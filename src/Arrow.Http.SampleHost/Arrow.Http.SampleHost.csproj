@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Arrow.Http.AspNetCore\Arrow.Http.AspNetCore.csproj" />
+    <ProjectReference Include="..\Arrow.Jobs.AspNetCore\Arrow.Jobs.AspNetCore.csproj" />
+    <ProjectReference Include="..\Arrow.Jobs.InMemory\Arrow.Jobs.InMemory.csproj" />
+  </ItemGroup>
+
+</Project>

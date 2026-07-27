@@ -1,0 +1,112 @@
+@ArrowHttp_SampleHost_HostAddress = http://localhost:5236
+@ArrowMediaType = application/vnd.apache.arrow.stream
+
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow
+Accept: {{ArrowMediaType}}
+
+###
+
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/batches
+
+###
+
+# Accept: Arrow → ArrowResults.FromDataTable (Arrow IPC stream)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/batches
+Accept: {{ArrowMediaType}}
+
+###
+
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/manual
+Accept: {{ArrowMediaType}}
+
+###
+
+# ArrowResults.FromReader — Pipe üzerinden IPC akışı
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/from-reader
+Accept: {{ArrowMediaType}}
+
+###
+
+# ArrowResults.FromDb — return + close: true (reader'da using yok)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/from-db
+Accept: {{ArrowMediaType}}
+
+###
+
+# WriteArrowFromDbAsync — await using reader + close: false
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/from-db-await
+Accept: {{ArrowMediaType}}
+
+###
+
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/variant/manual
+Accept: {{ArrowMediaType}}
+
+###
+
+# Arrow IPC → JSON özet (GetVariantColumn batch, "event_data")
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/variant/batches
+
+###
+
+# Db staging round-trip: Arrow → varbinary → Arrow (VariantBinaryColumnNames + event_data)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/variant/staging
+
+###
+
+POST {{ArrowHttp_SampleHost_HostAddress}}/arrow/variant
+Content-Type: {{ArrowMediaType}}
+Accept: {{ArrowMediaType}}
+
+###
+
+POST {{ArrowHttp_SampleHost_HostAddress}}/arrow
+Content-Type: {{ArrowMediaType}}
+Accept: {{ArrowMediaType}}
+
+###
+
+# ArrowQueryRequest — parametreli sorgu → FromDb + batchSize
+POST {{ArrowHttp_SampleHost_HostAddress}}/arrow/query
+Content-Type: application/json
+Accept: {{ArrowMediaType}}
+
+{
+  "cnnName": "inmemory",
+  "query": "SELECT * FROM People LIMIT @limit",
+  "parameters": {
+    "limit": 2
+  },
+  "batchSize": 1
+}
+
+###
+
+# Async job: POST → SSE events → GET job (Accept: Arrow)
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs
+Content-Type: application/json
+
+{
+  "cnnName": "inmemory",
+  "query": "SELECT * FROM People LIMIT @limit",
+  "parameters": {
+    "limit": 3
+  },
+  "batchSize": 1
+}
+
+###
+
+# @jobId = önceki POST yanıtındaki id
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
+
+###
+
+# SSE — job durumu (status → completed), heartbeat ile proxy timeout önlenir
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}/events
+
+###
+
+# Accept: Arrow → tamamlanınca Arrow IPC (henüz Running ise 202 + JSON)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
+Accept: {{ArrowMediaType}}
