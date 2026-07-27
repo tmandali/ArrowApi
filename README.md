@@ -112,6 +112,7 @@ await using var reader = await job.GetArrowReaderAsync();
 ```
 
 On older .NET Framework projects you may need binding redirects for `System.Text.Json` and related assemblies.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
