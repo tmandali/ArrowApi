@@ -1,21 +1,16 @@
-using System.Data.Common;
 using Arrow.Data;
 using Arrow.Jobs;
 using Arrow.Jobs.InMemory;
+using System.Data.Common;
 
 namespace Arrow.Http.SampleHost;
 
-public sealed class DemoArrowJobWorker : ArrowJobWorker<ArrowQueryRequest>
+public sealed class DemoArrowJobWorker(
+    IArrowJobQueue queue,
+    IArrowJobStore<ArrowQueryRequest> store,
+    IArrowJobResultStorage resultStorage,
+    ILogger<DemoArrowJobWorker> logger) : ArrowJobWorker<ArrowQueryRequest>(queue, store, resultStorage, logger)
 {
-    public DemoArrowJobWorker(
-        IArrowJobQueue queue,
-        IArrowJobStore<ArrowQueryRequest> store,
-        IArrowJobResultStorage resultStorage,
-        ILogger<DemoArrowJobWorker> logger)
-        : base(queue, store, resultStorage, logger)
-    {
-    }
-
     protected override async Task ExecuteJobAsync(
         ArrowJob<ArrowQueryRequest> job,
         string resultPath,

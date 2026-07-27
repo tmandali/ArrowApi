@@ -1,7 +1,7 @@
-using System.Data.Common;
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
 using Apache.Arrow.Types;
+using System.Data.Common;
 
 namespace Arrow.Data;
 
@@ -50,7 +50,7 @@ public sealed class ArrowConversionOptions
     /// <summary>
     /// <c>varbinary</c> olarak saklanan ve <see cref="VariantBinary"/> frame içeren kolon adları (Db → Arrow).
     /// </summary>
-    public IReadOnlySet<string>? VariantBinaryColumnNames { get; init; }
+    public IReadOnlyCollection<string>? VariantBinaryColumnNames { get; init; }
 
     internal bool IsVariantBinaryColumn(string columnName)
     {
@@ -78,7 +78,7 @@ public static class ArrowData
         bool leaveOpen = false,
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        ThrowHelper.ThrowIfNull(stream);
         return ArrowBatchReader.FromArrow(
             new ArrowDataReader(new ArrowStreamReader(stream), ownsReader: !leaveOpen, variantDbMode));
     }
@@ -89,7 +89,7 @@ public static class ArrowData
     /// </summary>
     public static ArrowBatchReader OpenArrowReader(DbDataReader reader, ArrowConversionOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(reader);
+        ThrowHelper.ThrowIfNull(reader);
         options ??= ArrowConversionOptions.Default;
 
         Schema? schema = options.EnableDictionaryEncoding

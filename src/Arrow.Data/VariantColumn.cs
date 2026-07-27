@@ -35,7 +35,7 @@ internal static class VariantColumn
     /// <summary>Materialize edilmiş <see cref="VariantValue"/> döndürür.</summary>
     public static VariantValue GetValue(VariantArray array, int rowIndex)
     {
-        ArgumentNullException.ThrowIfNull(array);
+        ThrowHelper.ThrowIfNull(array);
 
         if (array.IsShredded)
             throw new NotSupportedException(ShreddedMessage);
@@ -46,7 +46,7 @@ internal static class VariantColumn
     /// <summary>Zero-copy <see cref="VariantReader"/> döndürür; array yaşam süresi boyunca geçerlidir.</summary>
     public static VariantReader GetReader(VariantArray array, int rowIndex)
     {
-        ArgumentNullException.ThrowIfNull(array);
+        ThrowHelper.ThrowIfNull(array);
 
         if (array.IsShredded)
             throw new NotSupportedException(ShreddedMessage);
@@ -77,7 +77,7 @@ public static class VariantBatches
 
     public static RecordBatch CreateSingleColumn(VariantValue[] values, string fieldName = "payload")
     {
-        ArgumentNullException.ThrowIfNull(values);
+        ThrowHelper.ThrowIfNull(values);
 
         VariantArray variantArray = new VariantArray.Builder()
             .AppendRange(values)
@@ -90,8 +90,8 @@ public static class VariantBatches
     /// <summary><see cref="RecordBatch"/> içindeki Variant kolonu döndürür (kolon adıyla).</summary>
     public static VariantArray GetVariantColumn(RecordBatch batch, string fieldName)
     {
-        ArgumentNullException.ThrowIfNull(batch);
-        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ThrowHelper.ThrowIfNull(batch);
+        ThrowHelper.ThrowIfNullOrEmpty(fieldName);
 
         int columnIndex = FindFieldIndex(batch.Schema, fieldName);
         Field field = batch.Schema.GetFieldByIndex(columnIndex);

@@ -1,7 +1,7 @@
-using System.Data.Common;
-using System.Runtime.CompilerServices;
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
+using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 namespace Arrow.Data;
 
@@ -111,7 +111,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     /// <summary>Şemayla Arrow IPC writer açar.</summary>
     public ArrowStreamWriter OpenArrowWriter(Stream stream, bool leaveOpen = false)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        ThrowHelper.ThrowIfNull(stream);
         return new ArrowStreamWriter(stream, Schema, leaveOpen);
     }
 
@@ -122,7 +122,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
         ILogger? logger = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(outputStream);
+        ThrowHelper.ThrowIfNull(outputStream);
 
         if (_dbReader is not null && _dbOptions!.EnableDictionaryEncoding)
         {
@@ -142,7 +142,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
         ILogger? logger = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(writer);
+        ThrowHelper.ThrowIfNull(writer);
         return writer.WriteBatchesAsync(ReadBatchesAsync(cancellationToken, logger), cancellationToken);
     }
 

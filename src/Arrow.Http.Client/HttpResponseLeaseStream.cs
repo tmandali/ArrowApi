@@ -1,5 +1,3 @@
-using System.Net.Http.Headers;
-
 namespace Arrow.Http.Client;
 
 /// <summary>HttpResponseMessage yaşam süresini stream dispose ile bağlar.</summary>
@@ -27,8 +25,13 @@ internal sealed class HttpResponseLeaseStream : Stream
     public override void SetLength(long value) => _inner.SetLength(value);
     public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
 
+#if NET
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
         await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+#else
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        _inner.ReadAsync(buffer, offset, count, cancellationToken);
+#endif
 
     protected override void Dispose(bool disposing)
     {

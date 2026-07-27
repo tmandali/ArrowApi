@@ -1,6 +1,6 @@
+using Apache.Arrow;
 using System.Data;
 using System.Data.Common;
-using Apache.Arrow;
 
 namespace Arrow.Http.AspNetCore;
 

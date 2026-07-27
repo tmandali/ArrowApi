@@ -1,3 +1,6 @@
+using Apache.Arrow;
+using Apache.Arrow.Arrays;
+using Apache.Arrow.Types;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -9,9 +12,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Xml;
 using System.Xml.Linq;
-using Apache.Arrow;
-using Apache.Arrow.Arrays;
-using Apache.Arrow.Types;
 
 namespace Arrow.Data;
 
@@ -55,7 +55,7 @@ internal static class ArrowExporter
 
         try
         {
-            ArgumentNullException.ThrowIfNull(reader);
+            ThrowHelper.ThrowIfNull(reader);
             options ??= ArrowConversionOptions.Default;
 
             if (options.BatchSize <= 0)
@@ -64,7 +64,7 @@ internal static class ArrowExporter
             if (options.EnableDictionaryEncoding)
                 ValidateDictionaryEncodingThreshold(options.DictionaryEncodingThreshold);
 
-            ReadOnlyCollection<DbColumn> columnSchema = reader.GetColumnSchema();
+            ReadOnlyCollection<DbColumn> columnSchema = DbDataReaderSchema.GetColumnSchema(reader);
             int fieldCount = columnSchema.Count;
 
             if (logger != null && logger.IsEnabled(LogLevel.Debug))
@@ -266,13 +266,13 @@ internal static class ArrowExporter
         ArrowConversionOptions? options = null,
         ReadOnlySpan<bool> dictionaryEncodingByColumn = default)
     {
-        ArgumentNullException.ThrowIfNull(reader);
+        ThrowHelper.ThrowIfNull(reader);
         options ??= ArrowConversionOptions.Default;
 
         if (options.EnableDictionaryEncoding)
             ValidateDictionaryEncodingThreshold(options.DictionaryEncodingThreshold);
 
-        ReadOnlyCollection<DbColumn> columnSchema = reader.GetColumnSchema();
+        ReadOnlyCollection<DbColumn> columnSchema = DbDataReaderSchema.GetColumnSchema(reader);
 
         if (!dictionaryEncodingByColumn.IsEmpty && dictionaryEncodingByColumn.Length != columnSchema.Count)
         {
@@ -448,7 +448,7 @@ internal static class ArrowExporter
 
         var schemaMeta = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-                ["CreatedBy"] = "Arrow.Data.ArrowData",
+            ["CreatedBy"] = "Arrow.Data.ArrowData",
             ["ExportTime"] = DateTimeOffset.UtcNow.ToString("o"),
             ["GeneratorVersion"] = "2.0.0-Production",
             ["ArrowVersion"] = "23.0.0"
@@ -546,8 +546,14 @@ internal static class ArrowExporter
         if (type == typeof(Guid) || type == typeof(SqlGuid)) return new FixedSizeBinaryType(16);
         if (type == typeof(DateTime)) return new TimestampType(options.TimestampUnit, options.TimestampTimezone);
         if (type == typeof(DateTimeOffset)) return new TimestampType(options.TimestampUnit, "UTC");
-        if (type == typeof(TimeSpan) || type == typeof(TimeOnly)) return Time64Type.Default;
+        if (type == typeof(TimeSpan)
+#if NET
+            || type == typeof(TimeOnly)
+#endif
+            ) return Time64Type.Default;
+#if NET
         if (type == typeof(DateOnly)) return Date32Type.Default;
+#endif
         if (type == typeof(byte[]) || type == typeof(SqlBinary) || type == typeof(SqlBytes)) return options.UseLargeBinaryAndString ? LargeBinaryType.Default : BinaryType.Default;
 
         if (options.ThrowOnUnsupportedType)
@@ -844,7 +850,8 @@ internal static class ArrowExporter
     }
 
     private static IArrowArrayBuilderWrapper[] CreateBuilderWrappers(Schema schema, int batchSize)
-    {        int count = schema.FieldsList.Count;
+    {
+        int count = schema.FieldsList.Count;
         IArrowArrayBuilderWrapper[] wrappers = new IArrowArrayBuilderWrapper[count];
 
         for (int i = 0; i < count; i++)
@@ -897,7 +904,7 @@ internal static class ArrowExporter
 
     private static IColumnAccessor[] BuildColumnAccessors(DbDataReader reader, Schema schema, ArrowConversionOptions options)
     {
-        ReadOnlyCollection<DbColumn> columnSchema = reader.GetColumnSchema();
+        ReadOnlyCollection<DbColumn> columnSchema = DbDataReaderSchema.GetColumnSchema(reader);
         IColumnAccessor[] accessors = new IColumnAccessor[schema.FieldsList.Count];
 
         for (int i = 0; i < accessors.Length; i++)
@@ -1218,9 +1225,13 @@ internal static class ArrowExporter
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected override void AppendTypedValue(DbDataReader reader, IArrowArrayBuilderWrapper builder, int ordinal)
         {
-            DateTime dt = ClrType == typeof(DateOnly)
+            DateTime dt =
+#if NET
+                ClrType == typeof(DateOnly)
                 ? reader.GetFieldValue<DateOnly>(ordinal).ToDateTime(TimeOnly.MinValue)
-                : reader.GetDateTime(ordinal);
+                :
+#endif
+                reader.GetDateTime(ordinal);
 
             ((IArrowArrayBuilderWrapper<DateTime>)builder).Append(dt.Date);
         }
@@ -1233,9 +1244,13 @@ internal static class ArrowExporter
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected override void AppendTypedValue(DbDataReader reader, IArrowArrayBuilderWrapper builder, int ordinal)
         {
-            long ticks = ClrType == typeof(TimeOnly)
+            long ticks =
+#if NET
+                ClrType == typeof(TimeOnly)
                 ? reader.GetFieldValue<TimeOnly>(ordinal).Ticks
-                : reader.GetFieldValue<TimeSpan>(ordinal).Ticks;
+                :
+#endif
+                reader.GetFieldValue<TimeSpan>(ordinal).Ticks;
 
             // Time64Type.Default birimi nanosaniye; .NET TimeSpan tick'leri 100 ns birimindedir.
             ((IArrowArrayBuilderWrapper<long>)builder).Append(checked(ticks * 100));
@@ -1259,7 +1274,7 @@ internal static class ArrowExporter
             {
                 Guid g = ClrType == typeof(SqlGuid) ? ((SqlGuid)reader.GetValue(ordinal)).Value : reader.GetGuid(ordinal);
                 Span<byte> bytes = stackalloc byte[16];
-                g.TryWriteBytes(bytes);
+                NetFxCompat.WriteGuidBytes(g, bytes);
 
                 if (_guidOrder == GuidByteOrder.BigEndianRfc4122)
                 {

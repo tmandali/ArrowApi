@@ -1,12 +1,12 @@
+using Apache.Arrow;
+using Apache.Arrow.Ipc;
+using Apache.Arrow.Types;
+using Arrow.Data;
 using System.Data;
 using System.Data.Common;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Apache.Arrow;
-using Apache.Arrow.Ipc;
-using Apache.Arrow.Types;
-using Arrow.Data;
 
 namespace Arrow.Http.SampleHost;
 
@@ -86,8 +86,8 @@ internal static class ArrowSamples
         return new RecordBatch(schema, [idBuilder.Build(), nameBuilder.Build()], rows.Length);
     }
 
-  public static async IAsyncEnumerable<RecordBatch> ManualPeopleBatchesAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public static async IAsyncEnumerable<RecordBatch> ManualPeopleBatchesAsync(
+          [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         Schema schema = PeopleSchema;
         RecordBatch batch1 = CreatePeopleBatch(schema, (1, "Ali"), (2, "Ayşe"));

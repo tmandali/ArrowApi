@@ -1,8 +1,7 @@
-using System.Runtime.CompilerServices;
 using Apache.Arrow;
 using Apache.Arrow.Types;
-using Parquet;
 using Parquet.Serialization;
+using System.Runtime.CompilerServices;
 using ArrowField = Apache.Arrow.Field;
 using ArrowSchema = Apache.Arrow.Schema;
 

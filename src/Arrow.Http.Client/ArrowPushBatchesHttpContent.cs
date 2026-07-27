@@ -1,13 +1,13 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Threading.Channels;
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
 using Arrow.Data;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Threading.Channels;
 
 namespace Arrow.Http.Client;
 
-internal readonly record struct ArrowPushBatchItem(RecordBatch Batch, TaskCompletionSource Completion);
+internal readonly record struct ArrowPushBatchItem(RecordBatch Batch, TaskCompletionSource<object?> Completion);
 
 /// <summary>
 /// Channel üzerinden gelen batch'leri HTTP gövdesine Arrow IPC olarak yazar.
@@ -20,7 +20,7 @@ internal sealed class ArrowPushBatchesHttpContent : HttpContent
 
     public ArrowPushBatchesHttpContent(Channel<ArrowPushBatchItem> channel, Schema? emptySchema)
     {
-        ArgumentNullException.ThrowIfNull(channel);
+        ThrowHelper.ThrowIfNull(channel);
         _batchReader = channel.Reader;
         _emptySchema = emptySchema;
         Headers.ContentType = new MediaTypeHeaderValue(ArrowMediaTypes.Stream);
@@ -63,7 +63,7 @@ internal sealed class ArrowPushBatchesHttpContent : HttpContent
         try
         {
             await writer.WriteRecordBatchAsync(item.Batch, cancellationToken).ConfigureAwait(false);
-            item.Completion.TrySetResult();
+            item.Completion.TrySetResult(null);
         }
         catch (Exception ex)
         {

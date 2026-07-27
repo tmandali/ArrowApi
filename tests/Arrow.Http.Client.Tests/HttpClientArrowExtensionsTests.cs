@@ -1,15 +1,10 @@
-using System.Data;
-using System.Data.Common;
-using System.Net;
-using System.Net.Http.Json;
-using System.Net.ServerSentEvents;
-using System.Text.Json;
 using Apache.Arrow;
 using Arrow.Data;
-using Arrow.Http.Client;
-using Arrow.Http.SampleHost;
 using Arrow.Jobs;
 using Microsoft.AspNetCore.Mvc.Testing;
+using System.Data;
+using System.Data.Common;
+using System.Net.Http.Json;
 
 namespace Arrow.Http.Client.Tests;
 
@@ -371,7 +366,7 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
                 "SELECT * FROM People LIMIT @limit",
                 new Dictionary<string, object?> { ["limit"] = 2 }));
 
-        await foreach (SseItem<ArrowJobEvent> item in job.ReadEventsAsync())
+        await foreach (ArrowSseItem<ArrowJobEvent> item in job.ReadEventsAsync())
         {
             if (item.EventType is ArrowJobEventNames.Completed or ArrowJobEventNames.Failed)
                 break;
@@ -400,7 +395,7 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
 
         ArrowJobEvent? finalEvent = null;
 
-        await foreach (SseItem<ArrowJobEvent> item in job.ReadEventsAsync())
+        await foreach (ArrowSseItem<ArrowJobEvent> item in job.ReadEventsAsync())
         {
             finalEvent = item.Data;
 

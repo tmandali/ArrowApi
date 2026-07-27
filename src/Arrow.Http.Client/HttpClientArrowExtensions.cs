@@ -19,8 +19,8 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
 
         HttpResponseMessage response = await HttpClientArrowSend
             .SendAsync(httpClient, HttpMethod.Get, requestUri, content: null, cancellationToken)
@@ -35,8 +35,8 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
 
         HttpResponseMessage response = await HttpClientArrowSend
             .SendAsync(httpClient, HttpMethod.Get, requestUri, content: null, cancellationToken)
@@ -53,8 +53,8 @@ public static class HttpClientArrowExtensions
         Schema? emptySchema = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
         return new ArrowBatchWriter(httpClient, requestUri, emptySchema, cancellationToken);
     }
 
@@ -66,7 +66,7 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arrowRequestBody);
+        ThrowHelper.ThrowIfNull(arrowRequestBody);
         return httpClient.PostArrowReaderAsync(
             requestUri, arrowRequestBody.ToArrowHttpContent(), variantDbMode, cancellationToken);
     }
@@ -79,7 +79,7 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return httpClient.PostArrowReaderAsync(
             requestUri, source.ToArrowHttpContent(), variantDbMode, cancellationToken);
     }
@@ -92,7 +92,7 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return httpClient.PostArrowDataReaderAsync(
             requestUri, source.ToArrowHttpContent(), variantDbMode, cancellationToken);
     }
@@ -105,9 +105,9 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
-        ArgumentNullException.ThrowIfNull(content);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(content);
 
         HttpResponseMessage response = await HttpClientArrowSend
             .SendAsync(httpClient, HttpMethod.Post, requestUri, content, cancellationToken)
@@ -123,9 +123,9 @@ public static class HttpClientArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
-        ArgumentNullException.ThrowIfNull(content);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(content);
 
         HttpResponseMessage response = await HttpClientArrowSend
             .SendAsync(httpClient, HttpMethod.Post, requestUri, content, cancellationToken)
@@ -139,8 +139,8 @@ public static class HttpClientArrowExtensions
         string requestUri,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
 
         using HttpResponseMessage response = await httpClient
             .GetAsync(requestUri, cancellationToken)

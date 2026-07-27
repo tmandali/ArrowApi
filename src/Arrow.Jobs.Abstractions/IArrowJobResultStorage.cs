@@ -1,6 +1,6 @@
-using System.Data.Common;
 using Apache.Arrow;
 using Arrow.Data;
+using System.Data.Common;
 
 namespace Arrow.Jobs;
 

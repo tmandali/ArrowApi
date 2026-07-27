@@ -12,14 +12,14 @@ public static class ArrowStreamWriterExtensions
         IEnumerable<RecordBatch> batches,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(writer);
-        ArgumentNullException.ThrowIfNull(batches);
+        ThrowHelper.ThrowIfNull(writer);
+        ThrowHelper.ThrowIfNull(batches);
 
         bool wroteBatch = false;
 
         foreach (RecordBatch batch in batches)
         {
-            ArgumentNullException.ThrowIfNull(batch);
+            ThrowHelper.ThrowIfNull(batch);
             await writer.WriteRecordBatchAsync(batch, cancellationToken).ConfigureAwait(false);
             wroteBatch = true;
         }
@@ -36,14 +36,14 @@ public static class ArrowStreamWriterExtensions
         IAsyncEnumerable<RecordBatch> batches,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(writer);
-        ArgumentNullException.ThrowIfNull(batches);
+        ThrowHelper.ThrowIfNull(writer);
+        ThrowHelper.ThrowIfNull(batches);
 
         bool wroteBatch = false;
 
         await foreach (RecordBatch batch in batches.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
-            ArgumentNullException.ThrowIfNull(batch);
+            ThrowHelper.ThrowIfNull(batch);
             await writer.WriteRecordBatchAsync(batch, cancellationToken).ConfigureAwait(false);
             wroteBatch = true;
         }

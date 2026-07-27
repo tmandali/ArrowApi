@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using Apache.Arrow;
+using System.Threading.Channels;
 
 namespace Arrow.Http.Client;
 
@@ -19,8 +19,8 @@ public sealed class ArrowBatchWriter : IAsyncDisposable
         Schema? emptySchema,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
 
         Channel<ArrowPushBatchItem> channel = Channel.CreateBounded<ArrowPushBatchItem>(
             new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });
@@ -38,10 +38,11 @@ public sealed class ArrowBatchWriter : IAsyncDisposable
     /// </summary>
     public async Task WriteBatchAsync(RecordBatch batch, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(batch);
-        ObjectDisposedException.ThrowIf(_completed, this);
+        ThrowHelper.ThrowIfNull(batch);
+        if (_completed)
+            throw new ObjectDisposedException(nameof(ArrowBatchWriter));
 
-        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<object?> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await _batchWriter.WriteAsync(new ArrowPushBatchItem(batch, completion), cancellationToken)
             .ConfigureAwait(false);
         await completion.Task.ConfigureAwait(false);

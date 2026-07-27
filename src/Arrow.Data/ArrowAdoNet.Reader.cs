@@ -1,13 +1,13 @@
-using System.Collections;
-using System.Collections.ObjectModel;
-using System.Data;
-using System.Data.Common;
-using System.Runtime.CompilerServices;
 using Apache.Arrow;
 using Apache.Arrow.Arrays;
 using Apache.Arrow.Ipc;
 using Apache.Arrow.Scalars.Variant;
 using Apache.Arrow.Types;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.Data;
+using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 namespace Arrow.Data;
 
@@ -19,7 +19,7 @@ namespace Arrow.Data;
 /// THREAD SAFETY: Bu sınıf Thread-Safe DEĞİLDİR (Thread-Compatible). Standart DbDataReader davranışına uygun olarak
 /// aynı eşzamanlı örnek (instance) üzerinde birden fazla thread üzerinden okuma yapılmamalıdır.
 /// </remarks>
-public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
+public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator, IAsyncDisposable
 {
     private readonly ArrowStreamReader _reader;
     private readonly Schema _schema;
@@ -53,7 +53,7 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
         bool ownsReader = true,
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue)
     {
-        ArgumentNullException.ThrowIfNull(reader);
+        ThrowHelper.ThrowIfNull(reader);
 
         _reader = reader;
         _ownsReader = ownsReader;
@@ -375,7 +375,7 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
 
     public override int GetOrdinal(string name)
     {
-        ArgumentNullException.ThrowIfNull(name);
+        ThrowHelper.ThrowIfNull(name);
 
         if (_ordinals.TryGetValue(name, out var ordinal))
             return ordinal;
@@ -518,11 +518,13 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
         if (typeof(T) == typeof(DateTimeOffset) && array is TimestampArray tsDto)
             return (T)(object)tsDto.GetTimestamp(index)!.Value;
 
+#if NET
         if (typeof(T) == typeof(DateOnly) && array is Date32Array date32)
             return (T)(object)DateOnly.FromDateTime(date32.GetDateTime(index)!.Value);
 
         if (typeof(T) == typeof(TimeOnly) && array is Time64Array time64Only)
             return (T)(object)TimeOnly.FromTimeSpan(TemporalArrayReader.ConvertTime64ToTimeSpan(time64Only, index));
+#endif
 
         if (typeof(T) == typeof(TimeSpan) && array is Time32Array t32)
             return (T)(object)TemporalArrayReader.ConvertTime32ToTimeSpan(t32, index);
@@ -577,7 +579,7 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
             if (bytes.Length != 16)
                 throw new InvalidCastException($"'{ColumnName(ordinal)}' sütununun ikili boyutu 16 bayt (Guid) olmalıdır.");
 
-            return new Guid(bytes);
+            return NetFxCompat.GuidFromBytes(bytes);
         }
 
         if (array is ExtensionArray extArray)
@@ -677,7 +679,7 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
     public override int GetValues(object[] values)
     {
         EnsureRow();
-        ArgumentNullException.ThrowIfNull(values);
+        ThrowHelper.ThrowIfNull(values);
 
         int count = Math.Min(values.Length, FieldCount);
         for (int i = 0; i < count; i++)
@@ -857,7 +859,11 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
         _isClosed = true;
     }
 
+#if NET
     public override async ValueTask DisposeAsync()
+#else
+    public async ValueTask DisposeAsync()
+#endif
     {
         if (_isClosed)
             return;
@@ -884,7 +890,9 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
             }
         }
 
+#if NET
         await base.DisposeAsync().ConfigureAwait(false);
+#endif
     }
 
     protected override void Dispose(bool disposing)
@@ -907,6 +915,12 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator
 
     private static class ThrowHelper
     {
+        public static void ThrowIfNull([System.Diagnostics.CodeAnalysis.NotNull] object? argument, [System.Runtime.CompilerServices.CallerArgumentExpression(nameof(argument))] string? paramName = null)
+        {
+            if (argument is null)
+                throw new ArgumentNullException(paramName);
+        }
+
         public static void ThrowDataReaderClosed() =>
             throw new InvalidOperationException("DataReader kapalı.");
 
@@ -1106,7 +1120,7 @@ internal static class TemporalArrayReader
         {
             TimeUnit.Second => TimeSpan.FromSeconds(val),
             TimeUnit.Millisecond => TimeSpan.FromMilliseconds(val),
-            TimeUnit.Microsecond => TimeSpan.FromTicks(checked(val * TimeSpan.TicksPerMicrosecond)),
+            TimeUnit.Microsecond => TimeSpan.FromTicks(checked(val * NetFxCompat.TicksPerMicrosecond)),
             TimeUnit.Nanosecond => TimeSpan.FromTicks(val / 100),
             _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Desteklenmeyen TimeUnit birimi.")
         };
@@ -1121,7 +1135,7 @@ internal static class TemporalArrayReader
         {
             TimeUnit.Second => TimeSpan.FromSeconds(val),
             TimeUnit.Millisecond => TimeSpan.FromMilliseconds(val),
-            TimeUnit.Microsecond => TimeSpan.FromTicks(checked(val * TimeSpan.TicksPerMicrosecond)),
+            TimeUnit.Microsecond => TimeSpan.FromTicks(checked(val * NetFxCompat.TicksPerMicrosecond)),
             TimeUnit.Nanosecond => TimeSpan.FromTicks(val / 100),
             _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Desteklenmeyen TimeUnit birimi.")
         };
@@ -1196,7 +1210,7 @@ internal static class ExtensionArrayReader
         if (storage is FixedSizeBinaryArray fixedArray && ((FixedSizeBinaryType)fixedArray.Data.DataType).ByteWidth == 16)
         {
             ReadOnlySpan<byte> bytes = fixedArray.GetBytes(rowIndex);
-            return new Guid(bytes);
+            return NetFxCompat.GuidFromBytes(bytes);
         }
 
         throw new InvalidCastException("ExtensionArray sütunu 16-baytlık Guid veri yapısına dönüştürülemedi.");

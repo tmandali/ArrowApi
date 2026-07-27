@@ -1,7 +1,7 @@
-using System.Data.Common;
-using System.Net.Http.Headers;
 using Apache.Arrow;
 using Arrow.Data;
+using System.Data.Common;
+using System.Net.Http.Headers;
 
 namespace Arrow.Http.Client;
 
@@ -11,7 +11,7 @@ public static class HttpContentArrowExtensions
     /// <summary>Hazır Arrow IPC byte stream'inden istek gövdesi oluşturur.</summary>
     public static HttpContent ToArrowHttpContent(this Stream arrowIpcStream)
     {
-        ArgumentNullException.ThrowIfNull(arrowIpcStream);
+        ThrowHelper.ThrowIfNull(arrowIpcStream);
         StreamContent content = new(arrowIpcStream);
         content.Headers.ContentType = new MediaTypeHeaderValue(ArrowMediaTypes.Stream);
         return content;
@@ -25,14 +25,14 @@ public static class HttpContentArrowExtensions
         this IAsyncEnumerable<RecordBatch> batches,
         Schema? schema = null)
     {
-        ArgumentNullException.ThrowIfNull(batches);
+        ThrowHelper.ThrowIfNull(batches);
         return new ArrowBatchesHttpContent(batches, schema);
     }
 
     /// <summary>Batch reader'dan akışlı Arrow IPC istek gövdesi oluşturur.</summary>
     public static HttpContent ToArrowHttpContent(this ArrowBatchReader source)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return new ArrowStreamHttpContent(source);
     }
 
@@ -41,7 +41,7 @@ public static class HttpContentArrowExtensions
         this DbDataReader source,
         ArrowConversionOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return source.OpenArrowReader(options).ToArrowHttpContent();
     }
 }

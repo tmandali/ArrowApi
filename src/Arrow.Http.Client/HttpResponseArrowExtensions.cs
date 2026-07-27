@@ -1,6 +1,6 @@
-using System.Net.Http.Json;
 using Apache.Arrow.Ipc;
 using Arrow.Data;
+using System.Net.Http.Json;
 
 namespace Arrow.Http.Client;
 
@@ -16,10 +16,10 @@ public static class HttpResponseArrowExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(response);
+        ThrowHelper.ThrowIfNull(response);
         response.EnsureSuccessStatusCode();
 
-        Stream body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        Stream body = await HttpContentCompat.ReadAsStreamAsync(response.Content, cancellationToken).ConfigureAwait(false);
         Stream leased = new HttpResponseLeaseStream(response, body);
         return new ArrowDataReader(new ArrowStreamReader(leased), ownsReader: true, variantDbMode);
     }
@@ -41,7 +41,7 @@ public static class HttpResponseArrowExtensions
         this HttpResponseMessage response,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(response);
+        ThrowHelper.ThrowIfNull(response);
         response.EnsureSuccessStatusCode();
         return await response.Content
             .ReadFromJsonAsync<ArrowBatchSummary>(cancellationToken: cancellationToken)

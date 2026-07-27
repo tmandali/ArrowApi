@@ -1,6 +1,6 @@
-using System.Buffers.Binary;
 using Apache.Arrow;
 using Apache.Arrow.Scalars.Variant;
+using System.Buffers.Binary;
 
 namespace Arrow.Data;
 
@@ -24,8 +24,10 @@ public readonly ref struct VariantBinaryFrame
 /// </summary>
 public static class VariantBinary
 {
+    private static readonly byte[] MagicBytes = [(byte)'A', (byte)'R', (byte)'P', (byte)'V'];
+
     /// <summary>Magic: <c>ARPV</c> (Arrow Parquet Variant).</summary>
-    public static ReadOnlySpan<byte> Magic => "ARPV"u8;
+    public static ReadOnlySpan<byte> Magic => MagicBytes;
 
     /// <summary>Header: magic (4) + metadata length int32 LE (4).</summary>
     public const int HeaderSize = 8;
@@ -40,7 +42,7 @@ public static class VariantBinary
     /// <summary><see cref="VariantArray"/> satırından paketler — <see cref="VariantArray.GetMetadataBytes"/> / <see cref="VariantArray.GetValueBytes"/>.</summary>
     public static byte[] Pack(VariantArray array, int rowIndex)
     {
-        ArgumentNullException.ThrowIfNull(array);
+        ThrowHelper.ThrowIfNull(array);
         if (array.IsNull(rowIndex))
             throw new InvalidOperationException("Null variant satırı paketlenemez.");
 
@@ -50,7 +52,7 @@ public static class VariantBinary
     /// <summary>Ham Parquet Variant metadata + value span'lerini tek <c>byte[]</c> frame'e yazar.</summary>
     public static byte[] Pack(ReadOnlySpan<byte> metadata, ReadOnlySpan<byte> value)
     {
-        byte[] packed = GC.AllocateUninitializedArray<byte>(HeaderSize + metadata.Length + value.Length);
+        byte[] packed = new byte[HeaderSize + metadata.Length + value.Length];
         Magic.CopyTo(packed);
         BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(4), metadata.Length);
         metadata.CopyTo(packed.AsSpan(HeaderSize));
@@ -83,7 +85,7 @@ public static class VariantBinary
     /// <summary>Paketli satırları <see cref="VariantArray"/>'e ekler.</summary>
     public static VariantArray.Builder AppendPacked(VariantArray.Builder builder, ReadOnlySpan<byte> packed)
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ThrowHelper.ThrowIfNull(builder);
         VariantBinaryFrame frame = Unpack(packed);
         return builder.Append(frame.Metadata, frame.Value);
     }

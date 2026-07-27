@@ -1,6 +1,6 @@
+using Arrow.Data;
 using System.Net;
 using System.Net.Http.Headers;
-using Arrow.Data;
 
 namespace Arrow.Http.Client;
 
@@ -11,7 +11,7 @@ internal sealed class ArrowStreamHttpContent : HttpContent
 
     public ArrowStreamHttpContent(ArrowBatchReader source)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         _source = source;
         Headers.ContentType = new MediaTypeHeaderValue(ArrowMediaTypes.Stream);
     }

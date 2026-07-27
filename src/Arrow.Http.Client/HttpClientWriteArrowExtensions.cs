@@ -1,6 +1,6 @@
-using System.Data.Common;
 using Apache.Arrow;
 using Arrow.Data;
+using System.Data.Common;
 
 namespace Arrow.Http.Client;
 
@@ -23,7 +23,7 @@ public static class HttpClientWriteArrowExtensions
         ArrowBatchReader source,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return httpClient.WriteArrowAsync(requestUri, source.ToArrowHttpContent(), cancellationToken);
     }
 
@@ -37,7 +37,7 @@ public static class HttpClientWriteArrowExtensions
         Schema? schema = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(batches);
+        ThrowHelper.ThrowIfNull(batches);
         return httpClient.WriteArrowAsync(requestUri, batches.ToArrowHttpContent(schema), cancellationToken);
     }
 
@@ -51,7 +51,7 @@ public static class HttpClientWriteArrowExtensions
         ArrowConversionOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(source);
         return httpClient.WriteArrowAsync(requestUri, source.ToArrowHttpContent(options), cancellationToken);
     }
 
@@ -64,7 +64,7 @@ public static class HttpClientWriteArrowExtensions
         Stream arrowIpcStream,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arrowIpcStream);
+        ThrowHelper.ThrowIfNull(arrowIpcStream);
         return httpClient.WriteArrowAsync(requestUri, arrowIpcStream.ToArrowHttpContent(), cancellationToken);
     }
 
@@ -77,9 +77,9 @@ public static class HttpClientWriteArrowExtensions
         HttpContent content,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
-        ArgumentNullException.ThrowIfNull(content);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(content);
 
         using HttpResponseMessage response = await httpClient
             .PostAsync(requestUri, content, cancellationToken)

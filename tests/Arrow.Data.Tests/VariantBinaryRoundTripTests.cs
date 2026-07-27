@@ -1,9 +1,8 @@
-using System.Data;
-using System.Data.Common;
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
 using Apache.Arrow.Scalars.Variant;
-using Arrow.Data;
+using System.Data;
+using System.Data.Common;
 
 namespace Arrow.Data.Tests;
 

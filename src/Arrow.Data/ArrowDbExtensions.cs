@@ -8,7 +8,7 @@ public static class ArrowDbExtensions
     /// <summary>Columnar batch reader açar. Alttaki reader dispose edilmez.</summary>
     public static ArrowBatchReader OpenArrowReader(this DbDataReader reader, ArrowConversionOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(reader);
+        ThrowHelper.ThrowIfNull(reader);
         return ArrowData.OpenArrowReader(reader, options);
     }
 
@@ -21,8 +21,8 @@ public static class ArrowDbExtensions
         ILogger? logger = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(reader);
-        ArgumentNullException.ThrowIfNull(outputStream);
+        ThrowHelper.ThrowIfNull(reader);
+        ThrowHelper.ThrowIfNull(outputStream);
 
         ArrowBatchReader batchReader = reader.OpenArrowReader(options);
         return batchReader.WriteBatchesAsync(outputStream, leaveOpen, logger, cancellationToken);

@@ -1,17 +1,14 @@
-using System.Net.Http.Json;
-using System.Net.ServerSentEvents;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Arrow.Data;
 using Arrow.Jobs;
+using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace Arrow.Http.Client;
 
 /// <summary>Client tarafında oluşturulmuş job tutamacı.</summary>
 public sealed class ArrowJob
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private ArrowJob(HttpClient httpClient, ArrowJobStatus status)
     {
         _httpClient = httpClient;
@@ -34,7 +31,8 @@ public sealed class ArrowJob
 
     public string? Error => Status.Error;
 
-    public async IAsyncEnumerable<SseItem<ArrowJobEvent>> ReadEventsAsync(
+    /// <summary>SSE <c>/events</c> akışını okur (net48 dahil taşınabilir parser). Tamamlanana kadar bekler.</summary>
+    public async IAsyncEnumerable<ArrowSseItem<ArrowJobEvent>> ReadEventsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         string? eventsUri = Status.EventsUrl;
@@ -48,15 +46,21 @@ public sealed class ArrowJob
 
         response.EnsureSuccessStatusCode();
 
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        SseParser<ArrowJobEvent?> parser = SseParser.Create(stream, ParseEvent);
-
-        await foreach (SseItem<ArrowJobEvent?> item in parser.EnumerateAsync(cancellationToken).ConfigureAwait(false))
+#if NET
+        await using Stream stream = await HttpContentCompat.ReadAsStreamAsync(response.Content, cancellationToken).ConfigureAwait(false);
+#else
+        using Stream stream = await HttpContentCompat.ReadAsStreamAsync(response.Content, cancellationToken).ConfigureAwait(false);
+#endif
+        await foreach (ArrowSseItem<string> item in ArrowSseReader.ReadAsync(stream, cancellationToken).ConfigureAwait(false))
         {
-            if (item.Data is null)
+            if (string.IsNullOrEmpty(item.Data))
                 continue;
 
-            yield return new SseItem<ArrowJobEvent>(item.Data, item.EventType);
+            ArrowJobEvent? payload = JsonSerializer.Deserialize<ArrowJobEvent>(item.Data, JsonCompat.Web);
+            if (payload is null)
+                continue;
+
+            yield return new ArrowSseItem<ArrowJobEvent>(payload, item.EventType);
         }
     }
 
@@ -71,9 +75,9 @@ public sealed class ArrowJob
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(jobsUri);
-        ArgumentNullException.ThrowIfNull(request);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(jobsUri);
+        ThrowHelper.ThrowIfNull(request);
 
         using HttpResponseMessage response = await httpClient
             .PostAsJsonAsync(jobsUri, request, cancellationToken)
@@ -82,15 +86,12 @@ public sealed class ArrowJob
         response.EnsureSuccessStatusCode();
 
         ArrowJobStatus status = await response.Content
-            .ReadFromJsonAsync<ArrowJobStatus>(cancellationToken: cancellationToken)
+            .ReadFromJsonAsync<ArrowJobStatus>(JsonCompat.Web, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException("Boş job yanıtı.");
 
         return new ArrowJob(httpClient, status);
     }
-
-    private static ArrowJobEvent? ParseEvent(string eventType, ReadOnlySpan<byte> data) =>
-        data.IsEmpty ? null : JsonSerializer.Deserialize<ArrowJobEvent>(data, JsonOptions);
 }
 
 /// <summary><see cref="HttpClient"/> için Arrow job extension'ları.</summary>

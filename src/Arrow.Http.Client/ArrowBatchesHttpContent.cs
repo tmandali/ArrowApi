@@ -1,8 +1,8 @@
-using System.Net;
-using System.Net.Http.Headers;
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
 using Arrow.Data;
+using System.Net;
+using System.Net.Http.Headers;
 
 namespace Arrow.Http.Client;
 
@@ -17,7 +17,7 @@ internal sealed class ArrowBatchesHttpContent : HttpContent
 
     public ArrowBatchesHttpContent(IAsyncEnumerable<RecordBatch> batches, Schema? schema)
     {
-        ArgumentNullException.ThrowIfNull(batches);
+        ThrowHelper.ThrowIfNull(batches);
         _batches = batches;
         _schema = schema;
         Headers.ContentType = new MediaTypeHeaderValue(ArrowMediaTypes.Stream);

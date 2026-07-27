@@ -1,8 +1,8 @@
-using System.Reflection;
+using Arrow.Jobs.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Arrow.Jobs.InMemory;
 using StackExchange.Redis;
+using System.Reflection;
 
 namespace Arrow.Jobs.Redis;
 

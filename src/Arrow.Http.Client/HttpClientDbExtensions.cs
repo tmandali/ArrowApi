@@ -1,5 +1,5 @@
-using System.Data.Common;
 using Arrow.Data;
+using System.Data.Common;
 
 namespace Arrow.Http.Client;
 
@@ -18,9 +18,9 @@ public static class HttpClientDbExtensions
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrEmpty(requestUri);
-        ArgumentNullException.ThrowIfNull(source);
+        ThrowHelper.ThrowIfNull(httpClient);
+        ThrowHelper.ThrowIfNullOrEmpty(requestUri);
+        ThrowHelper.ThrowIfNull(source);
 
         return httpClient.PostArrowDataReaderAsync(
             requestUri,

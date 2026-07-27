@@ -1,11 +1,10 @@
-using System.Data;
-using System.Data.Common;
 using Apache.Arrow;
-using Apache.Arrow.Scalars.Variant;
 using Arrow.Data;
 using Arrow.Http.AspNetCore;
 using Arrow.Jobs;
 using Arrow.Jobs.AspNetCore;
+using System.Data;
+using System.Data.Common;
 
 namespace Arrow.Http.SampleHost;
 
