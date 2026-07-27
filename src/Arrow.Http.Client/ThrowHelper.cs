@@ -13,7 +13,9 @@ internal static class ThrowHelper
 
     public static void ThrowIfNullOrEmpty([NotNull] string? argument, [CallerArgumentExpression(nameof(argument))] string? paramName = null)
     {
-        if (string.IsNullOrEmpty(argument))
+        if (argument is null)
+            throw new ArgumentNullException(paramName);
+        if (argument.Length == 0)
             throw new ArgumentException("Value cannot be null or empty.", paramName);
     }
 }
