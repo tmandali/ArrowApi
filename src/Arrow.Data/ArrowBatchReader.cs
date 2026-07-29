@@ -48,7 +48,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     internal static ArrowBatchReader FromDb(DbDataReader dbReader, ArrowConversionOptions options, Schema? schema) =>
         new(dbReader, options, schema);
 
-    /// <summary>Batch'leri akış olarak okur. Dispose otomatiktir; batch yalnızca o anki döngü gövdesinde geçerlidir.</summary>
+    /// <summary>Batch'leri akış olarak okur. Kayıt yoksa şemalı 0 satırlık bir batch döner. Dispose otomatiktir; batch yalnızca o anki döngü gövdesinde geçerlidir.</summary>
     public IAsyncEnumerable<RecordBatch> ReadBatchesAsync(
         CancellationToken cancellationToken = default,
         ILogger? logger = null) =>

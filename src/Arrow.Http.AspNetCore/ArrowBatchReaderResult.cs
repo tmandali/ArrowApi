@@ -22,12 +22,12 @@ internal sealed class ArrowBatchReaderResult : IResult
                 httpContext.Response,
                 leaveOpen: true,
                 logger: null,
-                httpContext.RequestAborted).ConfigureAwait(false);
+                httpContext.RequestAborted);
         }
         finally
         {
             if (_disposeReader)
-                await _reader.DisposeAsync().ConfigureAwait(false);
+                await _reader.DisposeAsync();
         }
     }
 }

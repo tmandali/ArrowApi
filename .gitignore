@@ -483,4 +483,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 *.parquet
-*.parquet
+
+# Arrow job result files (SampleHost / FileArrowResultStorage)
+*.arrows
+arrow-jobs/

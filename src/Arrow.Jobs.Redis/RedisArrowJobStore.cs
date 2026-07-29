@@ -6,6 +6,7 @@ namespace Arrow.Jobs.Redis;
 public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly string TypeKey = typeof(TRequest).FullName ?? typeof(TRequest).Name;
     private readonly IConnectionMultiplexer _redis;
 
     public RedisArrowJobStore(IConnectionMultiplexer redis)
@@ -17,6 +18,10 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     private static string Key(Guid id) => $"arrow:job:{id:N}";
 
+    private static string ByTimeKey() => $"arrow:jobs:{TypeKey}:bytime";
+
+    private static string StateKey(ArrowJobState state) => $"arrow:jobs:{TypeKey}:state:{state}";
+
     public async Task<ArrowJob<TRequest>> CreateAsync(TRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -26,51 +31,205 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             Id = Guid.NewGuid(),
             Request = request
         };
+        ArrowJobTracePropagation.CaptureCurrent(job);
 
-        await SetAsync(job).ConfigureAwait(false);
+        await SetAsync(job);
+        await IndexAddAsync(job);
         return job;
     }
 
     public async Task<ArrowJob<TRequest>?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        RedisValue value = await Database.StringGetAsync(Key(id)).ConfigureAwait(false);
+        RedisValue value = await Database.StringGetAsync(Key(id));
         if (value.IsNullOrEmpty)
             return null;
 
         return JsonSerializer.Deserialize<ArrowJob<TRequest>>(value.ToString(), JsonOptions);
     }
 
+    public async Task<ArrowJobListPage<TRequest>> ListAsync(
+        ArrowJobListQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        int take = Math.Clamp(query.Take, 1, 500);
+        int skip = Math.Max(0, query.Skip);
+
+        double maxScore = query.To?.UtcDateTime.Ticks ?? double.PositiveInfinity;
+        double minScore = query.From?.UtcDateTime.Ticks ?? double.NegativeInfinity;
+
+        RedisValue[] ids;
+        if (query.State is { } state)
+        {
+            // State set ∩ time range: load state members, filter by score via ZSCORE
+            RedisValue[] stateIds = await Database.SetMembersAsync(StateKey(state));
+            var scored = new List<(Guid Id, double Score)>(stateIds.Length);
+            foreach (RedisValue stateId in stateIds)
+            {
+                if (!Guid.TryParseExact(stateId.ToString(), "N", out Guid id))
+                    continue;
+
+                double? score = await Database.SortedSetScoreAsync(ByTimeKey(), id.ToString("N"));
+                if (score is null)
+                    continue;
+                if (score < minScore || score > maxScore)
+                    continue;
+
+                scored.Add((id, score.Value));
+            }
+
+            scored.Sort((a, b) => b.Score.CompareTo(a.Score));
+            int total = scored.Count;
+            List<ArrowJob<TRequest>> items = [];
+            foreach ((Guid id, _) in scored.Skip(skip).Take(take))
+            {
+                ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+                if (job is not null)
+                    items.Add(job);
+            }
+
+            return new ArrowJobListPage<TRequest> { Items = items, Total = total };
+        }
+
+        long totalCount = await Database.SortedSetLengthAsync(ByTimeKey(), minScore, maxScore);
+        ids = await Database.SortedSetRangeByScoreAsync(
+            ByTimeKey(),
+            minScore,
+            maxScore,
+            Exclude.None,
+            Order.Descending,
+            skip,
+            take);
+
+        List<ArrowJob<TRequest>> page = [];
+        foreach (RedisValue idValue in ids)
+        {
+            if (!Guid.TryParseExact(idValue.ToString(), "N", out Guid id))
+                continue;
+
+            ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+            if (job is not null)
+                page.Add(job);
+        }
+
+        return new ArrowJobListPage<TRequest>
+        {
+            Items = page,
+            Total = (int)Math.Min(totalCount, int.MaxValue)
+        };
+    }
+
     public async Task MarkRunningAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = await GetRequiredAsync(id).ConfigureAwait(false);
+        ArrowJob<TRequest> job = await GetRequiredAsync(id);
+        if (job.State == ArrowJobState.Cancelled)
+            return;
+
+        ArrowJobState previous = job.State;
         job.State = ArrowJobState.Running;
-        await SetAsync(job).ConfigureAwait(false);
+        await SetAsync(job);
+        await IndexMoveStateAsync(job.Id, previous, job.State);
+    }
+
+    public async Task ReportProgressAsync(Guid id, int batchCount, long totalRows, CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest> job = await GetRequiredAsync(id);
+        job.BatchCount = batchCount;
+        job.TotalRows = totalRows;
+        await SetAsync(job);
     }
 
     public async Task MarkCompletedAsync(Guid id, string resultPath, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = await GetRequiredAsync(id).ConfigureAwait(false);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resultPath);
+        ArrowJob<TRequest> job = await GetRequiredAsync(id);
+        if (job.State == ArrowJobState.Cancelled)
+            return;
+
+        ArrowJobState previous = job.State;
         job.State = ArrowJobState.Completed;
         job.ResultPath = resultPath;
         job.CompletedAt = DateTimeOffset.UtcNow;
-        await SetAsync(job).ConfigureAwait(false);
+        await SetAsync(job);
+        await IndexMoveStateAsync(job.Id, previous, job.State);
     }
 
     public async Task MarkFailedAsync(Guid id, string error, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = await GetRequiredAsync(id).ConfigureAwait(false);
+        ArrowJob<TRequest> job = await GetRequiredAsync(id);
+        if (job.State == ArrowJobState.Cancelled)
+            return;
+
+        ArrowJobState previous = job.State;
         job.State = ArrowJobState.Failed;
         job.Error = error;
         job.CompletedAt = DateTimeOffset.UtcNow;
-        await SetAsync(job).ConfigureAwait(false);
+        await SetAsync(job);
+        await IndexMoveStateAsync(job.Id, previous, job.State);
+    }
+
+    public async Task<bool> TryCancelAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+        if (job is null)
+            return false;
+
+        if (job.State is not (ArrowJobState.Queued or ArrowJobState.Running))
+            return false;
+
+        ArrowJobState previous = job.State;
+        job.State = ArrowJobState.Cancelled;
+        job.CompletedAt = DateTimeOffset.UtcNow;
+        await SetAsync(job);
+        await IndexMoveStateAsync(job.Id, previous, job.State);
+        return true;
+    }
+
+    public async Task<bool> TryDeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+        if (job is null)
+            return false;
+
+        if (job.State == ArrowJobState.Running)
+            return false;
+
+        await Database.KeyDeleteAsync(Key(id));
+        await IndexRemoveAsync(job);
+        return true;
     }
 
     private async Task<ArrowJob<TRequest>> GetRequiredAsync(Guid id)
     {
-        ArrowJob<TRequest>? job = await GetAsync(id).ConfigureAwait(false);
+        ArrowJob<TRequest>? job = await GetAsync(id);
         return job ?? throw new KeyNotFoundException($"Job bulunamadı: {id}");
     }
 
     private Task SetAsync(ArrowJob<TRequest> job) =>
         Database.StringSetAsync(Key(job.Id), JsonSerializer.Serialize(job, JsonOptions));
+
+    private async Task IndexAddAsync(ArrowJob<TRequest> job)
+    {
+        string id = job.Id.ToString("N");
+        await Database.SortedSetAddAsync(ByTimeKey(), id, job.CreatedAt.UtcDateTime.Ticks);
+        await Database.SetAddAsync(StateKey(job.State), id);
+    }
+
+    private async Task IndexMoveStateAsync(Guid id, ArrowJobState from, ArrowJobState to)
+    {
+        if (from == to)
+            return;
+
+        string idValue = id.ToString("N");
+        await Database.SetRemoveAsync(StateKey(from), idValue);
+        await Database.SetAddAsync(StateKey(to), idValue);
+    }
+
+    private async Task IndexRemoveAsync(ArrowJob<TRequest> job)
+    {
+        string id = job.Id.ToString("N");
+        await Database.SortedSetRemoveAsync(ByTimeKey(), id);
+        await Database.SetRemoveAsync(StateKey(job.State), id);
+    }
 }

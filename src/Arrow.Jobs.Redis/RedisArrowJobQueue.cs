@@ -3,9 +3,11 @@ using System.Runtime.CompilerServices;
 
 namespace Arrow.Jobs.Redis;
 
-public sealed class RedisArrowJobQueue : IArrowJobQueue
+public sealed class RedisArrowJobQueue<TRequest> : IArrowJobQueue<TRequest>
 {
-    private const string QueueKey = "arrow:job:queue";
+    private readonly string _queueKey =
+        $"arrow:job:queue:{typeof(TRequest).FullName ?? typeof(TRequest).Name}";
+
     private readonly IConnectionMultiplexer _redis;
 
     public RedisArrowJobQueue(IConnectionMultiplexer redis)
@@ -17,7 +19,7 @@ public sealed class RedisArrowJobQueue : IArrowJobQueue
 
     public async ValueTask EnqueueAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        await Database.ListLeftPushAsync(QueueKey, jobId.ToString()).ConfigureAwait(false);
+        await Database.ListLeftPushAsync(_queueKey, jobId.ToString());
     }
 
     public async IAsyncEnumerable<Guid> DequeueAllAsync(
@@ -25,14 +27,14 @@ public sealed class RedisArrowJobQueue : IArrowJobQueue
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            RedisValue value = await Database.ListRightPopAsync(QueueKey).ConfigureAwait(false);
+            RedisValue value = await Database.ListRightPopAsync(_queueKey);
             if (!value.IsNullOrEmpty)
             {
                 yield return Guid.Parse(value.ToString());
                 continue;
             }
 
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(100, cancellationToken);
         }
     }
 }

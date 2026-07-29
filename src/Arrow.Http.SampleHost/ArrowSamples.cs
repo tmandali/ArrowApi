@@ -149,20 +149,20 @@ internal static class ArrowSamples
         {
             await foreach (RecordBatch batch in ManualPeopleBatchesAsync(cancellationToken)
                                .WithCancellation(cancellationToken)
-                               .ConfigureAwait(false))
+                               )
             {
                 writer ??= new ArrowStreamWriter(stream, batch.Schema, leaveOpen: true);
-                await writer.WriteRecordBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+                await writer.WriteRecordBatchAsync(batch, cancellationToken);
             }
 
             if (writer is null)
                 throw new InvalidOperationException("En az bir RecordBatch gerekli.");
 
-            await writer.WriteEndAsync(cancellationToken).ConfigureAwait(false);
+            await writer.WriteEndAsync(cancellationToken);
         }
         catch (Exception ex)
         {
-            await pipeWriter.CompleteAsync(ex).ConfigureAwait(false);
+            await pipeWriter.CompleteAsync(ex);
             return;
         }
         finally
@@ -170,6 +170,6 @@ internal static class ArrowSamples
             writer?.Dispose();
         }
 
-        await pipeWriter.CompleteAsync().ConfigureAwait(false);
+        await pipeWriter.CompleteAsync();
     }
 }

@@ -1,29 +1,28 @@
+using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Jobs;
-using Arrow.Jobs.InMemory;
 using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 namespace Arrow.Http.SampleHost;
 
-public sealed class DemoArrowJobWorker(
-    IArrowJobQueue queue,
-    IArrowJobStore<ArrowQueryRequest> store,
-    IArrowJobResultStorage resultStorage,
-    ILogger<DemoArrowJobWorker> logger) : ArrowJobWorker<ArrowQueryRequest>(queue, store, resultStorage, logger)
+public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
 {
-    protected override async Task ExecuteJobAsync(
-        ArrowJob<ArrowQueryRequest> job,
-        string resultPath,
-        CancellationToken cancellationToken)
+    public async IAsyncEnumerable<RecordBatch> ExecuteJobAsync(
+        IArrowJobExecutionContext<ArrowQueryRequest> context,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(job);
+        await context.PublishInfoAsync($"Sorgu başlıyor: {context.Request.Query}", cancellationToken);
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken).ConfigureAwait(false);
+        await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
 
-        await using DbDataReader reader = ArrowSamples.OpenDemoQueryReader(job.Request.Query, job.Request.Parameters);
-        ArrowConversionOptions? options = ArrowSamples.CreateConversionOptions(job.Request.BatchSize);
+        await using DbDataReader reader = ArrowSamples.OpenDemoQueryReader(context.Request.Query, context.Request.Parameters);
+        ArrowConversionOptions? options = ArrowSamples.CreateConversionOptions(context.Request.BatchSize);
+        await using ArrowBatchReader arrowReader = ArrowData.OpenArrowReader(reader, options);
 
-        await ResultStorage.WriteDbReaderAsync(reader, resultPath, options, cancellationToken)
-            .ConfigureAwait(false);
+        await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
+            yield return batch;
+
+        await context.PublishInfoAsync("Sorgu tamamlandı", cancellationToken);
     }
 }

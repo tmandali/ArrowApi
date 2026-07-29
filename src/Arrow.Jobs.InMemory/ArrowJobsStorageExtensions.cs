@@ -8,12 +8,16 @@ public static class ArrowJobsStorageExtensions
 {
     public const string DefaultFileStorePath = "arrow-jobs";
 
-    public static void UseFileStore(this IArrowJobsConfigurer configurer, string directoryPath)
+    /// <summary>Özel dizin; varsayılan <see cref="DefaultFileStorePath"/> zaten <c>AddArrowJob</c> ile gelir.</summary>
+    public static void UseFileStore(
+        this IArrowJobsConfigurer configurer,
+        string directoryPath)
     {
         ArgumentNullException.ThrowIfNull(configurer);
         RegisterFileStore(configurer.Services, directoryPath);
     }
 
+    /// <summary>Özel dizin; varsayılan <see cref="DefaultFileStorePath"/> zaten <c>AddArrowJob</c> ile gelir.</summary>
     public static ArrowJobsBuilder<TRequest> UseFileStore<TRequest>(
         this ArrowJobsBuilder<TRequest> builder,
         string directoryPath)
@@ -37,7 +41,11 @@ public static class ArrowJobsStorageExtensions
     }
 
     internal static void RegisterDefaultFileStore(IServiceCollection services) =>
-        RegisterFileStore(services, DefaultFileStorePath);
+        services.TryAddSingleton<IArrowJobResultStorage>(sp =>
+        {
+            IHostEnvironment environment = sp.GetRequiredService<IHostEnvironment>();
+            return new FileArrowResultStorage(environment, DefaultFileStorePath);
+        });
 
     private static void RegisterFileStore(IServiceCollection services, string directoryPath)
     {
@@ -47,7 +55,7 @@ public static class ArrowJobsStorageExtensions
         services.AddSingleton<IArrowJobResultStorage>(sp =>
         {
             IHostEnvironment environment = sp.GetRequiredService<IHostEnvironment>();
-            return new FileParquetResultStorage(environment, directoryPath);
+            return new FileArrowResultStorage(environment, directoryPath);
         });
     }
 

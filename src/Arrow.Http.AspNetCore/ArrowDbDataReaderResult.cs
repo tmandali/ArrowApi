@@ -27,14 +27,14 @@ internal sealed class ArrowDbDataReaderResult : IResult
                 httpContext.Response,
                 leaveOpen: true,
                 logger: null,
-                httpContext.RequestAborted).ConfigureAwait(false);
+                httpContext.RequestAborted);
         }
         finally
         {
             if (_close)
             {
                 if (_reader is IAsyncDisposable asyncDisposable)
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    await asyncDisposable.DisposeAsync();
                 else
                     _reader.Dispose();
             }

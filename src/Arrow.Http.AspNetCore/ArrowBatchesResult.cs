@@ -25,16 +25,16 @@ internal sealed class ArrowBatchesResult : IResult
 
         try
         {
-            await foreach (RecordBatch batch in _batches.WithCancellation(cancellationToken).ConfigureAwait(false))
+            await foreach (RecordBatch batch in _batches.WithCancellation(cancellationToken))
             {
                 writer ??= new ArrowStreamWriter(outputStream, batch.Schema, leaveOpen: true);
-                await writer.WriteRecordBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+                await writer.WriteRecordBatchAsync(batch, cancellationToken);
             }
 
             if (writer is null)
                 throw new InvalidOperationException("En az bir RecordBatch gerekli.");
 
-            await writer.WriteEndAsync(cancellationToken).ConfigureAwait(false);
+            await writer.WriteEndAsync(cancellationToken);
         }
         finally
         {

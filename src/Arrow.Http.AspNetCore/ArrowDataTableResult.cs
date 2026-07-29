@@ -27,7 +27,7 @@ internal sealed class ArrowDataTableResult : IResult
                 httpContext.Response,
                 leaveOpen: true,
                 logger: null,
-                httpContext.RequestAborted).ConfigureAwait(false);
+                httpContext.RequestAborted);
         }
         finally
         {

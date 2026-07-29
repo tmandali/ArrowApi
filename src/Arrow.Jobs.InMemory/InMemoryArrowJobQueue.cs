@@ -3,7 +3,7 @@ using System.Threading.Channels;
 
 namespace Arrow.Jobs.InMemory;
 
-public sealed class InMemoryArrowJobQueue : IArrowJobQueue
+public sealed class InMemoryArrowJobQueue<TRequest> : IArrowJobQueue<TRequest>
 {
     private readonly Channel<Guid> _channel = Channel.CreateUnbounded<Guid>(
         new UnboundedChannelOptions { SingleReader = true });
@@ -19,7 +19,7 @@ public sealed class InMemoryArrowJobQueue : IArrowJobQueue
     public async IAsyncEnumerable<Guid> DequeueAllAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (Guid jobId in _channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (Guid jobId in _channel.Reader.ReadAllAsync(cancellationToken))
             yield return jobId;
     }
 }

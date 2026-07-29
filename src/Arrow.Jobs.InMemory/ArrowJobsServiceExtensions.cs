@@ -1,40 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection;
 
 namespace Arrow.Jobs.InMemory;
 
-public sealed class ArrowJobsBuilder<TRequest>
-{
-    public IServiceCollection Services { get; }
-
-    internal ArrowJobsBuilder(IServiceCollection services)
-    {
-        Services = services;
-    }
-
-    public ArrowJobsBuilder<TRequest> UseInMemory()
-    {
-        RemoveBackend();
-        Services.TryAddSingleton<IArrowJobStore<TRequest>, InMemoryArrowJobStore<TRequest>>();
-        Services.TryAddSingleton<IArrowJobQueue, InMemoryArrowJobQueue>();
-        return this;
-    }
-
-    public void RemoveBackend()
-    {
-        Services.RemoveAll<IArrowJobStore<TRequest>>();
-        Services.RemoveAll<IArrowJobQueue>();
-    }
-}
-
 public static class ArrowJobsServiceExtensions
 {
     /// <summary>
-    /// <typeparamref name="T"/> worker ise altyapı + hosted service;
-    /// request tipi ise yalnızca altyapı (API node).
+    /// Job DI kaydı (store/queue/hub/file store; worker ise hosted service).
+    /// Public giriş: <c>AddArrowJob&lt;T&gt;(path)</c> (<c>Arrow.Jobs.AspNetCore</c>).
     /// </summary>
-    public static IServiceCollection AddArrowJobs<T>(
+    internal static IServiceCollection AddArrowJobServices<T>(
         this IServiceCollection services,
         Action<IArrowJobsConfigurer>? configure = null)
     {
@@ -67,10 +42,7 @@ public static class ArrowJobsServiceExtensions
         builder.UseInMemory();
 
         if (configure is not null)
-        {
-            var configurer = new ArrowJobsConfigurer<TRequest>(builder);
-            configure(configurer);
-        }
+            configure(new ArrowJobsConfigurer<TRequest>(builder));
 
         ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
         return services;
@@ -79,19 +51,17 @@ public static class ArrowJobsServiceExtensions
     private static IServiceCollection AddArrowJobsWorkerImpl<TRequest, TWorker>(
         IServiceCollection services,
         Action<IArrowJobsConfigurer>? configure)
-        where TWorker : ArrowJobWorker<TRequest>
+        where TWorker : class, IArrowJobWorker<TRequest>
     {
         var builder = new ArrowJobsBuilder<TRequest>(services);
         builder.UseInMemory();
 
         if (configure is not null)
-        {
-            var configurer = new ArrowJobsConfigurer<TRequest>(builder);
-            configure(configurer);
-        }
+            configure(new ArrowJobsConfigurer<TRequest>(builder));
 
         ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
-        services.AddHostedService<TWorker>();
+        services.AddSingleton<IArrowJobWorker<TRequest>, TWorker>();
+        services.AddHostedService<ArrowJobHostedService<TRequest>>();
         return services;
     }
 }

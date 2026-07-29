@@ -1,4 +1,3 @@
-using Arrow.Jobs.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
@@ -28,10 +27,12 @@ public static class ArrowJobsRedisExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.RemoveAll<IArrowJobStore<TRequest>>();
-        services.RemoveAll<IArrowJobQueue>();
+        services.RemoveAll<IArrowJobQueue<TRequest>>();
+        services.RemoveAll<IArrowJobEventHub>();
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(connectionString));
         services.TryAddSingleton<IArrowJobStore<TRequest>, RedisArrowJobStore<TRequest>>();
-        services.TryAddSingleton<IArrowJobQueue, RedisArrowJobQueue>();
+        services.TryAddSingleton<IArrowJobQueue<TRequest>, RedisArrowJobQueue<TRequest>>();
+        services.TryAddSingleton<IArrowJobEventHub, RedisArrowJobEventHub>();
     }
 
     private static void ConfigureRedis(Type requestType, IServiceCollection services, string connectionString)

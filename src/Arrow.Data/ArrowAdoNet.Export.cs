@@ -91,7 +91,8 @@ internal static class ArrowExporter
 
             if (firstBatch.Length == 0)
             {
-                firstBatch.Dispose();
+                current = firstBatch;
+                yield return firstBatch;
                 yield break;
             }
 
@@ -144,21 +145,21 @@ internal static class ArrowExporter
         CancellationToken cancellationToken,
         bool firstRowAlreadyRead = false)
     {
+        if (!(firstRowAlreadyRead || await reader.ReadAsync(cancellationToken).ConfigureAwait(false)))
+            return schema.EmptyBatch();
+
         IArrowArrayBuilderWrapper[] wrappers = CreateBuilderWrappers(schema, batchSize);
         int rowsInBatch = 0;
 
-        if (firstRowAlreadyRead || await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        do
         {
-            do
-            {
-                for (int i = 0; i < fieldCount; i++)
-                    accessors[i].AppendValue(reader, wrappers[i], i);
+            for (int i = 0; i < fieldCount; i++)
+                accessors[i].AppendValue(reader, wrappers[i], i);
 
-                rowsInBatch++;
-                if (rowsInBatch >= batchSize)
-                    break;
-            } while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false));
-        }
+            rowsInBatch++;
+            if (rowsInBatch >= batchSize)
+                break;
+        } while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false));
 
         IArrowArray[] arrays = new IArrowArray[fieldCount];
         for (int i = 0; i < fieldCount; i++)
@@ -241,6 +242,9 @@ internal static class ArrowExporter
 
         Schema schema = BuildArrowSchema(columnSchema, options, useDictionary);
         IColumnAccessor[] accessors = BuildColumnAccessors(reader, schema, options);
+
+        if (rowsInBatch == 0)
+            return (useDictionary, schema, accessors, schema.EmptyBatch());
 
         IArrowArray[] arrays = new IArrowArray[fieldCount];
         for (int i = 0; i < fieldCount; i++)

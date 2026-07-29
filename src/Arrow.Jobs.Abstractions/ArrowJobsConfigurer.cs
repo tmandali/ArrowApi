@@ -1,16 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Arrow.Jobs.InMemory;
-
-/// <summary>
-/// Job altyapısı yapılandırması — store/kuyruk ve sonuç depolama.
-/// </summary>
-public interface IArrowJobsConfigurer
-{
-    IServiceCollection Services { get; }
-    Type RequestType { get; }
-    void UseInMemory();
-}
+namespace Arrow.Jobs;
 
 internal sealed class ArrowJobsConfigurer<TRequest> : IArrowJobsConfigurer
 {
@@ -23,5 +13,4 @@ internal sealed class ArrowJobsConfigurer<TRequest> : IArrowJobsConfigurer
 
     public IServiceCollection Services => _builder.Services;
     public Type RequestType => typeof(TRequest);
-    public void UseInMemory() => _builder.UseInMemory();
 }

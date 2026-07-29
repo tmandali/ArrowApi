@@ -12,7 +12,7 @@ ArrowApi provides a collection of .NET libraries that enable efficient transfer 
 |---------|-------------|
 | **Arrow.Data** | Core Apache Arrow utilities, ADO.NET extensions, batch readers/writers, and data type helpers. |
 | **Arrow.Http.Client** | `HttpClient` extension methods for sending and receiving Arrow data over HTTP (e.g., `GetArrowReaderAsync`, `PostArrowWriterAsync`). |
-| **Arrow.Http.AspNetCore** | ASP.NET Core middleware (`AddArrowResponse`, `UseArrowResponse`) to expose Arrow endpoints with minimal setup. |
+| **Arrow.Http.AspNetCore** | ASP.NET Core (`AddArrowResponse`, `UseArrowApi`) — Arrow endpoint'leri; job feature isteğe bağlı. |
 | **Arrow.Http.SampleHost** | A sample ASP.NET Core host demonstrating how to serve Arrow data and integrate with job processing. |
 | **Arrow.Jobs.Abstractions** | Abstractions for defining and managing background jobs that process Arrow data. |
 | **Arrow.Jobs.InMemory** | In‑memory job store for development and testing. |
@@ -63,11 +63,11 @@ The host will listen on `http://localhost:5000` (or as configured in `launchSett
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddArrowResponse();          // Adds Arrow serialization services
-builder.Services.AddArrowJobs<DemoArrowJobWorker>(); // Optional: add job processing
+builder.Services.AddArrowResponse();
+builder.Services.AddArrowJob<DemoArrowJobWorker>("/api/arrow/jobs");
 
 var app = builder.Build();
-app.UseArrowResponse();                       // Enables Arrow middleware
+app.UseArrowApi();                            // IArrowApiFeature (job map vb.)
 app.MapArrowDemoEndpoints();                  // Sample endpoints (from SampleHost)
 
 app.Run();

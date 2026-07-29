@@ -2,7 +2,6 @@ using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Http.AspNetCore;
 using Arrow.Jobs;
-using Arrow.Jobs.AspNetCore;
 using System.Data;
 using System.Data.Common;
 
@@ -29,9 +28,6 @@ internal static class ArrowDemoEndpoints
         endpoints.MapPost("/arrow/query", PostQueryAsync)
             .Accepts<ArrowQueryRequest>("application/json")
             .ProducesArrow();
-
-        RouteGroupBuilder api = endpoints.MapGroup("/api");
-        api.MapArrowJobEndpoints<DemoArrowJobWorker>("/arrow/jobs");
 
         return endpoints;
     }

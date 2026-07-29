@@ -7,7 +7,7 @@ internal sealed class ArrowResponseEndpointFilter : IEndpointFilter
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next)
     {
-        object? result = await next(context).ConfigureAwait(false);
+        object? result = await next(context);
 
         if (result is ArrowDataTableSource source)
         {

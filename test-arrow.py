@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Arrow API endpoint testleri."""
+"""Arrow.Http.SampleHost endpoint testleri — Arrow.Http.SampleHost.http ile uyumlu."""
 
 from __future__ import annotations
 
@@ -17,6 +17,11 @@ except ImportError:
 BASE_URL = os.environ.get("ARROW_API_URL", "http://localhost:5236")
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 
+# Kurumsal proxy localhost'u 400 ile kesebiliyor
+SESSION = requests.Session()
+SESSION.trust_env = False
+SESSION.proxies = {"http": None, "https": None}
+
 VARIANT_COLUMN = "event_data"
 
 EXPECTED_ROWS = [
@@ -25,26 +30,37 @@ EXPECTED_ROWS = [
     {"Id": 3, "Name": "Veli"},
 ]
 
+QUERY_LIMIT_2_ROWS = [
+    {"Id": 1, "Name": "Ali"},
+    {"Id": 2, "Name": "Ayşe"},
+]
+
 
 def read_arrow_table(content: bytes) -> pa.Table:
     with ipc.open_stream(content) as reader:
         return reader.read_all()
 
 
-def assert_people_table(table: pa.Table, *, label: str) -> None:
-    assert table.num_rows == 3, f"{label}: satır sayısı 3 olmalı, gelen {table.num_rows}"
+def assert_people_table(table: pa.Table, *, label: str, expected: list[dict] | None = None) -> None:
+    rows = expected if expected is not None else EXPECTED_ROWS
+    assert table.num_rows == len(rows), f"{label}: satır sayısı {len(rows)} olmalı, gelen {table.num_rows}"
     assert table.column_names == ["Id", "Name"], f"{label}: sütunlar uyuşmuyor"
 
     actual = [
         {"Id": table.column("Id")[i].as_py(), "Name": table.column("Name")[i].as_py()}
         for i in range(table.num_rows)
     ]
-    assert actual == EXPECTED_ROWS, f"{label}: veri uyuşmuyor\n  beklenen: {EXPECTED_ROWS}\n  gelen: {actual}"
+    assert actual == rows, f"{label}: veri uyuşmuyor\n  beklenen: {rows}\n  gelen: {actual}"
+
+
+def get_arrow(path: str, *, accept_arrow: bool = True) -> requests.Response:
+    headers = {"Accept": ARROW_MEDIA_TYPE} if accept_arrow else {}
+    return SESSION.get(f"{BASE_URL}{path}", headers=headers, timeout=30)
 
 
 def test_get_arrow() -> pa.Table:
     print(f"GET {BASE_URL}/arrow")
-    resp = requests.get(f"{BASE_URL}/arrow", timeout=10)
+    resp = get_arrow("/arrow")
     resp.raise_for_status()
 
     print(f"  Status: {resp.status_code}")
@@ -57,9 +73,9 @@ def test_get_arrow() -> pa.Table:
     return table
 
 
-def test_get_arrow_batches() -> None:
-    print(f"\nGET {BASE_URL}/arrow/batches")
-    resp = requests.get(f"{BASE_URL}/arrow/batches", timeout=10)
+def test_get_arrow_batches_json() -> None:
+    print(f"\nGET {BASE_URL}/arrow/batches (JSON)")
+    resp = get_arrow("/arrow/batches", accept_arrow=False)
     resp.raise_for_status()
 
     data = resp.json()
@@ -71,27 +87,62 @@ def test_get_arrow_batches() -> None:
     assert [c["name"] for c in data["columns"]] == ["Id", "Name"]
 
 
-def test_get_arrow_manual() -> None:
-    print(f"\nGET {BASE_URL}/arrow/manual")
-    resp = requests.get(f"{BASE_URL}/arrow/manual", timeout=10)
+def test_get_arrow_batches_arrow() -> None:
+    print(f"\nGET {BASE_URL}/arrow/batches (Accept: Arrow)")
+    resp = get_arrow("/arrow/batches")
     resp.raise_for_status()
 
-    print(f"  Status: {resp.status_code}")
-    print(f"  Content-Type: {resp.headers.get('Content-Type')}")
-    print(f"  Content-Length: {len(resp.content)} bytes")
+    table = read_arrow_table(resp.content)
+    assert_people_table(table, label="GET /arrow/batches Arrow")
+    print(f"  Rows: {table.num_rows}")
+
+
+def test_get_arrow_manual() -> None:
+    print(f"\nGET {BASE_URL}/arrow/manual")
+    resp = get_arrow("/arrow/manual")
+    resp.raise_for_status()
 
     table = read_arrow_table(resp.content)
     assert_people_table(table, label="GET /arrow/manual")
     print(f"  Rows: {table.num_rows}, Columns: {table.column_names}")
 
 
+def test_get_arrow_from_reader() -> None:
+    print(f"\nGET {BASE_URL}/arrow/from-reader")
+    resp = get_arrow("/arrow/from-reader")
+    resp.raise_for_status()
+
+    table = read_arrow_table(resp.content)
+    assert_people_table(table, label="GET /arrow/from-reader")
+    print(f"  Rows: {table.num_rows}")
+
+
+def test_get_arrow_from_db() -> None:
+    print(f"\nGET {BASE_URL}/arrow/from-db")
+    resp = get_arrow("/arrow/from-db")
+    resp.raise_for_status()
+
+    table = read_arrow_table(resp.content)
+    assert_people_table(table, label="GET /arrow/from-db")
+    print(f"  Rows: {table.num_rows}")
+
+
+def test_get_arrow_from_db_await() -> None:
+    print(f"\nGET {BASE_URL}/arrow/from-db-await")
+    resp = get_arrow("/arrow/from-db-await")
+    resp.raise_for_status()
+
+    table = read_arrow_table(resp.content)
+    assert_people_table(table, label="GET /arrow/from-db-await")
+    print(f"  Rows: {table.num_rows}")
+
+
 def test_get_arrow_variant_manual() -> bytes:
     print(f"\nGET {BASE_URL}/arrow/variant/manual")
-    resp = requests.get(f"{BASE_URL}/arrow/variant/manual", timeout=10)
+    resp = get_arrow("/arrow/variant/manual")
     resp.raise_for_status()
 
     print(f"  Status: {resp.status_code}")
-    print(f"  Content-Type: {resp.headers.get('Content-Type')}")
     print(f"  Content-Length: {len(resp.content)} bytes")
 
     table = read_arrow_table(resp.content)
@@ -108,7 +159,7 @@ def test_get_arrow_variant_manual() -> bytes:
 
 def test_get_arrow_variant_batches() -> None:
     print(f"\nGET {BASE_URL}/arrow/variant/batches")
-    resp = requests.get(f"{BASE_URL}/arrow/variant/batches", timeout=10)
+    resp = get_arrow("/arrow/variant/batches", accept_arrow=False)
     resp.raise_for_status()
 
     data = resp.json()
@@ -127,7 +178,7 @@ def test_get_arrow_variant_batches() -> None:
 
 def test_get_arrow_variant_staging() -> None:
     print(f"\nGET {BASE_URL}/arrow/variant/staging")
-    resp = requests.get(f"{BASE_URL}/arrow/variant/staging", timeout=10)
+    resp = get_arrow("/arrow/variant/staging", accept_arrow=False)
     resp.raise_for_status()
 
     data = resp.json()
@@ -145,35 +196,29 @@ def test_get_arrow_variant_staging() -> None:
 
 def test_post_arrow_variant(arrow_bytes: bytes) -> None:
     print(f"\nPOST {BASE_URL}/arrow/variant")
-    resp = requests.post(
+    resp = SESSION.post(
         f"{BASE_URL}/arrow/variant",
         data=arrow_bytes,
-        headers={"Content-Type": ARROW_MEDIA_TYPE},
-        timeout=10,
+        headers={"Content-Type": ARROW_MEDIA_TYPE, "Accept": ARROW_MEDIA_TYPE},
+        timeout=30,
     )
     resp.raise_for_status()
-
-    print(f"  Status: {resp.status_code}")
-    print(f"  Content-Length: {len(resp.content)} bytes")
 
     table = read_arrow_table(resp.content)
     assert table.num_rows == 2
     assert table.column_names == [VARIANT_COLUMN]
+    print(f"  Status: {resp.status_code}, Rows: {table.num_rows}")
 
 
 def test_post_arrow(arrow_bytes: bytes, expected_table: pa.Table) -> None:
     print(f"\nPOST {BASE_URL}/arrow")
-    resp = requests.post(
+    resp = SESSION.post(
         f"{BASE_URL}/arrow",
         data=arrow_bytes,
-        headers={"Content-Type": ARROW_MEDIA_TYPE},
-        timeout=10,
+        headers={"Content-Type": ARROW_MEDIA_TYPE, "Accept": ARROW_MEDIA_TYPE},
+        timeout=30,
     )
     resp.raise_for_status()
-
-    print(f"  Status: {resp.status_code}")
-    print(f"  Content-Type: {resp.headers.get('Content-Type')}")
-    print(f"  Content-Length: {len(resp.content)} bytes")
 
     actual_table = read_arrow_table(resp.content)
     assert actual_table.equals(expected_table), (
@@ -181,13 +226,39 @@ def test_post_arrow(arrow_bytes: bytes, expected_table: pa.Table) -> None:
         f"  beklenen:\n{expected_table}\n"
         f"  gelen:\n{actual_table}"
     )
+    print(f"  Status: {resp.status_code}, Rows: {actual_table.num_rows}")
+
+
+def test_post_arrow_query() -> None:
+    print(f"\nPOST {BASE_URL}/arrow/query")
+    body = {
+        "cnnName": "inmemory",
+        "query": "SELECT * FROM People LIMIT @limit",
+        "parameters": {"limit": 2},
+        "batchSize": 1,
+    }
+    resp = SESSION.post(
+        f"{BASE_URL}/arrow/query",
+        json=body,
+        headers={"Accept": ARROW_MEDIA_TYPE},
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+    table = read_arrow_table(resp.content)
+    assert_people_table(table, label="POST /arrow/query", expected=QUERY_LIMIT_2_ROWS)
+    print(f"  Status: {resp.status_code}, Rows: {table.num_rows}")
 
 
 def main() -> int:
     try:
         table = test_get_arrow()
-        test_get_arrow_batches()
+        test_get_arrow_batches_json()
+        test_get_arrow_batches_arrow()
         test_get_arrow_manual()
+        test_get_arrow_from_reader()
+        test_get_arrow_from_db()
+        test_get_arrow_from_db_await()
         variant_bytes = test_get_arrow_variant_manual()
         test_get_arrow_variant_batches()
         test_get_arrow_variant_staging()
@@ -199,6 +270,7 @@ def main() -> int:
 
         test_post_arrow(arrow_bytes, table)
         test_post_arrow_variant(variant_bytes)
+        test_post_arrow_query()
     except requests.RequestException as exc:
         print(f"\nHTTP hatası: {exc}", file=sys.stderr)
         print("API çalışıyor mu? dotnet run --project src/Arrow.Http.SampleHost", file=sys.stderr)
@@ -208,10 +280,9 @@ def main() -> int:
         return 1
 
     print(
-        "\n✓ Tüm endpoint testleri geçti "
-        "(GET /arrow, /arrow/batches, /arrow/manual, "
-        "GET /arrow/variant/manual, /arrow/variant/batches, /arrow/variant/staging, "
-        "POST /arrow, POST /arrow/variant)"
+        "\nOK SampleHost testleri gecti "
+        "(GET /arrow, /batches, /manual, /from-reader, /from-db, /from-db-await, "
+        "variant/*, POST /arrow, /variant, /query)"
     )
     return 0
 

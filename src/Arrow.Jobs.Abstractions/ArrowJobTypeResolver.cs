@@ -5,7 +5,7 @@ public static class ArrowJobTypeResolver
     public static Type GetRequestType<TWorker>() =>
         TryGetRequestType(typeof(TWorker))
         ?? throw new InvalidOperationException(
-            $"{typeof(TWorker).Name} must inherit ArrowJobWorker<TRequest>.");
+            $"{typeof(TWorker).Name} must implement IArrowJobWorker<TRequest>.");
 
     public static Type? TryGetRequestType(Type workerType)
     {

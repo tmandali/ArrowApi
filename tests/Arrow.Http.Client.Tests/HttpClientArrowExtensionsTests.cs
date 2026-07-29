@@ -416,6 +416,77 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
         Assert.Equal(2, totalRows);
     }
 
+    [Fact]
+    public async Task Job_list_request_delete_and_retry_conflict_work()
+    {
+        HttpClient http = _factory.CreateClient();
+
+        ArrowJob job = await http.PostArrowJobAsync(
+            "/api/arrow/jobs",
+            new ArrowQueryRequest(
+                "inmemory",
+                "SELECT * FROM People LIMIT @limit",
+                new Dictionary<string, object?> { ["limit"] = 1 }));
+
+        await foreach (ArrowSseItem<ArrowJobEvent> item in job.ReadEventsAsync())
+        {
+            if (item.EventType is ArrowJobEventNames.Completed or ArrowJobEventNames.Failed)
+                break;
+        }
+
+        ArrowQueryRequest request = await job.GetRequestAsync<ArrowQueryRequest>();
+        Assert.Equal("inmemory", request.CnnName);
+        Assert.Contains("People", request.Query);
+
+        ArrowJobStatusList list = await http.GetArrowJobsAsync("/api/arrow/jobs", take: 100);
+        Assert.Contains(list.Items, s => s.Id == job.Id);
+
+        using HttpResponseMessage retryConflict = await http.PostAsync(job.JobUrl + "/retry", content: null);
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, retryConflict.StatusCode);
+
+        await job.DeleteAsync();
+
+        using HttpResponseMessage missing = await http.GetAsync(job.JobUrl);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Job_cancel_queued_or_running_then_retry()
+    {
+        HttpClient http = _factory.CreateClient();
+
+        ArrowJob job = await http.PostArrowJobAsync(
+            "/api/arrow/jobs",
+            new ArrowQueryRequest(
+                "inmemory",
+                "SELECT * FROM People",
+                new Dictionary<string, object?>()));
+
+        using HttpResponseMessage cancelResponse = await http.PostAsync(job.JobUrl + "/cancel", content: null);
+        if (cancelResponse.StatusCode == System.Net.HttpStatusCode.OK)
+        {
+            ArrowJobStatus? cancelled = await cancelResponse.Content.ReadFromJsonAsync<ArrowJobStatus>();
+            Assert.NotNull(cancelled);
+            Assert.Equal(nameof(ArrowJobState.Cancelled), cancelled.Status);
+
+            ArrowJob retry = await job.RetryAsync();
+            Assert.NotEqual(job.Id, retry.Id);
+            Assert.Equal(job.Id, retry.RetriedFrom);
+
+            await foreach (ArrowSseItem<ArrowJobEvent> item in retry.ReadEventsAsync())
+            {
+                if (item.EventType is ArrowJobEventNames.Completed or ArrowJobEventNames.Failed)
+                    break;
+            }
+
+            Assert.Equal(nameof(ArrowJobState.Completed), (await http.GetFromJsonAsync<ArrowJobStatus>(retry.JobUrl))!.Status);
+            return;
+        }
+
+        // Worker job'u cancel'dan önce bitirdiyse Conflict beklenir; akış yine geçerli.
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, cancelResponse.StatusCode);
+    }
+
     private static async IAsyncEnumerable<RecordBatch> EmptyBatches()
     {
         await Task.CompletedTask;

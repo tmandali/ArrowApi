@@ -4,11 +4,16 @@ namespace Arrow.Http.AspNetCore;
 public static class ArrowAspNetCoreApplicationExtensions
 {
     /// <summary>
-    /// Arrow yanıt desteğini etkinleştirir. <see cref="ArrowAspNetCoreServiceExtensions.AddArrowResponse"/> ile birlikte kullanın.
+    /// Kayıtlı <see cref="IArrowApiFeature"/>'ları uygular (ör. job endpoint map).
+    /// Feature yoksa no-op. <see cref="ArrowAspNetCoreServiceExtensions.AddArrowResponse"/> ile birlikte kullanın.
     /// </summary>
-    public static WebApplication UseArrowResponse(this WebApplication app)
+    public static WebApplication UseArrowApi(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
+
+        foreach (IArrowApiFeature feature in app.Services.GetServices<IArrowApiFeature>())
+            feature.Use(app);
+
         return app;
     }
 }
