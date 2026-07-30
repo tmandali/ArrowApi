@@ -12,9 +12,9 @@ namespace Arrow.Http.SampleHost;
 
 public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
 {
-    private readonly IArrowJobExecutionContext<ArrowQueryRequest> _context;
+    private readonly IArrowJobExecutionContext _context;
 
-    public DemoArrowJobWorker(IArrowJobExecutionContext<ArrowQueryRequest> context)
+    public DemoArrowJobWorker(IArrowJobExecutionContext context)
     {
         _context = context;
     }

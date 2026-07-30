@@ -115,8 +115,8 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
 
         using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
 
-        var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub, scope.ServiceProvider);
-        ArrowJobExecutionContextHolder<TRequest>.Current = context;
+        var context = new ArrowJobExecutionContext(jobId, _eventHub, scope.ServiceProvider);
+        ArrowJobExecutionContextHolder.Current = context;
 
         object? worker = null;
         if (!string.IsNullOrWhiteSpace(job.Name))
@@ -145,7 +145,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         }
         finally
         {
-            ArrowJobExecutionContextHolder<TRequest>.Current = null;
+            ArrowJobExecutionContextHolder.Current = null;
         }
 
         IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(

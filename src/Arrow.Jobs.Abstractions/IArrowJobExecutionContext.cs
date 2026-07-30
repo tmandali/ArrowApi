@@ -1,12 +1,13 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Arrow.Jobs;
 
-/// <summary>Worker <c>ExecuteJobAsync</c> için job kimliği, request ve bilgilendirme.</summary>
-public interface IArrowJobExecutionContext<TRequest>
-    where TRequest : notnull
+/// <summary>Worker için job kimliği, canlı ilerleme ve alt job zincirleme bağlamı.</summary>
+public interface IArrowJobExecutionContext
 {
     Guid JobId { get; }
-
-    TRequest Request { get; }
 
     /// <summary><c>info</c> event — job state değildir; yalnızca worker mesajı.</summary>
     ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);

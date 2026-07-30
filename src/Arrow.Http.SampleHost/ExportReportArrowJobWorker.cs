@@ -16,11 +16,11 @@ public sealed record ExportReportRequest(
 public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportRequest>
 {
     private readonly ILogger<ExportReportArrowJobWorker> _logger;
-    private readonly IArrowJobExecutionContext<ExportReportRequest> _context;
+    private readonly IArrowJobExecutionContext _context;
 
     public ExportReportArrowJobWorker(
         ILogger<ExportReportArrowJobWorker> logger,
-        IArrowJobExecutionContext<ExportReportRequest> context)
+        IArrowJobExecutionContext context)
     {
         _logger = logger;
         _context = context;

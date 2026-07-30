@@ -2,12 +2,11 @@ using System.Threading;
 
 namespace Arrow.Jobs.InMemory;
 
-public static class ArrowJobExecutionContextHolder<TRequest>
-    where TRequest : notnull
+public static class ArrowJobExecutionContextHolder
 {
-    private static readonly AsyncLocal<IArrowJobExecutionContext<TRequest>?> _current = new();
+    private static readonly AsyncLocal<IArrowJobExecutionContext?> _current = new();
 
-    public static IArrowJobExecutionContext<TRequest>? Current
+    public static IArrowJobExecutionContext? Current
     {
         get => _current.Value;
         set => _current.Value = value;

@@ -69,9 +69,9 @@ public static class ArrowJobsServiceExtensions
             services.AddKeyedScoped(typeof(TWorker), name);
             services.AddKeyedScoped(typeof(IArrowJobWorker<TRequest>), name, (sp, key) => sp.GetRequiredKeyedService(typeof(TWorker), key));
         }
-        services.AddScoped<IArrowJobExecutionContext<TRequest>>(sp =>
-            ArrowJobExecutionContextHolder<TRequest>.Current
-            ?? throw new InvalidOperationException($"IArrowJobExecutionContext<{typeof(TRequest).Name}> is only available during job execution."));
+        services.AddScoped<IArrowJobExecutionContext>(sp =>
+            ArrowJobExecutionContextHolder.Current
+            ?? throw new InvalidOperationException("IArrowJobExecutionContext is only available during job execution."));
 
         services.AddScoped(typeof(TWorker));
         services.AddScoped(typeof(IArrowJobWorker<TRequest>), sp => sp.GetRequiredService(typeof(TWorker)));

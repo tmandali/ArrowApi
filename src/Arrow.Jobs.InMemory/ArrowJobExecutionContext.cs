@@ -1,51 +1,48 @@
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Arrow.Jobs.InMemory;
 
-internal sealed class ArrowJobExecutionContext<TRequest> : IArrowJobExecutionContext<TRequest>
-    where TRequest : notnull
+internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 {
     private readonly Guid _jobId;
-    private readonly TRequest _request;
-    private readonly IArrowJobStore<TRequest> _store;
     private readonly IArrowJobEventHub _eventHub;
     private readonly IServiceProvider _serviceProvider;
 
     public ArrowJobExecutionContext(
         Guid jobId,
-        TRequest request,
-        IArrowJobStore<TRequest> store,
         IArrowJobEventHub eventHub,
         IServiceProvider serviceProvider)
     {
         _jobId = jobId;
-        _request = request;
-        _store = store;
         _eventHub = eventHub;
         _serviceProvider = serviceProvider;
     }
 
     public Guid JobId => _jobId;
 
-    public TRequest Request => _request;
-
     public async ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
-        ArrowJob<TRequest>? job = await _store.GetAsync(_jobId, cancellationToken);
-        ArrowJobEvent payload = job is null
+        var statusStore = _serviceProvider.GetService<IArrowJobStore>();
+        ArrowJobStatus? status = statusStore is not null
+            ? await statusStore.GetStatusAsync(_jobId, cancellationToken: cancellationToken)
+            : null;
+
+        ArrowJobEvent payload = status is null
             ? new ArrowJobEvent(Id: _jobId, Message: message)
             : new ArrowJobEvent(
-                job.Id,
-                job.State.ToString(),
-                job.CreatedAt,
-                job.CompletedAt,
-                job.Error,
-                BatchCount: job.BatchCount,
-                TotalRows: job.TotalRows,
-                Message: message,
-                TraceId: job.TraceId);
+                status.Id,
+                status.Status,
+                status.CreatedAt,
+                status.CompletedAt,
+                status.Error,
+                BatchCount: status.BatchCount,
+                TotalRows: status.TotalRows,
+                Message: message);
 
         await _eventHub.PublishAsync(_jobId, ArrowJobEventNames.Info, payload, cancellationToken);
     }
@@ -76,8 +73,12 @@ internal sealed class ArrowJobExecutionContext<TRequest> : IArrowJobExecutionCon
             };
         }
 
-        ArrowJob<TRequest>? parentJob = await _store.GetAsync(_jobId, cancellationToken);
-        string? correlationId = parentJob?.CorrelationId ?? _jobId.ToString("N");
+        var statusStore = _serviceProvider.GetService<IArrowJobStore>();
+        ArrowJobStatus? parentStatus = statusStore is not null
+            ? await statusStore.GetStatusAsync(_jobId, cancellationToken: cancellationToken)
+            : null;
+
+        string? correlationId = parentStatus?.CorrelationId ?? _jobId.ToString("N");
 
         ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, correlationId, cancellationToken);
         await queue.EnqueueAsync(nextJob.Id, cancellationToken);
