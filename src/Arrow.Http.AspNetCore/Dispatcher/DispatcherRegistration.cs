@@ -1,4 +1,6 @@
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Collections.Frozen;
 using System.Reflection;
 
@@ -60,18 +62,18 @@ public static class DispatcherRegistration
             requestWrappers.ToFrozenDictionary(),
             notificationWrappers.ToFrozenDictionary());
 
-        services.AddSingleton(registry);
-        services.AddScoped<Dispatcher>();
-        services.AddScoped<ISender>(sp => sp.GetRequiredService<Dispatcher>());
-        services.AddScoped<IPublisher>(sp => sp.GetRequiredService<Dispatcher>());
+        services.TryAddSingleton(registry);
+        services.TryAddScoped<Dispatcher>();
+        services.TryAddScoped<ISender>(sp => sp.GetRequiredService<Dispatcher>());
+        services.TryAddScoped<IPublisher>(sp => sp.GetRequiredService<Dispatcher>());
 
         // FluentValidation doğrulayıcılarını tara ve kaydet
         services.AddValidatorsFromAssembly(assembly);
 
         // Varsayılan Pipeline Behavior'lar: Tracing, Exception Handling ve Validation
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.TracingBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.JobExceptionHandlingBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.ValidationBehavior<,>));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.TracingBehavior<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.JobExceptionHandlingBehavior<,>)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.ValidationBehavior<,>)));
 
         return services;
     }

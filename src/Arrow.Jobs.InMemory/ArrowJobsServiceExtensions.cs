@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection;
 
 namespace Arrow.Jobs.InMemory;
@@ -69,7 +70,7 @@ public static class ArrowJobsServiceExtensions
             services.AddKeyedScoped(typeof(TWorker), name);
             services.AddKeyedScoped(typeof(IArrowJobWorker<TRequest>), name, (sp, key) => sp.GetRequiredKeyedService(typeof(TWorker), key));
         }
-        services.AddScoped<IArrowJobExecutionContext>(sp =>
+        services.TryAddScoped<IArrowJobExecutionContext>(sp =>
             ArrowJobExecutionContextHolder.Current
             ?? throw new InvalidOperationException("IArrowJobExecutionContext is only available during job execution."));
 

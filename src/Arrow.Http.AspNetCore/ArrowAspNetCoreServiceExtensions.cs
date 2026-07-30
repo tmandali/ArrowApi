@@ -8,7 +8,7 @@ public static class ArrowAspNetCoreServiceExtensions
     /// <summary>
     /// <see cref="ArrowDataTableSource"/> dönüşlerini Arrow IPC'ye çeviren endpoint filter'ı ekler.
     /// </summary>
-    public static IServiceCollection AddArrowResponse(this IServiceCollection services)
+    internal static IServiceCollection AddArrowResponse(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         services.TryAddSingleton<ArrowResponseEndpointFilter>();
@@ -36,11 +36,9 @@ public static class ArrowAspNetCoreServiceExtensions
         }
 
         // ISender henüz kaydolmadıysa çağıran Assembly için Dispatcher'ı otomatik kaydeder
-        if (!services.Any(d => d.ServiceType == typeof(Arrow.Http.AspNetCore.Dispatcher.ISender)))
-        {
-            System.Reflection.Assembly callingAssembly = System.Reflection.Assembly.GetCallingAssembly();
-            Arrow.Http.AspNetCore.Dispatcher.DispatcherRegistration.AddDispatcher(services, callingAssembly);
-        }
+        if (services.Any(d => d.ServiceType == typeof(Dispatcher.ISender))) return services;
+        System.Reflection.Assembly callingAssembly = System.Reflection.Assembly.GetCallingAssembly();
+        Dispatcher.DispatcherRegistration.AddDispatcher(services, callingAssembly);
 
         return services;
     }

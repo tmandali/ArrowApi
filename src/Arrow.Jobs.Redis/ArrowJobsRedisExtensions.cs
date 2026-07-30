@@ -31,7 +31,7 @@ public static class ArrowJobsRedisExtensions
         services.RemoveAll<IArrowJobStore<TRequest>>();
         services.RemoveAll<IArrowJobQueue<TRequest>>();
         services.RemoveAll<IArrowJobEventHub>();
-        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(connectionString));
+        services.TryAddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(connectionString));
         services.TryAddSingleton<IArrowJobStore<TRequest>, RedisArrowJobStore<TRequest>>();
         services.TryAddSingleton<IArrowJobQueue<TRequest>, RedisArrowJobQueue<TRequest>>();
         services.TryAddSingleton<IArrowJobEventHub, RedisArrowJobEventHub>();

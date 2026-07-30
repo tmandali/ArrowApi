@@ -31,7 +31,6 @@ public static class ArrowJobsServiceCollectionExtensions
                 $"'{name}' ismiyle birden fazla Arrow Job kaydı bulunuyor. Her Job ismi (name) benzersiz (unique) olmalıdır.");
         }
 
-        services.AddArrowResponse();
         services.AddArrowJobServices<T>(name, configure);
         services.AddSingleton(new ArrowJobEndpointRegistration(typeof(T), name));
         services.TryAddEnumerable(
