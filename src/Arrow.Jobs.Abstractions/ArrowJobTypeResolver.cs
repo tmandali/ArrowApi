@@ -1,5 +1,3 @@
-using System;
-
 namespace Arrow.Jobs;
 
 public static class ArrowJobTypeResolver

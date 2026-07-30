@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace Arrow.Jobs.InMemory;
 
 public static class ArrowJobExecutionContextHolder

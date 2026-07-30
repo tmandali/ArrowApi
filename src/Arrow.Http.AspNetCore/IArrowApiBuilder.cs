@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace Arrow.Http.AspNetCore;
 
 /// <summary>

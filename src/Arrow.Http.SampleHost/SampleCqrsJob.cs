@@ -1,10 +1,6 @@
 using Arrow.Http.AspNetCore.Dispatcher;
 using Arrow.Jobs;
 using FluentValidation;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Arrow.Http.SampleHost;
 

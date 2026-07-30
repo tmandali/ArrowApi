@@ -28,7 +28,7 @@ internal static class ArrowDemoEndpoints
         endpoints.MapPost("/arrow/query", PostQueryAsync)
             .Accepts<ArrowQueryRequest>("application/json")
             .ProducesArrow();
-        
+
         return endpoints;
     }
 

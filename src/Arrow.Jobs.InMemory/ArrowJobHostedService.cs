@@ -135,7 +135,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         {
             if (worker is IArrowJobWorker<TRequest> streamWorker)
             {
-                rawBatches = await streamWorker.Handle(job.Request, cancellationToken);
+                rawBatches = streamWorker.Handle(job.Request, cancellationToken);
             }
             else
             {

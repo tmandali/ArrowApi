@@ -1,6 +1,6 @@
+using FluentValidation;
 using System.Collections.Frozen;
 using System.Reflection;
-using FluentValidation;
 
 namespace Arrow.Http.AspNetCore.Dispatcher;
 

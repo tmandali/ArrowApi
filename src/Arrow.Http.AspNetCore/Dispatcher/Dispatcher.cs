@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 
 namespace Arrow.Http.AspNetCore.Dispatcher;
 

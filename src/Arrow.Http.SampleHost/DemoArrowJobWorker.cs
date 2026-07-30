@@ -1,12 +1,8 @@
 using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Jobs;
-using System;
-using System.Collections.Generic;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Arrow.Http.SampleHost;
 
@@ -19,14 +15,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         _context = context;
     }
 
-    public ValueTask<IAsyncEnumerable<RecordBatch>> Handle(
-        ArrowQueryRequest request,
-        CancellationToken cancellationToken)
-    {
-        return ValueTask.FromResult(ExecuteStreamAsync(request, cancellationToken));
-    }
-
-    private async IAsyncEnumerable<RecordBatch> ExecuteStreamAsync(
+    public async IAsyncEnumerable<RecordBatch> Handle(
         ArrowQueryRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

@@ -1,11 +1,6 @@
 using Apache.Arrow;
 using Arrow.Jobs;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Arrow.Http.SampleHost;
 
@@ -26,14 +21,7 @@ public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportReq
         _context = context;
     }
 
-    public ValueTask<IAsyncEnumerable<RecordBatch>> Handle(
-        ExportReportRequest request,
-        CancellationToken cancellationToken)
-    {
-        return ValueTask.FromResult(ExecuteStreamAsync(request, cancellationToken));
-    }
-
-    private async IAsyncEnumerable<RecordBatch> ExecuteStreamAsync(
+    public async IAsyncEnumerable<RecordBatch> Handle(
         ExportReportRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

@@ -1,5 +1,4 @@
 using Arrow.Http.AspNetCore;
-using Arrow.Http.AspNetCore.Dispatcher;
 using Arrow.Http.SampleHost;
 using Arrow.Jobs.AspNetCore;
 using Arrow.Jobs.AspNetCore.Authentication;
