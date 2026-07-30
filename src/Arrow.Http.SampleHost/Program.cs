@@ -6,10 +6,7 @@ using Arrow.Jobs.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. CQRS Dispatcher Kaydı
-builder.Services.AddDispatcher(typeof(Program).Assembly);
-
-// 2. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo", "export-report", "create-product")
+// 1. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo", "export-report", "create-product")
 builder.Services.AddArrowApi(arrow =>
 {
     arrow.AddJob<DemoArrowJobWorker>("demo");

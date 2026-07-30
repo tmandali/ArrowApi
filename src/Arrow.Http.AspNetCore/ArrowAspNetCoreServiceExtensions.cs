@@ -35,6 +35,13 @@ public static class ArrowAspNetCoreServiceExtensions
             configure(builder);
         }
 
+        // ISender henüz kaydolmadıysa çağıran Assembly için Dispatcher'ı otomatik kaydeder
+        if (!services.Any(d => d.ServiceType == typeof(Arrow.Http.AspNetCore.Dispatcher.ISender)))
+        {
+            System.Reflection.Assembly callingAssembly = System.Reflection.Assembly.GetCallingAssembly();
+            Arrow.Http.AspNetCore.Dispatcher.DispatcherRegistration.AddDispatcher(services, callingAssembly);
+        }
+
         return services;
     }
 }
