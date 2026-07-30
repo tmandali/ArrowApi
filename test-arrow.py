@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any
 
 try:
     import pyarrow as pa
@@ -41,16 +42,22 @@ def read_arrow_table(content: bytes) -> pa.Table:
         return reader.read_all()
 
 
-def assert_people_table(table: pa.Table, *, label: str, expected: list[dict] | None = None) -> None:
+def assert_people_table(
+    table: pa.Table, *, label: str, expected: list[dict[str, Any]] | None = None
+) -> None:
     rows = expected if expected is not None else EXPECTED_ROWS
-    assert table.num_rows == len(rows), f"{label}: satır sayısı {len(rows)} olmalı, gelen {table.num_rows}"
+    assert table.num_rows == len(rows), (
+        f"{label}: satır sayısı {len(rows)} olmalı, gelen {table.num_rows}"
+    )
     assert table.column_names == ["Id", "Name"], f"{label}: sütunlar uyuşmuyor"
 
     actual = [
         {"Id": table.column("Id")[i].as_py(), "Name": table.column("Name")[i].as_py()}
         for i in range(table.num_rows)
     ]
-    assert actual == rows, f"{label}: veri uyuşmuyor\n  beklenen: {rows}\n  gelen: {actual}"
+    assert actual == rows, (
+        f"{label}: veri uyuşmuyor\n  beklenen: {rows}\n  gelen: {actual}"
+    )
 
 
 def get_arrow(path: str, *, accept_arrow: bool = True) -> requests.Response:
@@ -146,8 +153,12 @@ def test_get_arrow_variant_manual() -> bytes:
     print(f"  Content-Length: {len(resp.content)} bytes")
 
     table = read_arrow_table(resp.content)
-    assert table.num_rows == 2, f"variant/manual: 2 satır bekleniyor, gelen {table.num_rows}"
-    assert table.column_names == [VARIANT_COLUMN], f"variant/manual: sütun adı {VARIANT_COLUMN} olmalı"
+    assert table.num_rows == 2, (
+        f"variant/manual: 2 satır bekleniyor, gelen {table.num_rows}"
+    )
+    assert table.column_names == [VARIANT_COLUMN], (
+        f"variant/manual: sütun adı {VARIANT_COLUMN} olmalı"
+    )
 
     field = table.schema.field(VARIANT_COLUMN)
     extension = field.metadata.get(b"ARROW:extension:name", b"").decode()
@@ -273,7 +284,10 @@ def main() -> int:
         test_post_arrow_query()
     except requests.RequestException as exc:
         print(f"\nHTTP hatası: {exc}", file=sys.stderr)
-        print("API çalışıyor mu? dotnet run --project src/Arrow.Http.SampleHost", file=sys.stderr)
+        print(
+            "API çalışıyor mu? dotnet run --project src/Arrow.Http.SampleHost",
+            file=sys.stderr,
+        )
         return 1
     except Exception as exc:
         print(f"\nTest başarısız: {exc}", file=sys.stderr)

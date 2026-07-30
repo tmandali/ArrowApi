@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+from typing import Any, Generator
 
 try:
     import pyarrow as pa
@@ -17,13 +18,16 @@ except ImportError:
     sys.exit(1)
 
 BASE_URL = os.environ.get("ARROW_API_URL", "http://localhost:5236")
+API_KEY = os.environ.get("ARROW_API_KEY", "dev-secret")
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
-JOBS_URL = f"{BASE_URL}/api/arrow/jobs/demo"
+JOBS_ROOT_URL = f"{BASE_URL}/api/arrow/jobs"
+CREATE_JOB_URL = f"{JOBS_ROOT_URL}/demo"
 
 # Kurumsal proxy localhost'u 400 ile kesebiliyor
 SESSION = requests.Session()
 SESSION.trust_env = False
 SESSION.proxies = {"http": None, "https": None}
+SESSION.headers["X-API-Key"] = API_KEY
 
 EXPECTED_ROWS = [
     {"Id": 1, "Name": "Ali"},
@@ -45,16 +49,22 @@ def read_arrow_table(content: bytes) -> pa.Table:
 
 
 def assert_people_table(table: pa.Table, *, label: str) -> None:
-    assert table.num_rows == 3, f"{label}: satır sayısı 3 olmalı, gelen {table.num_rows}"
+    assert table.num_rows == 3, (
+        f"{label}: satır sayısı 3 olmalı, gelen {table.num_rows}"
+    )
     assert table.column_names == ["Id", "Name"], f"{label}: sütunlar uyuşmuyor"
     actual = [
         {"Id": table.column("Id")[i].as_py(), "Name": table.column("Name")[i].as_py()}
         for i in range(table.num_rows)
     ]
-    assert actual == EXPECTED_ROWS, f"{label}: veri uyuşmuyor\n  beklenen: {EXPECTED_ROWS}\n  gelen: {actual}"
+    assert actual == EXPECTED_ROWS, (
+        f"{label}: veri uyuşmuyor\n  beklenen: {EXPECTED_ROWS}\n  gelen: {actual}"
+    )
 
 
-def parse_sse_events(response: requests.Response):
+def parse_sse_events(
+    response: requests.Response,
+) -> Generator[tuple[str, str], None, None]:
     event_name = "message"
     data_lines: list[str] = []
 
@@ -87,29 +97,39 @@ def absolute_url(path_or_url: str) -> str:
     return f"{BASE_URL}{path_or_url}"
 
 
-def job_url(status: dict) -> str:
+def job_url(status: dict[str, Any]) -> str:
     job_id = status["id"]
-    return absolute_url(status.get("jobUrl") or status.get("JobUrl") or f"{JOBS_URL}/{job_id}")
-
-
-def events_url(status: dict) -> str:
     return absolute_url(
-        status.get("eventsUrl") or status.get("EventsUrl") or f"{job_url(status)}/events"
+        status.get("jobUrl") or status.get("JobUrl") or f"{JOBS_ROOT_URL}/{job_id}"
     )
 
 
-def field(obj: dict, *names: str):
+def events_url(status: dict[str, Any]) -> str:
+    return absolute_url(
+        status.get("eventsUrl")
+        or status.get("EventsUrl")
+        or f"{job_url(status)}/events"
+    )
+
+
+def field(obj: dict[str, Any], *names: str) -> Any:
     for name in names:
         if name in obj and obj[name] is not None:
             return obj[name]
     return None
 
 
-def create_job(body: dict | None = None) -> dict:
-    payload = body if body is not None else QUERY_BODY
-    print(f"POST {JOBS_URL}")
-    resp = SESSION.post(JOBS_URL, json=payload, timeout=30)
-    assert resp.status_code == 202, f"job create 202 bekleniyor, gelen {resp.status_code}: {resp.text}"
+def create_job(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    if body is None:
+        payload = json.loads(json.dumps(QUERY_BODY))
+        payload["parameters"]["_t"] = int(time.time() * 1000)
+    else:
+        payload = body
+    print(f"POST {CREATE_JOB_URL}")
+    resp = SESSION.post(CREATE_JOB_URL, json=payload, timeout=30)
+    assert resp.status_code == 202, (
+        f"job create 202 bekleniyor, gelen {resp.status_code}: {resp.text}"
+    )
     status = resp.json()
     print(f"  Status: {resp.status_code}, Body: {status}")
     assert "id" in status
@@ -117,7 +137,11 @@ def create_job(body: dict | None = None) -> dict:
     return status
 
 
-def wait_sse(status: dict, *, terminal: tuple[str, ...] = ("completed", "failed", "cancelled")) -> str:
+def wait_sse(
+    status: dict[str, Any],
+    *,
+    terminal: tuple[str, ...] = ("completed", "failed", "cancelled"),
+) -> str:
     url = events_url(status)
     print(f"GET {url} (SSE)")
     with SESSION.get(url, stream=True, timeout=60) as sse:
@@ -139,7 +163,7 @@ def wait_sse(status: dict, *, terminal: tuple[str, ...] = ("completed", "failed"
     raise AssertionError(f"SSE terminal event gelmedi: {terminal}")
 
 
-def test_happy_path() -> dict:
+def test_happy_path() -> dict[str, Any]:
     status = create_job()
     event = wait_sse(status, terminal=("completed", "failed"))
     assert event == "completed", f"job failed/cancelled: {event}"
@@ -162,7 +186,7 @@ def test_happy_path() -> dict:
     return status
 
 
-def test_get_request(status: dict) -> None:
+def test_get_request(status: dict[str, Any]) -> None:
     url = f"{job_url(status)}/request"
     print(f"GET {url}")
     resp = SESSION.get(url, timeout=30)
@@ -175,9 +199,9 @@ def test_get_request(status: dict) -> None:
     assert params.get("limit") == 3 or params.get("Limit") == 3
 
 
-def test_list_jobs(status: dict) -> None:
-    print(f"GET {JOBS_URL}?take=100")
-    resp = SESSION.get(JOBS_URL, params={"take": 100}, timeout=30)
+def test_list_jobs(status: dict[str, Any]) -> None:
+    print(f"GET {JOBS_ROOT_URL}?take=100")
+    resp = SESSION.get(JOBS_ROOT_URL, params={"take": 100}, timeout=30)
     resp.raise_for_status()
     body = resp.json()
     items = field(body, "items", "Items") or []
@@ -185,13 +209,19 @@ def test_list_jobs(status: dict) -> None:
     print(f"  Status: {resp.status_code}, total={total}, count={len(items)}")
     assert total is not None and total >= 1
     job_id = status["id"]
-    assert any(field(item, "id", "Id") == job_id for item in items), "liste job id içermiyor"
+    assert any(field(item, "id", "Id") == job_id for item in items), (
+        "liste job id içermiyor"
+    )
 
-    print(f"GET {JOBS_URL}?state=Completed&take=50")
-    filtered = SESSION.get(JOBS_URL, params={"state": "Completed", "take": 50}, timeout=30)
+    print(f"GET {JOBS_ROOT_URL}?state=Completed&take=50")
+    filtered = SESSION.get(
+        JOBS_ROOT_URL, params={"state": "Completed", "take": 50}, timeout=30
+    )
     filtered.raise_for_status()
     completed_items = field(filtered.json(), "items", "Items") or []
-    assert all(field(item, "status", "Status") == "Completed" for item in completed_items)
+    assert all(
+        field(item, "status", "Status") == "Completed" for item in completed_items
+    )
 
 
 def test_cancel_and_retry() -> None:
@@ -199,7 +229,7 @@ def test_cancel_and_retry() -> None:
         {
             "cnnName": "inmemory",
             "query": "SELECT * FROM People",
-            "parameters": {},
+            "parameters": {"_t": int(time.time() * 1000)},
             "batchSize": 1,
         }
     )
@@ -215,7 +245,9 @@ def test_cancel_and_retry() -> None:
         retry_url = f"{job_url(status)}/retry"
         print(f"POST {retry_url}")
         retry = SESSION.post(retry_url, timeout=30)
-        assert retry.status_code == 202, f"retry 202 bekleniyor, gelen {retry.status_code}: {retry.text}"
+        assert retry.status_code == 202, (
+            f"retry 202 bekleniyor, gelen {retry.status_code}: {retry.text}"
+        )
         retry_status = retry.json()
         print(f"  Status: {retry.status_code}, Body: {retry_status}")
         assert retry_status["id"] != status["id"]
@@ -227,29 +259,39 @@ def test_cancel_and_retry() -> None:
         # Orijinal cancelled job silinebilir
         print(f"DELETE {job_url(status)}")
         deleted = SESSION.delete(job_url(status), timeout=30)
-        assert deleted.status_code == 204, f"delete 204 bekleniyor, gelen {deleted.status_code}"
+        assert deleted.status_code == 204, (
+            f"delete 204 bekleniyor, gelen {deleted.status_code}"
+        )
         missing = SESSION.get(job_url(status), timeout=30)
         assert missing.status_code == 404
         return
 
     # Worker cancel'dan önce bitirdiyse Conflict; completed job için retry Conflict olmalı
-    assert cancel.status_code == 409, f"cancel 200 veya 409 bekleniyor, gelen {cancel.status_code}"
+    assert cancel.status_code == 409, (
+        f"cancel 200 veya 409 bekleniyor, gelen {cancel.status_code}"
+    )
     print(f"  Cancel Conflict (job zaten bitti): {cancel.status_code}")
 
     retry_url = f"{job_url(status)}/retry"
     print(f"POST {retry_url} (Completed -> Conflict)")
     retry = SESSION.post(retry_url, timeout=30)
-    assert retry.status_code == 409, f"completed retry 409 bekleniyor, gelen {retry.status_code}"
+    assert retry.status_code == 409, (
+        f"completed retry 409 bekleniyor, gelen {retry.status_code}"
+    )
 
 
-def test_delete_completed(status: dict) -> None:
+def test_delete_completed(status: dict[str, Any]) -> None:
     url = job_url(status)
     print(f"DELETE {url}")
     resp = SESSION.delete(url, timeout=30)
-    assert resp.status_code == 204, f"delete 204 bekleniyor, gelen {resp.status_code}: {resp.text}"
+    assert resp.status_code == 204, (
+        f"delete 204 bekleniyor, gelen {resp.status_code}: {resp.text}"
+    )
 
     missing = SESSION.get(url, timeout=30)
-    assert missing.status_code == 404, f"silinen job 404 olmalı, gelen {missing.status_code}"
+    assert missing.status_code == 404, (
+        f"silinen job 404 olmalı, gelen {missing.status_code}"
+    )
 
     request_missing = SESSION.get(f"{url}/request", timeout=30)
     assert request_missing.status_code == 404
@@ -264,7 +306,10 @@ def main() -> int:
         test_delete_completed(completed)
     except requests.RequestException as exc:
         print(f"\nHTTP hatası: {exc}", file=sys.stderr)
-        print("API çalışıyor mu? dotnet run --project src/Arrow.Http.SampleHost", file=sys.stderr)
+        print(
+            "API çalışıyor mu? dotnet run --project src/Arrow.Http.SampleHost",
+            file=sys.stderr,
+        )
         return 1
     except Exception as exc:
         print(f"\nTest başarısız: {exc}", file=sys.stderr)
