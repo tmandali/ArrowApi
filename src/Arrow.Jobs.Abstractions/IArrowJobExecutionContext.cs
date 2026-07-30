@@ -1,3 +1,5 @@
+using Apache.Arrow;
+
 namespace Arrow.Jobs;
 
 /// <summary>Worker için job kimliği, canlı ilerleme ve alt job zincirleme bağlamı.</summary>
@@ -9,13 +11,12 @@ public interface IArrowJobExecutionContext
     ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Bu Job tamamlandıktan veya belirli bir aşamaya geldikten sonra zincirleme (chain) olarak bir sonraki Job'ı başlatır.
-    /// <paramref name="wait"/> true ise alt job tamamlanana (Completed, Failed, Cancelled) kadar bekler.
+    /// Bu Job tamamlandıktan veya belirli bir aşamaya geldikten sonra zincirleme (chain) olarak bir sonraki Job'ı başlatır ve anında döner.
+    /// Beklenmek istendiğinde <see cref="WaitForJobCompletionAsync"/> veya <see cref="ReadBatchesAsync"/> kullanılabilir.
     /// </summary>
     Task<ArrowJob<TNextRequest>> EnqueueNextJobAsync<TNextRequest>(
         string jobName,
         TNextRequest request,
-        bool wait = false,
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull;
 
@@ -26,4 +27,13 @@ public interface IArrowJobExecutionContext
         Guid targetJobId,
         TimeSpan? pollInterval = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// <see cref="ArrowJob{TRequest}"/> sonucunda oluşan RecordBatch'leri okur.
+    /// Job henüz tamamlanmadıysa, okuma başladığında otomatik olarak Job'ın bitmesini bekler (Lazy Evaluation).
+    /// </summary>
+    IAsyncEnumerable<RecordBatch> ReadBatchesAsync<TRequest>(
+        ArrowJob<TRequest>? job,
+        CancellationToken cancellationToken = default)
+        where TRequest : notnull;
 }

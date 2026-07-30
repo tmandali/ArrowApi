@@ -31,9 +31,15 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
             yield return batch;
 
         await _context.PublishInfoAsync("Sorgu tamamlandı, zincirdeki export-report job'ı tetikleniyor...", cancellationToken);
-        await _context.EnqueueNextJobAsync(
+        var report = await _context.EnqueueNextJobAsync(
             "export-report",
             new ExportReportRequest("DemoReport", _context.JobId),
             cancellationToken: cancellationToken);
+
+        // _context üzerinden doğrudan okunur (otomatik bekler ve stream eder)
+        await foreach (RecordBatch reportBatch in _context.ReadBatchesAsync(report, cancellationToken))
+        {
+            // Alt job sonuç batch'leri işlenebilir
+        }
     }
 }

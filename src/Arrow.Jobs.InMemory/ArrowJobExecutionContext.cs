@@ -47,7 +47,6 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
     public async Task<ArrowJob<TNextRequest>> EnqueueNextJobAsync<TNextRequest>(
         string jobName,
         TNextRequest request,
-        bool wait = false,
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
@@ -78,16 +77,10 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         string? correlationId = parentStatus?.CorrelationId ?? _jobId.ToString("N");
 
         ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, correlationId, cancellationToken);
+
         await queue.EnqueueAsync(nextJob.Id, cancellationToken);
 
         await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, CorrelationId: {correlationId})", cancellationToken);
-
-        if (wait)
-        {
-            await WaitForJobCompletionAsync(nextJob.Id, cancellationToken: cancellationToken);
-            ArrowJob<TNextRequest>? completedJob = await store.GetAsync(nextJob.Id, cancellationToken);
-            return completedJob ?? nextJob;
-        }
 
         return nextJob;
     }
@@ -110,5 +103,56 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         }
 
         throw new OperationCanceledException("WaitForJobCompletionAsync sonlandırıldı.", cancellationToken);
+    }
+
+    public async IAsyncEnumerable<Apache.Arrow.RecordBatch> ReadBatchesAsync<TNextRequest>(
+        ArrowJob<TNextRequest>? job,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        where TNextRequest : notnull
+    {
+        if (job is null) yield break;
+
+        // Job henüz bitmediyse, okuma döngüsü başladığında otomatik olarak bitmesini bekle (Lazy Evaluation)
+        if (job.State != ArrowJobState.Completed &&
+            job.State != ArrowJobState.Failed &&
+            job.State != ArrowJobState.Cancelled)
+        {
+            ArrowJobEvent evt = await WaitForJobCompletionAsync(job.Id, cancellationToken: cancellationToken);
+            if (string.Equals(evt.Status, nameof(ArrowJobState.Completed), StringComparison.OrdinalIgnoreCase))
+            {
+                job.State = ArrowJobState.Completed;
+            }
+            else if (string.Equals(evt.Status, nameof(ArrowJobState.Failed), StringComparison.OrdinalIgnoreCase))
+            {
+                job.State = ArrowJobState.Failed;
+            }
+            else if (string.Equals(evt.Status, nameof(ArrowJobState.Cancelled), StringComparison.OrdinalIgnoreCase))
+            {
+                job.State = ArrowJobState.Cancelled;
+            }
+        }
+
+        if (job.State != ArrowJobState.Completed || string.IsNullOrWhiteSpace(job.ResultPath))
+        {
+            yield break;
+        }
+
+        string resultPath = job.ResultPath!;
+
+        if (File.Exists(resultPath) == false && resultPath.Contains(Path.DirectorySeparatorChar.ToString()))
+        {
+            yield break;
+        }
+
+        var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
+        if (resultStorage is null)
+        {
+            throw new InvalidOperationException("IArrowJobResultStorage service is not registered in DI.");
+        }
+
+        await foreach (Apache.Arrow.RecordBatch batch in resultStorage.ReadBatchesAsync(resultPath, cancellationToken).WithCancellation(cancellationToken))
+        {
+            yield return batch;
+        }
     }
 }

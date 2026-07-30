@@ -6,7 +6,7 @@ namespace Arrow.Http.SampleHost;
 
 public sealed record ExportReportRequest(
     string ReportName,
-    Guid SourceJobId) : Arrow.Http.AspNetCore.Dispatcher.IRequest<IAsyncEnumerable<RecordBatch>>;
+    Guid SourceJobId) : AspNetCore.Dispatcher.IRequest<IAsyncEnumerable<RecordBatch>>;
 
 public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportRequest>
 {
