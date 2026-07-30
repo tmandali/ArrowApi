@@ -164,6 +164,46 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         return Task.FromResult(_jobs.TryRemove(id, out _));
     }
 
+    public Task<ArrowJobStatus?> GetStatusAsync(Guid id, string jobsBasePath = "/api/arrow/jobs", CancellationToken cancellationToken = default)
+    {
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.FromResult<ArrowJobStatus?>(null);
+
+        string cleanBase = jobsBasePath.TrimEnd('/');
+        string jobUrl = $"{cleanBase}/{id}";
+        string eventsUrl = $"{cleanBase}/{id}/events";
+
+        ArrowJobStatus status = new(
+            job.Id,
+            job.State.ToString(),
+            jobUrl,
+            eventsUrl,
+            job.CreatedAt,
+            job.CompletedAt,
+            job.Error,
+            job.BatchCount,
+            job.TotalRows,
+            null,
+            job.Name,
+            job.CorrelationId);
+
+        return Task.FromResult<ArrowJobStatus?>(status);
+    }
+
+    public Task<bool> TryCancelJobAsync(Guid id, CancellationToken cancellationToken = default) =>
+        TryCancelAsync(id, cancellationToken);
+
+    public Task<bool> TryDeleteJobAsync(Guid id, CancellationToken cancellationToken = default) =>
+        TryDeleteAsync(id, cancellationToken);
+
+    public Task<string?> GetResultPathAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.FromResult<string?>(null);
+
+        return Task.FromResult(job.ResultPath);
+    }
+
     private ArrowJob<TRequest> GetRequired(Guid id) =>
         _jobs.TryGetValue(id, out ArrowJob<TRequest>? job)
             ? job

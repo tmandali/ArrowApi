@@ -53,7 +53,7 @@ public static class ArrowJobsServiceExtensions
         IServiceCollection services,
         string? name,
         Action<IArrowJobsConfigurer>? configure)
-        where TWorker : class, IArrowJobWorker<TRequest>
+        where TWorker : class
     {
         var builder = new ArrowJobsBuilder<TRequest>(services);
         builder.UseInMemory();
@@ -64,9 +64,15 @@ public static class ArrowJobsServiceExtensions
         ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
         if (!string.IsNullOrWhiteSpace(name))
         {
-            services.AddKeyedScoped<IArrowJobWorker<TRequest>, TWorker>(name);
+            services.AddKeyedScoped(typeof(TWorker), name);
+            services.AddKeyedScoped(typeof(IArrowJobWorker<TRequest>), name, (sp, key) => sp.GetRequiredKeyedService(typeof(TWorker), key));
         }
-        services.AddScoped<IArrowJobWorker<TRequest>, TWorker>();
+        services.AddScoped<IArrowJobExecutionContext<TRequest>>(sp =>
+            ArrowJobExecutionContextHolder<TRequest>.Current
+            ?? throw new InvalidOperationException($"IArrowJobExecutionContext<{typeof(TRequest).Name}> is only available during job execution."));
+
+        services.AddScoped(typeof(TWorker));
+        services.AddScoped(typeof(IArrowJobWorker<TRequest>), sp => sp.GetRequiredService(typeof(TWorker)));
         services.AddHostedService<ArrowJobHostedService<TRequest>>();
         return services;
     }

@@ -514,6 +514,26 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
         Assert.Equal(firstJob.Id, conflictJob.Id);
     }
 
+    [Fact]
+    public async Task Cqrs_dispatcher_job_creates_and_executes_successfully()
+    {
+        HttpClient http = CreateClient();
+
+        var requestPayload = new { Name = "Laptop", Price = 1500.0m, Stock = 10 };
+        ArrowJob job = await http.PostArrowJobAsync("/api/arrow/jobs/create-product", requestPayload);
+        Assert.NotNull(job);
+
+        await foreach (ArrowSseItem<ArrowJobEvent> item in job.ReadEventsAsync())
+        {
+            if (item.EventType is ArrowJobEventNames.Completed)
+                break;
+        }
+
+        ArrowJobStatus? status = await http.GetFromJsonAsync<ArrowJobStatus>(job.JobUrl);
+        Assert.NotNull(status);
+        Assert.Equal("Completed", status.Status);
+    }
+
     private static async IAsyncEnumerable<RecordBatch> EmptyBatches()
     {
         await Task.CompletedTask;

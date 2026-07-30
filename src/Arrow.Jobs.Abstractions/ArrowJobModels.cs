@@ -34,7 +34,7 @@ public sealed record ArrowQueryRequest(
     string CnnName,
     string Query,
     IDictionary<string, object?> Parameters,
-    int? BatchSize = null);
+    int? BatchSize = null) : Arrow.Http.AspNetCore.Dispatcher.IRequest<System.Collections.Generic.IAsyncEnumerable<Apache.Arrow.RecordBatch>>;
 
 public sealed record ArrowJobStatus(
     Guid Id,

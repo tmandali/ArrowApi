@@ -1,8 +1,10 @@
 using Apache.Arrow;
+using Arrow.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Arrow.Jobs.InMemory;
@@ -111,20 +113,43 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         _logger.LogInformation("Job başladı: {JobId}", jobId);
 
         using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
-        IArrowJobWorker<TRequest>? worker = null;
+
+        var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub, scope.ServiceProvider);
+        ArrowJobExecutionContextHolder<TRequest>.Current = context;
+
+        object? worker = null;
         if (!string.IsNullOrWhiteSpace(job.Name))
         {
-            worker = scope.ServiceProvider.GetKeyedService<IArrowJobWorker<TRequest>>(job.Name);
+            worker = scope.ServiceProvider.GetKeyedService(typeof(IArrowJobWorker<TRequest>), job.Name)
+                     ?? scope.ServiceProvider.GetKeyedService<object>(job.Name);
         }
-        worker ??= scope.ServiceProvider.GetService<IArrowJobWorker<TRequest>>();
+        worker ??= scope.ServiceProvider.GetService(typeof(IArrowJobWorker<TRequest>));
         if (worker is null)
             throw new InvalidOperationException($"'{job.Name}' için uygun worker servisi bulunamadı.");
 
-        var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub, scope.ServiceProvider);
         string resultPath = _resultStorage.GetResultPath(jobId, job.Name, job.CorrelationId);
+
+        IAsyncEnumerable<RecordBatch> rawBatches;
+        try
+        {
+            if (worker is IArrowJobWorker<TRequest> streamWorker)
+            {
+                rawBatches = await streamWorker.Handle(job.Request, cancellationToken);
+            }
+            else
+            {
+                object? response = await InvokeHandlerDynamicAsync(worker, job.Request, cancellationToken);
+                rawBatches = ConvertResponseToBatches(response, cancellationToken);
+            }
+        }
+        finally
+        {
+            ArrowJobExecutionContextHolder<TRequest>.Current = null;
+        }
+
         IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(
             jobId,
-            worker.ExecuteJobAsync(context, cancellationToken),
+            rawBatches,
             cancellationToken);
         await _resultStorage.WriteBatchesAsync(resultPath, batches, cancellationToken);
 
@@ -198,5 +223,80 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
             TraceId: job.TraceId);
 
         await _eventHub.PublishAsync(jobId, eventName, payload, cancellationToken);
+    }
+
+    private static async IAsyncEnumerable<RecordBatch> ConvertResponseToBatches(
+        object? response,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (response is RecordBatch singleBatch)
+        {
+            yield return singleBatch;
+        }
+        else if (response is IAsyncEnumerable<RecordBatch> batchStream)
+        {
+            await foreach (RecordBatch b in batchStream.WithCancellation(cancellationToken))
+                yield return b;
+        }
+        else if (response is System.Data.DataTable dataTable)
+        {
+            using var reader = dataTable.CreateDataReader();
+            await using var arrowReader = ArrowData.OpenArrowReader(reader);
+            await foreach (RecordBatch b in arrowReader.ReadBatchesAsync(cancellationToken))
+                yield return b;
+        }
+        else if (response is System.Data.Common.DbDataReader dbReader)
+        {
+            await using var arrowReader = ArrowData.OpenArrowReader(dbReader);
+            await foreach (RecordBatch b in arrowReader.ReadBatchesAsync(cancellationToken))
+                yield return b;
+        }
+        else if (response is not null)
+        {
+            yield return CreateSingleResultBatch(response);
+        }
+    }
+
+    private static RecordBatch CreateSingleResultBatch(object response)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(response);
+        Field[] fields = [new Field("Result", new Apache.Arrow.Types.StringType(), false)];
+        Schema schema = new(fields, null);
+
+        var builder = new StringArray.Builder();
+        builder.Append(json);
+        StringArray array = builder.Build();
+
+        return new RecordBatch(schema, [array], 1);
+    }
+
+    private static async ValueTask<object?> InvokeHandlerDynamicAsync(
+        object worker,
+        object request,
+        CancellationToken cancellationToken)
+    {
+        MethodInfo? method = worker.GetType().GetMethod("Handle", [request.GetType(), typeof(CancellationToken)]);
+        if (method is null)
+            throw new InvalidOperationException($"{worker.GetType().Name} handler üzerinde Handle metodu bulunamadı.");
+
+        object? task = method.Invoke(worker, [request, cancellationToken]);
+        if (task is null)
+            return null;
+
+        Type returnType = task.GetType();
+        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+        {
+            MethodInfo asTaskMethod = returnType.GetMethod("AsTask")!;
+            Task t = (Task)asTaskMethod.Invoke(task, null)!;
+            await t.ConfigureAwait(false);
+            return t.GetType().GetProperty("Result")?.GetValue(t);
+        }
+        else if (task is Task t)
+        {
+            await t.ConfigureAwait(false);
+            return t.GetType().GetProperty("Result")?.GetValue(t);
+        }
+
+        return task;
     }
 }

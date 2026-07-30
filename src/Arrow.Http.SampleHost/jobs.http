@@ -36,6 +36,17 @@ X-Correlation-ID: custom-chain-123
   "sourceJobId": "00000000-0000-0000-0000-000000000000"
 }
 
+### 1c. Create Product Job (CQRS Dispatcher)
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/create-product
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "name": "Gaming Laptop",
+  "price": 2499.99,
+  "stock": 50
+}
+
 ### 2. Get Job Status (Sadece GUID ile - Job Name gerektirmez!)
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
 X-Api-Key: {{ApiKey}}

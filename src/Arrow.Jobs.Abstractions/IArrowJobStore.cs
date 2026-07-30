@@ -1,6 +1,14 @@
 namespace Arrow.Jobs;
 
-public interface IArrowJobStore<TRequest>
+public interface IArrowJobStore
+{
+    Task<ArrowJobStatus?> GetStatusAsync(Guid id, string jobsBasePath = "/api/arrow/jobs", CancellationToken cancellationToken = default);
+    Task<bool> TryCancelJobAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<bool> TryDeleteJobAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<string?> GetResultPathAsync(Guid id, CancellationToken cancellationToken = default);
+}
+
+public interface IArrowJobStore<TRequest> : IArrowJobStore
 {
     Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, string? correlationId = null, CancellationToken cancellationToken = default);
     Task<ArrowJob<TRequest>?> FindDuplicateAsync(TRequest request, string? name = null, TimeSpan? window = null, CancellationToken cancellationToken = default);

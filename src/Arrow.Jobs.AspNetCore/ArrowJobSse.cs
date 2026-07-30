@@ -6,9 +6,9 @@ internal static class ArrowJobSse
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static async Task StreamEventsAsync<TRequest>(
+    public static async Task StreamEventsAsync(
         Guid jobId,
-        IArrowJobStore<TRequest> store,
+        IArrowJobStore? store,
         IArrowJobEventHub eventHub,
         HttpResponse response,
         string jobsPath,
@@ -21,8 +21,8 @@ internal static class ArrowJobSse
 
         await using IArrowJobEventSubscription subscription = eventHub.Subscribe(jobId);
 
-        ArrowJob<TRequest>? job = await store.GetAsync(jobId, cancellationToken);
-        if (job is null)
+        ArrowJobStatus? status = store is null ? null : await store.GetStatusAsync(jobId, jobsPath, cancellationToken);
+        if (status is null)
         {
             await WriteEventAsync(
                 response,
@@ -32,21 +32,23 @@ internal static class ArrowJobSse
             return;
         }
 
-        string snapshotEvent = job.State switch
+        string snapshotEvent = status.Status switch
         {
-            ArrowJobState.Completed => ArrowJobEventNames.Completed,
-            ArrowJobState.Failed => ArrowJobEventNames.Failed,
-            ArrowJobState.Cancelled => ArrowJobEventNames.Cancelled,
+            nameof(ArrowJobState.Completed) => ArrowJobEventNames.Completed,
+            nameof(ArrowJobState.Failed) => ArrowJobEventNames.Failed,
+            nameof(ArrowJobState.Cancelled) => ArrowJobEventNames.Cancelled,
             _ => ArrowJobEventNames.Status
         };
 
         await WriteEventAsync(
             response,
             snapshotEvent,
-            JsonSerializer.Serialize(ToPayload(job, jobsPath), JsonOptions),
+            JsonSerializer.Serialize(ToPayload(status, jobsPath), JsonOptions),
             cancellationToken);
 
-        if (job.State is ArrowJobState.Completed or ArrowJobState.Failed or ArrowJobState.Cancelled)
+        if (string.Equals(status.Status, nameof(ArrowJobState.Completed), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status.Status, nameof(ArrowJobState.Failed), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status.Status, nameof(ArrowJobState.Cancelled), StringComparison.OrdinalIgnoreCase))
             return;
 
         await using IAsyncEnumerator<ArrowJobHubMessage> enumerator =
@@ -85,19 +87,18 @@ internal static class ArrowJobSse
         }
     }
 
-    private static ArrowJobEvent ToPayload<TRequest>(ArrowJob<TRequest> job, string jobsPath) =>
+    private static ArrowJobEvent ToPayload(ArrowJobStatus status, string jobsPath) =>
         EnrichUrls(
             new ArrowJobEvent(
-                job.Id,
-                job.State.ToString(),
-                job.CreatedAt,
-                job.CompletedAt,
-                job.Error,
-                BatchCount: job.BatchCount,
-                TotalRows: job.TotalRows,
-                TraceId: job.TraceId,
-                Name: job.Name,
-                CorrelationId: job.CorrelationId),
+                status.Id,
+                status.Status,
+                status.CreatedAt,
+                status.CompletedAt,
+                status.Error,
+                BatchCount: status.BatchCount,
+                TotalRows: status.TotalRows,
+                Name: status.Name,
+                CorrelationId: status.CorrelationId),
             jobsPath);
 
     private static ArrowJobEvent EnrichUrls(ArrowJobEvent payload, string jobsPath)

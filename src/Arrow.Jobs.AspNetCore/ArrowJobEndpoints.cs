@@ -389,64 +389,110 @@ public static class ArrowJobEndpoints
         IArrowJobStore<TRequest> store,
         CancellationToken cancellationToken)
     {
-        ArrowJob<TRequest>? job = await store.GetAsync(id, cancellationToken);
-        if (job is null)
-            return Results.NotFound();
-
         string jobsPath = ResolveJobsBasePath(request);
+
+        ArrowJobStatus? status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
+        string? resultPath = null;
+        if (status is not null)
+        {
+            resultPath = await store.GetResultPathAsync(id, cancellationToken);
+        }
+        else
+        {
+            var stores = request.HttpContext.RequestServices.GetServices<IArrowJobStore>();
+            foreach (var s in stores)
+            {
+                status = await s.GetStatusAsync(id, jobsPath, cancellationToken);
+                if (status is not null)
+                {
+                    resultPath = await s.GetResultPathAsync(id, cancellationToken);
+                    break;
+                }
+            }
+        }
+
+        if (status is null)
+            return Results.NotFound();
 
         if (request.AcceptsArrowStream())
         {
             IArrowJobResultStorage? resultStorage = request.HttpContext.RequestServices
                 .GetService<IArrowJobResultStorage>();
-            return GetJobArrowResult(job, resultStorage, jobsPath, cancellationToken);
+            return GetJobArrowResultByStatus(status, resultPath, resultStorage, jobsPath, cancellationToken);
         }
 
-        return Results.Ok(ToStatusResponse(job, jobsPath));
+        return Results.Ok(status);
     }
 
-    private static Task StreamJobEvents<TRequest>(
+    private static async Task StreamJobEvents<TRequest>(
         Guid id,
         IArrowJobStore<TRequest> store,
         IArrowJobEventHub eventHub,
         HttpResponse response,
-        CancellationToken cancellationToken) =>
-        ArrowJobSse.StreamEventsAsync(
+        CancellationToken cancellationToken)
+    {
+        string jobsPath = ResolveJobsBasePath(response.HttpContext.Request);
+        IArrowJobStore? targetStore = store;
+        ArrowJobStatus? status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
+        if (status is null)
+        {
+            var stores = response.HttpContext.RequestServices.GetServices<IArrowJobStore>();
+            foreach (var s in stores)
+            {
+                status = await s.GetStatusAsync(id, jobsPath, cancellationToken);
+                if (status is not null)
+                {
+                    targetStore = s;
+                    break;
+                }
+            }
+        }
+
+        await ArrowJobSse.StreamEventsAsync(
             id,
-            store,
+            targetStore,
             eventHub,
             response,
-            ResolveJobsBasePath(response.HttpContext.Request),
+            jobsPath,
             cancellationToken);
+    }
 
-    private static IResult GetJobArrowResult<TRequest>(
-        ArrowJob<TRequest> job,
+    private static IResult GetJobArrowResultByStatus(
+        ArrowJobStatus status,
+        string? resultPath,
         IArrowJobResultStorage? resultStorage,
         string jobsPath,
-        CancellationToken cancellationToken) =>
-        job.State switch
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(status.Status, nameof(ArrowJobState.Queued), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status.Status, nameof(ArrowJobState.Running), StringComparison.OrdinalIgnoreCase))
         {
-            ArrowJobState.Queued or ArrowJobState.Running => Results.Accepted(
-              JobUrl(jobsPath, job.Id),
-              ToStatusResponse(job, jobsPath)),
-            ArrowJobState.Cancelled => Results.Problem(
-              detail: "Job iptal edildi.",
-              statusCode: StatusCodes.Status409Conflict,
-              title: "Job iptal"),
-            ArrowJobState.Failed => Results.Problem(
-              detail: job.Error,
-              statusCode: StatusCodes.Status500InternalServerError,
-              title: "Job başarısız"),
-            ArrowJobState.Completed when resultStorage is null => Results.Problem(
-              detail: "Sonuç deposu yapılandırılmamış.",
-              statusCode: StatusCodes.Status500InternalServerError),
-            ArrowJobState.Completed when string.IsNullOrEmpty(job.ResultPath) || !File.Exists(job.ResultPath) => Results.Problem(
-              detail: "Sonuç dosyası bulunamadı.",
-              statusCode: StatusCodes.Status500InternalServerError),
-            ArrowJobState.Completed => ArrowResults.FromBatches(
-              resultStorage.ReadBatchesAsync(job.ResultPath, cancellationToken)),
-            _ => Results.StatusCode(StatusCodes.Status500InternalServerError)
-        };
+            return Results.Accepted(status.JobUrl, status);
+        }
+
+        if (string.Equals(status.Status, nameof(ArrowJobState.Cancelled), StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(detail: "Job iptal edildi.", statusCode: StatusCodes.Status409Conflict, title: "Job iptal");
+        }
+
+        if (string.Equals(status.Status, nameof(ArrowJobState.Failed), StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(detail: status.Error, statusCode: StatusCodes.Status500InternalServerError, title: "Job başarısız");
+        }
+
+        if (string.Equals(status.Status, nameof(ArrowJobState.Completed), StringComparison.OrdinalIgnoreCase))
+        {
+            if (resultStorage is null)
+                return Results.Problem(detail: "Sonuç deposu yapılandırılmamış.", statusCode: StatusCodes.Status500InternalServerError);
+
+            if (string.IsNullOrEmpty(resultPath) || !File.Exists(resultPath))
+                return Results.Problem(detail: "Sonuç dosyası bulunamadı.", statusCode: StatusCodes.Status500InternalServerError);
+
+            return ArrowResults.FromBatches(resultStorage.ReadBatchesAsync(resultPath, cancellationToken));
+        }
+
+        return Results.StatusCode(StatusCodes.Status500InternalServerError);
+    }
 
     private static ArrowJobStatus ToStatusResponse<TRequest>(
         ArrowJob<TRequest> job,

@@ -1,10 +1,17 @@
 using Apache.Arrow;
+using Arrow.Http.AspNetCore.Dispatcher;
+using System.Collections.Generic;
 
 namespace Arrow.Jobs;
 
-public interface IArrowJobWorker<TRequest>
+/// <summary>
+/// Ortak CQRS Handler & Arrow Job Worker arayüzü.
+/// </summary>
+public interface IArrowJobWorker<in TRequest, TResponse> : IRequestHandler<TRequest, TResponse>
 {
-    IAsyncEnumerable<RecordBatch> ExecuteJobAsync(
-        IArrowJobExecutionContext<TRequest> context,
-        CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// RecordBatch akışı dönen varsayılan Arrow Job Worker arayüzü.
+/// </summary>
+public interface IArrowJobWorker<in TRequest> : IArrowJobWorker<TRequest, IAsyncEnumerable<RecordBatch>>;
