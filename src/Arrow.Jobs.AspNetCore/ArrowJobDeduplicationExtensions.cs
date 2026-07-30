@@ -1,5 +1,8 @@
 namespace Arrow.Jobs.AspNetCore;
 
+/// <summary>Job tekilleştirme (deduplication) politikası.</summary>
+/// <param name="Enabled">Tekilleştirmenin aktif olup olmadığı.</param>
+/// <param name="Window">Tekilleştirme zaman penceresi (TTL).</param>
 public sealed record ArrowJobDeduplicationPolicy(bool Enabled, TimeSpan? Window = null);
 
 public static class ArrowJobDeduplicationExtensions

@@ -6,13 +6,19 @@ namespace Arrow.Http.Client;
 /// <summary>Taşınabilir SSE öğesi (<see cref="System.Net.ServerSentEvents"/> bağımlılığı yok).</summary>
 public readonly struct ArrowSseItem<T>
 {
+    /// <summary>Yeni bir <see cref="ArrowSseItem{T}"/> örneği oluşturur.</summary>
+    /// <param name="data">SSE veri içeriği.</param>
+    /// <param name="eventType">İsteğe bağlı SSE olay türü.</param>
     public ArrowSseItem(T data, string? eventType = null)
     {
         Data = data;
         EventType = eventType;
     }
 
+    /// <summary>SSE veri gövdesi.</summary>
     public T Data { get; }
+
+    /// <summary>SSE olay adı (ör. <c>status</c>, <c>completed</c>).</summary>
     public string? EventType { get; }
 }
 

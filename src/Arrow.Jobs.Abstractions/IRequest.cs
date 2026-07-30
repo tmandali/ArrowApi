@@ -15,6 +15,7 @@ public interface IRequest : IRequest<Unit>;
 /// </summary>
 public readonly struct Unit
 {
+    /// <summary>Tekil <see cref="Unit"/> değer örneği.</summary>
     public static readonly Unit Value = default;
 }
 

@@ -5,8 +5,10 @@ using System.Reflection;
 
 namespace Arrow.Jobs.Redis;
 
+/// <summary>Redis tabanlı job store/queue/hub kayıt extension'ları.</summary>
 public static class ArrowJobsRedisExtensions
 {
+    /// <summary>Belirtilen istek türü için Redis tabanlı job altyapısını kaydeder.</summary>
     public static ArrowJobsBuilder<TRequest> UseRedis<TRequest>(
         this ArrowJobsBuilder<TRequest> builder,
         string connectionString)
@@ -16,6 +18,7 @@ public static class ArrowJobsRedisExtensions
         return builder;
     }
 
+    /// <summary>Belirtilen yapılandırıcı için Redis tabanlı job altyapısını kaydeder.</summary>
     public static void UseRedis(this IArrowJobsConfigurer configurer, string connectionString)
     {
         ArgumentNullException.ThrowIfNull(configurer);

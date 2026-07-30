@@ -58,8 +58,10 @@ internal static class VariantColumn
 /// <summary>Elle oluşturulmuş Variant kolonlu <see cref="RecordBatch"/> yardımcıları.</summary>
 public static class VariantBatches
 {
+    /// <summary>Parquet Variant eklenti (extension) adı.</summary>
     public const string ExtensionName = "arrow.parquet.variant";
 
+    /// <summary>Test/örnek amaçlı Variant payload dizisi döndürür.</summary>
     public static VariantValue[] SamplePayloads() =>
     [
         VariantValue.FromObject(new Dictionary<string, VariantValue>
@@ -70,11 +72,13 @@ public static class VariantBatches
         VariantValue.FromArray(VariantValue.FromString("a"), VariantValue.FromString("b")),
     ];
 
+    /// <summary>Variant alan içeren varsayılan <see cref="Schema"/> oluşturur.</summary>
     public static Schema CreateSchema(string variantFieldName = "payload") =>
         new(
             [new Field(variantFieldName, VariantType.Default, nullable: true)],
             []);
 
+    /// <summary>Tek bir Variant kolonu içeren <see cref="RecordBatch"/> oluşturur.</summary>
     public static RecordBatch CreateSingleColumn(VariantValue[] values, string fieldName = "payload")
     {
         ThrowHelper.ThrowIfNull(values);

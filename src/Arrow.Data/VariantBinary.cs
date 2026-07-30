@@ -7,9 +7,15 @@ namespace Arrow.Data;
 /// <summary>Paketlenmiş Variant frame'den ayrılmış metadata + value görünümü.</summary>
 public readonly ref struct VariantBinaryFrame
 {
+    /// <summary>Parquet Variant metadata span'i.</summary>
     public readonly ReadOnlySpan<byte> Metadata;
+
+    /// <summary>Parquet Variant value span'i.</summary>
     public readonly ReadOnlySpan<byte> Value;
 
+    /// <summary><see cref="VariantBinaryFrame"/> yapısını başlatır.</summary>
+    /// <param name="metadata">Metadata bayt span'i.</param>
+    /// <param name="value">Değer bayt span'i.</param>
     public VariantBinaryFrame(ReadOnlySpan<byte> metadata, ReadOnlySpan<byte> value)
     {
         Metadata = metadata;
@@ -53,11 +59,22 @@ public static class VariantBinary
     public static byte[] Pack(ReadOnlySpan<byte> metadata, ReadOnlySpan<byte> value)
     {
         byte[] packed = new byte[HeaderSize + metadata.Length + value.Length];
-        Magic.CopyTo(packed);
-        BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(4), metadata.Length);
-        metadata.CopyTo(packed.AsSpan(HeaderSize));
-        value.CopyTo(packed.AsSpan(HeaderSize + metadata.Length));
+        Pack(metadata, value, packed);
         return packed;
+    }
+
+    /// <summary>Ham Parquet Variant metadata + value span'lerini hedef span'e yazar (zero allocation).</summary>
+    public static int Pack(ReadOnlySpan<byte> metadata, ReadOnlySpan<byte> value, Span<byte> destination)
+    {
+        int totalSize = HeaderSize + metadata.Length + value.Length;
+        if (destination.Length < totalSize)
+            throw new ArgumentException("Hedef span boyutu yetersiz.", nameof(destination));
+
+        Magic.CopyTo(destination);
+        BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(4), metadata.Length);
+        metadata.CopyTo(destination.Slice(HeaderSize));
+        value.CopyTo(destination.Slice(HeaderSize + metadata.Length));
+        return totalSize;
     }
 
     /// <summary>Paketli blob'u metadata + value span'lerine ayırır (view; ek decode yok).</summary>

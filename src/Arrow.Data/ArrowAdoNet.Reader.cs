@@ -3,6 +3,7 @@ using Apache.Arrow.Arrays;
 using Apache.Arrow.Ipc;
 using Apache.Arrow.Scalars.Variant;
 using Apache.Arrow.Types;
+using System.Buffers;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Data;
@@ -611,10 +612,37 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator, IA
         EnsureOrdinal(ordinal);
         if (IsDBNull(ordinal)) return 0;
 
+        if (_columns[ordinal] is VariantArray variant && IsVariantBinaryField(ordinal))
+        {
+            ReadOnlySpan<byte> meta = variant.GetMetadataBytes(_rowIndex);
+            ReadOnlySpan<byte> val = variant.GetValueBytes(_rowIndex);
+            int totalLen = VariantBinary.HeaderSize + meta.Length + val.Length;
+
+            if (dataOffset >= totalLen)
+                return 0;
+
+            if (buffer == null)
+                return totalLen;
+
+            int available = totalLen - (int)dataOffset;
+            int count = Math.Min(length, available);
+
+            byte[] poolBuffer = ArrayPool<byte>.Shared.Rent(totalLen);
+            try
+            {
+                VariantBinary.Pack(meta, val, poolBuffer);
+                poolBuffer.AsSpan((int)dataOffset, count).CopyTo(buffer.AsSpan(bufferOffset, count));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(poolBuffer, clearArray: false);
+            }
+
+            return count;
+        }
+
         ReadOnlySpan<byte> data = _columns[ordinal] switch
         {
-            VariantArray variant when IsVariantBinaryField(ordinal) =>
-                VariantBinary.Pack(variant, _rowIndex),
             BinaryArray bin => bin.GetBytes(_rowIndex),
             LargeBinaryArray lbin => lbin.GetBytes(_rowIndex),
             FixedSizeBinaryArray fbin => fbin.GetBytes(_rowIndex),
@@ -624,15 +652,15 @@ public sealed class ArrowDataReader : DbDataReader, IDbColumnSchemaGenerator, IA
         if (dataOffset >= data.Length)
             return 0;
 
-        int available = data.Length - (int)dataOffset;
-        int count = Math.Min(length, available);
+        int availableBytes = data.Length - (int)dataOffset;
+        int bytesToCopy = Math.Min(length, availableBytes);
 
         if (buffer != null)
         {
-            data.Slice((int)dataOffset, count).CopyTo(buffer.AsSpan(bufferOffset, count));
+            data.Slice((int)dataOffset, bytesToCopy).CopyTo(buffer.AsSpan(bufferOffset, bytesToCopy));
         }
 
-        return count;
+        return bytesToCopy;
     }
 
     public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)

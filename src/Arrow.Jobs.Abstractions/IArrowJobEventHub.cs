@@ -1,10 +1,14 @@
 namespace Arrow.Jobs;
 
+/// <summary>Job SSE event hub mesajı.</summary>
+/// <param name="EventName">Olay adı.</param>
+/// <param name="Payload">Olay yükü.</param>
 public sealed record ArrowJobHubMessage(string EventName, ArrowJobEvent Payload);
 
 /// <summary>Job SSE olayları için pub/sub.</summary>
 public interface IArrowJobEventHub
 {
+    /// <summary>Olay yayınlar.</summary>
     ValueTask PublishAsync(
         Guid jobId,
         string eventName,
@@ -15,7 +19,9 @@ public interface IArrowJobEventHub
     IArrowJobEventSubscription Subscribe(Guid jobId);
 }
 
+/// <summary>SSE olay aboneliği arayüzü.</summary>
 public interface IArrowJobEventSubscription : IAsyncDisposable
 {
+    /// <summary>Gelen SSE mesaj akışı.</summary>
     IAsyncEnumerable<ArrowJobHubMessage> Messages { get; }
 }

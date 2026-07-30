@@ -148,7 +148,6 @@ await foreach (var batch in reader.ReadBatchesAsync())
 // Send Arrow data to an endpoint
 await using var writer = http.PostArrowWriterAsync("http://localhost:5236/arrow");
 await writer.WriteBatchAsync(myBatch);
-await writer.FlushAsync();
 ```
 
 ### Background Jobs (Client API)

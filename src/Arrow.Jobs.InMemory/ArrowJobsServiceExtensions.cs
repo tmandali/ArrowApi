@@ -4,6 +4,7 @@ using System.Reflection;
 
 namespace Arrow.Jobs.InMemory;
 
+/// <summary>Arrow Job DI servis kayıt extension'ları.</summary>
 public static class ArrowJobsServiceExtensions
 {
     /// <summary>

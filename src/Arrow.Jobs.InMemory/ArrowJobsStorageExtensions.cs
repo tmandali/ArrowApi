@@ -4,8 +4,10 @@ using Microsoft.Extensions.Hosting;
 
 namespace Arrow.Jobs.InMemory;
 
+/// <summary>Job dosya ve sonuç depolama extension'ları.</summary>
 public static class ArrowJobsStorageExtensions
 {
+    /// <summary>Varsayılan dosya depolama klasör adı (<c>"arrow-jobs"</c>).</summary>
     public const string DefaultFileStorePath = "arrow-jobs";
 
     /// <summary>Özel dizin; varsayılan <see cref="DefaultFileStorePath"/> zaten <c>AddArrowJob</c> ile gelir.</summary>
@@ -27,6 +29,7 @@ public static class ArrowJobsStorageExtensions
         return builder;
     }
 
+    /// <summary>Özel <see cref="IArrowJobResultStorage"/> uygulamasını kaydeder.</summary>
     public static void UseResultStorage<TStorage>(this IArrowJobsConfigurer configurer)
         where TStorage : class, IArrowJobResultStorage
     {
@@ -34,6 +37,7 @@ public static class ArrowJobsStorageExtensions
         RegisterResultStorage<TStorage>(configurer.Services);
     }
 
+    /// <summary>Özel <see cref="IArrowJobResultStorage"/> uygulamasını jenerik builder üzerinden kaydeder.</summary>
     public static ArrowJobsBuilder<TRequest> UseResultStorage<TRequest, TStorage>(this ArrowJobsBuilder<TRequest> builder)
         where TRequest : notnull
         where TStorage : class, IArrowJobResultStorage

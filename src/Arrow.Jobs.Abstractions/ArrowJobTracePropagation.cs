@@ -5,6 +5,7 @@ namespace Arrow.Jobs;
 /// <summary>HTTP create activity ↔ job execute activity bağlama.</summary>
 public static class ArrowJobTracePropagation
 {
+    /// <summary>Mevcut izleme ortamını (TraceId, SpanId, TraceFlags) job modeline kaydeder.</summary>
     public static void CaptureCurrent<TRequest>(ArrowJob<TRequest> job)
         where TRequest : notnull
     {
@@ -19,6 +20,7 @@ public static class ArrowJobTracePropagation
         job.TraceFlags = (byte)activity.ActivityTraceFlags;
     }
 
+    /// <summary>Job yürütme aşaması için yeni bir OpenTelemetry etkinliği (<c>ArrowJob.Execute</c>) başlatır.</summary>
     public static Activity? StartExecuteActivity<TRequest>(ArrowJob<TRequest> job)
         where TRequest : notnull
     {

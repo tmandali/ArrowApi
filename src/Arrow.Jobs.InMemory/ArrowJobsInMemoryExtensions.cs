@@ -7,6 +7,7 @@ namespace Arrow.Jobs.InMemory;
 /// <summary>InMemory store/queue/hub kayıtları.</summary>
 public static class ArrowJobsInMemoryExtensions
 {
+    /// <summary>Belirtilen istek türü için bellek içi (In-Memory) job bileşenlerini kaydeder.</summary>
     public static ArrowJobsBuilder<TRequest> UseInMemory<TRequest>(this ArrowJobsBuilder<TRequest> builder)
         where TRequest : notnull
     {
@@ -19,6 +20,7 @@ public static class ArrowJobsInMemoryExtensions
         return builder;
     }
 
+    /// <summary>Belirtilen yapılandırıcı için bellek içi (In-Memory) job bileşenlerini kaydeder.</summary>
     public static void UseInMemory(this IArrowJobsConfigurer configurer)
     {
         ArgumentNullException.ThrowIfNull(configurer);

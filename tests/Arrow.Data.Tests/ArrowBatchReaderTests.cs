@@ -112,4 +112,26 @@ public class ArrowBatchReaderTests
         Assert.NotNull(await reader.ReadNextBatchAsync());
         Assert.Equal(2, reader.Schema.FieldsList.Count);
     }
+
+    [Fact]
+    public async Task BinaryColumns_converted_correctly_from_db_reader()
+    {
+        using DataTable table = new();
+        table.Columns.Add("Data", typeof(byte[]));
+        byte[] sample1 = [1, 2, 3, 4, 5];
+        byte[] sample2 = [10, 20, 30, 40, 50, 60];
+        table.Rows.Add(sample1);
+        table.Rows.Add(sample2);
+
+        await using DbDataReader dbReader = table.CreateDataReader();
+        await using ArrowBatchReader reader = ArrowData.OpenArrowReader(dbReader);
+
+        RecordBatch? batch = await reader.ReadNextBatchAsync();
+        Assert.NotNull(batch);
+        Assert.Equal(2, batch.Length);
+
+        BinaryArray binCol = (BinaryArray)batch.Column(0);
+        Assert.True(binCol.GetBytes(0).SequenceEqual(sample1));
+        Assert.True(binCol.GetBytes(1).SequenceEqual(sample2));
+    }
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace Arrow.Jobs;
 
+/// <summary>Job isteği için SHA256 tekilleştirme hash'i hesaplar.</summary>
 public static class ArrowJobRequestHasher
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -12,6 +13,10 @@ public static class ArrowJobRequestHasher
         WriteIndented = false
     };
 
+    /// <summary>İstek DTO nesnesini JSON serileştirip SHA256 hash string'i hesaplar.</summary>
+    /// <typeparam name="TRequest">İstek DTO türü.</typeparam>
+    /// <param name="request">İstek nesnesi.</param>
+    /// <returns>Hex formatında SHA256 hash string'i.</returns>
     public static string ComputeHash<TRequest>(TRequest request)
     {
         if (request is null)

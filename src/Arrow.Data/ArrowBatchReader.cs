@@ -43,6 +43,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
 
     internal static ArrowBatchReader FromArrow(ArrowDataReader arrowReader) => new(arrowReader);
 
+    /// <summary><see cref="ArrowDataReader"/> kaynaklı bir <see cref="ArrowBatchReader"/> oluşturur.</summary>
     public static ArrowBatchReader FromArrowReader(ArrowDataReader arrowReader) => new(arrowReader);
 
     internal static ArrowBatchReader FromDb(DbDataReader dbReader, ArrowConversionOptions options, Schema? schema) =>

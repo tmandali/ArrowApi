@@ -8,7 +8,9 @@ namespace Arrow.Http.Client;
 /// </summary>
 public static class ArrowClientActivity
 {
+    /// <summary>OpenTelemetry ActivitySource adı.</summary>
     public const string SourceName = "Arrow.Http.Client";
 
+    /// <summary>Arrow HTTP istemci etkinlik kaynağı.</summary>
     public static ActivitySource Source { get; } = new(SourceName);
 }

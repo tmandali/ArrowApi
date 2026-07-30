@@ -7,6 +7,8 @@ namespace Arrow.Jobs;
 /// </summary>
 public interface IArrowJobsConfigurer
 {
+    /// <summary>Servis koleksiyonu.</summary>
     IServiceCollection Services { get; }
+    /// <summary>Yapılandırılan job istek DTO türü.</summary>
     Type RequestType { get; }
 }

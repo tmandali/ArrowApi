@@ -20,18 +20,25 @@ public sealed class ArrowJob
 
     internal ArrowJobStatus Status { get; private set; }
 
+    /// <summary>Job benzersiz kimliği (GUID).</summary>
     public Guid Id => Status.Id;
 
+    /// <summary>Job durumu (Queued, Running, Completed, Failed, Cancelled).</summary>
     public string State => Status.Status;
 
+    /// <summary>Job HTTP endpoint adresi.</summary>
     public string JobUrl => Status.JobUrl;
 
+    /// <summary>Job oluşturulma zamanı.</summary>
     public DateTimeOffset? CreatedAt => Status.CreatedAt;
 
+    /// <summary>Job tamamlanma zamanı.</summary>
     public DateTimeOffset? CompletedAt => Status.CompletedAt;
 
+    /// <summary>Hata durumunda hata mesajı.</summary>
     public string? Error => Status.Error;
 
+    /// <summary>Yeniden deneme (retry) yapılmışsa orijinal job kimliği.</summary>
     public Guid? RetriedFrom => Status.RetriedFrom;
 
     /// <summary>SSE <c>/events</c> akışını okur (net48 dahil taşınabilir parser). Tamamlanana kadar bekler.</summary>
@@ -67,10 +74,12 @@ public sealed class ArrowJob
         }
     }
 
+    /// <summary>Tamamlanmış job'ın Arrow sonuçlarını okumak için okuyucu döndürür.</summary>
     public Task<ArrowBatchReader> GetArrowReaderAsync(
         CancellationToken cancellationToken = default) =>
         _httpClient.GetArrowReaderAsync(JobUrl, cancellationToken: cancellationToken);
 
+    /// <summary>Job istek gövdesini (request DTO) sunucudan çeker.</summary>
     public async Task<TRequest> GetRequestAsync<TRequest>(CancellationToken cancellationToken = default)
     {
         using HttpResponseMessage response = await _httpClient
@@ -85,6 +94,7 @@ public sealed class ArrowJob
             ?? throw new InvalidOperationException("Boş request yanıtı.");
     }
 
+    /// <summary>Kuyruktaki veya çalışan job'ı iptal eder.</summary>
     public async Task CancelAsync(CancellationToken cancellationToken = default)
     {
         using HttpResponseMessage response = await _httpClient
@@ -101,6 +111,7 @@ public sealed class ArrowJob
         Status = status;
     }
 
+    /// <summary>Başarısız veya iptal edilmiş job'ı yeniden başlatır ve yeni tutamaç döndürür.</summary>
     public async Task<ArrowJob> RetryAsync(CancellationToken cancellationToken = default)
     {
         using HttpResponseMessage response = await _httpClient
@@ -117,6 +128,7 @@ public sealed class ArrowJob
         return new ArrowJob(_httpClient, status);
     }
 
+    /// <summary>Job kaydını ve sonuçlarını sunucudan siler.</summary>
     public async Task DeleteAsync(CancellationToken cancellationToken = default)
     {
         using HttpResponseMessage response = await _httpClient

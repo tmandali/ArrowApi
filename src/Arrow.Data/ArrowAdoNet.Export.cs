@@ -1289,8 +1289,31 @@ internal static class ArrowExporter
             }
             else
             {
-                byte[] val = (byte[])reader.GetValue(ordinal);
-                ((IBinaryArrowArrayBuilderWrapper)builder).Append(val);
+                try
+                {
+                    long blobLength = reader.GetBytes(ordinal, 0, null, 0, 0);
+                    if (blobLength == 0)
+                    {
+                        ((IBinaryArrowArrayBuilderWrapper)builder).Append(ReadOnlySpan<byte>.Empty);
+                        return;
+                    }
+
+                    byte[] poolBuffer = ArrayPool<byte>.Shared.Rent((int)blobLength);
+                    try
+                    {
+                        long bytesRead = reader.GetBytes(ordinal, 0, poolBuffer, 0, (int)blobLength);
+                        ((IBinaryArrowArrayBuilderWrapper)builder).Append(poolBuffer.AsSpan(0, (int)bytesRead));
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(poolBuffer, clearArray: false);
+                    }
+                }
+                catch (Exception ex) when (ex is NotSupportedException or InvalidCastException or InvalidOperationException)
+                {
+                    byte[] val = (byte[])reader.GetValue(ordinal);
+                    ((IBinaryArrowArrayBuilderWrapper)builder).Append(val);
+                }
             }
         }
 
@@ -1324,22 +1347,27 @@ internal static class ArrowExporter
                 return;
             }
 
-            long blobLength = reader.GetBytes(ordinal, 0, null, 0, 0);
-
-            if (blobLength > _chunkThreshold)
+            try
             {
+                long blobLength = reader.GetBytes(ordinal, 0, null, 0, 0);
+                if (blobLength == 0)
+                {
+                    ((IBinaryArrowArrayBuilderWrapper)builder).Append(ReadOnlySpan<byte>.Empty);
+                    return;
+                }
+
                 byte[] poolBuffer = ArrayPool<byte>.Shared.Rent((int)blobLength);
                 try
                 {
-                    reader.GetBytes(ordinal, 0, poolBuffer, 0, (int)blobLength);
-                    ((IBinaryArrowArrayBuilderWrapper)builder).Append(poolBuffer.AsSpan(0, (int)blobLength));
+                    long bytesRead = reader.GetBytes(ordinal, 0, poolBuffer, 0, (int)blobLength);
+                    ((IBinaryArrowArrayBuilderWrapper)builder).Append(poolBuffer.AsSpan(0, (int)bytesRead));
                 }
                 finally
                 {
                     ArrayPool<byte>.Shared.Return(poolBuffer, clearArray: false);
                 }
             }
-            else
+            catch (Exception ex) when (ex is NotSupportedException or InvalidCastException or InvalidOperationException)
             {
                 byte[] data = (byte[])reader.GetValue(ordinal);
                 ((IBinaryArrowArrayBuilderWrapper)builder).Append(data);
@@ -1365,14 +1393,44 @@ internal static class ArrowExporter
                 return;
             }
 
-            byte[] packed = (byte[])reader.GetValue(ordinal);
-            if (!VariantBinary.IsPacked(packed))
+            try
             {
-                throw new InvalidDataException(
-                    $"Sütun '{ColumnName}' Variant binary (ARPV) frame bekliyor; magic bulunamadı.");
-            }
+                long blobLength = reader.GetBytes(ordinal, 0, null, 0, 0);
+                if (blobLength == 0)
+                {
+                    variantBuilder.AppendNull();
+                    return;
+                }
 
-            variantBuilder.AppendPacked(packed);
+                byte[] poolBuffer = ArrayPool<byte>.Shared.Rent((int)blobLength);
+                try
+                {
+                    long bytesRead = reader.GetBytes(ordinal, 0, poolBuffer, 0, (int)blobLength);
+                    ReadOnlySpan<byte> packed = poolBuffer.AsSpan(0, (int)bytesRead);
+                    if (!VariantBinary.IsPacked(packed))
+                    {
+                        throw new InvalidDataException(
+                            $"Sütun '{ColumnName}' Variant binary (ARPV) frame bekliyor; magic bulunamadı.");
+                    }
+
+                    variantBuilder.AppendPacked(packed);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(poolBuffer, clearArray: false);
+                }
+            }
+            catch (Exception ex) when (ex is NotSupportedException or InvalidCastException or InvalidOperationException)
+            {
+                byte[] packed = (byte[])reader.GetValue(ordinal);
+                if (!VariantBinary.IsPacked(packed))
+                {
+                    throw new InvalidDataException(
+                        $"Sütun '{ColumnName}' Variant binary (ARPV) frame bekliyor; magic bulunamadı.");
+                }
+
+                variantBuilder.AppendPacked(packed);
+            }
         }
     }
 
