@@ -12,6 +12,7 @@ public enum ArrowJobState
 public sealed class ArrowJob<TRequest>
 {
     public required Guid Id { get; init; }
+    public string? Name { get; set; }
     public required TRequest Request { get; init; }
     public ArrowJobState State { get; set; } = ArrowJobState.Queued;
     public string? ResultPath { get; set; }
@@ -43,7 +44,8 @@ public sealed record ArrowJobStatus(
     string? Error = null,
     int? BatchCount = null,
     long? TotalRows = null,
-    Guid? RetriedFrom = null);
+    Guid? RetriedFrom = null,
+    string? Name = null);
 
 public sealed record ArrowJobListQuery(
     ArrowJobState? State = null,
@@ -74,7 +76,8 @@ public sealed record ArrowJobEvent(
     int? BatchCount = null,
     long? TotalRows = null,
     string? Message = null,
-    string? TraceId = null);
+    string? TraceId = null,
+    string? Name = null);
 
 public static class ArrowJobEventNames
 {

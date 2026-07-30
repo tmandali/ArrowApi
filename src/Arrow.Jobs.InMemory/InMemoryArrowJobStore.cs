@@ -6,13 +6,14 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 {
     private readonly ConcurrentDictionary<Guid, ArrowJob<TRequest>> _jobs = new();
 
-    public Task<ArrowJob<TRequest>> CreateAsync(TRequest request, CancellationToken cancellationToken = default)
+    public Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var job = new ArrowJob<TRequest>
         {
             Id = Guid.NewGuid(),
+            Name = name,
             Request = request
         };
         ArrowJobTracePropagation.CaptureCurrent(job);

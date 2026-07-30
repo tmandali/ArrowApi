@@ -14,10 +14,17 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
 
     public HttpClientArrowExtensionsTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
+    private HttpClient CreateClient()
+    {
+        HttpClient client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", "dev-secret");
+        return client;
+    }
+
     [Fact]
     public async Task GetArrowReaderAsync_reads_people_batches()
     {
-        HttpClient http = _factory.CreateClient();
+        HttpClient http = CreateClient();
 
         await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow");
         int batchCount = 0;
@@ -357,10 +364,10 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task Background_query_job_writes_parquet_and_returns_arrow()
     {
-        HttpClient http = _factory.CreateClient();
+        HttpClient http = CreateClient();
 
         ArrowJob job = await http.PostArrowJobAsync(
-            "/api/arrow/jobs",
+            "/api/arrow/jobs/demo",
             new ArrowQueryRequest(
                 "inmemory",
                 "SELECT * FROM People LIMIT @limit",
@@ -384,10 +391,10 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task Background_query_job_sse_waits_until_completed()
     {
-        HttpClient http = _factory.CreateClient();
+        HttpClient http = CreateClient();
 
         ArrowJob job = await http.PostArrowJobAsync(
-            "/api/arrow/jobs",
+            "/api/arrow/jobs/demo",
             new ArrowQueryRequest(
                 "inmemory",
                 "SELECT * FROM People LIMIT @limit",
@@ -419,10 +426,10 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task Job_list_request_delete_and_retry_conflict_work()
     {
-        HttpClient http = _factory.CreateClient();
+        HttpClient http = CreateClient();
 
         ArrowJob job = await http.PostArrowJobAsync(
-            "/api/arrow/jobs",
+            "/api/arrow/jobs/demo",
             new ArrowQueryRequest(
                 "inmemory",
                 "SELECT * FROM People LIMIT @limit",
@@ -453,10 +460,10 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task Job_cancel_queued_or_running_then_retry()
     {
-        HttpClient http = _factory.CreateClient();
+        HttpClient http = CreateClient();
 
         ArrowJob job = await http.PostArrowJobAsync(
-            "/api/arrow/jobs",
+            "/api/arrow/jobs/demo",
             new ArrowQueryRequest(
                 "inmemory",
                 "SELECT * FROM People",

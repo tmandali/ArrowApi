@@ -18,7 +18,7 @@ except ImportError:
 
 BASE_URL = os.environ.get("ARROW_API_URL", "http://localhost:5236")
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
-JOBS_URL = f"{BASE_URL}/api/arrow/jobs"
+JOBS_URL = f"{BASE_URL}/api/arrow/jobs/demo"
 
 # Kurumsal proxy localhost'u 400 ile kesebiliyor
 SESSION = requests.Session()

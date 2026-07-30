@@ -15,52 +15,123 @@ public static class ArrowJobEndpoints
     ];
 
     /// <summary>
-    /// <c>AddArrowJob&lt;T&gt;(path)</c> ile kaydedilen job endpoint'lerini map eder.
+    /// Kayıtlı tüm job'ları verilen <paramref name="prefix"/> yolu altında haritalar.
+    /// Dönen <see cref="RouteGroupBuilder"/> üzerinden <c>.RequireAuthorization()</c> uygulanabilir.
     /// </summary>
-    internal static WebApplication MapArrowJob(this WebApplication app)
+    public static RouteGroupBuilder UseArrowApi(
+        this IEndpointRouteBuilder endpoints,
+        string prefix)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
 
-        foreach (ArrowJobEndpointRegistration registration in
-                 app.Services.GetServices<ArrowJobEndpointRegistration>())
+        string normalizedPrefix = NormalizePath(prefix);
+        RouteGroupBuilder group = endpoints.MapGroup(normalizedPrefix);
+
+        var registrations = endpoints.ServiceProvider.GetServices<ArrowJobEndpointRegistration>().ToList();
+        foreach (var reg in registrations)
         {
-            MapRegistered(app, registration);
+            if (reg.NameOrPath.StartsWith('/'))
+            {
+                MapRegisteredType(endpoints, reg.ServiceType, reg.NameOrPath, null);
+            }
+            else
+            {
+                string subPath = $"/{reg.NameOrPath.Trim('/')}";
+                MapRegisteredType(group, reg.ServiceType, subPath, reg.NameOrPath);
+            }
         }
 
-        return app;
+        return group;
     }
 
     /// <summary>
-    /// <typeparamref name="T"/> worker ise request worker'dan çıkarılır; aksi halde request tipidir.
+    /// Job endpoint'lerini akıcı (fluent) yöntemle tek tek haritalar.
     /// </summary>
-    internal static IEndpointRouteBuilder MapArrowJobEndpoints<T>(
+    public static IEndpointRouteBuilder UseArrowApi(
+        this IEndpointRouteBuilder endpoints,
+        Action<IArrowJobEndpointBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var registrations = endpoints.ServiceProvider.GetServices<ArrowJobEndpointRegistration>().ToList();
+        var builder = new ArrowJobEndpointBuilder(endpoints, registrations);
+        configure(builder);
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Job endpoint'lerini verilen <paramref name="prefix"/> ortak ön eki altında akıcı yöntemle haritalar.
+    /// Dönen <see cref="RouteGroupBuilder"/> üzerinden <c>.RequireAuthorization()</c> uygulanabilir.
+    /// </summary>
+    public static RouteGroupBuilder UseArrowApi(
+        this IEndpointRouteBuilder endpoints,
+        string prefix,
+        Action<IArrowJobEndpointBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        string normalizedPrefix = NormalizePath(prefix);
+        RouteGroupBuilder group = endpoints.MapGroup(normalizedPrefix);
+
+        var registrations = endpoints.ServiceProvider.GetServices<ArrowJobEndpointRegistration>().ToList();
+        var builder = new ArrowJobEndpointBuilder(group, registrations);
+        configure(builder);
+
+        return group;
+    }
+
+    /// <summary>
+    /// Varsayılan prefix (<c>"/api/arrow/jobs"</c>) ile tüm kayıtlı job'ları haritalar.
+    /// Dönen <see cref="RouteGroupBuilder"/> üzerinden <c>.RequireAuthorization()</c> uygulanabilir.
+    /// </summary>
+    public static RouteGroupBuilder UseArrowApi(this IEndpointRouteBuilder endpoints)
+    {
+        return endpoints.UseArrowApi("/api/arrow/jobs");
+    }
+
+    internal static WebApplication MapArrowJob(this WebApplication app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        app.UseArrowApi("/api/arrow/jobs");
+        return app;
+    }
+
+    public static RouteGroupBuilder MapArrowJobEndpoints<T>(
         this IEndpointRouteBuilder endpoints,
         string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        return MapRegistered(endpoints, new ArrowJobEndpointRegistration(typeof(T), path));
+        return MapRegisteredType(endpoints, typeof(T), path, null);
     }
 
-    internal static IEndpointRouteBuilder MapRegistered(
+    internal static RouteGroupBuilder MapRegisteredType(
         IEndpointRouteBuilder endpoints,
-        ArrowJobEndpointRegistration registration)
+        Type serviceType,
+        string path,
+        string? jobName = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        ArgumentNullException.ThrowIfNull(registration);
+        ArgumentNullException.ThrowIfNull(serviceType);
 
-        Type requestType = ArrowJobTypeResolver.TryGetRequestType(registration.ServiceType)
-            ?? registration.ServiceType;
+        Type requestType = ArrowJobTypeResolver.TryGetRequestType(serviceType)
+            ?? serviceType;
 
         MethodInfo method = typeof(ArrowJobEndpoints)
             .GetMethod(nameof(MapArrowJobEndpointsCore), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(requestType);
 
-        return (IEndpointRouteBuilder)method.Invoke(null, [endpoints, registration.Path])!;
+        return (RouteGroupBuilder)method.Invoke(null, [endpoints, path, jobName])!;
     }
 
-    private static IEndpointRouteBuilder MapArrowJobEndpointsCore<TRequest>(
+    private static RouteGroupBuilder MapArrowJobEndpointsCore<TRequest>(
         IEndpointRouteBuilder endpoints,
-        string path)
+        string path,
+        string? jobName = null)
         where TRequest : notnull
     {
         string jobsPath = NormalizePath(path);
@@ -69,62 +140,65 @@ public static class ArrowJobEndpoints
         group.MapPost(
                 string.Empty,
                 (TRequest request, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
-                    CreateJobAsync(request, httpRequest, store, queue, cancellationToken))
+                    CreateJobAsync(request, jobName, httpRequest, store, queue, cancellationToken))
             .Accepts<TRequest>("application/json");
 
-        group.MapGet(
-                string.Empty,
-                (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, CancellationToken cancellationToken) =>
-                    ListJobsAsync(httpRequest, store, state, from, to, skip, take, cancellationToken))
-            .Produces<ArrowJobStatusList>();
+        IEndpointRouteBuilder targetBuilder = string.IsNullOrEmpty(jobsPath) ? group : endpoints;
 
-        group.MapGet(
+        targetBuilder.MapGet(
                 "{id:guid}",
                 (Guid id, HttpRequest request, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
                     GetJob(id, request, store, cancellationToken))
             .ProducesArrow()
             .Produces<ArrowJobStatus>();
 
-        group.MapGet(
+        targetBuilder.MapGet(
                 "{id:guid}/request",
                 (Guid id, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
                     GetJobRequestAsync(id, store, cancellationToken))
             .Produces<TRequest>();
 
-        group.MapGet(
+        targetBuilder.MapGet(
             "{id:guid}/events",
             (Guid id, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
                 StreamJobEvents(id, store, eventHub, response, cancellationToken));
 
-        group.MapPost(
+        targetBuilder.MapPost(
                 "{id:guid}/cancel",
                 (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
                     CancelJobAsync(id, httpRequest, store, eventHub, cancellationToken))
             .Produces<ArrowJobStatus>();
 
-        group.MapPost(
+        targetBuilder.MapPost(
                 "{id:guid}/retry",
                 (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
                     RetryJobAsync(id, httpRequest, store, queue, cancellationToken))
             .Produces<ArrowJobStatus>();
 
-        group.MapDelete(
+        targetBuilder.MapDelete(
                 "{id:guid}",
                 (Guid id, IArrowJobStore<TRequest> store, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
                     DeleteJobAsync(id, store, resultStorage, cancellationToken));
 
-        return endpoints;
+        targetBuilder.MapGet(
+                string.Empty,
+                (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, CancellationToken cancellationToken) =>
+                    ListJobsAsync(httpRequest, store, state, from, to, skip, take, cancellationToken))
+            .Produces<ArrowJobStatusList>();
+
+        return group;
     }
 
     private static async Task<IResult> CreateJobAsync<TRequest>(
         TRequest request,
+        string? jobName,
         HttpRequest httpRequest,
         IArrowJobStore<TRequest> store,
         IArrowJobQueue<TRequest> queue,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
-        ArrowJob<TRequest> job = await store.CreateAsync(request, cancellationToken);
+        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, cancellationToken);
         await queue.EnqueueAsync(job.Id, cancellationToken);
 
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -243,7 +317,7 @@ public static class ArrowJobEndpoints
         if (job.State is not (ArrowJobState.Failed or ArrowJobState.Cancelled))
             return Results.Conflict(ToStatusResponse(job, ResolveJobsBasePath(httpRequest)));
 
-        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, cancellationToken);
+        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, job.Name, cancellationToken);
         await queue.EnqueueAsync(retry.Id, cancellationToken);
 
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -357,7 +431,8 @@ public static class ArrowJobEndpoints
             job.Error,
             job.BatchCount,
             job.TotalRows,
-            retriedFrom);
+            retriedFrom,
+            job.Name);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 
@@ -392,6 +467,20 @@ public static class ArrowJobEndpoints
         int lastSlash = path.LastIndexOf('/');
         if (lastSlash >= 0 && Guid.TryParse(path.AsSpan(lastSlash + 1), out _))
             path = path[..lastSlash];
+
+        var registrations = request.HttpContext.RequestServices.GetService<IEnumerable<ArrowJobEndpointRegistration>>();
+        if (registrations is not null)
+        {
+            lastSlash = path.LastIndexOf('/');
+            if (lastSlash >= 0)
+            {
+                string segment = path[(lastSlash + 1)..];
+                if (registrations.Any(r => string.Equals(r.NameOrPath.Trim('/'), segment, StringComparison.OrdinalIgnoreCase)))
+                {
+                    path = path[..lastSlash];
+                }
+            }
+        }
 
         return path;
     }

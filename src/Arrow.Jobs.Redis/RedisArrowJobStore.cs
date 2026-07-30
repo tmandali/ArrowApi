@@ -22,13 +22,14 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     private static string StateKey(ArrowJobState state) => $"arrow:jobs:{TypeKey}:state:{state}";
 
-    public async Task<ArrowJob<TRequest>> CreateAsync(TRequest request, CancellationToken cancellationToken = default)
+    public async Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var job = new ArrowJob<TRequest>
         {
             Id = Guid.NewGuid(),
+            Name = name,
             Request = request
         };
         ArrowJobTracePropagation.CaptureCurrent(job);

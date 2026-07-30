@@ -63,8 +63,10 @@ The host will listen on `http://localhost:5000` (or as configured in `launchSett
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddArrowResponse();
-builder.Services.AddArrowJob<DemoArrowJobWorker>("/api/arrow/jobs");
+builder.Services.AddArrowApi(arrow =>
+{
+    arrow.AddJob<DemoArrowJobWorker>("/api/arrow/jobs");
+});
 
 var app = builder.Build();
 app.UseArrowApi();                            // IArrowApiFeature (job map vb.)

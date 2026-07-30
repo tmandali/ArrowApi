@@ -1,0 +1,62 @@
+@ArrowHttp_SampleHost_HostAddress = http://localhost:5236
+@ArrowMediaType = application/vnd.apache.arrow.stream
+@ApiKey = dev-secret
+@jobName = demo
+
+# Manuel kullanim durumunda fallback degisken (Varsayilan ID)
+@jobId = 1
+
+# ==============================================================================
+# 1. Create a Job (Job adı zorunludur: /api/arrow/jobs/demo)
+# Visual Studio / VS Code REST Client istegi: # @name createJob
+# ==============================================================================
+# @name createJob
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobName}}
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "cnnName": "inmemory",
+  "query": "SELECT * FROM People LIMIT @limit",
+  "parameters": {
+    "limit": 3
+  },
+  "batchSize": 1
+}
+
+### 2. Get Job Status (Sadece GUID ile - Job Name gerektirmez!)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
+X-Api-Key: {{ApiKey}}
+
+### 3. Get Job Events (SSE - Sadece GUID ile!)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}/events
+X-Api-Key: {{ApiKey}}
+
+### 4. Get Job Results (Arrow IPC stream - Sadece GUID ile!)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
+Accept: {{ArrowMediaType}}
+X-Api-Key: {{ApiKey}}
+
+### 5. Get Job Original Request Configuration
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}/request
+X-Api-Key: {{ApiKey}}
+
+### 6. List Jobs
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?take=100
+X-Api-Key: {{ApiKey}}
+
+### 7. List Completed Jobs
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?state=Completed&take=50
+X-Api-Key: {{ApiKey}}
+
+### 8. Cancel a Running Job
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}/cancel
+X-Api-Key: {{ApiKey}}
+
+### 9. Retry a Cancelled/Failed Job
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}/retry
+X-Api-Key: {{ApiKey}}
+
+### 10. Delete Job (Sadece GUID ile!)
+DELETE {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
+X-Api-Key: {{ApiKey}}

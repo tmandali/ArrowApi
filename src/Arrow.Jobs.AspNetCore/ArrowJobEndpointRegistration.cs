@@ -1,4 +1,6 @@
 namespace Arrow.Jobs.AspNetCore;
 
-/// <summary><see cref="ArrowJobsServiceCollectionExtensions.AddArrowJob{T}"/> ile kaydedilen job HTTP route.</summary>
-internal sealed record ArrowJobEndpointRegistration(Type ServiceType, string Path);
+/// <summary>
+/// <see cref="ArrowJobApiBuilderExtensions.AddJob{T}"/> ile kaydedilen job HTTP endpoint bilgisi.
+/// </summary>
+internal sealed record ArrowJobEndpointRegistration(Type ServiceType, string NameOrPath);
