@@ -1,4 +1,5 @@
 using Apache.Arrow;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -11,23 +12,23 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
     private readonly IArrowJobQueue<TRequest> _queue;
     private readonly IArrowJobStore<TRequest> _store;
     private readonly IArrowJobResultStorage _resultStorage;
-    private readonly IArrowJobWorker<TRequest> _worker;
     private readonly IArrowJobEventHub _eventHub;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ArrowJobHostedService<TRequest>> _logger;
 
     public ArrowJobHostedService(
         IArrowJobQueue<TRequest> queue,
         IArrowJobStore<TRequest> store,
         IArrowJobResultStorage resultStorage,
-        IArrowJobWorker<TRequest> worker,
         IArrowJobEventHub eventHub,
+        IServiceProvider serviceProvider,
         ILogger<ArrowJobHostedService<TRequest>> logger)
     {
         _queue = queue;
         _store = store;
         _resultStorage = resultStorage;
-        _worker = worker;
         _eventHub = eventHub;
+        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
@@ -109,11 +110,21 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         await PublishAsync(jobId, ArrowJobEventNames.Status, cancellationToken);
         _logger.LogInformation("Job başladı: {JobId}", jobId);
 
+        using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
+        IArrowJobWorker<TRequest>? worker = null;
+        if (!string.IsNullOrWhiteSpace(job.Name))
+        {
+            worker = scope.ServiceProvider.GetKeyedService<IArrowJobWorker<TRequest>>(job.Name);
+        }
+        worker ??= scope.ServiceProvider.GetService<IArrowJobWorker<TRequest>>();
+        if (worker is null)
+            throw new InvalidOperationException($"'{job.Name}' için uygun worker servisi bulunamadı.");
+
         var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub);
         string resultPath = _resultStorage.GetResultPath(jobId);
         IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(
             jobId,
-            _worker.ExecuteJobAsync(context, cancellationToken),
+            worker.ExecuteJobAsync(context, cancellationToken),
             cancellationToken);
         await _resultStorage.WriteBatchesAsync(resultPath, batches, cancellationToken);
 

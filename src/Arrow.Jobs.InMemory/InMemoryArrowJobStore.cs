@@ -14,7 +14,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         {
             Id = Guid.NewGuid(),
             Name = name,
-            Request = request
+            Request = request,
+            RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
         ArrowJobTracePropagation.CaptureCurrent(job);
 
@@ -22,6 +23,36 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             throw new InvalidOperationException("Job kimliği çakıştı.");
 
         return Task.FromResult(job);
+    }
+
+    public Task<ArrowJob<TRequest>?> FindDuplicateAsync(
+        TRequest request,
+        string? name = null,
+        TimeSpan? window = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string hash = ArrowJobRequestHasher.ComputeHash(request);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        ArrowJob<TRequest>? match = _jobs.Values
+            .Where(j => string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase))
+            .Where(j => j.RequestHash == hash)
+            .Where(j =>
+            {
+                if (j.State is ArrowJobState.Queued or ArrowJobState.Running)
+                    return true;
+
+                if (window.HasValue && (now - j.CreatedAt) <= window.Value)
+                    return true;
+
+                return false;
+            })
+            .OrderByDescending(j => j.CreatedAt)
+            .FirstOrDefault();
+
+        return Task.FromResult(match);
     }
 
     public Task<ArrowJob<TRequest>?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>

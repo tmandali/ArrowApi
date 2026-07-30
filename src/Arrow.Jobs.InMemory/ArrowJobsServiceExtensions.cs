@@ -11,6 +11,7 @@ public static class ArrowJobsServiceExtensions
     /// </summary>
     internal static IServiceCollection AddArrowJobServices<T>(
         this IServiceCollection services,
+        string? name = null,
         Action<IArrowJobsConfigurer>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -24,7 +25,7 @@ public static class ArrowJobsServiceExtensions
                 .GetMethod(nameof(AddArrowJobsWorkerImpl), BindingFlags.NonPublic | BindingFlags.Static)!
                 .MakeGenericMethod(requestFromWorker, type);
 
-            return (IServiceCollection)method.Invoke(null, [services, configure])!;
+            return (IServiceCollection)method.Invoke(null, [services, name, configure])!;
         }
 
         MethodInfo infraMethod = typeof(ArrowJobsServiceExtensions)
@@ -50,6 +51,7 @@ public static class ArrowJobsServiceExtensions
 
     private static IServiceCollection AddArrowJobsWorkerImpl<TRequest, TWorker>(
         IServiceCollection services,
+        string? name,
         Action<IArrowJobsConfigurer>? configure)
         where TWorker : class, IArrowJobWorker<TRequest>
     {
@@ -60,7 +62,11 @@ public static class ArrowJobsServiceExtensions
             configure(new ArrowJobsConfigurer<TRequest>(builder));
 
         ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
-        services.AddSingleton<IArrowJobWorker<TRequest>, TWorker>();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            services.AddKeyedScoped<IArrowJobWorker<TRequest>, TWorker>(name);
+        }
+        services.AddScoped<IArrowJobWorker<TRequest>, TWorker>();
         services.AddHostedService<ArrowJobHostedService<TRequest>>();
         return services;
     }

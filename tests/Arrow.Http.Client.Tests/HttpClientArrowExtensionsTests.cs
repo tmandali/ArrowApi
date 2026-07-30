@@ -398,7 +398,7 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
             new ArrowQueryRequest(
                 "inmemory",
                 "SELECT * FROM People LIMIT @limit",
-                new Dictionary<string, object?> { ["limit"] = 2 }));
+                new Dictionary<string, object?> { ["limit"] = 3 }));
 
         ArrowJobEvent? finalEvent = null;
 
@@ -420,7 +420,7 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
         while (await reader.ReadNextBatchAsync() is { } batch)
             totalRows += batch.Length;
 
-        Assert.Equal(2, totalRows);
+        Assert.Equal(3, totalRows);
     }
 
     [Fact]
@@ -492,6 +492,26 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
 
         // Worker job'u cancel'dan önce bitirdiyse Conflict beklenir; akış yine geçerli.
         Assert.Equal(System.Net.HttpStatusCode.Conflict, cancelResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Job_prevent_duplicates_returns_conflict_within_ttl()
+    {
+        HttpClient http = CreateClient();
+        var request = new ArrowQueryRequest(
+            "inmemory",
+            "SELECT * FROM People WHERE Id = @id",
+            new Dictionary<string, object?> { ["id"] = 99 });
+
+        ArrowJob firstJob = await http.PostArrowJobAsync("/api/arrow/jobs/demo", request);
+
+        // İkinci istek aynı parametrelerle 10 dk TTL içinde atılıyor -> 409 Conflict beklenir
+        using HttpResponseMessage secondResponse = await http.PostAsJsonAsync("/api/arrow/jobs/demo", request);
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, secondResponse.StatusCode);
+
+        ArrowJobStatus? conflictJob = await secondResponse.Content.ReadFromJsonAsync<ArrowJobStatus>();
+        Assert.NotNull(conflictJob);
+        Assert.Equal(firstJob.Id, conflictJob.Id);
     }
 
     private static async IAsyncEnumerable<RecordBatch> EmptyBatches()
