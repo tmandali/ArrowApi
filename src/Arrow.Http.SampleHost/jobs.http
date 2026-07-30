@@ -14,6 +14,7 @@
 POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobName}}
 Content-Type: application/json
 X-Api-Key: {{ApiKey}}
+X-Correlation-ID: custom-chain-123
 
 {
   "cnnName": "inmemory",
@@ -28,6 +29,7 @@ X-Api-Key: {{ApiKey}}
 POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/export-report
 Content-Type: application/json
 X-Api-Key: {{ApiKey}}
+X-Correlation-ID: custom-chain-123
 
 {
   "reportName": "MonthlySummary",
@@ -53,6 +55,10 @@ X-Api-Key: {{ApiKey}}
 
 ### 6. List Jobs
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?take=100
+X-Api-Key: {{ApiKey}}
+
+### 6b. List Jobs by Correlation ID (Tüm İş Zincirini Sorgula)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?correlationId=custom-chain-123
 X-Api-Key: {{ApiKey}}
 
 ### 7. List Completed Jobs
