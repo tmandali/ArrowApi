@@ -31,9 +31,11 @@ public interface IArrowJobExecutionContext
     /// <summary>
     /// <see cref="ArrowJob{TRequest}"/> sonucunda oluşan RecordBatch'leri okur.
     /// Job henüz tamamlanmadıysa, okuma başladığında otomatik olarak Job'ın bitmesini bekler (Lazy Evaluation).
+    /// <paramref name="throwOnError"/> true ise alt job hata alırsa (<see cref="ArrowJobState.Failed"/>) veya iptal edilirse (<see cref="ArrowJobState.Cancelled"/>) exception fırlatır.
     /// </summary>
     IAsyncEnumerable<RecordBatch> ReadBatchesAsync<TRequest>(
         ArrowJob<TRequest>? job,
+        bool throwOnError = true,
         CancellationToken cancellationToken = default)
         where TRequest : notnull;
 }

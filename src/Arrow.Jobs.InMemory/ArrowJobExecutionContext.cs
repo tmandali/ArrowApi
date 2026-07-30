@@ -107,6 +107,7 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 
     public async IAsyncEnumerable<Apache.Arrow.RecordBatch> ReadBatchesAsync<TNextRequest>(
         ArrowJob<TNextRequest>? job,
+        bool throwOnError = true,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
@@ -125,10 +126,26 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
             else if (string.Equals(evt.Status, nameof(ArrowJobState.Failed), StringComparison.OrdinalIgnoreCase))
             {
                 job.State = ArrowJobState.Failed;
+                job.Error = evt.Message ?? evt.Error;
             }
             else if (string.Equals(evt.Status, nameof(ArrowJobState.Cancelled), StringComparison.OrdinalIgnoreCase))
             {
                 job.State = ArrowJobState.Cancelled;
+            }
+        }
+
+        if (throwOnError)
+        {
+            if (job.State == ArrowJobState.Failed)
+            {
+                throw new InvalidOperationException(
+                    $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) hata ile sonlandı: {job.Error ?? "Bilinmeyen hata."}");
+            }
+
+            if (job.State == ArrowJobState.Cancelled)
+            {
+                throw new OperationCanceledException(
+                    $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) iptal edildi.", cancellationToken);
             }
         }
 

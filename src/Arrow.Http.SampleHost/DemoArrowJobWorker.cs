@@ -37,7 +37,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
             cancellationToken: cancellationToken);
 
         // _context üzerinden doğrudan okunur (otomatik bekler ve stream eder)
-        await foreach (RecordBatch reportBatch in _context.ReadBatchesAsync(report, cancellationToken))
+        await foreach (RecordBatch reportBatch in _context.ReadBatchesAsync(report, cancellationToken: cancellationToken))
         {
             // Alt job sonuç batch'leri işlenebilir
         }
