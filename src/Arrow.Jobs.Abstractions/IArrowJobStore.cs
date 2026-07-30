@@ -19,7 +19,7 @@ public interface IArrowJobStore<TRequest> : IArrowJobStore
     where TRequest : notnull
 {
     /// <summary>Yeni bir job kaydı oluşturur.</summary>
-    Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, string? correlationId = null, CancellationToken cancellationToken = default);
+    Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, Guid? rootJobId = null, CancellationToken cancellationToken = default);
     /// <summary>Aynı parametrelerle oluşturulmuş yinelenen job arar.</summary>
     Task<ArrowJob<TRequest>?> FindDuplicateAsync(TRequest request, string? name = null, TimeSpan? window = null, CancellationToken cancellationToken = default);
     /// <summary>Job detayını getirir.</summary>

@@ -189,8 +189,8 @@ public static class ArrowJobEndpoints
 
             targetBuilder.MapGet(
                     string.Empty,
-                    (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] string? correlationId, CancellationToken cancellationToken) =>
-                        ListJobsAsync(httpRequest, store, state, from, to, skip, take, correlationId, cancellationToken))
+                    (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
+                        ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, cancellationToken))
                 .Produces<ArrowJobStatusList>();
         }
 
@@ -207,10 +207,6 @@ public static class ArrowJobEndpoints
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
-        string? correlationId = httpRequest.Headers["X-Correlation-ID"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(correlationId))
-            correlationId = Guid.NewGuid().ToString("N");
-
         var dedupPolicy = httpContext.GetEndpoint()?.Metadata.GetMetadata<ArrowJobDeduplicationPolicy>();
         if (dedupPolicy is { Enabled: true })
         {
@@ -227,7 +223,7 @@ public static class ArrowJobEndpoints
             }
         }
 
-        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, correlationId, cancellationToken);
+        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, cancellationToken: cancellationToken);
         await queue.EnqueueAsync(job.Id, cancellationToken);
 
         string jobsPathResolved = ResolveJobsBasePath(httpRequest);
@@ -245,7 +241,7 @@ public static class ArrowJobEndpoints
         DateTimeOffset? to,
         int? skip,
         int? take,
-        string? correlationId,
+        Guid? rootJobId,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
@@ -264,7 +260,7 @@ public static class ArrowJobEndpoints
             to,
             skip ?? 0,
             take ?? 50,
-            correlationId);
+            rootJobId);
 
         ArrowJobListPage<TRequest> page = await store.ListAsync(query, cancellationToken);
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -348,7 +344,7 @@ public static class ArrowJobEndpoints
         if (job.State is not (ArrowJobState.Failed or ArrowJobState.Cancelled))
             return Results.Conflict(ToStatusResponse(job, ResolveJobsBasePath(httpRequest)));
 
-        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, job.Name, job.CorrelationId, cancellationToken);
+        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, job.Name, rootJobId: job.RootJobId, cancellationToken: cancellationToken);
         await queue.EnqueueAsync(retry.Id, cancellationToken);
 
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -513,7 +509,7 @@ public static class ArrowJobEndpoints
             job.TotalRows,
             retriedFrom,
             job.Name,
-            job.CorrelationId);
+            job.RootJobId);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 

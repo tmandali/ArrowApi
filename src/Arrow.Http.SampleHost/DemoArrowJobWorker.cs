@@ -33,7 +33,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         await _context.PublishInfoAsync("Sorgu tamamlandı, zincirdeki export-report job'ı tetikleniyor...", cancellationToken);
         var report = await _context.EnqueueNextJobAsync(
             "export-report",
-            new ExportReportRequest("DemoReport", _context.JobId),
+            new ExportReportRequest("DemoReport"),
             cancellationToken: cancellationToken);
 
         // _context üzerinden doğrudan okunur (otomatik bekler ve stream eder)

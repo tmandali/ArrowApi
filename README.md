@@ -121,7 +121,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         // 2. Chain next job immediately in background (non-blocking enqueue)
         var reportJob = await _context.EnqueueNextJobAsync(
             "export-report",
-            new ExportReportRequest("DemoReport", _context.JobId),
+            new ExportReportRequest("DemoReport"),
             cancellationToken);
 
         // 3. Lazily wait and read chained job result batches when iterated

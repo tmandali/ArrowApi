@@ -128,7 +128,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         if (worker is null)
             throw new InvalidOperationException($"'{job.Name}' için uygun worker servisi bulunamadı.");
 
-        string resultPath = _resultStorage.GetResultPath(jobId, job.Name, job.CorrelationId);
+        string resultPath = _resultStorage.GetResultPath(jobId, job.Name, job.RootJobId);
 
         IAsyncEnumerable<RecordBatch> rawBatches;
         try
@@ -221,7 +221,9 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
             job.Error,
             BatchCount: job.BatchCount,
             TotalRows: job.TotalRows,
-            TraceId: job.TraceId);
+            TraceId: job.TraceId,
+            Name: job.Name,
+            RootJobId: job.RootJobId);
 
         await _eventHub.PublishAsync(jobId, eventName, payload, cancellationToken);
     }

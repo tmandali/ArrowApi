@@ -63,6 +63,7 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
             {
                 Id = Guid.NewGuid(),
                 Name = jobName,
+                RootJobId = _jobId,
                 Request = request,
                 State = ArrowJobState.Queued,
                 CreatedAt = DateTimeOffset.UtcNow
@@ -74,13 +75,13 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
             ? await statusStore.GetStatusAsync(_jobId, cancellationToken: cancellationToken)
             : null;
 
-        string? correlationId = parentStatus?.CorrelationId ?? _jobId.ToString("N");
+        Guid rootJobId = parentStatus?.RootJobId ?? _jobId;
 
-        ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, correlationId, cancellationToken);
+        ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, rootJobId: rootJobId, cancellationToken: cancellationToken);
 
         await queue.EnqueueAsync(nextJob.Id, cancellationToken);
 
-        await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, CorrelationId: {correlationId})", cancellationToken);
+        await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, RootJobId: {rootJobId})", cancellationToken);
 
         return nextJob;
     }

@@ -6,7 +6,7 @@ namespace Arrow.Jobs;
 public interface IArrowJobResultStorage
 {
     /// <summary>Job sonuç dosya/depo yolunu oluşturur.</summary>
-    string GetResultPath(Guid jobId, string? name = null, string? correlationId = null);
+    string GetResultPath(Guid jobId, string? name = null, Guid? rootJobId = null);
 
     /// <summary>Batch'leri Arrow IPC olarak yazar. Hiç batch yoksa dosya oluşturmaz.</summary>
     Task WriteBatchesAsync(

@@ -44,8 +44,8 @@ public sealed class ArrowJob<TRequest>
     public byte? TraceFlags { get; set; }
     /// <summary>Tekilleştirme için istek özeti hash'i.</summary>
     public string? RequestHash { get; set; }
-    /// <summary>İlişkilendirme kimliği (Correlation ID).</summary>
-    public string? CorrelationId { get; set; }
+    /// <summary>Kök (zincirin ilk) job kimliği.</summary>
+    public Guid RootJobId { get; set; }
     /// <summary>Oluşturulma zamanı.</summary>
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     /// <summary>Tamamlanma zamanı.</summary>
@@ -76,7 +76,7 @@ public sealed record ArrowJobStatus(
     long? TotalRows = null,
     Guid? RetriedFrom = null,
     string? Name = null,
-    string? CorrelationId = null);
+    Guid? RootJobId = null);
 
 /// <summary>Job listeleme sorgu parametreleri.</summary>
 public sealed record ArrowJobListQuery(
@@ -85,7 +85,7 @@ public sealed record ArrowJobListQuery(
     DateTimeOffset? To = null,
     int Skip = 0,
     int Take = 50,
-    string? CorrelationId = null);
+    Guid? RootJobId = null);
 
 /// <summary>Job listesi sayfalama sonucu.</summary>
 /// <typeparam name="TRequest">İstek DTO tipi.</typeparam>
@@ -117,7 +117,7 @@ public sealed record ArrowJobEvent(
     string? Message = null,
     string? TraceId = null,
     string? Name = null,
-    string? CorrelationId = null);
+    Guid? RootJobId = null);
 
 /// <summary>Job SSE olay isimleri sabitleri.</summary>
 public static class ArrowJobEventNames

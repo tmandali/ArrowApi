@@ -26,16 +26,17 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
     public async Task<ArrowJob<TRequest>> CreateAsync(
         TRequest request,
         string? name = null,
-        string? correlationId = null,
+        Guid? rootJobId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        Guid jobId = Guid.NewGuid();
         var job = new ArrowJob<TRequest>
         {
-            Id = Guid.NewGuid(),
+            Id = jobId,
             Name = name,
-            CorrelationId = correlationId,
+            RootJobId = rootJobId ?? jobId,
             Request = request,
             RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
@@ -261,7 +262,7 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             job.TotalRows,
             null,
             job.Name,
-            job.CorrelationId);
+            job.RootJobId);
     }
 
     public Task<bool> TryCancelJobAsync(Guid id, CancellationToken cancellationToken = default) =>

@@ -14,7 +14,6 @@
 POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobName}}
 Content-Type: application/json
 X-Api-Key: {{ApiKey}}
-X-Correlation-ID: custom-chain-123
 
 {
   "cnnName": "inmemory",
@@ -29,11 +28,9 @@ X-Correlation-ID: custom-chain-123
 POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/export-report
 Content-Type: application/json
 X-Api-Key: {{ApiKey}}
-X-Correlation-ID: custom-chain-123
 
 {
-  "reportName": "MonthlySummary",
-  "sourceJobId": "00000000-0000-0000-0000-000000000000"
+  "reportName": "MonthlySummary"
 }
 
 ### 1c. Create Product Job (CQRS Dispatcher)
@@ -68,8 +65,8 @@ X-Api-Key: {{ApiKey}}
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?take=100
 X-Api-Key: {{ApiKey}}
 
-### 6b. List Jobs by Correlation ID (Tüm İş Zincirini Sorgula)
-GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?correlationId=custom-chain-123
+### 6b. List Jobs by Root Job ID (Tüm İş Zincirini Sorgula)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs?rootJobId={{createJob.response.body.$.rootJobId}}
 X-Api-Key: {{ApiKey}}
 
 ### 7. List Completed Jobs

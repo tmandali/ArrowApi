@@ -18,12 +18,12 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
         Directory.CreateDirectory(_workDirectory);
     }
 
-    public string GetResultPath(Guid jobId, string? name = null, string? correlationId = null)
+    public string GetResultPath(Guid jobId, string? name = null, Guid? rootJobId = null)
     {
         string dir = _workDirectory;
-        if (!string.IsNullOrWhiteSpace(correlationId))
+        if (rootJobId.HasValue)
         {
-            dir = Path.Combine(_workDirectory, SanitizeFileName(correlationId));
+            dir = Path.Combine(_workDirectory, rootJobId.Value.ToString("N"));
         }
 
         Directory.CreateDirectory(dir);

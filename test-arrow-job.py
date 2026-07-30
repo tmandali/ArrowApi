@@ -133,6 +133,7 @@ def create_job(body: dict[str, Any] | None = None) -> dict[str, Any]:
     status = resp.json()
     print(f"  Status: {resp.status_code}, Body: {status}")
     assert "id" in status
+    assert field(status, "rootJobId", "RootJobId") == status["id"]
     assert field(status, "jobUrl", "JobUrl")
     return status
 
@@ -152,6 +153,7 @@ def wait_sse(
             print(
                 f"  event={event_name} status={payload.get('status')} "
                 f"batches={payload.get('batchCount')} rows={payload.get('totalRows')} "
+                f"rootJobId={payload.get('rootJobId')} "
                 f"message={payload.get('message')!r}"
             )
             if event_name in terminal:
@@ -175,6 +177,7 @@ def test_happy_path() -> dict[str, Any]:
     body = resp.json()
     print(f"  Status: {resp.status_code}, Body: {body}")
     assert field(body, "status", "Status") == "Completed"
+    assert field(body, "rootJobId", "RootJobId") == status["id"]
 
     print(f"GET {url} (Accept: Arrow)")
     arrow = SESSION.get(url, headers={"Accept": ARROW_MEDIA_TYPE}, timeout=30)
@@ -212,6 +215,15 @@ def test_list_jobs(status: dict[str, Any]) -> None:
     assert any(field(item, "id", "Id") == job_id for item in items), (
         "liste job id içermiyor"
     )
+
+    root_id = status["id"]
+    print(f"GET {JOBS_ROOT_URL}?rootJobId={root_id}")
+    root_filtered = SESSION.get(
+        JOBS_ROOT_URL, params={"rootJobId": root_id}, timeout=30
+    )
+    root_filtered.raise_for_status()
+    root_items = field(root_filtered.json(), "items", "Items") or []
+    assert any(field(item, "id", "Id") == root_id for item in root_items)
 
     print(f"GET {JOBS_ROOT_URL}?state=Completed&take=50")
     filtered = SESSION.get(

@@ -10,16 +10,17 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
     public Task<ArrowJob<TRequest>> CreateAsync(
         TRequest request,
         string? name = null,
-        string? correlationId = null,
+        Guid? rootJobId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        Guid jobId = Guid.NewGuid();
         var job = new ArrowJob<TRequest>
         {
-            Id = Guid.NewGuid(),
+            Id = jobId,
             Name = name,
-            CorrelationId = correlationId,
+            RootJobId = rootJobId ?? jobId,
             Request = request,
             RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
@@ -84,8 +85,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         if (query.To is { } to)
             filtered = filtered.Where(j => j.CreatedAt <= to);
 
-        if (!string.IsNullOrWhiteSpace(query.CorrelationId))
-            filtered = filtered.Where(j => string.Equals(j.CorrelationId, query.CorrelationId, StringComparison.OrdinalIgnoreCase));
+        if (query.RootJobId is { } rootJobId)
+            filtered = filtered.Where(j => j.RootJobId == rootJobId);
 
         List<ArrowJob<TRequest>> ordered = filtered
             .OrderByDescending(j => j.CreatedAt)
@@ -186,7 +187,7 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             job.TotalRows,
             null,
             job.Name,
-            job.CorrelationId);
+            job.RootJobId);
 
         return Task.FromResult<ArrowJobStatus?>(status);
     }
