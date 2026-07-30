@@ -96,7 +96,8 @@ internal static class ArrowJobSse
                 BatchCount: job.BatchCount,
                 TotalRows: job.TotalRows,
                 TraceId: job.TraceId,
-                Name: job.Name),
+                Name: job.Name,
+                CorrelationId: job.CorrelationId),
             jobsPath);
 
     private static ArrowJobEvent EnrichUrls(ArrowJobEvent payload, string jobsPath)

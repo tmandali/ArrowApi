@@ -120,8 +120,8 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         if (worker is null)
             throw new InvalidOperationException($"'{job.Name}' için uygun worker servisi bulunamadı.");
 
-        var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub);
-        string resultPath = _resultStorage.GetResultPath(jobId);
+        var context = new ArrowJobExecutionContext<TRequest>(jobId, job.Request, _store, _eventHub, scope.ServiceProvider);
+        string resultPath = _resultStorage.GetResultPath(jobId, job.Name, job.CorrelationId);
         IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(
             jobId,
             worker.ExecuteJobAsync(context, cancellationToken),
@@ -131,7 +131,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         latest = await _store.GetAsync(jobId, cancellationToken);
         if (latest?.State == ArrowJobState.Cancelled)
         {
-            await _resultStorage.DeleteResultAsync(jobId, cancellationToken);
+            await _resultStorage.DeleteResultAsync(resultPath, cancellationToken);
             await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
             return;
         }

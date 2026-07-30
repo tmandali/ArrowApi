@@ -5,10 +5,11 @@ using Arrow.Jobs.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo")
+// 1. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo" ve "export-report")
 builder.Services.AddArrowApi(arrow =>
 {
     arrow.AddJob<DemoArrowJobWorker>("demo");
+    arrow.AddJob<ExportReportArrowJobWorker>("export-report");
 });
 
 builder.Services.AddStaticApiKeyAuthentication(o =>
@@ -38,6 +39,9 @@ app.UseArrowApi("/api/arrow/jobs", jobs =>
     jobs.MapJob("demo")
         .RequireAuthorization("DemoJobPolicy")
         .PreventDuplicates(TimeSpan.FromMinutes(10));
+
+    jobs.MapJob("export-report")
+        .RequireAuthorization("DemoJobPolicy");
 });
 
 app.MapArrowDemoEndpoints();

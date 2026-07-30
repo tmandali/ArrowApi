@@ -32,13 +32,8 @@ public static class ArrowJobsServiceCollectionExtensions
         }
 
         services.AddArrowResponse();
-<<<<<<< HEAD
         services.AddArrowJobServices<T>(name, configure);
         services.AddSingleton(new ArrowJobEndpointRegistration(typeof(T), name));
-=======
-        services.AddArrowJobServices<T>(nameOrPath, configure);
-        services.AddSingleton(new ArrowJobEndpointRegistration(typeof(T), nameOrPath.Trim()));
->>>>>>> 5c09fda62d674ed3d7cb9330460ad7d9bcf2705c
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IArrowApiFeature, ArrowJobsApiFeature>());
         return services;

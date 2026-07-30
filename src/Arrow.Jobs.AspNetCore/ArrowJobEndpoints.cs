@@ -143,48 +143,56 @@ public static class ArrowJobEndpoints
                     CreateJobAsync(request, jobName, httpRequest, httpContext, store, queue, cancellationToken))
             .Accepts<TRequest>("application/json");
 
-        IEndpointRouteBuilder targetBuilder = string.IsNullOrEmpty(jobsPath) ? group : endpoints;
+        bool shouldMapGuidRoutes = !endpoints.DataSources
+            .SelectMany(ds => ds.Endpoints)
+            .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Any(e => e.RoutePattern.RawText?.EndsWith("{id:guid}", StringComparison.OrdinalIgnoreCase) == true);
 
-        targetBuilder.MapGet(
-                "{id:guid}",
-                (Guid id, HttpRequest request, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
-                    GetJob(id, request, store, cancellationToken))
-            .ProducesArrow()
-            .Produces<ArrowJobStatus>();
+        if (shouldMapGuidRoutes)
+        {
+            IEndpointRouteBuilder targetBuilder = string.IsNullOrEmpty(jobsPath) ? group : endpoints;
 
-        targetBuilder.MapGet(
-                "{id:guid}/request",
-                (Guid id, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
-                    GetJobRequestAsync(id, store, cancellationToken))
-            .Produces<TRequest>();
+            targetBuilder.MapGet(
+                    "{id:guid}",
+                    (Guid id, HttpRequest request, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
+                        GetJob(id, request, store, cancellationToken))
+                .ProducesArrow()
+                .Produces<ArrowJobStatus>();
 
-        targetBuilder.MapGet(
-            "{id:guid}/events",
-            (Guid id, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
-                StreamJobEvents(id, store, eventHub, response, cancellationToken));
+            targetBuilder.MapGet(
+                    "{id:guid}/request",
+                    (Guid id, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
+                        GetJobRequestAsync(id, store, cancellationToken))
+                .Produces<TRequest>();
 
-        targetBuilder.MapPost(
-                "{id:guid}/cancel",
-                (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
-                    CancelJobAsync(id, httpRequest, store, eventHub, cancellationToken))
-            .Produces<ArrowJobStatus>();
+            targetBuilder.MapGet(
+                "{id:guid}/events",
+                (Guid id, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
+                    StreamJobEvents(id, store, eventHub, response, cancellationToken));
 
-        targetBuilder.MapPost(
-                "{id:guid}/retry",
-                (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
-                    RetryJobAsync(id, httpRequest, store, queue, cancellationToken))
-            .Produces<ArrowJobStatus>();
+            targetBuilder.MapPost(
+                    "{id:guid}/cancel",
+                    (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
+                        CancelJobAsync(id, httpRequest, store, eventHub, cancellationToken))
+                .Produces<ArrowJobStatus>();
 
-        targetBuilder.MapDelete(
-                "{id:guid}",
-                (Guid id, IArrowJobStore<TRequest> store, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
-                    DeleteJobAsync(id, store, resultStorage, cancellationToken));
+            targetBuilder.MapPost(
+                    "{id:guid}/retry",
+                    (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
+                        RetryJobAsync(id, httpRequest, store, queue, cancellationToken))
+                .Produces<ArrowJobStatus>();
 
-        targetBuilder.MapGet(
-                string.Empty,
-                (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, CancellationToken cancellationToken) =>
-                    ListJobsAsync(httpRequest, store, state, from, to, skip, take, cancellationToken))
-            .Produces<ArrowJobStatusList>();
+            targetBuilder.MapDelete(
+                    "{id:guid}",
+                    (Guid id, IArrowJobStore<TRequest> store, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
+                        DeleteJobAsync(id, store, resultStorage, cancellationToken));
+
+            targetBuilder.MapGet(
+                    string.Empty,
+                    (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] string? correlationId, CancellationToken cancellationToken) =>
+                        ListJobsAsync(httpRequest, store, state, from, to, skip, take, correlationId, cancellationToken))
+                .Produces<ArrowJobStatusList>();
+        }
 
         return group;
     }
@@ -199,6 +207,10 @@ public static class ArrowJobEndpoints
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
+        string? correlationId = httpRequest.Headers["X-Correlation-ID"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(correlationId))
+            correlationId = Guid.NewGuid().ToString("N");
+
         var dedupPolicy = httpContext.GetEndpoint()?.Metadata.GetMetadata<ArrowJobDeduplicationPolicy>();
         if (dedupPolicy is { Enabled: true })
         {
@@ -215,7 +227,7 @@ public static class ArrowJobEndpoints
             }
         }
 
-        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, cancellationToken);
+        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, correlationId, cancellationToken);
         await queue.EnqueueAsync(job.Id, cancellationToken);
 
         string jobsPathResolved = ResolveJobsBasePath(httpRequest);
@@ -233,6 +245,7 @@ public static class ArrowJobEndpoints
         DateTimeOffset? to,
         int? skip,
         int? take,
+        string? correlationId,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
@@ -250,7 +263,8 @@ public static class ArrowJobEndpoints
             from,
             to,
             skip ?? 0,
-            take ?? 50);
+            take ?? 50,
+            correlationId);
 
         ArrowJobListPage<TRequest> page = await store.ListAsync(query, cancellationToken);
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -334,7 +348,7 @@ public static class ArrowJobEndpoints
         if (job.State is not (ArrowJobState.Failed or ArrowJobState.Cancelled))
             return Results.Conflict(ToStatusResponse(job, ResolveJobsBasePath(httpRequest)));
 
-        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, job.Name, cancellationToken);
+        ArrowJob<TRequest> retry = await store.CreateAsync(job.Request, job.Name, job.CorrelationId, cancellationToken);
         await queue.EnqueueAsync(retry.Id, cancellationToken);
 
         string jobsPath = ResolveJobsBasePath(httpRequest);
@@ -361,7 +375,7 @@ public static class ArrowJobEndpoints
         if (!await store.TryDeleteAsync(id, cancellationToken))
             return Results.Conflict();
 
-        await resultStorage.DeleteResultAsync(id, cancellationToken);
+        await resultStorage.DeleteResultAsync(job.ResultPath, cancellationToken);
         return Results.NoContent();
     }
 
@@ -449,7 +463,8 @@ public static class ArrowJobEndpoints
             job.BatchCount,
             job.TotalRows,
             retriedFrom,
-            job.Name);
+            job.Name,
+            job.CorrelationId);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 

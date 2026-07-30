@@ -23,6 +23,10 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
             yield return batch;
 
-        await context.PublishInfoAsync("Sorgu tamamlandı", cancellationToken);
+        await context.PublishInfoAsync("Sorgu tamamlandı, zincirdeki export-report job'ı tetikleniyor...", cancellationToken);
+        await context.EnqueueNextJobAsync(
+            "export-report",
+            new ExportReportRequest("DemoReport", context.JobId),
+            cancellationToken: cancellationToken);
     }
 }

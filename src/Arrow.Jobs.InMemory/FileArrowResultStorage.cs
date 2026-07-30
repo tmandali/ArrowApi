@@ -18,7 +18,22 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
         Directory.CreateDirectory(_workDirectory);
     }
 
-    public string GetResultPath(Guid jobId) => Path.Combine(_workDirectory, $"{jobId:N}.arrows");
+    public string GetResultPath(Guid jobId, string? name = null, string? correlationId = null)
+    {
+        string dir = _workDirectory;
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            dir = Path.Combine(_workDirectory, SanitizeFileName(correlationId));
+        }
+
+        Directory.CreateDirectory(dir);
+
+        string fileName = string.IsNullOrWhiteSpace(name)
+            ? $"{jobId:N}.arrows"
+            : $"{SanitizeFileName(name)}_{jobId:N}.arrows";
+
+        return Path.Combine(dir, fileName);
+    }
 
     public async Task WriteBatchesAsync(
         string resultPath,
@@ -69,12 +84,38 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
             yield return batch;
     }
 
-    public Task DeleteResultAsync(Guid jobId, CancellationToken cancellationToken = default)
+    public Task DeleteResultAsync(string? resultPath, CancellationToken cancellationToken = default)
     {
-        string path = GetResultPath(jobId);
-        if (File.Exists(path))
-            File.Delete(path);
+        if (!string.IsNullOrWhiteSpace(resultPath) && File.Exists(resultPath))
+        {
+            File.Delete(resultPath);
+
+            string? dir = Path.GetDirectoryName(resultPath);
+            if (!string.IsNullOrEmpty(dir) &&
+                !string.Equals(dir, _workDirectory, StringComparison.OrdinalIgnoreCase) &&
+                Directory.Exists(dir) &&
+                !Directory.EnumerateFileSystemEntries(dir).Any())
+            {
+                try
+                {
+                    Directory.Delete(dir);
+                }
+                catch
+                {
+                    // Suppress directory cleanup exception if folder locked
+                }
+            }
+        }
 
         return Task.CompletedTask;
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        foreach (char c in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(c, '_');
+        }
+        return name.Trim();
     }
 }

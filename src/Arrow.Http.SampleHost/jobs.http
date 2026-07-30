@@ -24,6 +24,16 @@ X-Api-Key: {{ApiKey}}
   "batchSize": 1
 }
 
+### 1b. Create Export Report Job (Stand-alone trigger)
+POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/export-report
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "reportName": "MonthlySummary",
+  "sourceJobId": "00000000-0000-0000-0000-000000000000"
+}
+
 ### 2. Get Job Status (Sadece GUID ile - Job Name gerektirmez!)
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
 X-Api-Key: {{ApiKey}}

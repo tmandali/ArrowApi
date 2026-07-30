@@ -6,7 +6,11 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 {
     private readonly ConcurrentDictionary<Guid, ArrowJob<TRequest>> _jobs = new();
 
-    public Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, CancellationToken cancellationToken = default)
+    public Task<ArrowJob<TRequest>> CreateAsync(
+        TRequest request,
+        string? name = null,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -14,6 +18,7 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         {
             Id = Guid.NewGuid(),
             Name = name,
+            CorrelationId = correlationId,
             Request = request,
             RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
@@ -77,6 +82,9 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
         if (query.To is { } to)
             filtered = filtered.Where(j => j.CreatedAt <= to);
+
+        if (!string.IsNullOrWhiteSpace(query.CorrelationId))
+            filtered = filtered.Where(j => string.Equals(j.CorrelationId, query.CorrelationId, StringComparison.OrdinalIgnoreCase));
 
         List<ArrowJob<TRequest>> ordered = filtered
             .OrderByDescending(j => j.CreatedAt)

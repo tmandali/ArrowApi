@@ -25,6 +25,7 @@ public sealed class ArrowJob<TRequest>
     public string? ParentSpanId { get; set; }
     public byte? TraceFlags { get; set; }
     public string? RequestHash { get; set; }
+    public string? CorrelationId { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }
 }
@@ -46,14 +47,16 @@ public sealed record ArrowJobStatus(
     int? BatchCount = null,
     long? TotalRows = null,
     Guid? RetriedFrom = null,
-    string? Name = null);
+    string? Name = null,
+    string? CorrelationId = null);
 
 public sealed record ArrowJobListQuery(
     ArrowJobState? State = null,
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
     int Skip = 0,
-    int Take = 50);
+    int Take = 50,
+    string? CorrelationId = null);
 
 public sealed class ArrowJobListPage<TRequest>
 {
@@ -78,7 +81,8 @@ public sealed record ArrowJobEvent(
     long? TotalRows = null,
     string? Message = null,
     string? TraceId = null,
-    string? Name = null);
+    string? Name = null,
+    string? CorrelationId = null);
 
 public static class ArrowJobEventNames
 {

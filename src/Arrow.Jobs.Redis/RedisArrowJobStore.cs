@@ -22,7 +22,11 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     private static string StateKey(ArrowJobState state) => $"arrow:jobs:{TypeKey}:state:{state}";
 
-    public async Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, CancellationToken cancellationToken = default)
+    public async Task<ArrowJob<TRequest>> CreateAsync(
+        TRequest request,
+        string? name = null,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -30,6 +34,7 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         {
             Id = Guid.NewGuid(),
             Name = name,
+            CorrelationId = correlationId,
             Request = request,
             RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
