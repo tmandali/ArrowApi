@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 namespace Arrow.Jobs.InMemory;
 
 public sealed class ArrowJobHostedService<TRequest> : BackgroundService
+    where TRequest : notnull
 {
     private readonly IArrowJobQueue<TRequest> _queue;
     private readonly IArrowJobStore<TRequest> _store;

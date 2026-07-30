@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 namespace Arrow.Jobs.InMemory;
 
 public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
+    where TRequest : notnull
 {
     private readonly ConcurrentDictionary<Guid, ArrowJob<TRequest>> _jobs = new();
 

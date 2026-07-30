@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Arrow.Jobs.InMemory;
 
 internal sealed class ArrowJobExecutionContext<TRequest> : IArrowJobExecutionContext<TRequest>
+    where TRequest : notnull
 {
     private readonly Guid _jobId;
     private readonly TRequest _request;

@@ -8,6 +8,7 @@ namespace Arrow.Jobs.InMemory;
 public static class ArrowJobsInMemoryExtensions
 {
     public static ArrowJobsBuilder<TRequest> UseInMemory<TRequest>(this ArrowJobsBuilder<TRequest> builder)
+        where TRequest : notnull
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.RemoveBackend();
@@ -28,6 +29,7 @@ public static class ArrowJobsInMemoryExtensions
             .Invoke(null, [configurer.Services]);
     }
 
-    private static void UseInMemoryForRequest<TRequest>(IServiceCollection services) =>
+    private static void UseInMemoryForRequest<TRequest>(IServiceCollection services)
+        where TRequest : notnull =>
         new ArrowJobsBuilder<TRequest>(services).UseInMemory();
 }

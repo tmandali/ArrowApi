@@ -3,6 +3,7 @@ using System.Threading;
 namespace Arrow.Jobs.InMemory;
 
 public static class ArrowJobExecutionContextHolder<TRequest>
+    where TRequest : notnull
 {
     private static readonly AsyncLocal<IArrowJobExecutionContext<TRequest>?> _current = new();
 

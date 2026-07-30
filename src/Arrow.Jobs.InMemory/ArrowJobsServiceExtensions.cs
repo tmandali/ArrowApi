@@ -38,6 +38,7 @@ public static class ArrowJobsServiceExtensions
     private static IServiceCollection AddArrowJobsInfrastructureImpl<TRequest>(
         IServiceCollection services,
         Action<IArrowJobsConfigurer>? configure)
+        where TRequest : notnull
     {
         var builder = new ArrowJobsBuilder<TRequest>(services);
         builder.UseInMemory();
@@ -53,6 +54,7 @@ public static class ArrowJobsServiceExtensions
         IServiceCollection services,
         string? name,
         Action<IArrowJobsConfigurer>? configure)
+        where TRequest : notnull
         where TWorker : class
     {
         var builder = new ArrowJobsBuilder<TRequest>(services);

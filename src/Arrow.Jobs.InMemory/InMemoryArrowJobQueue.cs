@@ -4,6 +4,7 @@ using System.Threading.Channels;
 namespace Arrow.Jobs.InMemory;
 
 public sealed class InMemoryArrowJobQueue<TRequest> : IArrowJobQueue<TRequest>
+    where TRequest : notnull
 {
     private readonly Channel<Guid> _channel = Channel.CreateUnbounded<Guid>(
         new UnboundedChannelOptions { SingleReader = true });

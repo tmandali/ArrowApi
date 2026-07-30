@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 namespace Arrow.Jobs.Redis;
 
 public sealed class RedisArrowJobQueue<TRequest> : IArrowJobQueue<TRequest>
+    where TRequest : notnull
 {
     private readonly string _queueKey =
         $"arrow:job:queue:{typeof(TRequest).FullName ?? typeof(TRequest).Name}";

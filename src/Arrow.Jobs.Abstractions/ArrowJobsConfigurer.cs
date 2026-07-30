@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Arrow.Jobs;
 
 internal sealed class ArrowJobsConfigurer<TRequest> : IArrowJobsConfigurer
+    where TRequest : notnull
 {
     private readonly ArrowJobsBuilder<TRequest> _builder;
 

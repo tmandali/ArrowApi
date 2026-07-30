@@ -9,6 +9,7 @@ public interface IArrowJobStore
 }
 
 public interface IArrowJobStore<TRequest> : IArrowJobStore
+    where TRequest : notnull
 {
     Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, string? correlationId = null, CancellationToken cancellationToken = default);
     Task<ArrowJob<TRequest>?> FindDuplicateAsync(TRequest request, string? name = null, TimeSpan? window = null, CancellationToken cancellationToken = default);

@@ -6,6 +6,7 @@ namespace Arrow.Jobs;
 public static class ArrowJobTracePropagation
 {
     public static void CaptureCurrent<TRequest>(ArrowJob<TRequest> job)
+        where TRequest : notnull
     {
         ThrowHelper.ThrowIfNull(job);
 
@@ -19,6 +20,7 @@ public static class ArrowJobTracePropagation
     }
 
     public static Activity? StartExecuteActivity<TRequest>(ArrowJob<TRequest> job)
+        where TRequest : notnull
     {
         ThrowHelper.ThrowIfNull(job);
 
@@ -41,6 +43,7 @@ public static class ArrowJobTracePropagation
     }
 
     private static bool TryCreateParentContext<TRequest>(ArrowJob<TRequest> job, out ActivityContext parent)
+        where TRequest : notnull
     {
         parent = default;
         if (string.IsNullOrEmpty(job.TraceId) || string.IsNullOrEmpty(job.ParentSpanId))

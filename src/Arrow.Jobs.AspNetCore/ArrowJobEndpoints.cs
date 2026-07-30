@@ -388,6 +388,7 @@ public static class ArrowJobEndpoints
         HttpRequest request,
         IArrowJobStore<TRequest> store,
         CancellationToken cancellationToken)
+        where TRequest : notnull
     {
         string jobsPath = ResolveJobsBasePath(request);
 
@@ -430,6 +431,7 @@ public static class ArrowJobEndpoints
         IArrowJobEventHub eventHub,
         HttpResponse response,
         CancellationToken cancellationToken)
+        where TRequest : notnull
     {
         string jobsPath = ResolveJobsBasePath(response.HttpContext.Request);
         IArrowJobStore? targetStore = store;
@@ -497,7 +499,8 @@ public static class ArrowJobEndpoints
     private static ArrowJobStatus ToStatusResponse<TRequest>(
         ArrowJob<TRequest> job,
         string jobsPath,
-        Guid? retriedFrom = null) =>
+        Guid? retriedFrom = null)
+        where TRequest : notnull =>
         new(
             job.Id,
             job.State.ToString(),

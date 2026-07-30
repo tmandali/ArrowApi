@@ -2,6 +2,7 @@ namespace Arrow.Jobs;
 
 /// <summary>Worker <c>ExecuteJobAsync</c> için job kimliği, request ve bilgilendirme.</summary>
 public interface IArrowJobExecutionContext<TRequest>
+    where TRequest : notnull
 {
     Guid JobId { get; }
 

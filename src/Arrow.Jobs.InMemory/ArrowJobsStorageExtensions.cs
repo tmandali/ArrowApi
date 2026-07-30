@@ -21,6 +21,7 @@ public static class ArrowJobsStorageExtensions
     public static ArrowJobsBuilder<TRequest> UseFileStore<TRequest>(
         this ArrowJobsBuilder<TRequest> builder,
         string directoryPath)
+        where TRequest : notnull
     {
         RegisterFileStore(builder.Services, directoryPath);
         return builder;
@@ -34,6 +35,7 @@ public static class ArrowJobsStorageExtensions
     }
 
     public static ArrowJobsBuilder<TRequest> UseResultStorage<TRequest, TStorage>(this ArrowJobsBuilder<TRequest> builder)
+        where TRequest : notnull
         where TStorage : class, IArrowJobResultStorage
     {
         RegisterResultStorage<TStorage>(builder.Services);

@@ -10,6 +10,7 @@ public enum ArrowJobState
 }
 
 public sealed class ArrowJob<TRequest>
+    where TRequest : notnull
 {
     public required Guid Id { get; init; }
     public string? Name { get; set; }
@@ -59,6 +60,7 @@ public sealed record ArrowJobListQuery(
     string? CorrelationId = null);
 
 public sealed class ArrowJobListPage<TRequest>
+    where TRequest : notnull
 {
     public required IReadOnlyList<ArrowJob<TRequest>> Items { get; init; }
     public required int Total { get; init; }

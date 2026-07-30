@@ -4,6 +4,7 @@ using System.Text.Json;
 namespace Arrow.Jobs.Redis;
 
 public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
+    where TRequest : notnull
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly string TypeKey = typeof(TRequest).FullName ?? typeof(TRequest).Name;
@@ -235,6 +236,44 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         await Database.KeyDeleteAsync(Key(id));
         await IndexRemoveAsync(job);
         return true;
+    }
+
+    public async Task<ArrowJobStatus?> GetStatusAsync(Guid id, string jobsBasePath = "/api/arrow/jobs", CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+        if (job is null)
+            return null;
+
+        string baseRoute = jobsBasePath.TrimEnd('/');
+        string jobUrl = $"{baseRoute}/{id:N}";
+        string downloadUrl = $"{baseRoute}/{id:N}/download";
+        string eventsUrl = $"{baseRoute}/{id:N}/events";
+
+        return new ArrowJobStatus(
+            job.Id,
+            job.State.ToString(),
+            jobUrl,
+            eventsUrl,
+            job.CreatedAt,
+            job.CompletedAt,
+            job.Error,
+            job.BatchCount,
+            job.TotalRows,
+            null,
+            job.Name,
+            job.CorrelationId);
+    }
+
+    public Task<bool> TryCancelJobAsync(Guid id, CancellationToken cancellationToken = default) =>
+        TryCancelAsync(id, cancellationToken);
+
+    public Task<bool> TryDeleteJobAsync(Guid id, CancellationToken cancellationToken = default) =>
+        TryDeleteAsync(id, cancellationToken);
+
+    public async Task<string?> GetResultPathAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+        return job?.ResultPath;
     }
 
     private async Task<ArrowJob<TRequest>> GetRequiredAsync(Guid id)

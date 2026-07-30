@@ -5,6 +5,7 @@ namespace Arrow.Jobs;
 
 /// <summary>Bir <typeparamref name="TRequest"/> için store/queue/hub kayıt builder'ı.</summary>
 public sealed class ArrowJobsBuilder<TRequest>
+    where TRequest : notnull
 {
     public IServiceCollection Services { get; }
 

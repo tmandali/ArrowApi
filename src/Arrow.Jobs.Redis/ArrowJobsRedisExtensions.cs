@@ -10,6 +10,7 @@ public static class ArrowJobsRedisExtensions
     public static ArrowJobsBuilder<TRequest> UseRedis<TRequest>(
         this ArrowJobsBuilder<TRequest> builder,
         string connectionString)
+        where TRequest : notnull
     {
         ConfigureRedis<TRequest>(builder.Services, connectionString);
         return builder;
@@ -23,6 +24,7 @@ public static class ArrowJobsRedisExtensions
     }
 
     private static void ConfigureRedis<TRequest>(IServiceCollection services, string connectionString)
+        where TRequest : notnull
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
