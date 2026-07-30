@@ -1,5 +1,6 @@
 using Arrow.Http.AspNetCore.Dispatcher;
 using Arrow.Jobs;
+using FluentValidation;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
@@ -22,5 +23,14 @@ public sealed class CreateProductCqrsCommandHandler : IArrowJobWorker<CreateProd
     {
         _logger.LogInformation("CQRS Worker Handler çalıştı! Ürün: {Name}, Fiyat: {Price}, Stok: {Stock}", request.Name, request.Price, request.Stock);
         return ValueTask.FromResult(Guid.NewGuid());
+    }
+}
+
+public sealed class CreateProductCqrsCommandValidator : FluentValidation.AbstractValidator<CreateProductCqrsCommand>
+{
+    public CreateProductCqrsCommandValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().WithMessage("Ürün adı boş olamaz.");
+        RuleFor(x => x.Price).GreaterThan(0).WithMessage("Fiyat 0'dan büyük olmalıdır.");
     }
 }

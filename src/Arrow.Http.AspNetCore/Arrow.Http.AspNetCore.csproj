@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Arrow.Data\Arrow.Data.csproj" />
     <ProjectReference Include="..\Arrow.Jobs.Abstractions\Arrow.Jobs.Abstractions.csproj" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Reflection;
+using FluentValidation;
 
 namespace Arrow.Http.AspNetCore.Dispatcher;
 
@@ -64,9 +65,13 @@ public static class DispatcherRegistration
         services.AddScoped<ISender>(sp => sp.GetRequiredService<Dispatcher>());
         services.AddScoped<IPublisher>(sp => sp.GetRequiredService<Dispatcher>());
 
-        // Varsayılan Pipeline Behavior'lar: Tracing ve Exception Handling
+        // FluentValidation doğrulayıcılarını tara ve kaydet
+        services.AddValidatorsFromAssembly(assembly);
+
+        // Varsayılan Pipeline Behavior'lar: Tracing, Exception Handling ve Validation
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.TracingBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.JobExceptionHandlingBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(Arrow.Http.AspNetCore.Behaviors.ValidationBehavior<,>));
 
         return services;
     }
