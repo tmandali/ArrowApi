@@ -3,6 +3,7 @@ namespace Arrow.Jobs;
 public interface IArrowJobStore<TRequest>
 {
     Task<ArrowJob<TRequest>> CreateAsync(TRequest request, string? name = null, CancellationToken cancellationToken = default);
+    Task<ArrowJob<TRequest>?> FindDuplicateAsync(TRequest request, string? name = null, TimeSpan? window = null, CancellationToken cancellationToken = default);
     Task<ArrowJob<TRequest>?> GetAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ArrowJobListPage<TRequest>> ListAsync(ArrowJobListQuery query, CancellationToken cancellationToken = default);
     Task MarkRunningAsync(Guid id, CancellationToken cancellationToken = default);

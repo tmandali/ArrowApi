@@ -30,13 +30,44 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         {
             Id = Guid.NewGuid(),
             Name = name,
-            Request = request
+            Request = request,
+            RequestHash = ArrowJobRequestHasher.ComputeHash(request)
         };
         ArrowJobTracePropagation.CaptureCurrent(job);
 
         await SetAsync(job);
         await IndexAddAsync(job);
         return job;
+    }
+
+    public async Task<ArrowJob<TRequest>?> FindDuplicateAsync(
+        TRequest request,
+        string? name = null,
+        TimeSpan? window = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string hash = ArrowJobRequestHasher.ComputeHash(request);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        ArrowJobListPage<TRequest> page = await ListAsync(new ArrowJobListQuery(Take: 200), cancellationToken);
+
+        return page.Items
+            .Where(j => string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase))
+            .Where(j => j.RequestHash == hash)
+            .Where(j =>
+            {
+                if (j.State is ArrowJobState.Queued or ArrowJobState.Running)
+                    return true;
+
+                if (window.HasValue && (now - j.CreatedAt) <= window.Value)
+                    return true;
+
+                return false;
+            })
+            .OrderByDescending(j => j.CreatedAt)
+            .FirstOrDefault();
     }
 
     public async Task<ArrowJob<TRequest>?> GetAsync(Guid id, CancellationToken cancellationToken = default)

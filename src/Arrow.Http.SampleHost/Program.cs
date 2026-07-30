@@ -23,7 +23,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("DemoJobPolicy", policy => policy
         //.RequireRole("Admin", "Developer")
         //.RequireClaim("scope", "jobs:write")
-        //.RequireWorkingHours()
+        //.RequireWorkingHours(new TimeOnly(9, 0), new TimeOnly(18, 0))
         .RequireAuthenticatedUser());
 });
 
@@ -35,7 +35,9 @@ app.UseAuthorization();
 // 2. HTTP Routing: DemoJobPolicy politikası ile yetkilendirilmiş endpoint'ler
 app.UseArrowApi("/api/arrow/jobs", jobs =>
 {
-    jobs.MapJob("demo").RequireAuthorization("DemoJobPolicy");
+    jobs.MapJob("demo")
+        .RequireAuthorization("DemoJobPolicy")
+        .PreventDuplicates(TimeSpan.FromMinutes(10));
 });
 
 app.MapArrowDemoEndpoints();

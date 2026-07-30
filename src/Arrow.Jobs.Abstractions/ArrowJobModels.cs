@@ -24,6 +24,7 @@ public sealed class ArrowJob<TRequest>
     /// <summary>HTTP create span'inin W3C <c>span-id</c> (hex) — job span buna child olur.</summary>
     public string? ParentSpanId { get; set; }
     public byte? TraceFlags { get; set; }
+    public string? RequestHash { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }
 }

@@ -139,8 +139,8 @@ public static class ArrowJobEndpoints
 
         group.MapPost(
                 string.Empty,
-                (TRequest request, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
-                    CreateJobAsync(request, jobName, httpRequest, store, queue, cancellationToken))
+                (TRequest request, HttpRequest httpRequest, HttpContext httpContext, IArrowJobStore<TRequest> store, IArrowJobQueue<TRequest> queue, CancellationToken cancellationToken) =>
+                    CreateJobAsync(request, jobName, httpRequest, httpContext, store, queue, cancellationToken))
             .Accepts<TRequest>("application/json");
 
         IEndpointRouteBuilder targetBuilder = string.IsNullOrEmpty(jobsPath) ? group : endpoints;
@@ -193,19 +193,36 @@ public static class ArrowJobEndpoints
         TRequest request,
         string? jobName,
         HttpRequest httpRequest,
+        HttpContext httpContext,
         IArrowJobStore<TRequest> store,
         IArrowJobQueue<TRequest> queue,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
+        var dedupPolicy = httpContext.GetEndpoint()?.Metadata.GetMetadata<ArrowJobDeduplicationPolicy>();
+        if (dedupPolicy is { Enabled: true })
+        {
+            ArrowJob<TRequest>? duplicate = await store.FindDuplicateAsync(
+                request,
+                jobName,
+                dedupPolicy.Window,
+                cancellationToken);
+
+            if (duplicate is not null)
+            {
+                string jobsPath = ResolveJobsBasePath(httpRequest);
+                return Results.Conflict(ToStatusResponse(duplicate, jobsPath));
+            }
+        }
+
         ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, cancellationToken);
         await queue.EnqueueAsync(job.Id, cancellationToken);
 
-        string jobsPath = ResolveJobsBasePath(httpRequest);
-        string jobUrl = JobUrl(jobsPath, job.Id);
+        string jobsPathResolved = ResolveJobsBasePath(httpRequest);
+        string jobUrl = JobUrl(jobsPathResolved, job.Id);
         return Results.Accepted(
             jobUrl,
-            ToStatusResponse(job, jobsPath));
+            ToStatusResponse(job, jobsPathResolved));
     }
 
     private static async Task<IResult> ListJobsAsync<TRequest>(

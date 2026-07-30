@@ -18,13 +18,22 @@ public static class ArrowJobsServiceCollectionExtensions
         string nameOrPath = "default",
         Action<IArrowJobsConfigurer>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        if (string.IsNullOrWhiteSpace(nameOrPath))
-            nameOrPath = "default";
+        string name = nameOrPath.Trim();
+
+        bool exists = services.Any(d =>
+            d.ServiceType == typeof(ArrowJobEndpointRegistration) &&
+            d.ImplementationInstance is ArrowJobEndpointRegistration reg &&
+            string.Equals(reg.NameOrPath, name, StringComparison.OrdinalIgnoreCase));
+
+        if (exists)
+        {
+            throw new InvalidOperationException(
+                $"'{name}' ismiyle birden fazla Arrow Job kaydı bulunuyor. Her Job ismi (name) benzersiz (unique) olmalıdır.");
+        }
 
         services.AddArrowResponse();
-        services.AddArrowJobServices<T>(configure);
-        services.AddSingleton(new ArrowJobEndpointRegistration(typeof(T), nameOrPath.Trim()));
+        services.AddArrowJobServices<T>(name, configure);
+        services.AddSingleton(new ArrowJobEndpointRegistration(typeof(T), name));
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IArrowApiFeature, ArrowJobsApiFeature>());
         return services;
