@@ -26,6 +26,15 @@ public interface IArrowJobExecutionContext
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull;
 
+    /// <summary>
+    /// Veri akışı olmadan, aynı DI Scope ve DbContext içinde bir sonraki Child Worker'ı Pipe (boru hattı) ile inline olarak çalıştırır.
+    /// </summary>
+    IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
+        string jobName,
+        TNextRequest request,
+        CancellationToken cancellationToken = default)
+        where TNextRequest : notnull;
+
     /// <summary><c>info</c> event — job state değildir; yalnızca worker mesajı.</summary>
     ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);
 }

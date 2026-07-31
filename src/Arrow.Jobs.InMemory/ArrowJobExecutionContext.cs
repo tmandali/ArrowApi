@@ -103,6 +103,21 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         }
     }
 
+    public IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
+        string jobName,
+        TNextRequest request,
+        CancellationToken cancellationToken = default)
+        where TNextRequest : notnull
+    {
+        return PipeToAsync(jobName, request, EmptyStreamAsync(), cancellationToken);
+
+        static async IAsyncEnumerable<RecordBatch> EmptyStreamAsync()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
     public async ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
