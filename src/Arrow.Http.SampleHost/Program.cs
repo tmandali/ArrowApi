@@ -1,15 +1,17 @@
 using Arrow.Http.AspNetCore;
 using Arrow.Http.SampleHost;
+using Arrow.Http.SampleHost.Workers;
 using Arrow.Jobs.AspNetCore;
 using Arrow.Jobs.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo", "export-report", "create-product")
+// 1. DI Kaydı: Job mantıksal ismiyle kaydolur ("demo", "export-report", "piped-sales-report", "create-product")
 builder.Services.AddArrowApi(arrow =>
 {
     arrow.AddJob<DemoArrowJobWorker>("demo");
     arrow.AddJob<ExportReportArrowJobWorker>("export-report");
+    arrow.AddJob<PipedSalesReportWorker>("piped-sales-report");
     arrow.AddJob<CreateProductCqrsCommandHandler>("create-product");
 });
 
@@ -23,9 +25,6 @@ builder.Services.AddStaticApiKeyAuthentication(o =>
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("DemoJobPolicy", policy => policy
-        //.RequireRole("Admin", "Developer")
-        //.RequireClaim("scope", "jobs:write")
-        //.RequireWorkingHours(new TimeOnly(9, 0), new TimeOnly(18, 0))
         .RequireAuthenticatedUser());
 });
 
@@ -42,6 +41,9 @@ app.UseArrowApi("/api/arrow/jobs", jobs =>
         .PreventDuplicates(TimeSpan.FromMinutes(10));
 
     jobs.MapJob("export-report")
+        .RequireAuthorization("DemoJobPolicy");
+
+    jobs.MapJob("piped-sales-report")
         .RequireAuthorization("DemoJobPolicy");
 
     jobs.MapJob("create-product")
