@@ -12,8 +12,8 @@ namespace Arrow.Http.Client;
 /// </remarks>
 public static class HttpClientArrowExtensions
 {
-    /// <summary>GET ile Arrow IPC stream açar.</summary>
-    public static async Task<ArrowBatchReader> GetArrowReaderAsync(
+    /// <summary>GET ile Arrow IPC stream açar ve <see cref="Result{T}"/> olarak döner.</summary>
+    public static async Task<Result<ArrowBatchReader>> GetArrowReaderAsync(
         this HttpClient httpClient,
         string requestUri,
         VariantDbRepresentation variantDbMode = VariantDbRepresentation.VariantValue,
@@ -22,10 +22,24 @@ public static class HttpClientArrowExtensions
         ThrowHelper.ThrowIfNull(httpClient);
         ThrowHelper.ThrowIfNullOrEmpty(requestUri);
 
-        HttpResponseMessage response = await HttpClientArrowSend
-            .SendAsync(httpClient, HttpMethod.Get, requestUri, content: null, cancellationToken)
-            .ConfigureAwait(false);
-        return await response.ReadAsArrowBatchReaderAsync(variantDbMode, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            HttpResponseMessage response = await HttpClientArrowSend
+                .SendAsync(httpClient, HttpMethod.Get, requestUri, content: null, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                ArrowBatchReader reader = await response.ReadAsArrowBatchReaderAsync(variantDbMode, cancellationToken).ConfigureAwait(false);
+                return Result<ArrowBatchReader>.Success(reader);
+            }
+
+            return await response.ReadAsResultAsync<ArrowBatchReader>(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return Result<ArrowBatchReader>.Failure($"Arrow akışı açılırken hata oluştu: {ex.Message}", 500);
+        }
     }
 
     /// <summary>GET ile Arrow IPC stream'i <see cref="ArrowDataReader"/> olarak açar.</summary>

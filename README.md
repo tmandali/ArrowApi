@@ -171,10 +171,10 @@ await foreach (var evt in job.ReadEventsAsync())
         break;
 }
 
-await using var reader = await job.GetArrowReaderAsync();
-await foreach (var batch in reader.ReadBatchesAsync())
+Result<ArrowBatchReader> report = await job.GetArrowReaderAsync();
+while (await report.ReadNextBatchAsync<MyDto>() is { } batch)
 {
-    // Process result batches
+    // Process result DTO batches (Auto-Disposed upon completion)
 }
 ```
 

@@ -1,5 +1,6 @@
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
+using Arrow;
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Linq.Expressions;

@@ -29,6 +29,8 @@ internal static class ArrowDemoEndpoints
             .Accepts<ArrowQueryRequest>("application/json")
             .ProducesArrow();
 
+        endpoints.MapGet("/arrow/result-demo/{id}", GetResultDemo);
+
         return endpoints;
     }
 
@@ -167,5 +169,24 @@ internal static class ArrowDemoEndpoints
         DbDataReader reader = ArrowSamples.OpenDemoQueryReader(request.Query, request.Parameters);
         ArrowConversionOptions? options = ArrowSamples.CreateConversionOptions(request.BatchSize);
         return ArrowResults.FromDb(reader, options, close: true);
+    }
+
+    private static IResult GetResultDemo(int id)
+    {
+        if (id <= 0)
+            return Result<ResultSampleDto>.BadRequest("ID değeri 0'dan büyük olmalıdır.").ToHttpResult();
+
+        if (id > 100)
+            return Result<ResultSampleDto>.NotFound($"ID '{id}' olan kayıt bulunamadı.").ToHttpResult();
+
+        var dto = new ResultSampleDto { Id = id, Name = $"Sample_{id}", CreatedAt = DateTime.UtcNow };
+        return Result<ResultSampleDto>.Success(dto).ToHttpResult();
+    }
+
+    private class ResultSampleDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 }

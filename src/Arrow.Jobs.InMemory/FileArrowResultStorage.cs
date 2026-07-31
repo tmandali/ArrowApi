@@ -72,15 +72,25 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
         }
     }
 
-    public Task<ArrowBatchReader> OpenBatchReaderAsync(
+    public Task<Result<ArrowBatchReader>> OpenBatchReaderAsync(
         string resultPath,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(resultPath);
+        if (string.IsNullOrWhiteSpace(resultPath) || !File.Exists(resultPath))
+        {
+            return Task.FromResult(Result<ArrowBatchReader>.NotFound($"Sonuç dosyası bulunamadı: '{resultPath}'"));
+        }
 
-        FileStream stream = File.OpenRead(resultPath);
-        ArrowBatchReader reader = ArrowData.OpenArrowReader(stream);
-        return Task.FromResult(reader);
+        try
+        {
+            FileStream stream = File.OpenRead(resultPath);
+            ArrowBatchReader reader = ArrowData.OpenArrowReader(stream);
+            return Task.FromResult(Result<ArrowBatchReader>.Success(reader));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(Result<ArrowBatchReader>.Failure($"Sonuç dosyası okunamadı: {ex.Message}", 500));
+        }
     }
 
     public Task DeleteResultAsync(string? resultPath, CancellationToken cancellationToken = default)

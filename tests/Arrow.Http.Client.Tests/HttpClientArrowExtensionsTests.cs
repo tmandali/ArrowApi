@@ -26,7 +26,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow");
+        var result = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int batchCount = 0;
         int totalRows = 0;
 
@@ -46,7 +48,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow");
+        var result = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int batchCount = 0;
         int totalRows = 0;
 
@@ -66,7 +70,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow/manual");
+        var result = await http.GetArrowReaderAsync("/arrow/manual");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int batchCount = 0;
         int totalRows = 0;
 
@@ -115,7 +121,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow/db-source");
+        var result = await http.GetArrowReaderAsync("/arrow/db-source");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int totalRows = 0;
 
         while (await reader.ReadNextBatchAsync() is { } batch)
@@ -129,7 +137,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow/variant/manual");
+        var result = await http.GetArrowReaderAsync("/arrow/variant/manual");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         await foreach (RecordBatch batch in reader.ReadBatchesAsync())
         {
             VariantArray eventData = VariantBatches.GetVariantColumn(batch, "event_data");
@@ -143,7 +153,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("/arrow");
+        var result = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         await using ArrowBatchWriter writer = http.PostArrowWriterAsync("/arrow");
 
         int batchCount = 0;
@@ -164,7 +176,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     public async Task WriteArrowAsync_posts_without_reading_arrow_response()
     {
         HttpClient http = _factory.CreateClient();
-        await using ArrowBatchReader source = await http.GetArrowReaderAsync("/arrow");
+        var sourceResult = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(sourceResult.IsSuccess);
+        await using ArrowBatchReader source = sourceResult.Value!;
 
         await http.WriteArrowAsync("/arrow", source);
     }
@@ -174,7 +188,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     {
         HttpClient http = _factory.CreateClient();
 
-        await using ArrowBatchReader source = await http.GetArrowReaderAsync("/arrow");
+        var sourceResult = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(sourceResult.IsSuccess);
+        await using ArrowBatchReader source = sourceResult.Value!;
         await using ArrowBatchReader echoed = await http.PostArrowReaderAsync("/arrow", source);
 
         int totalRows = 0;
@@ -234,7 +250,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     public async Task HttpContent_ToArrowHttpContent_posts_and_reads_response()
     {
         HttpClient http = _factory.CreateClient();
-        await using ArrowBatchReader source = await http.GetArrowReaderAsync("/arrow");
+        var sourceResult = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(sourceResult.IsSuccess);
+        await using ArrowBatchReader source = sourceResult.Value!;
 
         HttpRequestMessage request = new(HttpMethod.Post, "/arrow")
         {
@@ -256,7 +274,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     public async Task IAsyncEnumerable_ToArrowHttpContent_posts_batches_without_schema_param()
     {
         HttpClient http = _factory.CreateClient();
-        await using ArrowBatchReader source = await http.GetArrowReaderAsync("/arrow");
+        var sourceResult = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(sourceResult.IsSuccess);
+        await using ArrowBatchReader source = sourceResult.Value!;
 
         using HttpResponseMessage response = await http.PostAsync(
             "/arrow",
@@ -274,7 +294,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
     public async Task IAsyncEnumerable_ToArrowHttpContent_empty_with_schema_posts_zero_rows()
     {
         HttpClient http = _factory.CreateClient();
-        await using ArrowBatchReader source = await http.GetArrowReaderAsync("/arrow");
+        var sourceResult = await http.GetArrowReaderAsync("/arrow");
+        Assert.True(sourceResult.IsSuccess);
+        await using ArrowBatchReader source = sourceResult.Value!;
         Schema schema = source.Schema;
 
         using HttpResponseMessage response = await http.PostAsync(
@@ -379,7 +401,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
                 break;
         }
 
-        await using ArrowBatchReader reader = await job.GetArrowReaderAsync();
+        var result = await job.GetArrowReaderAsync();
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int totalRows = 0;
 
         while (await reader.ReadNextBatchAsync() is { } batch)
@@ -414,7 +438,9 @@ public class HttpClientArrowExtensionsTests : IClassFixture<WebApplicationFactor
         Assert.Equal("Completed", finalEvent.Status);
         Assert.Equal(job.JobUrl, finalEvent.JobUrl);
 
-        await using ArrowBatchReader reader = await job.GetArrowReaderAsync();
+        var result = await job.GetArrowReaderAsync();
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int totalRows = 0;
 
         while (await reader.ReadNextBatchAsync() is { } batch)

@@ -492,10 +492,15 @@ public static class ArrowJobEndpoints
             if (string.IsNullOrEmpty(resultPath) || !File.Exists(resultPath))
                 return Results.Problem(detail: "Sonuç dosyası bulunamadı.", statusCode: StatusCodes.Status500InternalServerError);
 
-            ArrowBatchReader reader = await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken);
+            Result<ArrowBatchReader> openResult = await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken);
+            if (!openResult.IsSuccess || openResult.Value is null)
+            {
+                return openResult.ToHttpResult();
+            }
+
             return wantsNdJson
-                ? ArrowResults.FromReaderNdJson(reader)
-                : ArrowResults.FromReader(reader);
+                ? ArrowResults.FromReaderNdJson(openResult.Value)
+                : ArrowResults.FromReader(openResult.Value);
         }
 
         return Results.StatusCode(StatusCodes.Status500InternalServerError);

@@ -87,7 +87,9 @@ public class Net48ClientFeatureTests
         Assert.NotNull(final);
         Assert.Equal("Completed", final!.Status);
 
-        await using ArrowBatchReader reader = await job.GetArrowReaderAsync();
+        var result = await job.GetArrowReaderAsync();
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
         int totalRows = 0;
         while (await reader.ReadNextBatchAsync() is { } batch)
         {
@@ -114,7 +116,9 @@ public class Net48ClientFeatureTests
         });
 
         using HttpClient http = new(handler) { BaseAddress = new Uri("http://test/") };
-        await using ArrowBatchReader reader = await http.GetArrowReaderAsync("http://test/arrow");
+        var result = await http.GetArrowReaderAsync("http://test/arrow");
+        Assert.True(result.IsSuccess);
+        await using ArrowBatchReader reader = result.Value!;
 
         int totalRows = 0;
         await foreach (RecordBatch batch in reader.ReadBatchesAsync())

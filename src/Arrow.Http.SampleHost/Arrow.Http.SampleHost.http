@@ -116,3 +116,18 @@ Accept: {{ArrowMediaType}}
 # Accept: application/x-ndjson → tamamlanınca satır satır NDJSON akışı
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
 Accept: application/x-ndjson
+
+###
+
+# Result<T> Pattern Demo - Success (200 OK)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/result-demo/5
+
+###
+
+# Result<T> Pattern Demo - Bad Request (400 Bad Request)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/result-demo/0
+
+###
+
+# Result<T> Pattern Demo - Not Found (404 Not Found)
+GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/result-demo/999

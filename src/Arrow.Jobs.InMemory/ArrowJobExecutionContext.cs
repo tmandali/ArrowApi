@@ -107,9 +107,8 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         throw new OperationCanceledException("WaitForJobCompletionAsync sonlandırıldı.", cancellationToken);
     }
 
-    public async Task<ArrowBatchReader> GetArrowReaderAsync<TNextRequest>(
+    public async Task<Result<ArrowBatchReader>> GetArrowReaderAsync<TNextRequest>(
         ArrowJob<TNextRequest>? job,
-        bool throwOnError = true,
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
@@ -136,35 +135,30 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
             }
         }
 
-        if (throwOnError)
+        if (job.State == ArrowJobState.Failed)
         {
-            if (job.State == ArrowJobState.Failed)
-            {
-                throw new InvalidOperationException(
-                    $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) hata ile sonlandı: {job.Error ?? "Bilinmeyen hata."}");
-            }
+            return Result<ArrowBatchReader>.Failure(
+                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) hata ile sonlandı: {job.Error ?? "Bilinmeyen hata."}", 500);
+        }
 
-            if (job.State == ArrowJobState.Cancelled)
-            {
-                throw new OperationCanceledException(
-                    $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) iptal edildi.", cancellationToken);
-            }
+        if (job.State == ArrowJobState.Cancelled)
+        {
+            return Result<ArrowBatchReader>.Conflict(
+                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) iptal edildi.");
         }
 
         if (job.State != ArrowJobState.Completed || string.IsNullOrWhiteSpace(job.ResultPath))
         {
-            throw new InvalidOperationException(
+            return Result<ArrowBatchReader>.NotFound(
                 $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) henüz tamamlanmadı veya sonuç dosyası yok.");
         }
-
-        string resultPath = job.ResultPath!;
 
         var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
         if (resultStorage is null)
         {
-            throw new InvalidOperationException("IArrowJobResultStorage service is not registered in DI.");
+            return Result<ArrowBatchReader>.Failure("IArrowJobResultStorage service is not registered in DI.", 500);
         }
 
-        return await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken).ConfigureAwait(false);
+        return await resultStorage.OpenBatchReaderAsync(job.ResultPath!, cancellationToken).ConfigureAwait(false);
     }
 }

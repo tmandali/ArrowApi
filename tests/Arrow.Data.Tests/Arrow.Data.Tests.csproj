@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Arrow.Data\Arrow.Data.csproj" />
+    <ProjectReference Include="..\..\src\Arrow.Jobs.Abstractions\Arrow.Jobs.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

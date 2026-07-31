@@ -320,8 +320,31 @@ def test_delete_completed(status: dict[str, Any]) -> None:
     assert request_missing.status_code == 404
 
 
+def test_result_pattern_endpoints() -> None:
+    url_ok = f"{BASE_URL}/arrow/result-demo/5"
+    print(f"GET {url_ok} (Result<T> Success)")
+    resp_ok = SESSION.get(url_ok, timeout=30)
+    resp_ok.raise_for_status()
+    assert resp_ok.status_code == 200
+    data_ok = resp_ok.json()
+    assert data_ok["id"] == 5 and data_ok["name"] == "Sample_5"
+
+    url_bad = f"{BASE_URL}/arrow/result-demo/0"
+    print(f"GET {url_bad} (Result<T> BadRequest)")
+    resp_bad = SESSION.get(url_bad, timeout=30)
+    assert resp_bad.status_code == 400
+    assert "error" in resp_bad.json()
+
+    url_nf = f"{BASE_URL}/arrow/result-demo/999"
+    print(f"GET {url_nf} (Result<T> NotFound)")
+    resp_nf = SESSION.get(url_nf, timeout=30)
+    assert resp_nf.status_code == 404
+    assert "error" in resp_nf.json()
+
+
 def main() -> int:
     try:
+        test_result_pattern_endpoints()
         completed = test_happy_path()
         test_get_request(completed)
         test_list_jobs(completed)

@@ -36,28 +36,14 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
             new ExportReportRequest("DemoReport"),
             cancellationToken: cancellationToken);
 
-        // _context / job üzerinden ArrowBatchReader alınır (otomatik bekler ve ArrowBatchReader döndürür)
-        await using ArrowBatchReader reportReader = await report.GetArrowReaderAsync(_context, cancellationToken: cancellationToken);
+        // _context / job üzerinden Result<ArrowBatchReader> alınır ve ReadNextBatchAsync ile otomatik okunur & dispose edilir
+        Result<ArrowBatchReader> reportResult = await report.GetArrowReaderAsync(_context, cancellationToken: cancellationToken);
 
-        while (await reportReader.ReadNextBatchAsync(cancellationToken) is { } reportBatch)
-            using(reportBatch)
-            {
-                //var idArray = (Int32Array)batch.Column("Id");
-                //var nameArray = (StringArray)batch.Column("Name");
-
-                //var list = new List<MyReportDto>(batch.Length);
-
-                //for (int i = 0; i < batch.Length; i++)
-                //{
-                //    list.Add(new MyReportDto
-                //    {
-                //        Id = idArray.GetValue(i)!.Value,
-                //        Name = nameArray.GetString(i)
-                //    });
-                //}
-
-                // Alt job sonuç batch'leri işlenebilir
-                //reportBatch.Dispose();
-            }
+        while (await reportResult.ReadNextBatchAsync<MyReportDto>(cancellationToken) is { } reportBatch)
+        {
+            // reportBatch -> IReadOnlyList<MyReportDto> DTO paketi
+        }
     }
+
+    public record MyReportDto(int Id, string Name);
 }

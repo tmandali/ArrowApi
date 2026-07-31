@@ -74,8 +74,8 @@ public sealed class ArrowJob
         }
     }
 
-    /// <summary>Tamamlanmış job'ın Arrow sonuçlarını okumak için okuyucu döndürür.</summary>
-    public Task<ArrowBatchReader> GetArrowReaderAsync(
+    /// <summary>Tamamlanmış job'ın Arrow sonuçlarını okumak için okuyucu <see cref="Result{T}"/> olarak döndürür.</summary>
+    public Task<Result<ArrowBatchReader>> GetArrowReaderAsync(
         CancellationToken cancellationToken = default) =>
         _httpClient.GetArrowReaderAsync(JobUrl, cancellationToken: cancellationToken);
 

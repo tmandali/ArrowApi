@@ -16,7 +16,7 @@ public interface IArrowJobResultStorage
         CancellationToken cancellationToken = default);
 
     /// <summary>Belirtilen yoldan <see cref="ArrowBatchReader"/> açar.</summary>
-    Task<ArrowBatchReader> OpenBatchReaderAsync(string resultPath, CancellationToken cancellationToken = default);
+    Task<Result<ArrowBatchReader>> OpenBatchReaderAsync(string resultPath, CancellationToken cancellationToken = default);
 
     /// <summary>Job sonuç dosyasını varsa siler.</summary>
     Task DeleteResultAsync(string? resultPath, CancellationToken cancellationToken = default);
