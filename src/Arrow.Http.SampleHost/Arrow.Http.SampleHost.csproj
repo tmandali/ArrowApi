@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Arrow.Http.AspNetCore\Arrow.Http.AspNetCore.csproj" />
     <ProjectReference Include="..\Arrow.Jobs.AspNetCore\Arrow.Jobs.AspNetCore.csproj" />
   </ItemGroup>
 

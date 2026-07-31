@@ -52,6 +52,9 @@ public static class ArrowHttpExtensions
     /// <summary>
     /// <see cref="DbDataReader"/> verisini Arrow IPC yanıtına yazar.
     /// </summary>
+    /// <param name="response">HTTP yanıtı.</param>
+    /// <param name="reader">Okunacak veri okuyucu.</param>
+    /// <param name="options">Dönüştürme seçenekleri.</param>
     /// <param name="close">
     /// <see langword="true"/> (varsayılan) — yazım sonrası reader dispose edilir.
     /// <see langword="false"/> — çağıran <c>await using</c> ile yönetir.

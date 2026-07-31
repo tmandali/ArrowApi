@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Arrow.Http.Client;
 
-/// <summary>Taşınabilir SSE öğesi (<see cref="System.Net.ServerSentEvents"/> bağımlılığı yok).</summary>
+/// <summary>Taşınabilir SSE öğesi (<c>System.Net.ServerSentEvents</c> bağımlılığı yok).</summary>
 public readonly struct ArrowSseItem<T>
 {
     /// <summary>Yeni bir <see cref="ArrowSseItem{T}"/> örneği oluşturur.</summary>

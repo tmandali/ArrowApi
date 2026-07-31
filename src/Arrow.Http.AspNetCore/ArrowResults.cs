@@ -28,7 +28,7 @@ public static class ArrowResults
         new ArrowDbDataReaderResult(reader, options, close);
 
     /// <summary>
-    /// <see cref="FromDb"/> sonucunu yanıta yazar. <c>await response.WriteArrowFromDbAsync(reader)</c> kısayolu için
+    /// <see cref="FromDb(DbDataReader, ArrowConversionOptions?, bool)"/> sonucunu yanıta yazar. <c>await response.WriteArrowFromDbAsync(reader)</c> kısayolu için
     /// <see cref="ArrowHttpExtensions.WriteArrowFromDbAsync"/> kullanın.
     /// </summary>
     public static Task FromDb(

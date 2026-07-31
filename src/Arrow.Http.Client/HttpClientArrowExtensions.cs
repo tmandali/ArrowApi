@@ -5,10 +5,10 @@ namespace Arrow.Http.Client;
 
 /// <summary><see cref="HttpClient"/> için Arrow IPC kısayol extension'ları.</summary>
 /// <remarks>
-/// Özel istek gövdeleri (JSON vb.) için <see cref="HttpClient.SendAsync"/> +
+/// Özel istek gövdeleri (JSON vb.) için <see cref="HttpClient.SendAsync(HttpRequestMessage, CancellationToken)"/> +
 /// <see cref="HttpResponseArrowExtensions.ReadAsArrowDataReaderAsync(HttpResponseMessage, VariantDbRepresentation, CancellationToken)"/>.
 /// Arrow gövde oluşturmak için <see cref="HttpContentArrowExtensions"/>.
-/// Arrow göndermek için <see cref="HttpClientWriteArrowExtensions.WriteArrowAsync"/>.
+/// Arrow göndermek için <see cref="HttpClientWriteArrowExtensions.WriteArrowAsync(HttpClient, string, ArrowBatchReader, CancellationToken)"/>.
 /// </remarks>
 public static class HttpClientArrowExtensions
 {

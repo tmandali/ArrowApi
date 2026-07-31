@@ -4,7 +4,7 @@ using Arrow.Http.AspNetCore.Dispatcher;
 namespace Arrow.Jobs;
 
 /// <summary>
-/// Ortak CQRS Handler & Arrow Job Worker arayüzü.
+/// Ortak CQRS Handler &amp; Arrow Job Worker arayüzü.
 /// </summary>
 public interface IArrowJobWorker<in TRequest, TResponse> : IRequestHandler<TRequest, TResponse>
     where TRequest : notnull
@@ -18,6 +18,7 @@ public interface IArrowJobWorker<in TRequest> : IRequestHandler<TRequest, IAsync
     where TRequest : notnull
 {
 #if NETCOREAPP || NETSTANDARD2_1_OR_GREATER || NET6_0_OR_GREATER
+    /// <summary>İsteği işler ve RecordBatch akışı döner.</summary>
     new IAsyncEnumerable<RecordBatch> Handle(TRequest request, CancellationToken cancellationToken);
 
     ValueTask<IAsyncEnumerable<RecordBatch>> IRequestHandler<TRequest, IAsyncEnumerable<RecordBatch>>.Handle(

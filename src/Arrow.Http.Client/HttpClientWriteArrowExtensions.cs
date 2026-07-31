@@ -7,8 +7,8 @@ namespace Arrow.Http.Client;
 /// <summary><see cref="HttpClient"/> için Arrow IPC yazma extension'ları.</summary>
 /// <remarks>
 /// Okuma: <see cref="HttpClientArrowExtensions.GetArrowReaderAsync"/> /
-/// <see cref="HttpClientArrowExtensions.PostArrowReaderAsync"/>.
-/// Tek seferde gönderim: <see cref="WriteArrowAsync"/>.
+/// <see cref="HttpClientArrowExtensions.PostArrowReaderAsync(HttpClient, string, ArrowBatchReader, VariantDbRepresentation, CancellationToken)"/>.
+/// Tek seferde gönderim: <see cref="WriteArrowAsync(HttpClient, string, ArrowBatchReader, CancellationToken)"/>.
 /// Döngü içinde batch batch gönderim: <see cref="HttpClientArrowExtensions.PostArrowWriterAsync"/> →
 /// <see cref="ArrowBatchWriter.WriteBatchAsync"/>.
 /// </remarks>
