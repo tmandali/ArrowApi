@@ -32,10 +32,21 @@ public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportReq
         Result<ArrowBatchReader> parentData = await _context.GetParentArrowReaderAsync(cancellationToken);
         int parentRowCount = 0;
 
-        // Result<ArrowBatchReader> uzerinden ReadBatchesAsync doğrudan ve güvenle okunur
-        await foreach (IReadOnlyList<DemoReportDto> parentBatch in parentData.ReadBatchesAsync<DemoReportDto>(cancellationToken))
+        // request.ReportName.IsJob(...) extension metodu ile kontrat ismi kontrolü:
+        if (request.ReportName.IsJob("DemoReport") || request.ReportName.IsJob("Marmara"))
         {
-            parentRowCount += parentBatch.Count;
+            await foreach (IReadOnlyList<DemoReportDto> parentBatch in parentData.ReadBatchesAsync<DemoReportDto>(cancellationToken))
+            {
+                parentRowCount += parentBatch.Count;
+            }
+        }
+        else
+        {
+            // Genel varsayılan okuma
+            await foreach (IReadOnlyList<DemoReportDto> parentBatch in parentData.ReadBatchesAsync<DemoReportDto>(cancellationToken))
+            {
+                parentRowCount += parentBatch.Count;
+            }
         }
 
         Field[] fields = [new Field("ReportSummary", new Apache.Arrow.Types.StringType(), false)];
