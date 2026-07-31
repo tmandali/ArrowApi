@@ -46,6 +46,8 @@ public sealed class ArrowJob<TRequest>
     public string? RequestHash { get; set; }
     /// <summary>Kök (zincirin ilk) job kimliği.</summary>
     public Guid RootJobId { get; set; }
+    /// <summary>Üst (doğrudan tetikleyen) job kimliği.</summary>
+    public Guid? ParentJobId { get; set; }
     /// <summary>Oluşturulma zamanı.</summary>
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     /// <summary>Tamamlanma zamanı.</summary>
@@ -76,7 +78,8 @@ public sealed record ArrowJobStatus(
     long? TotalRows = null,
     Guid? RetriedFrom = null,
     string? Name = null,
-    Guid? RootJobId = null);
+    Guid? RootJobId = null,
+    Guid? ParentJobId = null);
 
 /// <summary>Job listeleme sorgu parametreleri.</summary>
 public sealed record ArrowJobListQuery(

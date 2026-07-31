@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Arrow.Jobs.AspNetCore" />
+    <InternalsVisibleTo Include="Arrow.Data.Tests" />
   </ItemGroup>
 
   <ItemGroup>

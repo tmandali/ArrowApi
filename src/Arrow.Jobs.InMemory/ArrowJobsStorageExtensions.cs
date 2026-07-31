@@ -47,11 +47,7 @@ public static class ArrowJobsStorageExtensions
     }
 
     internal static void RegisterDefaultFileStore(IServiceCollection services) =>
-        services.TryAddSingleton<IArrowJobResultStorage>(sp =>
-        {
-            IHostEnvironment environment = sp.GetRequiredService<IHostEnvironment>();
-            return new FileArrowResultStorage(environment, DefaultFileStorePath);
-        });
+        services.TryAddSingleton<IArrowJobResultStorage, InMemoryArrowResultStorage>();
 
     private static void RegisterFileStore(IServiceCollection services, string directoryPath)
     {

@@ -187,7 +187,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             job.TotalRows,
             null,
             job.Name,
-            job.RootJobId);
+            job.RootJobId,
+            job.ParentJobId);
 
         return Task.FromResult<ArrowJobStatus?>(status);
     }

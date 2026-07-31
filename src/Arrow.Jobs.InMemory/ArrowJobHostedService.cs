@@ -115,7 +115,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
 
         using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
 
-        var context = new ArrowJobExecutionContext(jobId, _eventHub, scope.ServiceProvider);
+        var context = new ArrowJobExecutionContext(jobId, _eventHub, scope.ServiceProvider, parentJobId: job.ParentJobId);
         ArrowJobExecutionContextHolder.Current = context;
 
         object? worker = null;

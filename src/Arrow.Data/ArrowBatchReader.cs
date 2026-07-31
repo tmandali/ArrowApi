@@ -11,8 +11,10 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     private readonly ArrowDataReader? _arrowReader;
     private readonly DbDataReader? _dbReader;
     private readonly ArrowConversionOptions? _dbOptions;
+    private readonly IAsyncEnumerable<RecordBatch>? _batchStream;
     private Schema? _dbSchema;
     private IAsyncEnumerator<RecordBatch>? _dbBatchEnumerator;
+    private IAsyncEnumerator<RecordBatch>? _batchStreamEnumerator;
 
     private ArrowBatchReader(ArrowDataReader arrowReader)
     {
@@ -23,6 +25,12 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     {
         _dbReader = dbReader;
         _dbOptions = options;
+        _dbSchema = schema;
+    }
+
+    private ArrowBatchReader(IAsyncEnumerable<RecordBatch> batchStream, Schema? schema)
+    {
+        _batchStream = batchStream;
         _dbSchema = schema;
     }
 
@@ -38,7 +46,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     /// <summary>IPC stream kaynağındaki ADO.NET reader. Db kaynaklı batch reader'da hata fırlatır.</summary>
     public ArrowDataReader RequireArrowReader() =>
         _arrowReader ?? throw new InvalidOperationException(
-            "Bu ArrowBatchReader bir DbDataReader kaynağından oluşturuldu. " +
+            "Bu ArrowBatchReader bir DbDataReader veya in-memory akış kaynağından oluşturuldu. " +
             "ArrowDataReader yalnızca Arrow IPC stream kaynağında kullanılabilir.");
 
     internal static ArrowBatchReader FromArrow(ArrowDataReader arrowReader) => new(arrowReader);
@@ -48,6 +56,26 @@ public sealed class ArrowBatchReader : IAsyncDisposable
 
     internal static ArrowBatchReader FromDb(DbDataReader dbReader, ArrowConversionOptions options, Schema? schema) =>
         new(dbReader, options, schema);
+
+    /// <summary>Bellek içi <see cref="RecordBatch"/> akışından <see cref="ArrowBatchReader"/> oluşturur.</summary>
+    public static ArrowBatchReader FromBatches(IAsyncEnumerable<RecordBatch> batches, Schema? schema = null) =>
+        new(batches, schema);
+
+    /// <summary>Bellek içi <see cref="RecordBatch"/> listesinden <see cref="ArrowBatchReader"/> oluşturur.</summary>
+    public static ArrowBatchReader FromBatches(IReadOnlyList<RecordBatch> batches, Schema? schema = null)
+    {
+        Schema? batchSchema = schema ?? (batches.Count > 0 ? batches[0].Schema : null);
+        return new ArrowBatchReader(ToAsyncEnumerable(batches), batchSchema);
+    }
+
+    private static async IAsyncEnumerable<RecordBatch> ToAsyncEnumerable(IReadOnlyList<RecordBatch> batches)
+    {
+        foreach (var batch in batches)
+        {
+            yield return batch;
+        }
+        await Task.CompletedTask;
+    }
 
     /// <summary>Batch'leri akış olarak okur. Kayıt yoksa şemalı 0 satırlık bir batch döner. Dispose otomatiktir; batch yalnızca o anki döngü gövdesinde geçerlidir.</summary>
     public IAsyncEnumerable<RecordBatch> ReadBatchesAsync(
@@ -65,7 +93,7 @@ public sealed class ArrowBatchReader : IAsyncDisposable
             return _arrowReader.ReadNextBatch();
 
         throw new InvalidOperationException(
-            "DbDataReader kaynağı için ReadNextBatchAsync kullanın.");
+            "DbDataReader veya in-memory akış kaynağı için ReadNextBatchAsync kullanın.");
     }
 
     /// <summary><see cref="ReadNextBatch"/> asenkron karşılığı.</summary>
@@ -75,6 +103,9 @@ public sealed class ArrowBatchReader : IAsyncDisposable
     {
         if (_arrowReader is not null)
             return _arrowReader.ReadNextBatchAsync(cancellationToken);
+
+        if (_batchStream is not null)
+            return ReadNextStreamBatchAsync(cancellationToken);
 
         return ReadNextDbBatchAsync(cancellationToken, logger);
     }
@@ -186,8 +217,22 @@ public sealed class ArrowBatchReader : IAsyncDisposable
         }
     }
 
+    private async ValueTask<RecordBatch?> ReadNextStreamBatchAsync(CancellationToken cancellationToken)
+    {
+        _batchStreamEnumerator ??= _batchStream!.GetAsyncEnumerator(cancellationToken);
+        if (!await _batchStreamEnumerator.MoveNextAsync().ConfigureAwait(false))
+            return null;
+
+        RecordBatch batch = _batchStreamEnumerator.Current;
+        _dbSchema ??= batch.Schema;
+        return batch;
+    }
+
     public async ValueTask DisposeAsync()
     {
+        if (_batchStreamEnumerator is not null)
+            await _batchStreamEnumerator.DisposeAsync().ConfigureAwait(false);
+
         if (_dbBatchEnumerator is not null)
             await _dbBatchEnumerator.DisposeAsync().ConfigureAwait(false);
 

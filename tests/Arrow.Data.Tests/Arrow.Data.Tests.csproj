@@ -13,6 +13,8 @@
     <PackageReference Include="Apache.Arrow" Version="23.0.0" />
     <PackageReference Include="Apache.Arrow.Scalars" Version="23.0.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
@@ -25,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Arrow.Data\Arrow.Data.csproj" />
     <ProjectReference Include="..\..\src\Arrow.Jobs.Abstractions\Arrow.Jobs.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Arrow.Jobs.InMemory\Arrow.Jobs.InMemory.csproj" />
   </ItemGroup>
 
 </Project>

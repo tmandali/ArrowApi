@@ -6,20 +6,64 @@ namespace Arrow.Jobs.InMemory;
 internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 {
     private readonly Guid _jobId;
+    private readonly Guid? _parentJobId;
     private readonly IArrowJobEventHub _eventHub;
     private readonly IServiceProvider _serviceProvider;
 
     public ArrowJobExecutionContext(
         Guid jobId,
         IArrowJobEventHub eventHub,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        Guid? parentJobId = null)
     {
         _jobId = jobId;
+        _parentJobId = parentJobId;
         _eventHub = eventHub;
         _serviceProvider = serviceProvider;
     }
 
     public Guid JobId => _jobId;
+    public Guid? ParentJobId => _parentJobId;
+
+    public async Task<Result<ArrowBatchReader>> GetParentArrowReaderAsync(CancellationToken cancellationToken = default)
+    {
+        Guid? pId = _parentJobId;
+
+        if (!pId.HasValue)
+        {
+            var statusStore = _serviceProvider.GetService<IArrowJobStore>();
+            ArrowJobStatus? currentStatus = statusStore is not null
+                ? await statusStore.GetStatusAsync(_jobId, cancellationToken: cancellationToken)
+                : null;
+            pId = currentStatus?.ParentJobId;
+        }
+
+        if (!pId.HasValue)
+        {
+            return Result<ArrowBatchReader>.NotFound($"Mevcut job (ID: {_jobId}) için üst job (ParentJobId) bulunamadı.");
+        }
+
+        var store = _serviceProvider.GetService<IArrowJobStore>();
+        ArrowJobStatus? parentStatus = store is not null
+            ? await store.GetStatusAsync(pId.Value, cancellationToken: cancellationToken)
+            : null;
+
+        var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
+        string? resultPath = resultStorage?.GetResultPath(pId.Value, parentStatus?.Name, parentStatus?.RootJobId);
+
+        var dummyJob = new ArrowJob<object>
+        {
+            Id = pId.Value,
+            Name = parentStatus?.Name,
+            Request = new object(),
+            State = parentStatus is not null && Enum.TryParse<ArrowJobState>(parentStatus.Status, out var st) ? st : ArrowJobState.Completed,
+            Error = parentStatus?.Error,
+            ResultPath = resultPath,
+            RootJobId = parentStatus?.RootJobId ?? pId.Value
+        };
+
+        return await GetArrowReaderAsync(dummyJob, cancellationToken).ConfigureAwait(false);
+    }
 
     public async ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default)
     {
@@ -65,6 +109,7 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
                 Id = Guid.NewGuid(),
                 Name = jobName,
                 RootJobId = _jobId,
+                ParentJobId = _jobId,
                 Request = request,
                 State = ArrowJobState.Queued,
                 CreatedAt = DateTimeOffset.UtcNow
@@ -79,10 +124,11 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         Guid rootJobId = parentStatus?.RootJobId ?? _jobId;
 
         ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, rootJobId: rootJobId, cancellationToken: cancellationToken);
+        nextJob.ParentJobId = _jobId;
 
         await queue.EnqueueAsync(nextJob.Id, cancellationToken);
 
-        await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, RootJobId: {rootJobId})", cancellationToken);
+        await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, RootJobId: {rootJobId}, ParentJobId: {_jobId})", cancellationToken);
 
         return nextJob;
     }

@@ -489,7 +489,8 @@ public static class ArrowJobEndpoints
             if (resultStorage is null)
                 return Results.Problem(detail: "Sonuç deposu yapılandırılmamış.", statusCode: StatusCodes.Status500InternalServerError);
 
-            if (string.IsNullOrEmpty(resultPath) || !File.Exists(resultPath))
+            bool isInMemory = resultPath?.StartsWith("inmemory://", StringComparison.OrdinalIgnoreCase) ?? false;
+            if (string.IsNullOrEmpty(resultPath) || (!isInMemory && !File.Exists(resultPath)))
                 return Results.Problem(detail: "Sonuç dosyası bulunamadı.", statusCode: StatusCodes.Status500InternalServerError);
 
             Result<ArrowBatchReader> openResult = await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken);
@@ -523,7 +524,8 @@ public static class ArrowJobEndpoints
             job.TotalRows,
             retriedFrom,
             job.Name,
-            job.RootJobId);
+            job.RootJobId,
+            job.ParentJobId);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 

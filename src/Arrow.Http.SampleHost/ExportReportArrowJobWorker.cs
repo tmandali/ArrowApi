@@ -1,4 +1,5 @@
 using Apache.Arrow;
+using Arrow.Data;
 using Arrow.Jobs;
 using System.Runtime.CompilerServices;
 
@@ -24,18 +25,31 @@ public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportReq
         ExportReportRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await _context.PublishInfoAsync($"Generating export report '{request.ReportName}' for job {_context.JobId}", cancellationToken);
-        _logger.LogInformation("ExportReportJob running for {ReportName} (JobId: {JobId})", request.ReportName, _context.JobId);
+        await _context.PublishInfoAsync($"Generating export report '{request.ReportName}' for job {_context.JobId} (ParentJobId: {_context.ParentJobId})", cancellationToken);
+        _logger.LogInformation("ExportReportJob running for {ReportName} (JobId: {JobId}, ParentJobId: {ParentJobId})", request.ReportName, _context.JobId, _context.ParentJobId);
+
+        // Sub-worker parent'tan Arrow verisini okur (Pub/Sub veya Chained Sub-Worker)
+        Result<ArrowBatchReader> parentData = await _context.GetParentArrowReaderAsync(cancellationToken);
+        int parentRowCount = 0;
+
+        if (parentData.IsSuccess && parentData.Value is not null)
+        {
+            while (await parentData.ReadNextBatchAsync<DemoReportDto>(cancellationToken) is { } parentBatch)
+            {
+                parentRowCount += parentBatch.Count;
+            }
+        }
 
         Field[] fields = [new Field("ReportSummary", new Apache.Arrow.Types.StringType(), false)];
         Schema schema = new(fields, null);
 
         var builder = new StringArray.Builder();
-        builder.Append($"Report-{request.ReportName}-{_context.JobId}");
+        builder.Append($"Report-{request.ReportName}-Processed-{parentRowCount}-ParentRows");
         StringArray array = builder.Build();
 
         RecordBatch batch = new(schema, [array], 1);
         yield return batch;
-        await Task.CompletedTask;
     }
 }
+
+public record DemoReportDto(int Id, string Name);

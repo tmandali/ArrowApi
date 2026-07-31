@@ -8,6 +8,14 @@ public interface IArrowJobExecutionContext
 {
     Guid JobId { get; }
 
+    /// <summary>Üst (doğrudan tetikleyen) job kimliği (kök job ise <see langword="null"/>).</summary>
+    Guid? ParentJobId { get; }
+
+    /// <summary>
+    /// Üst (parent) job'ın ürettiği Arrow veri akışını okumak için <see cref="Result{T}"/> içinde <see cref="ArrowBatchReader"/> döndürür.
+    /// </summary>
+    Task<Result<ArrowBatchReader>> GetParentArrowReaderAsync(CancellationToken cancellationToken = default);
+
     /// <summary><c>info</c> event — job state değildir; yalnızca worker mesajı.</summary>
     ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);
 
