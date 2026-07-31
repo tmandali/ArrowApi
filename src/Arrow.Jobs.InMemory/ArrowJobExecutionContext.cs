@@ -71,12 +71,11 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
     public async IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
         string jobName,
         TNextRequest request,
-        IAsyncEnumerable<RecordBatch> sourceStream,
+        IAsyncEnumerable<RecordBatch>? sourceStream = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(sourceStream);
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
 
         object? workerObj = _serviceProvider.GetKeyedService(typeof(IArrowJobWorker<TNextRequest>), jobName)
@@ -100,21 +99,6 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         finally
         {
             _currentPipeSource = previousPipe;
-        }
-    }
-
-    public IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
-        string jobName,
-        TNextRequest request,
-        CancellationToken cancellationToken = default)
-        where TNextRequest : notnull
-    {
-        return PipeToAsync(jobName, request, EmptyStreamAsync(), cancellationToken);
-
-        static async IAsyncEnumerable<RecordBatch> EmptyStreamAsync()
-        {
-            await Task.CompletedTask;
-            yield break;
         }
     }
 

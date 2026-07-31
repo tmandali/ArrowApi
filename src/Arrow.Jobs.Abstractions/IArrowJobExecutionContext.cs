@@ -17,21 +17,13 @@ public interface IArrowJobExecutionContext
     Task<Result<ArrowBatchReader>> GetParentArrowReaderAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gelen Arrow batch akışını aynı DI Scope ve DbContext içinde bir sonraki Child Worker'a Pipe (boru hattı) ile bağlar.
+    /// Aynı DI Scope ve DbContext içinde bir sonraki Child Worker'ı Pipe (boru hattı) ile inline olarak çalıştırır.
+    /// (İsteğe bağlı olarak üst job'dan gelen <paramref name="sourceStream"/> paket akışını aktarır).
     /// </summary>
     IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
         string jobName,
         TNextRequest request,
-        IAsyncEnumerable<RecordBatch> sourceStream,
-        CancellationToken cancellationToken = default)
-        where TNextRequest : notnull;
-
-    /// <summary>
-    /// Veri akışı olmadan, aynı DI Scope ve DbContext içinde bir sonraki Child Worker'ı Pipe (boru hattı) ile inline olarak çalıştırır.
-    /// </summary>
-    IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
-        string jobName,
-        TNextRequest request,
+        IAsyncEnumerable<RecordBatch>? sourceStream = null,
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull;
 
