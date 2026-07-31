@@ -124,10 +124,12 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
             new ExportReportRequest("DemoReport"),
             cancellationToken);
 
-        // 3. Lazily wait and read chained job result batches when iterated
-        await foreach (RecordBatch reportBatch in _context.ReadBatchesAsync(reportJob, cancellationToken))
+        // 3. Lazily wait and read chained job result batches via ArrowBatchReader
+        await using ArrowBatchReader reportReader = await reportJob.GetArrowReaderAsync(_context, cancellationToken);
+        while (await reportReader.ReadNextBatchAsync(cancellationToken) is { } reportBatch)
         {
             // Process chained report RecordBatches
+            reportBatch.Dispose();
         }
     }
 }

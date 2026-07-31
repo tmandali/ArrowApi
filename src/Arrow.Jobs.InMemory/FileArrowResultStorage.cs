@@ -72,16 +72,15 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
         }
     }
 
-    public async IAsyncEnumerable<RecordBatch> ReadBatchesAsync(
+    public Task<ArrowBatchReader> OpenBatchReaderAsync(
         string resultPath,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resultPath);
 
         FileStream stream = File.OpenRead(resultPath);
-        await using ArrowBatchReader reader = ArrowData.OpenArrowReader(stream);
-        await foreach (RecordBatch batch in reader.ReadBatchesAsync(cancellationToken))
-            yield return batch;
+        ArrowBatchReader reader = ArrowData.OpenArrowReader(stream);
+        return Task.FromResult(reader);
     }
 
     public Task DeleteResultAsync(string? resultPath, CancellationToken cancellationToken = default)

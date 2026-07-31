@@ -36,10 +36,12 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
             new ExportReportRequest("DemoReport"),
             cancellationToken: cancellationToken);
 
-        // _context üzerinden doğrudan okunur (otomatik bekler ve stream eder)
-        await foreach (RecordBatch reportBatch in _context.ReadBatchesAsync(report, cancellationToken: cancellationToken))
+        // _context / job üzerinden ArrowBatchReader alınır (otomatik bekler ve ArrowBatchReader döndürür)
+        await using ArrowBatchReader reportReader = await report.GetArrowReaderAsync(_context, cancellationToken: cancellationToken);
+        while (await reportReader.ReadNextBatchAsync(cancellationToken) is { } reportBatch)
         {
             // Alt job sonuç batch'leri işlenebilir
+            reportBatch.Dispose();
         }
     }
 }

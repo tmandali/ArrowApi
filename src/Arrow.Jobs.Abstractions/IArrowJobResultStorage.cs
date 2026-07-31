@@ -1,4 +1,5 @@
 using Apache.Arrow;
+using Arrow.Data;
 
 namespace Arrow.Jobs;
 
@@ -14,8 +15,8 @@ public interface IArrowJobResultStorage
         IAsyncEnumerable<RecordBatch> batches,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Belirtilen yoldan RecordBatch akışını okur.</summary>
-    IAsyncEnumerable<RecordBatch> ReadBatchesAsync(string resultPath, CancellationToken cancellationToken = default);
+    /// <summary>Belirtilen yoldan <see cref="ArrowBatchReader"/> açar.</summary>
+    Task<ArrowBatchReader> OpenBatchReaderAsync(string resultPath, CancellationToken cancellationToken = default);
 
     /// <summary>Job sonuç dosyasını varsa siler.</summary>
     Task DeleteResultAsync(string? resultPath, CancellationToken cancellationToken = default);

@@ -1,3 +1,4 @@
+using Arrow.Data;
 using Arrow.Http.AspNetCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -415,7 +416,7 @@ public static class ArrowJobEndpoints
         {
             IArrowJobResultStorage? resultStorage = request.HttpContext.RequestServices
                 .GetService<IArrowJobResultStorage>();
-            return GetJobArrowResultByStatus(status, resultPath, resultStorage, jobsPath, cancellationToken);
+            return await GetJobArrowResultByStatus(status, resultPath, resultStorage, jobsPath, cancellationToken);
         }
 
         return Results.Ok(status);
@@ -455,7 +456,7 @@ public static class ArrowJobEndpoints
             cancellationToken);
     }
 
-    private static IResult GetJobArrowResultByStatus(
+    private static async Task<IResult> GetJobArrowResultByStatus(
         ArrowJobStatus status,
         string? resultPath,
         IArrowJobResultStorage? resultStorage,
@@ -486,7 +487,8 @@ public static class ArrowJobEndpoints
             if (string.IsNullOrEmpty(resultPath) || !File.Exists(resultPath))
                 return Results.Problem(detail: "Sonuç dosyası bulunamadı.", statusCode: StatusCodes.Status500InternalServerError);
 
-            return ArrowResults.FromBatches(resultStorage.ReadBatchesAsync(resultPath, cancellationToken));
+            ArrowBatchReader reader = await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken);
+            return ArrowResults.FromReader(reader);
         }
 
         return Results.StatusCode(StatusCodes.Status500InternalServerError);

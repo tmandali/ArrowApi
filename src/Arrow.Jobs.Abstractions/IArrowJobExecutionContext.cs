@@ -1,4 +1,5 @@
 using Apache.Arrow;
+using Arrow.Data;
 
 namespace Arrow.Jobs;
 
@@ -12,7 +13,7 @@ public interface IArrowJobExecutionContext
 
     /// <summary>
     /// Bu Job tamamlandıktan veya belirli bir aşamaya geldikten sonra zincirleme (chain) olarak bir sonraki Job'ı başlatır ve anında döner.
-    /// Beklenmek istendiğinde <see cref="WaitForJobCompletionAsync"/> veya <see cref="ReadBatchesAsync"/> kullanılabilir.
+    /// Beklenmek istendiğinde <see cref="WaitForJobCompletionAsync"/> veya <see cref="GetArrowReaderAsync"/> kullanılabilir.
     /// </summary>
     Task<ArrowJob<TNextRequest>> EnqueueNextJobAsync<TNextRequest>(
         string jobName,
@@ -29,11 +30,11 @@ public interface IArrowJobExecutionContext
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// <see cref="ArrowJob{TRequest}"/> sonucunda oluşan RecordBatch'leri okur.
+    /// <see cref="ArrowJob{TRequest}"/> sonucunda oluşan RecordBatch'leri okumak için <see cref="ArrowBatchReader"/> döndürür.
     /// Job henüz tamamlanmadıysa, okuma başladığında otomatik olarak Job'ın bitmesini bekler (Lazy Evaluation).
     /// <paramref name="throwOnError"/> true ise alt job hata alırsa (<see cref="ArrowJobState.Failed"/>) veya iptal edilirse (<see cref="ArrowJobState.Cancelled"/>) exception fırlatır.
     /// </summary>
-    IAsyncEnumerable<RecordBatch> ReadBatchesAsync<TRequest>(
+    Task<ArrowBatchReader> GetArrowReaderAsync<TRequest>(
         ArrowJob<TRequest>? job,
         bool throwOnError = true,
         CancellationToken cancellationToken = default)

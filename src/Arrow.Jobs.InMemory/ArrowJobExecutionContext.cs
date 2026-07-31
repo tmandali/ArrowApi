@@ -1,3 +1,4 @@
+using Arrow.Data;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Arrow.Jobs.InMemory;
@@ -106,15 +107,15 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         throw new OperationCanceledException("WaitForJobCompletionAsync sonlandırıldı.", cancellationToken);
     }
 
-    public async IAsyncEnumerable<Apache.Arrow.RecordBatch> ReadBatchesAsync<TNextRequest>(
+    public async Task<ArrowBatchReader> GetArrowReaderAsync<TNextRequest>(
         ArrowJob<TNextRequest>? job,
         bool throwOnError = true,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
-        if (job is null) yield break;
+        if (job is null) throw new ArgumentNullException(nameof(job));
 
-        // Job henüz bitmediyse, okuma döngüsü başladığında otomatik olarak bitmesini bekle (Lazy Evaluation)
+        // Job henüz bitmediyse, okuma başlamadan önce otomatik olarak bitmesini bekle (Lazy Evaluation)
         if (job.State != ArrowJobState.Completed &&
             job.State != ArrowJobState.Failed &&
             job.State != ArrowJobState.Cancelled)
@@ -152,15 +153,11 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 
         if (job.State != ArrowJobState.Completed || string.IsNullOrWhiteSpace(job.ResultPath))
         {
-            yield break;
+            throw new InvalidOperationException(
+                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) henüz tamamlanmadı veya sonuç dosyası yok.");
         }
 
         string resultPath = job.ResultPath!;
-
-        if (File.Exists(resultPath) == false && resultPath.Contains(Path.DirectorySeparatorChar.ToString()))
-        {
-            yield break;
-        }
 
         var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
         if (resultStorage is null)
@@ -168,9 +165,6 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
             throw new InvalidOperationException("IArrowJobResultStorage service is not registered in DI.");
         }
 
-        await foreach (Apache.Arrow.RecordBatch batch in resultStorage.ReadBatchesAsync(resultPath, cancellationToken).WithCancellation(cancellationToken))
-        {
-            yield return batch;
-        }
+        return await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken).ConfigureAwait(false);
     }
 }
