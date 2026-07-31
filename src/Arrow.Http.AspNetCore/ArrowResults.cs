@@ -42,6 +42,10 @@ public static class ArrowResults
     public static IResult FromReader(ArrowBatchReader reader, bool disposeReader = true) =>
         new ArrowBatchReaderResult(reader, disposeReader);
 
+    /// <summary>Columnar reader verisini NDJSON (application/x-ndjson) akışı olarak yazar.</summary>
+    public static IResult FromReaderNdJson(ArrowBatchReader reader, bool disposeReader = true) =>
+        new ArrowNdJsonResult(reader, disposeReader);
+
     /// <summary>Batch akışını doğrudan Arrow IPC stream olarak yazar (bellek tamponu yok).</summary>
     public static IResult FromBatches(IAsyncEnumerable<RecordBatch> batches) =>
         new ArrowBatchesResult(batches);

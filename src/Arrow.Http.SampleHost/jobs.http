@@ -57,6 +57,11 @@ GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.bod
 Accept: {{ArrowMediaType}}
 X-Api-Key: {{ApiKey}}
 
+### 4b. Get Job Results (NDJSON stream - Satır satır JSON akışı!)
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}
+Accept: application/x-ndjson
+X-Api-Key: {{ApiKey}}
+
 ### 5. Get Job Original Request Configuration
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{createJob.response.body.$.id}}/request
 X-Api-Key: {{ApiKey}}

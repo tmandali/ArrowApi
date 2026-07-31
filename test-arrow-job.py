@@ -186,6 +186,17 @@ def test_happy_path() -> dict[str, Any]:
     table = read_arrow_table(arrow.content)
     assert_people_table(table, label="GET job Arrow")
     print(f"  Rows: {table.num_rows}, Columns: {table.column_names}")
+
+    print(f"GET {url} (Accept: application/x-ndjson)")
+    ndjson_resp = SESSION.get(url, headers={"Accept": "application/x-ndjson"}, timeout=30)
+    ndjson_resp.raise_for_status()
+    assert ndjson_resp.status_code == 200
+    assert "application/x-ndjson" in ndjson_resp.headers.get("Content-Type", "")
+    lines = [line.strip() for line in ndjson_resp.text.strip().split("\n") if line.strip()]
+    rows = [json.loads(line) for line in lines]
+    print(f"  NDJSON Rows Count: {len(rows)}, First Row: {rows[0] if rows else None}")
+    assert len(rows) == 3
+    assert rows[0]["Id"] == 1 and rows[0]["Name"] == "Ali"
     return status
 
 

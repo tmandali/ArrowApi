@@ -412,11 +412,15 @@ public static class ArrowJobEndpoints
         if (status is null)
             return Results.NotFound();
 
-        if (request.AcceptsArrowStream())
+        string acceptHeader = request.Headers.Accept.ToString();
+        bool wantsArrowStream = request.AcceptsArrowStream();
+        bool wantsNdJsonStream = acceptHeader.Contains("application/x-ndjson");
+
+        if (wantsArrowStream || wantsNdJsonStream)
         {
             IArrowJobResultStorage? resultStorage = request.HttpContext.RequestServices
                 .GetService<IArrowJobResultStorage>();
-            return await GetJobArrowResultByStatus(status, resultPath, resultStorage, jobsPath, cancellationToken);
+            return await GetJobArrowResultByStatus(status, resultPath, resultStorage, jobsPath, wantsNdJsonStream, cancellationToken);
         }
 
         return Results.Ok(status);
@@ -461,6 +465,7 @@ public static class ArrowJobEndpoints
         string? resultPath,
         IArrowJobResultStorage? resultStorage,
         string jobsPath,
+        bool wantsNdJson,
         CancellationToken cancellationToken)
     {
         if (string.Equals(status.Status, nameof(ArrowJobState.Queued), StringComparison.OrdinalIgnoreCase) ||
@@ -488,7 +493,9 @@ public static class ArrowJobEndpoints
                 return Results.Problem(detail: "Sonuç dosyası bulunamadı.", statusCode: StatusCodes.Status500InternalServerError);
 
             ArrowBatchReader reader = await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken);
-            return ArrowResults.FromReader(reader);
+            return wantsNdJson
+                ? ArrowResults.FromReaderNdJson(reader)
+                : ArrowResults.FromReader(reader);
         }
 
         return Results.StatusCode(StatusCodes.Status500InternalServerError);

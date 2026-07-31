@@ -110,3 +110,9 @@ GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}/events
 # Accept: Arrow → tamamlanınca Arrow IPC (henüz Running ise 202 + JSON)
 GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
 Accept: {{ArrowMediaType}}
+
+###
+
+# Accept: application/x-ndjson → tamamlanınca satır satır NDJSON akışı
+GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
+Accept: application/x-ndjson
