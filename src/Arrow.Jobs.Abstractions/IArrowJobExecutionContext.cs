@@ -16,33 +16,16 @@ public interface IArrowJobExecutionContext
     /// </summary>
     Task<Result<ArrowBatchReader>> GetParentArrowReaderAsync(CancellationToken cancellationToken = default);
 
-    /// <summary><c>info</c> event — job state değildir; yalnızca worker mesajı.</summary>
-    ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);
-
     /// <summary>
-    /// Bu Job tamamlandıktan veya belirli bir aşamaya geldikten sonra zincirleme (chain) olarak bir sonraki Job'ı başlatır ve anında döner.
-    /// Beklenmek istendiğinde <see cref="WaitForJobCompletionAsync"/> veya <see cref="GetArrowReaderAsync"/> kullanılabilir.
+    /// Gelen Arrow batch akışını aynı DI Scope ve DbContext içinde bir sonraki Child Worker'a Pipe (boru hattı) ile bağlar.
     /// </summary>
-    Task<ArrowJob<TNextRequest>> EnqueueNextJobAsync<TNextRequest>(
+    IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
         string jobName,
         TNextRequest request,
+        IAsyncEnumerable<RecordBatch> sourceStream,
         CancellationToken cancellationToken = default)
         where TNextRequest : notnull;
 
-    /// <summary>
-    /// Belirtilen Job'ın sonlanmasını (Completed, Failed veya Cancelled) bekler.
-    /// </summary>
-    Task<ArrowJobEvent> WaitForJobCompletionAsync(
-        Guid targetJobId,
-        TimeSpan? pollInterval = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// <see cref="ArrowJob{TRequest}"/> sonucunda oluşan RecordBatch'leri okumak için <see cref="Result{T}"/> içinde <see cref="ArrowBatchReader"/> döndürür.
-    /// Job henüz tamamlanmadıysa, okuma başladığında otomatik olarak Job'ın bitmesini bekler (Lazy Evaluation).
-    /// </summary>
-    Task<Result<ArrowBatchReader>> GetArrowReaderAsync<TRequest>(
-        ArrowJob<TRequest>? job,
-        CancellationToken cancellationToken = default)
-        where TRequest : notnull;
+    /// <summary><c>info</c> event — job state değildir; yalnızca worker mesajı.</summary>
+    ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default);
 }

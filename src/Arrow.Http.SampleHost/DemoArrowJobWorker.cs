@@ -28,22 +28,10 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         await using ArrowBatchReader arrowReader = ArrowData.OpenArrowReader(reader, options);
 
         await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
-            yield return batch;
-
-        await _context.PublishInfoAsync("Sorgu tamamlandı, zincirdeki export-report job'ı tetikleniyor...", cancellationToken);
-        var report = await _context.EnqueueNextJobAsync(
-            "export-report",
-            new ExportReportRequest("DemoReport"),
-            cancellationToken: cancellationToken);
-
-        // _context / job üzerinden Result<ArrowBatchReader> alınır ve ReadNextBatchAsync ile otomatik okunur & dispose edilir
-        Result<ArrowBatchReader> reportResult = await report.GetArrowReaderAsync(_context, cancellationToken: cancellationToken);
-
-        while (await reportResult.ReadNextBatchAsync<MyReportDto>(cancellationToken) is { } reportBatch)
         {
-            // reportBatch -> IReadOnlyList<MyReportDto> DTO paketi
+            yield return batch;
         }
-    }
 
-    public record MyReportDto(int Id, string Name);
+        await _context.PublishInfoAsync("Sorgu başarıyla tamamlandı.", cancellationToken);
+    }
 }

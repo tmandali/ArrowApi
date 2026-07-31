@@ -1,3 +1,4 @@
+using Apache.Arrow;
 using Arrow.Data;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,8 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
     private readonly Guid? _parentJobId;
     private readonly IArrowJobEventHub _eventHub;
     private readonly IServiceProvider _serviceProvider;
+
+    private IAsyncEnumerable<RecordBatch>? _currentPipeSource;
 
     public ArrowJobExecutionContext(
         Guid jobId,
@@ -27,6 +30,12 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 
     public async Task<Result<ArrowBatchReader>> GetParentArrowReaderAsync(CancellationToken cancellationToken = default)
     {
+        if (_currentPipeSource is not null)
+        {
+            ArrowBatchReader pipeReader = ArrowBatchReader.FromBatches(_currentPipeSource);
+            return Result<ArrowBatchReader>.Success(pipeReader);
+        }
+
         Guid? pId = _parentJobId;
 
         if (!pId.HasValue)
@@ -51,18 +60,47 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
         string? resultPath = resultStorage?.GetResultPath(pId.Value, parentStatus?.Name, parentStatus?.RootJobId);
 
-        var dummyJob = new ArrowJob<object>
+        if (string.IsNullOrEmpty(resultPath) || resultStorage is null)
         {
-            Id = pId.Value,
-            Name = parentStatus?.Name,
-            Request = new object(),
-            State = parentStatus is not null && Enum.TryParse<ArrowJobState>(parentStatus.Status, out var st) ? st : ArrowJobState.Completed,
-            Error = parentStatus?.Error,
-            ResultPath = resultPath,
-            RootJobId = parentStatus?.RootJobId ?? pId.Value
-        };
+            return Result<ArrowBatchReader>.NotFound($"Üst job (ID: {pId.Value}) sonuç verisi bulunamadı.");
+        }
 
-        return await GetArrowReaderAsync(dummyJob, cancellationToken).ConfigureAwait(false);
+        return await resultStorage.OpenBatchReaderAsync(resultPath, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async IAsyncEnumerable<RecordBatch> PipeToAsync<TNextRequest>(
+        string jobName,
+        TNextRequest request,
+        IAsyncEnumerable<RecordBatch> sourceStream,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        where TNextRequest : notnull
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(sourceStream);
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+
+        object? workerObj = _serviceProvider.GetKeyedService(typeof(IArrowJobWorker<TNextRequest>), jobName)
+                 ?? _serviceProvider.GetKeyedService<object>(jobName)
+                 ?? _serviceProvider.GetService(typeof(IArrowJobWorker<TNextRequest>));
+
+        if (workerObj is not IArrowJobWorker<TNextRequest> worker)
+        {
+            throw new InvalidOperationException($"Pipe alt işçi '{jobName}' ({typeof(TNextRequest).Name}) için uygun worker servisi bulunamadı.");
+        }
+
+        var previousPipe = _currentPipeSource;
+        _currentPipeSource = sourceStream;
+        try
+        {
+            await foreach (RecordBatch batch in worker.Handle(request, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                yield return batch;
+            }
+        }
+        finally
+        {
+            _currentPipeSource = previousPipe;
+        }
     }
 
     public async ValueTask PublishInfoAsync(string message, CancellationToken cancellationToken = default)
@@ -87,124 +125,5 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
                 Message: message);
 
         await _eventHub.PublishAsync(_jobId, ArrowJobEventNames.Info, payload, cancellationToken);
-    }
-
-    public async Task<ArrowJob<TNextRequest>> EnqueueNextJobAsync<TNextRequest>(
-        string jobName,
-        TNextRequest request,
-        CancellationToken cancellationToken = default)
-        where TNextRequest : notnull
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
-
-        var store = _serviceProvider.GetService<IArrowJobStore<TNextRequest>>();
-        var queue = _serviceProvider.GetService<IArrowJobQueue<TNextRequest>>();
-
-        if (store is null || queue is null)
-        {
-            await PublishInfoAsync($"Skipped chaining next job '{jobName}' - request type not registered in DI.", cancellationToken);
-            return new ArrowJob<TNextRequest>
-            {
-                Id = Guid.NewGuid(),
-                Name = jobName,
-                RootJobId = _jobId,
-                ParentJobId = _jobId,
-                Request = request,
-                State = ArrowJobState.Queued,
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-        }
-
-        var statusStore = _serviceProvider.GetService<IArrowJobStore>();
-        ArrowJobStatus? parentStatus = statusStore is not null
-            ? await statusStore.GetStatusAsync(_jobId, cancellationToken: cancellationToken)
-            : null;
-
-        Guid rootJobId = parentStatus?.RootJobId ?? _jobId;
-
-        ArrowJob<TNextRequest> nextJob = await store.CreateAsync(request, jobName, rootJobId: rootJobId, cancellationToken: cancellationToken);
-        nextJob.ParentJobId = _jobId;
-
-        await queue.EnqueueAsync(nextJob.Id, cancellationToken);
-
-        await PublishInfoAsync($"Chained next job '{jobName}' (ID: {nextJob.Id}, RootJobId: {rootJobId}, ParentJobId: {_jobId})", cancellationToken);
-
-        return nextJob;
-    }
-
-    public async Task<ArrowJobEvent> WaitForJobCompletionAsync(
-        Guid targetJobId,
-        TimeSpan? pollInterval = null,
-        CancellationToken cancellationToken = default)
-    {
-        await using IArrowJobEventSubscription subscription = _eventHub.Subscribe(targetJobId);
-
-        await foreach (ArrowJobHubMessage message in subscription.Messages.WithCancellation(cancellationToken))
-        {
-            if (message.EventName is ArrowJobEventNames.Completed
-                or ArrowJobEventNames.Failed
-                or ArrowJobEventNames.Cancelled)
-            {
-                return message.Payload;
-            }
-        }
-
-        throw new OperationCanceledException("WaitForJobCompletionAsync sonlandırıldı.", cancellationToken);
-    }
-
-    public async Task<Result<ArrowBatchReader>> GetArrowReaderAsync<TNextRequest>(
-        ArrowJob<TNextRequest>? job,
-        CancellationToken cancellationToken = default)
-        where TNextRequest : notnull
-    {
-        if (job is null) throw new ArgumentNullException(nameof(job));
-
-        // Job henüz bitmediyse, okuma başlamadan önce otomatik olarak bitmesini bekle (Lazy Evaluation)
-        if (job.State != ArrowJobState.Completed &&
-            job.State != ArrowJobState.Failed &&
-            job.State != ArrowJobState.Cancelled)
-        {
-            ArrowJobEvent evt = await WaitForJobCompletionAsync(job.Id, cancellationToken: cancellationToken);
-            if (string.Equals(evt.Status, nameof(ArrowJobState.Completed), StringComparison.OrdinalIgnoreCase))
-            {
-                job.State = ArrowJobState.Completed;
-            }
-            else if (string.Equals(evt.Status, nameof(ArrowJobState.Failed), StringComparison.OrdinalIgnoreCase))
-            {
-                job.State = ArrowJobState.Failed;
-                job.Error = evt.Message ?? evt.Error;
-            }
-            else if (string.Equals(evt.Status, nameof(ArrowJobState.Cancelled), StringComparison.OrdinalIgnoreCase))
-            {
-                job.State = ArrowJobState.Cancelled;
-            }
-        }
-
-        if (job.State == ArrowJobState.Failed)
-        {
-            return Result<ArrowBatchReader>.Failure(
-                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) hata ile sonlandı: {job.Error ?? "Bilinmeyen hata."}", 500);
-        }
-
-        if (job.State == ArrowJobState.Cancelled)
-        {
-            return Result<ArrowBatchReader>.Conflict(
-                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) iptal edildi.");
-        }
-
-        if (job.State != ArrowJobState.Completed || string.IsNullOrWhiteSpace(job.ResultPath))
-        {
-            return Result<ArrowBatchReader>.NotFound(
-                $"Alt job '{job.Name ?? job.Id.ToString("N")}' (ID: {job.Id}) henüz tamamlanmadı veya sonuç dosyası yok.");
-        }
-
-        var resultStorage = _serviceProvider.GetService<IArrowJobResultStorage>();
-        if (resultStorage is null)
-        {
-            return Result<ArrowBatchReader>.Failure("IArrowJobResultStorage service is not registered in DI.", 500);
-        }
-
-        return await resultStorage.OpenBatchReaderAsync(job.ResultPath!, cancellationToken).ConfigureAwait(false);
     }
 }

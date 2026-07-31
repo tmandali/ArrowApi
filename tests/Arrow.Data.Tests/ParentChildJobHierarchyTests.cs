@@ -96,4 +96,56 @@ public class ParentChildJobHierarchyTests
         // Clean up
         await storage.DeleteResultAsync(resultPath);
     }
+
+    public class ChildPipeWorker : IArrowJobWorker<SampleDataDto>
+    {
+        private readonly IArrowJobExecutionContext _context;
+
+        public ChildPipeWorker(IArrowJobExecutionContext context)
+        {
+            _context = context;
+        }
+
+        public async IAsyncEnumerable<RecordBatch> Handle(SampleDataDto request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            Result<ArrowBatchReader> parentReader = await _context.GetParentArrowReaderAsync(cancellationToken);
+            Assert.True(parentReader.IsSuccess);
+            Assert.NotNull(parentReader.Value);
+
+            while (await parentReader.Value.ReadNextBatchAsync(cancellationToken) is { } batch)
+            {
+                yield return batch;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PipeToAsync_streams_parent_batches_inline_in_same_scope()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
+        services.AddSingleton<IArrowJobEventHub, InMemoryArrowJobEventHub>();
+        services.AddSingleton<IArrowJobResultStorage, InMemoryArrowResultStorage>();
+        services.AddSingleton(typeof(IArrowJobStore<>), typeof(InMemoryArrowJobStore<>));
+        services.AddScoped<IArrowJobWorker<SampleDataDto>, ChildPipeWorker>();
+        services.AddScoped<IArrowJobExecutionContext>(sp => ArrowJobExecutionContextHolder.Current!);
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        Guid parentId = Guid.NewGuid();
+        var hub = scope.ServiceProvider.GetRequiredService<IArrowJobEventHub>();
+        var parentContext = new ArrowJobExecutionContext(parentId, hub, scope.ServiceProvider);
+        ArrowJobExecutionContextHolder.Current = parentContext;
+
+        var pipedBatches = new List<RecordBatch>();
+        await foreach (var batch in parentContext.PipeToAsync("child-pipe", new SampleDataDto(1, "Test"), CreateSampleBatchesAsync()))
+        {
+            pipedBatches.Add(batch);
+        }
+
+        Assert.Single(pipedBatches);
+        Assert.Equal(2, pipedBatches[0].Length);
+    }
 }
