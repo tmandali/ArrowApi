@@ -21,7 +21,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
     {
         await _context.PublishInfoAsync($"Sorgu başlıyor: {request.Query}", cancellationToken);
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
 
         await using DbDataReader reader = ArrowSamples.OpenDemoQueryReader(request.Query, request.Parameters);
         ArrowConversionOptions? options = ArrowSamples.CreateConversionOptions(request.BatchSize);

@@ -28,16 +28,14 @@ public sealed class ExportReportArrowJobWorker : IArrowJobWorker<ExportReportReq
         await _context.PublishInfoAsync($"Generating export report '{request.ReportName}' for job {_context.JobId} (ParentJobId: {_context.ParentJobId})", cancellationToken);
         _logger.LogInformation("ExportReportJob running for {ReportName} (JobId: {JobId}, ParentJobId: {ParentJobId})", request.ReportName, _context.JobId, _context.ParentJobId);
 
-        // Sub-worker parent'tan Arrow verisini okur (Pub/Sub veya Chained Sub-Worker)
+        // Sub-worker parent'tan Arrow verisini okur (Pipe / Parent Stream)
         Result<ArrowBatchReader> parentData = await _context.GetParentArrowReaderAsync(cancellationToken);
         int parentRowCount = 0;
 
-        if (parentData.IsSuccess && parentData.Value is not null)
+        // Result<ArrowBatchReader> uzerinden ReadBatchesAsync doğrudan ve güvenle okunur
+        await foreach (IReadOnlyList<DemoReportDto> parentBatch in parentData.ReadBatchesAsync<DemoReportDto>(cancellationToken))
         {
-            while (await parentData.ReadNextBatchAsync<DemoReportDto>(cancellationToken) is { } parentBatch)
-            {
-                parentRowCount += parentBatch.Count;
-            }
+            parentRowCount += parentBatch.Count;
         }
 
         Field[] fields = [new Field("ReportSummary", new Apache.Arrow.Types.StringType(), false)];
