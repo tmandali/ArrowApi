@@ -82,43 +82,6 @@ Accept: {{ArrowMediaType}}
 
 ###
 
-# Async job: POST → SSE events → GET job (Accept: Arrow)
-POST {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs
-Content-Type: application/json
-
-{
-  "cnnName": "inmemory",
-  "query": "SELECT * FROM People LIMIT @limit",
-  "parameters": {
-    "limit": 3
-  },
-  "batchSize": 1
-}
-
-###
-
-# @jobId = önceki POST yanıtındaki id
-GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
-
-###
-
-# SSE — job durumu (status → completed), heartbeat ile proxy timeout önlenir
-GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}/events
-
-###
-
-# Accept: Arrow → tamamlanınca Arrow IPC (henüz Running ise 202 + JSON)
-GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
-Accept: {{ArrowMediaType}}
-
-###
-
-# Accept: application/x-ndjson → tamamlanınca satır satır NDJSON akışı
-GET {{ArrowHttp_SampleHost_HostAddress}}/api/arrow/jobs/{{jobId}}
-Accept: application/x-ndjson
-
-###
-
 # Result<T> Pattern Demo - Success (200 OK)
 GET {{ArrowHttp_SampleHost_HostAddress}}/arrow/result-demo/5
 
