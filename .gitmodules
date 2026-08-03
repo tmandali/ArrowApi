@@ -1,4 +1,0 @@
-[submodule "src/Sample.Client/Sims"]
-	path = src/Sample.Client/Sims
-	url = https://github.com/tmandali/Sample.Client.Sims.git
-	branch = main
