@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,13 +39,15 @@ import {
   MoreHorizontal,
   Plus,
   X,
-  Mail,
   UserPlus,
   Paperclip,
   Tag,
   ShoppingBag,
 } from "lucide-react"
+import { DocumentActivity } from "@/components/common/document-activity"
+import { DocumentComments } from "@/components/common/document-comments"
 import { ItemImageUpload } from "./ItemImageUpload"
+import { ItemTaxTab } from "./ItemTaxTab"
 
 export function ItemForm() {
   const [descriptionOpen, setDescriptionOpen] = React.useState(false)
@@ -58,7 +59,6 @@ export function ItemForm() {
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
   const [showBanner, setShowBanner] = React.useState(true)
-  const [showAllActivity, setShowAllActivity] = React.useState(false)
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
@@ -180,7 +180,8 @@ export function ItemForm() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="details" className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
+      <Tabs defaultValue="details" className="flex flex-1 flex-col overflow-hidden min-w-0">
         <div className="border-b bg-background px-4 py-1 overflow-x-auto">
           <TabsList variant="line" className="min-w-max">
             <TabsTrigger value="details">Details</TabsTrigger>
@@ -196,11 +197,12 @@ export function ItemForm() {
           </TabsList>
         </div>
 
+        <div className="flex-1 overflow-y-auto">
         <TabsContent
           value="details"
-          className="flex-1 flex flex-col lg:flex-row overflow-y-auto m-0 data-[state=inactive]:hidden"
+          className="m-0 data-[state=inactive]:hidden"
         >
-          <div className="flex-1 p-6 space-y-6">
+          <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5">
               <div className="space-y-5">
                 <Field>
@@ -384,57 +386,44 @@ export function ItemForm() {
                 </CollapsibleContent>
               </Collapsible>
             </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Comments</h3>
-              <div className="flex items-start gap-3">
-                <Avatar className="size-8">
-                  <AvatarFallback className="text-[10px] font-semibold">
-                    JD
-                  </AvatarFallback>
-                </Avatar>
-                <Textarea
-                  placeholder="Type a reply / comment"
-                  className="min-h-16 text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">Activity</h3>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="show-all-activity"
-                      checked={showAllActivity}
-                      onCheckedChange={(checked) =>
-                        setShowAllActivity(!!checked)
-                      }
-                    />
-                    <Label
-                      htmlFor="show-all-activity"
-                      className="text-xs cursor-pointer text-muted-foreground"
-                    >
-                      Show all activity
-                    </Label>
-                  </div>
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-                    <Plus className="size-3.5" />
-                    New Email
-                    <Mail className="size-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                • You last edited this · 3 hours ago
-              </p>
-            </div>
           </div>
+        </TabsContent>
 
-          <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10">
+        <TabsContent
+          value="tax"
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <ItemTaxTab />
+        </TabsContent>
+
+        {[
+          "dashboard",
+          "inventory",
+          "variants",
+          "accounting",
+          "purchasing",
+          "sales",
+          "quality",
+          "manufacturing",
+        ].map((tab) => (
+          <TabsContent
+            key={tab}
+            value={tab}
+            className="p-6 m-0 text-xs text-muted-foreground capitalize data-[state=inactive]:hidden"
+          >
+            {tab} content
+          </TabsContent>
+        ))}
+
+        <div className="space-y-6 px-6 pb-6 pt-2">
+          <Separator />
+          <DocumentComments />
+          <DocumentActivity />
+        </div>
+        </div>
+      </Tabs>
+
+          <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10 overflow-y-auto shrink-0">
             <ItemImageUpload />
 
             <div className="space-y-1">
@@ -543,28 +532,7 @@ export function ItemForm() {
               </div>
             </div>
           </div>
-        </TabsContent>
-
-        {[
-          "dashboard",
-          "inventory",
-          "variants",
-          "accounting",
-          "purchasing",
-          "sales",
-          "tax",
-          "quality",
-          "manufacturing",
-        ].map((tab) => (
-          <TabsContent
-            key={tab}
-            value={tab}
-            className="p-6 m-0 text-xs text-muted-foreground capitalize"
-          >
-            {tab} content
-          </TabsContent>
-        ))}
-      </Tabs>
+      </div>
     </>
   )
 }
