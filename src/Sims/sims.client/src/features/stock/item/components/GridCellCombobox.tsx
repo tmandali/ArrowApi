@@ -13,7 +13,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
-import { Search } from "lucide-react"
+import { Search, X } from "lucide-react"
 import { cn } from "@/utils/cn"
 
 type GridCellComboboxProps = {
@@ -37,20 +37,28 @@ export function GridCellCombobox({
 }: GridCellComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [width, setWidth] = React.useState<number>()
+  const [query, setQuery] = React.useState("")
+  const [focused, setFocused] = React.useState(false)
   const anchorRef = React.useRef<HTMLDivElement>(null)
   const ignoreCloseRef = React.useRef(false)
 
   const filtered = React.useMemo(() => {
-    const query = value.trim().toLowerCase()
-    if (!query) return options
-    return options.filter((option) => option.toLowerCase().includes(query))
-  }, [options, value])
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return options
+    return options.filter((option) =>
+      option.toLowerCase().includes(normalized)
+    )
+  }, [options, query])
 
   const isInsideAnchor = (target: EventTarget | null) =>
     target instanceof Node && !!anchorRef.current?.contains(target)
 
-  const openDropdown = () => {
+  const getInput = () =>
+    anchorRef.current?.querySelector<HTMLInputElement>("input")
+
+  const openDropdown = (nextQuery = "") => {
     setWidth(anchorRef.current?.offsetWidth)
+    setQuery(nextQuery)
     ignoreCloseRef.current = true
     setOpen(true)
     window.setTimeout(() => {
@@ -58,34 +66,61 @@ export function GridCellCombobox({
     }, 0)
   }
 
+  const clearValue = () => {
+    onChange("")
+    setQuery("")
+    openDropdown("")
+    getInput()?.focus()
+  }
+
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
         if (!next && ignoreCloseRef.current) return
+        if (!next) setQuery("")
         setOpen(next)
       }}
     >
       <PopoverAnchor asChild>
-        <div ref={anchorRef} className="w-full">
+        <div ref={anchorRef} className="relative w-full">
           <Input
             value={value}
             placeholder={placeholder}
             data-grid-cell={dataGridCell}
             onChange={(event) => {
-              onChange(event.target.value)
-              openDropdown()
+              const next = event.target.value
+              onChange(next)
+              openDropdown(next)
             }}
-            onFocus={openDropdown}
+            onFocus={(event) => {
+              setFocused(true)
+              openDropdown("")
+              event.currentTarget.select()
+            }}
+            onBlur={() => setFocused(false)}
             onKeyDown={(event) => {
               if (event.key === "Tab" || event.key === "Escape") {
                 ignoreCloseRef.current = false
+                setQuery("")
                 setOpen(false)
               }
             }}
-            className={cn(className)}
+            className={cn(focused && value ? "pr-7" : undefined, className)}
             autoComplete="off"
           />
+          {focused && value ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Clear"
+              className="absolute right-1.5 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={clearValue}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
         </div>
       </PopoverAnchor>
       <PopoverContent
@@ -124,6 +159,7 @@ export function GridCellCombobox({
                   className="rounded-md px-2.5 py-1.5 text-xs"
                   onSelect={() => {
                     onChange(option)
+                    setQuery("")
                     setOpen(false)
                   }}
                 >
