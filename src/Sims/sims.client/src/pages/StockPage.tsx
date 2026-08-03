@@ -1,6 +1,6 @@
-﻿import * as React from "react"
-import { AIChatAssistant } from "@/components/ai-chat-assistant"
-import { AppSidebar } from "@/components/app-sidebar"
+import * as React from "react"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { AppSidebar } from "@/components/layout/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
