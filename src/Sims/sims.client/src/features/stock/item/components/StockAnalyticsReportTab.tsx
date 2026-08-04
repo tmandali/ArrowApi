@@ -22,10 +22,16 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Spinner } from "@/components/ui/spinner"
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+} from "@/components/ui/avatar"
+import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
 import {
@@ -50,6 +56,13 @@ import {
 } from "@/components/ui/resizable"
 import { cn } from "@/utils/cn"
 import { useWorkspaceNotifications } from "@/context/workspace-notifications"
+import { ApiError } from "@/services"
+import { stockAnalyticsService } from "../services/stock-analytics-service"
+import type {
+  ArrowJobEvent,
+  ReportColumn,
+  ReportGridRow,
+} from "../types/stock-analytics"
 import {
   BookOpen,
   Calendar as CalendarIcon,
@@ -72,298 +85,24 @@ const cellClass =
 const headClass =
   "h-8 px-2 py-1.5 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-tight text-muted-foreground bg-muted/40 align-middle"
 
-type ReportRow = {
-  id: string
-  name: string
-  openingDr: string
-  openingCr: string
-  debit: string
-  credit: string
-  closingDr: string
-  closingCr: string
-  children?: ReportRow[]
-}
-
-const money = (value: string): Pick<
-  ReportRow,
-  "openingDr" | "openingCr" | "debit" | "credit" | "closingDr" | "closingCr"
-> => ({
-  openingDr: "₹ 0.00",
-  openingCr: "₹ 0.00",
-  debit: value,
-  credit: "₹ 0.00",
-  closingDr: value,
-  closingCr: "₹ 0.00",
-})
-
-const reportData: ReportRow[] = [
-  {
-    id: "1",
-    name: "Application of Funds (Assets)",
-    ...money("₹ 1,20,00,000.0"),
-    children: [
-      {
-        id: "1-1",
-        name: "Current Assets",
-        ...money("₹ 1,20,00,000.0"),
-        children: [
-          {
-            id: "1-1-1",
-            name: "Stock Assets",
-            ...money("₹ 1,20,00,000.0"),
-            children: [
-              { id: "1-1-1-1", name: "Stock In Hand", ...money("₹ 85,00,000.00") },
-              { id: "1-1-1-2", name: "Work In Progress", ...money("₹ 20,00,000.00") },
-              { id: "1-1-1-3", name: "Finished Goods", ...money("₹ 15,00,000.00") },
-            ],
-          },
-          {
-            id: "1-1-2",
-            name: "Accounts Receivable",
-            ...money("₹ 45,00,000.00"),
-            children: [
-              { id: "1-1-2-1", name: "Debtors", ...money("₹ 40,00,000.00") },
-              { id: "1-1-2-2", name: "Debtors USD", ...money("₹ 5,00,000.00") },
-            ],
-          },
-          {
-            id: "1-1-3",
-            name: "Bank Accounts",
-            ...money("₹ 32,50,000.00"),
-            children: [
-              { id: "1-1-3-1", name: "HDFC - Current", ...money("₹ 18,00,000.00") },
-              { id: "1-1-3-2", name: "SBI - Current", ...money("₹ 10,50,000.00") },
-              { id: "1-1-3-3", name: "Petty Cash", ...money("₹ 4,00,000.00") },
-            ],
-          },
-          {
-            id: "1-1-4",
-            name: "Cash In Hand",
-            ...money("₹ 2,25,000.00"),
-          },
-        ],
-      },
-      {
-        id: "1-2",
-        name: "Fixed Assets",
-        ...money("₹ 75,00,000.00"),
-        children: [
-          { id: "1-2-1", name: "Buildings", ...money("₹ 40,00,000.00") },
-          { id: "1-2-2", name: "Plant and Machinery", ...money("₹ 25,00,000.00") },
-          { id: "1-2-3", name: "Furniture and Fixtures", ...money("₹ 6,00,000.00") },
-          { id: "1-2-4", name: "Vehicles", ...money("₹ 4,00,000.00") },
-        ],
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Source of Funds (Liabilities)",
-    openingDr: "₹ 0.00",
-    openingCr: "₹ 0.00",
-    debit: "₹ 5,40,000.00",
-    credit: "₹ 2,45,40,000.0",
-    closingDr: "₹ 0.00",
-    closingCr: "₹ 2,40,00,000.0",
-    children: [
-      {
-        id: "2-1",
-        name: "Foreign Currency Translation Reserve",
-        ...money("₹ 25,00,000.00"),
-      },
-      {
-        id: "2-2",
-        name: "Current Liabilities",
-        openingDr: "₹ 0.00",
-        openingCr: "₹ 0.00",
-        debit: "₹ 5,40,000.00",
-        credit: "₹ 2,45,40,000.0",
-        closingDr: "₹ 0.00",
-        closingCr: "₹ 2,40,00,000.0",
-        children: [
-          {
-            id: "2-2-1",
-            name: "Accounts Payable",
-            openingDr: "₹ 0.00",
-            openingCr: "₹ 0.00",
-            debit: "₹ 0.00",
-            credit: "₹ 2,45,40,000.0",
-            closingDr: "₹ 0.00",
-            closingCr: "₹ 2,45,40,000.0",
-            children: [
-              {
-                id: "2-2-1-1",
-                name: "Creditors",
-                openingDr: "₹ 0.00",
-                openingCr: "₹ 0.00",
-                debit: "₹ 0.00",
-                credit: "₹ 2,20,00,000.0",
-                closingDr: "₹ 0.00",
-                closingCr: "₹ 2,20,00,000.0",
-              },
-              {
-                id: "2-2-1-2",
-                name: "Creditors EUR",
-                openingDr: "₹ 0.00",
-                openingCr: "₹ 0.00",
-                debit: "₹ 0.00",
-                credit: "₹ 25,40,000.00",
-                closingDr: "₹ 0.00",
-                closingCr: "₹ 25,40,000.00",
-              },
-            ],
-          },
-          {
-            id: "2-2-2",
-            name: "Duties and Taxes",
-            ...money("₹ 5,40,000.00"),
-            children: [
-              { id: "2-2-2-1", name: "ST 6%", ...money("₹ 2,10,000.00") },
-              { id: "2-2-2-2", name: "GST Payable", ...money("₹ 2,80,000.00") },
-              { id: "2-2-2-3", name: "TDS Payable", ...money("₹ 50,000.00") },
-            ],
-          },
-          {
-            id: "2-2-3",
-            name: "Provisions",
-            ...money("₹ 8,75,000.00"),
-            children: [
-              { id: "2-2-3-1", name: "Provision for Expenses", ...money("₹ 5,00,000.00") },
-              { id: "2-2-3-2", name: "Provision for Tax", ...money("₹ 3,75,000.00") },
-            ],
-          },
-        ],
-      },
-      {
-        id: "2-3",
-        name: "Loans (Liability)",
-        ...money("₹ 50,00,000.00"),
-        children: [
-          { id: "2-3-1", name: "Bank Overdraft", ...money("₹ 15,00,000.00") },
-          { id: "2-3-2", name: "Secured Loans", ...money("₹ 35,00,000.00") },
-        ],
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "Expenses",
-    ...money("₹ 95,00,000.00"),
-    children: [
-      {
-        id: "3-1",
-        name: "Indirect Expenses",
-        ...money("₹ 55,00,000.00"),
-        children: [
-          { id: "3-1-1", name: "Salary and Wages", ...money("₹ 28,00,000.00") },
-          { id: "3-1-2", name: "Rent", ...money("₹ 12,00,000.00") },
-          { id: "3-1-3", name: "Utilities", ...money("₹ 6,50,000.00") },
-          { id: "3-1-4", name: "Office Supplies", ...money("₹ 3,25,000.00") },
-          { id: "3-1-5", name: "Travel and Conveyance", ...money("₹ 5,25,000.00") },
-        ],
-      },
-      {
-        id: "3-2",
-        name: "Direct Expenses",
-        ...money("₹ 40,00,000.00"),
-        children: [
-          { id: "3-2-1", name: "Freight Inward", ...money("₹ 8,00,000.00") },
-          { id: "3-2-2", name: "Manufacturing Expenses", ...money("₹ 22,00,000.00") },
-          { id: "3-2-3", name: "Packing Expenses", ...money("₹ 10,00,000.00") },
-        ],
-      },
-    ],
-  },
-  {
-    id: "4",
-    name: "Income",
-    openingDr: "₹ 0.00",
-    openingCr: "₹ 0.00",
-    debit: "₹ 0.00",
-    credit: "₹ 3,10,00,000.0",
-    closingDr: "₹ 0.00",
-    closingCr: "₹ 3,10,00,000.0",
-    children: [
-      {
-        id: "4-1",
-        name: "Direct Income",
-        openingDr: "₹ 0.00",
-        openingCr: "₹ 0.00",
-        debit: "₹ 0.00",
-        credit: "₹ 2,80,00,000.0",
-        closingDr: "₹ 0.00",
-        closingCr: "₹ 2,80,00,000.0",
-        children: [
-          {
-            id: "4-1-1",
-            name: "Sales",
-            openingDr: "₹ 0.00",
-            openingCr: "₹ 0.00",
-            debit: "₹ 0.00",
-            credit: "₹ 2,50,00,000.0",
-            closingDr: "₹ 0.00",
-            closingCr: "₹ 2,50,00,000.0",
-          },
-          {
-            id: "4-1-2",
-            name: "Service Income",
-            openingDr: "₹ 0.00",
-            openingCr: "₹ 0.00",
-            debit: "₹ 0.00",
-            credit: "₹ 30,00,000.00",
-            closingDr: "₹ 0.00",
-            closingCr: "₹ 30,00,000.00",
-          },
-        ],
-      },
-      {
-        id: "4-2",
-        name: "Indirect Income",
-        openingDr: "₹ 0.00",
-        openingCr: "₹ 0.00",
-        debit: "₹ 0.00",
-        credit: "₹ 30,00,000.00",
-        closingDr: "₹ 0.00",
-        closingCr: "₹ 30,00,000.00",
-        children: [
-          {
-            id: "4-2-1",
-            name: "Interest Income",
-            openingDr: "₹ 0.00",
-            openingCr: "₹ 0.00",
-            debit: "₹ 0.00",
-            credit: "₹ 12,00,000.00",
-            closingDr: "₹ 0.00",
-            closingCr: "₹ 12,00,000.00",
-          },
-          {
-            id: "4-2-2",
-            name: "Other Income",
-            openingDr: "₹ 0.00",
-            openingCr: "₹ 0.00",
-            debit: "₹ 0.00",
-            credit: "₹ 18,00,000.00",
-            closingDr: "₹ 0.00",
-            closingCr: "₹ 18,00,000.00",
-          },
-        ],
-      },
-    ],
-  },
-]
-
-function collectIds(rows: ReportRow[]): string[] {
+function collectIds(rows: ReportGridRow[]): string[] {
   return rows.flatMap((row) => [
     row.id,
     ...(row.children ? collectIds(row.children) : []),
   ])
 }
 
-const allNodeIds = collectIds(reportData)
+function expandAllIds(rows: ReportGridRow[]): Record<string, boolean> {
+  return Object.fromEntries(collectIds(rows).map((id) => [id, true]))
+}
 
-const initialExpanded = Object.fromEntries(
-  allNodeIds.map((id) => [id, true])
-) as Record<string, boolean>
+type RunEventItem = {
+  id: string
+  eventName: string
+  title: string
+  detail: string
+  tone: "muted" | "success" | "danger"
+}
 
 /** Shared layout % — Filters panel and Account column stay aligned. */
 const FILTERS_WIDTH_PERCENT = 20
@@ -434,29 +173,86 @@ const filterCriteria: {
 const formatFilterDate = (date?: Date) =>
   date ? date.toLocaleDateString("en-GB").replace(/\//g, "-") : undefined
 
-const reportRunSteps = [
-  {
-    key: "preparing",
-    title: "Preparing",
-    detail: "validating filters",
-    tone: "muted",
-  },
-  {
-    key: "fetching",
-    title: "Running",
-    detail: "fetching ledger balances",
-    tone: "success",
-  },
-  {
-    key: "building",
-    title: "Building",
-    detail: "assembling account tree",
-    tone: "success",
-  },
-] as const
-
-type ReportRunStepKey = (typeof reportRunSteps)[number]["key"]
 type ReportRunStatus = "idle" | "running" | "done" | "cancelled"
+
+function mapSseToRunEvent(
+  eventName: string,
+  payload: ArrowJobEvent,
+  index: number
+): RunEventItem {
+  if (eventName === "info") {
+    return {
+      id: `info-${index}`,
+      eventName,
+      title: "Info",
+      detail: payload.message || "…",
+      tone: "success",
+    }
+  }
+  if (eventName === "progress") {
+    return {
+      id: "progress",
+      eventName,
+      title: "Progress",
+      detail: `${payload.totalRows ?? 0} rows`,
+      tone: "success",
+    }
+  }
+  if (eventName === "completed") {
+    return {
+      id: `completed-${index}`,
+      eventName,
+      title: "Completed",
+      detail: `${payload.totalRows ?? 0} rows ready`,
+      tone: "success",
+    }
+  }
+  if (eventName === "failed") {
+    return {
+      id: `failed-${index}`,
+      eventName,
+      title: "Failed",
+      detail: payload.error || "job failed",
+      tone: "danger",
+    }
+  }
+  if (eventName === "cancelled") {
+    return {
+      id: `cancelled-${index}`,
+      eventName,
+      title: "Cancelled",
+      detail: "report stopped",
+      tone: "danger",
+    }
+  }
+  return {
+    id: `status-${index}`,
+    eventName,
+    title: payload.status || eventName,
+    detail: payload.message || eventName,
+    tone: "muted",
+  }
+}
+
+function appendOrUpdateRunEvent(
+  prev: RunEventItem[],
+  eventName: string,
+  payload: ArrowJobEvent
+): RunEventItem[] {
+  // Batch row progress: tek satırda rows sayısını güncelle
+  if (eventName === "progress") {
+    const item = mapSseToRunEvent(eventName, payload, prev.length)
+    const idx = prev.findIndex((e) => e.eventName === "progress")
+    if (idx >= 0) {
+      const next = [...prev]
+      next[idx] = { ...item, id: prev[idx].id }
+      return next
+    }
+    return [...prev, item]
+  }
+
+  return [...prev, mapSseToRunEvent(eventName, payload, prev.length)]
+}
 
 export type StockAnalyticsTreeAction =
   | { id: number; type: "expand-all" }
@@ -479,7 +275,10 @@ export function StockAnalyticsReportTab({
   showFilterRow?: boolean
 } = {}) {
   const [expandedNodes, setExpandedNodes] =
-    React.useState<Record<string, boolean>>(initialExpanded)
+    React.useState<Record<string, boolean>>({})
+  const [reportRows, setReportRows] = React.useState<ReportGridRow[]>([])
+  const [reportColumns, setReportColumns] = React.useState<ReportColumn[]>([])
+  const [runEvents, setRunEvents] = React.useState<RunEventItem[]>([])
   const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(true)
   const filtersOpen = filtersOpenProp ?? internalFiltersOpen
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
@@ -498,10 +297,9 @@ export function StockAnalyticsReportTab({
   const [showZeroValues, setShowZeroValues] = React.useState(false)
   const [showGroupAccounts, setShowGroupAccounts] = React.useState(true)
   const [runStatus, setRunStatus] = React.useState<ReportRunStatus>("idle")
-  const [runStepKey, setRunStepKey] =
-    React.useState<ReportRunStepKey>("preparing")
   const [reportReady, setReportReady] = React.useState(false)
   const runIdRef = React.useRef(0)
+  const abortRef = React.useRef<AbortController | null>(null)
   const isMountedRef = React.useRef(true)
   const running = runStatus === "running"
   const [searchParams, setSearchParams] = useSearchParams()
@@ -542,67 +340,193 @@ export function StockAnalyticsReportTab({
   const collapseAll = React.useCallback(() => setExpandedNodes({}), [])
 
   const expandAll = React.useCallback(() => {
-    setExpandedNodes(
-      Object.fromEntries(allNodeIds.map((id) => [id, true])) as Record<
-        string,
-        boolean
-      >
-    )
-  }, [])
+    setExpandedNodes(expandAllIds(reportRows))
+  }, [reportRows])
 
-  const setLevel = React.useCallback((level: number) => {
-    const next: Record<string, boolean> = {}
-    const walk = (rows: ReportRow[], depth: number) => {
-      for (const row of rows) {
-        if (!row.children?.length) continue
-        next[row.id] = depth < level
-        walk(row.children, depth + 1)
+  const setLevel = React.useCallback(
+    (level: number) => {
+      const next: Record<string, boolean> = {}
+      const walk = (rows: ReportGridRow[], depth: number) => {
+        for (const row of rows) {
+          if (!row.children?.length) continue
+          next[row.id] = depth < level
+          walk(row.children, depth + 1)
+        }
       }
-    }
-    walk(reportData, 1)
-    setExpandedNodes(next)
-  }, [])
+      walk(reportRows, 1)
+      setExpandedNodes(next)
+    },
+    [reportRows]
+  )
 
   const cancelReport = React.useCallback(() => {
     runIdRef.current += 1
+    abortRef.current?.abort()
     setRunStatus("cancelled")
+    setRunEvents((prev) => [
+      ...prev,
+      {
+        id: `cancelled-local-${prev.length}`,
+        eventName: "cancelled",
+        title: "Cancelled",
+        detail: "report stopped",
+        tone: "danger",
+      },
+    ])
+  }, [])
+
+  const confirmReportReady = React.useCallback(() => {
+    setReportReady(true)
+    setRunStatus("idle")
   }, [])
 
   const runReport = React.useCallback(async () => {
     const runId = ++runIdRef.current
+    abortRef.current?.abort()
+    const abort = new AbortController()
+    abortRef.current = abort
+
     setReportReady(false)
     setRunStatus("running")
-    setRunStepKey("preparing")
+    setRunEvents([
+      {
+        id: "local-0",
+        eventName: "status",
+        title: "Queued",
+        detail: "creating Arrow job",
+        tone: "muted",
+      },
+    ])
 
-    const wait = (ms: number) =>
-      new Promise<boolean>((resolve) => {
-        window.setTimeout(() => resolve(runIdRef.current === runId), ms)
+    try {
+      const report = await stockAnalyticsService.runReport(
+        {
+          fromDate,
+          toDate,
+          fiscalYear,
+          financeBook: financeBook || undefined,
+          currency: currency || "inr",
+          valuesMode,
+          showZeroValues,
+          showGroupAccounts,
+        },
+        {
+          signal: abort.signal,
+          onEvent: (eventName, payload) => {
+            if (runIdRef.current !== runId) return
+            setRunEvents((prev) =>
+              appendOrUpdateRunEvent(prev, eventName, payload)
+            )
+          },
+        }
+      )
+
+      if (runIdRef.current !== runId) return
+
+      setReportColumns(report.columns)
+      setReportRows(report.rows)
+      setExpandedNodes(expandAllIds(report.rows))
+
+      pushNotification({
+        title: "Stock Analytics Ready",
+        description:
+          "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
+        type: "report",
+        href: "/stock/stock-analytics?openReport=1",
       })
-
-    for (let index = 0; index < reportRunSteps.length; index += 1) {
-      const step = reportRunSteps[index]
-      setRunStepKey(step.key)
-      const stillRunning = await wait(900)
-      if (!stillRunning) return
-    }
-
-    if (runIdRef.current !== runId) return
-    pushNotification({
-      title: "Stock Analytics Ready",
-      description:
-        "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
-      type: "report",
-      href: "/stock/stock-analytics?openReport=1",
-    })
-    if (!isMountedRef.current) return
-    setRunStatus("done")
-    window.setTimeout(() => {
-      if (runIdRef.current === runId && isMountedRef.current) {
-        setReportReady(true)
-        setRunStatus("idle")
+      if (!isMountedRef.current) return
+      setRunStatus("done")
+    } catch (error) {
+      if (runIdRef.current !== runId) return
+      if (abort.signal.aborted) {
+        setRunStatus("cancelled")
+        return
       }
-    }, 700)
-  }, [pushNotification])
+      const message =
+        error instanceof ApiError
+          ? typeof error.body === "object" &&
+            error.body &&
+            "error" in error.body
+            ? String((error.body as { error?: string }).error)
+            : error.message
+          : error instanceof Error
+            ? error.message
+            : "Rapor alınamadı"
+      setRunEvents((prev) => [
+        ...prev,
+        {
+          id: `error-${prev.length}`,
+          eventName: "failed",
+          title: "Failed",
+          detail: message,
+          tone: "danger",
+        },
+      ])
+      pushNotification({
+        title: "Stock Analytics Failed",
+        description: message,
+        type: "report",
+      })
+      if (!isMountedRef.current) return
+      setRunStatus("idle")
+      setReportReady(false)
+    }
+  }, [
+    pushNotification,
+    fromDate,
+    toDate,
+    fiscalYear,
+    financeBook,
+    currency,
+    valuesMode,
+    showZeroValues,
+    showGroupAccounts,
+  ])
+
+  const primaryActionLabel =
+    runStatus === "running"
+      ? "Cancel"
+      : runStatus === "done"
+        ? "View"
+        : "Execute"
+
+  const primaryActionButtonProps = (() => {
+    switch (runStatus) {
+      case "running":
+        return {
+          variant: "destructive" as const,
+          className: undefined as string | undefined,
+        }
+      case "done":
+        return {
+          variant: "default" as const,
+          className:
+            "bg-emerald-600 text-white hover:bg-emerald-600/90 focus-visible:ring-emerald-600/30",
+        }
+      case "idle":
+      case "cancelled":
+        return {
+          variant: "default" as const,
+          className: undefined as string | undefined,
+        }
+      default: {
+        const _exhaustive: never = runStatus
+        return _exhaustive
+      }
+    }
+  })()
+
+  const onPrimaryAction = React.useCallback(() => {
+    if (runStatus === "running") {
+      cancelReport()
+      return
+    }
+    if (runStatus === "done") {
+      confirmReportReady()
+      return
+    }
+    void runReport()
+  }, [runStatus, cancelReport, confirmReportReady, runReport])
 
   React.useEffect(() => {
     if (runReportToken > 0) {
@@ -714,16 +638,13 @@ export function StockAnalyticsReportTab({
 
   const activeFilterMeta = filterCriteria.find((c) => c.key === activeFilter)
 
-  const currentStepIndex = reportRunSteps.findIndex(
-    (step) => step.key === runStepKey
-  )
-  const showGrid = reportReady && runStatus === "idle"
+  const showGrid = reportReady && runStatus === "idle" && reportColumns.length > 0
   const showRunSteps =
     runStatus === "running" ||
     runStatus === "cancelled" ||
     runStatus === "done"
 
-  const renderRows = (rows: ReportRow[], depth = 0): React.ReactNode =>
+  const renderRows = (rows: ReportGridRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
       const hasChildren = !!row.children?.length
       const isExpanded = !!expandedNodes[row.id]
@@ -731,69 +652,60 @@ export function StockAnalyticsReportTab({
       return (
         <React.Fragment key={row.id}>
           <tr className="hover:bg-muted/30 text-xs">
-            <td className={cellClass}>
-              <div
-                className="flex h-7 items-center gap-1.5 px-2 whitespace-nowrap"
-                style={{ paddingLeft: `${8 + depth * 16}px` }}
-              >
-                {hasChildren ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleNode(row.id)}
-                    className="size-4 inline-flex shrink-0 items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        "size-3.5 transition-transform",
-                        !isExpanded && "-rotate-90"
+            {reportColumns.map((col) => {
+              if (col.kind === "account") {
+                return (
+                  <td key={col.name} className={cellClass}>
+                    <div
+                      className="flex h-7 items-center gap-1.5 px-2 whitespace-nowrap"
+                      style={{ paddingLeft: `${8 + depth * 16}px` }}
+                    >
+                      {hasChildren ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleNode(row.id)}
+                          className="size-4 inline-flex shrink-0 items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              "size-3.5 transition-transform",
+                              !isExpanded && "-rotate-90"
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <span className="size-4 inline-block shrink-0" />
                       )}
-                    />
-                  </button>
-                ) : (
-                  <span className="size-4 inline-block shrink-0" />
-                )}
-                <span
-                  className={cn(
-                    "truncate font-medium",
-                    hasChildren
-                      ? "font-semibold text-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {row.name}
-                </span>
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
-                {row.openingDr}
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
-                {row.openingCr}
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 font-medium whitespace-nowrap">
-                {row.debit}
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
-                {row.credit}
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 font-medium whitespace-nowrap">
-                {row.closingDr}
-              </div>
-            </td>
-            <td className={cellClass}>
-              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
-                {row.closingCr}
-              </div>
-            </td>
+                      <span
+                        className={cn(
+                          "truncate font-medium",
+                          hasChildren
+                            ? "font-semibold text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {row.name}
+                      </span>
+                    </div>
+                  </td>
+                )
+              }
+
+              return (
+                <td key={col.name} className={cellClass}>
+                  <div
+                    className={cn(
+                      "flex h-7 items-center justify-end px-2 whitespace-nowrap",
+                      col.name === "Debit" || col.name === "ClosingDr"
+                        ? "font-medium"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {row.values[col.name] ?? "—"}
+                  </div>
+                </td>
+              )
+            })}
           </tr>
           {hasChildren && isExpanded
             ? renderRows(row.children!, depth + 1)
@@ -818,36 +730,33 @@ export function StockAnalyticsReportTab({
               <div className="shrink-0 border-b">
                 <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
                   <colgroup>
-                    <col style={ACCOUNT_COL_STYLE} />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
+                    {reportColumns.map((col) => (
+                      <col
+                        key={col.name}
+                        style={
+                          col.kind === "account" ? ACCOUNT_COL_STYLE : undefined
+                        }
+                      />
+                    ))}
                   </colgroup>
                   <thead>
                     <tr>
-                      <th className={cn(headClass, "text-left")}>Account</th>
-                      <th className={cn(headClass, "text-right")}>
-                        Opening (Dr)
-                      </th>
-                      <th className={cn(headClass, "text-right")}>
-                        Opening (Cr)
-                      </th>
-                      <th className={cn(headClass, "text-right")}>Debit</th>
-                      <th className={cn(headClass, "text-right")}>Credit</th>
-                      <th className={cn(headClass, "text-right")}>
-                        Closing (Dr)
-                      </th>
-                      <th className={cn(headClass, "text-right")}>
-                        Closing (Cr)
-                      </th>
+                      {reportColumns.map((col) => (
+                        <th
+                          key={col.name}
+                          className={cn(
+                            headClass,
+                            col.align === "left" ? "text-left" : "text-right"
+                          )}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
                     </tr>
                     {showFilterRow ? (
                     <tr className="bg-muted/10">
-                      {Array.from({ length: 7 }).map((_, index) => (
-                        <th key={index} className={cellClass}>
+                      {reportColumns.map((col, index) => (
+                        <th key={col.name} className={cellClass}>
                           <Input
                             className={cn(
                               cellInputClass,
@@ -866,122 +775,153 @@ export function StockAnalyticsReportTab({
               <ScrollArea className="h-0 min-h-0 w-full flex-1">
                 <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
                   <colgroup>
-                    <col style={ACCOUNT_COL_STYLE} />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
-                    <col />
+                    {reportColumns.map((col) => (
+                      <col
+                        key={col.name}
+                        style={
+                          col.kind === "account" ? ACCOUNT_COL_STYLE : undefined
+                        }
+                      />
+                    ))}
                   </colgroup>
-                  <tbody>{renderRows(reportData)}</tbody>
+                  <tbody>{renderRows(reportRows)}</tbody>
                 </table>
               </ScrollArea>
             </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed bg-card/40 p-6">
-              <Empty className="max-w-xs border-0 p-0">
-                {showRunSteps ? (
-                  <EmptyHeader className="max-w-none items-stretch">
-                    <EmptyContent className="items-stretch gap-3 text-left">
-                      {reportRunSteps.map((step, index) => {
-                        const isCurrent = index === currentStepIndex
-                        const isComplete =
-                          runStatus === "done" ||
-                          ((runStatus === "running" ||
-                            runStatus === "cancelled") &&
-                            index < currentStepIndex)
-                        const isCancelledHere =
-                          runStatus === "cancelled" && isCurrent
-                        const isPending =
-                          (runStatus === "running" ||
-                            runStatus === "cancelled") &&
-                          index > currentStepIndex
+          ) : showRunSteps ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex shrink-0 items-center justify-between gap-4 px-1 pb-3">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-sm font-semibold tracking-tight">
+                    {runStatus === "cancelled"
+                      ? "Report cancelled"
+                      : runStatus === "done"
+                        ? "Report ready"
+                        : "Running Stock Analytics"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Arrow job · live SSE
+                  </p>
+                </div>
+              </div>
 
-                        const titleClass = isCancelledHere
-                          ? "font-medium text-amber-500"
-                          : isComplete || (isCurrent && step.tone === "success")
-                            ? "font-medium text-emerald-600"
-                            : isCurrent
-                              ? "text-muted-foreground"
-                              : "text-muted-foreground/70"
+              <ScrollArea className="h-0 min-h-0 w-full flex-1">
+                <div className="flex flex-col gap-2.5 px-1 pr-3 pb-2">
+                  {runEvents.map((step, index) => {
+                    const isCurrent = index === runEvents.length - 1
+                    const isComplete =
+                      runStatus === "done" ||
+                      (runStatus === "running" && !isCurrent) ||
+                      (runStatus === "cancelled" && !isCurrent)
+                    const isCancelledHere =
+                      runStatus === "cancelled" && isCurrent
+                    const isFailedHere =
+                      step.tone === "danger" && isCurrent
+                    const isProgress = step.eventName === "progress"
 
-                        const iconClass = isCancelledHere
-                          ? "text-amber-500"
-                          : isComplete || (isCurrent && step.tone === "success")
-                            ? "text-emerald-600"
-                            : "text-muted-foreground"
+                    const titleClass = isCancelledHere || isFailedHere
+                      ? "font-medium text-amber-500"
+                      : isComplete || (isCurrent && step.tone === "success")
+                        ? "font-medium text-emerald-600"
+                        : isCurrent
+                          ? "text-foreground"
+                          : "text-muted-foreground/70"
 
-                        return (
-                          <div
-                            key={step.key}
-                            className={cn(
-                              "flex items-center gap-2",
-                              isPending && "opacity-50"
-                            )}
-                          >
-                            {runStatus === "running" && isCurrent ? (
-                              <Spinner
-                                className={cn("size-3.5 shrink-0", iconClass)}
-                              />
-                            ) : isComplete ? (
-                              <Check
-                                className={cn("size-3.5 shrink-0", iconClass)}
-                              />
-                            ) : isCancelledHere ? (
-                              <X
-                                className={cn("size-3.5 shrink-0", iconClass)}
-                              />
-                            ) : (
-                              <span className="size-3.5 shrink-0 rounded-full border border-muted-foreground/40" />
-                            )}
-                            <span className="text-sm">
-                              <span className={titleClass}>
-                                {isCancelledHere ? "Cancelled" : step.title}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {" "}
-                                —{" "}
-                                {isCancelledHere
-                                  ? "report stopped"
-                                  : step.detail}
-                              </span>
+                    const iconClass = isCancelledHere || isFailedHere
+                      ? "text-amber-500"
+                      : isComplete || (isCurrent && step.tone === "success")
+                        ? "text-emerald-600"
+                        : "text-muted-foreground"
+
+                    return (
+                      <div
+                        key={step.id}
+                        className="flex items-start gap-2.5"
+                      >
+                        <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+                          {runStatus === "running" && isCurrent ? (
+                            <Spinner
+                              className={cn("size-3.5", iconClass)}
+                            />
+                          ) : isComplete && !isCancelledHere && !isFailedHere ? (
+                            <Check
+                              className={cn("size-3.5", iconClass)}
+                            />
+                          ) : isCancelledHere || isFailedHere ? (
+                            <X className={cn("size-3.5", iconClass)} />
+                          ) : (
+                            <span className="size-1.5 rounded-full bg-muted-foreground/35" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className={cn("text-sm", titleClass)}>
+                              {step.title}
                             </span>
+                            {isProgress ? (
+                              <span className="tabular-nums text-sm font-medium text-foreground">
+                                {step.detail}
+                              </span>
+                            ) : null}
                           </div>
-                        )
-                      })}
-
-                      {running ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-1 h-7 self-start text-xs"
-                          onClick={cancelReport}
-                        >
-                          Cancel
-                        </Button>
-                      ) : runStatus === "cancelled" ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="mt-1 h-7 self-start text-xs"
-                          onClick={() => setRunStatus("idle")}
-                        >
-                          Dismiss
-                        </Button>
-                      ) : null}
-                    </EmptyContent>
-                  </EmptyHeader>
-                ) : (
-                  <EmptyHeader>
-                    <EmptyTitle>No report yet</EmptyTitle>
-                    <EmptyDescription>
-                      Query panelinden kriterleri seçip Execute ile grid’i üretin.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                )}
+                          {!isProgress ? (
+                            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                              {step.detail}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+              <Empty className="max-w-md border rounded-xl bg-card p-10">
+                <EmptyHeader>
+                  <EmptyMedia>
+                    <AvatarGroup className="*:data-[slot=avatar]:size-12 *:data-[slot=avatar]:grayscale-[0.35] hover:*:data-[slot=avatar]:grayscale-0">
+                      <Avatar>
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          <Layers className="size-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <Avatar>
+                        <AvatarFallback className="bg-emerald-500/10 text-emerald-600">
+                          <BookOpen className="size-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <Avatar>
+                        <AvatarFallback className="bg-amber-500/10 text-amber-600">
+                          <CircleDollarSign className="size-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </AvatarGroup>
+                  </EmptyMedia>
+                  <EmptyTitle className="text-base font-semibold">
+                    No report yet
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    Query panelinden filtreleri seçin ve Execute ile Stock
+                    Analytics raporunu Arrow job + SSE akışıyla üretin.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={cn(
+                      "h-8 gap-1.5 text-xs",
+                      primaryActionButtonProps.className
+                    )}
+                    variant={primaryActionButtonProps.variant}
+                    onClick={onPrimaryAction}
+                  >
+                    <Play className="size-3.5" />
+                    Execute Report
+                  </Button>
+                </EmptyContent>
               </Empty>
             </div>
           )}
@@ -1157,16 +1097,21 @@ export function StockAnalyticsReportTab({
               <div className="shrink-0 border-t p-3">
                 <Button
                   type="button"
-                  className="w-full h-8 text-xs gap-1.5"
-                  onClick={() => void runReport()}
-                  disabled={running}
+                  className={cn(
+                    "w-full h-8 text-xs gap-1.5",
+                    primaryActionButtonProps.className
+                  )}
+                  variant={primaryActionButtonProps.variant}
+                  onClick={onPrimaryAction}
                 >
-                  {running ? (
-                    <Spinner className="size-3.5" />
+                  {runStatus === "running" ? (
+                    <X className="size-3.5" />
+                  ) : runStatus === "done" ? (
+                    <Check className="size-3.5" />
                   ) : (
                     <Play className="size-3.5" />
                   )}
-                  {running ? "Running…" : "Execute"}
+                  {primaryActionLabel}
                 </Button>
               </div>
             </aside>

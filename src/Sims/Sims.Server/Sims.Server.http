@@ -1,6 +1,45 @@
 @Sims.Server_HostAddress = http://localhost:5168
+@ArrowMediaType = application/vnd.apache.arrow.stream
 
-GET {{Sims.Server_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Create Stock Analytics job
+# @name createStockAnalytics
+POST {{Sims.Server_HostAddress}}/api/arrow/jobs/stock-analytics
+Content-Type: application/json
+
+{
+  "fromDate": "2025-04-01",
+  "toDate": "2026-03-31",
+  "fiscalYear": "2025-2026",
+  "financeBook": "Main Book",
+  "currency": "inr",
+  "valuesMode": "5-values",
+  "showZeroValues": false,
+  "showGroupAccounts": true,
+  "batchSize": 12
+}
+
+###
+
+### 2. SSE events
+GET {{Sims.Server_HostAddress}}/api/arrow/jobs/{{createStockAnalytics.response.body.$.id}}/events
+Accept: text/event-stream
+
+###
+
+### 3. Arrow IPC result
+GET {{Sims.Server_HostAddress}}/api/arrow/jobs/{{createStockAnalytics.response.body.$.id}}
+Accept: {{ArrowMediaType}}
+
+###
+
+### 4. Sync Arrow IPC (debug)
+POST {{Sims.Server_HostAddress}}/api/stock/analytics/arrow
+Content-Type: application/json
+Accept: {{ArrowMediaType}}
+
+{
+  "valuesMode": "all",
+  "showGroupAccounts": true
+}
 
 ###
