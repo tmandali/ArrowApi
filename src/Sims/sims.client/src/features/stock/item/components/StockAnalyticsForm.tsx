@@ -18,10 +18,15 @@ export function StockAnalyticsForm({
   const [treeAction, setTreeAction] =
     React.useState<StockAnalyticsTreeAction | null>(null)
   const [treeLevel, setTreeLevel] = React.useState("2")
+  const [reportReady, setReportReady] = React.useState(false)
   const actionIdRef = React.useRef(0)
 
   const filtersOpen = filtersOpenProp ?? internalFiltersOpen
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
+
+  const handleReportReadyChange = React.useCallback((ready: boolean) => {
+    setReportReady(ready)
+  }, [])
 
   const dispatchTreeAction = (
     action: Omit<StockAnalyticsTreeAction, "id"> & { level?: number }
@@ -41,16 +46,12 @@ export function StockAnalyticsForm({
   return (
     <ItemForm
       mode="stock-analytics"
-      tabs={["report", "tax"]}
-      defaultTab="report"
-      tabLabels={{
-        tax: "Data Prepare",
-        report: "Report",
-      }}
       filtersOpen={filtersOpen}
       onFiltersOpenChange={setFiltersOpen}
       onRunReport={() => setRunReportToken((token) => token + 1)}
       runReportToken={runReportToken}
+      reportReady={reportReady}
+      onReportReadyChange={handleReportReadyChange}
       treeLevel={treeLevel}
       onTreeLevelChange={setTreeLevel}
       onExpandAll={() => dispatchTreeAction({ type: "expand-all" })}

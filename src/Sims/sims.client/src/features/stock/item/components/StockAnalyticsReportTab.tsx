@@ -468,11 +468,13 @@ export function StockAnalyticsReportTab({
   onFiltersOpenChange,
   runReportToken = 0,
   treeAction = null,
+  onReportReadyChange,
 }: {
   filtersOpen?: boolean
   onFiltersOpenChange?: (open: boolean) => void
   runReportToken?: number
   treeAction?: StockAnalyticsTreeAction | null
+  onReportReadyChange?: (ready: boolean) => void
 } = {}) {
   const [expandedNodes, setExpandedNodes] =
     React.useState<Record<string, boolean>>(initialExpanded)
@@ -502,6 +504,14 @@ export function StockAnalyticsReportTab({
   const running = runStatus === "running"
   const [searchParams, setSearchParams] = useSearchParams()
   const { pushNotification } = useWorkspaceNotifications()
+
+  React.useEffect(() => {
+    onReportReadyChange?.(reportReady)
+  }, [reportReady, onReportReadyChange])
+
+  React.useEffect(() => {
+    return () => onReportReadyChange?.(false)
+  }, [onReportReadyChange])
 
   React.useEffect(() => {
     isMountedRef.current = true
@@ -964,7 +974,7 @@ export function StockAnalyticsReportTab({
                   <EmptyHeader>
                     <EmptyTitle>No report yet</EmptyTitle>
                     <EmptyDescription>
-                      Run Report to generate the analytics grid.
+                      Query panelinden kriterleri seçip Execute ile grid’i üretin.
                     </EmptyDescription>
                   </EmptyHeader>
                 )}
@@ -983,6 +993,11 @@ export function StockAnalyticsReportTab({
             maxSize="40"
             collapsible
             collapsedSize={0}
+            onResize={(size) => {
+              if (size.asPercentage <= 0 || size.inPixels <= 0) {
+                setFiltersOpen(false)
+              }
+            }}
           >
             <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/10">
               <button
@@ -991,7 +1006,7 @@ export function StockAnalyticsReportTab({
                 className="flex shrink-0 w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
                 aria-label="Collapse filters"
               >
-                <span className="text-sm font-semibold">Filters</span>
+                <span className="text-sm font-semibold">Query</span>
                 <ChevronRight className="size-4 text-muted-foreground" />
               </button>
 
@@ -1147,7 +1162,7 @@ export function StockAnalyticsReportTab({
                   ) : (
                     <Play className="size-3.5" />
                   )}
-                  {running ? "Running…" : "Run Report"}
+                  {running ? "Running…" : "Execute"}
                 </Button>
               </div>
             </aside>

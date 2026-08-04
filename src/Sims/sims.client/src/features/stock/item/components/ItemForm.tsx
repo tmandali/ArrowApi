@@ -44,9 +44,7 @@ import {
   Paperclip,
   Tag,
   ShoppingBag,
-  Filter,
-  Play,
-  RefreshCw,
+  Search,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
@@ -106,6 +104,8 @@ type ItemFormProps = {
   onFiltersOpenChange?: (open: boolean) => void
   onRunReport?: () => void
   runReportToken?: number
+  reportReady?: boolean
+  onReportReadyChange?: (ready: boolean) => void
   treeLevel?: string
   onTreeLevelChange?: (value: string) => void
   onExpandAll?: () => void
@@ -123,6 +123,8 @@ export function ItemForm({
   onFiltersOpenChange,
   onRunReport,
   runReportToken = 0,
+  reportReady = false,
+  onReportReadyChange,
   treeLevel = "2",
   onTreeLevelChange,
   onExpandAll,
@@ -227,12 +229,13 @@ export function ItemForm({
             <>
               <Button
                 type="button"
-                variant="outline"
-                size="icon"
-                className="size-7"
-                aria-label="Refresh"
+                variant={filtersOpen ? "secondary" : "outline"}
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5"
+                onClick={() => onFiltersOpenChange?.(!filtersOpen)}
               >
-                <RefreshCw className="size-3.5" />
+                <Search className="size-3.5" />
+                Query
               </Button>
 
               <DropdownMenu>
@@ -242,6 +245,7 @@ export function ItemForm({
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs gap-1 px-2.5"
+                    disabled={!reportReady}
                   >
                     Options
                     <ChevronDown className="size-3" />
@@ -283,35 +287,16 @@ export function ItemForm({
 
               <Button
                 type="button"
-                variant={filtersOpen ? "secondary" : "outline"}
-                size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5"
-                onClick={() => onFiltersOpenChange?.(!filtersOpen)}
-              >
-                <Filter className="size-3.5" />
-                Filters
-              </Button>
-              <Button
-                type="button"
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs gap-1.5 px-2.5"
-                disabled={isPrinting}
+                disabled={!reportReady || isPrinting}
                 onClick={() => {
                   void handlePrint()
                 }}
               >
                 <Printer className="size-3.5" />
-                {isPrinting ? "Preparing…" : "Yazdır"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="h-7 text-xs gap-1.5 px-3"
-                onClick={onRunReport}
-              >
-                <Play className="size-3.5" />
-                Run Report
+                {isPrinting ? "Preparing…" : "Print"}
               </Button>
               <AIChatAssistant variant="toolbar" />
             </>
@@ -407,6 +392,15 @@ export function ItemForm({
             : "flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row"
         }
       >
+      {isStockAnalytics ? (
+        <StockAnalyticsReportTab
+          filtersOpen={filtersOpen}
+          onFiltersOpenChange={onFiltersOpenChange}
+          runReportToken={runReportToken}
+          treeAction={treeAction}
+          onReportReadyChange={onReportReadyChange}
+        />
+      ) : (
       <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
         <div className="shrink-0 border-b bg-background px-4 py-1 overflow-x-auto">
           <TabsList variant="line" className="min-w-max">
@@ -424,13 +418,7 @@ export function ItemForm({
           </TabsList>
         </div>
 
-        <div
-          className={
-            isStockAnalytics
-              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-              : "flex min-h-0 flex-1 flex-col overflow-y-auto"
-          }
-        >
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {visibleTabs.has("details") ? (
         <TabsContent
           value="details"
@@ -627,25 +615,9 @@ export function ItemForm({
         {visibleTabs.has("tax") ? (
         <TabsContent
           value="tax"
-          forceMount
           className="m-0 flex-1 min-h-0 data-[state=inactive]:hidden"
         >
           <ItemTaxTab />
-        </TabsContent>
-        ) : null}
-
-        {visibleTabs.has("report") ? (
-        <TabsContent
-          value="report"
-          forceMount
-          className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-        >
-          <StockAnalyticsReportTab
-            filtersOpen={filtersOpen}
-            onFiltersOpenChange={onFiltersOpenChange}
-            runReportToken={runReportToken}
-            treeAction={treeAction}
-          />
         </TabsContent>
         ) : null}
 
@@ -659,15 +631,14 @@ export function ItemForm({
           </TabsContent>
         ))}
 
-        {!isStockAnalytics ? (
           <div className="space-y-6 px-6 pb-6 pt-2">
             <Separator />
             <DocumentComments />
             <DocumentActivity />
           </div>
-        ) : null}
         </div>
       </Tabs>
+      )}
 
           {!isStockAnalytics ? (
           <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10 overflow-y-auto shrink-0">
