@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -48,6 +49,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { cn } from "@/utils/cn"
+import { useWorkspaceNotifications } from "@/context/workspace-notifications"
 import {
   BookOpen,
   Calendar as CalendarIcon,
@@ -496,7 +498,30 @@ export function StockAnalyticsReportTab({
     React.useState<ReportRunStepKey>("preparing")
   const [reportReady, setReportReady] = React.useState(false)
   const runIdRef = React.useRef(0)
+  const isMountedRef = React.useRef(true)
   const running = runStatus === "running"
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { pushNotification } = useWorkspaceNotifications()
+
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const openReportFromNotification = React.useCallback(() => {
+    setReportReady(true)
+    setRunStatus("idle")
+  }, [])
+
+  React.useEffect(() => {
+    if (searchParams.get("openReport") !== "1") return
+    openReportFromNotification()
+    const next = new URLSearchParams(searchParams)
+    next.delete("openReport")
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, openReportFromNotification])
 
   const toggleNode = (id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -550,14 +575,22 @@ export function StockAnalyticsReportTab({
     }
 
     if (runIdRef.current !== runId) return
+    pushNotification({
+      title: "Stock Analytics Ready",
+      description:
+        "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
+      type: "report",
+      href: "/stock/stock-analytics?openReport=1",
+    })
+    if (!isMountedRef.current) return
     setRunStatus("done")
     window.setTimeout(() => {
-      if (runIdRef.current === runId) {
+      if (runIdRef.current === runId && isMountedRef.current) {
         setReportReady(true)
         setRunStatus("idle")
       }
     }, 700)
-  }, [])
+  }, [pushNotification])
 
   React.useEffect(() => {
     if (runReportToken > 0) {
