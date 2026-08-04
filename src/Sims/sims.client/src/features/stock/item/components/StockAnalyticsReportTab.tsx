@@ -19,6 +19,14 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Spinner } from "@/components/ui/spinner"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import {
   Dialog,
   DialogContent,
@@ -51,6 +59,7 @@ import {
   Play,
   Search,
   X,
+  Check,
 } from "lucide-react"
 
 const cellInputClass =
@@ -423,6 +432,30 @@ const filterCriteria: {
 const formatFilterDate = (date?: Date) =>
   date ? date.toLocaleDateString("en-GB").replace(/\//g, "-") : undefined
 
+const reportRunSteps = [
+  {
+    key: "preparing",
+    title: "Preparing",
+    detail: "validating filters",
+    tone: "muted",
+  },
+  {
+    key: "fetching",
+    title: "Running",
+    detail: "fetching ledger balances",
+    tone: "success",
+  },
+  {
+    key: "building",
+    title: "Building",
+    detail: "assembling account tree",
+    tone: "success",
+  },
+] as const
+
+type ReportRunStepKey = (typeof reportRunSteps)[number]["key"]
+type ReportRunStatus = "idle" | "running" | "done" | "cancelled"
+
 export type StockAnalyticsTreeAction =
   | { id: number; type: "expand-all" }
   | { id: number; type: "collapse-all" }
@@ -458,7 +491,12 @@ export function StockAnalyticsReportTab({
   const [openPicker, setOpenPicker] = React.useState<FilterKey | null>(null)
   const [showZeroValues, setShowZeroValues] = React.useState(false)
   const [showGroupAccounts, setShowGroupAccounts] = React.useState(true)
-  const [running, setRunning] = React.useState(false)
+  const [runStatus, setRunStatus] = React.useState<ReportRunStatus>("idle")
+  const [runStepKey, setRunStepKey] =
+    React.useState<ReportRunStepKey>("preparing")
+  const [reportReady, setReportReady] = React.useState(false)
+  const runIdRef = React.useRef(0)
+  const running = runStatus === "running"
 
   const toggleNode = (id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -488,14 +526,42 @@ export function StockAnalyticsReportTab({
     setExpandedNodes(next)
   }, [])
 
-  const runReport = React.useCallback(() => {
-    setRunning(true)
-    window.setTimeout(() => setRunning(false), 600)
+  const cancelReport = React.useCallback(() => {
+    runIdRef.current += 1
+    setRunStatus("cancelled")
+  }, [])
+
+  const runReport = React.useCallback(async () => {
+    const runId = ++runIdRef.current
+    setReportReady(false)
+    setRunStatus("running")
+    setRunStepKey("preparing")
+
+    const wait = (ms: number) =>
+      new Promise<boolean>((resolve) => {
+        window.setTimeout(() => resolve(runIdRef.current === runId), ms)
+      })
+
+    for (let index = 0; index < reportRunSteps.length; index += 1) {
+      const step = reportRunSteps[index]
+      setRunStepKey(step.key)
+      const stillRunning = await wait(900)
+      if (!stillRunning) return
+    }
+
+    if (runIdRef.current !== runId) return
+    setRunStatus("done")
+    window.setTimeout(() => {
+      if (runIdRef.current === runId) {
+        setReportReady(true)
+        setRunStatus("idle")
+      }
+    }, 700)
   }, [])
 
   React.useEffect(() => {
     if (runReportToken > 0) {
-      runReport()
+      void runReport()
     }
   }, [runReportToken, runReport])
 
@@ -603,6 +669,15 @@ export function StockAnalyticsReportTab({
 
   const activeFilterMeta = filterCriteria.find((c) => c.key === activeFilter)
 
+  const currentStepIndex = reportRunSteps.findIndex(
+    (step) => step.key === runStepKey
+  )
+  const showGrid = reportReady && runStatus === "idle"
+  const showRunSteps =
+    runStatus === "running" ||
+    runStatus === "cancelled" ||
+    runStatus === "done"
+
   const renderRows = (rows: ReportRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
       const hasChildren = !!row.children?.length
@@ -693,60 +768,176 @@ export function StockAnalyticsReportTab({
         minSize="45"
       >
         <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 gap-3">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
-            <div className="shrink-0 border-b">
-              <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-                <colgroup>
-                  <col style={ACCOUNT_COL_STYLE} />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className={cn(headClass, "text-left")}>Account</th>
-                    <th className={cn(headClass, "text-right")}>Opening (Dr)</th>
-                    <th className={cn(headClass, "text-right")}>Opening (Cr)</th>
-                    <th className={cn(headClass, "text-right")}>Debit</th>
-                    <th className={cn(headClass, "text-right")}>Credit</th>
-                    <th className={cn(headClass, "text-right")}>Closing (Dr)</th>
-                    <th className={cn(headClass, "text-right")}>Closing (Cr)</th>
-                  </tr>
-                  <tr className="bg-muted/10">
-                    {Array.from({ length: 7 }).map((_, index) => (
-                      <th key={index} className={cellClass}>
-                        <Input
-                          className={cn(
-                            cellInputClass,
-                            index > 0 && "text-right"
-                          )}
-                          placeholder={index === 0 ? "Filter…" : undefined}
-                        />
+          {showGrid ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
+              <div className="shrink-0 border-b">
+                <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+                  <colgroup>
+                    <col style={ACCOUNT_COL_STYLE} />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className={cn(headClass, "text-left")}>Account</th>
+                      <th className={cn(headClass, "text-right")}>
+                        Opening (Dr)
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-              </table>
-            </div>
+                      <th className={cn(headClass, "text-right")}>
+                        Opening (Cr)
+                      </th>
+                      <th className={cn(headClass, "text-right")}>Debit</th>
+                      <th className={cn(headClass, "text-right")}>Credit</th>
+                      <th className={cn(headClass, "text-right")}>
+                        Closing (Dr)
+                      </th>
+                      <th className={cn(headClass, "text-right")}>
+                        Closing (Cr)
+                      </th>
+                    </tr>
+                    <tr className="bg-muted/10">
+                      {Array.from({ length: 7 }).map((_, index) => (
+                        <th key={index} className={cellClass}>
+                          <Input
+                            className={cn(
+                              cellInputClass,
+                              index > 0 && "text-right"
+                            )}
+                            placeholder={index === 0 ? "Filter…" : undefined}
+                          />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                </table>
+              </div>
 
-            <ScrollArea className="h-0 min-h-0 w-full flex-1">
-              <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-                <colgroup>
-                  <col style={ACCOUNT_COL_STYLE} />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                  <col />
-                </colgroup>
-                <tbody>{renderRows(reportData)}</tbody>
-              </table>
-            </ScrollArea>
-          </div>
+              <ScrollArea className="h-0 min-h-0 w-full flex-1">
+                <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+                  <colgroup>
+                    <col style={ACCOUNT_COL_STYLE} />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                  </colgroup>
+                  <tbody>{renderRows(reportData)}</tbody>
+                </table>
+              </ScrollArea>
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed bg-card/40 p-6">
+              <Empty className="max-w-xs border-0 p-0">
+                {showRunSteps ? (
+                  <EmptyHeader className="max-w-none items-stretch">
+                    <EmptyContent className="items-stretch gap-3 text-left">
+                      {reportRunSteps.map((step, index) => {
+                        const isCurrent = index === currentStepIndex
+                        const isComplete =
+                          runStatus === "done" ||
+                          ((runStatus === "running" ||
+                            runStatus === "cancelled") &&
+                            index < currentStepIndex)
+                        const isCancelledHere =
+                          runStatus === "cancelled" && isCurrent
+                        const isPending =
+                          (runStatus === "running" ||
+                            runStatus === "cancelled") &&
+                          index > currentStepIndex
+
+                        const titleClass = isCancelledHere
+                          ? "font-medium text-amber-500"
+                          : isComplete || (isCurrent && step.tone === "success")
+                            ? "font-medium text-emerald-600"
+                            : isCurrent
+                              ? "text-muted-foreground"
+                              : "text-muted-foreground/70"
+
+                        const iconClass = isCancelledHere
+                          ? "text-amber-500"
+                          : isComplete || (isCurrent && step.tone === "success")
+                            ? "text-emerald-600"
+                            : "text-muted-foreground"
+
+                        return (
+                          <div
+                            key={step.key}
+                            className={cn(
+                              "flex items-center gap-2",
+                              isPending && "opacity-50"
+                            )}
+                          >
+                            {runStatus === "running" && isCurrent ? (
+                              <Spinner
+                                className={cn("size-3.5 shrink-0", iconClass)}
+                              />
+                            ) : isComplete ? (
+                              <Check
+                                className={cn("size-3.5 shrink-0", iconClass)}
+                              />
+                            ) : isCancelledHere ? (
+                              <X
+                                className={cn("size-3.5 shrink-0", iconClass)}
+                              />
+                            ) : (
+                              <span className="size-3.5 shrink-0 rounded-full border border-muted-foreground/40" />
+                            )}
+                            <span className="text-sm">
+                              <span className={titleClass}>
+                                {isCancelledHere ? "Cancelled" : step.title}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                —{" "}
+                                {isCancelledHere
+                                  ? "report stopped"
+                                  : step.detail}
+                              </span>
+                            </span>
+                          </div>
+                        )
+                      })}
+
+                      {running ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-1 h-7 self-start text-xs"
+                          onClick={cancelReport}
+                        >
+                          Cancel
+                        </Button>
+                      ) : runStatus === "cancelled" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mt-1 h-7 self-start text-xs"
+                          onClick={() => setRunStatus("idle")}
+                        >
+                          Dismiss
+                        </Button>
+                      ) : null}
+                    </EmptyContent>
+                  </EmptyHeader>
+                ) : (
+                  <EmptyHeader>
+                    <EmptyTitle>No report yet</EmptyTitle>
+                    <EmptyDescription>
+                      Run Report to generate the analytics grid.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                )}
+              </Empty>
+            </div>
+          )}
         </div>
       </ResizablePanel>
 
@@ -915,10 +1106,14 @@ export function StockAnalyticsReportTab({
                 <Button
                   type="button"
                   className="w-full h-8 text-xs gap-1.5"
-                  onClick={runReport}
+                  onClick={() => void runReport()}
                   disabled={running}
                 >
-                  <Play className="size-3.5" />
+                  {running ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <Play className="size-3.5" />
+                  )}
                   {running ? "Running…" : "Run Report"}
                 </Button>
               </div>
