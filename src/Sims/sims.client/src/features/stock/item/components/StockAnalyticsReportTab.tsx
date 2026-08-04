@@ -70,7 +70,7 @@ const cellInputClass =
 const cellClass =
   "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
 const headClass =
-  "h-7 px-2 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium text-muted-foreground bg-muted/30"
+  "h-8 px-2 py-1.5 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-tight text-muted-foreground bg-muted/40 align-middle"
 
 type ReportRow = {
   id: string
