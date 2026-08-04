@@ -28,7 +28,6 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   ChevronRight,
-  Filter,
   Play,
 } from "lucide-react"
 
@@ -325,10 +324,27 @@ const initialExpanded = Object.fromEntries(
   allNodeIds.map((id) => [id, true])
 ) as Record<string, boolean>
 
-export function StockAnalyticsReportTab() {
+export type StockAnalyticsTreeAction =
+  | { id: number; type: "expand-all" }
+  | { id: number; type: "collapse-all" }
+  | { id: number; type: "set-level"; level: number }
+
+export function StockAnalyticsReportTab({
+  filtersOpen: filtersOpenProp,
+  onFiltersOpenChange,
+  runReportToken = 0,
+  treeAction = null,
+}: {
+  filtersOpen?: boolean
+  onFiltersOpenChange?: (open: boolean) => void
+  runReportToken?: number
+  treeAction?: StockAnalyticsTreeAction | null
+} = {}) {
   const [expandedNodes, setExpandedNodes] =
     React.useState<Record<string, boolean>>(initialExpanded)
-  const [filtersOpen, setFiltersOpen] = React.useState(true)
+  const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(true)
+  const filtersOpen = filtersOpenProp ?? internalFiltersOpen
+  const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
   const [fromDate, setFromDate] = React.useState<Date | undefined>(
     new Date(2025, 3, 1)
   )
@@ -343,21 +359,54 @@ export function StockAnalyticsReportTab() {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const collapseAll = () => setExpandedNodes({})
+  const collapseAll = React.useCallback(() => setExpandedNodes({}), [])
 
-  const expandAll = () => {
+  const expandAll = React.useCallback(() => {
     setExpandedNodes(
       Object.fromEntries(allNodeIds.map((id) => [id, true])) as Record<
         string,
         boolean
       >
     )
-  }
+  }, [])
 
-  const runReport = () => {
+  const setLevel = React.useCallback((level: number) => {
+    const next: Record<string, boolean> = {}
+    const walk = (rows: ReportRow[], depth: number) => {
+      for (const row of rows) {
+        if (!row.children?.length) continue
+        next[row.id] = depth < level
+        walk(row.children, depth + 1)
+      }
+    }
+    walk(reportData, 1)
+    setExpandedNodes(next)
+  }, [])
+
+  const runReport = React.useCallback(() => {
     setRunning(true)
     window.setTimeout(() => setRunning(false), 600)
-  }
+  }, [])
+
+  React.useEffect(() => {
+    if (runReportToken > 0) {
+      runReport()
+    }
+  }, [runReportToken, runReport])
+
+  React.useEffect(() => {
+    if (!treeAction) return
+    if (treeAction.type === "expand-all") {
+      expandAll()
+      return
+    }
+    if (treeAction.type === "collapse-all") {
+      collapseAll()
+      return
+    }
+    setLevel(treeAction.level)
+  }, [treeAction, expandAll, collapseAll, setLevel])
+
 
   const renderRows = (rows: ReportRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
@@ -500,45 +549,6 @@ export function StockAnalyticsReportTab() {
               </table>
             </ScrollArea>
           </div>
-
-          <div className="flex shrink-0 items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5">
-              <Input
-                defaultValue="2"
-                className="h-7 w-10 text-center text-xs bg-muted/20 border-muted-foreground/20 px-1"
-              />
-              <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-                Set Level
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2.5"
-              onClick={collapseAll}
-            >
-              Collapse All
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2.5"
-              onClick={expandAll}
-            >
-              Expand All
-            </Button>
-            {!filtersOpen ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-auto h-7 text-xs gap-1.5 px-2.5"
-                onClick={() => setFiltersOpen(true)}
-              >
-                <Filter className="size-3.5" />
-                Filters
-              </Button>
-            ) : null}
-          </div>
         </div>
       </ResizablePanel>
 
@@ -553,19 +563,15 @@ export function StockAnalyticsReportTab() {
             collapsedSize={0}
           >
             <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/10">
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
-                <h3 className="text-sm font-semibold">Filters</h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => setFiltersOpen(false)}
-                  aria-label="Collapse filters"
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="flex shrink-0 w-full items-center justify-between gap-2 border-b px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                aria-label="Collapse filters"
+              >
+                <span className="text-sm font-semibold">Filters</span>
+                <ChevronRight className="size-4 text-muted-foreground" />
+              </button>
 
               <ScrollArea className="h-0 min-h-0 flex-1">
                 <div className="space-y-4 p-4 text-xs">

@@ -9,9 +9,18 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { cn } from "@/utils/cn"
 import { Sparkles, Send, Bot, User } from "lucide-react"
 
-export function AIChatAssistant() {
+type AIChatAssistantProps = {
+  variant?: "toolbar" | "floating"
+  className?: string
+}
+
+export function AIChatAssistant({
+  variant = "floating",
+  className,
+}: AIChatAssistantProps = {}) {
   const { messages, status, sendMessage } = useChat()
   const [input, setInput] = React.useState("")
 
@@ -28,14 +37,32 @@ export function AIChatAssistant() {
     <Sheet>
       <SheetTrigger asChild>
         <Button
+          type="button"
+          variant={variant === "toolbar" ? "outline" : undefined}
           size="icon"
-          className="fixed bottom-5 right-5 z-50 shadow-xl rounded-full size-11 bg-primary text-primary-foreground hover:bg-primary/90 transition-transform hover:scale-105"
+          className={cn(
+            "group/ai relative overflow-hidden",
+            variant === "toolbar"
+              ? "size-7 transition-all duration-300 hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/25 active:scale-95"
+              : "fixed bottom-5 right-5 z-50 size-11 rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 hover:scale-105 hover:bg-primary/90",
+            className
+          )}
           aria-label="ERP AI Asistanı"
         >
-          <Sparkles className="size-5 animate-pulse" />
+          <Sparkles
+            className={cn(
+              "relative transition-transform duration-300",
+              variant === "toolbar"
+                ? "size-3.5 group-hover/ai:scale-110 group-hover/ai:rotate-12"
+                : "size-5 animate-pulse"
+            )}
+          />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:w-[440px] flex flex-col p-0 gap-0">
+      <SheetContent
+        side="right"
+        className="w-full sm:w-[440px] flex flex-col p-0 gap-0"
+      >
         <SheetHeader className="p-4 border-b">
           <SheetTitle className="flex items-center gap-2 text-sm font-semibold">
             <Sparkles className="size-4 text-primary" />
@@ -43,19 +70,22 @@ export function AIChatAssistant() {
           </SheetTitle>
         </SheetHeader>
 
-        {/* Messages Stream Container */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-2 py-12">
               <Bot className="size-8 text-muted-foreground/50" />
-              <p className="font-medium">ERP Systems AI Asistanına Hoş Geldiniz!</p>
+              <p className="font-medium">
+                ERP Systems AI Asistanına Hoş Geldiniz!
+              </p>
               <p className="text-[11px] max-w-[260px]">
-                Stok durumu, satış siparişleri veya finansal raporlar hakkında soru sorabilirsiniz.
+                Stok durumu, satış siparişleri veya finansal raporlar hakkında
+                soru sorabilirsiniz.
               </p>
             </div>
           ) : (
             messages.map((m) => {
-              const textContent = m.parts?.find((p) => p.type === "text")?.text || ""
+              const textContent =
+                m.parts?.find((p) => p.type === "text")?.text || ""
               return (
                 <div
                   key={m.id}
@@ -97,15 +127,22 @@ export function AIChatAssistant() {
           )}
         </div>
 
-        {/* Input Form */}
-        <form onSubmit={handleFormSubmit} className="p-3 border-t flex gap-2 bg-background">
+        <form
+          onSubmit={handleFormSubmit}
+          className="p-3 border-t flex gap-2 bg-background"
+        >
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Bir soru veya komut yazın..."
             className="h-9 text-xs flex-1 bg-muted/20"
           />
-          <Button type="submit" size="icon" className="size-9 shrink-0" disabled={isLoading}>
+          <Button
+            type="submit"
+            size="icon"
+            className="size-9 shrink-0"
+            disabled={isLoading}
+          >
             <Send className="size-3.5" />
           </Button>
         </form>

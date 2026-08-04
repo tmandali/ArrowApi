@@ -27,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -43,12 +44,19 @@ import {
   Paperclip,
   Tag,
   ShoppingBag,
+  Filter,
+  Play,
+  RefreshCw,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
-import { StockAnalyticsReportTab } from "./StockAnalyticsReportTab"
+import {
+  StockAnalyticsReportTab,
+  type StockAnalyticsTreeAction,
+} from "./StockAnalyticsReportTab"
 
 export type ItemFormTab =
   | "details"
@@ -93,6 +101,16 @@ type ItemFormProps = {
   tabLabels?: Partial<Record<ItemFormTab, string>>
   defaultTab?: ItemFormTab
   mode?: "item" | "stock-analytics"
+  filtersOpen?: boolean
+  onFiltersOpenChange?: (open: boolean) => void
+  onRunReport?: () => void
+  runReportToken?: number
+  treeLevel?: string
+  onTreeLevelChange?: (value: string) => void
+  onExpandAll?: () => void
+  onCollapseAll?: () => void
+  onSetTreeLevel?: () => void
+  treeAction?: StockAnalyticsTreeAction | null
 }
 
 export function ItemForm({
@@ -100,6 +118,16 @@ export function ItemForm({
   tabLabels,
   defaultTab,
   mode = "item",
+  filtersOpen = true,
+  onFiltersOpenChange,
+  onRunReport,
+  runReportToken = 0,
+  treeLevel = "2",
+  onTreeLevelChange,
+  onExpandAll,
+  onCollapseAll,
+  onSetTreeLevel,
+  treeAction = null,
 }: ItemFormProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
@@ -182,64 +210,148 @@ export function ItemForm({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
-          <ButtonGroup>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-              View
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 px-1.5">
-                  <ChevronDown className="size-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem>Print Format</DropdownMenuItem>
-                <DropdownMenuItem>Stock Ledger</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </ButtonGroup>
-
-          <ButtonGroup>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-              Actions
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 px-1.5">
-                  <ChevronDown className="size-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem>Make Stock Entry</DropdownMenuItem>
-                <DropdownMenuItem>Open Material Request</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </ButtonGroup>
-
-          <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-            Duplicate
-          </Button>
-
-          <Button variant="outline" size="icon" className="size-7">
-            <Printer className="size-3.5" />
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="size-7">
-                <MoreHorizontal className="size-3.5" />
+        <div className="flex shrink-0 items-center gap-2">
+          {isStockAnalytics ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-7"
+                aria-label="Refresh"
+              >
+                <RefreshCw className="size-3.5" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem>Reload</DropdownMenuItem>
-              <DropdownMenuItem>Delete</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
-          <Button size="sm" className="h-7 text-xs px-3">
-            Save
-          </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1 px-2.5"
+                  >
+                    Options
+                    <ChevronDown className="size-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={onExpandAll}>
+                    Expand All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onCollapseAll}>
+                    Collapse All
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <Input
+                      value={treeLevel}
+                      onChange={(event) =>
+                        onTreeLevelChange?.(event.target.value)
+                      }
+                      className="h-7 w-12 text-center text-xs"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 flex-1 text-xs"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        onSetTreeLevel?.()
+                      }}
+                    >
+                      Set Level
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                type="button"
+                variant={filtersOpen ? "secondary" : "outline"}
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5"
+                onClick={() => onFiltersOpenChange?.(!filtersOpen)}
+              >
+                <Filter className="size-3.5" />
+                Filters
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-3"
+                onClick={onRunReport}
+              >
+                <Play className="size-3.5" />
+                Run Report
+              </Button>
+              <AIChatAssistant variant="toolbar" />
+            </>
+          ) : (
+            <>
+              <ButtonGroup>
+                <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                  View
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-1.5">
+                      <ChevronDown className="size-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem>Print Format</DropdownMenuItem>
+                    <DropdownMenuItem>Stock Ledger</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </ButtonGroup>
+
+              <ButtonGroup>
+                <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                  Actions
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-1.5">
+                      <ChevronDown className="size-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem>Make Stock Entry</DropdownMenuItem>
+                    <DropdownMenuItem>Open Material Request</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </ButtonGroup>
+
+              <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
+                Duplicate
+              </Button>
+
+              <Button variant="outline" size="icon" className="size-7">
+                <Printer className="size-3.5" />
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="size-7">
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem>Reload</DropdownMenuItem>
+                  <DropdownMenuItem>Delete</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button size="sm" className="h-7 text-xs px-3">
+                Save
+              </Button>
+              <AIChatAssistant variant="toolbar" />
+            </>
+          )}
         </div>
       </header>
 
@@ -501,7 +613,12 @@ export function ItemForm({
           value="report"
           className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
-          <StockAnalyticsReportTab />
+          <StockAnalyticsReportTab
+            filtersOpen={filtersOpen}
+            onFiltersOpenChange={onFiltersOpenChange}
+            runReportToken={runReportToken}
+            treeAction={treeAction}
+          />
         </TabsContent>
         ) : null}
 
