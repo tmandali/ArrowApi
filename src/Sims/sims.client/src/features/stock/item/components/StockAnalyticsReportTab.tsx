@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select"
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
@@ -19,16 +20,37 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command"
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { cn } from "@/utils/cn"
 import {
+  BookOpen,
   Calendar as CalendarIcon,
+  CalendarRange,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
+  Layers,
   Play,
+  Search,
+  X,
 } from "lucide-react"
 
 const cellInputClass =
@@ -337,6 +359,70 @@ const FILTERS_WIDTH_PERCENT = 20
 const REPORT_WIDTH_PERCENT = 100 - FILTERS_WIDTH_PERCENT
 const ACCOUNT_COL_STYLE = { width: `${FILTERS_WIDTH_PERCENT}%` } as const
 
+type FilterKey =
+  | "values"
+  | "fiscalYear"
+  | "dateRange"
+  | "financeBook"
+  | "currency"
+
+const filterCriteria: {
+  key: FilterKey
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  options: { value: string; label: string }[]
+}[] = [
+  {
+    key: "values",
+    label: "Values",
+    icon: Layers,
+    options: [
+      { value: "5-values", label: "5 values selected" },
+      { value: "all", label: "All Values" },
+    ],
+  },
+  {
+    key: "fiscalYear",
+    label: "Fiscal Year",
+    icon: CalendarRange,
+    options: [
+      { value: "2025-2026", label: "2025-2026" },
+      { value: "2024-2025", label: "2024-2025" },
+    ],
+  },
+  {
+    key: "dateRange",
+    label: "Date Range",
+    icon: CalendarIcon,
+    options: [
+      { value: "fy-current", label: "Current Fiscal Year" },
+      { value: "fy-prev", label: "Previous Fiscal Year" },
+    ],
+  },
+  {
+    key: "financeBook",
+    label: "Finance Book",
+    icon: BookOpen,
+    options: [
+      { value: "Main Book", label: "Main Book" },
+      { value: "Tax Book", label: "Tax Book" },
+    ],
+  },
+  {
+    key: "currency",
+    label: "Currency",
+    icon: CircleDollarSign,
+    options: [
+      { value: "inr", label: "INR (₹)" },
+      { value: "try", label: "TRY (₺)" },
+      { value: "usd", label: "USD ($)" },
+    ],
+  },
+]
+
+const formatFilterDate = (date?: Date) =>
+  date ? date.toLocaleDateString("en-GB").replace(/\//g, "-") : undefined
+
 export type StockAnalyticsTreeAction =
   | { id: number; type: "expand-all" }
   | { id: number; type: "collapse-all" }
@@ -364,6 +450,12 @@ export function StockAnalyticsReportTab({
   const [toDate, setToDate] = React.useState<Date | undefined>(
     new Date(2026, 2, 31)
   )
+  const [valuesMode, setValuesMode] = React.useState("5-values")
+  const [fiscalYear, setFiscalYear] = React.useState("2025-2026")
+  const [financeBook, setFinanceBook] = React.useState("")
+  const [currency, setCurrency] = React.useState("inr")
+  const [activeFilter, setActiveFilter] = React.useState<FilterKey | null>(null)
+  const [openPicker, setOpenPicker] = React.useState<FilterKey | null>(null)
   const [showZeroValues, setShowZeroValues] = React.useState(false)
   const [showGroupAccounts, setShowGroupAccounts] = React.useState(true)
   const [running, setRunning] = React.useState(false)
@@ -420,6 +512,96 @@ export function StockAnalyticsReportTab({
     setLevel(treeAction.level)
   }, [treeAction, expandAll, collapseAll, setLevel])
 
+  const currencyLabel =
+    currency === "try"
+      ? "TRY (₺)"
+      : currency === "usd"
+        ? "USD ($)"
+        : currency === "inr"
+          ? "INR (₹)"
+          : ""
+  const valuesLabel =
+    valuesMode === "all"
+      ? "All Values"
+      : valuesMode === "5-values"
+        ? "5 values selected"
+        : ""
+  const dateRangeLabel = [formatFilterDate(fromDate), formatFilterDate(toDate)]
+    .filter(Boolean)
+    .join(" → ")
+
+  const filterChips: Record<FilterKey, string[]> = {
+    values: valuesLabel ? [valuesLabel] : [],
+    fiscalYear: fiscalYear ? [fiscalYear] : [],
+    dateRange: dateRangeLabel ? [dateRangeLabel] : [],
+    financeBook: financeBook ? [financeBook] : [],
+    currency: currencyLabel ? [currencyLabel] : [],
+  }
+
+  const selectedValue: Record<FilterKey, string> = {
+    values: valuesMode,
+    fiscalYear,
+    dateRange: "",
+    financeBook,
+    currency,
+  }
+
+  const applyFilterOption = (key: FilterKey, value: string) => {
+    switch (key) {
+      case "values":
+        setValuesMode(value)
+        break
+      case "fiscalYear":
+        setFiscalYear(value)
+        break
+      case "dateRange":
+        if (value === "fy-current") {
+          setFromDate(new Date(2025, 3, 1))
+          setToDate(new Date(2026, 2, 31))
+        } else if (value === "fy-prev") {
+          setFromDate(new Date(2024, 3, 1))
+          setToDate(new Date(2025, 2, 31))
+        }
+        break
+      case "financeBook":
+        setFinanceBook(value)
+        break
+      case "currency":
+        setCurrency(value)
+        break
+      default: {
+        const _exhaustive: never = key
+        return _exhaustive
+      }
+    }
+  }
+
+  const clearFilter = (key: FilterKey) => {
+    switch (key) {
+      case "values":
+        setValuesMode("")
+        break
+      case "fiscalYear":
+        setFiscalYear("")
+        break
+      case "dateRange":
+        setFromDate(undefined)
+        setToDate(undefined)
+        break
+      case "financeBook":
+        setFinanceBook("")
+        break
+      case "currency":
+        setCurrency("")
+        break
+      default: {
+        const _exhaustive: never = key
+        return _exhaustive
+      }
+    }
+  }
+
+  const activeFilterMeta = filterCriteria.find((c) => c.key === activeFilter)
 
   const renderRows = (rows: ReportRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
@@ -582,7 +764,7 @@ export function StockAnalyticsReportTab({
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
-                className="flex shrink-0 w-full items-center justify-between gap-2 border-b px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                className="flex shrink-0 w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
                 aria-label="Collapse filters"
               >
                 <span className="text-sm font-semibold">Filters</span>
@@ -590,124 +772,111 @@ export function StockAnalyticsReportTab({
               </button>
 
               <ScrollArea className="h-0 min-h-0 flex-1">
-                <div className="space-y-4 p-4 text-xs">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Values
-                    </Label>
-                    <Select defaultValue="5-values">
-                      <SelectTrigger className="h-8 w-full text-xs bg-muted/30 border-muted-foreground/20">
-                        <SelectValue placeholder="Values" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5-values">
-                          5 values selected
-                        </SelectItem>
-                        <SelectItem value="all">All Values</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Fiscal Year
-                    </Label>
-                    <Select defaultValue="2025-2026">
-                      <SelectTrigger className="h-8 w-full text-xs bg-muted/30 border-muted-foreground/20">
-                        <SelectValue placeholder="Fiscal Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2025-2026">2025-2026</SelectItem>
-                        <SelectItem value="2024-2025">2024-2025</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      From Date
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full h-8 justify-between text-left font-normal text-xs bg-muted/30 border-muted-foreground/20 px-2.5"
+                <div className="py-1">
+                  {filterCriteria.map((criterion) => {
+                    const Icon = criterion.icon
+                    const chips = filterChips[criterion.key]
+                    const isOpen = openPicker === criterion.key
+                    return (
+                      <div key={criterion.key} className="px-1">
+                        <Popover
+                          open={isOpen}
+                          onOpenChange={(open) =>
+                            setOpenPicker(open ? criterion.key : null)
+                          }
                         >
-                          {fromDate
-                            ? fromDate
-                                .toLocaleDateString("en-GB")
-                                .replace(/\//g, "-")
-                            : "Start Date"}
-                          <CalendarIcon className="size-3.5 text-muted-foreground/60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={fromDate}
-                          onSelect={setFromDate}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                          <PopoverAnchor asChild>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenPicker(isOpen ? null : criterion.key)
+                              }
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50"
+                            >
+                              <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                              <span className="min-w-0 flex-1 truncate text-foreground">
+                                {criterion.label}
+                              </span>
+                            </button>
+                          </PopoverAnchor>
+                          <PopoverContent
+                            align="start"
+                            side="bottom"
+                            sideOffset={4}
+                            className="w-56 gap-0 rounded-md p-1 shadow-md ring-1 ring-border"
+                          >
+                            <Command className="rounded-md bg-transparent p-0">
+                              <CommandList className="max-h-56">
+                                <CommandEmpty className="py-3 text-xs">
+                                  No results.
+                                </CommandEmpty>
+                                <CommandGroup className="p-0">
+                                  {criterion.options.map((option) => (
+                                    <CommandItem
+                                      key={option.value}
+                                      value={option.label}
+                                      data-checked={
+                                        selectedValue[criterion.key] ===
+                                          option.value || undefined
+                                      }
+                                      className="rounded-md px-2.5 py-1.5 text-xs"
+                                      onSelect={() => {
+                                        applyFilterOption(
+                                          criterion.key,
+                                          option.value
+                                        )
+                                        setOpenPicker(null)
+                                      }}
+                                    >
+                                      {option.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                              <CommandSeparator />
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
+                                onClick={() => {
+                                  setOpenPicker(null)
+                                  setActiveFilter(criterion.key)
+                                }}
+                              >
+                                <Search className="size-3.5 text-muted-foreground" />
+                                Advanced Search
+                              </button>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {chips.length > 0 ? (
+                          <div className="space-y-0.5 pb-1 pl-7 pr-1">
+                            {chips.map((chip) => (
+                              <div
+                                key={chip}
+                                className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted/40"
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {chip}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Clear ${criterion.label}`}
+                                  className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/70 opacity-70 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                  onClick={() => clearFilter(criterion.key)}
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
 
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      To Date
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full h-8 justify-between text-left font-normal text-xs bg-muted/30 border-muted-foreground/20 px-2.5"
-                        >
-                          {toDate
-                            ? toDate
-                                .toLocaleDateString("en-GB")
-                                .replace(/\//g, "-")
-                            : "End Date"}
-                          <CalendarIcon className="size-3.5 text-muted-foreground/60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={toDate}
-                          onSelect={setToDate}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <Separator className="my-2" />
 
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Finance Book
-                    </Label>
-                    <Input
-                      placeholder="Finance Book"
-                      className="h-8 text-xs bg-muted/20 border-muted-foreground/20"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Currency
-                    </Label>
-                    <Select defaultValue="inr">
-                      <SelectTrigger className="h-8 w-full text-xs bg-muted/30 border-muted-foreground/20">
-                        <SelectValue placeholder="Currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inr">INR (₹)</SelectItem>
-                        <SelectItem value="try">TRY (₺)</SelectItem>
-                        <SelectItem value="usd">USD ($)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 px-3 py-1">
                     <div className="flex items-start gap-2">
                       <Checkbox
                         id="sa-show-zero"
@@ -742,7 +911,7 @@ export function StockAnalyticsReportTab({
                 </div>
               </ScrollArea>
 
-              <div className="shrink-0 border-t p-4">
+              <div className="shrink-0 border-t p-3">
                 <Button
                   type="button"
                   className="w-full h-8 text-xs gap-1.5"
@@ -757,6 +926,168 @@ export function StockAnalyticsReportTab({
           </ResizablePanel>
         </>
       ) : null}
+
+      <Dialog
+        open={activeFilter !== null}
+        onOpenChange={(open) => {
+          if (!open) setActiveFilter(null)
+        }}
+      >
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b px-4 py-3">
+            <DialogTitle className="text-sm font-semibold">
+              Advanced Search — {activeFilterMeta?.label ?? "Filter"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 p-4 text-xs">
+            {activeFilter === "values" ? (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">
+                  Values
+                </Label>
+                <Select value={valuesMode || undefined} onValueChange={setValuesMode}>
+                  <SelectTrigger className="h-8 w-full text-xs">
+                    <SelectValue placeholder="Select values" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5-values">5 values selected</SelectItem>
+                    <SelectItem value="all">All Values</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            {activeFilter === "fiscalYear" ? (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">
+                  Fiscal Year
+                </Label>
+                <Select
+                  value={fiscalYear || undefined}
+                  onValueChange={setFiscalYear}
+                >
+                  <SelectTrigger className="h-8 w-full text-xs">
+                    <SelectValue placeholder="Select fiscal year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2025-2026">2025-2026</SelectItem>
+                    <SelectItem value="2024-2025">2024-2025</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            {activeFilter === "dateRange" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">
+                    From Date
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full h-8 justify-between text-left font-normal text-xs px-2.5"
+                      >
+                        {formatFilterDate(fromDate) ?? "Start Date"}
+                        <CalendarIcon className="size-3.5 text-muted-foreground/60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={setFromDate}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">
+                    To Date
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full h-8 justify-between text-left font-normal text-xs px-2.5"
+                      >
+                        {formatFilterDate(toDate) ?? "End Date"}
+                        <CalendarIcon className="size-3.5 text-muted-foreground/60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={toDate}
+                        onSelect={setToDate}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            ) : null}
+
+            {activeFilter === "financeBook" ? (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">
+                  Finance Book
+                </Label>
+                <Input
+                  value={financeBook}
+                  onChange={(event) => setFinanceBook(event.target.value)}
+                  placeholder="Finance Book"
+                  className="h-8 text-xs"
+                />
+              </div>
+            ) : null}
+
+            {activeFilter === "currency" ? (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">
+                  Currency
+                </Label>
+                <Select
+                  value={currency || undefined}
+                  onValueChange={setCurrency}
+                >
+                  <SelectTrigger className="h-8 w-full text-xs">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inr">INR (₹)</SelectItem>
+                    <SelectItem value="try">TRY (₺)</SelectItem>
+                    <SelectItem value="usd">USD ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="flex-row items-center justify-between gap-2 border-t px-4 py-3 sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => {
+                if (activeFilter) clearFilter(activeFilter)
+              }}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="text-xs"
+              onClick={() => setActiveFilter(null)}
+            >
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ResizablePanelGroup>
   )
 }
