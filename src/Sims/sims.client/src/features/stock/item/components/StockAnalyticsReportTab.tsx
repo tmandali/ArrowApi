@@ -324,6 +324,11 @@ const initialExpanded = Object.fromEntries(
   allNodeIds.map((id) => [id, true])
 ) as Record<string, boolean>
 
+/** Shared layout % — Filters panel and Account column stay aligned. */
+const FILTERS_WIDTH_PERCENT = 20
+const REPORT_WIDTH_PERCENT = 100 - FILTERS_WIDTH_PERCENT
+const ACCOUNT_COL_STYLE = { width: `${FILTERS_WIDTH_PERCENT}%` } as const
+
 export type StockAnalyticsTreeAction =
   | { id: number; type: "expand-all" }
   | { id: number; type: "collapse-all" }
@@ -480,13 +485,16 @@ export function StockAnalyticsReportTab({
       orientation="horizontal"
       className="h-full min-h-0 w-full"
     >
-      <ResizablePanel defaultSize={filtersOpen ? "72" : "100"} minSize="45">
+      <ResizablePanel
+        defaultSize={filtersOpen ? String(REPORT_WIDTH_PERCENT) : "100"}
+        minSize="45"
+      >
         <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 gap-3">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
             <div className="shrink-0 border-b bg-muted/40">
               <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
                 <colgroup>
-                  <col className="w-[28%]" />
+                  <col style={ACCOUNT_COL_STYLE} />
                   <col />
                   <col />
                   <col />
@@ -537,7 +545,7 @@ export function StockAnalyticsReportTab({
             <ScrollArea className="h-0 min-h-0 w-full flex-1">
               <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
                 <colgroup>
-                  <col className="w-[28%]" />
+                  <col style={ACCOUNT_COL_STYLE} />
                   <col />
                   <col />
                   <col />
@@ -556,8 +564,8 @@ export function StockAnalyticsReportTab({
         <>
           <ResizableHandle withHandle />
           <ResizablePanel
-            defaultSize="28"
-            minSize="18"
+            defaultSize={String(FILTERS_WIDTH_PERCENT)}
+            minSize={String(FILTERS_WIDTH_PERCENT)}
             maxSize="40"
             collapsible
             collapsedSize={0}
