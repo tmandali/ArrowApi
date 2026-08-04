@@ -1,6 +1,7 @@
 import * as React from "react"
 import { ItemForm } from "./ItemForm"
 import type { StockAnalyticsTreeAction } from "./StockAnalyticsReportTab"
+import { useStockAnalyticsReport } from "@/context/stock-analytics-report"
 
 export type { StockAnalyticsTreeAction }
 
@@ -18,16 +19,12 @@ export function StockAnalyticsForm({
   const [treeAction, setTreeAction] =
     React.useState<StockAnalyticsTreeAction | null>(null)
   const [treeLevel, setTreeLevel] = React.useState("2")
-  const [reportReady, setReportReady] = React.useState(false)
   const [showFilterRow, setShowFilterRow] = React.useState(true)
   const actionIdRef = React.useRef(0)
+  const { reportReady } = useStockAnalyticsReport()
 
   const filtersOpen = filtersOpenProp ?? internalFiltersOpen
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
-
-  const handleReportReadyChange = React.useCallback((ready: boolean) => {
-    setReportReady(ready)
-  }, [])
 
   const dispatchTreeAction = (
     action: Omit<StockAnalyticsTreeAction, "id"> & { level?: number }
@@ -52,7 +49,6 @@ export function StockAnalyticsForm({
       onRunReport={() => setRunReportToken((token) => token + 1)}
       runReportToken={runReportToken}
       reportReady={reportReady}
-      onReportReadyChange={handleReportReadyChange}
       showFilterRow={showFilterRow}
       onShowFilterRowChange={setShowFilterRow}
       treeLevel={treeLevel}

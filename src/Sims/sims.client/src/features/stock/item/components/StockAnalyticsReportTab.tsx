@@ -55,14 +55,8 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { cn } from "@/utils/cn"
-import { useWorkspaceNotifications } from "@/context/workspace-notifications"
-import { ApiError } from "@/services"
-import { stockAnalyticsService } from "../services/stock-analytics-service"
-import type {
-  ArrowJobEvent,
-  ReportColumn,
-  ReportGridRow,
-} from "../types/stock-analytics"
+import { useStockAnalyticsReport } from "@/context/stock-analytics-report"
+import type { ReportGridRow } from "../types/stock-analytics"
 import {
   BookOpen,
   Calendar as CalendarIcon,
@@ -84,25 +78,6 @@ const cellClass =
   "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
 const headClass =
   "h-8 px-2 py-1.5 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-tight text-muted-foreground bg-muted/40 align-middle"
-
-function collectIds(rows: ReportGridRow[]): string[] {
-  return rows.flatMap((row) => [
-    row.id,
-    ...(row.children ? collectIds(row.children) : []),
-  ])
-}
-
-function expandAllIds(rows: ReportGridRow[]): Record<string, boolean> {
-  return Object.fromEntries(collectIds(rows).map((id) => [id, true]))
-}
-
-type RunEventItem = {
-  id: string
-  eventName: string
-  title: string
-  detail: string
-  tone: "muted" | "success" | "danger"
-}
 
 /** Shared layout % — Filters panel and Account column stay aligned. */
 const FILTERS_WIDTH_PERCENT = 20
@@ -173,87 +148,6 @@ const filterCriteria: {
 const formatFilterDate = (date?: Date) =>
   date ? date.toLocaleDateString("en-GB").replace(/\//g, "-") : undefined
 
-type ReportRunStatus = "idle" | "running" | "done" | "cancelled"
-
-function mapSseToRunEvent(
-  eventName: string,
-  payload: ArrowJobEvent,
-  index: number
-): RunEventItem {
-  if (eventName === "info") {
-    return {
-      id: `info-${index}`,
-      eventName,
-      title: "Info",
-      detail: payload.message || "…",
-      tone: "success",
-    }
-  }
-  if (eventName === "progress") {
-    return {
-      id: "progress",
-      eventName,
-      title: "Progress",
-      detail: `${payload.totalRows ?? 0} rows`,
-      tone: "success",
-    }
-  }
-  if (eventName === "completed") {
-    return {
-      id: `completed-${index}`,
-      eventName,
-      title: "Completed",
-      detail: `${payload.totalRows ?? 0} rows ready`,
-      tone: "success",
-    }
-  }
-  if (eventName === "failed") {
-    return {
-      id: `failed-${index}`,
-      eventName,
-      title: "Failed",
-      detail: payload.error || "job failed",
-      tone: "danger",
-    }
-  }
-  if (eventName === "cancelled") {
-    return {
-      id: `cancelled-${index}`,
-      eventName,
-      title: "Cancelled",
-      detail: "report stopped",
-      tone: "danger",
-    }
-  }
-  return {
-    id: `status-${index}`,
-    eventName,
-    title: payload.status || eventName,
-    detail: payload.message || eventName,
-    tone: "muted",
-  }
-}
-
-function appendOrUpdateRunEvent(
-  prev: RunEventItem[],
-  eventName: string,
-  payload: ArrowJobEvent
-): RunEventItem[] {
-  // Batch row progress: tek satırda rows sayısını güncelle
-  if (eventName === "progress") {
-    const item = mapSseToRunEvent(eventName, payload, prev.length)
-    const idx = prev.findIndex((e) => e.eventName === "progress")
-    if (idx >= 0) {
-      const next = [...prev]
-      next[idx] = { ...item, id: prev[idx].id }
-      return next
-    }
-    return [...prev, item]
-  }
-
-  return [...prev, mapSseToRunEvent(eventName, payload, prev.length)]
-}
-
 export type StockAnalyticsTreeAction =
   | { id: number; type: "expand-all" }
   | { id: number; type: "collapse-all" }
@@ -274,56 +168,53 @@ export function StockAnalyticsReportTab({
   onReportReadyChange?: (ready: boolean) => void
   showFilterRow?: boolean
 } = {}) {
-  const [expandedNodes, setExpandedNodes] =
-    React.useState<Record<string, boolean>>({})
-  const [reportRows, setReportRows] = React.useState<ReportGridRow[]>([])
-  const [reportColumns, setReportColumns] = React.useState<ReportColumn[]>([])
-  const [runEvents, setRunEvents] = React.useState<RunEventItem[]>([])
+  const {
+    expandedNodes,
+    reportRows,
+    reportColumns,
+    runEvents,
+    runStatus,
+    reportReady,
+    running,
+    hasPendingReport,
+    isPendingView,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    valuesMode,
+    setValuesMode,
+    fiscalYear,
+    setFiscalYear,
+    financeBook,
+    setFinanceBook,
+    currency,
+    setCurrency,
+    showZeroValues,
+    setShowZeroValues,
+    showGroupAccounts,
+    setShowGroupAccounts,
+    toggleNode,
+    expandAll,
+    collapseAll,
+    setLevel,
+    runReport,
+    openReportFromNotification,
+    primaryActionLabel,
+    primaryActionButtonProps,
+    onPrimaryAction,
+  } = useStockAnalyticsReport()
+
   const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(true)
   const filtersOpen = filtersOpenProp ?? internalFiltersOpen
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
-  const [fromDate, setFromDate] = React.useState<Date | undefined>(
-    new Date(2025, 3, 1)
-  )
-  const [toDate, setToDate] = React.useState<Date | undefined>(
-    new Date(2026, 2, 31)
-  )
-  const [valuesMode, setValuesMode] = React.useState("5-values")
-  const [fiscalYear, setFiscalYear] = React.useState("2025-2026")
-  const [financeBook, setFinanceBook] = React.useState("")
-  const [currency, setCurrency] = React.useState("inr")
   const [activeFilter, setActiveFilter] = React.useState<FilterKey | null>(null)
   const [openPicker, setOpenPicker] = React.useState<FilterKey | null>(null)
-  const [showZeroValues, setShowZeroValues] = React.useState(false)
-  const [showGroupAccounts, setShowGroupAccounts] = React.useState(true)
-  const [runStatus, setRunStatus] = React.useState<ReportRunStatus>("idle")
-  const [reportReady, setReportReady] = React.useState(false)
-  const runIdRef = React.useRef(0)
-  const abortRef = React.useRef<AbortController | null>(null)
-  const isMountedRef = React.useRef(true)
-  const running = runStatus === "running"
   const [searchParams, setSearchParams] = useSearchParams()
-  const { pushNotification } = useWorkspaceNotifications()
 
   React.useEffect(() => {
     onReportReadyChange?.(reportReady)
   }, [reportReady, onReportReadyChange])
-
-  React.useEffect(() => {
-    return () => onReportReadyChange?.(false)
-  }, [onReportReadyChange])
-
-  React.useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  const openReportFromNotification = React.useCallback(() => {
-    setReportReady(true)
-    setRunStatus("idle")
-  }, [])
 
   React.useEffect(() => {
     if (searchParams.get("openReport") !== "1") return
@@ -332,201 +223,6 @@ export function StockAnalyticsReportTab({
     next.delete("openReport")
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams, openReportFromNotification])
-
-  const toggleNode = (id: string) => {
-    setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
-
-  const collapseAll = React.useCallback(() => setExpandedNodes({}), [])
-
-  const expandAll = React.useCallback(() => {
-    setExpandedNodes(expandAllIds(reportRows))
-  }, [reportRows])
-
-  const setLevel = React.useCallback(
-    (level: number) => {
-      const next: Record<string, boolean> = {}
-      const walk = (rows: ReportGridRow[], depth: number) => {
-        for (const row of rows) {
-          if (!row.children?.length) continue
-          next[row.id] = depth < level
-          walk(row.children, depth + 1)
-        }
-      }
-      walk(reportRows, 1)
-      setExpandedNodes(next)
-    },
-    [reportRows]
-  )
-
-  const cancelReport = React.useCallback(() => {
-    runIdRef.current += 1
-    abortRef.current?.abort()
-    setRunStatus("cancelled")
-    setRunEvents((prev) => [
-      ...prev,
-      {
-        id: `cancelled-local-${prev.length}`,
-        eventName: "cancelled",
-        title: "Cancelled",
-        detail: "report stopped",
-        tone: "danger",
-      },
-    ])
-  }, [])
-
-  const confirmReportReady = React.useCallback(() => {
-    setReportReady(true)
-    setRunStatus("idle")
-  }, [])
-
-  const runReport = React.useCallback(async () => {
-    const runId = ++runIdRef.current
-    abortRef.current?.abort()
-    const abort = new AbortController()
-    abortRef.current = abort
-
-    setReportReady(false)
-    setRunStatus("running")
-    setRunEvents([
-      {
-        id: "local-0",
-        eventName: "status",
-        title: "Queued",
-        detail: "creating Arrow job",
-        tone: "muted",
-      },
-    ])
-
-    try {
-      const report = await stockAnalyticsService.runReport(
-        {
-          fromDate,
-          toDate,
-          fiscalYear,
-          financeBook: financeBook || undefined,
-          currency: currency || "inr",
-          valuesMode,
-          showZeroValues,
-          showGroupAccounts,
-        },
-        {
-          signal: abort.signal,
-          onEvent: (eventName, payload) => {
-            if (runIdRef.current !== runId) return
-            setRunEvents((prev) =>
-              appendOrUpdateRunEvent(prev, eventName, payload)
-            )
-          },
-        }
-      )
-
-      if (runIdRef.current !== runId) return
-
-      setReportColumns(report.columns)
-      setReportRows(report.rows)
-      setExpandedNodes(expandAllIds(report.rows))
-
-      pushNotification({
-        title: "Stock Analytics Ready",
-        description:
-          "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
-        type: "report",
-        href: "/stock/stock-analytics?openReport=1",
-      })
-      if (!isMountedRef.current) return
-      setRunStatus("done")
-    } catch (error) {
-      if (runIdRef.current !== runId) return
-      if (abort.signal.aborted) {
-        setRunStatus("cancelled")
-        return
-      }
-      const message =
-        error instanceof ApiError
-          ? typeof error.body === "object" &&
-            error.body &&
-            "error" in error.body
-            ? String((error.body as { error?: string }).error)
-            : error.message
-          : error instanceof Error
-            ? error.message
-            : "Rapor alınamadı"
-      setRunEvents((prev) => [
-        ...prev,
-        {
-          id: `error-${prev.length}`,
-          eventName: "failed",
-          title: "Failed",
-          detail: message,
-          tone: "danger",
-        },
-      ])
-      pushNotification({
-        title: "Stock Analytics Failed",
-        description: message,
-        type: "report",
-      })
-      if (!isMountedRef.current) return
-      setRunStatus("idle")
-      setReportReady(false)
-    }
-  }, [
-    pushNotification,
-    fromDate,
-    toDate,
-    fiscalYear,
-    financeBook,
-    currency,
-    valuesMode,
-    showZeroValues,
-    showGroupAccounts,
-  ])
-
-  const primaryActionLabel =
-    runStatus === "running"
-      ? "Cancel"
-      : runStatus === "done"
-        ? "View"
-        : "Execute"
-
-  const primaryActionButtonProps = (() => {
-    switch (runStatus) {
-      case "running":
-        return {
-          variant: "destructive" as const,
-          className: undefined as string | undefined,
-        }
-      case "done":
-        return {
-          variant: "default" as const,
-          className:
-            "bg-emerald-600 text-white hover:bg-emerald-600/90 focus-visible:ring-emerald-600/30",
-        }
-      case "idle":
-      case "cancelled":
-        return {
-          variant: "default" as const,
-          className: undefined as string | undefined,
-        }
-      default: {
-        const _exhaustive: never = runStatus
-        return _exhaustive
-      }
-    }
-  })()
-
-  const onPrimaryAction = React.useCallback(() => {
-    if (runStatus === "running") {
-      cancelReport()
-      return
-    }
-    if (runStatus === "done") {
-      confirmReportReady()
-      return
-    }
-    void runReport()
-  }, [runStatus, cancelReport, confirmReportReady, runReport])
 
   React.useEffect(() => {
     if (runReportToken > 0) {
@@ -642,7 +338,7 @@ export function StockAnalyticsReportTab({
   const showRunSteps =
     runStatus === "running" ||
     runStatus === "cancelled" ||
-    runStatus === "done"
+    isPendingView
 
   const renderRows = (rows: ReportGridRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
@@ -795,7 +491,7 @@ export function StockAnalyticsReportTab({
                   <p className="text-sm font-semibold tracking-tight">
                     {runStatus === "cancelled"
                       ? "Report cancelled"
-                      : runStatus === "done"
+                      : isPendingView
                         ? "Report ready"
                         : "Running Stock Analytics"}
                   </p>
@@ -803,6 +499,27 @@ export function StockAnalyticsReportTab({
                     Arrow job · live SSE
                   </p>
                 </div>
+                {runStatus === "running" || isPendingView || runStatus === "cancelled" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={cn(
+                      "h-8 shrink-0 gap-1.5 text-xs",
+                      primaryActionButtonProps.className
+                    )}
+                    variant={primaryActionButtonProps.variant}
+                    onClick={onPrimaryAction}
+                  >
+                    {runStatus === "running" ? (
+                      <X className="size-3.5" />
+                    ) : isPendingView ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Play className="size-3.5" />
+                    )}
+                    {primaryActionLabel}
+                  </Button>
+                ) : null}
               </div>
 
               <ScrollArea className="h-0 min-h-0 w-full flex-1">
@@ -810,7 +527,7 @@ export function StockAnalyticsReportTab({
                   {runEvents.map((step, index) => {
                     const isCurrent = index === runEvents.length - 1
                     const isComplete =
-                      runStatus === "done" ||
+                      isPendingView ||
                       (runStatus === "running" && !isCurrent) ||
                       (runStatus === "cancelled" && !isCurrent)
                     const isCancelledHere =
@@ -900,11 +617,12 @@ export function StockAnalyticsReportTab({
                     </AvatarGroup>
                   </EmptyMedia>
                   <EmptyTitle className="text-base font-semibold">
-                    No report yet
+                    {hasPendingReport ? "Report ready" : "No report yet"}
                   </EmptyTitle>
                   <EmptyDescription>
-                    Query panelinden filtreleri seçin ve Execute ile Stock
-                    Analytics raporunu Arrow job + SSE akışıyla üretin.
+                    {hasPendingReport
+                      ? "Rapor tamamlandı. View ile sonuçları görüntüleyin."
+                      : "Query panelinden filtreleri seçin ve Execute ile Stock Analytics raporunu Arrow job + SSE akışıyla üretin."}
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
@@ -918,8 +636,12 @@ export function StockAnalyticsReportTab({
                     variant={primaryActionButtonProps.variant}
                     onClick={onPrimaryAction}
                   >
-                    <Play className="size-3.5" />
-                    Execute Report
+                    {isPendingView ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Play className="size-3.5" />
+                    )}
+                    {primaryActionLabel}
                   </Button>
                 </EmptyContent>
               </Empty>
@@ -1106,7 +828,7 @@ export function StockAnalyticsReportTab({
                 >
                   {runStatus === "running" ? (
                     <X className="size-3.5" />
-                  ) : runStatus === "done" ? (
+                  ) : isPendingView ? (
                     <Check className="size-3.5" />
                   ) : (
                     <Play className="size-3.5" />
