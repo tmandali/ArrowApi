@@ -268,7 +268,7 @@ const stockNav = [
       },
       {
         title: "Stock Analytics",
-        url: "/empty",
+        url: "/stock/stock-analytics",
       },
       {
         title: "Serial No and Batch Traceability",

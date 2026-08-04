@@ -124,6 +124,10 @@ export function WorkspaceSearchDialog({
               <BarChart2 className="size-4 mr-2" />
               <span>Stock Balance</span>
             </CommandItem>
+            <CommandItem onSelect={() => handleSelect("/stock/stock-analytics")}>
+              <BarChart2 className="size-4 mr-2" />
+              <span>Stock Analytics</span>
+            </CommandItem>
           </CommandGroup>
         </>
       )

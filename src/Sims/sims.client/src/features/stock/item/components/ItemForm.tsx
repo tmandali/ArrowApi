@@ -48,8 +48,65 @@ import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
+import { StockAnalyticsReportTab } from "./StockAnalyticsReportTab"
 
-export function ItemForm() {
+export type ItemFormTab =
+  | "details"
+  | "dashboard"
+  | "inventory"
+  | "variants"
+  | "accounting"
+  | "purchasing"
+  | "sales"
+  | "tax"
+  | "report"
+  | "quality"
+  | "manufacturing"
+
+const TAB_ITEMS: { value: ItemFormTab; label: string }[] = [
+  { value: "details", label: "Details" },
+  { value: "dashboard", label: "Dashboard" },
+  { value: "inventory", label: "Inventory" },
+  { value: "variants", label: "Variants" },
+  { value: "accounting", label: "Accounting" },
+  { value: "purchasing", label: "Purchasing" },
+  { value: "sales", label: "Sales" },
+  { value: "tax", label: "Tax" },
+  { value: "report", label: "Report" },
+  { value: "quality", label: "Quality" },
+  { value: "manufacturing", label: "Manufacturing" },
+]
+
+const PLACEHOLDER_TABS: ItemFormTab[] = [
+  "dashboard",
+  "inventory",
+  "variants",
+  "accounting",
+  "purchasing",
+  "sales",
+  "quality",
+  "manufacturing",
+]
+
+type ItemFormProps = {
+  tabs?: ItemFormTab[]
+  tabLabels?: Partial<Record<ItemFormTab, string>>
+  defaultTab?: ItemFormTab
+  mode?: "item" | "stock-analytics"
+}
+
+export function ItemForm({
+  tabs = TAB_ITEMS.map((tab) => tab.value),
+  tabLabels,
+  defaultTab,
+  mode = "item",
+}: ItemFormProps) {
+  const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
+  const isStockAnalytics = mode === "stock-analytics"
+  const initialTab =
+    defaultTab && visibleTabs.has(defaultTab)
+      ? defaultTab
+      : (tabs.find((tab) => visibleTabs.has(tab)) ?? "details")
   const [descriptionOpen, setDescriptionOpen] = React.useState(false)
   const [uomOpen, setUomOpen] = React.useState(false)
   const [maintainStock, setMaintainStock] = React.useState(true)
@@ -58,14 +115,20 @@ export function ItemForm() {
   const [isZeroRated, setIsZeroRated] = React.useState(false)
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
-  const [showBanner, setShowBanner] = React.useState(true)
+  const [showBanner, setShowBanner] = React.useState(!isStockAnalytics)
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
   const attachmentInputRef = React.useRef<HTMLInputElement>(null)
 
   return (
-    <>
+    <div
+      className={
+        isStockAnalytics
+          ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+          : "contents"
+      }
+    >
       <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
         <div className="flex items-center gap-2 overflow-hidden">
           <SidebarTrigger className="-ml-1" />
@@ -81,22 +144,42 @@ export function ItemForm() {
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link to="/stock/item">Item</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-semibold text-foreground">
-                  GB
-                </BreadcrumbPage>
-              </BreadcrumbItem>
+              {isStockAnalytics ? (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link to="/stock">Reports</Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="font-semibold text-foreground">
+                      Stock Analytics
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              ) : (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link to="/stock/item">Item</Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="font-semibold text-foreground">
+                      GB
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              )}
             </BreadcrumbList>
           </Breadcrumb>
-          <Badge className="ml-2 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium">
-            Variant
-          </Badge>
+          {!isStockAnalytics ? (
+            <Badge className="ml-2 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium">
+              Variant
+            </Badge>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
@@ -160,7 +243,7 @@ export function ItemForm() {
         </div>
       </header>
 
-      {showBanner ? (
+      {showBanner && !isStockAnalytics ? (
         <div className="flex items-center justify-between gap-3 border-b bg-sky-500/10 px-4 py-2 text-xs text-sky-900 dark:text-sky-100">
           <p>
             This Item is a Variant of{" "}
@@ -180,24 +263,38 @@ export function ItemForm() {
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
-      <Tabs defaultValue="details" className="flex flex-1 flex-col overflow-hidden min-w-0">
-        <div className="border-b bg-background px-4 py-1 overflow-x-auto">
+      <div
+        className={
+          isStockAnalytics
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row"
+        }
+      >
+      <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
+        <div className="shrink-0 border-b bg-background px-4 py-1 overflow-x-auto">
           <TabsList variant="line" className="min-w-max">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="variants">Variants</TabsTrigger>
-            <TabsTrigger value="accounting">Accounting</TabsTrigger>
-            <TabsTrigger value="purchasing">Purchasing</TabsTrigger>
-            <TabsTrigger value="sales">Sales</TabsTrigger>
-            <TabsTrigger value="tax">Tax</TabsTrigger>
-            <TabsTrigger value="quality">Quality</TabsTrigger>
-            <TabsTrigger value="manufacturing">Manufacturing</TabsTrigger>
+            {tabs
+              .filter((tab) => visibleTabs.has(tab))
+              .map((tab) => {
+                const item = TAB_ITEMS.find((entry) => entry.value === tab)
+                if (!item) return null
+                return (
+                  <TabsTrigger key={tab} value={tab}>
+                    {tabLabels?.[tab] ?? item.label}
+                  </TabsTrigger>
+                )
+              })}
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div
+          className={
+            isStockAnalytics
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "flex min-h-0 flex-1 flex-col overflow-y-auto"
+          }
+        >
+        {visibleTabs.has("details") ? (
         <TabsContent
           value="details"
           className="m-0 data-[state=inactive]:hidden"
@@ -388,24 +485,27 @@ export function ItemForm() {
             </div>
           </div>
         </TabsContent>
+        ) : null}
 
+        {visibleTabs.has("tax") ? (
         <TabsContent
           value="tax"
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 flex-1 min-h-0 data-[state=inactive]:hidden"
         >
           <ItemTaxTab />
         </TabsContent>
+        ) : null}
 
-        {[
-          "dashboard",
-          "inventory",
-          "variants",
-          "accounting",
-          "purchasing",
-          "sales",
-          "quality",
-          "manufacturing",
-        ].map((tab) => (
+        {visibleTabs.has("report") ? (
+        <TabsContent
+          value="report"
+          className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+        >
+          <StockAnalyticsReportTab />
+        </TabsContent>
+        ) : null}
+
+        {PLACEHOLDER_TABS.filter((tab) => visibleTabs.has(tab)).map((tab) => (
           <TabsContent
             key={tab}
             value={tab}
@@ -415,14 +515,17 @@ export function ItemForm() {
           </TabsContent>
         ))}
 
-        <div className="space-y-6 px-6 pb-6 pt-2">
-          <Separator />
-          <DocumentComments />
-          <DocumentActivity />
-        </div>
+        {!isStockAnalytics ? (
+          <div className="space-y-6 px-6 pb-6 pt-2">
+            <Separator />
+            <DocumentComments />
+            <DocumentActivity />
+          </div>
+        ) : null}
         </div>
       </Tabs>
 
+          {!isStockAnalytics ? (
           <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10 overflow-y-auto shrink-0">
             <ItemImageUpload />
 
@@ -532,7 +635,8 @@ export function ItemForm() {
               </div>
             </div>
           </div>
+          ) : null}
       </div>
-    </>
+    </div>
   )
 }

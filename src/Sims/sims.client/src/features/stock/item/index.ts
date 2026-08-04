@@ -1,3 +1,6 @@
 export { ItemForm } from "./components/ItemForm"
+export type { ItemFormTab } from "./components/ItemForm"
 export { ItemImageUpload } from "./components/ItemImageUpload"
 export { ItemTaxTab } from "./components/ItemTaxTab"
+export { StockAnalyticsForm } from "./components/StockAnalyticsForm"
+export { StockAnalyticsReportTab } from "./components/StockAnalyticsReportTab"
