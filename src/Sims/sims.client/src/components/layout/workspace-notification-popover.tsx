@@ -15,11 +15,8 @@ import {
   type WorkspaceNotification,
   type WorkspaceNotificationType,
 } from "@/context/workspace-notifications"
-import {
-  Bell,
-  CheckCheck,
-  Clock,
-} from "lucide-react"
+import { cn } from "@/utils/cn"
+import { Bell, CheckCheck, Clock } from "lucide-react"
 
 type MockNotification = Omit<WorkspaceNotification, "createdAt"> & {
   time: string
@@ -134,6 +131,11 @@ function workspaceKey(pathname: string) {
   return pathname
 }
 
+function formatUnreadCount(count: number) {
+  if (count > 99) return "99+"
+  return String(count)
+}
+
 export function WorkspaceNotificationPopover() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -205,45 +207,50 @@ export function WorkspaceNotificationPopover() {
       <PopoverTrigger asChild>
         <SidebarMenuButton
           tooltip="Notification"
-          className="text-sidebar-foreground/70 relative"
+          className="relative text-sidebar-foreground/70"
         >
-          <Bell className="size-4" />
-          <span>Notification</span>
-          {unreadCount > 0 && (
+          <Bell className="size-4 shrink-0" />
+          <span className="truncate">Notification</span>
+          {unreadCount > 0 ? (
             <Badge
               variant="destructive"
-              className="ml-auto size-4 p-0 flex items-center justify-center text-[10px] rounded-full group-data-[collapsible=icon]:hidden"
+              className={cn(
+                "ml-auto h-4 min-w-4 shrink-0 justify-center rounded-full px-1 text-[10px] tabular-nums",
+                "group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:right-1 group-data-[collapsible=icon]:ml-0"
+              )}
             >
-              {unreadCount}
+              {formatUnreadCount(unreadCount)}
             </Badge>
-          )}
+          ) : null}
         </SidebarMenuButton>
       </PopoverTrigger>
       <PopoverContent
         side="right"
         align="start"
-        className="w-80 p-0 shadow-xl rounded-xl"
+        className="flex w-80 flex-col overflow-hidden p-0 shadow-xl"
       >
-        <div className="flex items-center justify-between border-b p-3 bg-muted/20">
-          <div className="flex items-center gap-2">
-            <Bell className="size-4 text-primary" />
-            <h4 className="text-xs font-semibold">{getWorkspaceTitle()}</h4>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Bell className="size-4 shrink-0 text-primary" />
+            <h4 className="truncate text-xs font-semibold">
+              {getWorkspaceTitle()}
+            </h4>
           </div>
-          {unreadCount > 0 && (
+          {unreadCount > 0 ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground"
+              className="h-6 shrink-0 px-2 text-[11px] text-muted-foreground hover:text-foreground"
               onClick={handleMarkAllAsRead}
             >
-              <CheckCheck className="size-3.5 mr-1" />
-              Tümünü Okundu İşaretle
+              <CheckCheck className="size-3.5" />
+              Mark all
             </Button>
-          )}
+          ) : null}
         </div>
 
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="h-80">
           <div className="divide-y">
             {displayNotifications.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted-foreground">
@@ -254,24 +261,26 @@ export function WorkspaceNotificationPopover() {
                 <button
                   key={`${item.source}-${item.id}`}
                   type="button"
-                  className={`w-full p-3 text-left text-xs space-y-1 transition-colors hover:bg-muted/40 ${
-                    item.unread ? "bg-primary/5" : ""
-                  } ${item.href ? "cursor-pointer" : "cursor-default"}`}
+                  className={cn(
+                    "flex w-full flex-col gap-1 p-3 text-left text-xs transition-colors hover:bg-muted/40",
+                    item.unread && "bg-primary/5",
+                    item.href ? "cursor-pointer" : "cursor-default"
+                  )}
                   onClick={() => handleOpenNotification(item)}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground flex items-center gap-1.5">
-                      {item.unread && (
-                        <span className="size-1.5 rounded-full bg-primary inline-block" />
-                      )}
-                      {item.title}
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+                      {item.unread ? (
+                        <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                      ) : null}
+                      <span className="truncate">{item.title}</span>
                     </span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1">
+                    <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
                       <Clock className="size-3" />
                       {item.time}
                     </span>
                   </div>
-                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                     {item.description}
                   </p>
                 </button>
