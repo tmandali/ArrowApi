@@ -31,6 +31,14 @@ import {
   Play,
 } from "lucide-react"
 
+const cellInputClass =
+  "h-7 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
+
+const cellClass =
+  "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
+const headClass =
+  "h-7 px-2 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium text-muted-foreground bg-muted/30"
+
 type ReportRow = {
   id: string
   name: string
@@ -420,17 +428,17 @@ export function StockAnalyticsReportTab({
 
       return (
         <React.Fragment key={row.id}>
-          <tr className="border-b hover:bg-muted/30 text-xs">
-            <td className="py-2 px-2 font-medium whitespace-nowrap">
+          <tr className="hover:bg-muted/30 text-xs">
+            <td className={cellClass}>
               <div
-                className="flex items-center gap-1.5"
-                style={{ paddingLeft: `${depth * 16}px` }}
+                className="flex h-7 items-center gap-1.5 px-2 whitespace-nowrap"
+                style={{ paddingLeft: `${8 + depth * 16}px` }}
               >
                 {hasChildren ? (
                   <button
                     type="button"
                     onClick={() => toggleNode(row.id)}
-                    className="size-4 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                    className="size-4 inline-flex shrink-0 items-center justify-center rounded hover:bg-muted text-muted-foreground"
                   >
                     <ChevronDown
                       className={cn(
@@ -440,36 +448,49 @@ export function StockAnalyticsReportTab({
                     />
                   </button>
                 ) : (
-                  <span className="size-4 inline-block" />
+                  <span className="size-4 inline-block shrink-0" />
                 )}
                 <span
-                  className={
+                  className={cn(
+                    "truncate font-medium",
                     hasChildren
                       ? "font-semibold text-foreground"
                       : "text-muted-foreground"
-                  }
+                  )}
                 >
                   {row.name}
                 </span>
               </div>
             </td>
-            <td className="py-2 px-2 text-right text-muted-foreground whitespace-nowrap">
-              {row.openingDr}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
+                {row.openingDr}
+              </div>
             </td>
-            <td className="py-2 px-2 text-right text-muted-foreground whitespace-nowrap">
-              {row.openingCr}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
+                {row.openingCr}
+              </div>
             </td>
-            <td className="py-2 px-2 text-right font-medium whitespace-nowrap">
-              {row.debit}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 font-medium whitespace-nowrap">
+                {row.debit}
+              </div>
             </td>
-            <td className="py-2 px-2 text-right text-muted-foreground whitespace-nowrap">
-              {row.credit}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
+                {row.credit}
+              </div>
             </td>
-            <td className="py-2 px-2 text-right font-medium whitespace-nowrap">
-              {row.closingDr}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 font-medium whitespace-nowrap">
+                {row.closingDr}
+              </div>
             </td>
-            <td className="py-2 px-2 text-right text-muted-foreground whitespace-nowrap">
-              {row.closingCr}
+            <td className={cellClass}>
+              <div className="flex h-7 items-center justify-end px-2 text-muted-foreground whitespace-nowrap">
+                {row.closingCr}
+              </div>
             </td>
           </tr>
           {hasChildren && isExpanded
@@ -491,7 +512,7 @@ export function StockAnalyticsReportTab({
       >
         <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 gap-3">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
-            <div className="shrink-0 border-b bg-muted/40">
+            <div className="shrink-0 border-b">
               <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
                 <colgroup>
                   <col style={ACCOUNT_COL_STYLE} />
@@ -504,36 +525,23 @@ export function StockAnalyticsReportTab({
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className="h-10 px-2 text-left font-semibold text-foreground">
-                      Account
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Opening (Dr)
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Opening (Cr)
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Debit
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Credit
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Closing (Dr)
-                    </th>
-                    <th className="h-10 px-2 text-right font-semibold text-foreground">
-                      Closing (Cr)
-                    </th>
+                    <th className={cn(headClass, "text-left")}>Account</th>
+                    <th className={cn(headClass, "text-right")}>Opening (Dr)</th>
+                    <th className={cn(headClass, "text-right")}>Opening (Cr)</th>
+                    <th className={cn(headClass, "text-right")}>Debit</th>
+                    <th className={cn(headClass, "text-right")}>Credit</th>
+                    <th className={cn(headClass, "text-right")}>Closing (Dr)</th>
+                    <th className={cn(headClass, "text-right")}>Closing (Cr)</th>
                   </tr>
-                  <tr className="border-t bg-muted/10">
+                  <tr className="bg-muted/10">
                     {Array.from({ length: 7 }).map((_, index) => (
-                      <th key={index} className="p-1.5">
+                      <th key={index} className={cellClass}>
                         <Input
                           className={cn(
-                            "h-7 text-xs bg-muted/20 border-muted-foreground/20",
+                            cellInputClass,
                             index > 0 && "text-right"
                           )}
+                          placeholder={index === 0 ? "Filter…" : undefined}
                         />
                       </th>
                     ))}
