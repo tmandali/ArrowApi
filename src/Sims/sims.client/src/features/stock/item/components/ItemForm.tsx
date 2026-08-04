@@ -57,6 +57,7 @@ import {
   StockAnalyticsReportTab,
   type StockAnalyticsTreeAction,
 } from "./StockAnalyticsReportTab"
+import { printStockAnalyticsReport } from "./printStockAnalyticsReport"
 
 export type ItemFormTab =
   | "details"
@@ -147,7 +148,18 @@ export function ItemForm({
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
+  const [isPrinting, setIsPrinting] = React.useState(false)
   const attachmentInputRef = React.useRef<HTMLInputElement>(null)
+
+  const handlePrint = React.useCallback(async () => {
+    if (isPrinting) return
+    setIsPrinting(true)
+    try {
+      await printStockAnalyticsReport()
+    } finally {
+      setIsPrinting(false)
+    }
+  }, [isPrinting])
 
   return (
     <div
@@ -278,6 +290,19 @@ export function ItemForm({
               >
                 <Filter className="size-3.5" />
                 Filters
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5"
+                disabled={isPrinting}
+                onClick={() => {
+                  void handlePrint()
+                }}
+              >
+                <Printer className="size-3.5" />
+                {isPrinting ? "Preparing…" : "Yazdır"}
               </Button>
               <Button
                 type="button"
@@ -602,6 +627,7 @@ export function ItemForm({
         {visibleTabs.has("tax") ? (
         <TabsContent
           value="tax"
+          forceMount
           className="m-0 flex-1 min-h-0 data-[state=inactive]:hidden"
         >
           <ItemTaxTab />
@@ -611,6 +637,7 @@ export function ItemForm({
         {visibleTabs.has("report") ? (
         <TabsContent
           value="report"
+          forceMount
           className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
           <StockAnalyticsReportTab
