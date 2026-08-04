@@ -45,6 +45,7 @@ import {
   Tag,
   ShoppingBag,
   Search,
+  ListFilter,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
@@ -106,6 +107,8 @@ type ItemFormProps = {
   runReportToken?: number
   reportReady?: boolean
   onReportReadyChange?: (ready: boolean) => void
+  showFilterRow?: boolean
+  onShowFilterRowChange?: (show: boolean) => void
   treeLevel?: string
   onTreeLevelChange?: (value: string) => void
   onExpandAll?: () => void
@@ -125,6 +128,8 @@ export function ItemForm({
   runReportToken = 0,
   reportReady = false,
   onReportReadyChange,
+  showFilterRow = true,
+  onShowFilterRowChange,
   treeLevel = "2",
   onTreeLevelChange,
   onExpandAll,
@@ -236,6 +241,21 @@ export function ItemForm({
               >
                 <Search className="size-3.5" />
                 Query
+              </Button>
+
+              <Button
+                type="button"
+                variant={showFilterRow ? "secondary" : "outline"}
+                size="icon"
+                className="size-7"
+                disabled={!reportReady}
+                onClick={() => onShowFilterRowChange?.(!showFilterRow)}
+                title={showFilterRow ? "Hide filter row" : "Show filter row"}
+                aria-label={
+                  showFilterRow ? "Hide filter row" : "Show filter row"
+                }
+              >
+                <ListFilter className="size-3.5" />
               </Button>
 
               <DropdownMenu>
@@ -399,6 +419,7 @@ export function ItemForm({
           runReportToken={runReportToken}
           treeAction={treeAction}
           onReportReadyChange={onReportReadyChange}
+          showFilterRow={showFilterRow}
         />
       ) : (
       <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">

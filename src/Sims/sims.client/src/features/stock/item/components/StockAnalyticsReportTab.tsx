@@ -469,12 +469,14 @@ export function StockAnalyticsReportTab({
   runReportToken = 0,
   treeAction = null,
   onReportReadyChange,
+  showFilterRow = true,
 }: {
   filtersOpen?: boolean
   onFiltersOpenChange?: (open: boolean) => void
   runReportToken?: number
   treeAction?: StockAnalyticsTreeAction | null
   onReportReadyChange?: (ready: boolean) => void
+  showFilterRow?: boolean
 } = {}) {
   const [expandedNodes, setExpandedNodes] =
     React.useState<Record<string, boolean>>(initialExpanded)
@@ -842,6 +844,7 @@ export function StockAnalyticsReportTab({
                         Closing (Cr)
                       </th>
                     </tr>
+                    {showFilterRow ? (
                     <tr className="bg-muted/10">
                       {Array.from({ length: 7 }).map((_, index) => (
                         <th key={index} className={cellClass}>
@@ -855,6 +858,7 @@ export function StockAnalyticsReportTab({
                         </th>
                       ))}
                     </tr>
+                    ) : null}
                   </thead>
                 </table>
               </div>

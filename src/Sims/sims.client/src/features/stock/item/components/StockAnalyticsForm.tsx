@@ -19,6 +19,7 @@ export function StockAnalyticsForm({
     React.useState<StockAnalyticsTreeAction | null>(null)
   const [treeLevel, setTreeLevel] = React.useState("2")
   const [reportReady, setReportReady] = React.useState(false)
+  const [showFilterRow, setShowFilterRow] = React.useState(true)
   const actionIdRef = React.useRef(0)
 
   const filtersOpen = filtersOpenProp ?? internalFiltersOpen
@@ -52,6 +53,8 @@ export function StockAnalyticsForm({
       runReportToken={runReportToken}
       reportReady={reportReady}
       onReportReadyChange={handleReportReadyChange}
+      showFilterRow={showFilterRow}
+      onShowFilterRowChange={setShowFilterRow}
       treeLevel={treeLevel}
       onTreeLevelChange={setTreeLevel}
       onExpandAll={() => dispatchTreeAction({ type: "expand-all" })}
