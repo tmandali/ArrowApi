@@ -39,7 +39,11 @@ internal sealed class ArrowJobEndpointBuilder(
         string rawPath = string.IsNullOrWhiteSpace(path) ? name : path;
         string normalizedPath = NormalizeRelativePath(rawPath);
 
-        return ArrowJobEndpoints.MapRegisteredType(endpoints, registration.ServiceType, normalizedPath);
+        return ArrowJobEndpoints.MapRegisteredType(
+            endpoints,
+            registration.ServiceType,
+            normalizedPath,
+            registration.NameOrPath);
     }
 
     private static string NormalizeRelativePath(string path)

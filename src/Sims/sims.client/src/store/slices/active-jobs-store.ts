@@ -131,7 +131,7 @@ export function selectPendingStockAnalyticsJob(
 ): TrackedJob | null {
   const pending = selectPendingJobs(jobs, "/stock").filter(
     (job) =>
-      job.href === "/stock/stock-analytics" ||
+      job.href.startsWith("/stock/stock-analytics") ||
       job.name === "stock-analytics" ||
       job.name.startsWith("stock-analytics")
   )

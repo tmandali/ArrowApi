@@ -59,6 +59,7 @@ import {
   StockAnalyticsReportTab,
   type StockAnalyticsTreeAction,
 } from "./StockAnalyticsReportTab"
+import { StockAnalyticsExecutionHistory } from "./StockAnalyticsExecutionHistory"
 import { printStockAnalyticsReport } from "./printStockAnalyticsReport"
 
 export type ItemFormTab =
@@ -243,6 +244,8 @@ export function ItemForm({
                 icon={Search}
                 label="Query"
               />
+
+              <StockAnalyticsExecutionHistory />
 
               <Button
                 type="button"

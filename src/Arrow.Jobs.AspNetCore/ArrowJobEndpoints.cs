@@ -144,6 +144,13 @@ public static class ArrowJobEndpoints
                     CreateJobAsync(request, jobName, httpRequest, httpContext, store, queue, cancellationToken))
             .Accepts<TRequest>("application/json");
 
+        // Job tipine özel history: GET /api/arrow/jobs/{jobName}
+        group.MapGet(
+                string.Empty,
+                (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
+                    ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, jobName, cancellationToken))
+            .Produces<ArrowJobStatusList>();
+
         bool shouldMapGuidRoutes = !endpoints.DataSources
             .SelectMany(ds => ds.Endpoints)
             .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
@@ -187,12 +194,6 @@ public static class ArrowJobEndpoints
                     "{id:guid}",
                     (Guid id, IArrowJobStore<TRequest> store, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
                         DeleteJobAsync(id, store, resultStorage, cancellationToken));
-
-            targetBuilder.MapGet(
-                    string.Empty,
-                    (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
-                        ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, cancellationToken))
-                .Produces<ArrowJobStatusList>();
         }
 
         return group;
@@ -243,6 +244,7 @@ public static class ArrowJobEndpoints
         int? skip,
         int? take,
         Guid? rootJobId,
+        string? jobName,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
@@ -261,7 +263,8 @@ public static class ArrowJobEndpoints
             to,
             skip ?? 0,
             take ?? 50,
-            rootJobId);
+            rootJobId,
+            jobName);
 
         ArrowJobListPage<TRequest> page = await store.ListAsync(query, cancellationToken);
         string jobsPath = ResolveJobsBasePath(httpRequest);

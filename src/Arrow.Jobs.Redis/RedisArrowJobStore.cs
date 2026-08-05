@@ -98,6 +98,46 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         double maxScore = query.To?.UtcDateTime.Ticks ?? double.PositiveInfinity;
         double minScore = query.From?.UtcDateTime.Ticks ?? double.NegativeInfinity;
 
+        static bool MatchesName(ArrowJob<TRequest> job, string? name) =>
+            string.IsNullOrWhiteSpace(name) ||
+            string.IsNullOrEmpty(job.Name) ||
+            string.Equals(job.Name, name, StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(query.Name) || query.RootJobId is not null)
+        {
+            RedisValue[] allIds = await Database.SortedSetRangeByScoreAsync(
+                ByTimeKey(),
+                minScore,
+                maxScore,
+                Exclude.None,
+                Order.Descending);
+
+            var matched = new List<ArrowJob<TRequest>>();
+            foreach (RedisValue idValue in allIds)
+            {
+                if (!Guid.TryParseExact(idValue.ToString(), "N", out Guid id))
+                    continue;
+
+                ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+                if (job is null)
+                    continue;
+                if (query.State is { } stateFilter && job.State != stateFilter)
+                    continue;
+                if (query.RootJobId is { } root && job.RootJobId != root)
+                    continue;
+                if (!MatchesName(job, query.Name))
+                    continue;
+
+                matched.Add(job);
+            }
+
+            return new ArrowJobListPage<TRequest>
+            {
+                Items = matched.Skip(skip).Take(take).ToList(),
+                Total = matched.Count
+            };
+        }
+
         RedisValue[] ids;
         if (query.State is { } state)
         {

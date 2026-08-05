@@ -1,6 +1,8 @@
 import * as React from "react"
+import { useMatch, useNavigate } from "react-router-dom"
 import { useJobSync } from "@/context/job-sync-provider"
 import { ApiError } from "@/services"
+import { fetchJobStatus } from "@/features/jobs/arrow-job-client"
 import { stockAnalyticsService } from "@/features/stock/item/services/stock-analytics-service"
 import type {
   ArrowJobEvent,
@@ -9,6 +11,7 @@ import type {
   StockAnalyticsRequest,
 } from "@/features/stock/item/types/stock-analytics"
 import {
+  isTerminalJobStatus,
   selectPendingStockAnalyticsJob,
   useActiveJobsStore,
   type TrackedJob,
@@ -22,6 +25,12 @@ export type RunEventItem = {
   title: string
   detail: string
   tone: "muted" | "success" | "danger"
+}
+
+const STOCK_ANALYTICS_PATH = "/stock/stock-analytics"
+
+function jobHref(jobId: string): string {
+  return `${STOCK_ANALYTICS_PATH}/${jobId}`
 }
 
 function collectIds(rows: ReportGridRow[]): string[] {
@@ -168,6 +177,21 @@ function requestFromJobPayload(
   }
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    if (
+      typeof error.body === "object" &&
+      error.body &&
+      "error" in error.body
+    ) {
+      return String((error.body as { error?: string }).error)
+    }
+    return error.message
+  }
+  if (error instanceof Error) return error.message
+  return fallback
+}
+
 type StockAnalyticsReportContextValue = {
   expandedNodes: Record<string, boolean>
   setExpandedNodes: React.Dispatch<
@@ -204,7 +228,8 @@ type StockAnalyticsReportContextValue = {
   runReport: () => Promise<void>
   cancelReport: () => void
   confirmReportReady: () => void
-  openReportFromNotification: () => void
+  activeJobId: string | null
+  selectExecution: (jobId: string) => void
   primaryActionLabel: string
   primaryActionButtonProps: {
     variant: "default" | "destructive"
@@ -221,6 +246,12 @@ export function StockAnalyticsReportProvider({
 }: {
   children: React.ReactNode
 }) {
+  const navigate = useNavigate()
+  const jobMatch = useMatch({
+    path: `${STOCK_ANALYTICS_PATH}/:jobId`,
+    end: true,
+  })
+  const urlJobId = jobMatch?.params.jobId
   const { trackJob, waitUntilTerminal, cancelTrackedJob } = useJobSync()
 
   const [expandedNodes, setExpandedNodes] =
@@ -246,6 +277,7 @@ export function StockAnalyticsReportProvider({
   const runIdRef = React.useRef(0)
   const abortRef = React.useRef<AbortController | null>(null)
   const activeJobIdRef = React.useRef<string | null>(null)
+  const loadedJobIdRef = React.useRef<string | null>(null)
   const resumedRef = React.useRef(false)
   const running = runStatus === "running"
 
@@ -300,9 +332,11 @@ export function StockAnalyticsReportProvider({
       job: Pick<TrackedJob, "id" | "jobUrl">,
       request: StockAnalyticsRequest,
       runId: number,
-      abort: AbortController
+      abort: AbortController,
+      options?: { autoOpen?: boolean }
     ) => {
       activeJobIdRef.current = job.id
+      loadedJobIdRef.current = job.id
 
       const terminal = await waitUntilTerminal(job.id, {
         signal: abort.signal,
@@ -337,7 +371,12 @@ export function StockAnalyticsReportProvider({
       setReportColumns(report.columns)
       setReportRows(report.rows)
       setExpandedNodes(expandAllIds(report.rows))
-      setRunStatus("done")
+      if (options?.autoOpen) {
+        setReportReady(true)
+        setRunStatus("idle")
+      } else {
+        setRunStatus("done")
+      }
     },
     [waitUntilTerminal]
   )
@@ -369,10 +408,6 @@ export function StockAnalyticsReportProvider({
     setRunStatus("idle")
   }, [reportColumns.length])
 
-  const openReportFromNotification = React.useCallback(() => {
-    // Bildirim yalnızca sayfaya yönlendirir; tamamlanan raporda View akışını korur.
-  }, [])
-
   const hasPendingReport = reportColumns.length > 0 && !reportReady
   const isPendingView = runStatus === "done" || hasPendingReport
 
@@ -381,6 +416,30 @@ export function StockAnalyticsReportProvider({
       setRunStatus("done")
     }
   }, [hasPendingReport, runStatus])
+
+  const handleJobError = React.useCallback(
+    (runId: number, abort: AbortController, error: unknown) => {
+      if (runIdRef.current !== runId) return
+      activeJobIdRef.current = null
+      if (abort.signal.aborted) {
+        setRunStatus("cancelled")
+        return
+      }
+      setRunEvents((prev) => [
+        ...prev,
+        {
+          id: `error-${prev.length}`,
+          eventName: "failed",
+          title: "Failed",
+          detail: errorMessage(error, "Rapor alınamadı"),
+          tone: "danger",
+        },
+      ])
+      setRunStatus("idle")
+      setReportReady(false)
+    },
+    []
+  )
 
   const resumePendingJob = React.useCallback(
     (job: TrackedJob) => {
@@ -393,6 +452,7 @@ export function StockAnalyticsReportProvider({
       abortRef.current?.abort()
       const abort = new AbortController()
       abortRef.current = abort
+      loadedJobIdRef.current = job.id
 
       setReportReady(false)
       setRunStatus("running")
@@ -406,46 +466,198 @@ export function StockAnalyticsReportProvider({
         },
       ])
 
+      if (!window.location.pathname.includes(job.id)) {
+        navigate(jobHref(job.id), { replace: true })
+      }
+
       void followJob(job, request, runId, abort).catch((error) => {
+        handleJobError(runId, abort, error)
+      })
+    },
+    [applyRequestToForm, followJob, handleJobError, navigate]
+  )
+
+  const loadJobById = React.useCallback(
+    async (jobId: string) => {
+      if (activeJobIdRef.current === jobId || loadedJobIdRef.current === jobId) {
+        return
+      }
+
+      const runId = ++runIdRef.current
+      abortRef.current?.abort()
+      const abort = new AbortController()
+      abortRef.current = abort
+      resumedRef.current = true
+      loadedJobIdRef.current = jobId
+
+      setReportReady(false)
+      setReportRows([])
+      setReportColumns([])
+      setRunStatus("running")
+      setRunEvents([
+        {
+          id: "hydrate-0",
+          eventName: "status",
+          title: "Loading",
+          detail: `job ${jobId}`,
+          tone: "muted",
+        },
+      ])
+
+      try {
+        const status = await fetchJobStatus(jobId, abort.signal)
         if (runIdRef.current !== runId) return
-        activeJobIdRef.current = null
-        if (abort.signal.aborted) {
-          setRunStatus("cancelled")
+
+        if (!status) {
+          setRunEvents([
+            {
+              id: "hydrate-404",
+              eventName: "failed",
+              title: "Not found",
+              detail: "Job bulunamadı",
+              tone: "danger",
+            },
+          ])
+          setRunStatus("idle")
+          loadedJobIdRef.current = null
           return
         }
-        const message =
-          error instanceof ApiError
-            ? typeof error.body === "object" &&
-              error.body &&
-              "error" in error.body
-              ? String((error.body as { error?: string }).error)
-              : error.message
-            : error instanceof Error
-              ? error.message
-              : "Rapor alınamadı"
+
+        const requestBody = await stockAnalyticsService.fetchJobRequest(
+          jobId,
+          abort.signal
+        )
+        if (runIdRef.current !== runId) return
+
+        const request: StockAnalyticsRequest = requestBody
+          ? {
+              fromDate: requestBody.fromDate,
+              toDate: requestBody.toDate,
+              fiscalYear: requestBody.fiscalYear,
+              financeBook: requestBody.financeBook,
+              currency: requestBody.currency,
+              valuesMode: requestBody.valuesMode,
+              showZeroValues: requestBody.showZeroValues,
+              showGroupAccounts: requestBody.showGroupAccounts,
+            }
+          : {}
+        applyRequestToForm(request)
+
+        const jobStatus = status.status || ""
+        if (
+          jobStatus === "Queued" ||
+          jobStatus === "Running" ||
+          !isTerminalJobStatus(jobStatus)
+        ) {
+          trackJob({
+            id: status.id,
+            name: status.name || "stock-analytics",
+            title: "Stock Analytics",
+            href: jobHref(status.id),
+            status: jobStatus || "Queued",
+            eventsUrl: status.eventsUrl,
+            jobUrl: status.jobUrl,
+            createdAt: status.createdAt || new Date().toISOString(),
+            notificationType: "report",
+            workspace: "/stock",
+            successTitle: "Stock Analytics Ready",
+            successDescription:
+              "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
+            failureTitle: "Stock Analytics Failed",
+            payload: serializeReportRequest(request),
+          })
+
+          setRunEvents((prev) => [
+            ...prev,
+            {
+              id: "hydrate-follow",
+              eventName: "status",
+              title: jobStatus || "Running",
+              detail: "GUID ile job'a bağlanıldı",
+              tone: "muted",
+            },
+          ])
+
+          await followJob(
+            { id: status.id, jobUrl: status.jobUrl },
+            request,
+            runId,
+            abort,
+            { autoOpen: true }
+          )
+          return
+        }
+
+        if (jobStatus === "Cancelled") {
+          setRunStatus("cancelled")
+          setRunEvents((prev) => [
+            ...prev,
+            mapSseToRunEvent("cancelled", { id: jobId, status: jobStatus }, prev.length),
+          ])
+          return
+        }
+
+        if (jobStatus === "Failed") {
+          setRunEvents((prev) => [
+            ...prev,
+            {
+              id: `failed-${prev.length}`,
+              eventName: "failed",
+              title: "Failed",
+              detail: status.error || "job failed",
+              tone: "danger",
+            },
+          ])
+          setRunStatus("idle")
+          return
+        }
+
+        const report = await stockAnalyticsService.fetchReport(
+          status.jobUrl,
+          request,
+          abort.signal
+        )
+        if (runIdRef.current !== runId) return
+
+        setReportColumns(report.columns)
+        setReportRows(report.rows)
+        setExpandedNodes(expandAllIds(report.rows))
         setRunEvents((prev) => [
           ...prev,
           {
-            id: `error-${prev.length}`,
-            eventName: "failed",
-            title: "Failed",
-            detail: message,
-            tone: "danger",
+            id: `completed-${prev.length}`,
+            eventName: "completed",
+            title: "Completed",
+            detail: `${report.totalRows} rows ready`,
+            tone: "success",
           },
         ])
+        setReportReady(true)
         setRunStatus("idle")
-        setReportReady(false)
-      })
+      } catch (error) {
+        handleJobError(runId, abort, error)
+        if (!abort.signal.aborted) {
+          loadedJobIdRef.current = null
+        }
+      }
     },
-    [applyRequestToForm, followJob]
+    [applyRequestToForm, followJob, handleJobError, trackJob]
   )
 
-  // Persist hydrate / hard reload sonrası pending job UI progress'ini geri yükle.
+  // URL GUID öncelikli: sayfa /stock/stock-analytics/{guid} ile açıldığında sonuçları yükle.
   React.useEffect(() => {
+    if (!urlJobId) return
+    resumedRef.current = true
+    void loadJobById(urlJobId)
+  }, [urlJobId, loadJobById])
+
+  // Persist hydrate / hard reload sonrası pending job (URL'de GUID yoksa).
+  React.useEffect(() => {
+    if (urlJobId) return
     if (resumedRef.current) return
 
     const tryResume = () => {
-      if (resumedRef.current) return
+      if (resumedRef.current || urlJobId) return
       const job = selectPendingStockAnalyticsJob(
         useActiveJobsStore.getState().jobs
       )
@@ -462,7 +674,7 @@ export function StockAnalyticsReportProvider({
     return useActiveJobsStore.persist.onFinishHydration(() => {
       tryResume()
     })
-  }, [resumePendingJob])
+  }, [resumePendingJob, urlJobId])
 
   const runReport = React.useCallback(async () => {
     const runId = ++runIdRef.current
@@ -498,11 +710,14 @@ export function StockAnalyticsReportProvider({
       const job = await stockAnalyticsService.createJob(request, abort.signal)
       if (runIdRef.current !== runId) return
 
+      loadedJobIdRef.current = job.id
+      navigate(jobHref(job.id), { replace: true })
+
       trackJob({
         id: job.id,
         name: job.name || "stock-analytics",
         title: "Stock Analytics",
-        href: "/stock/stock-analytics",
+        href: jobHref(job.id),
         status: job.status || "Queued",
         eventsUrl: job.eventsUrl,
         jobUrl: job.jobUrl,
@@ -523,38 +738,13 @@ export function StockAnalyticsReportProvider({
         abort
       )
     } catch (error) {
-      if (runIdRef.current !== runId) return
-      activeJobIdRef.current = null
-      if (abort.signal.aborted) {
-        setRunStatus("cancelled")
-        return
-      }
-      const message =
-        error instanceof ApiError
-          ? typeof error.body === "object" &&
-            error.body &&
-            "error" in error.body
-            ? String((error.body as { error?: string }).error)
-            : error.message
-          : error instanceof Error
-            ? error.message
-            : "Rapor alınamadı"
-      setRunEvents((prev) => [
-        ...prev,
-        {
-          id: `error-${prev.length}`,
-          eventName: "failed",
-          title: "Failed",
-          detail: message,
-          tone: "danger",
-        },
-      ])
-      setRunStatus("idle")
-      setReportReady(false)
+      handleJobError(runId, abort, error)
     }
   }, [
     trackJob,
     followJob,
+    handleJobError,
+    navigate,
     fromDate,
     toDate,
     fiscalYear,
@@ -621,6 +811,19 @@ export function StockAnalyticsReportProvider({
     void runReport()
   }, [runStatus, isPendingView, cancelReport, confirmReportReady, runReport])
 
+  const selectExecution = React.useCallback(
+    (jobId: string) => {
+      if (!jobId) return
+      if (urlJobId === jobId && reportReady && runStatus === "idle") return
+      loadedJobIdRef.current = null
+      resumedRef.current = true
+      navigate(jobHref(jobId))
+    },
+    [navigate, reportReady, runStatus, urlJobId]
+  )
+
+  const activeJobId = urlJobId ?? activeJobIdRef.current
+
   const value = React.useMemo(
     () => ({
       expandedNodes,
@@ -656,7 +859,8 @@ export function StockAnalyticsReportProvider({
       runReport,
       cancelReport,
       confirmReportReady,
-      openReportFromNotification,
+      activeJobId,
+      selectExecution,
       primaryActionLabel,
       primaryActionButtonProps,
       onPrimaryAction,
@@ -686,7 +890,8 @@ export function StockAnalyticsReportProvider({
       runReport,
       cancelReport,
       confirmReportReady,
-      openReportFromNotification,
+      activeJobId,
+      selectExecution,
       primaryActionLabel,
       primaryActionButtonProps,
       onPrimaryAction,

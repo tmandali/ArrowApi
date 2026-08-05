@@ -1,5 +1,4 @@
 import * as React from "react"
-import { useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -196,7 +195,6 @@ export function StockAnalyticsReportTab({
     collapseAll,
     setLevel,
     runReport,
-    openReportFromNotification,
     primaryActionLabel,
     primaryActionButtonProps,
     onPrimaryAction,
@@ -207,19 +205,10 @@ export function StockAnalyticsReportTab({
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
   const [activeFilter, setActiveFilter] = React.useState<FilterKey | null>(null)
   const [openPicker, setOpenPicker] = React.useState<FilterKey | null>(null)
-  const [searchParams, setSearchParams] = useSearchParams()
 
   React.useEffect(() => {
     onReportReadyChange?.(reportReady)
   }, [reportReady, onReportReadyChange])
-
-  React.useEffect(() => {
-    if (searchParams.get("openReport") !== "1") return
-    openReportFromNotification()
-    const next = new URLSearchParams(searchParams)
-    next.delete("openReport")
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams, openReportFromNotification])
 
   React.useEffect(() => {
     if (runReportToken > 0) {

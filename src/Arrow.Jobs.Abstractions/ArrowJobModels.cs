@@ -88,7 +88,8 @@ public sealed record ArrowJobListQuery(
     DateTimeOffset? To = null,
     int Skip = 0,
     int Take = 50,
-    Guid? RootJobId = null);
+    Guid? RootJobId = null,
+    string? Name = null);
 
 /// <summary>Job listesi sayfalama sonucu.</summary>
 /// <typeparam name="TRequest">İstek DTO tipi.</typeparam>

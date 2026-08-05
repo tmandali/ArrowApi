@@ -4,6 +4,7 @@ import { readJobSseEvents } from "@/features/jobs/arrow-job-client"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
+  ArrowJobStatusList,
   ReportColumn,
   ReportGridRow,
   StockAnalyticsArrowReport,
@@ -196,6 +197,45 @@ export type RunStockAnalyticsOptions = {
 }
 
 export const stockAnalyticsService = {
+  async listJobs(
+    options: {
+      take?: number
+      skip?: number
+      state?: string
+      signal?: AbortSignal
+    } = {}
+  ): Promise<ArrowJobStatusList> {
+    const params = new URLSearchParams()
+    if (options.take != null) params.set("take", String(options.take))
+    if (options.skip != null) params.set("skip", String(options.skip))
+    if (options.state) params.set("state", options.state)
+
+    const query = params.toString()
+    const response = await fetch(
+      query ? `${JOB_BASE}?${query}` : JOB_BASE,
+      {
+        headers: { Accept: "application/json" },
+        signal: options.signal,
+      }
+    )
+
+    if (!response.ok) {
+      let body: unknown
+      try {
+        body = await response.json()
+      } catch {
+        body = undefined
+      }
+      throw new ApiError(
+        response.statusText || "Job listesi alınamadı",
+        response.status,
+        body
+      )
+    }
+
+    return (await response.json()) as ArrowJobStatusList
+  },
+
   async createJob(
     request: StockAnalyticsRequest = {},
     signal?: AbortSignal
@@ -235,6 +275,36 @@ export const stockAnalyticsService = {
     }
 
     return (await createResponse.json()) as ArrowJobStatus
+  },
+
+  async fetchJobRequest(
+    jobId: string,
+    signal?: AbortSignal
+  ): Promise<StockAnalyticsRequest | null> {
+    const response = await fetch(`/api/arrow/jobs/${jobId}/request`, {
+      headers: { Accept: "application/json" },
+      signal,
+    })
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      let body: unknown
+      try {
+        body = await response.json()
+      } catch {
+        body = undefined
+      }
+      throw new ApiError(
+        response.statusText || "Job request alınamadı",
+        response.status,
+        body
+      )
+    }
+
+    return (await response.json()) as StockAnalyticsRequest
   },
 
   async fetchReport(

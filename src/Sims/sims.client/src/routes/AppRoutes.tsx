@@ -51,6 +51,10 @@ export function AppRoutes() {
 
         <Route element={<AppLayout fullHeight />}>
           <Route path="stock/stock-analytics" element={<StockAnalyticsPage />} />
+          <Route
+            path="stock/stock-analytics/:jobId"
+            element={<StockAnalyticsPage />}
+          />
           <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
         </Route>
 

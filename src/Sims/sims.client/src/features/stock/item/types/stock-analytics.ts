@@ -24,6 +24,11 @@ export type ArrowJobStatus = {
   rootJobId?: string
 }
 
+export type ArrowJobStatusList = {
+  items: ArrowJobStatus[]
+  total: number
+}
+
 export type ArrowJobEvent = {
   id: string
   status: string

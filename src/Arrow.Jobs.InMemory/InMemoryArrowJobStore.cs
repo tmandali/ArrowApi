@@ -88,6 +88,15 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         if (query.RootJobId is { } rootJobId)
             filtered = filtered.Where(j => j.RootJobId == rootJobId);
 
+        if (!string.IsNullOrWhiteSpace(query.Name))
+        {
+            string name = query.Name;
+            // Name henüz yazılmamış eski job'lar da bu store'da bu tipe aittir.
+            filtered = filtered.Where(j =>
+                string.IsNullOrEmpty(j.Name) ||
+                string.Equals(j.Name, name, StringComparison.OrdinalIgnoreCase));
+        }
+
         List<ArrowJob<TRequest>> ordered = filtered
             .OrderByDescending(j => j.CreatedAt)
             .ToList();
