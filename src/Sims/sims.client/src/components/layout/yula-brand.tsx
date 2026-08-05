@@ -29,14 +29,14 @@ type YulaMarkIconProps = {
   glow?: boolean
 }
 
-/** AI sparkles mark — edge-to-edge in the viewBox (currentColor). */
+/** AI sparkles mark — edge-to-edge in the viewBox (currentColor → default primary). */
 export function YulaMarkIcon({ className, glow = false }: YulaMarkIconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("block size-full shrink-0", className)}
+      className={cn("block size-full shrink-0 text-primary", className)}
       aria-hidden
     >
       {glow ? (

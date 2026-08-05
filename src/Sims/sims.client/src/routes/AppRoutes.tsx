@@ -8,6 +8,9 @@ const SellingPage = lazy(() => import("@/pages/SellingPage"))
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"))
 const AccountingPage = lazy(() => import("@/pages/AccountingPage"))
 const StockPage = lazy(() => import("@/pages/StockPage"))
+const SerialBatchTraceabilityPage = lazy(
+  () => import("@/pages/SerialBatchTraceabilityPage")
+)
 const ItemPage = lazy(() => import("@/pages/ItemPage"))
 const StockAnalyticsPage = lazy(() => import("@/pages/StockAnalyticsPage"))
 const StockLedgerPage = lazy(() => import("@/pages/StockLedgerPage"))
@@ -55,6 +58,10 @@ export function AppRoutes() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="accounting" element={<AccountingPage />} />
           <Route path="stock" element={<StockPage />} />
+          <Route
+            path="stock/serial-batch-traceability"
+            element={<SerialBatchTraceabilityPage />}
+          />
           <Route path="stock/item" element={<ItemPage />} />
           <Route path="products" element={<Navigate to="/stock/item" replace />} />
           <Route path="manufacturing" element={<ManufacturingPage />} />

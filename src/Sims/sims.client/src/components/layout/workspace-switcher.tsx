@@ -81,8 +81,12 @@ export function WorkspaceSwitcher({
                 {activeWorkspace.logo}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{activeWorkspace.name}</span>
-                <span className="truncate text-xs">{activeWorkspace.plan}</span>
+                <span className="truncate font-medium text-primary dark:text-sidebar-primary">
+                  {activeWorkspace.name}
+                </span>
+                <span className="truncate text-xs text-orange-600 dark:text-orange-400">
+                  {activeWorkspace.plan}
+                </span>
               </div>
               <ChevronsUpDownIcon className="ml-auto" />
             </SidebarMenuButton>

@@ -37,7 +37,7 @@ export function AIChatAssistant({
         aria-pressed={open}
         aria-label={YULA.ariaLabel}
       >
-        <YulaMarkIcon className="size-7" glow />
+        <YulaMarkIcon className="size-7 text-primary-foreground" glow />
       </Button>
     )
   }
@@ -50,12 +50,13 @@ export function AIChatAssistant({
       icon={YulaMarkIcon}
       aria-label={YULA.ariaLabel}
       className={cn(
-        "group/ai relative overflow-hidden transition-all duration-300 hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/25 active:scale-95 [&_svg]:!size-5",
-        open && "border-primary bg-primary text-primary-foreground",
+        "group/ai relative overflow-hidden transition-all duration-300 hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/25 active:scale-95 [&_svg]:!size-5 hover:[&_svg]:text-primary-foreground",
+        open &&
+          "border-primary bg-primary text-primary-foreground [&_svg]:text-primary-foreground",
         className
       )}
     >
-      <YulaMarkIcon className="relative size-5 transition-transform duration-300 group-hover/ai:scale-105" />
+      <YulaMarkIcon className="relative size-5 transition-transform duration-300 group-hover/ai:scale-105 group-hover/ai:text-primary-foreground" />
     </WorkspaceSidePanelTrigger>
   )
 }

@@ -118,8 +118,16 @@ export function WorkspaceSearchDialog({
           <CommandGroup heading="Stock Pages">
             <CommandItem onSelect={() => handleSelect("/stock")}>
               <Package className="size-4 mr-2" />
-              <span>Serial No and Batch Traceability</span>
+              <span>Stock Dashboard</span>
               <CommandShortcut>↵</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              onSelect={() =>
+                handleSelect("/stock/serial-batch-traceability")
+              }
+            >
+              <Package className="size-4 mr-2" />
+              <span>Serial No and Batch Traceability</span>
             </CommandItem>
             <CommandItem
               onSelect={() => handleSelect(e("stock", "Stock Entry"))}

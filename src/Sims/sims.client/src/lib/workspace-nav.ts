@@ -135,7 +135,7 @@ export const financialReportsNav: WorkspaceNavItem[] = [
 export const stockNav: WorkspaceNavItem[] = [
   {
     title: "Dashboard",
-    url: e("stock", "Dashboard"),
+    url: "/stock",
     icon: LayoutDashboardIcon,
   },
   {
@@ -187,7 +187,10 @@ export const stockNav: WorkspaceNavItem[] = [
       { title: "Stock Ledger", url: "/stock/stock-ledger" },
       { title: "Stock Balance", url: e("stock", "Stock Balance") },
       { title: "Stock Analytics", url: "/stock/stock-analytics" },
-      { title: "Serial No and Batch Traceability", url: "/stock" },
+      {
+        title: "Serial No and Batch Traceability",
+        url: "/stock/serial-batch-traceability",
+      },
       {
         title: "Purchase Receipt Trends",
         url: e("stock", "Purchase Receipt Trends"),
