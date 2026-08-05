@@ -499,27 +499,6 @@ export function StockAnalyticsReportTab({
                     Arrow job · live SSE
                   </p>
                 </div>
-                {runStatus === "running" || isPendingView || runStatus === "cancelled" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className={cn(
-                      "h-8 shrink-0 gap-1.5 text-xs",
-                      primaryActionButtonProps.className
-                    )}
-                    variant={primaryActionButtonProps.variant}
-                    onClick={onPrimaryAction}
-                  >
-                    {runStatus === "running" ? (
-                      <X className="size-3.5" />
-                    ) : isPendingView ? (
-                      <Check className="size-3.5" />
-                    ) : (
-                      <Play className="size-3.5" />
-                    )}
-                    {primaryActionLabel}
-                  </Button>
-                ) : null}
               </div>
 
               <ScrollArea className="h-0 min-h-0 w-full flex-1">
