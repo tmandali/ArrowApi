@@ -37,6 +37,7 @@ export function AppRoutes() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="accounting" element={<AccountingPage />} />
           <Route path="stock" element={<StockPage />} />
+          <Route path="stock/item" element={<ItemPage />} />
           <Route path="products" element={<Navigate to="/stock/item" replace />} />
           <Route path="manufacturing" element={<ManufacturingPage />} />
           <Route path="landed-cost-voucher" element={<LandedCostVoucherPage />} />
@@ -48,13 +49,9 @@ export function AppRoutes() {
           />
         </Route>
 
-        <Route element={<AppLayout fullHeight showChat={false} />}>
+        <Route element={<AppLayout fullHeight />}>
           <Route path="stock/stock-analytics" element={<StockAnalyticsPage />} />
           <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
-        </Route>
-
-        <Route element={<AppLayout showChat={false} />}>
-          <Route path="stock/item" element={<ItemPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

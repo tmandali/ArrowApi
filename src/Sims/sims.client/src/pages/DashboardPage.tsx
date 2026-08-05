@@ -6,6 +6,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { Button } from "@/components/ui/button"
 import {
   ButtonGroup,
@@ -58,6 +59,8 @@ export default function Page() {
               <span className="hidden sm:inline">Yeni Ekle</span>
             </Button>
           </ButtonGroup>
+
+          <AIChatAssistant variant="toolbar" />
         </div>
       </header>
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

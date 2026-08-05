@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -31,6 +31,7 @@ export function WorkspaceSwitcher({
 }) {
   const { isMobile } = useSidebar()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
 
   const currentWorkspace = React.useMemo(() => {
     if (
@@ -108,7 +109,9 @@ export function WorkspaceSwitcher({
                 onClick={() => {
                   setActiveWorkspace(workspace)
                   if (workspace.url) {
-                    window.location.href = workspace.url
+                    // Soft navigate: JobSync + rapor UI state (progress) korunur.
+                    // window.location.href full reload yapıp React context'i sıfırlıyordu.
+                    navigate(workspace.url)
                   }
                 }}
                 className="gap-2 p-2 cursor-pointer"

@@ -6,6 +6,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -57,6 +58,10 @@ export default function EmptyModulePage() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <AIChatAssistant variant="toolbar" />
         </div>
       </header>
 

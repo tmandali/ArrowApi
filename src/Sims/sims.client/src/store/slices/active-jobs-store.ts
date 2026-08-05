@@ -34,6 +34,8 @@ export type TrackedJob = {
   successTitle?: string
   successDescription?: string
   failureTitle?: string
+  /** Job'a özel serializable payload (ör. rapor request parametreleri). */
+  payload?: Record<string, unknown>
 }
 
 type ActiveJobsState = {
@@ -121,4 +123,25 @@ export function selectPendingJobs(
       }) === workspace
     )
   })
+}
+
+/** En son başlatılan pending Stock Analytics job (href / name ile). */
+export function selectPendingStockAnalyticsJob(
+  jobs: Record<string, TrackedJob>
+): TrackedJob | null {
+  const pending = selectPendingJobs(jobs, "/stock").filter(
+    (job) =>
+      job.href === "/stock/stock-analytics" ||
+      job.name === "stock-analytics" ||
+      job.name.startsWith("stock-analytics")
+  )
+  if (pending.length === 0) return null
+  return pending.reduce((latest, job) =>
+    createdAtMs(job.createdAt) > createdAtMs(latest.createdAt) ? job : latest
+  )
+}
+
+function createdAtMs(createdAt: string): number {
+  const parsed = Date.parse(createdAt)
+  return Number.isFinite(parsed) ? parsed : 0
 }

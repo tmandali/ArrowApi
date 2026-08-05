@@ -7,6 +7,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -356,6 +357,8 @@ export default function AccountingPage() {
                 <DropdownMenuItem>Add to Desktop</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <AIChatAssistant variant="toolbar" />
           </div>
         </header>
 

@@ -6,7 +6,13 @@ import type {
   ArrowJobEvent,
   ReportColumn,
   ReportGridRow,
+  StockAnalyticsRequest,
 } from "@/features/stock/item/types/stock-analytics"
+import {
+  selectPendingStockAnalyticsJob,
+  useActiveJobsStore,
+  type TrackedJob,
+} from "@/store/slices/active-jobs-store"
 
 export type ReportRunStatus = "idle" | "running" | "done" | "cancelled"
 
@@ -107,6 +113,61 @@ function appendOrUpdateRunEvent(
   return [...prev, mapSseToRunEvent(eventName, payload, prev.length)]
 }
 
+function toIsoDateString(value: Date | string | undefined): string | undefined {
+  if (!value) return undefined
+  if (typeof value === "string") return value.slice(0, 10)
+  const y = value.getFullYear()
+  const m = String(value.getMonth() + 1).padStart(2, "0")
+  const d = String(value.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function parseStoredDate(value: unknown): Date | undefined {
+  if (typeof value !== "string" || !value) return undefined
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+function serializeReportRequest(
+  request: StockAnalyticsRequest
+): Record<string, unknown> {
+  return {
+    fromDate: toIsoDateString(request.fromDate),
+    toDate: toIsoDateString(request.toDate),
+    fiscalYear: request.fiscalYear,
+    financeBook: request.financeBook,
+    currency: request.currency,
+    valuesMode: request.valuesMode,
+    showZeroValues: request.showZeroValues ?? false,
+    showGroupAccounts: request.showGroupAccounts ?? true,
+  }
+}
+
+function requestFromJobPayload(
+  payload: Record<string, unknown> | undefined
+): StockAnalyticsRequest {
+  if (!payload) return {}
+  return {
+    fromDate: typeof payload.fromDate === "string" ? payload.fromDate : undefined,
+    toDate: typeof payload.toDate === "string" ? payload.toDate : undefined,
+    fiscalYear:
+      typeof payload.fiscalYear === "string" ? payload.fiscalYear : undefined,
+    financeBook:
+      typeof payload.financeBook === "string" ? payload.financeBook : undefined,
+    currency: typeof payload.currency === "string" ? payload.currency : undefined,
+    valuesMode:
+      typeof payload.valuesMode === "string" ? payload.valuesMode : undefined,
+    showZeroValues:
+      typeof payload.showZeroValues === "boolean"
+        ? payload.showZeroValues
+        : undefined,
+    showGroupAccounts:
+      typeof payload.showGroupAccounts === "boolean"
+        ? payload.showGroupAccounts
+        : undefined,
+  }
+}
+
 type StockAnalyticsReportContextValue = {
   expandedNodes: Record<string, boolean>
   setExpandedNodes: React.Dispatch<
@@ -185,6 +246,7 @@ export function StockAnalyticsReportProvider({
   const runIdRef = React.useRef(0)
   const abortRef = React.useRef<AbortController | null>(null)
   const activeJobIdRef = React.useRef<string | null>(null)
+  const resumedRef = React.useRef(false)
   const running = runStatus === "running"
 
   const toggleNode = React.useCallback((id: string) => {
@@ -211,6 +273,73 @@ export function StockAnalyticsReportProvider({
       setExpandedNodes(next)
     },
     [reportRows]
+  )
+
+  const applyRequestToForm = React.useCallback(
+    (request: StockAnalyticsRequest) => {
+      const from = parseStoredDate(request.fromDate)
+      const to = parseStoredDate(request.toDate)
+      if (from) setFromDate(from)
+      if (to) setToDate(to)
+      if (request.fiscalYear) setFiscalYear(request.fiscalYear)
+      if (request.financeBook != null) setFinanceBook(request.financeBook)
+      if (request.currency) setCurrency(request.currency)
+      if (request.valuesMode) setValuesMode(request.valuesMode)
+      if (typeof request.showZeroValues === "boolean") {
+        setShowZeroValues(request.showZeroValues)
+      }
+      if (typeof request.showGroupAccounts === "boolean") {
+        setShowGroupAccounts(request.showGroupAccounts)
+      }
+    },
+    []
+  )
+
+  const followJob = React.useCallback(
+    async (
+      job: Pick<TrackedJob, "id" | "jobUrl">,
+      request: StockAnalyticsRequest,
+      runId: number,
+      abort: AbortController
+    ) => {
+      activeJobIdRef.current = job.id
+
+      const terminal = await waitUntilTerminal(job.id, {
+        signal: abort.signal,
+        onEvent: (eventName, payload) => {
+          if (runIdRef.current !== runId) return
+          setRunEvents((prev) =>
+            appendOrUpdateRunEvent(prev, eventName, payload)
+          )
+        },
+      })
+
+      if (runIdRef.current !== runId) return
+      activeJobIdRef.current = null
+
+      if (terminal.status === "Cancelled") {
+        setRunStatus("cancelled")
+        return
+      }
+
+      if (terminal.status === "Failed") {
+        throw new Error(terminal.error || "Rapor job'ı başarısız")
+      }
+
+      const report = await stockAnalyticsService.fetchReport(
+        terminal.jobUrl || job.jobUrl,
+        request,
+        abort.signal
+      )
+
+      if (runIdRef.current !== runId) return
+
+      setReportColumns(report.columns)
+      setReportRows(report.rows)
+      setExpandedNodes(expandAllIds(report.rows))
+      setRunStatus("done")
+    },
+    [waitUntilTerminal]
   )
 
   const cancelReport = React.useCallback(() => {
@@ -253,11 +382,94 @@ export function StockAnalyticsReportProvider({
     }
   }, [hasPendingReport, runStatus])
 
+  const resumePendingJob = React.useCallback(
+    (job: TrackedJob) => {
+      if (activeJobIdRef.current) return
+
+      const request = requestFromJobPayload(job.payload)
+      applyRequestToForm(request)
+
+      const runId = ++runIdRef.current
+      abortRef.current?.abort()
+      const abort = new AbortController()
+      abortRef.current = abort
+
+      setReportReady(false)
+      setRunStatus("running")
+      setRunEvents([
+        {
+          id: "resume-0",
+          eventName: "status",
+          title: job.status || "Running",
+          detail: "workspace dönüşünde job'a yeniden bağlanıldı",
+          tone: "muted",
+        },
+      ])
+
+      void followJob(job, request, runId, abort).catch((error) => {
+        if (runIdRef.current !== runId) return
+        activeJobIdRef.current = null
+        if (abort.signal.aborted) {
+          setRunStatus("cancelled")
+          return
+        }
+        const message =
+          error instanceof ApiError
+            ? typeof error.body === "object" &&
+              error.body &&
+              "error" in error.body
+              ? String((error.body as { error?: string }).error)
+              : error.message
+            : error instanceof Error
+              ? error.message
+              : "Rapor alınamadı"
+        setRunEvents((prev) => [
+          ...prev,
+          {
+            id: `error-${prev.length}`,
+            eventName: "failed",
+            title: "Failed",
+            detail: message,
+            tone: "danger",
+          },
+        ])
+        setRunStatus("idle")
+        setReportReady(false)
+      })
+    },
+    [applyRequestToForm, followJob]
+  )
+
+  // Persist hydrate / hard reload sonrası pending job UI progress'ini geri yükle.
+  React.useEffect(() => {
+    if (resumedRef.current) return
+
+    const tryResume = () => {
+      if (resumedRef.current) return
+      const job = selectPendingStockAnalyticsJob(
+        useActiveJobsStore.getState().jobs
+      )
+      if (!job) return
+      resumedRef.current = true
+      resumePendingJob(job)
+    }
+
+    if (useActiveJobsStore.persist.hasHydrated()) {
+      tryResume()
+      return
+    }
+
+    return useActiveJobsStore.persist.onFinishHydration(() => {
+      tryResume()
+    })
+  }, [resumePendingJob])
+
   const runReport = React.useCallback(async () => {
     const runId = ++runIdRef.current
     abortRef.current?.abort()
     const abort = new AbortController()
     abortRef.current = abort
+    resumedRef.current = true
 
     setReportReady(false)
     setRunStatus("running")
@@ -271,7 +483,7 @@ export function StockAnalyticsReportProvider({
       },
     ])
 
-    const request = {
+    const request: StockAnalyticsRequest = {
       fromDate,
       toDate,
       fiscalYear,
@@ -286,7 +498,6 @@ export function StockAnalyticsReportProvider({
       const job = await stockAnalyticsService.createJob(request, abort.signal)
       if (runIdRef.current !== runId) return
 
-      activeJobIdRef.current = job.id
       trackJob({
         id: job.id,
         name: job.name || "stock-analytics",
@@ -302,42 +513,15 @@ export function StockAnalyticsReportProvider({
         successDescription:
           "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
         failureTitle: "Stock Analytics Failed",
+        payload: serializeReportRequest(request),
       })
 
-      const terminal = await waitUntilTerminal(job.id, {
-        signal: abort.signal,
-        onEvent: (eventName, payload) => {
-          if (runIdRef.current !== runId) return
-          setRunEvents((prev) =>
-            appendOrUpdateRunEvent(prev, eventName, payload)
-          )
-        },
-      })
-
-      if (runIdRef.current !== runId) return
-      activeJobIdRef.current = null
-
-      if (terminal.status === "Cancelled") {
-        setRunStatus("cancelled")
-        return
-      }
-
-      if (terminal.status === "Failed") {
-        throw new Error(terminal.error || "Rapor job'ı başarısız")
-      }
-
-      const report = await stockAnalyticsService.fetchReport(
-        terminal.jobUrl || job.jobUrl,
+      await followJob(
+        { id: job.id, jobUrl: job.jobUrl },
         request,
-        abort.signal
+        runId,
+        abort
       )
-
-      if (runIdRef.current !== runId) return
-
-      setReportColumns(report.columns)
-      setReportRows(report.rows)
-      setExpandedNodes(expandAllIds(report.rows))
-      setRunStatus("done")
     } catch (error) {
       if (runIdRef.current !== runId) return
       activeJobIdRef.current = null
@@ -370,7 +554,7 @@ export function StockAnalyticsReportProvider({
     }
   }, [
     trackJob,
-    waitUntilTerminal,
+    followJob,
     fromDate,
     toDate,
     fiscalYear,

@@ -1,6 +1,7 @@
 export {
   useActiveJobsStore,
   selectPendingJobs,
+  selectPendingStockAnalyticsJob,
   isTerminalJobStatus,
   TERMINAL_JOB_STATUSES,
   type TrackedJob,

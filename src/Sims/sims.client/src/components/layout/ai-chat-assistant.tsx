@@ -18,7 +18,7 @@ type AIChatAssistantProps = {
 }
 
 export function AIChatAssistant({
-  variant = "floating",
+  variant = "toolbar",
   className,
 }: AIChatAssistantProps = {}) {
   const { messages, status, sendMessage } = useChat()

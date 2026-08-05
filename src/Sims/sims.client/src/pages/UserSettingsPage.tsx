@@ -7,6 +7,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -138,6 +139,8 @@ export default function UserSettingsPage() {
             <Button size="sm" className="h-7 text-xs px-3">
               Save
             </Button>
+
+            <AIChatAssistant variant="toolbar" />
           </div>
         </header>
 

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Separator } from "@/components/ui/separator"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Collapsible,
@@ -171,6 +172,8 @@ export default function SellingPage() {
             <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
               Cancel
             </Button>
+
+            <AIChatAssistant variant="toolbar" />
           </div>
         </header>
 
