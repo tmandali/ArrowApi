@@ -3,6 +3,7 @@ import {
   AIChatPanel,
   AIChatPanelTitle,
 } from "@/components/layout/ai-chat-assistant"
+import { YULA } from "@/components/layout/yula-brand"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat"
 import { cn } from "@/utils/cn"
@@ -32,7 +33,7 @@ export function WorkspaceAiDock({ children, className }: WorkspaceAiDockProps) {
       open={open}
       onOpenChange={setOpen}
       title={<AIChatPanelTitle />}
-      collapseLabel="Collapse AI assistant"
+      collapseLabel={YULA.collapseLabel}
       panel={<AIChatPanel />}
       className={cn("min-h-0 flex-1", className)}
     >
