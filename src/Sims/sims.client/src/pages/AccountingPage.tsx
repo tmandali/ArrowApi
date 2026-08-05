@@ -1,6 +1,4 @@
 import * as React from "react"
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
-import { AppSidebar } from "@/components/layout/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,11 +9,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -314,11 +308,9 @@ export default function AccountingPage() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="bg-background">
-        {/* Header Navigation & Actions */}
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
+    <>
+      {/* Header Navigation & Actions */}
+      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
           <div className="flex items-center gap-2 overflow-hidden">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -613,8 +605,6 @@ export default function AccountingPage() {
             </Button>
           </div>
         </div>
-        <AIChatAssistant />
-      </SidebarInset>
-    </SidebarProvider>
+    </>
   )
 }

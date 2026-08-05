@@ -1,6 +1,4 @@
 import * as React from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,11 +9,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -75,11 +69,9 @@ export default function LandedCostVoucherPage() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="bg-background">
-        {/* Sticky Header Navigation */}
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
+    <>
+      {/* Sticky Header Navigation */}
+      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
           <div className="flex items-center gap-2 overflow-hidden">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -325,9 +317,6 @@ export default function LandedCostVoucherPage() {
             </div>
           </div>
         </div>
-
-        <AIChatAssistant />
-      </SidebarInset>
-    </SidebarProvider>
+    </>
   )
 }
