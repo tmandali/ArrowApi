@@ -18,11 +18,9 @@ import {
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import {
-  emptyWorkspaceHome,
-  unslugifyModule,
-} from "@/lib/empty-module"
-import { FileQuestion, Plus, ArrowLeft } from "lucide-react"
+import { emptyWorkspaceHome } from "@/lib/empty-module"
+import { resolveEmptyModule } from "@/lib/workspace-nav"
+import { Plus, ArrowLeft } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
 
 export default function EmptyModulePage() {
@@ -30,9 +28,10 @@ export default function EmptyModulePage() {
     workspace: string
     slug: string
   }>()
-  const moduleTitle = unslugifyModule(slug)
+  const module = resolveEmptyModule(workspace, slug)
+  const ModuleIcon = module.icon
   const workspaceMeta =
-    emptyWorkspaceHome[workspace] ?? emptyWorkspaceHome.selling
+    emptyWorkspaceHome[module.workspace] ?? emptyWorkspaceHome.selling
 
   return (
     <>
@@ -52,8 +51,9 @@ export default function EmptyModulePage() {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage className="font-semibold text-foreground">
-                  {moduleTitle}
+                <BreadcrumbPage className="inline-flex items-center gap-2 font-semibold text-foreground">
+                  <ModuleIcon className="size-4 shrink-0" />
+                  <span>{module.title}</span>
                 </BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
@@ -69,13 +69,13 @@ export default function EmptyModulePage() {
         <Empty className="max-w-md border rounded-xl bg-card p-10">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <FileQuestion className="size-5 text-muted-foreground" />
+              <ModuleIcon className="size-4 text-muted-foreground" />
             </EmptyMedia>
             <EmptyTitle className="text-base font-semibold">
-              {moduleTitle}
+              {module.title}
             </EmptyTitle>
             <EmptyDescription>
-              {moduleTitle} modülü için henüz kayıt bulunmuyor. Yeni bir kayıt
+              {module.title} modülü için henüz kayıt bulunmuyor. Yeni bir kayıt
               ekleyebilir veya {workspaceMeta.label} alanına dönebilirsiniz.
             </EmptyDescription>
           </EmptyHeader>
@@ -93,7 +93,7 @@ export default function EmptyModulePage() {
                 className="h-8 text-xs gap-1.5"
               >
                 <Plus className="size-3.5" />
-                Yeni {moduleTitle}
+                Yeni {module.title}
               </Button>
             </div>
           </EmptyContent>

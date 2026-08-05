@@ -13,24 +13,15 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
+import type { WorkspaceNavItem } from "@/lib/workspace-nav"
 import { ChevronRightIcon } from "lucide-react"
 
-type NavItem = {
-  title: string
-  url: string
-  icon?: React.ReactNode
-  isActive?: boolean
-  items?: {
-    title: string
-    url: string
-  }[]
-}
-
-export function NavMain({ items }: { items: NavItem[] }) {
+export function NavMain({ items }: { items: WorkspaceNavItem[] }) {
   return (
     <SidebarGroup>
       <SidebarMenu>
         {items.map((item) => {
+          const Icon = item.icon
           const hasChildren = Boolean(item.items && item.items.length > 0)
 
           if (!hasChildren) {
@@ -42,7 +33,7 @@ export function NavMain({ items }: { items: NavItem[] }) {
                   isActive={item.isActive}
                 >
                   <Link to={item.url}>
-                    {item.icon}
+                    <Icon className="size-4" />
                     <span>{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
@@ -60,7 +51,7 @@ export function NavMain({ items }: { items: NavItem[] }) {
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip={item.title}>
-                    {item.icon}
+                    <Icon className="size-4" />
                     <span>{item.title}</span>
                     <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
