@@ -46,6 +46,7 @@ import {
   ShoppingBag,
   Search,
   ListFilter,
+  RefreshCw,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"

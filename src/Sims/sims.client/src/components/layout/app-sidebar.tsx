@@ -40,6 +40,9 @@ import {
   Settings2Icon,
   UserCheckIcon,
 } from "lucide-react"
+import { emptyModulePath } from "@/lib/empty-module"
+
+const e = emptyModulePath
 
 // Sample workspace data with isolated navigation menus
 const data = {
@@ -84,7 +87,7 @@ const data = {
 const subcontractingNav = [
   {
     title: "Inward Order",
-    url: "/empty",
+    url: e("selling", "Inward Order"),
     icon: <ArrowRightIcon className="size-4" />,
     isActive: true,
     items: [
@@ -94,48 +97,48 @@ const subcontractingNav = [
       },
       {
         title: "Subcontracting Order",
-        url: "/empty",
+        url: e("selling", "Inward Subcontracting Order"),
       },
       {
         title: "Subcontracting Delivery",
-        url: "/empty",
+        url: e("selling", "Subcontracting Delivery"),
       },
     ],
   },
   {
     title: "Outward Order",
-    url: "/empty",
+    url: e("selling", "Outward Order"),
     icon: <ArrowLeftIcon className="size-4" />,
     items: [
       {
         title: "Purchase Order",
-        url: "/empty",
+        url: e("selling", "Purchase Order"),
       },
       {
         title: "Subcontracting Order",
-        url: "/empty",
+        url: e("selling", "Outward Subcontracting Order"),
       },
       {
         title: "Subcontracting Receipt",
-        url: "/empty",
+        url: e("selling", "Subcontracting Receipt"),
       },
     ],
   },
   {
     title: "Tools",
-    url: "/empty",
+    url: e("selling", "Tools"),
     icon: <WrenchIcon className="size-4" />,
     items: [],
   },
   {
     title: "Reports",
-    url: "/empty",
+    url: e("selling", "Reports"),
     icon: <BarChart2Icon className="size-4" />,
     items: [],
   },
   {
     title: "Settings",
-    url: "/empty",
+    url: e("selling", "Settings"),
     icon: <Settings2Icon className="size-4" />,
     items: [],
   },
@@ -145,25 +148,25 @@ const subcontractingNav = [
 const financialReportsNav = [
   {
     title: "Financial Reports",
-    url: "/empty",
+    url: e("accounting", "Financial Reports"),
     icon: <BarChart2Icon className="size-4" />,
     isActive: true,
     items: [
       {
         title: "Balance Sheet",
-        url: "/empty",
+        url: e("accounting", "Balance Sheet"),
       },
       {
         title: "Profit and Loss",
-        url: "/empty",
+        url: e("accounting", "Profit and Loss"),
       },
       {
         title: "Cash Flow",
-        url: "/empty",
+        url: e("accounting", "Cash Flow"),
       },
       {
         title: "Trial Balance",
-        url: "/empty",
+        url: e("accounting", "Trial Balance"),
       },
       {
         title: "Consolidated Report",
@@ -173,33 +176,33 @@ const financialReportsNav = [
   },
   {
     title: "Ledgers",
-    url: "/empty",
+    url: e("accounting", "Ledgers"),
     icon: <BookOpenIcon className="size-4" />,
     isActive: true,
     items: [
       {
         title: "General Ledger",
-        url: "/empty",
+        url: e("accounting", "General Ledger"),
       },
       {
         title: "Customer Ledger",
-        url: "/empty",
+        url: e("accounting", "Customer Ledger"),
       },
       {
         title: "Supplier Ledger",
-        url: "/empty",
+        url: e("accounting", "Supplier Ledger"),
       },
     ],
   },
   {
     title: "Profitability",
-    url: "/empty",
+    url: e("accounting", "Profitability"),
     icon: <TrendingUpIcon className="size-4" />,
     items: [],
   },
   {
     title: "Other Reports",
-    url: "/empty",
+    url: e("accounting", "Other Reports"),
     icon: <FileSpreadsheetIcon className="size-4" />,
     items: [],
   },
@@ -209,7 +212,7 @@ const financialReportsNav = [
 const stockNav = [
   {
     title: "Dashboard",
-    url: "/empty",
+    url: e("stock", "Dashboard"),
     icon: <LayoutDashboardIcon className="size-4" />,
   },
   {
@@ -219,27 +222,27 @@ const stockNav = [
   },
   {
     title: "Warehouse",
-    url: "/empty",
+    url: e("stock", "Warehouse"),
     icon: <HomeIcon className="size-4" />,
   },
   {
     title: "Stock Entry",
-    url: "/empty",
+    url: e("stock", "Stock Entry"),
     icon: <FileCheckIcon className="size-4" />,
   },
   {
     title: "Purchase Receipt",
-    url: "/empty",
+    url: e("stock", "Purchase Receipt"),
     icon: <ReceiptIcon className="size-4" />,
   },
   {
     title: "Delivery Note",
-    url: "/empty",
+    url: e("stock", "Delivery Note"),
     icon: <TruckIcon className="size-4" />,
   },
   {
     title: "Stock Reconciliation",
-    url: "/empty",
+    url: e("stock", "Stock Reconciliation"),
     icon: <ScaleIcon className="size-4" />,
   },
   {
@@ -249,12 +252,12 @@ const stockNav = [
   },
   {
     title: "Material Request",
-    url: "/empty",
+    url: e("stock", "Material Request"),
     icon: <SendIcon className="size-4" />,
   },
   {
     title: "Reports",
-    url: "/empty",
+    url: e("stock", "Reports"),
     icon: <BarChart2Icon className="size-4" />,
     isActive: true,
     items: [
@@ -264,7 +267,7 @@ const stockNav = [
       },
       {
         title: "Stock Balance",
-        url: "/empty",
+        url: e("stock", "Stock Balance"),
       },
       {
         title: "Stock Analytics",
@@ -276,11 +279,11 @@ const stockNav = [
       },
       {
         title: "Purchase Receipt Trends",
-        url: "/empty",
+        url: e("stock", "Purchase Receipt Trends"),
       },
       {
         title: "Delivery Note Trends",
-        url: "/empty",
+        url: e("stock", "Delivery Note Trends"),
       },
     ],
   },
@@ -290,7 +293,7 @@ const stockNav = [
 const manufacturingNav = [
   {
     title: "Dashboard",
-    url: "/empty",
+    url: e("manufacturing", "Dashboard"),
     icon: <LayoutDashboardIcon className="size-4" />,
   },
   {
@@ -300,27 +303,27 @@ const manufacturingNav = [
   },
   {
     title: "Warehouse",
-    url: "/empty",
+    url: e("manufacturing", "Warehouse"),
     icon: <HomeIcon className="size-4" />,
   },
   {
     title: "BOM",
-    url: "/empty",
+    url: e("manufacturing", "BOM"),
     icon: <FileTextIcon className="size-4" />,
   },
   {
     title: "Work Order",
-    url: "/empty",
+    url: e("manufacturing", "Work Order"),
     icon: <FileCheckIcon className="size-4" />,
   },
   {
     title: "Job Card",
-    url: "/empty",
+    url: e("manufacturing", "Job Card"),
     icon: <UserCheckIcon className="size-4" />,
   },
   {
     title: "Stock Entry",
-    url: "/empty",
+    url: e("manufacturing", "Stock Entry"),
     icon: <ReceiptIcon className="size-4" />,
   },
   {
@@ -331,11 +334,11 @@ const manufacturingNav = [
     items: [
       {
         title: "Production Plan",
-        url: "/empty",
+        url: e("manufacturing", "Production Plan"),
       },
       {
         title: "Forecasting",
-        url: "/empty",
+        url: e("manufacturing", "Forecasting"),
       },
       {
         title: "Master Production Schedule",
@@ -343,44 +346,44 @@ const manufacturingNav = [
       },
       {
         title: "Sales Forecast",
-        url: "/empty",
+        url: e("manufacturing", "Sales Forecast"),
       },
       {
         title: "Production Planning Report",
-        url: "/empty",
+        url: e("manufacturing", "Production Planning Report"),
       },
     ],
   },
   {
     title: "Tools",
-    url: "/empty",
+    url: e("manufacturing", "Tools"),
     icon: <Settings2Icon className="size-4" />,
     items: [],
   },
   {
     title: "Reports",
-    url: "/empty",
+    url: e("manufacturing", "Reports"),
     icon: <BarChart2Icon className="size-4" />,
     items: [
       {
         title: "Production Planning Report",
-        url: "/empty",
+        url: e("manufacturing", "Reports Production Planning"),
       },
       {
         title: "Work Order Summary",
-        url: "/empty",
+        url: e("manufacturing", "Work Order Summary"),
       },
       {
         title: "Quality Inspection Summary",
-        url: "/empty",
+        url: e("manufacturing", "Quality Inspection Summary"),
       },
       {
         title: "Downtime Analysis",
-        url: "/empty",
+        url: e("manufacturing", "Downtime Analysis"),
       },
       {
         title: "Job Card Summary",
-        url: "/empty",
+        url: e("manufacturing", "Job Card Summary"),
       },
     ],
   },
@@ -404,19 +407,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Select dynamic navigation items based on current active workspace path
   const currentNav = React.useMemo(() => {
-    if (pathname === "/accounting" || pathname.startsWith("/accounting/")) {
+    if (
+      pathname === "/accounting" ||
+      pathname.startsWith("/accounting/") ||
+      pathname.startsWith("/empty/accounting/")
+    ) {
       return financialReportsNav
     }
     if (
       pathname === "/stock" ||
       pathname.startsWith("/stock/") ||
-      pathname === "/landed-cost-voucher"
+      pathname === "/landed-cost-voucher" ||
+      pathname.startsWith("/empty/stock/")
     ) {
       return stockNav
     }
     if (
       pathname === "/manufacturing" ||
-      pathname.startsWith("/manufacturing/")
+      pathname.startsWith("/manufacturing/") ||
+      pathname.startsWith("/empty/manufacturing/")
     ) {
       return manufacturingNav
     }

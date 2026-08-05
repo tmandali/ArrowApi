@@ -27,6 +27,7 @@ import {
   Settings,
   CornerDownLeft,
 } from "lucide-react"
+import { emptyModulePath } from "@/lib/empty-module"
 
 interface WorkspaceSearchDialogProps {
   open: boolean
@@ -39,6 +40,7 @@ export function WorkspaceSearchDialog({
 }: WorkspaceSearchDialogProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const e = emptyModulePath
 
   const handleSelect = (url: string) => {
     onOpenChange(false)
@@ -47,9 +49,22 @@ export function WorkspaceSearchDialog({
     }
   }
 
+  const workspace =
+    pathname.startsWith("/accounting") ||
+    pathname.startsWith("/empty/accounting/")
+      ? "accounting"
+      : pathname.startsWith("/stock") ||
+          pathname === "/landed-cost-voucher" ||
+          pathname.startsWith("/empty/stock/")
+        ? "stock"
+        : pathname.startsWith("/manufacturing") ||
+            pathname.startsWith("/empty/manufacturing/")
+          ? "manufacturing"
+          : "selling"
+
   // Define workspace-specific search categories & options based on route
   const getSearchContent = () => {
-    if (pathname === "/accounting") {
+    if (workspace === "accounting") {
       return (
         <>
           <CommandGroup heading="Financial Reports Pages">
@@ -58,29 +73,41 @@ export function WorkspaceSearchDialog({
               <span>Consolidated Report</span>
               <CommandShortcut>↵</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "Balance Sheet"))}
+            >
               <FileText className="size-4 mr-2" />
               <span>Balance Sheet</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "Profit and Loss"))}
+            >
               <TrendingUp className="size-4 mr-2" />
               <span>Profit and Loss</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "Cash Flow"))}
+            >
               <DollarSign className="size-4 mr-2" />
               <span>Cash Flow</span>
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Ledgers">
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "General Ledger"))}
+            >
               <BookOpen className="size-4 mr-2" />
               <span>General Ledger</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "Customer Ledger"))}
+            >
               <BookOpen className="size-4 mr-2" />
               <span>Customer Ledger</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("accounting", "Supplier Ledger"))}
+            >
               <BookOpen className="size-4 mr-2" />
               <span>Supplier Ledger</span>
             </CommandItem>
@@ -89,7 +116,7 @@ export function WorkspaceSearchDialog({
       )
     }
 
-    if (pathname === "/stock") {
+    if (workspace === "stock") {
       return (
         <>
           <CommandGroup heading="Stock Pages">
@@ -98,19 +125,27 @@ export function WorkspaceSearchDialog({
               <span>Serial No and Batch Traceability</span>
               <CommandShortcut>↵</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("stock", "Stock Entry"))}
+            >
               <Receipt className="size-4 mr-2" />
               <span>Stock Entry</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("stock", "Delivery Note"))}
+            >
               <Truck className="size-4 mr-2" />
               <span>Delivery Note</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("stock", "Stock Reconciliation"))}
+            >
               <Scale className="size-4 mr-2" />
               <span>Stock Reconciliation</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("stock", "Material Request"))}
+            >
               <Send className="size-4 mr-2" />
               <span>Material Request</span>
             </CommandItem>
@@ -120,7 +155,9 @@ export function WorkspaceSearchDialog({
               <BarChart2 className="size-4 mr-2" />
               <span>Stock Ledger</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("stock", "Stock Balance"))}
+            >
               <BarChart2 className="size-4 mr-2" />
               <span>Stock Balance</span>
             </CommandItem>
@@ -133,7 +170,7 @@ export function WorkspaceSearchDialog({
       )
     }
 
-    if (pathname === "/manufacturing") {
+    if (workspace === "manufacturing") {
       return (
         <>
           <CommandGroup heading="Manufacturing Settings & Forms">
@@ -142,19 +179,29 @@ export function WorkspaceSearchDialog({
               <span>Stock Settings</span>
               <CommandShortcut>↵</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("manufacturing", "BOM"))}
+            >
               <FileText className="size-4 mr-2" />
               <span>BOM (Bill of Materials)</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("manufacturing", "Work Order"))}
+            >
               <Factory className="size-4 mr-2" />
               <span>Work Order</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() => handleSelect(e("manufacturing", "Job Card"))}
+            >
               <UserCheck className="size-4 mr-2" />
               <span>Job Card</span>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem
+              onSelect={() =>
+                handleSelect(e("manufacturing", "Production Plan"))
+              }
+            >
               <Wrench className="size-4 mr-2" />
               <span>Material Planning</span>
             </CommandItem>
@@ -172,21 +219,35 @@ export function WorkspaceSearchDialog({
             <span>Sales Order (Subcontracting)</span>
             <CommandShortcut>↵</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect("/empty")}>
+          <CommandItem
+            onSelect={() =>
+              handleSelect(e("selling", "Inward Subcontracting Order"))
+            }
+          >
             <FileText className="size-4 mr-2" />
             <span>Subcontracting Order</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect("/empty")}>
+          <CommandItem
+            onSelect={() =>
+              handleSelect(e("selling", "Subcontracting Delivery"))
+            }
+          >
             <Truck className="size-4 mr-2" />
             <span>Subcontracting Delivery</span>
           </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Outward Orders">
-          <CommandItem onSelect={() => handleSelect("/empty")}>
+          <CommandItem
+            onSelect={() => handleSelect(e("selling", "Purchase Order"))}
+          >
             <Receipt className="size-4 mr-2" />
             <span>Purchase Order</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect("/empty")}>
+          <CommandItem
+            onSelect={() =>
+              handleSelect(e("selling", "Subcontracting Receipt"))
+            }
+          >
             <Receipt className="size-4 mr-2" />
             <span>Subcontracting Receipt</span>
           </CommandItem>
@@ -196,9 +257,9 @@ export function WorkspaceSearchDialog({
   }
 
   const getPlaceholder = () => {
-    if (pathname === "/accounting") return "Search Financial Reports..."
-    if (pathname === "/stock") return "Search Stock & Traceability..."
-    if (pathname === "/manufacturing") return "Search Manufacturing & BOM..."
+    if (workspace === "accounting") return "Search Financial Reports..."
+    if (workspace === "stock") return "Search Stock & Traceability..."
+    if (workspace === "manufacturing") return "Search Manufacturing & BOM..."
     return "Search Subcontracting & Orders..."
   }
 
