@@ -100,7 +100,7 @@ type ItemFormProps = {
   tabs?: ItemFormTab[]
   tabLabels?: Partial<Record<ItemFormTab, string>>
   defaultTab?: ItemFormTab
-  mode?: "item" | "stock-analytics"
+  mode?: "item" | "stock-analytics" | "stock-ledger"
   filtersOpen?: boolean
   onFiltersOpenChange?: (open: boolean) => void
   onRunReport?: () => void
@@ -139,6 +139,8 @@ export function ItemForm({
 }: ItemFormProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
+  const isStockLedger = mode === "stock-ledger"
+  const isReportShell = isStockAnalytics || isStockLedger
   const initialTab =
     defaultTab && visibleTabs.has(defaultTab)
       ? defaultTab
@@ -151,7 +153,7 @@ export function ItemForm({
   const [isZeroRated, setIsZeroRated] = React.useState(false)
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
-  const [showBanner, setShowBanner] = React.useState(!isStockAnalytics)
+  const [showBanner, setShowBanner] = React.useState(!isReportShell)
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
@@ -171,7 +173,7 @@ export function ItemForm({
   return (
     <div
       className={
-        isStockAnalytics
+        isReportShell
           ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
           : "contents"
       }
@@ -191,7 +193,7 @@ export function ItemForm({
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
-              {isStockAnalytics ? (
+              {isReportShell ? (
                 <>
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
@@ -201,7 +203,7 @@ export function ItemForm({
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage className="font-semibold text-foreground">
-                      Stock Analytics
+                      {isStockLedger ? "Stock Ledger" : "Stock Analytics"}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
@@ -222,7 +224,7 @@ export function ItemForm({
               )}
             </BreadcrumbList>
           </Breadcrumb>
-          {!isStockAnalytics ? (
+          {!isReportShell ? (
             <Badge className="ml-2 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium">
               Variant
             </Badge>
@@ -320,6 +322,19 @@ export function ItemForm({
               </Button>
               <AIChatAssistant variant="toolbar" />
             </>
+          ) : isStockLedger ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-7"
+                aria-label="Refresh"
+              >
+                <RefreshCw className="size-3.5" />
+              </Button>
+              <AIChatAssistant variant="toolbar" />
+            </>
           ) : (
             <>
               <ButtonGroup>
@@ -385,7 +400,7 @@ export function ItemForm({
         </div>
       </header>
 
-      {showBanner && !isStockAnalytics ? (
+      {showBanner && !isReportShell ? (
         <div className="flex items-center justify-between gap-3 border-b bg-sky-500/10 px-4 py-2 text-xs text-sky-900 dark:text-sky-100">
           <p>
             This Item is a Variant of{" "}
@@ -407,7 +422,7 @@ export function ItemForm({
 
       <div
         className={
-          isStockAnalytics
+          isReportShell
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
             : "flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row"
         }
@@ -439,7 +454,13 @@ export function ItemForm({
           </TabsList>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div
+          className={
+            isReportShell
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "flex min-h-0 flex-1 flex-col overflow-y-auto"
+          }
+        >
         {visibleTabs.has("details") ? (
         <TabsContent
           value="details"
@@ -652,16 +673,18 @@ export function ItemForm({
           </TabsContent>
         ))}
 
+        {!isReportShell ? (
           <div className="space-y-6 px-6 pb-6 pt-2">
             <Separator />
             <DocumentComments />
             <DocumentActivity />
           </div>
+        ) : null}
         </div>
       </Tabs>
       )}
 
-          {!isStockAnalytics ? (
+          {!isReportShell ? (
           <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10 overflow-y-auto shrink-0">
             <ItemImageUpload />
 

@@ -260,7 +260,7 @@ const stockNav = [
     items: [
       {
         title: "Stock Ledger",
-        url: "/empty",
+        url: "/stock/stock-ledger",
       },
       {
         title: "Stock Balance",

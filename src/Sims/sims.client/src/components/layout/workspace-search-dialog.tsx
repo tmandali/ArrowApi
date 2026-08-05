@@ -116,7 +116,7 @@ export function WorkspaceSearchDialog({
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Stock Reports">
-            <CommandItem onSelect={() => handleSelect("/empty")}>
+            <CommandItem onSelect={() => handleSelect("/stock/stock-ledger")}>
               <BarChart2 className="size-4 mr-2" />
               <span>Stock Ledger</span>
             </CommandItem>

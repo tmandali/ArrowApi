@@ -10,6 +10,7 @@ import UserSettingsPage from "@/pages/UserSettingsPage"
 import EmptyPage from "@/pages/EmptyPage"
 import ItemPage from "@/pages/ItemPage"
 import StockAnalyticsPage from "@/pages/StockAnalyticsPage"
+import StockLedgerPage from "@/pages/StockLedgerPage"
 
 export function AppRoutes() {
   return (
@@ -22,6 +23,7 @@ export function AppRoutes() {
       <Route path="stock" element={<StockPage />} />
       <Route path="stock/item" element={<ItemPage />} />
       <Route path="stock/stock-analytics" element={<StockAnalyticsPage />} />
+      <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
       <Route path="products" element={<Navigate to="/stock/item" replace />} />
       <Route path="manufacturing" element={<ManufacturingPage />} />
       <Route path="landed-cost-voucher" element={<LandedCostVoucherPage />} />
