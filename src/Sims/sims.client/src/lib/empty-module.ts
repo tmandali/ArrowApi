@@ -15,8 +15,9 @@ export function unslugifyModule(slug: string) {
     .join(" ")
 }
 
+/** Workspace module URL: /{workspace}/{slug} (unimplemented → 404) */
 export function emptyModulePath(workspace: string, title: string) {
-  return `/empty/${slugifyModule(workspace)}/${slugifyModule(title)}`
+  return `/${slugifyModule(workspace)}/${slugifyModule(title)}`
 }
 
 export const emptyWorkspaceHome: Record<string, { label: string; url: string }> =

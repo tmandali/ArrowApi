@@ -50,15 +50,11 @@ export function WorkspaceSearchDialog({
   }
 
   const workspace =
-    pathname.startsWith("/accounting") ||
-    pathname.startsWith("/empty/accounting/")
+    pathname.startsWith("/accounting")
       ? "accounting"
-      : pathname.startsWith("/stock") ||
-          pathname === "/landed-cost-voucher" ||
-          pathname.startsWith("/empty/stock/")
+      : pathname.startsWith("/stock") || pathname === "/landed-cost-voucher"
         ? "stock"
-        : pathname.startsWith("/manufacturing") ||
-            pathname.startsWith("/empty/manufacturing/")
+        : pathname.startsWith("/manufacturing")
           ? "manufacturing"
           : "selling"
 

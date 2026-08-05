@@ -8,7 +8,6 @@ import {
   FileCheckIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
-  FileQuestionIcon,
   HomeIcon,
   LayoutDashboardIcon,
   ReceiptIcon,
@@ -20,11 +19,7 @@ import {
   UserCheckIcon,
   WrenchIcon,
 } from "lucide-react"
-import {
-  emptyModulePath,
-  slugifyModule,
-  unslugifyModule,
-} from "@/lib/empty-module"
+import { emptyModulePath } from "@/lib/empty-module"
 
 const e = emptyModulePath
 
@@ -43,12 +38,6 @@ export type WorkspaceNavItem = {
 }
 
 export type WorkspaceId = "selling" | "accounting" | "stock" | "manufacturing"
-
-export type EmptyModuleMeta = {
-  title: string
-  icon: LucideIcon
-  workspace: WorkspaceId
-}
 
 export const subcontractingNav: WorkspaceNavItem[] = [
   {
@@ -311,85 +300,20 @@ export const workspaceNavById: Record<WorkspaceId, WorkspaceNavItem[]> = {
   manufacturing: manufacturingNav,
 }
 
-function parseEmptyPath(url: string) {
-  const match = url.match(/^\/empty\/([^/]+)\/([^/?#]+)/)
-  if (!match) return null
-  return { workspace: match[1], slug: match[2] }
-}
-
-function buildEmptyModuleIndex() {
-  const index = new Map<string, EmptyModuleMeta>()
-
-  for (const [workspace, items] of Object.entries(workspaceNavById) as [
-    WorkspaceId,
-    WorkspaceNavItem[],
-  ][]) {
-    const register = (
-      title: string,
-      url: string,
-      icon: EmptyModuleMeta["icon"]
-    ) => {
-      const parsed = parseEmptyPath(url)
-      if (!parsed) return
-      index.set(`${parsed.workspace}/${parsed.slug}`, {
-        title,
-        icon,
-        workspace,
-      })
-    }
-
-    for (const item of items) {
-      register(item.title, item.url, item.icon)
-      for (const sub of item.items ?? []) {
-        register(sub.title, sub.url, sub.icon ?? item.icon)
-      }
-    }
-  }
-
-  return index
-}
-
-const emptyModuleIndex = buildEmptyModuleIndex()
-
-export function resolveEmptyModule(
-  workspace: string,
-  slug: string
-): EmptyModuleMeta {
-  const key = `${slugifyModule(workspace)}/${slugifyModule(slug)}`
-  const matched = emptyModuleIndex.get(key)
-  if (matched) return matched
-
-  const workspaceId = (
-    workspace in workspaceNavById ? workspace : "selling"
-  ) as WorkspaceId
-
-  return {
-    title: unslugifyModule(slug),
-    icon: FileQuestionIcon,
-    workspace: workspaceId,
-  }
-}
-
 export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
-  if (
-    pathname === "/accounting" ||
-    pathname.startsWith("/accounting/") ||
-    pathname.startsWith("/empty/accounting/")
-  ) {
+  if (pathname === "/accounting" || pathname.startsWith("/accounting/")) {
     return financialReportsNav
   }
   if (
     pathname === "/stock" ||
     pathname.startsWith("/stock/") ||
-    pathname === "/landed-cost-voucher" ||
-    pathname.startsWith("/empty/stock/")
+    pathname === "/landed-cost-voucher"
   ) {
     return stockNav
   }
   if (
     pathname === "/manufacturing" ||
-    pathname.startsWith("/manufacturing/") ||
-    pathname.startsWith("/empty/manufacturing/")
+    pathname.startsWith("/manufacturing/")
   ) {
     return manufacturingNav
   }

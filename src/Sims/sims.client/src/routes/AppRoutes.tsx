@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react"
-import { Navigate, Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes, useParams } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { AppLayout } from "@/components/layout/app-layout"
 
@@ -14,7 +14,7 @@ const StockLedgerPage = lazy(() => import("@/pages/StockLedgerPage"))
 const ManufacturingPage = lazy(() => import("@/pages/ManufacturingPage"))
 const LandedCostVoucherPage = lazy(() => import("@/pages/LandedCostVoucherPage"))
 const UserSettingsPage = lazy(() => import("@/pages/UserSettingsPage"))
-const EmptyPage = lazy(() => import("@/pages/EmptyPage"))
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"))
 
 function RouteFallback() {
   return (
@@ -23,6 +23,24 @@ function RouteFallback() {
       Yükleniyor…
     </div>
   )
+}
+
+/** /empty/{workspace}/{slug} → /{workspace}/{slug} */
+function LegacyEmptyPrefixRedirect() {
+  const { workspace = "selling", slug = "module" } = useParams<{
+    workspace: string
+    slug: string
+  }>()
+  return <Navigate to={`/${workspace}/${slug}`} replace />
+}
+
+/** /{workspace}/empty/{slug} → /{workspace}/{slug} */
+function LegacyWorkspaceEmptyRedirect() {
+  const { workspace = "selling", slug = "module" } = useParams<{
+    workspace: string
+    slug: string
+  }>()
+  return <Navigate to={`/${workspace}/${slug}`} replace />
 }
 
 export function AppRoutes() {
@@ -42,11 +60,15 @@ export function AppRoutes() {
           <Route path="manufacturing" element={<ManufacturingPage />} />
           <Route path="landed-cost-voucher" element={<LandedCostVoucherPage />} />
           <Route path="user-settings" element={<UserSettingsPage />} />
-          <Route path="empty/:workspace/:slug" element={<EmptyPage />} />
           <Route
-            path="empty"
-            element={<Navigate to="/empty/selling/module" replace />}
+            path="empty/:workspace/:slug"
+            element={<LegacyEmptyPrefixRedirect />}
           />
+          <Route
+            path=":workspace/empty/:slug"
+            element={<LegacyWorkspaceEmptyRedirect />}
+          />
+          <Route path="empty" element={<Navigate to="/" replace />} />
         </Route>
 
         <Route element={<AppLayout fullHeight />}>
@@ -58,7 +80,13 @@ export function AppRoutes() {
           <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route element={<AppLayout />}>
+          <Route path="stock/*" element={<NotFoundPage />} />
+          <Route path="accounting/*" element={<NotFoundPage />} />
+          <Route path="manufacturing/*" element={<NotFoundPage />} />
+          <Route path="selling/*" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Routes>
     </Suspense>
   )

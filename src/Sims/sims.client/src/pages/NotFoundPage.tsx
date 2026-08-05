@@ -20,19 +20,25 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { emptyWorkspaceHome } from "@/lib/empty-module"
-import { resolveEmptyModule } from "@/lib/workspace-nav"
-import { Plus, ArrowLeft } from "lucide-react"
-import { Link, useParams } from "react-router-dom"
+import { FileQuestion, ArrowLeft, Home } from "lucide-react"
+import { Link, useLocation } from "react-router-dom"
 
-export default function EmptyModulePage() {
-  const { workspace = "selling", slug = "module" } = useParams<{
-    workspace: string
-    slug: string
-  }>()
-  const module = resolveEmptyModule(workspace, slug)
-  const ModuleIcon = module.icon
-  const workspaceMeta =
-    emptyWorkspaceHome[module.workspace] ?? emptyWorkspaceHome.selling
+function workspaceHomeFromPath(pathname: string): { label: string; url: string } {
+  if (pathname.startsWith("/stock") || pathname === "/landed-cost-voucher") {
+    return emptyWorkspaceHome.stock
+  }
+  if (pathname.startsWith("/accounting")) {
+    return emptyWorkspaceHome.accounting
+  }
+  if (pathname.startsWith("/manufacturing")) {
+    return emptyWorkspaceHome.manufacturing
+  }
+  return emptyWorkspaceHome.selling
+}
+
+export default function NotFoundPage() {
+  const { pathname } = useLocation()
+  const home = workspaceHomeFromPath(pathname)
 
   return (
     <>
@@ -47,14 +53,13 @@ export default function EmptyModulePage() {
             <BreadcrumbList className="text-xs">
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to={workspaceMeta.url}>{workspaceMeta.label}</Link>
+                  <Link to={home.url}>{home.label}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage className="inline-flex items-center gap-2 font-semibold text-foreground">
-                  <ModuleIcon className="size-4 shrink-0" />
-                  <span>{module.title}</span>
+                <BreadcrumbPage className="font-semibold text-foreground">
+                  Not Found
                 </BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
@@ -67,35 +72,42 @@ export default function EmptyModulePage() {
       </header>
 
       <WorkspaceAiDock>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <Empty className="max-w-md border rounded-xl bg-card p-10">
+        <div className="flex flex-1 items-center justify-center p-6">
+          <Empty className="max-w-md rounded-xl border bg-card p-10">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <ModuleIcon className="size-4 text-muted-foreground" />
+                <FileQuestion className="size-4 text-muted-foreground" />
               </EmptyMedia>
               <EmptyTitle className="text-base font-semibold">
-                {module.title}
+                404 — Page not found
               </EmptyTitle>
               <EmptyDescription>
-                {module.title} modülü için henüz kayıt bulunmuyor. Yeni bir kayıt
-                ekleyebilir veya {workspaceMeta.label} alanına dönebilirsiniz.
+                <span className="block break-all font-mono text-[11px] text-muted-foreground/80">
+                  {pathname}
+                </span>
+                <span className="mt-2 block">
+                  This page does not exist or has not been implemented yet.
+                </span>
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
               <div className="flex items-center gap-2 pt-2">
-                <Button size="sm" className="h-8 text-xs gap-1.5" asChild>
-                  <Link to={workspaceMeta.url}>
+                <Button size="sm" className="h-8 gap-1.5 text-xs" asChild>
+                  <Link to={home.url}>
                     <ArrowLeft className="size-3.5" />
-                    {workspaceMeta.label} Sayfasına Dön
+                    Back to {home.label}
                   </Link>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5"
+                  className="h-8 gap-1.5 text-xs"
+                  asChild
                 >
-                  <Plus className="size-3.5" />
-                  Yeni {module.title}
+                  <Link to="/">
+                    <Home className="size-3.5" />
+                    Home
+                  </Link>
                 </Button>
               </div>
             </EmptyContent>

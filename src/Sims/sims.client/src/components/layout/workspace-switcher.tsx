@@ -36,23 +36,16 @@ export function WorkspaceSwitcher({
   const currentWorkspace = React.useMemo(() => {
     if (
       pathname === "/landed-cost-voucher" ||
-      pathname.startsWith("/manufacturing") ||
-      pathname.startsWith("/empty/manufacturing/")
+      pathname.startsWith("/manufacturing")
     ) {
       return (
         workspaces.find((ws) => ws.name === "Manufacturing") || workspaces[0]
       )
     }
-    if (
-      pathname.startsWith("/stock") ||
-      pathname.startsWith("/empty/stock/")
-    ) {
+    if (pathname.startsWith("/stock")) {
       return workspaces.find((ws) => ws.name === "Stock") || workspaces[0]
     }
-    if (
-      pathname.startsWith("/accounting") ||
-      pathname.startsWith("/empty/accounting/")
-    ) {
+    if (pathname.startsWith("/accounting")) {
       return (
         workspaces.find((ws) => ws.name === "Financial Reports") ||
         workspaces[0]
