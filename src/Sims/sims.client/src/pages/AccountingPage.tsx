@@ -8,6 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -362,6 +363,7 @@ export default function AccountingPage() {
           </div>
         </header>
 
+        <WorkspaceAiDock>
         {/* Top Controls & Filter Panel */}
         <div className="p-4 space-y-4 border-b bg-muted/10">
           {/* Row 1: Filter Selectors */}
@@ -608,6 +610,7 @@ export default function AccountingPage() {
             </Button>
           </div>
         </div>
+        </WorkspaceAiDock>
     </>
   )
 }

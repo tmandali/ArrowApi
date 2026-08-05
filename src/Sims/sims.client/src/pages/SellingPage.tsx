@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Separator } from "@/components/ui/separator"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Collapsible,
@@ -177,6 +178,7 @@ export default function SellingPage() {
           </div>
         </header>
 
+        <WorkspaceAiDock>
         {/* Standard shadcn Tabs Container */}
         <Tabs defaultValue="details" className="flex flex-1 flex-col overflow-hidden">
           <div className="border-b bg-background px-4 py-1">
@@ -520,6 +522,7 @@ export default function SellingPage() {
             Connected Documents & Links
           </TabsContent>
       </Tabs>
+        </WorkspaceAiDock>
     </>
   )
 }

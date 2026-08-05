@@ -51,6 +51,8 @@ import {
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
 import {
@@ -235,16 +237,12 @@ export function ItemForm({
         <div className="flex shrink-0 items-center gap-2">
           {isStockAnalytics ? (
             <>
-              <Button
-                type="button"
-                variant={filtersOpen ? "secondary" : "outline"}
-                size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5"
-                onClick={() => onFiltersOpenChange?.(!filtersOpen)}
-              >
-                <Search className="size-3.5" />
-                Query
-              </Button>
+              <WorkspaceSidePanelTrigger
+                open={!!filtersOpen}
+                onOpenChange={(open) => onFiltersOpenChange?.(open)}
+                icon={Search}
+                label="Query"
+              />
 
               <Button
                 type="button"
@@ -421,11 +419,11 @@ export function ItemForm({
         </div>
       ) : null}
 
-      <div
+      <WorkspaceAiDock
         className={
           isReportShell
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row"
+            ? "overflow-hidden"
+            : "overflow-hidden lg:flex-row"
         }
       >
       {isStockAnalytics ? (
@@ -796,7 +794,7 @@ export function ItemForm({
             </div>
           </div>
           ) : null}
-      </div>
+      </WorkspaceAiDock>
     </div>
   )
 }

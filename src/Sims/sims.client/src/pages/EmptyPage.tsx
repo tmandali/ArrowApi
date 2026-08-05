@@ -7,6 +7,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -65,40 +66,42 @@ export default function EmptyModulePage() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6">
-        <Empty className="max-w-md border rounded-xl bg-card p-10">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ModuleIcon className="size-4 text-muted-foreground" />
-            </EmptyMedia>
-            <EmptyTitle className="text-base font-semibold">
-              {module.title}
-            </EmptyTitle>
-            <EmptyDescription>
-              {module.title} modülü için henüz kayıt bulunmuyor. Yeni bir kayıt
-              ekleyebilir veya {workspaceMeta.label} alanına dönebilirsiniz.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <div className="flex items-center gap-2 pt-2">
-              <Button size="sm" className="h-8 text-xs gap-1.5" asChild>
-                <Link to={workspaceMeta.url}>
-                  <ArrowLeft className="size-3.5" />
-                  {workspaceMeta.label} Sayfasına Dön
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1.5"
-              >
-                <Plus className="size-3.5" />
-                Yeni {module.title}
-              </Button>
-            </div>
-          </EmptyContent>
-        </Empty>
-      </div>
+      <WorkspaceAiDock>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <Empty className="max-w-md border rounded-xl bg-card p-10">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ModuleIcon className="size-4 text-muted-foreground" />
+              </EmptyMedia>
+              <EmptyTitle className="text-base font-semibold">
+                {module.title}
+              </EmptyTitle>
+              <EmptyDescription>
+                {module.title} modülü için henüz kayıt bulunmuyor. Yeni bir kayıt
+                ekleyebilir veya {workspaceMeta.label} alanına dönebilirsiniz.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex items-center gap-2 pt-2">
+                <Button size="sm" className="h-8 text-xs gap-1.5" asChild>
+                  <Link to={workspaceMeta.url}>
+                    <ArrowLeft className="size-3.5" />
+                    {workspaceMeta.label} Sayfasına Dön
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Plus className="size-3.5" />
+                  Yeni {module.title}
+                </Button>
+              </div>
+            </EmptyContent>
+          </Empty>
+        </div>
+      </WorkspaceAiDock>
     </>
   )
 }

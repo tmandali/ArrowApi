@@ -8,6 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -289,6 +290,7 @@ export default function StockPage() {
           </div>
         </header>
 
+        <WorkspaceAiDock>
         {/* Filter Controls Row */}
         <div className="p-4 border-b bg-muted/10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -404,6 +406,7 @@ export default function StockPage() {
             </div>
           </div>
         </div>
+        </WorkspaceAiDock>
     </>
   )
 }

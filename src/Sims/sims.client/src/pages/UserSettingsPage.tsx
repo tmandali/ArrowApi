@@ -8,6 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -144,6 +145,7 @@ export default function UserSettingsPage() {
           </div>
         </header>
 
+        <WorkspaceAiDock>
         {/* Tabs Component (variant="line") matching selling template */}
         <Tabs defaultValue="user-details" className="flex flex-1 flex-col overflow-hidden">
           <div className="border-b bg-background px-4 py-1">
@@ -649,6 +651,7 @@ export default function UserSettingsPage() {
             Connected Social Logins & Roles
           </TabsContent>
       </Tabs>
+        </WorkspaceAiDock>
     </>
   )
 }

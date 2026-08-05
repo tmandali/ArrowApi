@@ -8,6 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -110,6 +111,7 @@ export default function LandedCostVoucherPage() {
           </div>
         </header>
 
+        <WorkspaceAiDock>
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           {/* Top Form Fields Grid */}
@@ -320,6 +322,7 @@ export default function LandedCostVoucherPage() {
             </div>
           </div>
         </div>
+        </WorkspaceAiDock>
     </>
   )
 }

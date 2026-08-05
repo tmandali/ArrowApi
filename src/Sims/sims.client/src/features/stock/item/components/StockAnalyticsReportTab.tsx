@@ -50,10 +50,9 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
+  WorkspaceSidePanelLayout,
+  WORKSPACE_SIDE_PANEL_PERCENT,
+} from "@/components/layout/workspace-side-panel"
 import { cn } from "@/utils/cn"
 import { useStockAnalyticsReport } from "@/context/stock-analytics-report"
 import type { ReportGridRow } from "../types/stock-analytics"
@@ -62,7 +61,6 @@ import {
   Calendar as CalendarIcon,
   CalendarRange,
   ChevronDown,
-  ChevronRight,
   CircleDollarSign,
   Layers,
   Play,
@@ -80,8 +78,7 @@ const headClass =
   "h-8 px-2 py-1.5 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-tight text-muted-foreground bg-muted/40 align-middle"
 
 /** Shared layout % — Filters panel and Account column stay aligned. */
-const FILTERS_WIDTH_PERCENT = 20
-const REPORT_WIDTH_PERCENT = 100 - FILTERS_WIDTH_PERCENT
+const FILTERS_WIDTH_PERCENT = WORKSPACE_SIDE_PANEL_PERCENT
 const ACCOUNT_COL_STYLE = { width: `${FILTERS_WIDTH_PERCENT}%` } as const
 
 type FilterKey =
@@ -410,16 +407,180 @@ export function StockAnalyticsReportTab({
       )
     })
 
+  const queryPanel = (
+    <>
+      <ScrollArea className="h-0 min-h-0 flex-1">
+        <div className="py-1">
+          {filterCriteria.map((criterion) => {
+            const Icon = criterion.icon
+            const chips = filterChips[criterion.key]
+            const isOpen = openPicker === criterion.key
+            return (
+              <div key={criterion.key} className="px-1">
+                <Popover
+                  open={isOpen}
+                  onOpenChange={(open) =>
+                    setOpenPicker(open ? criterion.key : null)
+                  }
+                >
+                  <PopoverAnchor asChild>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenPicker(isOpen ? null : criterion.key)
+                      }
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50"
+                    >
+                      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate text-foreground">
+                        {criterion.label}
+                      </span>
+                    </button>
+                  </PopoverAnchor>
+                  <PopoverContent
+                    align="start"
+                    side="bottom"
+                    sideOffset={4}
+                    className="w-56 gap-0 rounded-md p-1 shadow-md ring-1 ring-border"
+                  >
+                    <Command className="rounded-md bg-transparent p-0">
+                      <CommandList className="max-h-56">
+                        <CommandEmpty className="py-3 text-xs">
+                          No results.
+                        </CommandEmpty>
+                        <CommandGroup className="p-0">
+                          {criterion.options.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.label}
+                              data-checked={
+                                selectedValue[criterion.key] ===
+                                  option.value || undefined
+                              }
+                              className="rounded-md px-2.5 py-1.5 text-xs"
+                              onSelect={() => {
+                                applyFilterOption(
+                                  criterion.key,
+                                  option.value
+                                )
+                                setOpenPicker(null)
+                              }}
+                            >
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                      <CommandSeparator />
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
+                        onClick={() => {
+                          setOpenPicker(null)
+                          setActiveFilter(criterion.key)
+                        }}
+                      >
+                        <Search className="size-3.5 text-muted-foreground" />
+                        Advanced Search
+                      </button>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {chips.length > 0 ? (
+                  <div className="space-y-0.5 pb-1 pl-7 pr-1">
+                    {chips.map((chip) => (
+                      <div
+                        key={chip}
+                        className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted/40"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {chip}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Clear ${criterion.label}`}
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/70 opacity-70 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          onClick={() => clearFilter(criterion.key)}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+
+          <Separator className="my-2" />
+
+          <div className="space-y-2.5 px-3 py-1">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="sa-show-zero"
+                checked={showZeroValues}
+                onCheckedChange={(checked) =>
+                  setShowZeroValues(!!checked)
+                }
+              />
+              <Label
+                htmlFor="sa-show-zero"
+                className="cursor-pointer text-xs font-normal leading-snug"
+              >
+                Show zero values
+              </Label>
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="sa-show-group"
+                checked={showGroupAccounts}
+                onCheckedChange={(checked) =>
+                  setShowGroupAccounts(!!checked)
+                }
+              />
+              <Label
+                htmlFor="sa-show-group"
+                className="cursor-pointer text-xs font-normal leading-snug"
+              >
+                Show Group Accounts
+              </Label>
+            </div>
+          </div>
+        </div>
+      </ScrollArea>
+
+      <div className="shrink-0 border-t p-3">
+        <Button
+          type="button"
+          className={cn(
+            "h-8 w-full gap-1.5 text-xs",
+            primaryActionButtonProps.className
+          )}
+          variant={primaryActionButtonProps.variant}
+          onClick={onPrimaryAction}
+        >
+          {runStatus === "running" ? (
+            <X className="size-3.5" />
+          ) : isPendingView ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Play className="size-3.5" />
+          )}
+          {primaryActionLabel}
+        </Button>
+      </div>
+    </>
+  )
+
   return (
-    <ResizablePanelGroup
-      key={filtersOpen ? "split" : "full"}
-      orientation="horizontal"
-      className="h-full min-h-0 w-full"
+    <>
+    <WorkspaceSidePanelLayout
+      open={filtersOpen}
+      onOpenChange={setFiltersOpen}
+      title="Query"
+      collapseLabel="Collapse filters"
+      panel={queryPanel}
     >
-      <ResizablePanel
-        defaultSize={filtersOpen ? String(REPORT_WIDTH_PERCENT) : "100"}
-        minSize="45"
-      >
         <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 gap-3">
           {showGrid ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
@@ -627,198 +788,7 @@ export function StockAnalyticsReportTab({
             </div>
           )}
         </div>
-      </ResizablePanel>
-
-      {filtersOpen ? (
-        <>
-          <ResizableHandle withHandle />
-          <ResizablePanel
-            defaultSize={String(FILTERS_WIDTH_PERCENT)}
-            minSize={String(FILTERS_WIDTH_PERCENT)}
-            maxSize="40"
-            collapsible
-            collapsedSize={0}
-            onResize={(size) => {
-              if (size.asPercentage <= 0 || size.inPixels <= 0) {
-                setFiltersOpen(false)
-              }
-            }}
-          >
-            <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/10">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(false)}
-                className="flex shrink-0 w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
-                aria-label="Collapse filters"
-              >
-                <span className="text-sm font-semibold">Query</span>
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </button>
-
-              <ScrollArea className="h-0 min-h-0 flex-1">
-                <div className="py-1">
-                  {filterCriteria.map((criterion) => {
-                    const Icon = criterion.icon
-                    const chips = filterChips[criterion.key]
-                    const isOpen = openPicker === criterion.key
-                    return (
-                      <div key={criterion.key} className="px-1">
-                        <Popover
-                          open={isOpen}
-                          onOpenChange={(open) =>
-                            setOpenPicker(open ? criterion.key : null)
-                          }
-                        >
-                          <PopoverAnchor asChild>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenPicker(isOpen ? null : criterion.key)
-                              }
-                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50"
-                            >
-                              <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                              <span className="min-w-0 flex-1 truncate text-foreground">
-                                {criterion.label}
-                              </span>
-                            </button>
-                          </PopoverAnchor>
-                          <PopoverContent
-                            align="start"
-                            side="bottom"
-                            sideOffset={4}
-                            className="w-56 gap-0 rounded-md p-1 shadow-md ring-1 ring-border"
-                          >
-                            <Command className="rounded-md bg-transparent p-0">
-                              <CommandList className="max-h-56">
-                                <CommandEmpty className="py-3 text-xs">
-                                  No results.
-                                </CommandEmpty>
-                                <CommandGroup className="p-0">
-                                  {criterion.options.map((option) => (
-                                    <CommandItem
-                                      key={option.value}
-                                      value={option.label}
-                                      data-checked={
-                                        selectedValue[criterion.key] ===
-                                          option.value || undefined
-                                      }
-                                      className="rounded-md px-2.5 py-1.5 text-xs"
-                                      onSelect={() => {
-                                        applyFilterOption(
-                                          criterion.key,
-                                          option.value
-                                        )
-                                        setOpenPicker(null)
-                                      }}
-                                    >
-                                      {option.label}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                              <CommandSeparator />
-                              <button
-                                type="button"
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-muted"
-                                onClick={() => {
-                                  setOpenPicker(null)
-                                  setActiveFilter(criterion.key)
-                                }}
-                              >
-                                <Search className="size-3.5 text-muted-foreground" />
-                                Advanced Search
-                              </button>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {chips.length > 0 ? (
-                          <div className="space-y-0.5 pb-1 pl-7 pr-1">
-                            {chips.map((chip) => (
-                              <div
-                                key={chip}
-                                className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted/40"
-                              >
-                                <span className="min-w-0 flex-1 truncate">
-                                  {chip}
-                                </span>
-                                <button
-                                  type="button"
-                                  aria-label={`Clear ${criterion.label}`}
-                                  className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/70 opacity-70 transition-opacity hover:text-foreground group-hover:opacity-100"
-                                  onClick={() => clearFilter(criterion.key)}
-                                >
-                                  <X className="size-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-
-                  <Separator className="my-2" />
-
-                  <div className="space-y-2.5 px-3 py-1">
-                    <div className="flex items-start gap-2">
-                      <Checkbox
-                        id="sa-show-zero"
-                        checked={showZeroValues}
-                        onCheckedChange={(checked) =>
-                          setShowZeroValues(!!checked)
-                        }
-                      />
-                      <Label
-                        htmlFor="sa-show-zero"
-                        className="text-xs font-normal leading-snug cursor-pointer"
-                      >
-                        Show zero values
-                      </Label>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Checkbox
-                        id="sa-show-group"
-                        checked={showGroupAccounts}
-                        onCheckedChange={(checked) =>
-                          setShowGroupAccounts(!!checked)
-                        }
-                      />
-                      <Label
-                        htmlFor="sa-show-group"
-                        className="text-xs font-normal leading-snug cursor-pointer"
-                      >
-                        Show Group Accounts
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              </ScrollArea>
-
-              <div className="shrink-0 border-t p-3">
-                <Button
-                  type="button"
-                  className={cn(
-                    "w-full h-8 text-xs gap-1.5",
-                    primaryActionButtonProps.className
-                  )}
-                  variant={primaryActionButtonProps.variant}
-                  onClick={onPrimaryAction}
-                >
-                  {runStatus === "running" ? (
-                    <X className="size-3.5" />
-                  ) : isPendingView ? (
-                    <Check className="size-3.5" />
-                  ) : (
-                    <Play className="size-3.5" />
-                  )}
-                  {primaryActionLabel}
-                </Button>
-              </div>
-            </aside>
-          </ResizablePanel>
-        </>
-      ) : null}
+    </WorkspaceSidePanelLayout>
 
       <Dialog
         open={activeFilter !== null}
@@ -981,6 +951,6 @@ export function StockAnalyticsReportTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </ResizablePanelGroup>
+    </>
   )
 }
