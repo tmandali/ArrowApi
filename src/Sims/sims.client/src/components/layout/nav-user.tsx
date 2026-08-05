@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
   Avatar,
@@ -22,6 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { cn } from "@/utils/cn"
 import {
   ChevronsUpDown,
@@ -52,6 +53,8 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { theme, setTheme } = useTheme()
+  const navigate = useNavigate()
+  const { clearJobSession } = useJobSession()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -68,6 +71,11 @@ export function NavUser({
     : "NB"
 
   const activeTheme = mounted ? (theme ?? "system") : "system"
+
+  const handleSignOut = () => {
+    clearJobSession()
+    navigate("/login")
+  }
 
   return (
     <SidebarMenu>
@@ -174,7 +182,10 @@ export function NavUser({
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem className="cursor-pointer">
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onSelect={handleSignOut}
+            >
               <LogOut />
               Sign Out
               <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>

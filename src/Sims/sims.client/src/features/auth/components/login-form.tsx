@@ -1,3 +1,5 @@
+import * as React from "react"
+import { useNavigate } from "react-router-dom"
 import { cn } from "@/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,11 +16,22 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { useJobSession } from "@/features/auth/hooks/use-job-session"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const navigate = useNavigate()
+  const { resyncJobSession } = useJobSession()
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    // Auth stub: gerçek login gelince buraya token/session bağlanacak.
+    resyncJobSession()
+    navigate("/")
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -29,7 +42,7 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useWorkspaceNotifications } from "@/context/workspace-notifications"
+import { useJobSync } from "@/context/job-sync-provider"
 import { ApiError } from "@/services"
 import { stockAnalyticsService } from "@/features/stock/item/services/stock-analytics-service"
 import type {
@@ -160,7 +160,7 @@ export function StockAnalyticsReportProvider({
 }: {
   children: React.ReactNode
 }) {
-  const { pushNotification } = useWorkspaceNotifications()
+  const { trackJob, waitUntilTerminal, cancelTrackedJob } = useJobSync()
 
   const [expandedNodes, setExpandedNodes] =
     React.useState<Record<string, boolean>>({})
@@ -184,6 +184,7 @@ export function StockAnalyticsReportProvider({
 
   const runIdRef = React.useRef(0)
   const abortRef = React.useRef<AbortController | null>(null)
+  const activeJobIdRef = React.useRef<string | null>(null)
   const running = runStatus === "running"
 
   const toggleNode = React.useCallback((id: string) => {
@@ -214,7 +215,12 @@ export function StockAnalyticsReportProvider({
 
   const cancelReport = React.useCallback(() => {
     runIdRef.current += 1
+    const jobId = activeJobIdRef.current
+    activeJobIdRef.current = null
     abortRef.current?.abort()
+    if (jobId) {
+      void cancelTrackedJob(jobId)
+    }
     setRunStatus("cancelled")
     setRunEvents((prev) => [
       ...prev,
@@ -226,7 +232,7 @@ export function StockAnalyticsReportProvider({
         tone: "danger",
       },
     ])
-  }, [])
+  }, [cancelTrackedJob])
 
   const confirmReportReady = React.useCallback(() => {
     if (reportColumns.length === 0) return
@@ -265,27 +271,65 @@ export function StockAnalyticsReportProvider({
       },
     ])
 
+    const request = {
+      fromDate,
+      toDate,
+      fiscalYear,
+      financeBook: financeBook || undefined,
+      currency: currency || "inr",
+      valuesMode,
+      showZeroValues,
+      showGroupAccounts,
+    }
+
     try {
-      const report = await stockAnalyticsService.runReport(
-        {
-          fromDate,
-          toDate,
-          fiscalYear,
-          financeBook: financeBook || undefined,
-          currency: currency || "inr",
-          valuesMode,
-          showZeroValues,
-          showGroupAccounts,
+      const job = await stockAnalyticsService.createJob(request, abort.signal)
+      if (runIdRef.current !== runId) return
+
+      activeJobIdRef.current = job.id
+      trackJob({
+        id: job.id,
+        name: job.name || "stock-analytics",
+        title: "Stock Analytics",
+        href: "/stock/stock-analytics",
+        status: job.status || "Queued",
+        eventsUrl: job.eventsUrl,
+        jobUrl: job.jobUrl,
+        createdAt: job.createdAt || new Date().toISOString(),
+        notificationType: "report",
+        workspace: "/stock",
+        successTitle: "Stock Analytics Ready",
+        successDescription:
+          "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
+        failureTitle: "Stock Analytics Failed",
+      })
+
+      const terminal = await waitUntilTerminal(job.id, {
+        signal: abort.signal,
+        onEvent: (eventName, payload) => {
+          if (runIdRef.current !== runId) return
+          setRunEvents((prev) =>
+            appendOrUpdateRunEvent(prev, eventName, payload)
+          )
         },
-        {
-          signal: abort.signal,
-          onEvent: (eventName, payload) => {
-            if (runIdRef.current !== runId) return
-            setRunEvents((prev) =>
-              appendOrUpdateRunEvent(prev, eventName, payload)
-            )
-          },
-        }
+      })
+
+      if (runIdRef.current !== runId) return
+      activeJobIdRef.current = null
+
+      if (terminal.status === "Cancelled") {
+        setRunStatus("cancelled")
+        return
+      }
+
+      if (terminal.status === "Failed") {
+        throw new Error(terminal.error || "Rapor job'ı başarısız")
+      }
+
+      const report = await stockAnalyticsService.fetchReport(
+        terminal.jobUrl || job.jobUrl,
+        request,
+        abort.signal
       )
 
       if (runIdRef.current !== runId) return
@@ -293,17 +337,10 @@ export function StockAnalyticsReportProvider({
       setReportColumns(report.columns)
       setReportRows(report.rows)
       setExpandedNodes(expandAllIds(report.rows))
-
-      pushNotification({
-        title: "Stock Analytics Ready",
-        description:
-          "Stock Analytics raporu tamamlandı. Açmak için bildirime tıklayın.",
-        type: "report",
-        href: "/stock/stock-analytics",
-      })
       setRunStatus("done")
     } catch (error) {
       if (runIdRef.current !== runId) return
+      activeJobIdRef.current = null
       if (abort.signal.aborted) {
         setRunStatus("cancelled")
         return
@@ -328,16 +365,12 @@ export function StockAnalyticsReportProvider({
           tone: "danger",
         },
       ])
-      pushNotification({
-        title: "Stock Analytics Failed",
-        description: message,
-        type: "report",
-      })
       setRunStatus("idle")
       setReportReady(false)
     }
   }, [
-    pushNotification,
+    trackJob,
+    waitUntilTerminal,
     fromDate,
     toDate,
     fiscalYear,

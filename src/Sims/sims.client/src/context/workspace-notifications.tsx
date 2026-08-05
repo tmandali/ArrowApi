@@ -1,31 +1,33 @@
 import * as React from "react"
+import {
+  useNotificationsStore,
+  type WorkspaceNotification,
+  type WorkspaceNotificationType,
+} from "@/store/slices/notifications-store"
+import type { WorkspaceKey } from "@/lib/workspace"
 
-export type WorkspaceNotificationType =
-  | "order"
-  | "report"
-  | "stock"
-  | "manufacturing"
-
-export type WorkspaceNotification = {
-  id: string
-  title: string
-  description: string
-  createdAt: number
-  unread: boolean
-  type: WorkspaceNotificationType
-  href?: string
-}
+export type { WorkspaceNotification, WorkspaceNotificationType }
 
 type WorkspaceNotificationsContextValue = {
   notifications: WorkspaceNotification[]
   pushNotification: (
-    input: Omit<WorkspaceNotification, "id" | "createdAt" | "unread"> & {
+    input: Omit<
+      WorkspaceNotification,
+      "id" | "createdAt" | "unread" | "workspace"
+    > & {
       id?: string
       unread?: boolean
+      workspace?: WorkspaceKey
     }
   ) => void
   markAsRead: (id: string) => void
-  markAllAsRead: () => void
+  markAllAsRead: (options?: {
+    workspace?: WorkspaceKey
+    mockIds?: string[]
+  }) => void
+  markMockAsRead: (id: string) => void
+  isMockRead: (id: string) => boolean
+  clearNotifications: () => void
 }
 
 const WorkspaceNotificationsContext =
@@ -36,40 +38,13 @@ export function WorkspaceNotificationsProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [notifications, setNotifications] = React.useState<
-    WorkspaceNotification[]
-  >([])
-
-  const pushNotification = React.useCallback(
-    (
-      input: Omit<WorkspaceNotification, "id" | "createdAt" | "unread"> & {
-        id?: string
-        unread?: boolean
-      }
-    ) => {
-      const next: WorkspaceNotification = {
-        id: input.id ?? `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        title: input.title,
-        description: input.description,
-        type: input.type,
-        href: input.href,
-        createdAt: Date.now(),
-        unread: input.unread ?? true,
-      }
-      setNotifications((prev) => [next, ...prev])
-    },
-    []
-  )
-
-  const markAsRead = React.useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, unread: false } : item))
-    )
-  }, [])
-
-  const markAllAsRead = React.useCallback(() => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })))
-  }, [])
+  const notifications = useNotificationsStore((s) => s.notifications)
+  const pushNotification = useNotificationsStore((s) => s.pushNotification)
+  const markAsRead = useNotificationsStore((s) => s.markAsRead)
+  const markAllAsRead = useNotificationsStore((s) => s.markAllAsRead)
+  const markMockAsRead = useNotificationsStore((s) => s.markMockAsRead)
+  const isMockRead = useNotificationsStore((s) => s.isMockRead)
+  const clear = useNotificationsStore((s) => s.clear)
 
   const value = React.useMemo(
     () => ({
@@ -77,8 +52,19 @@ export function WorkspaceNotificationsProvider({
       pushNotification,
       markAsRead,
       markAllAsRead,
+      markMockAsRead,
+      isMockRead,
+      clearNotifications: clear,
     }),
-    [notifications, pushNotification, markAsRead, markAllAsRead]
+    [
+      notifications,
+      pushNotification,
+      markAsRead,
+      markAllAsRead,
+      markMockAsRead,
+      isMockRead,
+      clear,
+    ]
   )
 
   return (

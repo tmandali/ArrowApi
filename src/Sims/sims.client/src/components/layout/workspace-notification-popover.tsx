@@ -15,10 +15,18 @@ import {
   type WorkspaceNotification,
   type WorkspaceNotificationType,
 } from "@/context/workspace-notifications"
+import {
+  selectPendingJobs,
+  useActiveJobsStore,
+} from "@/store/slices/active-jobs-store"
+import {
+  resolveNotificationWorkspace,
+  workspaceKeyFromPath,
+} from "@/lib/workspace"
 import { cn } from "@/utils/cn"
-import { Bell, CheckCheck, Clock } from "lucide-react"
+import { Bell, CheckCheck, Clock, LoaderCircle } from "lucide-react"
 
-type MockNotification = Omit<WorkspaceNotification, "createdAt"> & {
+type MockNotification = Omit<WorkspaceNotification, "createdAt" | "workspace"> & {
   time: string
 }
 
@@ -120,15 +128,8 @@ type DisplayNotification = {
   unread: boolean
   type: WorkspaceNotificationType
   href?: string
-  source: "live" | "mock"
-}
-
-function workspaceKey(pathname: string) {
-  if (pathname.startsWith("/stock")) return "/stock"
-  if (pathname.startsWith("/accounting")) return "/accounting"
-  if (pathname.startsWith("/manufacturing")) return "/manufacturing"
-  if (pathname.startsWith("/selling")) return "/selling"
-  return pathname
+  source: "pending" | "live" | "mock"
+  pending?: boolean
 }
 
 function formatUnreadCount(count: number) {
@@ -136,57 +137,85 @@ function formatUnreadCount(count: number) {
   return String(count)
 }
 
+function createdAtMs(createdAt: string): number {
+  const parsed = Date.parse(createdAt)
+  return Number.isFinite(parsed) ? parsed : Date.now()
+}
+
 export function WorkspaceNotificationPopover() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
-  const { notifications, markAsRead, markAllAsRead } =
+  const { notifications, markAsRead, markAllAsRead, markMockAsRead, isMockRead } =
     useWorkspaceNotifications()
-  const [readMockIds, setReadMockIds] = React.useState<Set<string>>(
-    () => new Set()
+  const jobs = useActiveJobsStore((s) => s.jobs)
+  const key = workspaceKeyFromPath(pathname)
+  const pendingJobs = React.useMemo(
+    () => selectPendingJobs(jobs, key),
+    [jobs, key]
   )
 
-  const key = workspaceKey(pathname)
   const mockList = mockNotifications[key] ?? mockNotifications["/selling"]
 
   const displayNotifications = React.useMemo<DisplayNotification[]>(() => {
-    const live = notifications.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      time: formatNotificationTime(item.createdAt),
-      unread: item.unread,
-      type: item.type,
-      href: item.href,
-      source: "live" as const,
+    const pending = pendingJobs.map((job) => ({
+      id: `pending-${job.id}`,
+      title: job.title,
+      description: `${job.status} — işlem devam ediyor…`,
+      time: formatNotificationTime(createdAtMs(job.createdAt)),
+      unread: true,
+      type: job.notificationType as WorkspaceNotificationType,
+      href: job.href,
+      source: "pending" as const,
+      pending: true,
     }))
+
+    const live = notifications
+      .filter((item) => resolveNotificationWorkspace(item) === key)
+      .filter((item) => {
+        if (!item.id.startsWith("job-")) return true
+        const jobId = item.id.slice(4)
+        return !pendingJobs.some((job) => job.id === jobId)
+      })
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        time: formatNotificationTime(item.createdAt),
+        unread: item.unread,
+        type: item.type,
+        href: item.href,
+        source: "live" as const,
+      }))
 
     const mocks = mockList.map((item) => ({
       id: item.id,
       title: item.title,
       description: item.description,
       time: item.time,
-      unread: item.unread && !readMockIds.has(item.id),
+      unread: item.unread && !isMockRead(item.id),
       type: item.type,
       href: item.href,
       source: "mock" as const,
     }))
 
-    return [...live, ...mocks]
-  }, [notifications, mockList, readMockIds])
+    return [...pending, ...live, ...mocks]
+  }, [notifications, mockList, pendingJobs, isMockRead, key])
 
   const unreadCount = displayNotifications.filter((n) => n.unread).length
 
   const handleMarkAllAsRead = () => {
-    markAllAsRead()
-    setReadMockIds(new Set(mockList.map((item) => item.id)))
+    markAllAsRead({
+      workspace: key,
+      mockIds: mockList.map((item) => item.id),
+    })
   }
 
   const handleOpenNotification = (item: DisplayNotification) => {
     if (item.source === "live") {
       markAsRead(item.id)
-    } else {
-      setReadMockIds((prev) => new Set(prev).add(item.id))
+    } else if (item.source === "mock") {
+      markMockAsRead(item.id)
     }
 
     if (item.href) {
@@ -270,7 +299,9 @@ export function WorkspaceNotificationPopover() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
-                      {item.unread ? (
+                      {item.pending ? (
+                        <LoaderCircle className="size-3.5 shrink-0 animate-spin text-primary" />
+                      ) : item.unread ? (
                         <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                       ) : null}
                       <span className="truncate">{item.title}</span>

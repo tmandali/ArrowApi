@@ -1,5 +1,6 @@
 import { tableFromIPC, type Table } from "apache-arrow"
 import { ApiError } from "@/services"
+import { readJobSseEvents } from "@/features/jobs/arrow-job-client"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
@@ -165,92 +166,6 @@ function buildTree(
   return roots
 }
 
-async function readSseEvents(
-  eventsUrl: string,
-  signal: AbortSignal,
-  onEvent: (eventName: string, payload: ArrowJobEvent) => void
-): Promise<ArrowJobEvent> {
-  const response = await fetch(eventsUrl, {
-    headers: { Accept: "text/event-stream" },
-    signal,
-  })
-
-  if (!response.ok || !response.body) {
-    throw new ApiError(
-      response.statusText || "SSE bağlantısı başarısız",
-      response.status
-    )
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-  let eventName = "message"
-  let dataLines: string[] = []
-  const received: ArrowJobEvent[] = []
-
-  const flush = () => {
-    if (dataLines.length === 0) {
-      eventName = "message"
-      return
-    }
-    const raw = dataLines.join("\n")
-    dataLines = []
-    const name = eventName
-    eventName = "message"
-    try {
-      const payload = JSON.parse(raw) as ArrowJobEvent
-      received.push(payload)
-      onEvent(name, payload)
-    } catch {
-      // ignore malformed keepalive payloads
-    }
-  }
-
-  const isTerminal = (status: string | undefined) =>
-    status === "Completed" || status === "Failed" || status === "Cancelled"
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split(/\r?\n/)
-    buffer = parts.pop() ?? ""
-
-    for (const line of parts) {
-      if (line === "") {
-        flush()
-        continue
-      }
-      if (line.startsWith(":")) continue
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim()
-        continue
-      }
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart())
-      }
-    }
-
-    const latest = received[received.length - 1]
-    if (latest && isTerminal(latest.status)) {
-      break
-    }
-  }
-
-  const terminal = received[received.length - 1]
-  if (!terminal) {
-    throw new Error("SSE tamamlanmadan kapandı")
-  }
-  if (terminal.status === "Failed") {
-    throw new Error(terminal.error || "Rapor job'ı başarısız")
-  }
-  if (terminal.status === "Cancelled") {
-    throw new Error("Rapor iptal edildi")
-  }
-  return terminal
-}
-
 async function fetchArrowTable(jobUrl: string, signal: AbortSignal): Promise<Table> {
   const response = await fetch(jobUrl, {
     headers: { Accept: ARROW_ACCEPT },
@@ -281,12 +196,10 @@ export type RunStockAnalyticsOptions = {
 }
 
 export const stockAnalyticsService = {
-  async runReport(
+  async createJob(
     request: StockAnalyticsRequest = {},
-    options: RunStockAnalyticsOptions = {}
-  ): Promise<StockAnalyticsArrowReport> {
-    const signal = options.signal
-
+    signal?: AbortSignal
+  ): Promise<ArrowJobStatus> {
     const createResponse = await fetch(JOB_BASE, {
       method: "POST",
       headers: {
@@ -321,12 +234,18 @@ export const stockAnalyticsService = {
       )
     }
 
-    const job = (await createResponse.json()) as ArrowJobStatus
-    await readSseEvents(job.eventsUrl, signal ?? new AbortController().signal, (name, payload) => {
-      options.onEvent?.(name, payload)
-    })
+    return (await createResponse.json()) as ArrowJobStatus
+  },
 
-    const table = await fetchArrowTable(job.jobUrl, signal ?? new AbortController().signal)
+  async fetchReport(
+    jobUrl: string,
+    request: StockAnalyticsRequest = {},
+    signal?: AbortSignal
+  ): Promise<StockAnalyticsArrowReport> {
+    const table = await fetchArrowTable(
+      jobUrl,
+      signal ?? new AbortController().signal
+    )
     const columns = columnsFromSchema(table)
     const currency = request.currency || "inr"
     const rows = rowsFromTable(table, columns, currency)
@@ -337,6 +256,34 @@ export const stockAnalyticsService = {
       currency,
       totalRows: table.numRows,
     }
+  },
+
+  /**
+   * Standalone create → SSE → Arrow fetch (JobSync olmadan).
+   * Tercihen JobSyncProvider + createJob/fetchReport kullanın.
+   */
+  async runReport(
+    request: StockAnalyticsRequest = {},
+    options: RunStockAnalyticsOptions = {}
+  ): Promise<StockAnalyticsArrowReport> {
+    const signal = options.signal
+    const job = await this.createJob(request, signal)
+    const terminal = await readJobSseEvents(
+      job.eventsUrl,
+      signal ?? new AbortController().signal,
+      (name, payload) => {
+        options.onEvent?.(name, payload)
+      }
+    )
+
+    if (terminal.status === "Failed") {
+      throw new Error(terminal.error || "Rapor job'ı başarısız")
+    }
+    if (terminal.status === "Cancelled") {
+      throw new Error("Rapor iptal edildi")
+    }
+
+    return this.fetchReport(job.jobUrl, request, signal)
   },
 
   async cancel(jobId: string): Promise<void> {
