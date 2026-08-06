@@ -16,7 +16,9 @@ type WorkspaceAiDockProps = {
 }
 
 function YulaExpandToggle() {
-  const { expanded, toggleExpanded } = useWorkspaceAiChat()
+  const { expanded, toggleExpanded, sideDockAllowed } = useWorkspaceAiChat()
+
+  if (!sideDockAllowed) return null
 
   return (
     <Button
@@ -41,11 +43,11 @@ function YulaExpandToggle() {
 /**
  * Page body under the workspace header.
  * Closed: page content.
- * Open (default): resizable side dock.
- * Expanded (header button): full content between header and nav.
+ * Open + desktop: resizable side dock (or expanded full content).
+ * Open + tablet/phone (<1024px): full content only; always closable.
  */
 export function WorkspaceAiDock({ children, className }: WorkspaceAiDockProps) {
-  const { open, setOpen, expanded } = useWorkspaceAiChat()
+  const { open, setOpen, expanded, sideDockAllowed } = useWorkspaceAiChat()
 
   if (!open) {
     return (
@@ -60,7 +62,7 @@ export function WorkspaceAiDock({ children, className }: WorkspaceAiDockProps) {
     )
   }
 
-  if (expanded) {
+  if (expanded || !sideDockAllowed) {
     return (
       <aside
         className={cn(

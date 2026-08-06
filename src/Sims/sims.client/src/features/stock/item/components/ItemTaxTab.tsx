@@ -259,7 +259,7 @@ export function ItemTaxTab() {
   }, [dialogOpen])
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="space-y-4 p-6">
       <div>
         <h3 className="text-sm font-semibold">Taxes</h3>
         <p className="text-xs text-muted-foreground">

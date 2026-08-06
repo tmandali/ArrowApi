@@ -97,12 +97,12 @@ export function StockAnalyticsExecutionHistory() {
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1.5 px-2.5"
+          className="h-7 shrink-0 gap-1.5 px-2 text-xs sm:px-2.5"
           title="Execution history"
           aria-label="Execution history"
         >
           <History className="size-3.5" />
-          History
+          <span className="hidden sm:inline">History</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0">

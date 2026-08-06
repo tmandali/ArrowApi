@@ -52,6 +52,8 @@ import {
   WorkspaceSidePanelLayout,
   WORKSPACE_SIDE_PANEL_PERCENT,
 } from "@/components/layout/workspace-side-panel"
+import { YULA_SIDE_DOCK_MIN_WIDTH } from "@/context/workspace-ai-chat"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/utils/cn"
 import { useStockAnalyticsReport } from "@/context/stock-analytics-report"
 import type { ReportGridRow } from "../types/stock-analytics"
@@ -206,6 +208,9 @@ export function StockAnalyticsReportTab({
   const setFiltersOpen = onFiltersOpenChange ?? setInternalFiltersOpen
   const [activeFilter, setActiveFilter] = React.useState<FilterKey | null>(null)
   const [openPicker, setOpenPicker] = React.useState<FilterKey | null>(null)
+  const sideDockAllowed = !useMediaQuery(
+    `(max-width: ${YULA_SIDE_DOCK_MIN_WIDTH - 1}px)`
+  )
 
   React.useEffect(() => {
     onReportReadyChange?.(reportReady)
@@ -326,6 +331,31 @@ export function StockAnalyticsReportTab({
     runStatus === "running" ||
     runStatus === "cancelled" ||
     isPendingView
+  const hasMainContent = showGrid || showRunSteps
+  const prevHasMainContent = React.useRef<boolean | null>(null)
+
+  // Compact: empty → Query open; not empty → Query closed first (grid/steps).
+  // User can still reopen Query manually while content exists.
+  React.useEffect(() => {
+    if (sideDockAllowed) {
+      prevHasMainContent.current = null
+      return
+    }
+    if (!hasMainContent) {
+      if (!filtersOpen) setFiltersOpen(true)
+    } else if (prevHasMainContent.current !== true) {
+      setFiltersOpen(false)
+    }
+    prevHasMainContent.current = hasMainContent
+  }, [sideDockAllowed, hasMainContent, filtersOpen, setFiltersOpen])
+
+  const handleFiltersOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!sideDockAllowed && !hasMainContent && !open) return
+      setFiltersOpen(open)
+    },
+    [sideDockAllowed, hasMainContent, setFiltersOpen]
+  )
 
   const renderRows = (rows: ReportGridRow[], depth = 0): React.ReactNode =>
     rows.map((row) => {
@@ -562,78 +592,80 @@ export function StockAnalyticsReportTab({
     </>
   )
 
-  return (
-    <>
-    <WorkspaceSidePanelLayout
-      open={filtersOpen}
-      onOpenChange={setFiltersOpen}
-      title="Query"
-      collapseLabel="Collapse filters"
-      panel={queryPanel}
-    >
+  const reportMain = (
         <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 gap-3">
           {showGrid ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
-              <div className="shrink-0 border-b">
-                <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-                  <colgroup>
-                    {reportColumns.map((col) => (
-                      <col
-                        key={col.name}
-                        style={
-                          col.kind === "account" ? ACCOUNT_COL_STYLE : undefined
-                        }
-                      />
-                    ))}
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      {reportColumns.map((col) => (
-                        <th
-                          key={col.name}
-                          className={cn(
-                            headClass,
-                            col.align === "left" ? "text-left" : "text-right"
-                          )}
-                        >
-                          {col.label}
-                        </th>
-                      ))}
-                    </tr>
-                    {showFilterRow ? (
-                    <tr className="bg-muted/10">
-                      {reportColumns.map((col, index) => (
-                        <th key={col.name} className={cellClass}>
-                          <Input
-                            className={cn(
-                              cellInputClass,
-                              index > 0 && "text-right"
-                            )}
-                            placeholder={index === 0 ? "Filter…" : undefined}
+              <div className="min-h-0 flex-1 overflow-auto">
+                <div className="min-w-[42rem]">
+                  <div className="sticky top-0 z-10 border-b bg-card">
+                    <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+                      <colgroup>
+                        {reportColumns.map((col) => (
+                          <col
+                            key={col.name}
+                            style={
+                              col.kind === "account"
+                                ? ACCOUNT_COL_STYLE
+                                : undefined
+                            }
                           />
-                        </th>
-                      ))}
-                    </tr>
-                    ) : null}
-                  </thead>
-                </table>
-              </div>
+                        ))}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          {reportColumns.map((col) => (
+                            <th
+                              key={col.name}
+                              className={cn(
+                                headClass,
+                                col.align === "left"
+                                  ? "text-left"
+                                  : "text-right"
+                              )}
+                            >
+                              {col.label}
+                            </th>
+                          ))}
+                        </tr>
+                        {showFilterRow ? (
+                          <tr className="bg-muted/10">
+                            {reportColumns.map((col, index) => (
+                              <th key={col.name} className={cellClass}>
+                                <Input
+                                  className={cn(
+                                    cellInputClass,
+                                    index > 0 && "text-right"
+                                  )}
+                                  placeholder={
+                                    index === 0 ? "Filter…" : undefined
+                                  }
+                                />
+                              </th>
+                            ))}
+                          </tr>
+                        ) : null}
+                      </thead>
+                    </table>
+                  </div>
 
-              <ScrollArea className="h-0 min-h-0 w-full flex-1">
-                <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-                  <colgroup>
-                    {reportColumns.map((col) => (
-                      <col
-                        key={col.name}
-                        style={
-                          col.kind === "account" ? ACCOUNT_COL_STYLE : undefined
-                        }
-                      />
-                    ))}
-                  </colgroup>
-                  <tbody>{renderRows(reportRows)}</tbody>
-                </table>
-              </ScrollArea>
+                  <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+                    <colgroup>
+                      {reportColumns.map((col) => (
+                        <col
+                          key={col.name}
+                          style={
+                            col.kind === "account"
+                              ? ACCOUNT_COL_STYLE
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </colgroup>
+                    <tbody>{renderRows(reportRows)}</tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           ) : showRunSteps ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -752,7 +784,7 @@ export function StockAnalyticsReportTab({
                 </div>
               </ScrollArea>
             </div>
-          ) : (
+          ) : !sideDockAllowed ? null : (
             <div className="flex min-h-0 flex-1 items-center justify-center p-6">
               <Empty className="max-w-md border rounded-xl bg-card p-10">
                 <EmptyHeader>
@@ -807,6 +839,19 @@ export function StockAnalyticsReportTab({
             </div>
           )}
         </div>
+  )
+
+  return (
+    <>
+    <WorkspaceSidePanelLayout
+      open={filtersOpen}
+      onOpenChange={handleFiltersOpenChange}
+      title="Query"
+      collapseLabel="Collapse filters"
+      panel={queryPanel}
+      sideDockAllowed={sideDockAllowed}
+    >
+      {reportMain}
     </WorkspaceSidePanelLayout>
 
       <Dialog

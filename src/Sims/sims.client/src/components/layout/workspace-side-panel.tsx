@@ -30,11 +30,55 @@ type WorkspaceSidePanelLayoutProps = {
   /** Classes for the main (left) content shell. */
   mainClassName?: string
   panelClassName?: string
+  /**
+   * When false (tablet/phone), an open panel replaces main content instead of
+   * docking beside it — same rule as Yula below 1024px.
+   */
+  sideDockAllowed?: boolean
+}
+
+function SidePanelHeader({
+  title,
+  headerActions,
+  collapseLabel,
+  onCollapse,
+}: {
+  title: React.ReactNode
+  headerActions?: React.ReactNode
+  collapseLabel: string
+  onCollapse: () => void
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+      <button
+        type="button"
+        onClick={onCollapse}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
+        aria-label={collapseLabel}
+      >
+        <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          {title}
+        </span>
+      </button>
+      {headerActions}
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-7 shrink-0"
+        onClick={onCollapse}
+        aria-label={collapseLabel}
+      >
+        <ChevronRight className="size-4 text-muted-foreground" />
+      </Button>
+    </div>
+  )
 }
 
 /**
  * Docked right side surface (Query Criteria pattern):
  * controlled open state, ResizablePanel split, header collapse, resize-to-0 close.
+ * Below tablet width, pass sideDockAllowed={false} for full-content panel.
  */
 export function WorkspaceSidePanelLayout({
   open,
@@ -51,12 +95,35 @@ export function WorkspaceSidePanelLayout({
   className,
   mainClassName,
   panelClassName,
+  sideDockAllowed = true,
 }: WorkspaceSidePanelLayoutProps) {
   const mainDefault = 100 - defaultSizePercent
   const panelMinSize = minSizePercent ?? defaultSizePercent
   const resolvedCollapseLabel =
     collapseLabel ??
     (typeof title === "string" ? `Collapse ${title}` : "Collapse panel")
+
+  if (open && !sideDockAllowed) {
+    return (
+      <aside
+        className={cn(
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-muted/10",
+          panelClassName,
+          className
+        )}
+      >
+        <SidePanelHeader
+          title={title}
+          headerActions={headerActions}
+          collapseLabel={resolvedCollapseLabel}
+          onCollapse={() => onOpenChange(false)}
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {panel}
+        </div>
+      </aside>
+    )
+  }
 
   return (
     <ResizablePanelGroup
@@ -101,29 +168,12 @@ export function WorkspaceSidePanelLayout({
                 panelClassName
               )}
             >
-              <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenChange(false)}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
-                  aria-label={resolvedCollapseLabel}
-                >
-                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                    {title}
-                  </span>
-                </button>
-                {headerActions}
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 shrink-0"
-                  onClick={() => onOpenChange(false)}
-                  aria-label={resolvedCollapseLabel}
-                >
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </Button>
-              </div>
+              <SidePanelHeader
+                title={title}
+                headerActions={headerActions}
+                collapseLabel={resolvedCollapseLabel}
+                onCollapse={() => onOpenChange(false)}
+              />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {panel}
               </div>
@@ -179,7 +229,9 @@ export function WorkspaceSidePanelTrigger({
       {children ?? (
         <>
           {Icon ? <Icon className="size-3.5" /> : null}
-          {!iconOnly && label ? label : null}
+          {!iconOnly && label ? (
+            <span className="truncate">{label}</span>
+          ) : null}
         </>
       )}
     </Button>

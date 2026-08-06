@@ -1,4 +1,11 @@
 import * as React from "react"
+import { useMediaQuery } from "@/hooks/use-media-query"
+
+/**
+ * Below `lg` (1024px) the side dock is too narrow for page + Yula.
+ * Tablet/phone: open Yula only as full content; always closable.
+ */
+export const YULA_SIDE_DOCK_MIN_WIDTH = 1024
 
 type WorkspaceAiChatContextValue = {
   open: boolean
@@ -8,6 +15,8 @@ type WorkspaceAiChatContextValue = {
   expanded: boolean
   setExpanded: (expanded: boolean) => void
   toggleExpanded: () => void
+  /** False on tablet/phone — only full-content mode is available. */
+  sideDockAllowed: boolean
 }
 
 const WorkspaceAiChatContext =
@@ -18,24 +27,62 @@ export function WorkspaceAiChatProvider({
 }: {
   children: React.ReactNode
 }) {
+  const sideDockAllowed = !useMediaQuery(
+    `(max-width: ${YULA_SIDE_DOCK_MIN_WIDTH - 1}px)`
+  )
   const [open, setOpenState] = React.useState(false)
-  const [expanded, setExpanded] = React.useState(false)
+  const [expanded, setExpandedState] = React.useState(false)
 
-  const setOpen = React.useCallback((next: boolean) => {
-    setOpenState(next)
-    if (!next) setExpanded(false)
-  }, [])
+  React.useEffect(() => {
+    if (!sideDockAllowed && open) {
+      setExpandedState(true)
+    }
+  }, [sideDockAllowed, open])
+
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      setOpenState(next)
+      if (!next) {
+        setExpandedState(false)
+        return
+      }
+      if (!sideDockAllowed) {
+        setExpandedState(true)
+      }
+    },
+    [sideDockAllowed]
+  )
+
+  const setExpanded = React.useCallback(
+    (next: boolean) => {
+      if (!sideDockAllowed && open && !next) return
+      setExpandedState(next)
+    },
+    [sideDockAllowed, open]
+  )
+
+  const toggleExpanded = React.useCallback(() => {
+    setExpanded((current) => !current)
+  }, [setExpanded])
 
   const value = React.useMemo(
     () => ({
       open,
       setOpen,
       toggle: () => setOpen(!open),
+      expanded: open && (!sideDockAllowed || expanded),
+      setExpanded,
+      toggleExpanded,
+      sideDockAllowed,
+    }),
+    [
+      open,
+      setOpen,
       expanded,
       setExpanded,
-      toggleExpanded: () => setExpanded((current) => !current),
-    }),
-    [open, setOpen, expanded]
+      toggleExpanded,
+      sideDockAllowed,
+    ]
   )
 
   return (

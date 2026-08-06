@@ -22,6 +22,7 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu,
@@ -185,52 +186,46 @@ export function ItemForm({
   }, [isPrinting])
 
   return (
-    <div
-      className={
-        isReportShell
-          ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
-          : "contents"
-      }
-    >
-      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <SidebarTrigger className="-ml-1" />
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 sm:px-4 text-xs">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
+          <SidebarTrigger className="-ml-1 shrink-0" />
           <Separator
             orientation="vertical"
-            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+            className="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
           />
-          <Breadcrumb>
-            <BreadcrumbList className="text-xs">
-              <BreadcrumbItem>
+          <Breadcrumb className="min-w-0 overflow-hidden">
+            <BreadcrumbList className="flex-nowrap text-xs">
+              <BreadcrumbItem className="hidden md:inline-flex">
                 <BreadcrumbLink asChild>
                   <Link to="/stock">Stock</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              <BreadcrumbSeparator />
+              <BreadcrumbSeparator className="hidden md:block" />
               {isReportShell ? (
                 <>
-                  <BreadcrumbItem>
+                  <BreadcrumbItem className="hidden md:inline-flex">
                     <BreadcrumbLink asChild>
                       <Link to="/stock">Reports</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="font-semibold text-foreground">
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem className="min-w-0">
+                    <BreadcrumbPage className="block truncate font-semibold text-foreground">
                       {isStockLedger ? "Stock Ledger" : "Stock Analytics"}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
               ) : (
                 <>
-                  <BreadcrumbItem>
+                  <BreadcrumbItem className="hidden sm:inline-flex">
                     <BreadcrumbLink asChild>
                       <Link to="/stock/item">Item</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="font-semibold text-foreground">
+                  <BreadcrumbSeparator className="hidden sm:block" />
+                  <BreadcrumbItem className="min-w-0">
+                    <BreadcrumbPage className="block truncate font-semibold text-foreground">
                       GB
                     </BreadcrumbPage>
                   </BreadcrumbItem>
@@ -239,13 +234,13 @@ export function ItemForm({
             </BreadcrumbList>
           </Breadcrumb>
           {!isReportShell ? (
-            <Badge className="ml-2 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium">
+            <Badge className="ml-2 hidden shrink-0 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium sm:inline-flex">
               Variant
             </Badge>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto sm:gap-2">
           {isStockAnalytics ? (
             <>
               <WorkspaceSidePanelTrigger
@@ -253,18 +248,19 @@ export function ItemForm({
                 onOpenChange={(open) => onFiltersOpenChange?.(open)}
                 icon={Search}
                 label="Query"
+                className="shrink-0 [&_span]:hidden sm:[&_span]:inline"
               />
 
               <Separator
                 orientation="vertical"
-                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+                className="mx-0.5 hidden data-vertical:h-4 data-vertical:self-auto sm:block"
               />
 
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5"
+                className="hidden h-7 text-xs gap-1.5 px-2.5 md:inline-flex"
                 onClick={() => onStartNewReport?.()}
                 title="New report"
                 aria-label="New report"
@@ -279,7 +275,7 @@ export function ItemForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                className="hidden h-7 text-xs gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive md:inline-flex"
                 disabled={!activeJobId || deletingReport || reportRunning}
                 onClick={() => onDeleteActiveReport?.()}
                 title={
@@ -295,14 +291,14 @@ export function ItemForm({
 
               <Separator
                 orientation="vertical"
-                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+                className="mx-0.5 hidden data-vertical:h-4 data-vertical:self-auto lg:block"
               />
 
               <Button
                 type="button"
                 variant={showFilterRow ? "secondary" : "outline"}
                 size="icon"
-                className="size-7"
+                className="size-7 shrink-0"
                 disabled={!reportReady}
                 onClick={() => onShowFilterRowChange?.(!showFilterRow)}
                 title={showFilterRow ? "Hide filter row" : "Show filter row"}
@@ -319,7 +315,7 @@ export function ItemForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs gap-1 px-2.5"
+                    className="hidden h-7 text-xs gap-1 px-2.5 lg:inline-flex"
                     disabled={!reportReady}
                   >
                     Options
@@ -364,7 +360,7 @@ export function ItemForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5"
+                className="hidden h-7 text-xs gap-1.5 px-2.5 lg:inline-flex"
                 disabled={!reportReady || isPrinting}
                 onClick={() => {
                   void handlePrint()
@@ -373,6 +369,87 @@ export function ItemForm({
                 <Printer className="size-3.5" />
                 {isPrinting ? "Preparing…" : "Print"}
               </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-7 shrink-0 lg:hidden"
+                    aria-label="More actions"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem
+                    className="md:hidden"
+                    onClick={() => onStartNewReport?.()}
+                  >
+                    <FilePlus2 className="size-3.5" />
+                    New
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="md:hidden"
+                    disabled={!activeJobId || deletingReport || reportRunning}
+                    onClick={() => onDeleteActiveReport?.()}
+                  >
+                    <Trash2 className="size-3.5" />
+                    {deletingReport ? "Deleting…" : "Delete"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="md:hidden" />
+                  <DropdownMenuItem
+                    disabled={!reportReady}
+                    onClick={onExpandAll}
+                  >
+                    Expand All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!reportReady}
+                    onClick={onCollapseAll}
+                  >
+                    Collapse All
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center gap-2 px-2 py-1.5 lg:hidden">
+                    <Input
+                      value={treeLevel}
+                      onChange={(event) =>
+                        onTreeLevelChange?.(event.target.value)
+                      }
+                      className="h-7 w-12 text-center text-xs"
+                      disabled={!reportReady}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 flex-1 text-xs"
+                      disabled={!reportReady}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        onSetTreeLevel?.()
+                      }}
+                    >
+                      Set Level
+                    </Button>
+                  </div>
+                  <DropdownMenuSeparator className="lg:hidden" />
+                  <DropdownMenuItem
+                    className="lg:hidden"
+                    disabled={!reportReady || isPrinting}
+                    onClick={() => {
+                      void handlePrint()
+                    }}
+                  >
+                    <Printer className="size-3.5" />
+                    {isPrinting ? "Preparing…" : "Print"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <Separator
                 orientation="vertical"
@@ -396,7 +473,7 @@ export function ItemForm({
             </>
           ) : (
             <>
-              <ButtonGroup>
+              <ButtonGroup className="hidden md:inline-flex">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3">
                   View
                 </Button>
@@ -413,7 +490,7 @@ export function ItemForm({
                 </DropdownMenu>
               </ButtonGroup>
 
-              <ButtonGroup>
+              <ButtonGroup className="hidden sm:inline-flex">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3">
                   Actions
                 </Button>
@@ -430,11 +507,19 @@ export function ItemForm({
                 </DropdownMenu>
               </ButtonGroup>
 
-              <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden h-7 text-xs px-2.5 lg:inline-flex"
+              >
                 Duplicate
               </Button>
 
-              <Button variant="outline" size="icon" className="size-7">
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-7 sm:inline-flex"
+              >
                 <Printer className="size-3.5" />
               </Button>
 
@@ -445,6 +530,10 @@ export function ItemForm({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem className="md:hidden">View</DropdownMenuItem>
+                  <DropdownMenuItem className="sm:hidden">Actions</DropdownMenuItem>
+                  <DropdownMenuItem className="lg:hidden">Duplicate</DropdownMenuItem>
+                  <DropdownMenuItem className="sm:hidden">Print</DropdownMenuItem>
                   <DropdownMenuItem>Reload</DropdownMenuItem>
                   <DropdownMenuItem>Delete</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -479,13 +568,7 @@ export function ItemForm({
         </div>
       ) : null}
 
-      <WorkspaceAiDock
-        className={
-          isReportShell
-            ? "overflow-hidden"
-            : "overflow-hidden lg:flex-row"
-        }
-      >
+      <WorkspaceAiDock className="overflow-hidden">
       {isStockAnalytics ? (
         <StockAnalyticsReportTab
           filtersOpen={filtersOpen}
@@ -497,36 +580,40 @@ export function ItemForm({
         />
       ) : (
       <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
-        <div className="shrink-0 border-b bg-background px-4 py-1 overflow-x-auto">
-          <TabsList variant="line" className="min-w-max">
-            {tabs
-              .filter((tab) => visibleTabs.has(tab))
-              .map((tab) => {
-                const item = TAB_ITEMS.find((entry) => entry.value === tab)
-                if (!item) return null
-                return (
-                  <TabsTrigger key={tab} value={tab}>
-                    {tabLabels?.[tab] ?? item.label}
-                  </TabsTrigger>
-                )
-              })}
-          </TabsList>
+        <div className="shrink-0 border-b bg-background px-4">
+          <ScrollArea type="hover" className="w-full whitespace-nowrap">
+            <div className="py-1">
+              <TabsList variant="line" className="min-w-max">
+                {tabs
+                  .filter((tab) => visibleTabs.has(tab))
+                  .map((tab) => {
+                    const item = TAB_ITEMS.find((entry) => entry.value === tab)
+                    if (!item) return null
+                    return (
+                      <TabsTrigger key={tab} value={tab}>
+                        {tabLabels?.[tab] ?? item.label}
+                      </TabsTrigger>
+                    )
+                  })}
+              </TabsList>
+            </div>
+          </ScrollArea>
         </div>
 
         <div
           className={
             isReportShell
               ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-              : "flex min-h-0 flex-1 flex-col overflow-y-auto"
+              : "@container/item-details flex min-h-0 flex-1 flex-col overflow-y-auto"
           }
         >
         {visibleTabs.has("details") ? (
         <TabsContent
           value="details"
-          className="m-0 data-[state=inactive]:hidden"
+          className="m-0 grid grid-cols-1 @[56rem]/item-details:grid-cols-[minmax(0,1fr)_18rem] data-[state=inactive]:hidden"
         >
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5">
+          <div className="min-w-0 space-y-6 p-4 sm:p-6">
+            <div className="grid grid-cols-1 gap-x-10 gap-y-5 @[40rem]/item-details:grid-cols-2">
               <div className="space-y-5">
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
@@ -710,41 +797,8 @@ export function ItemForm({
               </Collapsible>
             </div>
           </div>
-        </TabsContent>
-        ) : null}
 
-        {visibleTabs.has("tax") ? (
-        <TabsContent
-          value="tax"
-          className="m-0 flex-1 min-h-0 data-[state=inactive]:hidden"
-        >
-          <ItemTaxTab />
-        </TabsContent>
-        ) : null}
-
-        {PLACEHOLDER_TABS.filter((tab) => visibleTabs.has(tab)).map((tab) => (
-          <TabsContent
-            key={tab}
-            value={tab}
-            className="p-6 m-0 text-xs text-muted-foreground capitalize data-[state=inactive]:hidden"
-          >
-            {tab} content
-          </TabsContent>
-        ))}
-
-        {!isReportShell ? (
-          <div className="space-y-6 px-6 pb-6 pt-2">
-            <Separator />
-            <DocumentComments />
-            <DocumentActivity />
-          </div>
-        ) : null}
-        </div>
-      </Tabs>
-      )}
-
-          {!isReportShell ? (
-          <div className="w-full lg:w-72 border-l p-4 space-y-4 text-xs bg-muted/10 overflow-y-auto shrink-0">
+          <aside className="w-full space-y-4 border-t bg-muted/10 p-4 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0">
             <ItemImageUpload />
 
             <div className="space-y-1">
@@ -852,8 +906,37 @@ export function ItemForm({
                 <p>created this · 2 months ago</p>
               </div>
             </div>
+          </aside>
+
+          <div className="min-w-0 space-y-6 p-4 pt-0 sm:p-6 sm:pt-0">
+            <Separator />
+            <DocumentComments />
+            <DocumentActivity />
           </div>
-          ) : null}
+        </TabsContent>
+        ) : null}
+
+        {visibleTabs.has("tax") ? (
+        <TabsContent
+          value="tax"
+          className="m-0 data-[state=inactive]:hidden"
+        >
+          <ItemTaxTab />
+        </TabsContent>
+        ) : null}
+
+        {PLACEHOLDER_TABS.filter((tab) => visibleTabs.has(tab)).map((tab) => (
+          <TabsContent
+            key={tab}
+            value={tab}
+            className="m-0 p-6 text-xs text-muted-foreground capitalize data-[state=inactive]:hidden"
+          >
+            {tab} content
+          </TabsContent>
+        ))}
+        </div>
+      </Tabs>
+      )}
       </WorkspaceAiDock>
     </div>
   )
