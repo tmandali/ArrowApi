@@ -1,7 +1,6 @@
 import * as React from "react"
 
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
-import { WorkspaceSearchDialog } from "@/components/layout/workspace-search-dialog"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { NavMain } from "@/components/layout/nav-main"
 import { NavUser } from "@/components/layout/nav-user"
@@ -25,6 +24,7 @@ import {
   FactoryIcon,
 } from "lucide-react"
 import { useLocation } from "react-router-dom"
+import { useWorkspaceSearch } from "@/context/workspace-search"
 import { getWorkspaceNavForPath } from "@/lib/workspace-nav"
 
 const data = {
@@ -67,18 +67,7 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation()
-  const [searchOpen, setSearchOpen] = React.useState(false)
-
-  React.useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setSearchOpen((open) => !open)
-      }
-    }
-    document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
-  }, [])
+  const { setOpen } = useWorkspaceSearch()
 
   const currentNav = React.useMemo(
     () => getWorkspaceNavForPath(pathname),
@@ -86,41 +75,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   )
 
   return (
-    <>
-      <Sidebar collapsible="icon" {...props}>
-        <SidebarHeader>
-          <WorkspaceSwitcher workspaces={data.workspaces} />
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup className="py-0">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Search"
-                  className="text-sidebar-foreground/70"
-                  onClick={() => setSearchOpen(true)}
-                >
-                  <SearchIcon className="size-4" />
-                  <span>Search</span>
-                  <KbdGroup className="ml-auto pointer-events-none group-data-[collapsible=icon]:hidden">
-                    <Kbd>⌘</Kbd>
-                    <Kbd>K</Kbd>
-                  </KbdGroup>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <WorkspaceNotificationPopover />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-          <NavMain items={currentNav} />
-        </SidebarContent>
-        <SidebarFooter>
-          <NavUser user={data.user} />
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-      <WorkspaceSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
-    </>
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <WorkspaceSwitcher workspaces={data.workspaces} />
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup className="py-0">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Search"
+                className="text-sidebar-foreground/70"
+                onClick={() => setOpen(true)}
+              >
+                <SearchIcon className="size-4" />
+                <span>Search</span>
+                <KbdGroup className="ml-auto pointer-events-none group-data-[collapsible=icon]:hidden">
+                  <Kbd>⌘</Kbd>
+                  <Kbd>K</Kbd>
+                </KbdGroup>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <WorkspaceNotificationPopover />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+        <NavMain items={currentNav} />
+      </SidebarContent>
+      <SidebarFooter>
+        <NavUser user={data.user} />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   )
 }

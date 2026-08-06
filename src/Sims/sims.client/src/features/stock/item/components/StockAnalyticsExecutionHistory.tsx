@@ -1,5 +1,5 @@
 import * as React from "react"
-import { History, Loader2 } from "lucide-react"
+import { Check, History, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -44,6 +44,11 @@ function shortId(id: string): string {
   return id.slice(0, 8)
 }
 
+function sameJobId(a: string | null | undefined, b: string | null | undefined) {
+  if (!a || !b) return false
+  return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0
+}
+
 export function StockAnalyticsExecutionHistory() {
   const { activeJobId, selectExecution } = useStockAnalyticsReport()
   const [open, setOpen] = React.useState(false)
@@ -51,6 +56,7 @@ export function StockAnalyticsExecutionHistory() {
   const [error, setError] = React.useState<string | null>(null)
   const [items, setItems] = React.useState<ArrowJobStatus[]>([])
   const [total, setTotal] = React.useState(0)
+  const selectedItemRef = React.useRef<HTMLButtonElement | null>(null)
 
   const load = React.useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -78,6 +84,11 @@ export function StockAnalyticsExecutionHistory() {
     void load(abort.signal)
     return () => abort.abort()
   }, [open, load])
+
+  React.useEffect(() => {
+    if (!open || loading || !activeJobId) return
+    selectedItemRef.current?.scrollIntoView({ block: "nearest" })
+  }, [open, loading, activeJobId, items])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -131,14 +142,16 @@ export function StockAnalyticsExecutionHistory() {
           ) : (
             <ul className="divide-y p-1">
               {items.map((job) => {
-                const selected = activeJobId === job.id
+                const selected = sameJobId(activeJobId, job.id)
                 const disabled =
                   job.status === "Failed" || job.status === "Cancelled"
                 return (
                   <li key={job.id}>
                     <button
+                      ref={selected ? selectedItemRef : undefined}
                       type="button"
                       disabled={disabled}
+                      aria-current={selected ? "true" : undefined}
                       onClick={() => {
                         selectExecution(job.id)
                         setOpen(false)
@@ -148,19 +161,36 @@ export function StockAnalyticsExecutionHistory() {
                         disabled
                           ? "cursor-not-allowed opacity-50"
                           : "hover:bg-muted/80",
-                        selected && "bg-muted"
+                        selected &&
+                          "bg-primary/10 ring-1 ring-inset ring-primary/40"
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs">
-                          {shortId(job.id)}…
+                        <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs">
+                          {selected ? (
+                            <Check
+                              className="size-3.5 shrink-0 text-primary"
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span className="truncate">{shortId(job.id)}…</span>
                         </span>
-                        <Badge
-                          variant={statusTone(job.status)}
-                          className="h-5 px-1.5 text-[10px]"
-                        >
-                          {job.status}
-                        </Badge>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {selected ? (
+                            <Badge
+                              variant="outline"
+                              className="h-5 border-primary/40 px-1.5 text-[10px] text-primary"
+                            >
+                              Open
+                            </Badge>
+                          ) : null}
+                          <Badge
+                            variant={statusTone(job.status)}
+                            className="h-5 px-1.5 text-[10px]"
+                          >
+                            {job.status}
+                          </Badge>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                         <span>{formatWhen(job.createdAt)}</span>

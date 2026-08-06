@@ -4,6 +4,10 @@ type WorkspaceAiChatContextValue = {
   open: boolean
   setOpen: (open: boolean) => void
   toggle: () => void
+  /** Full content area (between header and nav). Off by default — side dock opens first. */
+  expanded: boolean
+  setExpanded: (expanded: boolean) => void
+  toggleExpanded: () => void
 }
 
 const WorkspaceAiChatContext =
@@ -14,15 +18,24 @@ export function WorkspaceAiChatProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpenState] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
+
+  const setOpen = React.useCallback((next: boolean) => {
+    setOpenState(next)
+    if (!next) setExpanded(false)
+  }, [])
 
   const value = React.useMemo(
     () => ({
       open,
       setOpen,
-      toggle: () => setOpen((current) => !current),
+      toggle: () => setOpen(!open),
+      expanded,
+      setExpanded,
+      toggleExpanded: () => setExpanded((current) => !current),
     }),
-    [open]
+    [open, setOpen, expanded]
   )
 
   return (

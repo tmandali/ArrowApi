@@ -21,6 +21,7 @@ export default function Page() {
     <>
       <WorkspacePageHeader
         className="h-16 border-b-0 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
+        searchPlaceholder="Search..."
         actions={
           <>
             <ButtonGroup>

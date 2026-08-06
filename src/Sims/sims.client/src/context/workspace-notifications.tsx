@@ -27,6 +27,11 @@ type WorkspaceNotificationsContextValue = {
   }) => void
   markMockAsRead: (id: string) => void
   isMockRead: (id: string) => boolean
+  isMockDismissed: (id: string) => boolean
+  clearRead: (options?: {
+    workspace?: WorkspaceKey
+    mockIds?: string[]
+  }) => void
   clearNotifications: () => void
 }
 
@@ -44,6 +49,8 @@ export function WorkspaceNotificationsProvider({
   const markAllAsRead = useNotificationsStore((s) => s.markAllAsRead)
   const markMockAsRead = useNotificationsStore((s) => s.markMockAsRead)
   const isMockRead = useNotificationsStore((s) => s.isMockRead)
+  const isMockDismissed = useNotificationsStore((s) => s.isMockDismissed)
+  const clearRead = useNotificationsStore((s) => s.clearRead)
   const clear = useNotificationsStore((s) => s.clear)
 
   const value = React.useMemo(
@@ -54,6 +61,8 @@ export function WorkspaceNotificationsProvider({
       markAllAsRead,
       markMockAsRead,
       isMockRead,
+      isMockDismissed,
+      clearRead,
       clearNotifications: clear,
     }),
     [
@@ -63,6 +72,8 @@ export function WorkspaceNotificationsProvider({
       markAllAsRead,
       markMockAsRead,
       isMockRead,
+      isMockDismissed,
+      clearRead,
       clear,
     ]
   )

@@ -8,7 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SidebarMenuButton } from "@/components/ui/sidebar"
+import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar"
 import {
   formatNotificationTime,
   useWorkspaceNotifications,
@@ -24,7 +24,7 @@ import {
   workspaceKeyFromPath,
 } from "@/lib/workspace"
 import { cn } from "@/utils/cn"
-import { Bell, CheckCheck, Clock, LoaderCircle } from "lucide-react"
+import { Bell, CheckCheck, Clock, LoaderCircle, Trash2 } from "lucide-react"
 
 type MockNotification = Omit<WorkspaceNotification, "createdAt" | "workspace"> & {
   time: string
@@ -146,7 +146,9 @@ export function WorkspaceNotificationPopover() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
-  const { notifications, markAsRead, markAllAsRead, markMockAsRead, isMockRead } =
+  const { isMobile, state } = useSidebar()
+  const iconCollapsed = !isMobile && state === "collapsed"
+  const { notifications, markAsRead, markAllAsRead, markMockAsRead, isMockRead, isMockDismissed, clearRead } =
     useWorkspaceNotifications()
   const jobs = useActiveJobsStore((s) => s.jobs)
   const key = workspaceKeyFromPath(pathname)
@@ -188,26 +190,40 @@ export function WorkspaceNotificationPopover() {
         source: "live" as const,
       }))
 
-    const mocks = mockList.map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      time: item.time,
-      unread: item.unread && !isMockRead(item.id),
-      type: item.type,
-      href: item.href,
-      source: "mock" as const,
-    }))
+    const mocks = mockList
+      .filter((item) => !isMockDismissed(item.id))
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        time: item.time,
+        unread: item.unread && !isMockRead(item.id),
+        type: item.type,
+        href: item.href,
+        source: "mock" as const,
+      }))
 
     return [...pending, ...live, ...mocks]
-  }, [notifications, mockList, pendingJobs, isMockRead, key])
+  }, [notifications, mockList, pendingJobs, isMockRead, isMockDismissed, key])
 
   const unreadCount = displayNotifications.filter((n) => n.unread).length
+  const readCount = displayNotifications.filter(
+    (n) => !n.unread && n.source !== "pending"
+  ).length
 
   const handleMarkAllAsRead = () => {
     markAllAsRead({
       workspace: key,
       mockIds: mockList.map((item) => item.id),
+    })
+  }
+
+  const handleClearRead = () => {
+    clearRead({
+      workspace: key,
+      mockIds: displayNotifications
+        .filter((item) => item.source === "mock" && !item.unread)
+        .map((item) => item.id),
     })
   }
 
@@ -239,16 +255,21 @@ export function WorkspaceNotificationPopover() {
           className="relative text-sidebar-foreground/70"
         >
           <Bell className="size-4 shrink-0" />
-          <span className="truncate">Notification</span>
+          <span className={cn("truncate", iconCollapsed && "hidden")}>
+            Notification
+          </span>
           {unreadCount > 0 ? (
             <Badge
+              asChild
               variant="destructive"
               className={cn(
-                "ml-auto h-4 min-w-4 shrink-0 justify-center rounded-full px-1 text-[10px] tabular-nums",
-                "group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:right-1 group-data-[collapsible=icon]:ml-0"
+                "h-4 min-w-4 shrink-0 justify-center rounded-full px-1 text-[10px] tabular-nums",
+                iconCollapsed
+                  ? "absolute top-0 right-0 z-10 ml-0"
+                  : "ml-auto"
               )}
             >
-              {formatUnreadCount(unreadCount)}
+              <div>{formatUnreadCount(unreadCount)}</div>
             </Badge>
           ) : null}
         </SidebarMenuButton>
@@ -265,18 +286,32 @@ export function WorkspaceNotificationPopover() {
               {getWorkspaceTitle()}
             </h4>
           </div>
-          {unreadCount > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 shrink-0 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={handleMarkAllAsRead}
-            >
-              <CheckCheck className="size-3.5" />
-              Mark all
-            </Button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-0.5">
+            {unreadCount > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 shrink-0 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={handleMarkAllAsRead}
+              >
+                <CheckCheck className="size-3.5" />
+                Mark all
+              </Button>
+            ) : null}
+            {readCount > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 shrink-0 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={handleClearRead}
+              >
+                <Trash2 className="size-3.5" />
+                Clear read
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <ScrollArea className="h-80">

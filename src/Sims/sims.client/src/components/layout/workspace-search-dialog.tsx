@@ -1,291 +1,44 @@
-import * as React from "react"
-import { useLocation, useNavigate } from "react-router-dom"
 import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandShortcut,
-} from "@/components/ui/command"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
-  ArrowRight,
-  FileText,
-  Package,
-  Factory,
-  BarChart2,
-  BookOpen,
-  DollarSign,
-  TrendingUp,
-  Receipt,
-  Truck,
-  Scale,
-  Send,
-  UserCheck,
-  Wrench,
-  Settings,
-  CornerDownLeft,
-} from "lucide-react"
-import { emptyModulePath } from "@/lib/empty-module"
+  WorkspaceSearchPanel,
+  useWorkspaceSearchNavigate,
+} from "@/components/layout/workspace-search-panel"
 
-interface WorkspaceSearchDialogProps {
+type WorkspaceSearchDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
+/** Fallback modal search when no header search box is mounted. */
 export function WorkspaceSearchDialog({
   open,
   onOpenChange,
 }: WorkspaceSearchDialogProps) {
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const e = emptyModulePath
-
-  const handleSelect = (url: string) => {
-    onOpenChange(false)
-    if (url && url !== "#") {
-      navigate(url)
-    }
-  }
-
-  const workspace =
-    pathname.startsWith("/accounting")
-      ? "accounting"
-      : pathname.startsWith("/stock") || pathname === "/landed-cost-voucher"
-        ? "stock"
-        : pathname.startsWith("/manufacturing")
-          ? "manufacturing"
-          : "selling"
-
-  // Define workspace-specific search categories & options based on route
-  const getSearchContent = () => {
-    if (workspace === "accounting") {
-      return (
-        <>
-          <CommandGroup heading="Financial Reports Pages">
-            <CommandItem onSelect={() => handleSelect("/accounting")}>
-              <BarChart2 className="size-4 mr-2" />
-              <span>Consolidated Report</span>
-              <CommandShortcut>↵</CommandShortcut>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "Balance Sheet"))}
-            >
-              <FileText className="size-4 mr-2" />
-              <span>Balance Sheet</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "Profit and Loss"))}
-            >
-              <TrendingUp className="size-4 mr-2" />
-              <span>Profit and Loss</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "Cash Flow"))}
-            >
-              <DollarSign className="size-4 mr-2" />
-              <span>Cash Flow</span>
-            </CommandItem>
-          </CommandGroup>
-          <CommandGroup heading="Ledgers">
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "General Ledger"))}
-            >
-              <BookOpen className="size-4 mr-2" />
-              <span>General Ledger</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "Customer Ledger"))}
-            >
-              <BookOpen className="size-4 mr-2" />
-              <span>Customer Ledger</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("accounting", "Supplier Ledger"))}
-            >
-              <BookOpen className="size-4 mr-2" />
-              <span>Supplier Ledger</span>
-            </CommandItem>
-          </CommandGroup>
-        </>
-      )
-    }
-
-    if (workspace === "stock") {
-      return (
-        <>
-          <CommandGroup heading="Stock Pages">
-            <CommandItem onSelect={() => handleSelect("/stock")}>
-              <Package className="size-4 mr-2" />
-              <span>Stock Dashboard</span>
-              <CommandShortcut>↵</CommandShortcut>
-            </CommandItem>
-            <CommandItem
-              onSelect={() =>
-                handleSelect("/stock/serial-batch-traceability")
-              }
-            >
-              <Package className="size-4 mr-2" />
-              <span>Serial No and Batch Traceability</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("stock", "Stock Entry"))}
-            >
-              <Receipt className="size-4 mr-2" />
-              <span>Stock Entry</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("stock", "Delivery Note"))}
-            >
-              <Truck className="size-4 mr-2" />
-              <span>Delivery Note</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("stock", "Stock Reconciliation"))}
-            >
-              <Scale className="size-4 mr-2" />
-              <span>Stock Reconciliation</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("stock", "Material Request"))}
-            >
-              <Send className="size-4 mr-2" />
-              <span>Material Request</span>
-            </CommandItem>
-          </CommandGroup>
-          <CommandGroup heading="Stock Reports">
-            <CommandItem onSelect={() => handleSelect("/stock/stock-ledger")}>
-              <BarChart2 className="size-4 mr-2" />
-              <span>Stock Ledger</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("stock", "Stock Balance"))}
-            >
-              <BarChart2 className="size-4 mr-2" />
-              <span>Stock Balance</span>
-            </CommandItem>
-            <CommandItem onSelect={() => handleSelect("/stock/stock-analytics")}>
-              <BarChart2 className="size-4 mr-2" />
-              <span>Stock Analytics</span>
-            </CommandItem>
-          </CommandGroup>
-        </>
-      )
-    }
-
-    if (workspace === "manufacturing") {
-      return (
-        <>
-          <CommandGroup heading="Manufacturing Settings & Forms">
-            <CommandItem onSelect={() => handleSelect("/manufacturing")}>
-              <Settings className="size-4 mr-2" />
-              <span>Stock Settings</span>
-              <CommandShortcut>↵</CommandShortcut>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("manufacturing", "BOM"))}
-            >
-              <FileText className="size-4 mr-2" />
-              <span>BOM (Bill of Materials)</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("manufacturing", "Work Order"))}
-            >
-              <Factory className="size-4 mr-2" />
-              <span>Work Order</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect(e("manufacturing", "Job Card"))}
-            >
-              <UserCheck className="size-4 mr-2" />
-              <span>Job Card</span>
-            </CommandItem>
-            <CommandItem
-              onSelect={() =>
-                handleSelect(e("manufacturing", "Production Plan"))
-              }
-            >
-              <Wrench className="size-4 mr-2" />
-              <span>Material Planning</span>
-            </CommandItem>
-          </CommandGroup>
-        </>
-      )
-    }
-
-    // Default: Subcontracting / Selling Workspace (/selling)
-    return (
-      <>
-        <CommandGroup heading="Subcontracting Pages">
-          <CommandItem onSelect={() => handleSelect("/selling")}>
-            <ArrowRight className="size-4 mr-2" />
-            <span>Sales Order (Subcontracting)</span>
-            <CommandShortcut>↵</CommandShortcut>
-          </CommandItem>
-          <CommandItem
-            onSelect={() =>
-              handleSelect(e("selling", "Inward Subcontracting Order"))
-            }
-          >
-            <FileText className="size-4 mr-2" />
-            <span>Subcontracting Order</span>
-          </CommandItem>
-          <CommandItem
-            onSelect={() =>
-              handleSelect(e("selling", "Subcontracting Delivery"))
-            }
-          >
-            <Truck className="size-4 mr-2" />
-            <span>Subcontracting Delivery</span>
-          </CommandItem>
-        </CommandGroup>
-        <CommandGroup heading="Outward Orders">
-          <CommandItem
-            onSelect={() => handleSelect(e("selling", "Purchase Order"))}
-          >
-            <Receipt className="size-4 mr-2" />
-            <span>Purchase Order</span>
-          </CommandItem>
-          <CommandItem
-            onSelect={() =>
-              handleSelect(e("selling", "Subcontracting Receipt"))
-            }
-          >
-            <Receipt className="size-4 mr-2" />
-            <span>Subcontracting Receipt</span>
-          </CommandItem>
-        </CommandGroup>
-      </>
-    )
-  }
-
-  const getPlaceholder = () => {
-    if (workspace === "accounting") return "Search Financial Reports..."
-    if (workspace === "stock") return "Search Stock & Traceability..."
-    if (workspace === "manufacturing") return "Search Manufacturing & BOM..."
-    return "Search Subcontracting & Orders..."
-  }
+  const handleSelect = useWorkspaceSearchNavigate(onOpenChange)
 
   return (
-    <CommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Search Documentation"
-      description="Quick search for pages and commands in the current workspace"
-    >
-      <CommandInput placeholder={getPlaceholder()} />
-      <CommandList className="max-h-[320px] p-2">
-        <CommandEmpty>No results found for this workspace.</CommandEmpty>
-        {getSearchContent()}
-      </CommandList>
-      <div className="flex items-center justify-between border-t p-2 text-[11px] text-muted-foreground bg-muted/20">
-        <div className="flex items-center gap-1.5">
-          <CornerDownLeft className="size-3" />
-          <span>Go to Page</span>
-        </div>
-        <span className="font-mono text-[10px]">ESC to close</span>
-      </div>
-    </CommandDialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogHeader className="sr-only">
+        <DialogTitle>Search Workspace</DialogTitle>
+        <DialogDescription>
+          Quick search for pages and commands in the current workspace
+        </DialogDescription>
+      </DialogHeader>
+      <DialogContent
+        className="top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0"
+        showCloseButton={false}
+      >
+        <WorkspaceSearchPanel
+          onSelect={handleSelect}
+          className="rounded-none"
+        />
+      </DialogContent>
+    </Dialog>
   )
 }

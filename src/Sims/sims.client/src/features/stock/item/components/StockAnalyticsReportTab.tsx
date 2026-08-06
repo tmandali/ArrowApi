@@ -198,6 +198,7 @@ export function StockAnalyticsReportTab({
     primaryActionLabel,
     primaryActionButtonProps,
     onPrimaryAction,
+    confirmReportReady,
   } = useStockAnalyticsReport()
 
   const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(true)
@@ -664,6 +665,8 @@ export function StockAnalyticsReportTab({
                     const isFailedHere =
                       step.tone === "danger" && isCurrent
                     const isProgress = step.eventName === "progress"
+                    const isCompletedClickable =
+                      step.eventName === "completed" && isPendingView
 
                     const titleClass = isCancelledHere || isFailedHere
                       ? "font-medium text-amber-500"
@@ -679,11 +682,14 @@ export function StockAnalyticsReportTab({
                         ? "text-emerald-600"
                         : "text-muted-foreground"
 
-                    return (
-                      <div
-                        key={step.id}
-                        className="flex items-start gap-2.5"
-                      >
+                    const rowClassName = cn(
+                      "flex items-start gap-2.5",
+                      isCompletedClickable &&
+                        "-mx-1 w-[calc(100%+0.5rem)] rounded-md px-1 py-0.5 text-left transition-colors hover:bg-emerald-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/30"
+                    )
+
+                    const rowBody = (
+                      <>
                         <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
                           {runStatus === "running" && isCurrent ? (
                             <Spinner
@@ -700,13 +706,18 @@ export function StockAnalyticsReportTab({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-2">
                             <span className={cn("text-sm", titleClass)}>
                               {step.title}
                             </span>
                             {isProgress ? (
-                              <span className="tabular-nums text-sm font-medium text-foreground">
+                              <span className="tabular-nums text-xs text-muted-foreground">
                                 {step.detail}
+                              </span>
+                            ) : null}
+                            {isCompletedClickable ? (
+                              <span className="text-[11px] font-medium text-emerald-600/80">
+                                View
                               </span>
                             ) : null}
                           </div>
@@ -716,6 +727,25 @@ export function StockAnalyticsReportTab({
                             </p>
                           ) : null}
                         </div>
+                      </>
+                    )
+
+                    if (isCompletedClickable) {
+                      return (
+                        <button
+                          key={step.id}
+                          type="button"
+                          className={rowClassName}
+                          onClick={confirmReportReady}
+                        >
+                          {rowBody}
+                        </button>
+                      )
+                    }
+
+                    return (
+                      <div key={step.id} className={rowClassName}>
+                        {rowBody}
                       </div>
                     )
                   })}

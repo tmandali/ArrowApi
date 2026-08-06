@@ -10,10 +10,14 @@ export const YULA = {
     "Merhaba, ben Yula — LCW ERP süreçlerinde dijital rehberiniz. Bugün neyi netleştirmemi istersiniz?",
   emptyTitle: "Yula ile başlayın",
   emptyDescription: "Stok, satış, maliyet veya raporlar hakkında soru sorun.",
+  helpPrompt: "Bugün size nasıl yardımcı olabilirim?",
+  mockHint: "Mock mod — AI API yok; demo diyaloğu veya serbest metinle UI geliştirebilirsiniz.",
   ariaLabel: "Yula — AI asistan",
-  placeholder: "Yula’ya sorun…",
+  placeholder: "Mesaj yazın, / ile komut…",
   loading: "Yula yazıyor…",
   collapseLabel: "Yula panelini kapat",
+  expandLabel: "Yula’yı tam içeriğe genişlet",
+  restoreLabel: "Yula’yı yan panele küçült",
   welcomeMessageId: "yula-welcome",
 } as const
 

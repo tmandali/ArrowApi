@@ -364,4 +364,32 @@ export const stockAnalyticsService = {
       headers: { ...getCompanyHeaders() },
     })
   },
+
+  async deleteJob(jobId: string, signal?: AbortSignal): Promise<void> {
+    const response = await fetch(`/api/arrow/jobs/${jobId}`, {
+      method: "DELETE",
+      headers: { ...getCompanyHeaders() },
+      signal,
+    })
+
+    if (response.status === 204 || response.status === 404) {
+      return
+    }
+
+    if (!response.ok) {
+      let body: unknown
+      try {
+        body = await response.json()
+      } catch {
+        body = undefined
+      }
+      throw new ApiError(
+        response.status === 409
+          ? "Çalışan rapor silinemez"
+          : response.statusText || "Job silinemedi",
+        response.status,
+        body
+      )
+    }
+  },
 }

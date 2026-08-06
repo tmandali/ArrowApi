@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useMatch, useNavigate } from "react-router-dom"
+import { useLocation, useMatch, useNavigate } from "react-router-dom"
 import { useJobSync } from "@/context/job-sync-provider"
 import { ApiError } from "@/services"
 import { fetchJobStatus } from "@/features/jobs/arrow-job-client"
@@ -29,8 +29,22 @@ export type RunEventItem = {
 
 const STOCK_ANALYTICS_PATH = "/stock/stock-analytics"
 
+type StockAnalyticsLocationState = {
+  stockAnalyticsFresh?: boolean
+}
+
 function jobHref(jobId: string): string {
   return `${STOCK_ANALYTICS_PATH}/${jobId}`
+}
+
+function isFreshStockAnalyticsEntry(
+  state: unknown
+): state is StockAnalyticsLocationState {
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    (state as StockAnalyticsLocationState).stockAnalyticsFresh === true
+  )
 }
 
 function collectIds(rows: ReportGridRow[]): string[] {
@@ -230,6 +244,9 @@ type StockAnalyticsReportContextValue = {
   confirmReportReady: () => void
   activeJobId: string | null
   selectExecution: (jobId: string) => void
+  startNewReport: () => void
+  deleteActiveReport: () => Promise<void>
+  deletingReport: boolean
   primaryActionLabel: string
   primaryActionButtonProps: {
     variant: "default" | "destructive"
@@ -247,11 +264,19 @@ export function StockAnalyticsReportProvider({
   children: React.ReactNode
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const jobMatch = useMatch({
     path: `${STOCK_ANALYTICS_PATH}/:jobId`,
     end: true,
   })
+  const bareMatch = useMatch({
+    path: STOCK_ANALYTICS_PATH,
+    end: true,
+  })
   const urlJobId = jobMatch?.params.jobId
+  const isOnBarePath = bareMatch != null
+  const isFreshEntry =
+    isOnBarePath && isFreshStockAnalyticsEntry(location.state)
   const { trackJob, waitUntilTerminal, cancelTrackedJob } = useJobSync()
 
   const [expandedNodes, setExpandedNodes] =
@@ -273,6 +298,7 @@ export function StockAnalyticsReportProvider({
   const [showGroupAccounts, setShowGroupAccounts] = React.useState(true)
   const [runStatus, setRunStatus] = React.useState<ReportRunStatus>("idle")
   const [reportReady, setReportReady] = React.useState(false)
+  const [deletingReport, setDeletingReport] = React.useState(false)
 
   const runIdRef = React.useRef(0)
   const abortRef = React.useRef<AbortController | null>(null)
@@ -651,30 +677,147 @@ export function StockAnalyticsReportProvider({
     void loadJobById(urlJobId)
   }, [urlJobId, loadJobById])
 
-  // Persist hydrate / hard reload sonrası pending job (URL'de GUID yoksa).
+  // GUID yok: pending job → son Completed job (replace) → boş workspace.
+  // New Report (`state.stockAnalyticsFresh`) bu yönlendirmeyi atlar.
+  // Yalnızca /stock/stock-analytics bare path'inde çalışır (provider app-wide).
   React.useEffect(() => {
-    if (urlJobId) return
-    if (resumedRef.current) return
-
-    const tryResume = () => {
-      if (resumedRef.current || urlJobId) return
-      const job = selectPendingStockAnalyticsJob(
-        useActiveJobsStore.getState().jobs
-      )
-      if (!job) return
+    if (!isOnBarePath) return
+    if (isFreshEntry) {
       resumedRef.current = true
-      resumePendingJob(job)
-    }
-
-    if (useActiveJobsStore.persist.hasHydrated()) {
-      tryResume()
       return
     }
 
-    return useActiveJobsStore.persist.onFinishHydration(() => {
-      tryResume()
+    let cancelled = false
+    const abort = new AbortController()
+
+    const openLastOrPending = async () => {
+      const waitHydrated = () =>
+        new Promise<void>((resolve) => {
+          if (useActiveJobsStore.persist.hasHydrated()) {
+            resolve()
+            return
+          }
+          useActiveJobsStore.persist.onFinishHydration(() => resolve())
+        })
+
+      await waitHydrated()
+      if (cancelled || !isOnBarePath) return
+
+      const pending = selectPendingStockAnalyticsJob(
+        useActiveJobsStore.getState().jobs
+      )
+      if (pending) {
+        resumedRef.current = true
+        resumePendingJob(pending)
+        return
+      }
+
+      if (loadedJobIdRef.current) {
+        resumedRef.current = true
+        navigate(jobHref(loadedJobIdRef.current), { replace: true })
+        return
+      }
+
+      try {
+        const page = await stockAnalyticsService.listJobs({
+          take: 1,
+          state: "Completed",
+          signal: abort.signal,
+        })
+        if (cancelled) return
+        const last = page.items?.[0]
+        if (last?.id) {
+          resumedRef.current = true
+          navigate(jobHref(last.id), { replace: true })
+        }
+      } catch {
+        // Liste alınamazsa boş workspace'te kal.
+      }
+    }
+
+    void openLastOrPending()
+    return () => {
+      cancelled = true
+      abort.abort()
+    }
+  }, [isOnBarePath, isFreshEntry, resumePendingJob, navigate])
+
+  const startNewReport = React.useCallback(() => {
+    runIdRef.current += 1
+    abortRef.current?.abort()
+    abortRef.current = null
+    activeJobIdRef.current = null
+    loadedJobIdRef.current = null
+    resumedRef.current = true
+
+    setReportRows([])
+    setReportColumns([])
+    setExpandedNodes({})
+    setRunEvents([])
+    setReportReady(false)
+    setRunStatus("idle")
+
+    navigate(STOCK_ANALYTICS_PATH, {
+      replace: true,
+      state: { stockAnalyticsFresh: true } satisfies StockAnalyticsLocationState,
     })
-  }, [resumePendingJob, urlJobId])
+  }, [navigate])
+
+  const deleteActiveReport = React.useCallback(async () => {
+    const jobId = urlJobId ?? loadedJobIdRef.current
+    if (!jobId || runStatus === "running" || deletingReport) return
+
+    setDeletingReport(true)
+    try {
+      await stockAnalyticsService.deleteJob(jobId)
+      useActiveJobsStore.getState().removeJob(jobId)
+
+      runIdRef.current += 1
+      abortRef.current?.abort()
+      abortRef.current = null
+      activeJobIdRef.current = null
+      loadedJobIdRef.current = null
+      resumedRef.current = true
+
+      setReportRows([])
+      setReportColumns([])
+      setExpandedNodes({})
+      setRunEvents([])
+      setReportReady(false)
+      setRunStatus("idle")
+
+      const page = await stockAnalyticsService.listJobs({
+        take: 1,
+        state: "Completed",
+      })
+      const next = page.items?.[0]
+      if (next?.id) {
+        navigate(jobHref(next.id), { replace: true })
+        return
+      }
+
+      navigate(STOCK_ANALYTICS_PATH, {
+        replace: true,
+        state: {
+          stockAnalyticsFresh: true,
+        } satisfies StockAnalyticsLocationState,
+      })
+    } catch (error) {
+      setRunEvents((prev) => [
+        ...prev,
+        {
+          id: `delete-error-${prev.length}`,
+          eventName: "failed",
+          title: "Delete failed",
+          detail: errorMessage(error, "Rapor silinemedi"),
+          tone: "danger",
+        },
+      ])
+      throw error
+    } finally {
+      setDeletingReport(false)
+    }
+  }, [urlJobId, runStatus, deletingReport, navigate])
 
   const runReport = React.useCallback(async () => {
     const runId = ++runIdRef.current
@@ -861,6 +1004,9 @@ export function StockAnalyticsReportProvider({
       confirmReportReady,
       activeJobId,
       selectExecution,
+      startNewReport,
+      deleteActiveReport,
+      deletingReport,
       primaryActionLabel,
       primaryActionButtonProps,
       onPrimaryAction,
@@ -892,6 +1038,9 @@ export function StockAnalyticsReportProvider({
       confirmReportReady,
       activeJobId,
       selectExecution,
+      startNewReport,
+      deleteActiveReport,
+      deletingReport,
       primaryActionLabel,
       primaryActionButtonProps,
       onPrimaryAction,

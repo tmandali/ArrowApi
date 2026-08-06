@@ -39,10 +39,26 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/ui/item"
-import { Separator } from "@/components/ui/separator"
 import { emptyModulePath } from "@/lib/empty-module"
+import { cn } from "@/utils/cn"
 
 const e = emptyModulePath
+
+type KpiTone = "primary" | "orange"
+
+const kpiToneClassName: Record<
+  KpiTone,
+  { title: string; value: string }
+> = {
+  primary: {
+    title: "text-primary dark:text-sidebar-primary",
+    value: "text-primary dark:text-sidebar-primary",
+  },
+  orange: {
+    title: "text-orange-700 dark:text-orange-400",
+    value: "text-orange-700 dark:text-orange-400",
+  },
+}
 
 const kpiCards = [
   {
@@ -50,18 +66,21 @@ const kpiCards = [
     value: "3.510 L",
     change: "0% since yesterday",
     trend: "flat" as const,
+    tone: "primary" as const satisfies KpiTone,
   },
   {
     title: "Total Warehouses",
     value: "5",
     change: "0% since last month",
     trend: "flat" as const,
+    tone: "orange" as const satisfies KpiTone,
   },
   {
     title: "Total Active Items",
     value: "37",
     change: "106% since last month",
     trend: "up" as const,
+    tone: "primary" as const satisfies KpiTone,
   },
 ]
 
@@ -375,44 +394,36 @@ function CardMenu() {
 }
 
 function FeatureVisual({ kind }: { kind: FeatureSection["visual"] }) {
-  const icon =
-    kind === "catalogue" ? (
-      <Package className="size-4 text-primary" />
-    ) : kind === "setup" ? (
-      <Settings2Icon className="size-4 text-orange-600" />
-    ) : kind === "tools" ? (
-      <WrenchIcon className="size-4 text-primary" />
-    ) : (
-      <BarChart2Icon className="size-4 text-orange-600" />
-    )
-
-  return (
-    <div className="flex size-full items-center justify-center bg-muted/40">
-      {icon}
-    </div>
-  )
+  switch (kind) {
+    case "catalogue":
+      return <Package className="size-3.5 shrink-0 text-primary" />
+    case "setup":
+      return <Settings2Icon className="size-3.5 shrink-0 text-orange-600" />
+    case "tools":
+      return <WrenchIcon className="size-3.5 shrink-0 text-primary" />
+    case "reports":
+      return <BarChart2Icon className="size-3.5 shrink-0 text-orange-600" />
+    default: {
+      const _exhaustive: never = kind
+      return _exhaustive
+    }
+  }
 }
 
 function FeaturePanel({ section }: { section: FeatureSection }) {
   return (
     <Card size="sm" className="gap-0 py-0">
-      <CardHeader className="py-2">
-        <div className="flex items-center gap-2">
-          <div className="size-9 shrink-0 overflow-hidden rounded-md">
-            <FeatureVisual kind={section.visual} />
-          </div>
-          <CardTitle className="text-xs font-medium tracking-tight">
-            <span className="text-primary dark:text-sidebar-primary">
-              {section.titleLead}
-            </span>{" "}
-            <span className="text-orange-600 dark:text-orange-400">
-              {section.titleTrail}
-            </span>
-          </CardTitle>
-        </div>
+      <CardHeader className="flex h-8 flex-row items-center gap-1.5 px-2.5 py-0">
+        <FeatureVisual kind={section.visual} />
+        <CardTitle className="text-xs font-medium tracking-tight">
+          <span className="text-primary dark:text-sidebar-primary">
+            {section.titleLead}
+          </span>{" "}
+          <span className="text-orange-600 dark:text-orange-400">
+            {section.titleTrail}
+          </span>
+        </CardTitle>
       </CardHeader>
-
-      <Separator />
 
       <CardContent className="p-1">
         <ItemGroup className="gap-0" data-size="xs">
@@ -445,35 +456,48 @@ export function StockDashboard() {
   return (
     <div className="flex flex-1 flex-col gap-3 p-3">
       <div className="grid gap-2 md:grid-cols-3">
-        {kpiCards.map((kpi) => (
-          <Card key={kpi.title} size="sm">
-            <CardHeader className="gap-0.5">
-              <CardDescription className="text-[0.625rem] uppercase tracking-wide">
-                {kpi.title}
-              </CardDescription>
-              <CardAction>
-                <CardMenu />
-              </CardAction>
-              <CardTitle className="text-lg font-semibold tracking-tight">
-                {kpi.value}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {kpi.trend === "up" ? (
-                <Badge
-                  variant="secondary"
-                  className={badgeToneClassName.success}
+        {kpiCards.map((kpi) => {
+          const tone = kpiToneClassName[kpi.tone]
+          return (
+            <Card key={kpi.title} size="sm">
+              <CardHeader className="gap-0.5">
+                <CardDescription
+                  className={cn(
+                    "text-[0.625rem] uppercase tracking-wide",
+                    tone.title
+                  )}
                 >
-                  ↑ {kpi.change}
-                </Badge>
-              ) : (
-                <p className="text-[0.625rem] text-muted-foreground">
-                  {kpi.change}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                  {kpi.title}
+                </CardDescription>
+                <CardAction>
+                  <CardMenu />
+                </CardAction>
+                <CardTitle
+                  className={cn(
+                    "text-lg font-semibold tracking-tight",
+                    tone.value
+                  )}
+                >
+                  {kpi.value}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {kpi.trend === "up" ? (
+                  <Badge
+                    variant="secondary"
+                    className={badgeToneClassName.success}
+                  >
+                    ↑ {kpi.change}
+                  </Badge>
+                ) : (
+                  <p className="text-[0.625rem] text-muted-foreground">
+                    {kpi.change}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -507,7 +531,7 @@ export function StockDashboard() {
         })}
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {featureSections.map((section) => (
           <FeaturePanel
             key={`${section.titleLead}-${section.titleTrail}`}

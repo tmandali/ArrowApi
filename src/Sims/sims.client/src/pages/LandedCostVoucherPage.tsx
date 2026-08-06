@@ -76,7 +76,7 @@ export default function LandedCostVoucherPage() {
   return (
     <>
       {/* Sticky Header Navigation */}
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
+      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
           <div className="flex items-center gap-2 overflow-hidden">
             <SidebarTrigger className="-ml-1" />
             <Separator

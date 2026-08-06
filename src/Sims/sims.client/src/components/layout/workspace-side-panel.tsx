@@ -17,12 +17,18 @@ type WorkspaceSidePanelLayoutProps = {
   title: React.ReactNode
   panel: React.ReactNode
   children: React.ReactNode
+  /** Extra controls in the panel header (before collapse). */
+  headerActions?: React.ReactNode
   /** Collapse control aria-label. Defaults from string title when possible. */
   collapseLabel?: string
   defaultSizePercent?: number
+  /** Minimum panel width while open. Defaults to defaultSizePercent. */
+  minSizePercent?: number
   maxSizePercent?: number
   mainMinSizePercent?: number
   className?: string
+  /** Classes for the main (left) content shell. */
+  mainClassName?: string
   panelClassName?: string
 }
 
@@ -36,14 +42,18 @@ export function WorkspaceSidePanelLayout({
   title,
   panel,
   children,
+  headerActions,
   collapseLabel,
   defaultSizePercent = WORKSPACE_SIDE_PANEL_PERCENT,
+  minSizePercent,
   maxSizePercent = 40,
   mainMinSizePercent = 45,
   className,
+  mainClassName,
   panelClassName,
 }: WorkspaceSidePanelLayoutProps) {
   const mainDefault = 100 - defaultSizePercent
+  const panelMinSize = minSizePercent ?? defaultSizePercent
   const resolvedCollapseLabel =
     collapseLabel ??
     (typeof title === "string" ? `Collapse ${title}` : "Collapse panel")
@@ -59,7 +69,12 @@ export function WorkspaceSidePanelLayout({
         minSize={String(mainMinSizePercent)}
         className="min-h-0"
       >
-        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+        <div
+          className={cn(
+            "flex h-full min-h-0 min-w-0 flex-col overflow-hidden",
+            mainClassName
+          )}
+        >
           {children}
         </div>
       </ResizablePanel>
@@ -69,7 +84,7 @@ export function WorkspaceSidePanelLayout({
           <ResizableHandle withHandle />
           <ResizablePanel
             defaultSize={String(defaultSizePercent)}
-            minSize={String(defaultSizePercent)}
+            minSize={String(panelMinSize)}
             maxSize={String(maxSizePercent)}
             collapsible
             collapsedSize={0}
@@ -86,17 +101,29 @@ export function WorkspaceSidePanelLayout({
                 panelClassName
               )}
             >
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="flex w-full shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
-                aria-label={resolvedCollapseLabel}
-              >
-                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                  {title}
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
+                  aria-label={resolvedCollapseLabel}
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                    {title}
+                  </span>
+                </button>
+                {headerActions}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 shrink-0"
+                  onClick={() => onOpenChange(false)}
+                  aria-label={resolvedCollapseLabel}
+                >
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </Button>
+              </div>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {panel}
               </div>

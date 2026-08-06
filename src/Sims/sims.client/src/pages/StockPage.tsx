@@ -22,6 +22,7 @@ export default function StockPage() {
   return (
     <>
       <WorkspacePageHeader
+        searchPlaceholder="Search Stock & Traceability..."
         actions={
           <>
             <Button variant="outline" size="icon" aria-label="Refresh">

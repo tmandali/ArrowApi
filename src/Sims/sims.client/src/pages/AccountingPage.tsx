@@ -2,16 +2,13 @@ import * as React from "react"
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -311,26 +308,10 @@ export default function AccountingPage() {
 
   return (
     <>
-      {/* Header Navigation & Actions */}
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-            />
-            <Breadcrumb>
-              <BreadcrumbList className="text-xs">
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-foreground">
-                    Accounting
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-
-          <div className="flex items-center gap-2">
+      <WorkspacePageHeader
+        searchPlaceholder="Search Financial Reports..."
+        actions={
+          <>
             <Select defaultValue="actions">
               <SelectTrigger className="h-7 text-xs font-normal gap-1 px-2.5">
                 <span>Actions</span>
@@ -360,8 +341,19 @@ export default function AccountingPage() {
             </DropdownMenu>
 
             <AIChatAssistant variant="toolbar" />
-          </div>
-        </header>
+          </>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold text-foreground">
+                Accounting
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </WorkspacePageHeader>
 
         <WorkspaceAiDock>
         {/* Top Controls & Filter Panel */}

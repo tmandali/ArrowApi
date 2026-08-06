@@ -45,6 +45,8 @@ import {
   Search,
   ListFilter,
   RefreshCw,
+  FilePlus2,
+  Trash2,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
@@ -117,6 +119,11 @@ type ItemFormProps = {
   onCollapseAll?: () => void
   onSetTreeLevel?: () => void
   treeAction?: StockAnalyticsTreeAction | null
+  onStartNewReport?: () => void
+  onDeleteActiveReport?: () => void
+  deletingReport?: boolean
+  activeJobId?: string | null
+  reportRunning?: boolean
 }
 
 export function ItemForm({
@@ -138,6 +145,11 @@ export function ItemForm({
   onCollapseAll,
   onSetTreeLevel,
   treeAction = null,
+  onStartNewReport,
+  onDeleteActiveReport,
+  deletingReport = false,
+  activeJobId = null,
+  reportRunning = false,
 }: ItemFormProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
@@ -180,7 +192,7 @@ export function ItemForm({
           : "contents"
       }
     >
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
+      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
         <div className="flex items-center gap-2 overflow-hidden">
           <SidebarTrigger className="-ml-1" />
           <Separator
@@ -243,7 +255,48 @@ export function ItemForm({
                 label="Query"
               />
 
+              <Separator
+                orientation="vertical"
+                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5"
+                onClick={() => onStartNewReport?.()}
+                title="New report"
+                aria-label="New report"
+              >
+                <FilePlus2 className="size-3.5" />
+                New
+              </Button>
+
               <StockAnalyticsExecutionHistory />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={!activeJobId || deletingReport || reportRunning}
+                onClick={() => onDeleteActiveReport?.()}
+                title={
+                  reportRunning
+                    ? "Running report cannot be deleted"
+                    : "Delete report"
+                }
+                aria-label="Delete report"
+              >
+                <Trash2 className="size-3.5" />
+                {deletingReport ? "Deleting…" : "Delete"}
+              </Button>
+
+              <Separator
+                orientation="vertical"
+                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+              />
 
               <Button
                 type="button"
@@ -320,6 +373,12 @@ export function ItemForm({
                 <Printer className="size-3.5" />
                 {isPrinting ? "Preparing…" : "Print"}
               </Button>
+
+              <Separator
+                orientation="vertical"
+                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+              />
+
               <AIChatAssistant variant="toolbar" />
             </>
           ) : isStockLedger ? (
