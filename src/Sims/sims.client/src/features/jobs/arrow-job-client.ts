@@ -1,4 +1,5 @@
 import { ApiError } from "@/services"
+import { getCompanyHeaders } from "@/lib/company-headers"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
@@ -10,7 +11,7 @@ export async function fetchJobStatus(
   signal?: AbortSignal
 ): Promise<ArrowJobStatus | null> {
   const response = await fetch(`/api/arrow/jobs/${jobId}`, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...getCompanyHeaders() },
     signal,
   })
 
@@ -36,7 +37,10 @@ export async function fetchJobStatus(
 }
 
 export async function cancelArrowJob(jobId: string): Promise<void> {
-  await fetch(`/api/arrow/jobs/${jobId}/cancel`, { method: "POST" })
+  await fetch(`/api/arrow/jobs/${jobId}/cancel`, {
+    method: "POST",
+    headers: { ...getCompanyHeaders() },
+  })
 }
 
 /**
@@ -49,7 +53,7 @@ export async function readJobSseEvents(
   onEvent: (eventName: string, payload: ArrowJobEvent) => void
 ): Promise<ArrowJobEvent> {
   const response = await fetch(eventsUrl, {
-    headers: { Accept: "text/event-stream" },
+    headers: { Accept: "text/event-stream", ...getCompanyHeaders() },
     signal,
   })
 

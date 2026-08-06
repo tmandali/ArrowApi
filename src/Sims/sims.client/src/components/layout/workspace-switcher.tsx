@@ -18,6 +18,7 @@ import {
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
 import { useLocation, useNavigate } from "react-router-dom"
+import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -25,13 +26,14 @@ export function WorkspaceSwitcher({
   workspaces: {
     name: string
     logo: React.ReactNode
-    plan: string
+    plan?: string
     url?: string
   }[]
 }) {
   const { isMobile } = useSidebar()
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const { company } = useActiveCompany()
 
   const currentWorkspace = React.useMemo(() => {
     if (
@@ -85,7 +87,9 @@ export function WorkspaceSwitcher({
                   {activeWorkspace.name}
                 </span>
                 <span className="truncate text-xs text-orange-600 dark:text-orange-400">
-                  {activeWorkspace.plan}
+                  {company
+                    ? [company.abbr, company.name].filter(Boolean).join(" · ")
+                    : (activeWorkspace.plan ?? "")}
                 </span>
               </div>
               <ChevronsUpDownIcon className="ml-auto" />

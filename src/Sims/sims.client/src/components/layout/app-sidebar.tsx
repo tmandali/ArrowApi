@@ -29,8 +29,8 @@ import { getWorkspaceNavForPath } from "@/lib/workspace-nav"
 
 const data = {
   user: {
-    name: "Dipen Gala",
-    email: "dipen@erpnext.com",
+    name: "Timur MANDALI",
+    email: "timur.mandali@lcwaikiki.com",
     avatar: "",
   },
   workspaces: [

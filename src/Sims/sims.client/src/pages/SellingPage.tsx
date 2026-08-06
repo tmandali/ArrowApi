@@ -9,10 +9,11 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
-import { Separator } from "@/components/ui/separator"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import {
   Collapsible,
   CollapsibleContent,
@@ -74,6 +75,7 @@ import {
 } from "lucide-react"
 
 export default function SellingPage() {
+  const { company } = useActiveCompany()
   const [accountingOpen, setAccountingOpen] = React.useState(false)
   const [currencyOpen, setCurrencyOpen] = React.useState(false)
   const [isSubcontracted, setIsSubcontracted] = React.useState(true)
@@ -292,7 +294,8 @@ export default function SellingPage() {
                     Company <span className="text-red-500">*</span>
                   </FieldLabel>
                   <Input
-                    defaultValue="Dipen"
+                    key={company?.id ?? "company"}
+                    defaultValue={company?.name ?? ""}
                     className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                   />
                 </Field>

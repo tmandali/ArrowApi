@@ -11,11 +11,12 @@ import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import {
   Select,
   SelectContent,
@@ -69,6 +70,8 @@ export default function LandedCostVoucherPage() {
       },
     ])
   }
+
+  const { company } = useActiveCompany()
 
   return (
     <>
@@ -163,7 +166,8 @@ export default function LandedCostVoucherPage() {
                 Company <span className="text-red-500">*</span>
               </FieldLabel>
               <Input
-                defaultValue="Sun Inc"
+                key={company?.id ?? "company"}
+                defaultValue={company?.name ?? ""}
                 className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
               />
             </Field>

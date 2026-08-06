@@ -2,6 +2,8 @@
  * Shared HTTP client for feature services.
  * Point baseURL at Sims.Server (or Vite proxy) as APIs land.
  */
+import { getCompanyHeaders } from "@/lib/company-headers"
+
 const defaultHeaders: HeadersInit = {
   Accept: "application/json",
   "Content-Type": "application/json",
@@ -27,6 +29,7 @@ export async function apiFetch<T>(
     ...init,
     headers: {
       ...defaultHeaders,
+      ...getCompanyHeaders(),
       ...init.headers,
     },
   })

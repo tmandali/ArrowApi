@@ -13,3 +13,9 @@ export {
   type WorkspaceNotification,
   type WorkspaceNotificationType,
 } from "./slices/notifications-store"
+
+export {
+  useCompanyStore,
+  selectActiveCompany,
+  MOCK_COMPANIES,
+} from "./slices/company-store"

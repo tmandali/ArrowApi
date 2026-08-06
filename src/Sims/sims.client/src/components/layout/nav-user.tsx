@@ -23,8 +23,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
+import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import { cn } from "@/utils/cn"
 import {
+  Building2,
+  Check,
   ChevronsUpDown,
   User,
   Settings,
@@ -55,6 +58,7 @@ export function NavUser({
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const { clearJobSession } = useJobSession()
+  const { company, companies, setActiveCompany } = useActiveCompany()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -123,6 +127,33 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel className="px-2 py-1.5 text-xs text-muted-foreground">
+              Company
+            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              {companies.map((item) => {
+                const isActive = item.id === company?.id
+                return (
+                  <DropdownMenuItem
+                    key={item.id}
+                    className="cursor-pointer gap-2"
+                    onClick={() => setActiveCompany(item.id)}
+                  >
+                    <Building2 />
+                    <span className="flex-1 truncate">{item.name}</span>
+                    {item.abbr ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {item.abbr}
+                      </span>
+                    ) : null}
+                    {isActive ? <Check className="size-3.5" /> : null}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 

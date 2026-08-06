@@ -1,5 +1,6 @@
 import { tableFromIPC, type Table } from "apache-arrow"
 import { ApiError } from "@/services"
+import { getCompanyHeaders } from "@/lib/company-headers"
 import { readJobSseEvents } from "@/features/jobs/arrow-job-client"
 import type {
   ArrowJobEvent,
@@ -169,7 +170,7 @@ function buildTree(
 
 async function fetchArrowTable(jobUrl: string, signal: AbortSignal): Promise<Table> {
   const response = await fetch(jobUrl, {
-    headers: { Accept: ARROW_ACCEPT },
+    headers: { Accept: ARROW_ACCEPT, ...getCompanyHeaders() },
     signal,
   })
 
@@ -214,7 +215,7 @@ export const stockAnalyticsService = {
     const response = await fetch(
       query ? `${JOB_BASE}?${query}` : JOB_BASE,
       {
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", ...getCompanyHeaders() },
         signal: options.signal,
       }
     )
@@ -245,6 +246,7 @@ export const stockAnalyticsService = {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        ...getCompanyHeaders(),
       },
       body: JSON.stringify({
         fromDate: toIsoDate(request.fromDate),
@@ -282,7 +284,7 @@ export const stockAnalyticsService = {
     signal?: AbortSignal
   ): Promise<StockAnalyticsRequest | null> {
     const response = await fetch(`/api/arrow/jobs/${jobId}/request`, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
       signal,
     })
 
@@ -357,6 +359,9 @@ export const stockAnalyticsService = {
   },
 
   async cancel(jobId: string): Promise<void> {
-    await fetch(`/api/arrow/jobs/${jobId}/cancel`, { method: "POST" })
+    await fetch(`/api/arrow/jobs/${jobId}/cancel`, {
+      method: "POST",
+      headers: { ...getCompanyHeaders() },
+    })
   },
 }

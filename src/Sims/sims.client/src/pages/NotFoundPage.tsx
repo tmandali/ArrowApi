@@ -17,8 +17,7 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { emptyWorkspaceHome } from "@/lib/empty-module"
 import { FileQuestion, ArrowLeft, Home } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
@@ -42,34 +41,23 @@ export default function NotFoundPage() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 text-xs">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-          />
-          <Breadcrumb>
-            <BreadcrumbList className="text-xs">
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link to={home.url}>{home.label}</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-semibold text-foreground">
-                  Not Found
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <AIChatAssistant variant="toolbar" />
-        </div>
-      </header>
+      <WorkspacePageHeader actions={<AIChatAssistant variant="toolbar" />}>
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={home.url}>{home.label}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold text-foreground">
+                Not Found
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </WorkspacePageHeader>
 
       <WorkspaceAiDock>
         <div className="flex flex-1 items-center justify-center p-6">
