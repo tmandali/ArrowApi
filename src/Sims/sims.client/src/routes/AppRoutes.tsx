@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes, useParams } from "react-router-dom"
-import { Loader2 } from "lucide-react"
 import { AppLayout } from "@/components/layout/app-layout"
+import { RouteFallback } from "@/components/layout/route-fallback"
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"))
 const SellingPage = lazy(() => import("@/pages/SellingPage"))
@@ -18,15 +18,6 @@ const ManufacturingPage = lazy(() => import("@/pages/ManufacturingPage"))
 const LandedCostVoucherPage = lazy(() => import("@/pages/LandedCostVoucherPage"))
 const UserSettingsPage = lazy(() => import("@/pages/UserSettingsPage"))
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"))
-
-function RouteFallback() {
-  return (
-    <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
-      <Loader2 className="size-4 animate-spin" />
-      Yükleniyor…
-    </div>
-  )
-}
 
 /** /empty/{workspace}/{slug} → /{workspace}/{slug} */
 function LegacyEmptyPrefixRedirect() {

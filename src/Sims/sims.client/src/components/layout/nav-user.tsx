@@ -58,7 +58,8 @@ export function NavUser({
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const { clearJobSession } = useJobSession()
-  const { company, companies, setActiveCompany } = useActiveCompany()
+  const { company, companies, beginCompanySwitch, isSwitching } =
+    useActiveCompany()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
@@ -140,7 +141,8 @@ export function NavUser({
                   <DropdownMenuItem
                     key={item.id}
                     className="cursor-pointer gap-2"
-                    onClick={() => setActiveCompany(item.id)}
+                    disabled={isSwitching}
+                    onClick={() => beginCompanySwitch(item.id)}
                   >
                     <Building2 />
                     <span className="flex-1 truncate">{item.name}</span>

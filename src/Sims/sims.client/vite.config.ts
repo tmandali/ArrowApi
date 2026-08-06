@@ -46,6 +46,8 @@ export default defineConfig({
         }
     },
     server: {
+        // Makine adı / LAN erişimi için tüm arayüzlerde dinle (localhost + TIMURMANDALI2...)
+        host: true,
         proxy: {
             '^/weatherforecast': {
                 target,
