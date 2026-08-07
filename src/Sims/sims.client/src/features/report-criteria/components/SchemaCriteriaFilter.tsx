@@ -1,0 +1,624 @@
+import * as React from "react"
+import { Button } from "@/components/ui/button"
+import { Field, FieldLabel } from "@/components/ui/field"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  ChevronDown,
+  Copy,
+  Keyboard,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react"
+import { cn } from "@/utils/cn"
+import { parseCriteriaSchema } from "../lib/parse-criteria-schema"
+import { createInitialCriteriaRows } from "../lib/create-initial-criteria-rows"
+import { rowsToCriteriaInstance } from "../lib/rows-to-criteria-instance"
+import { validateCellPatterns } from "../lib/validate-cell-patterns"
+import { validateCriteria } from "../lib/validate-criteria"
+import type {
+  CriteriaComboboxOption,
+  CriteriaFilterRow,
+  CriteriaValidationResult,
+  JsonSchemaObject,
+} from "../types"
+import { CriteriaSimpleCombobox } from "./CriteriaSimpleCombobox"
+import { CriteriaValueCell } from "./CriteriaValueCell"
+
+const cellInputClass =
+  "h-9 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
+
+const cellClass = "p-0 border-r border-border/60 last:border-r-0"
+const headClass =
+  "h-9 px-2 border-r border-border/60 last:border-r-0 text-[11px] font-medium text-muted-foreground bg-muted/30"
+
+const EDITABLE_COL_COUNT = 2
+
+const emptyRow = (): CriteriaFilterRow => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  selected: false,
+  name: "",
+  value: "",
+})
+
+export type SchemaCriteriaFilterProps = {
+  schema: JsonSchemaObject
+  initialRows?: CriteriaFilterRow[]
+  autoValidate?: boolean
+  /** Show schema title/description header. Default true. */
+  showHeader?: boolean
+  onChange?: (
+    rows: CriteriaFilterRow[],
+    instance: Record<string, unknown>
+  ) => void
+  onValidate?: (result: CriteriaValidationResult) => void
+  className?: string
+}
+
+export type SchemaCriteriaFilterHandle = {
+  submit: () => CriteriaValidationResult
+}
+
+export const SchemaCriteriaFilter = React.forwardRef<
+  SchemaCriteriaFilterHandle,
+  SchemaCriteriaFilterProps
+>(function SchemaCriteriaFilter(
+  {
+    schema,
+    initialRows,
+    autoValidate = false,
+    showHeader = true,
+    onChange,
+    onValidate,
+    className,
+  },
+  ref
+) {
+  const parsed = React.useMemo(() => parseCriteriaSchema(schema), [schema])
+  const [rows, setRows] = React.useState<CriteriaFilterRow[]>(() => {
+    if (initialRows) return initialRows
+    return createInitialCriteriaRows(parseCriteriaSchema(schema).fields)
+  })
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
+  const [validation, setValidation] =
+    React.useState<CriteriaValidationResult | null>(null)
+  const hasValidatedRef = React.useRef(false)
+  const rowsRef = React.useRef(rows)
+  rowsRef.current = rows
+  const tableRef = React.useRef<HTMLDivElement>(null)
+
+  const nameOptions = React.useMemo<CriteriaComboboxOption[]>(
+    () =>
+      parsed.fields.map((field) => ({
+        value: field.key,
+        label: field.required ? `${field.title} *` : field.title,
+      })),
+    [parsed.fields]
+  )
+
+  const fieldMap = React.useMemo(
+    () => new Map(parsed.fields.map((field) => [field.key, field])),
+    [parsed.fields]
+  )
+
+  const invalidFields = React.useMemo(() => {
+    const keys = new Set<string>()
+    for (const error of validation?.errors ?? []) {
+      if (error.fieldKey) keys.add(error.fieldKey)
+    }
+    return keys
+  }, [validation])
+
+  const patternInvalidByRowId = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const row of rows) {
+      const field = fieldMap.get(row.name)
+      const result = validateCellPatterns(field, row.value)
+      if (!result.valid && result.message) {
+        map.set(row.id, result.message)
+      }
+    }
+    return map
+  }, [rows, fieldMap])
+
+  const editingRow =
+    editingIndex === null ? null : (rows[editingIndex] ?? null)
+  const dialogOpen = editingIndex !== null && editingRow !== null
+
+  const runValidate = React.useCallback(
+    (nextRows: CriteriaFilterRow[]) => {
+      hasValidatedRef.current = true
+      const result = validateCriteria(schema, nextRows, parsed.fields)
+
+      const patternErrors = nextRows.flatMap((row) => {
+        const field = fieldMap.get(row.name)
+        const cell = validateCellPatterns(field, row.value)
+        if (cell.valid || !field) return []
+        return [
+          {
+            fieldKey: field.key,
+            message: cell.message ?? `${field.title}: pattern mismatch`,
+            keyword: "pattern",
+          },
+        ]
+      })
+
+      const merged = {
+        ...result,
+        valid: result.valid && patternErrors.length === 0,
+        errors: [...result.errors, ...patternErrors],
+      }
+      setValidation(merged)
+      onValidate?.(merged)
+      return merged
+    },
+    [schema, parsed.fields, onValidate, fieldMap]
+  )
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      submit: () => runValidate(rowsRef.current),
+    }),
+    [runValidate]
+  )
+
+  const emitChange = React.useCallback(
+    (nextRows: CriteriaFilterRow[]) => {
+      const instance = rowsToCriteriaInstance(nextRows, parsed.fields)
+      onChange?.(nextRows, instance)
+    },
+    [onChange, parsed.fields]
+  )
+
+  const setRowsAndNotify = React.useCallback(
+    (updater: (prev: CriteriaFilterRow[]) => CriteriaFilterRow[]) => {
+      setRows((prev) => {
+        const next = updater(prev)
+        emitChange(next)
+        return next
+      })
+    },
+    [emitChange]
+  )
+
+  React.useEffect(() => {
+    if (!autoValidate || !hasValidatedRef.current) return
+    const timer = window.setTimeout(() => {
+      runValidate(rows)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [rows, autoValidate, runValidate])
+
+  const focusGridCell = React.useCallback((row: number, col: number) => {
+    const cell = tableRef.current?.querySelector<HTMLElement>(
+      `[data-grid-cell="${row}-${col}"]`
+    )
+    cell?.focus()
+  }, [])
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") return
+
+    const target = event.target as HTMLElement | null
+    const cell = target?.closest<HTMLElement>("[data-grid-cell]")
+    if (!cell) return
+
+    const [rowText, colText] = (cell.dataset.gridCell ?? "").split("-")
+    const row = Number(rowText)
+    const col = Number(colText)
+    if (Number.isNaN(row) || Number.isNaN(col)) return
+
+    let nextRow = row
+    let nextCol = col + (event.shiftKey ? -1 : 1)
+
+    if (nextCol >= EDITABLE_COL_COUNT) {
+      nextRow += 1
+      nextCol = 0
+    } else if (nextCol < 0) {
+      nextRow -= 1
+      nextCol = EDITABLE_COL_COUNT - 1
+    }
+
+    if (nextRow < 0 || nextRow >= rows.length) return
+
+    event.preventDefault()
+    focusGridCell(nextRow, nextCol)
+  }
+
+  const updateRow = (id: string, patch: Partial<CriteriaFilterRow>) => {
+    setRowsAndNotify((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row
+        const next = { ...row, ...patch }
+        if (patch.name !== undefined && patch.name !== row.name) {
+          next.value = ""
+        }
+        return next
+      })
+    )
+  }
+
+  const addRow = (atIndex?: number) => {
+    const row = emptyRow()
+    setRowsAndNotify((prev) => {
+      if (atIndex === undefined) return [...prev, row]
+      const next = [...prev]
+      next.splice(atIndex, 0, row)
+      return next
+    })
+    return row
+  }
+
+  const resetToDefault = () => {
+    setEditingIndex(null)
+    setValidation(null)
+    hasValidatedRef.current = false
+    setRowsAndNotify(() => createInitialCriteriaRows(parsed.fields))
+  }
+
+  const insertBelow = () => {
+    if (editingIndex === null) return
+    addRow(editingIndex + 1)
+    setEditingIndex(editingIndex + 1)
+  }
+
+  const insertAbove = () => {
+    if (editingIndex === null) return
+    addRow(editingIndex)
+    setEditingIndex(editingIndex + 1)
+  }
+
+  const duplicateRow = () => {
+    if (editingIndex === null || !editingRow) return
+    const copy: CriteriaFilterRow = {
+      ...editingRow,
+      id: emptyRow().id,
+      selected: false,
+    }
+    setRowsAndNotify((prev) => {
+      const next = [...prev]
+      next.splice(editingIndex + 1, 0, copy)
+      return next
+    })
+    setEditingIndex(editingIndex + 1)
+  }
+
+  const deleteRow = () => {
+    if (editingIndex === null || !editingRow) return
+    setRowsAndNotify((prev) =>
+      prev.filter((row) => row.id !== editingRow.id)
+    )
+    setEditingIndex(null)
+  }
+
+  const moveRow = (direction: "up" | "down") => {
+    if (editingIndex === null) return
+    const target = direction === "up" ? editingIndex - 1 : editingIndex + 1
+    if (target < 0 || target >= rows.length) return
+    setRowsAndNotify((prev) => {
+      const next = [...prev]
+      const [item] = next.splice(editingIndex, 1)
+      next.splice(target, 0, item)
+      return next
+    })
+    setEditingIndex(target)
+  }
+
+  const moveRowRef = React.useRef(moveRow)
+  moveRowRef.current = moveRow
+
+  React.useEffect(() => {
+    if (!dialogOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEditingIndex(null)
+        return
+      }
+      if (event.ctrlKey && event.key === "ArrowUp") {
+        event.preventDefault()
+        moveRowRef.current("up")
+      }
+      if (event.ctrlKey && event.key === "ArrowDown") {
+        event.preventDefault()
+        moveRowRef.current("down")
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [dialogOpen])
+
+  return (
+    <div className={cn("space-y-4 p-6", className)}>
+      {showHeader || parsed.description || (validation && !validation.valid) ? (
+        <div className="space-y-1">
+          {showHeader ? (
+            <h3 className="text-sm font-semibold">{parsed.title}</h3>
+          ) : null}
+          {parsed.description ? (
+            <p className="text-xs text-muted-foreground">{parsed.description}</p>
+          ) : showHeader ? (
+            <p className="text-xs text-muted-foreground">
+              Define name / value filter rows from the report schema.
+            </p>
+          ) : null}
+          {validation && !validation.valid && validation.errors.length > 0 ? (
+            <p className="truncate text-xs text-destructive">
+              {validation.errors[0]?.message}
+              {validation.errors.length > 1
+                ? ` (+${validation.errors.length - 1})`
+                : null}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div
+        ref={tableRef}
+        className="w-full max-w-3xl overflow-hidden rounded-md border bg-card [&_[data-slot=table-container]]:overflow-hidden"
+        onKeyDownCapture={handleGridKeyDown}
+      >
+        <Table className="table-fixed border-separate border-spacing-0">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b">
+              <TableHead className={cn(headClass, "w-12")}>No</TableHead>
+              <TableHead className={cn(headClass, "w-[14rem]")}>Name</TableHead>
+              <TableHead className={headClass}>Value</TableHead>
+              <TableHead className={cn(headClass, "w-10 text-center px-0")}>
+                <div className="flex h-9 items-center justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    tabIndex={-1}
+                    className="size-7"
+                    aria-label="Reset to default"
+                    onClick={resetToDefault}
+                  >
+                    <RotateCcw className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, index) => {
+              const field = fieldMap.get(row.name)
+              const patternMessage = patternInvalidByRowId.get(row.id)
+              const rowInvalid = Boolean(
+                (row.name && invalidFields.has(row.name)) || patternMessage
+              )
+              return (
+                <TableRow key={row.id} className="hover:bg-transparent">
+                  <TableCell className={cellClass}>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="flex h-9 w-full items-center px-2 font-medium text-foreground"
+                      onClick={() => setEditingIndex(index)}
+                    >
+                      {index + 1}
+                    </button>
+                  </TableCell>
+                  <TableCell className={cellClass}>
+                    <CriteriaSimpleCombobox
+                      value={row.name}
+                      onChange={(value) => updateRow(row.id, { name: value })}
+                      options={nameOptions}
+                      placeholder="Name"
+                      data-grid-cell={`${index}-0`}
+                      className={cn(
+                        cellInputClass,
+                        row.name && "font-medium"
+                      )}
+                      variant="cell"
+                      showClear={false}
+                    />
+                  </TableCell>
+                  <TableCell className={cellClass}>
+                    <CriteriaValueCell
+                      field={field}
+                      value={row.value}
+                      onChange={(value) => updateRow(row.id, { value })}
+                      data-grid-cell={`${index}-1`}
+                      invalid={rowInvalid}
+                    />
+                  </TableCell>
+                  <TableCell className={cellClass}>
+                    <div className="flex h-9 items-center justify-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        tabIndex={-1}
+                        className="size-7"
+                        onClick={() => setEditingIndex(index)}
+                      >
+                        <Pencil className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+
+        <div className="border-t bg-muted/10 p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            onClick={() => addRow()}
+          >
+            <Plus className="size-3.5 mr-1" />
+            Add Row
+          </Button>
+        </div>
+      </div>
+
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) setEditingIndex(null)
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-xl gap-0 p-0 overflow-hidden"
+        >
+          {editingRow && editingIndex !== null ? (
+            <>
+              <DialogHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b px-4 py-3">
+                <DialogTitle className="text-sm font-semibold">
+                  Editing Row #{editingIndex + 1}
+                </DialogTitle>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="size-7 bg-red-600 text-white hover:bg-red-600/90"
+                    onClick={deleteRow}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={insertBelow}
+                  >
+                    Insert Below
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={insertAbove}
+                  >
+                    Insert Above
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={duplicateRow}
+                  >
+                    <Copy className="size-3" />
+                    Duplicate
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                      >
+                        Move
+                        <ChevronDown className="size-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => moveRow("up")}>
+                        Move Up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => moveRow("down")}>
+                        Move Down
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 px-4 py-4">
+                <Field>
+                  <FieldLabel className="text-xs text-muted-foreground">
+                    Name
+                  </FieldLabel>
+                  <CriteriaSimpleCombobox
+                    value={editingRow.name}
+                    onChange={(value) =>
+                      updateRow(editingRow.id, { name: value })
+                    }
+                    options={nameOptions}
+                    placeholder="Name"
+                    className="h-9 text-xs bg-muted/30"
+                    variant="form"
+                    showClear={false}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel className="text-xs text-muted-foreground">
+                    Value
+                  </FieldLabel>
+                  <CriteriaValueCell
+                    field={fieldMap.get(editingRow.name)}
+                    value={editingRow.value}
+                    onChange={(value) =>
+                      updateRow(editingRow.id, { value })
+                    }
+                    variant="form"
+                    invalid={Boolean(
+                      (editingRow.name &&
+                        invalidFields.has(editingRow.name)) ||
+                        patternInvalidByRowId.has(editingRow.id)
+                    )}
+                  />
+                </Field>
+              </div>
+
+              <DialogFooter className="flex-row items-center justify-between gap-3 border-t px-4 py-3 sm:justify-between">
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <Keyboard className="size-3.5" />
+                  <span>Shortcuts:</span>
+                  <KbdGroup>
+                    <Kbd>Ctrl + Up</Kbd>
+                    <Kbd>Ctrl + Down</Kbd>
+                    <Kbd>ESC</Kbd>
+                  </KbdGroup>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={insertBelow}
+                >
+                  Insert Below
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+})

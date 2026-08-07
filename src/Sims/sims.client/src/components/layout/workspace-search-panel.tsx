@@ -149,7 +149,7 @@ export function WorkspaceSearchItems({ onSelect }: WorkspaceSearchItemsProps) {
             <BarChart2 className="mr-2 size-4" />
             <span>Stock Ledger</span>
           </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("stock", "Stock Balance"))}>
+          <CommandItem onSelect={() => onSelect("/stock/stock-balance")}>
             <BarChart2 className="mr-2 size-4" />
             <span>Stock Balance</span>
           </CommandItem>

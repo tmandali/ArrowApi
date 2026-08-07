@@ -185,7 +185,7 @@ export const stockNav: WorkspaceNavItem[] = [
     isActive: true,
     items: [
       { title: "Stock Ledger", url: "/stock/stock-ledger" },
-      { title: "Stock Balance", url: e("stock", "Stock Balance") },
+      { title: "Stock Balance", url: "/stock/stock-balance" },
       { title: "Stock Analytics", url: "/stock/stock-analytics" },
       {
         title: "Serial No and Batch Traceability",

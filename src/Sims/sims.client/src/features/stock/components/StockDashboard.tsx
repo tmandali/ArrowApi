@@ -137,7 +137,7 @@ const shortcuts: ShortcutItem[] = [
   },
   {
     title: "Stock Balance",
-    url: e("stock", "Stock Balance"),
+    url: "/stock/stock-balance",
     icon: ScaleIcon,
   },
   {
@@ -194,7 +194,7 @@ const featureSections: FeatureSection[] = [
     visual: "reports",
     links: [
       { title: "Stock Ledger", url: "/stock/stock-ledger" },
-      { title: "Stock Balance", url: e("stock", "Stock Balance") },
+      { title: "Stock Balance", url: "/stock/stock-balance" },
       { title: "Stock Projected Qty", url: e("stock", "Stock Projected Qty") },
       { title: "Stock Summary", url: e("stock", "Stock Summary") },
       { title: "Stock Ageing", url: e("stock", "Stock Ageing") },

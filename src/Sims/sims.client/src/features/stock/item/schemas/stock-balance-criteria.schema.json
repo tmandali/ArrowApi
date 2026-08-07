@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rapor Kriterleri",
+  "description": "Stock Balance raporu için filtre kriterlerini tanımlayın.",
+  "type": "object",
+  "properties": {
+    "kayitTarihi": {
+      "type": "string",
+      "title": "Kayıt Tarihi",
+      "description": "YYYYMMDD veya YYYYMMDD..YYYYMMDD",
+      "anyOf": [
+        { "pattern": "^\\d{8}$" },
+        { "pattern": "^\\d{8}\\.\\.\\d{8}$" }
+      ]
+    },
+    "durum": {
+      "type": "array",
+      "title": "Evrak Durumu",
+      "x-selection": "multiple",
+      "items": {
+        "type": "string",
+        "enum": ["AKTIF", "PASIF", "BEKLEMEDE", "IPTAL"]
+      }
+    },
+    "tutarMiktar": {
+      "type": "number",
+      "title": "Tutar",
+      "description": "Filtrelenecek parasal miktar",
+      "minimum": 0
+    },
+    "tutarParaBirimi": {
+      "type": "string",
+      "title": "Para Birimi",
+      "description": "Tutarın döviz cinsi",
+      "enum": ["TRY", "USD", "EUR"],
+      "x-selection": "single",
+      "default": "TRY"
+    },
+    "urun": {
+      "type": "array",
+      "title": "Ürün Bilgileri",
+      "description": "Raporlanacak ürün bilgileri",
+      "x-selection": "multiple",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kod": { "type": "string", "title": "Ürün Kodu" },
+          "ad": { "type": "string", "title": "Ürün Adı" },
+          "barkod": {
+            "type": "string",
+            "title": "Ürün Barkodu",
+            "pattern": "^\\d{13}$"
+          }
+        },
+        "x-datasource": [
+          { "kod": "1", "ad": "Ürün 1", "barkod": "1234567890123" },
+          { "kod": "2", "ad": "Ürün 2", "barkod": "9876543210987" }
+        ]
+      }
+    }
+  },
+  "required": ["kayitTarihi"]
+}

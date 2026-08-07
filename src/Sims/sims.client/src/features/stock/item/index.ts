@@ -6,6 +6,8 @@ export { StockAnalyticsForm } from "./components/StockAnalyticsForm"
 export { StockAnalyticsReportTab } from "./components/StockAnalyticsReportTab"
 export type { StockAnalyticsTreeAction } from "./components/StockAnalyticsReportTab"
 export { StockLedgerForm } from "./components/StockLedgerForm"
+export { StockBalanceForm } from "./components/StockBalanceForm"
+export { StockBalanceFilter } from "./components/StockBalanceFilter"
 export { stockAnalyticsService } from "./services/stock-analytics-service"
 export type {
   ArrowJobEvent,
@@ -15,3 +17,4 @@ export type {
   StockAnalyticsArrowReport,
   StockAnalyticsRequest,
 } from "./types/stock-analytics"
+export { default as stockBalanceCriteriaSchema } from "./schemas/stock-balance-criteria.schema.json"

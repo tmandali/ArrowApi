@@ -56,6 +56,8 @@ import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
+import { StockBalanceFilter } from "./StockBalanceFilter"
+import type { SchemaCriteriaFilterGroupHandle } from "@/features/report-criteria"
 import {
   StockAnalyticsReportTab,
   type StockAnalyticsTreeAction,
@@ -105,7 +107,7 @@ type ItemFormProps = {
   tabs?: ItemFormTab[]
   tabLabels?: Partial<Record<ItemFormTab, string>>
   defaultTab?: ItemFormTab
-  mode?: "item" | "stock-analytics" | "stock-ledger"
+  mode?: "item" | "stock-analytics" | "stock-ledger" | "stock-balance"
   filtersOpen?: boolean
   onFiltersOpenChange?: (open: boolean) => void
   onRunReport?: () => void
@@ -155,7 +157,10 @@ export function ItemForm({
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
   const isStockLedger = mode === "stock-ledger"
-  const isReportShell = isStockAnalytics || isStockLedger
+  const isStockBalance = mode === "stock-balance"
+  const isLedgerLikeShell = isStockLedger || isStockBalance
+  const isReportShell = isStockAnalytics || isLedgerLikeShell
+  const criteriaFilterRef = React.useRef<SchemaCriteriaFilterGroupHandle>(null)
   const initialTab =
     defaultTab && visibleTabs.has(defaultTab)
       ? defaultTab
@@ -212,7 +217,11 @@ export function ItemForm({
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem className="min-w-0">
                     <BreadcrumbPage className="block truncate font-semibold text-foreground">
-                      {isStockLedger ? "Stock Ledger" : "Stock Analytics"}
+                      {isStockLedger
+                        ? "Stock Ledger"
+                        : isStockBalance
+                          ? "Stock Balance"
+                          : "Stock Analytics"}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
@@ -240,7 +249,7 @@ export function ItemForm({
           ) : null}
         </div>
 
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto sm:gap-2">
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
           {isStockAnalytics ? (
             <>
               <WorkspaceSidePanelTrigger
@@ -458,19 +467,29 @@ export function ItemForm({
 
               <AIChatAssistant variant="toolbar" />
             </>
-          ) : isStockLedger ? (
-            <>
+          ) : isLedgerLikeShell ? (
+            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-7"
+                className="size-7 shrink-0"
                 aria-label="Refresh"
               >
                 <RefreshCw className="size-3.5" />
               </Button>
+              {isStockBalance ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 shrink-0 text-xs px-3"
+                  onClick={() => criteriaFilterRef.current?.submit()}
+                >
+                  Submit
+                </Button>
+              ) : null}
               <AIChatAssistant variant="toolbar" />
-            </>
+            </div>
           ) : (
             <>
               <ButtonGroup className="hidden md:inline-flex">
@@ -578,6 +597,8 @@ export function ItemForm({
           onReportReadyChange={onReportReadyChange}
           showFilterRow={showFilterRow}
         />
+      ) : isStockBalance ? (
+        <StockBalanceFilter ref={criteriaFilterRef} />
       ) : (
       <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
         <div className="shrink-0 border-b bg-background px-4">
