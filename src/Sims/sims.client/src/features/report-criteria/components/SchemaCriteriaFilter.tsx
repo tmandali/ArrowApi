@@ -50,9 +50,193 @@ import { CriteriaValueCell } from "./CriteriaValueCell"
 const cellInputClass =
   "h-9 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
 
-const cellClass = "p-0 border-r border-border/60 last:border-r-0"
+const cellClass = "overflow-hidden p-0 border-r border-border/60 last:border-r-0"
 const headClass =
-  "h-9 px-2 border-r border-border/60 last:border-r-0 text-[11px] font-medium text-muted-foreground bg-muted/30"
+  "h-9 overflow-hidden px-2 border-r border-border/60 last:border-r-0 text-[11px] font-medium text-muted-foreground bg-muted/30"
+
+const NO_COL_WIDTH = 40
+const ACTIONS_COL_WIDTH = 40
+const DESCRIPTION_MIN_WIDTH = 140
+/** Hide description only when leftover falls clearly below show threshold (hysteresis). */
+const DESCRIPTION_HIDE_BELOW = 100
+/**
+ * Layout breakpoints (viewport):
+ * - phone  (< 40rem): Name+Value stacked
+ * - tablet (< 64rem): Name | Value (Description always off)
+ * - desk   (≥ 64rem): Name | Value | Description when leftover fits
+ */
+const PHONE_VIEWPORT_MAX_REM = 40
+const DESK_VIEWPORT_MIN_REM = 64
+const DEFAULT_COL_WIDTHS = { name: 224, value: 320 } as const
+const DEFAULT_COL_WIDTHS_TABLET = { name: 168, value: 220 } as const
+const MIN_COL_WIDTHS = { name: 112, value: 128 } as const
+
+type ResizableColKey = keyof typeof DEFAULT_COL_WIDTHS
+type ColWidths = { name: number; value: number }
+/** phone → stacked; tablet → columns; desk → columns ± description */
+type CriteriaGridLayout = "stacked" | "columns" | "columns-with-description"
+
+function rootFontSizePx(): number {
+  return (
+    Number.parseFloat(getComputedStyle(document.documentElement).fontSize) ||
+    16
+  )
+}
+
+function viewportPx(rem: number): number {
+  return rem * rootFontSizePx()
+}
+
+function isPhoneViewport(): boolean {
+  return window.matchMedia(`(max-width: ${viewportPx(PHONE_VIEWPORT_MAX_REM)}px)`)
+    .matches
+}
+
+function isDeskViewport(): boolean {
+  return window.matchMedia(
+    `(min-width: ${viewportPx(DESK_VIEWPORT_MIN_REM)}px)`
+  ).matches
+}
+
+function descriptionLeftover(
+  tableWidth: number,
+  colWidths: ColWidths
+): number {
+  return (
+    tableWidth -
+    NO_COL_WIDTH -
+    ACTIONS_COL_WIDTH -
+    colWidths.name -
+    colWidths.value
+  )
+}
+
+function resolveGridLayout(
+  tableWidth: number,
+  colWidths: ColWidths,
+  previous: CriteriaGridLayout
+): CriteriaGridLayout {
+  if (isPhoneViewport()) return "stacked"
+  // Tablet: never show Description — only desk + leftover.
+  if (!isDeskViewport()) return "columns"
+
+  const leftover = descriptionLeftover(tableWidth, colWidths)
+  if (previous === "columns-with-description") {
+    return leftover >= DESCRIPTION_HIDE_BELOW
+      ? "columns-with-description"
+      : "columns"
+  }
+  return leftover >= DESCRIPTION_MIN_WIDTH
+    ? "columns-with-description"
+    : "columns"
+}
+
+function maxNameValueTotal(tableWidth: number): number {
+  // Do not reserve description space here — leftover drives show/hide on resize.
+  return Math.max(
+    MIN_COL_WIDTHS.name + MIN_COL_WIDTHS.value,
+    tableWidth - NO_COL_WIDTH - ACTIONS_COL_WIDTH
+  )
+}
+
+function clampColWidths(widths: ColWidths, tableWidth: number): ColWidths {
+  let name = Math.max(MIN_COL_WIDTHS.name, widths.name)
+  let value = Math.max(MIN_COL_WIDTHS.value, widths.value)
+  const maxTotal = maxNameValueTotal(tableWidth)
+  const total = name + value
+  if (total <= maxTotal) return { name, value }
+
+  const scale = maxTotal / total
+  name = Math.max(MIN_COL_WIDTHS.name, Math.floor(name * scale))
+  value = Math.max(MIN_COL_WIDTHS.value, maxTotal - name)
+  if (value < MIN_COL_WIDTHS.value) {
+    value = MIN_COL_WIDTHS.value
+    name = Math.max(MIN_COL_WIDTHS.name, maxTotal - value)
+  }
+  return { name, value }
+}
+
+function widthsForLayout(
+  layout: CriteriaGridLayout,
+  tableWidth: number,
+  previous: ColWidths
+): ColWidths {
+  if (layout === "stacked") return previous
+  const preferred =
+    layout === "columns" ? DEFAULT_COL_WIDTHS_TABLET : DEFAULT_COL_WIDTHS
+  // Keep user-resized widths when still in a column layout; seed from preferred on first fit.
+  const seed =
+    previous.name === DEFAULT_COL_WIDTHS.name &&
+    previous.value === DEFAULT_COL_WIDTHS.value &&
+    layout === "columns"
+      ? preferred
+      : previous
+  return clampColWidths(seed, tableWidth)
+}
+
+const fixedEdgeColStyle = (width: number): React.CSSProperties => ({
+  width,
+  minWidth: width,
+  maxWidth: width,
+})
+
+function ColumnResizeHandle({
+  column,
+  onResize,
+  onResizeEnd,
+}: {
+  column: ResizableColKey
+  onResize: (column: ResizableColKey, deltaX: number) => void
+  onResizeEnd?: () => void
+}) {
+  const startXRef = React.useRef(0)
+  const [dragging, setDragging] = React.useState(false)
+
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Resize ${column} column`}
+      aria-valuemin={MIN_COL_WIDTHS[column]}
+      className={cn(
+        "absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none select-none",
+        "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent",
+        "hover:after:bg-primary/40 active:after:bg-primary/60",
+        dragging && "after:bg-primary/60"
+      )}
+      onPointerDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        startXRef.current = event.clientX
+        setDragging(true)
+        const target = event.currentTarget
+        target.setPointerCapture(event.pointerId)
+        const previousCursor = document.body.style.cursor
+        const previousUserSelect = document.body.style.userSelect
+        document.body.style.cursor = "col-resize"
+        document.body.style.userSelect = "none"
+
+        const onMove = (moveEvent: PointerEvent) => {
+          onResize(column, moveEvent.clientX - startXRef.current)
+          startXRef.current = moveEvent.clientX
+        }
+        const onUp = (upEvent: PointerEvent) => {
+          setDragging(false)
+          document.body.style.cursor = previousCursor
+          document.body.style.userSelect = previousUserSelect
+          target.releasePointerCapture(upEvent.pointerId)
+          target.removeEventListener("pointermove", onMove)
+          target.removeEventListener("pointerup", onUp)
+          target.removeEventListener("pointercancel", onUp)
+          onResizeEnd?.()
+        }
+        target.addEventListener("pointermove", onMove)
+        target.addEventListener("pointerup", onUp)
+        target.addEventListener("pointercancel", onUp)
+      }}
+    />
+  )
+}
 
 const EDITABLE_COL_COUNT = 2
 
@@ -62,6 +246,10 @@ const emptyRow = (): CriteriaFilterRow => ({
   name: "",
   value: "",
 })
+
+function isBlankCriteriaRow(row: CriteriaFilterRow): boolean {
+  return !row.name.trim() && !String(row.value ?? "").trim()
+}
 
 export type SchemaCriteriaFilterProps = {
   schema: JsonSchemaObject
@@ -108,6 +296,103 @@ export const SchemaCriteriaFilter = React.forwardRef<
   const rowsRef = React.useRef(rows)
   rowsRef.current = rows
   const tableRef = React.useRef<HTMLDivElement>(null)
+  const [colWidths, setColWidths] = React.useState<ColWidths>(DEFAULT_COL_WIDTHS)
+  const [layout, setLayout] = React.useState<CriteriaGridLayout>("columns")
+
+  const descriptionColumnVisible = layout === "columns-with-description"
+  const stackedLayout = layout === "stacked"
+  const layoutRef = React.useRef(layout)
+  layoutRef.current = layout
+  const colWidthsRef = React.useRef(colWidths)
+  colWidthsRef.current = colWidths
+  /** After Description hides mid-drag, ignore further growth until pointer up. */
+  const stopGrowAfterDescHideRef = React.useRef(false)
+
+  React.useEffect(() => {
+    const el = tableRef.current
+    if (!el) return
+
+    const update = () => {
+      const tableWidth = el.clientWidth
+      const widths = colWidthsRef.current
+      const nextLayout = resolveGridLayout(
+        tableWidth,
+        widths,
+        layoutRef.current
+      )
+      setLayout(nextLayout)
+      setColWidths((prev) => widthsForLayout(nextLayout, tableWidth, prev))
+    }
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    const phoneMedia = window.matchMedia(
+      `(max-width: ${viewportPx(PHONE_VIEWPORT_MAX_REM)}px)`
+    )
+    const deskMedia = window.matchMedia(
+      `(min-width: ${viewportPx(DESK_VIEWPORT_MIN_REM)}px)`
+    )
+    phoneMedia.addEventListener("change", update)
+    deskMedia.addEventListener("change", update)
+    return () => {
+      observer.disconnect()
+      phoneMedia.removeEventListener("change", update)
+      deskMedia.removeEventListener("change", update)
+    }
+  }, [])
+
+  const endColumnResize = React.useCallback(() => {
+    stopGrowAfterDescHideRef.current = false
+  }, [])
+
+  const resizeColumn = React.useCallback(
+    (column: ResizableColKey, deltaX: number) => {
+      if (deltaX === 0) return
+      if (stopGrowAfterDescHideRef.current && deltaX > 0) return
+
+      const tableWidth = tableRef.current?.clientWidth ?? 0
+      const prev = colWidthsRef.current
+      const prevLayout = layoutRef.current
+      const tentative = {
+        ...prev,
+        [column]: prev[column] + deltaX,
+      }
+      const nextLayout = resolveGridLayout(tableWidth, tentative, prevLayout)
+      if (nextLayout === "stacked") return
+
+      if (
+        prevLayout === "columns-with-description" &&
+        nextLayout === "columns"
+      ) {
+        // Snap to the hide boundary — don't keep eating Description space.
+        const targetLeftover = DESCRIPTION_HIDE_BELOW - 1
+        const maxTotal = Math.max(
+          MIN_COL_WIDTHS.name + MIN_COL_WIDTHS.value,
+          tableWidth - NO_COL_WIDTH - ACTIONS_COL_WIDTH - targetLeftover
+        )
+        const overflow = tentative.name + tentative.value - maxTotal
+        const snapped =
+          overflow > 0
+            ? {
+                ...tentative,
+                [column]: Math.max(
+                  MIN_COL_WIDTHS[column],
+                  tentative[column] - overflow
+                ),
+              }
+            : tentative
+        stopGrowAfterDescHideRef.current = true
+        setLayout(nextLayout)
+        setColWidths(clampColWidths(snapped, tableWidth))
+        return
+      }
+
+      setLayout(nextLayout)
+      setColWidths(clampColWidths(tentative, tableWidth))
+    },
+    []
+  )
 
   const nameOptions = React.useMemo<CriteriaComboboxOption[]>(
     () =>
@@ -116,6 +401,25 @@ export const SchemaCriteriaFilter = React.forwardRef<
         label: field.required ? `${field.title} *` : field.title,
       })),
     [parsed.fields]
+  )
+
+  const usedNames = React.useMemo(() => {
+    const names = new Set<string>()
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (name) names.add(name)
+    }
+    return names
+  }, [rows])
+
+  const nameOptionsForRow = React.useCallback(
+    (rowName: string) => {
+      const current = rowName.trim()
+      return nameOptions.filter(
+        (option) => option.value === current || !usedNames.has(option.value)
+      )
+    },
+    [nameOptions, usedNames]
   )
 
   const fieldMap = React.useMemo(
@@ -219,6 +523,17 @@ export const SchemaCriteriaFilter = React.forwardRef<
     cell?.focus()
   }, [])
 
+  const pendingFocusRef = React.useRef<{ row: number; col: number } | null>(
+    null
+  )
+
+  React.useLayoutEffect(() => {
+    const pending = pendingFocusRef.current
+    if (!pending) return
+    pendingFocusRef.current = null
+    focusGridCell(pending.row, pending.col)
+  }, [rows, focusGridCell])
+
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Tab") return
 
@@ -261,14 +576,26 @@ export const SchemaCriteriaFilter = React.forwardRef<
     )
   }
 
-  const addRow = (atIndex?: number) => {
+  const addRow = (atIndex?: number, options?: { focusName?: boolean }) => {
+    const existingBlankIndex = rows.findIndex(isBlankCriteriaRow)
+    if (existingBlankIndex >= 0) {
+      if (options?.focusName !== false) {
+        focusGridCell(existingBlankIndex, 0)
+      }
+      return rows[existingBlankIndex]!
+    }
+
     const row = emptyRow()
+    const focusIndex = atIndex ?? rows.length
     setRowsAndNotify((prev) => {
       if (atIndex === undefined) return [...prev, row]
       const next = [...prev]
       next.splice(atIndex, 0, row)
       return next
     })
+    if (options?.focusName !== false) {
+      pendingFocusRef.current = { row: focusIndex, col: 0 }
+    }
     return row
   }
 
@@ -281,13 +608,13 @@ export const SchemaCriteriaFilter = React.forwardRef<
 
   const insertBelow = () => {
     if (editingIndex === null) return
-    addRow(editingIndex + 1)
+    addRow(editingIndex + 1, { focusName: false })
     setEditingIndex(editingIndex + 1)
   }
 
   const insertAbove = () => {
     if (editingIndex === null) return
-    addRow(editingIndex)
+    addRow(editingIndex, { focusName: false })
     setEditingIndex(editingIndex + 1)
   }
 
@@ -353,20 +680,28 @@ export const SchemaCriteriaFilter = React.forwardRef<
   }, [dialogOpen])
 
   return (
-    <div className={cn("space-y-4 p-6", className)}>
-      {showHeader || parsed.description || (validation && !validation.valid) ? (
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 w-full flex-col",
+        showHeader
+          ? "h-full space-y-3 p-3 sm:space-y-4 sm:p-4 md:p-6"
+          : "p-3 sm:p-4",
+        className
+      )}
+    >
+      {showHeader ? (
         <div className="space-y-1">
-          {showHeader ? (
-            <h3 className="text-sm font-semibold">{parsed.title}</h3>
-          ) : null}
+          <h3 className="text-sm font-semibold">{parsed.title}</h3>
           {parsed.description ? (
             <p className="text-xs text-muted-foreground">{parsed.description}</p>
-          ) : showHeader ? (
+          ) : (
             <p className="text-xs text-muted-foreground">
               Define name / value filter rows from the report schema.
             </p>
-          ) : null}
-          {validation && !validation.valid && validation.errors.length > 0 ? (
+          )}
+          {validation &&
+          !validation.valid &&
+          validation.errors.length > 0 ? (
             <p className="truncate text-xs text-destructive">
               {validation.errors[0]?.message}
               {validation.errors.length > 1
@@ -379,16 +714,64 @@ export const SchemaCriteriaFilter = React.forwardRef<
 
       <div
         ref={tableRef}
-        className="w-full max-w-3xl overflow-hidden rounded-md border bg-card [&_[data-slot=table-container]]:overflow-hidden"
+        className="min-w-0 w-full overflow-hidden rounded-md border bg-card [&_[data-slot=table-container]]:overflow-hidden"
         onKeyDownCapture={handleGridKeyDown}
       >
         <Table className="table-fixed border-separate border-spacing-0">
+          <colgroup>
+            <col style={fixedEdgeColStyle(NO_COL_WIDTH)} />
+            {stackedLayout ? (
+              <col />
+            ) : (
+              <>
+                <col style={{ width: colWidths.name }} />
+                <col style={{ width: colWidths.value }} />
+                {descriptionColumnVisible ? <col /> : null}
+              </>
+            )}
+            <col style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)} />
+          </colgroup>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b">
-              <TableHead className={cn(headClass, "w-12")}>No</TableHead>
-              <TableHead className={cn(headClass, "w-[14rem]")}>Name</TableHead>
-              <TableHead className={headClass}>Value</TableHead>
-              <TableHead className={cn(headClass, "w-10 text-center px-0")}>
+              <TableHead
+                className={cn(headClass, "text-center px-0")}
+                style={fixedEdgeColStyle(NO_COL_WIDTH)}
+              >
+                <div className="flex h-9 items-center justify-center">No</div>
+              </TableHead>
+              {stackedLayout ? (
+                <TableHead className={headClass}>
+                  <span className="block truncate">Name / Value</span>
+                </TableHead>
+              ) : (
+                <>
+                  <TableHead className={cn(headClass, "relative")}>
+                    <span className="block truncate">Name</span>
+                    <ColumnResizeHandle
+                      column="name"
+                      onResize={resizeColumn}
+                      onResizeEnd={endColumnResize}
+                    />
+                  </TableHead>
+                  <TableHead className={cn(headClass, "relative min-w-0")}>
+                    <span className="block truncate">Value</span>
+                    <ColumnResizeHandle
+                      column="value"
+                      onResize={resizeColumn}
+                      onResizeEnd={endColumnResize}
+                    />
+                  </TableHead>
+                  {descriptionColumnVisible ? (
+                    <TableHead className={headClass}>
+                      <span className="block truncate">Description</span>
+                    </TableHead>
+                  ) : null}
+                </>
+              )}
+              <TableHead
+                className={cn(headClass, "text-center px-0")}
+                style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
+              >
                 <div className="flex h-9 items-center justify-center">
                   <Button
                     type="button"
@@ -412,44 +795,114 @@ export const SchemaCriteriaFilter = React.forwardRef<
               const rowInvalid = Boolean(
                 (row.name && invalidFields.has(row.name)) || patternMessage
               )
+              const description = field?.description?.trim() || ""
               return (
                 <TableRow key={row.id} className="hover:bg-transparent">
-                  <TableCell className={cellClass}>
+                  <TableCell
+                    className={cn(
+                      cellClass,
+                      "text-center",
+                      stackedLayout && "align-middle"
+                    )}
+                    style={fixedEdgeColStyle(NO_COL_WIDTH)}
+                  >
                     <button
                       type="button"
                       tabIndex={-1}
-                      className="flex h-9 w-full items-center px-2 font-medium text-foreground"
+                      className={cn(
+                        "flex w-full items-center justify-center font-medium text-foreground",
+                        stackedLayout ? "min-h-[4.5rem]" : "h-9"
+                      )}
                       onClick={() => setEditingIndex(index)}
                     >
                       {index + 1}
                     </button>
                   </TableCell>
-                  <TableCell className={cellClass}>
-                    <CriteriaSimpleCombobox
-                      value={row.name}
-                      onChange={(value) => updateRow(row.id, { name: value })}
-                      options={nameOptions}
-                      placeholder="Name"
-                      data-grid-cell={`${index}-0`}
+                  {stackedLayout ? (
+                    <TableCell className={cellClass}>
+                      <div className="flex min-w-0 flex-col divide-y divide-border/60">
+                        <CriteriaSimpleCombobox
+                          value={row.name}
+                          onChange={(value) =>
+                            updateRow(row.id, { name: value })
+                          }
+                          options={nameOptionsForRow(row.name)}
+                          placeholder="Name"
+                          data-grid-cell={`${index}-0`}
+                          className={cn(
+                            cellInputClass,
+                            row.name && "font-medium"
+                          )}
+                          variant="cell"
+                          showClear={false}
+                        />
+                        <CriteriaValueCell
+                          field={field}
+                          value={row.value}
+                          onChange={(value) =>
+                            updateRow(row.id, { value })
+                          }
+                          data-grid-cell={`${index}-1`}
+                          invalid={rowInvalid}
+                          descriptionAsPlaceholder
+                        />
+                      </div>
+                    </TableCell>
+                  ) : (
+                    <>
+                      <TableCell className={cellClass}>
+                        <CriteriaSimpleCombobox
+                          value={row.name}
+                          onChange={(value) =>
+                            updateRow(row.id, { name: value })
+                          }
+                          options={nameOptionsForRow(row.name)}
+                          placeholder="Name"
+                          data-grid-cell={`${index}-0`}
+                          className={cn(
+                            cellInputClass,
+                            row.name && "font-medium"
+                          )}
+                          variant="cell"
+                          showClear={false}
+                        />
+                      </TableCell>
+                      <TableCell className={cellClass}>
+                        <CriteriaValueCell
+                          field={field}
+                          value={row.value}
+                          onChange={(value) =>
+                            updateRow(row.id, { value })
+                          }
+                          data-grid-cell={`${index}-1`}
+                          invalid={rowInvalid}
+                          descriptionAsPlaceholder={
+                            !descriptionColumnVisible
+                          }
+                        />
+                      </TableCell>
+                      {descriptionColumnVisible ? (
+                        <TableCell className={cellClass}>
+                          <div
+                            className="flex h-9 min-w-0 items-center truncate px-2 text-xs text-muted-foreground"
+                            title={description || undefined}
+                          >
+                            {description || null}
+                          </div>
+                        </TableCell>
+                      ) : null}
+                    </>
+                  )}
+                  <TableCell
+                    className={cn(cellClass, stackedLayout && "align-middle")}
+                    style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
+                  >
+                    <div
                       className={cn(
-                        cellInputClass,
-                        row.name && "font-medium"
+                        "flex items-center justify-center",
+                        stackedLayout ? "min-h-[4.5rem]" : "h-9"
                       )}
-                      variant="cell"
-                      showClear={false}
-                    />
-                  </TableCell>
-                  <TableCell className={cellClass}>
-                    <CriteriaValueCell
-                      field={field}
-                      value={row.value}
-                      onChange={(value) => updateRow(row.id, { value })}
-                      data-grid-cell={`${index}-1`}
-                      invalid={rowInvalid}
-                    />
-                  </TableCell>
-                  <TableCell className={cellClass}>
-                    <div className="flex h-9 items-center justify-center">
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
@@ -467,7 +920,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
           </TableBody>
         </Table>
 
-        <div className="border-t bg-muted/10 p-2">
+        <div className="flex items-center gap-1 border-t bg-muted/10 p-2">
           <Button
             type="button"
             variant="ghost"
@@ -477,6 +930,16 @@ export const SchemaCriteriaFilter = React.forwardRef<
           >
             <Plus className="size-3.5 mr-1" />
             Add Row
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            onClick={resetToDefault}
+          >
+            <RotateCcw className="size-3.5 mr-1" />
+            Clear
           </Button>
         </div>
       </div>
@@ -568,7 +1031,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                     onChange={(value) =>
                       updateRow(editingRow.id, { name: value })
                     }
-                    options={nameOptions}
+                    options={nameOptionsForRow(editingRow.name)}
                     placeholder="Name"
                     className="h-9 text-xs bg-muted/30"
                     variant="form"

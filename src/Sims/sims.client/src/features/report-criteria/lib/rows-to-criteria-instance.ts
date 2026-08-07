@@ -1,14 +1,19 @@
 import type { CriteriaFieldDef, CriteriaFilterRow } from "../types"
+import {
+  addDaysToCompactDate,
+  rangeBoundKeys,
+  splitRangeCellValue,
+} from "./compact-date"
 import { splitMultiValue } from "./multi-value"
 
 function resolveLookupItem(
   field: CriteriaFieldDef,
   value: string
-): Record<string, unknown> | string {
+): string {
+  const valueKey = field.lookupValueKey ?? field.lookupFields?.[0]?.key ?? "id"
   const items = field.lookupItems ?? []
-  const valueKey = field.lookupValueKey ?? "kod"
   const match = items.find((item) => String(item[valueKey] ?? "") === value)
-  if (match) return { ...match }
+  if (match) return String(match[valueKey] ?? value)
   return value
 }
 
@@ -22,6 +27,7 @@ function coerceFieldValue(
       return Number.isFinite(num) ? num : raw
     }
     case "objectLookup":
+      // Complex types: emit identity key only (e.g. kod), not the full object.
       return resolveLookupItem(field, raw)
     case "enum":
     case "string":
@@ -55,6 +61,18 @@ export function rowsToCriteriaInstance(
     }
 
     if (value === "" || value === undefined) {
+      continue
+    }
+
+    if (field.rangeSplit) {
+      const { from, to } = splitRangeCellValue(value, field.rangeSplit)
+      const { fromKey, toKey } = rangeBoundKeys(name)
+      instance[fromKey] = from
+      // Date ranges: exclusive end (+1 day) so the selected day is fully covered.
+      instance[toKey] =
+        field.format === "date"
+          ? (addDaysToCompactDate(to, 1) ?? to)
+          : to
       continue
     }
 

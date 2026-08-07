@@ -4,6 +4,7 @@ export type {
   CriteriaFieldError,
   CriteriaFieldKind,
   CriteriaFilterRow,
+  CriteriaLookupField,
   CriteriaSelectionMode,
   CriteriaValidationResult,
   JsonSchemaObject,
@@ -18,6 +19,13 @@ export {
   splitMultiValue,
   toggleMultiValue,
 } from "./lib/multi-value"
+export {
+  addDaysToCompactDate,
+  isValidCompactDate,
+  isValidCompactDateCellValue,
+  rangeBoundKeys,
+  splitRangeCellValue,
+} from "./lib/compact-date"
 export { validateCellPatterns } from "./lib/validate-cell-patterns"
 export { rowsToCriteriaInstance } from "./lib/rows-to-criteria-instance"
 export { stripExtensionKeywords } from "./lib/strip-extension-keywords"

@@ -1,6 +1,11 @@
+import * as React from "react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/utils/cn"
-import type { CriteriaComboboxOption, CriteriaFieldDef } from "../types"
+import type {
+  CriteriaComboboxOption,
+  CriteriaFieldDef,
+} from "../types"
+import { CriteriaDateValueCell } from "./CriteriaDateValueCell"
 import { CriteriaGridCellCombobox } from "./CriteriaGridCellCombobox"
 import { CriteriaSimpleCombobox } from "./CriteriaSimpleCombobox"
 
@@ -15,21 +20,116 @@ type CriteriaValueCellProps = {
   "data-grid-cell"?: string
   invalid?: boolean
   variant?: "cell" | "form"
+  /** When false, field description is not used as the input placeholder. */
+  descriptionAsPlaceholder?: boolean
 }
 
-function lookupOptions(field: CriteriaFieldDef): CriteriaComboboxOption[] {
+function resolveValueKey(field: CriteriaFieldDef): string {
+  return field.lookupValueKey ?? field.lookupFields?.[0]?.key ?? "id"
+}
+
+function lookupOptions(
+  field: CriteriaFieldDef,
+  labelKeys: string[]
+): CriteriaComboboxOption[] {
   const items = field.lookupItems ?? []
-  const valueKey = field.lookupValueKey ?? "kod"
-  const labelKeys = field.lookupLabelKeys ?? [valueKey]
+  const valueKey = resolveValueKey(field)
+  const displayKey = labelKeys[0] ?? valueKey
 
   return items.map((item) => {
     const value = String(item[valueKey] ?? "")
-    const label = labelKeys
-      .map((key) => String(item[key] ?? ""))
-      .filter(Boolean)
-      .join(" — ")
-    return { value, label: label || value }
+    const display = String(item[displayKey] ?? "")
+    const label =
+      !display || displayKey === valueKey || display === value
+        ? value
+        : `${value}·${display}`
+    return {
+      value,
+      label: label || value,
+      searchText: display || value,
+    }
   })
+}
+
+function selectDisplayField(key: string): string[] {
+  return [key]
+}
+
+function ObjectLookupValueCell({
+  field,
+  value,
+  onChange,
+  className,
+  "data-grid-cell": dataGridCell,
+  invalid = false,
+  variant = "cell",
+  descriptionAsPlaceholder = true,
+}: {
+  field: CriteriaFieldDef
+  value: string
+  onChange: (value: string) => void
+  className?: string
+  "data-grid-cell"?: string
+  invalid?: boolean
+  variant?: "cell" | "form"
+  descriptionAsPlaceholder?: boolean
+}) {
+  const displayFields = field.lookupFields ?? []
+  const valueKey = resolveValueKey(field)
+  const defaultKeys = [
+    field.lookupLabelKeys?.[0] ??
+      displayFields.find((item) => item.key !== valueKey)?.key ??
+      valueKey,
+  ]
+  const [selectedDisplayFields, setSelectedDisplayFields] =
+    React.useState(defaultKeys)
+  const previousFieldKeyRef = React.useRef(field.key)
+
+  if (previousFieldKeyRef.current !== field.key) {
+    previousFieldKeyRef.current = field.key
+    setSelectedDisplayFields(defaultKeys)
+  }
+
+  const options = React.useMemo(
+    () => lookupOptions(field, selectedDisplayFields),
+    [field, selectedDisplayFields]
+  )
+
+  const inputClass =
+    variant === "cell"
+      ? cn(
+          cellInputClass,
+          invalid && "border-destructive focus-visible:border-destructive",
+          className
+        )
+      : cn(
+          "h-9 text-xs bg-muted/30",
+          invalid && "border-destructive focus-visible:border-destructive",
+          className
+        )
+
+  const description = field.description?.trim()
+  const placeholder =
+    descriptionAsPlaceholder && description ? description : undefined
+
+  return (
+    <CriteriaGridCellCombobox
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      data-grid-cell={dataGridCell}
+      aria-invalid={invalid || undefined}
+      className={inputClass}
+      multiple={field.selectionMode === "multiple"}
+      showAdvancedSearch
+      displayFields={displayFields}
+      selectedDisplayFields={selectedDisplayFields}
+      onSelectedDisplayFieldsChange={(key) =>
+        setSelectedDisplayFields(selectDisplayField(key))
+      }
+    />
+  )
 }
 
 export function CriteriaValueCell({
@@ -40,6 +140,7 @@ export function CriteriaValueCell({
   "data-grid-cell": dataGridCell,
   invalid = false,
   variant = "cell",
+  descriptionAsPlaceholder = true,
 }: CriteriaValueCellProps) {
   const inputClass =
     variant === "cell"
@@ -55,7 +156,8 @@ export function CriteriaValueCell({
         )
 
   const description = field?.description?.trim()
-  const placeholder = description || undefined
+  const placeholder =
+    descriptionAsPlaceholder && description ? description : undefined
 
   const control = (() => {
     if (!field) {
@@ -91,16 +193,15 @@ export function CriteriaValueCell({
         )
       case "objectLookup":
         return (
-          <CriteriaGridCellCombobox
+          <ObjectLookupValueCell
+            field={field}
             value={value}
             onChange={onChange}
-            options={lookupOptions(field)}
-            placeholder={placeholder}
+            className={className}
             data-grid-cell={dataGridCell}
-            aria-invalid={invalid || undefined}
-            className={inputClass}
-            multiple={field.selectionMode === "multiple"}
-            showAdvancedSearch
+            invalid={invalid}
+            variant={variant}
+            descriptionAsPlaceholder={descriptionAsPlaceholder}
           />
         )
       case "number":
@@ -114,10 +215,27 @@ export function CriteriaValueCell({
             max={field.maximum}
             placeholder={placeholder}
             onChange={(event) => onChange(event.target.value)}
-            className={cn(inputClass, variant === "cell" && "text-right")}
+            className={cn(
+              inputClass,
+              variant === "cell" && value.trim() !== "" && "text-right"
+            )}
           />
         )
       case "string":
+        if (field.format === "date") {
+          return (
+            <CriteriaDateValueCell
+              field={field}
+              value={value}
+              onChange={onChange}
+              data-grid-cell={dataGridCell}
+              invalid={invalid}
+              variant={variant}
+              placeholder={placeholder}
+              className={inputClass}
+            />
+          )
+        }
         return (
           <Input
             value={value}
