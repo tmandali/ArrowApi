@@ -16,6 +16,7 @@ export type JsonSchemaProperty = {
   type?: string | string[]
   title?: string
   description?: string
+  format?: string
   enum?: unknown[]
   default?: unknown
   minimum?: number
@@ -29,6 +30,8 @@ export type JsonSchemaProperty = {
   /** UI selection mode. Prefer this or `type: "array"` for multiple. */
   "x-selection"?: CriteriaSelectionMode
   "x-multiple"?: boolean
+  /** single | range — calendar picker mode when format is date. */
+  "x-mode"?: "single" | "range"
   [key: string]: unknown
 }
 
@@ -37,6 +40,11 @@ export type CriteriaFieldKind =
   | "number"
   | "enum"
   | "objectLookup"
+
+export type CriteriaLookupField = {
+  key: string
+  title: string
+}
 
 export type CriteriaFieldDef = {
   key: string
@@ -47,9 +55,15 @@ export type CriteriaFieldDef = {
   enumValues?: string[]
   description?: string
   defaultValue?: string | number
+  /** JSON Schema string format (e.g. date). */
+  format?: string
+  /** Calendar mode for format: date fields. */
+  dateMode?: "single" | "range"
   lookupItems?: Record<string, unknown>[]
   lookupLabelKeys?: string[]
   lookupValueKey?: string
+  /** Available object properties that can be shown in lookup labels. */
+  lookupFields?: CriteriaLookupField[]
   minimum?: number
   maximum?: number
   /** JSON Schema `pattern` and/or `anyOf[].pattern` values. */
@@ -86,4 +100,6 @@ export type ParsedCriteriaSchema = {
 export type CriteriaComboboxOption = {
   value: string
   label: string
+  /** Text used for typeahead filter (selected display field). */
+  searchText?: string
 }

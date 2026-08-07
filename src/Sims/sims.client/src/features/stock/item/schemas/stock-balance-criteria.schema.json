@@ -5,13 +5,22 @@
   "type": "object",
   "properties": {
     "kayitTarihi": {
-      "type": "string",
+      "type": "object",
+      "format": "date",
       "title": "Kayıt Tarihi",
-      "description": "YYYYMMDD veya YYYYMMDD..YYYYMMDD",
-      "anyOf": [
-        { "pattern": "^\\d{8}$" },
-        { "pattern": "^\\d{8}\\.\\.\\d{8}$" }
-      ]
+      "description": "Takvimden başlangıç ve bitiş tarihi seçin; tek gün de seçilebilir.",
+      "x-mode": "range",
+      "required": ["from", "to"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "pattern": "^\\d{8}$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^\\d{8}$"
+        }
+      }
     },
     "durum": {
       "type": "array",
@@ -39,24 +48,34 @@
     "urun": {
       "type": "array",
       "title": "Ürün Bilgileri",
-      "description": "Raporlanacak ürün bilgileri",
+      "description": "Listeden bir veya birden fazla ürün seçin.",
       "x-selection": "multiple",
       "items": {
-        "type": "object",
-        "properties": {
-          "kod": { "type": "string", "title": "Ürün Kodu" },
-          "ad": { "type": "string", "title": "Ürün Adı" },
-          "barkod": {
-            "type": "string",
-            "title": "Ürün Barkodu",
-            "pattern": "^\\d{13}$"
-          }
-        },
-        "x-datasource": [
-          { "kod": "1", "ad": "Ürün 1", "barkod": "1234567890123" },
-          { "kod": "2", "ad": "Ürün 2", "barkod": "9876543210987" }
-        ]
-      }
+        "type": "string"
+      },
+      "properties": {
+        "kod": { "type": "string", "title": "Ürün Kodu" },
+        "ad": { "type": "string", "title": "Ürün Adı" },
+        "barkod": {
+          "type": "string",
+          "title": "Ürün Barkodu",
+          "pattern": "^\\d{13}$"
+        }
+      },
+      "x-datasource": [
+        { "kod": "1", "ad": "Ürün 1", "barkod": "1234567890123" },
+        { "kod": "2", "ad": "Ürün 2", "barkod": "9876543210987" },
+        { "kod": "3", "ad": "Ürün 3", "barkod": "1111111111111" },
+        { "kod": "4", "ad": "Ürün 4", "barkod": "2222222222222" },
+        { "kod": "5", "ad": "Ürün 5", "barkod": "3333333333333" },
+        { "kod": "6", "ad": "Ürün 6", "barkod": "4444444444444" },
+        { "kod": "7", "ad": "Ürün 7", "barkod": "5555555555555" },
+        { "kod": "8", "ad": "Ürün 8", "barkod": "6666666666666" },
+        { "kod": "9", "ad": "Ürün 9", "barkod": "7777777777777" },
+        { "kod": "10", "ad": "Ürün 10", "barkod": "8888888888888" },
+        { "kod": "11", "ad": "Ürün 11", "barkod": "9999999999999" },
+        { "kod": "12", "ad": "Ürün 12", "barkod": "1010101010101" }
+      ]
     }
   },
   "required": ["kayitTarihi"]

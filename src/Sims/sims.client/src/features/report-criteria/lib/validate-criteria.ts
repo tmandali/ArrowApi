@@ -7,6 +7,7 @@ import type {
   CriteriaValidationResult,
   JsonSchemaObject,
 } from "../types"
+import { isValidCompactDate } from "./compact-date"
 import { parseCriteriaSchema } from "./parse-criteria-schema"
 import { rowsToCriteriaInstance } from "./rows-to-criteria-instance"
 import { stripExtensionKeywords } from "./strip-extension-keywords"
@@ -42,22 +43,127 @@ function topLevelFieldKey(error: ErrorObject): string {
   return path.split("/")[0] ?? ""
 }
 
-function mapAjvErrors(errors: ErrorObject[] | null | undefined): CriteriaFieldError[] {
-  if (!errors?.length) return []
+function fieldLabel(fields: CriteriaFieldDef[], fieldKey: string): string {
+  if (!fieldKey) return ""
+  return fields.find((field) => field.key === fieldKey)?.title || fieldKey
+}
 
-  return errors.map((error) => {
-    const fieldKey = topLevelFieldKey(error)
-    const message =
-      error.message && fieldKey
-        ? `${fieldKey}: ${error.message}`
-        : error.message || error.keyword || "Validation error"
+function formatAjvError(
+  error: ErrorObject,
+  fields: CriteriaFieldDef[]
+): CriteriaFieldError {
+  const fieldKey = topLevelFieldKey(error)
+  const label = fieldLabel(fields, fieldKey)
 
-    return {
-      fieldKey,
-      message,
-      keyword: error.keyword,
+  switch (error.keyword) {
+    case "required":
+      return {
+        fieldKey,
+        message: label ? `${label} is required` : "A required field is missing",
+        keyword: error.keyword,
+      }
+    case "type":
+      return {
+        fieldKey,
+        message: label
+          ? `${label} has an invalid type`
+          : "A field has an invalid type",
+        keyword: error.keyword,
+      }
+    case "pattern":
+    case "format":
+      return {
+        fieldKey,
+        message: label
+          ? `${label} has an invalid format`
+          : "A field has an invalid format",
+        keyword: error.keyword,
+      }
+    case "enum":
+      return {
+        fieldKey,
+        message: label
+          ? `${label} must be one of the allowed values`
+          : "Value is not allowed",
+        keyword: error.keyword,
+      }
+    case "minimum":
+    case "maximum":
+    case "minLength":
+    case "maxLength":
+    case "minItems":
+    case "maxItems":
+      return {
+        fieldKey,
+        message:
+          label && error.message
+            ? `${label}: ${error.message}`
+            : error.message || "Value is out of range",
+        keyword: error.keyword,
+      }
+    default: {
+      const _exhaustiveCheck: string = error.keyword
+      void _exhaustiveCheck
+      return {
+        fieldKey,
+        message:
+          label && error.message
+            ? `${label}: ${error.message}`
+            : error.message || error.keyword || "Validation error",
+        keyword: error.keyword,
+      }
     }
-  })
+  }
+}
+
+function mapAjvErrors(
+  errors: ErrorObject[] | null | undefined,
+  fields: CriteriaFieldDef[]
+): CriteriaFieldError[] {
+  if (!errors?.length) return []
+  return errors.map((error) => formatAjvError(error, fields))
+}
+
+function validateInstanceDates(
+  instance: Record<string, unknown>,
+  fields: CriteriaFieldDef[]
+): CriteriaFieldError[] {
+  const errors: CriteriaFieldError[] = []
+
+  for (const field of fields) {
+    if (field.format !== "date") continue
+    const value = instance[field.key]
+    if (value === undefined || value === null || value === "") continue
+
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      value !== null &&
+      "from" in value
+    ) {
+      const range = value as { from?: unknown; to?: unknown }
+      const from = String(range.from ?? "")
+      const to = String(range.to ?? "")
+      if (!isValidCompactDate(from) || !isValidCompactDate(to)) {
+        errors.push({
+          fieldKey: field.key,
+          message: `${field.title}: invalid date`,
+          keyword: "format",
+        })
+      }
+      continue
+    }
+
+    if (typeof value === "string" && !isValidCompactDate(value)) {
+      errors.push({
+        fieldKey: field.key,
+        message: `${field.title}: invalid date`,
+        keyword: "format",
+      })
+    }
+  }
+
+  return errors
 }
 
 export function validateCriteria(
@@ -72,12 +178,17 @@ export function validateCriteria(
     : { ...rowsOrInstance }
 
   const validate = getValidator(schema)
-  const valid = validate(instance) as boolean
+  const ajvValid = validate(instance) as boolean
+  const dateErrors = validateInstanceDates(instance, resolvedFields)
+  const errors = [
+    ...mapAjvErrors(validate.errors, resolvedFields),
+    ...dateErrors,
+  ]
 
   return {
-    valid,
+    valid: ajvValid && dateErrors.length === 0,
     instance,
-    errors: mapAjvErrors(validate.errors),
+    errors,
     ajvErrors: validate.errors,
   }
 }

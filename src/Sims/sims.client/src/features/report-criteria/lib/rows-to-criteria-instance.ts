@@ -4,12 +4,29 @@ import { splitMultiValue } from "./multi-value"
 function resolveLookupItem(
   field: CriteriaFieldDef,
   value: string
-): Record<string, unknown> | string {
+): string {
+  const valueKey = field.lookupValueKey ?? field.lookupFields?.[0]?.key ?? "id"
   const items = field.lookupItems ?? []
-  const valueKey = field.lookupValueKey ?? "kod"
   const match = items.find((item) => String(item[valueKey] ?? "") === value)
-  if (match) return { ...match }
+  if (match) return String(match[valueKey] ?? value)
   return value
+}
+
+function coerceDateRangeValue(raw: string): { from: string; to: string } {
+  const trimmed = raw.trim()
+  if (trimmed.includes("..")) {
+    const [from = "", to = ""] = trimmed.split("..").map((part) => part.trim())
+    return { from, to: to || from }
+  }
+  return { from: trimmed, to: trimmed }
+}
+
+function isRangeDateField(field: CriteriaFieldDef): boolean {
+  return (
+    field.format === "date" &&
+    (field.dateMode === "range" ||
+      (field.patterns?.some((pattern) => pattern.includes("\\.\\.")) ?? false))
+  )
 }
 
 function coerceFieldValue(
@@ -22,9 +39,13 @@ function coerceFieldValue(
       return Number.isFinite(num) ? num : raw
     }
     case "objectLookup":
+      // Complex types: emit identity key only (e.g. kod), not the full object.
       return resolveLookupItem(field, raw)
     case "enum":
+      return raw
     case "string":
+      // Range dates → { from, to } so report APIs don't confuse them with multi-select arrays.
+      if (isRangeDateField(field)) return coerceDateRangeValue(raw)
       return raw
     default: {
       const _exhaustive: never = field.kind

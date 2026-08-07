@@ -20,20 +20,27 @@ function stringifyEnum(values: unknown[] | undefined): string[] | undefined {
 function defaultLookupKeys(prop: JsonSchemaProperty): {
   lookupValueKey: string
   lookupLabelKeys: string[]
+  lookupFields: { key: string; title: string }[]
 } {
-  const keys = Object.keys(prop.properties ?? {})
-  const lookupValueKey = keys.includes("kod") ? "kod" : (keys[0] ?? "kod")
+  const properties = prop.properties ?? {}
+  const keys = Object.keys(properties)
+  const lookupFields = keys.map((key) => ({
+    key,
+    title: properties[key]?.title?.trim() || key,
+  }))
+  // First schema property is always the identity key; default display is the next field if any.
+  const lookupValueKey = keys[0] ?? "id"
   const lookupLabelKeys =
-    keys.includes("kod") && keys.includes("ad")
-      ? ["kod", "ad"]
-      : keys.slice(0, 2)
-  return { lookupValueKey, lookupLabelKeys }
+    keys.length > 1 ? [keys[1]!] : keys.length > 0 ? [keys[0]!] : ["id"]
+  return { lookupValueKey, lookupLabelKeys, lookupFields }
 }
 
 function resolveSelectionMode(
   prop: JsonSchemaProperty,
   types: string[]
 ): CriteriaSelectionMode {
+  // Date fields use a single cell value (range encoded as from..to), never multi-select.
+  if (prop.format === "date") return "single"
   const explicit = prop["x-selection"]
   if (explicit === "multiple" || explicit === "single") return explicit
   if (prop["x-multiple"] === true) return "multiple"
@@ -98,7 +105,16 @@ function parseProperty(
   const itemTypes = asTypeList(itemSchema.type)
   const enumValues =
     stringifyEnum(itemSchema.enum) ?? stringifyEnum(prop.enum)
-  const patterns = collectPatterns(prop, itemSchema)
+  const patternsFromSchema = collectPatterns(prop, itemSchema)
+  const format = prop.format ?? itemSchema.format
+  const dateMode =
+    prop["x-mode"] ??
+    itemSchema["x-mode"] ??
+    (patternsFromSchema?.some((pattern) => pattern.includes("\\.\\."))
+      ? "range"
+      : "single")
+  // Date cells are validated as real calendar dates; schema patterns are for AJV only.
+  const patterns = format === "date" ? undefined : patternsFromSchema
 
   const base = {
     key,
@@ -107,6 +123,8 @@ function parseProperty(
     description,
     selectionMode,
     patterns,
+    format,
+    dateMode: format === "date" ? dateMode : undefined,
   }
 
   if (enumValues?.length) {
@@ -119,19 +137,22 @@ function parseProperty(
   }
 
   if (
-    itemTypes.includes("object") ||
-    types.includes("object") ||
-    itemSchema["x-datasource"] ||
-    prop["x-datasource"]
+    format !== "date" &&
+    (itemTypes.includes("object") ||
+      types.includes("object") ||
+      itemSchema["x-datasource"] ||
+      prop["x-datasource"])
   ) {
     const source = itemSchema["x-datasource"] ? itemSchema : prop
-    const { lookupValueKey, lookupLabelKeys } = defaultLookupKeys(source)
+    const { lookupValueKey, lookupLabelKeys, lookupFields } =
+      defaultLookupKeys(source)
     return {
       ...base,
       kind: "objectLookup",
       lookupItems: source["x-datasource"] ?? prop["x-datasource"] ?? [],
       lookupValueKey,
       lookupLabelKeys,
+      lookupFields,
       defaultValue: stringifyDefaultValue(prop.default, selectionMode),
     }
   }

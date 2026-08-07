@@ -1,4 +1,5 @@
 import type { CriteriaFieldDef } from "../types"
+import { isValidCompactDateCellValue } from "./compact-date"
 import { splitMultiValue } from "./multi-value"
 
 function toRegExp(pattern: string): RegExp | null {
@@ -28,14 +29,22 @@ export function validateCellPatterns(
   field: CriteriaFieldDef | undefined,
   value: string
 ): { valid: boolean; message?: string } {
-  if (!field?.patterns?.length) return { valid: true }
+  if (!field) return { valid: true }
   if (value === "") return { valid: true }
 
   const parts =
     field.selectionMode === "multiple" ? splitMultiValue(value) : [value]
 
   for (const part of parts) {
-    if (!matchesPatterns(part, field.patterns)) {
+    // Date fields: calendar validity (rejects e.g. 20260855); no regex pattern needed.
+    if (field.format === "date" && !isValidCompactDateCellValue(part)) {
+      return {
+        valid: false,
+        message: `${field.title}: invalid date`,
+      }
+    }
+
+    if (field.format !== "date" && field.patterns?.length && !matchesPatterns(part, field.patterns)) {
       return {
         valid: false,
         message: `${field.title}: pattern mismatch`,

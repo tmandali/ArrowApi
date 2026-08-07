@@ -107,11 +107,11 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
       value={activeTab}
       onValueChange={setActiveTab}
       className={cn(
-        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0",
+        "flex min-h-0 min-w-0 w-full flex-1 flex-col gap-0 overflow-hidden",
         className
       )}
     >
-      <div className="shrink-0 border-b bg-background px-4">
+      <div className="shrink-0 border-b bg-background px-3 sm:px-4">
         <ScrollArea type="hover" className="w-full whitespace-nowrap">
           <div className="py-1">
             <TabsList variant="line" className="min-w-max">
@@ -129,7 +129,7 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
         <TabsContent
           key={tab.id}
           value={tab.id}
-          className="m-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
+          className="m-0 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto data-[state=inactive]:hidden"
         >
           <SchemaCriteriaFilter
             ref={(handle) => {
@@ -137,6 +137,7 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
             }}
             schema={tab.schema}
             showHeader={false}
+            className="h-auto"
           />
         </TabsContent>
       ))}

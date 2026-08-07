@@ -57,13 +57,17 @@ import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-pa
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
 import { StockBalanceFilter } from "./StockBalanceFilter"
-import type { SchemaCriteriaFilterGroupHandle } from "@/features/report-criteria"
+import type {
+  CriteriaValidationResult,
+  SchemaCriteriaFilterGroupHandle,
+} from "@/features/report-criteria"
 import {
   StockAnalyticsReportTab,
   type StockAnalyticsTreeAction,
 } from "./StockAnalyticsReportTab"
 import { StockAnalyticsExecutionHistory } from "./StockAnalyticsExecutionHistory"
 import { printStockAnalyticsReport } from "./printStockAnalyticsReport"
+import { cn } from "@/utils/cn"
 
 export type ItemFormTab =
   | "details"
@@ -174,6 +178,9 @@ export function ItemForm({
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
   const [showBanner, setShowBanner] = React.useState(!isReportShell)
+  const [validationBanner, setValidationBanner] = React.useState<string | null>(
+    null
+  )
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
@@ -189,6 +196,23 @@ export function ItemForm({
       setIsPrinting(false)
     }
   }, [isPrinting])
+
+  const formatValidationBanner = React.useCallback(
+    (result: CriteriaValidationResult) => {
+      if (result.valid || result.errors.length === 0) return null
+      const first = result.errors[0]?.message ?? "Validation failed"
+      const extra =
+        result.errors.length > 1 ? ` (+${result.errors.length - 1})` : ""
+      return `${first}${extra}`
+    },
+    []
+  )
+
+  const handleCriteriaSubmit = React.useCallback(() => {
+    const result = criteriaFilterRef.current?.submit()
+    if (!result) return
+    setValidationBanner(formatValidationBanner(result))
+  }, [formatValidationBanner])
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -251,7 +275,7 @@ export function ItemForm({
 
         <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
           {isStockAnalytics ? (
-            <>
+            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <WorkspaceSidePanelTrigger
                 open={!!filtersOpen}
                 onOpenChange={(open) => onFiltersOpenChange?.(open)}
@@ -466,7 +490,7 @@ export function ItemForm({
               />
 
               <AIChatAssistant variant="toolbar" />
-            </>
+            </div>
           ) : isLedgerLikeShell ? (
             <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <Button
@@ -482,8 +506,8 @@ export function ItemForm({
                 <Button
                   type="button"
                   size="sm"
-                  className="h-7 shrink-0 text-xs px-3"
-                  onClick={() => criteriaFilterRef.current?.submit()}
+                  className="h-7 shrink-0 px-2.5 text-xs sm:px-3"
+                  onClick={handleCriteriaSubmit}
                 >
                   Submit
                 </Button>
@@ -491,7 +515,7 @@ export function ItemForm({
               <AIChatAssistant variant="toolbar" />
             </div>
           ) : (
-            <>
+            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <ButtonGroup className="hidden md:inline-flex">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3">
                   View
@@ -562,7 +586,7 @@ export function ItemForm({
                 Save
               </Button>
               <AIChatAssistant variant="toolbar" />
-            </>
+            </div>
           )}
         </div>
       </header>
@@ -587,7 +611,29 @@ export function ItemForm({
         </div>
       ) : null}
 
-      <WorkspaceAiDock className="overflow-hidden">
+      {validationBanner && isStockBalance ? (
+        <div className="flex items-center justify-between gap-3 border-b bg-destructive/10 px-3 py-2 text-xs text-destructive sm:px-4">
+          <p className="min-w-0 truncate" title={validationBanner}>
+            {validationBanner}
+          </p>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-destructive hover:bg-destructive/15 hover:text-destructive"
+            onClick={() => setValidationBanner(null)}
+            aria-label="Dismiss validation"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      ) : null}
+
+      <WorkspaceAiDock
+        className={cn(
+          "overflow-hidden",
+          isLedgerLikeShell && "max-md:overflow-y-auto"
+        )}
+      >
       {isStockAnalytics ? (
         <StockAnalyticsReportTab
           filtersOpen={filtersOpen}
@@ -598,7 +644,10 @@ export function ItemForm({
           showFilterRow={showFilterRow}
         />
       ) : isStockBalance ? (
-        <StockBalanceFilter ref={criteriaFilterRef} />
+        <StockBalanceFilter
+          ref={criteriaFilterRef}
+          className="min-h-0 min-w-0 w-full flex-1"
+        />
       ) : (
       <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
         <div className="shrink-0 border-b bg-background px-4">
