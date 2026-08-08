@@ -43,30 +43,44 @@ import {
   Paperclip,
   Tag,
   ShoppingBag,
-  Search,
-  ListFilter,
   RefreshCw,
   FilePlus2,
-  Trash2,
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import {
+  pageContentGutterClass,
+  pageHeaderCardClass,
+  pageHeaderShellClass,
+  panelCardClass,
+} from "@/components/layout/panel-chrome"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
-import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
+import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
-import { StockBalanceFilter } from "./StockBalanceFilter"
-import type {
-  CriteriaValidationResult,
-  SchemaCriteriaFilterGroupHandle,
-} from "@/features/report-criteria"
 import {
-  StockAnalyticsReportTab,
-  type StockAnalyticsTreeAction,
-} from "./StockAnalyticsReportTab"
-import { StockAnalyticsExecutionHistory } from "./StockAnalyticsExecutionHistory"
-import { printStockAnalyticsReport } from "./printStockAnalyticsReport"
+  StockBalanceFilter,
+  type StockBalanceJobSession,
+} from "./StockBalanceFilter"
+import {
+  StockAnalyticsFilter,
+  type StockAnalyticsJobSession,
+} from "./StockAnalyticsFilter"
+import {
+  ReportModuleFilter,
+  type ReportModuleJobSession,
+} from "@/features/reports/components/ReportModuleFilter"
+import type { ArrowJobStatus } from "@/features/stock/item/types/stock-analytics"
+import {
+  assertSafeApiJobEndpoint,
+  type CriteriaValidationResult,
+  type JsonSchemaObject,
+  type SchemaCriteriaFilterHandle,
+} from "@/features/report-criteria"
+import { emptyWorkspaceHome } from "@/lib/empty-module"
+import { createArrowJob } from "@/features/jobs/arrow-job-client"
+import { ApiError } from "@/services"
 import { cn } from "@/utils/cn"
 
 export type ItemFormTab =
@@ -111,26 +125,39 @@ type ItemFormProps = {
   tabs?: ItemFormTab[]
   tabLabels?: Partial<Record<ItemFormTab, string>>
   defaultTab?: ItemFormTab
-  mode?: "item" | "stock-analytics" | "stock-ledger" | "stock-balance"
-  filtersOpen?: boolean
-  onFiltersOpenChange?: (open: boolean) => void
-  onRunReport?: () => void
-  runReportToken?: number
-  reportReady?: boolean
-  onReportReadyChange?: (ready: boolean) => void
-  showFilterRow?: boolean
-  onShowFilterRowChange?: (show: boolean) => void
-  treeLevel?: string
-  onTreeLevelChange?: (value: string) => void
-  onExpandAll?: () => void
-  onCollapseAll?: () => void
-  onSetTreeLevel?: () => void
-  treeAction?: StockAnalyticsTreeAction | null
+  mode?:
+    | "item"
+    | "stock-analytics"
+    | "stock-ledger"
+    | "stock-balance"
+    | "report-module"
   onStartNewReport?: () => void
-  onDeleteActiveReport?: () => void
-  deletingReport?: boolean
-  activeJobId?: string | null
-  reportRunning?: boolean
+  /** Stock Balance: stay on page and track the new job in Executions. */
+  onStockBalanceJobCreated?: (
+    job: ArrowJobStatus,
+    request: Record<string, unknown>
+  ) => void
+  stockBalanceJobSession?: StockBalanceJobSession
+  /** Stock Analytics: stay on page and track the new job in Executions. */
+  onStockAnalyticsJobCreated?: (
+    job: ArrowJobStatus,
+    request: Record<string, unknown>
+  ) => void
+  stockAnalyticsJobSession?: StockAnalyticsJobSession
+  /** Generic nav report module (Criteria + Executions shell). */
+  reportModule?: {
+    title: string
+    workspace: string
+    jobsEndpoint: string
+    jobName: string
+    schema: JsonSchemaObject
+    emptyListHint?: string
+  }
+  onReportJobCreated?: (
+    job: ArrowJobStatus,
+    request: Record<string, unknown>
+  ) => void
+  reportJobSession?: ReportModuleJobSession
 }
 
 export function ItemForm({
@@ -138,33 +165,37 @@ export function ItemForm({
   tabLabels,
   defaultTab,
   mode = "item",
-  filtersOpen = true,
-  onFiltersOpenChange,
-  onRunReport,
-  runReportToken = 0,
-  reportReady = false,
-  onReportReadyChange,
-  showFilterRow = true,
-  onShowFilterRowChange,
-  treeLevel = "2",
-  onTreeLevelChange,
-  onExpandAll,
-  onCollapseAll,
-  onSetTreeLevel,
-  treeAction = null,
   onStartNewReport,
-  onDeleteActiveReport,
-  deletingReport = false,
-  activeJobId = null,
-  reportRunning = false,
+  onStockBalanceJobCreated,
+  stockBalanceJobSession,
+  onStockAnalyticsJobCreated,
+  stockAnalyticsJobSession,
+  reportModule,
+  onReportJobCreated,
+  reportJobSession,
 }: ItemFormProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
   const isStockLedger = mode === "stock-ledger"
   const isStockBalance = mode === "stock-balance"
-  const isLedgerLikeShell = isStockLedger || isStockBalance
-  const isReportShell = isStockAnalytics || isLedgerLikeShell
-  const criteriaFilterRef = React.useRef<SchemaCriteriaFilterGroupHandle>(null)
+  const isReportModule = mode === "report-module"
+  const isJobCriteriaShell =
+    isStockBalance || isReportModule || isStockAnalytics
+  const isLedgerLikeShell = isStockLedger || isJobCriteriaShell
+  const isReportShell = isLedgerLikeShell
+  const workspaceHome =
+    emptyWorkspaceHome[reportModule?.workspace ?? "stock"] ??
+    emptyWorkspaceHome.stock
+  const reportTitle = isReportModule
+    ? (reportModule?.title ?? "Report")
+    : isStockBalance
+      ? "Stock Balance"
+      : isStockAnalytics
+        ? "Stock Analytics"
+        : isStockLedger
+          ? "Stock Ledger"
+          : "Report"
+  const criteriaFilterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
   const initialTab =
     defaultTab && visibleTabs.has(defaultTab)
       ? defaultTab
@@ -178,24 +209,22 @@ export function ItemForm({
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
   const [showBanner, setShowBanner] = React.useState(!isReportShell)
-  const [validationBanner, setValidationBanner] = React.useState<string | null>(
+  const [criteriaBanner, setCriteriaBanner] = React.useState<{
+    tone: "error" | "success"
+    message: string
+    href?: string
+  } | null>(null)
+  const [listErrorBanner, setListErrorBanner] = React.useState<string | null>(
     null
   )
+  const handleListError = React.useCallback((message: string | null) => {
+    setListErrorBanner(message)
+  }, [])
+  const [submittingCriteria, setSubmittingCriteria] = React.useState(false)
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([{ id: "1", name: "blck.webp" }])
-  const [isPrinting, setIsPrinting] = React.useState(false)
   const attachmentInputRef = React.useRef<HTMLInputElement>(null)
-
-  const handlePrint = React.useCallback(async () => {
-    if (isPrinting) return
-    setIsPrinting(true)
-    try {
-      await printStockAnalyticsReport()
-    } finally {
-      setIsPrinting(false)
-    }
-  }, [isPrinting])
 
   const formatValidationBanner = React.useCallback(
     (result: CriteriaValidationResult) => {
@@ -208,15 +237,61 @@ export function ItemForm({
     []
   )
 
-  const handleCriteriaSubmit = React.useCallback(() => {
+  const handleCriteriaSubmit = React.useCallback(async () => {
     const result = criteriaFilterRef.current?.submit()
     if (!result) return
-    setValidationBanner(formatValidationBanner(result))
-  }, [formatValidationBanner])
+
+    if (!result.valid) {
+      const message = formatValidationBanner(result)
+      setCriteriaBanner(
+        message ? { tone: "error", message } : { tone: "error", message: "Validation failed" }
+      )
+      return
+    }
+
+    if (!result.jobEndpoint) {
+      setCriteriaBanner({
+        tone: "error",
+        message: "Schema x-job-endpoint is missing",
+      })
+      return
+    }
+
+    try {
+      setSubmittingCriteria(true)
+      const endpoint = assertSafeApiJobEndpoint(result.jobEndpoint)
+      const job = await createArrowJob(endpoint, result.instance)
+      onStockBalanceJobCreated?.(job, result.instance)
+      onStockAnalyticsJobCreated?.(job, result.instance)
+      onReportJobCreated?.(job, result.instance)
+      setCriteriaBanner(null)
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Job create failed"
+      setCriteriaBanner({ tone: "error", message })
+    } finally {
+      setSubmittingCriteria(false)
+    }
+  }, [
+    formatValidationBanner,
+    onStockBalanceJobCreated,
+    onStockAnalyticsJobCreated,
+    onReportJobCreated,
+  ])
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 sm:px-4 text-xs">
+      <div className={pageHeaderShellClass}>
+      <header
+        className={cn(
+          pageHeaderCardClass,
+          "justify-between gap-1.5 sm:gap-2"
+        )}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
           <SidebarTrigger className="-ml-1 shrink-0" />
           <Separator
@@ -227,7 +302,7 @@ export function ItemForm({
             <BreadcrumbList className="flex-nowrap text-xs">
               <BreadcrumbItem className="hidden md:inline-flex">
                 <BreadcrumbLink asChild>
-                  <Link to="/stock">Stock</Link>
+                  <Link to={workspaceHome.url}>{workspaceHome.label}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
@@ -235,17 +310,13 @@ export function ItemForm({
                 <>
                   <BreadcrumbItem className="hidden md:inline-flex">
                     <BreadcrumbLink asChild>
-                      <Link to="/stock">Reports</Link>
+                      <Link to={workspaceHome.url}>Reports</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem className="min-w-0">
                     <BreadcrumbPage className="block truncate font-semibold text-foreground">
-                      {isStockLedger
-                        ? "Stock Ledger"
-                        : isStockBalance
-                          ? "Stock Balance"
-                          : "Stock Analytics"}
+                      {reportTitle}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
@@ -274,242 +345,31 @@ export function ItemForm({
         </div>
 
         <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-          {isStockAnalytics ? (
+          {isLedgerLikeShell ? (
             <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
-              <WorkspaceSidePanelTrigger
-                open={!!filtersOpen}
-                onOpenChange={(open) => onFiltersOpenChange?.(open)}
-                icon={Search}
-                label="Query"
-                className="shrink-0 [&_span]:hidden sm:[&_span]:inline"
-              />
-
-              <Separator
-                orientation="vertical"
-                className="mx-0.5 hidden data-vertical:h-4 data-vertical:self-auto sm:block"
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden h-7 text-xs gap-1.5 px-2.5 md:inline-flex"
-                onClick={() => onStartNewReport?.()}
-                title="New report"
-                aria-label="New report"
-              >
-                <FilePlus2 className="size-3.5" />
-                New
-              </Button>
-
-              <StockAnalyticsExecutionHistory />
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden h-7 text-xs gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive md:inline-flex"
-                disabled={!activeJobId || deletingReport || reportRunning}
-                onClick={() => onDeleteActiveReport?.()}
-                title={
-                  reportRunning
-                    ? "Running report cannot be deleted"
-                    : "Delete report"
-                }
-                aria-label="Delete report"
-              >
-                <Trash2 className="size-3.5" />
-                {deletingReport ? "Deleting…" : "Delete"}
-              </Button>
-
-              <Separator
-                orientation="vertical"
-                className="mx-0.5 hidden data-vertical:h-4 data-vertical:self-auto lg:block"
-              />
-
-              <Button
-                type="button"
-                variant={showFilterRow ? "secondary" : "outline"}
-                size="icon"
-                className="size-7 shrink-0"
-                disabled={!reportReady}
-                onClick={() => onShowFilterRowChange?.(!showFilterRow)}
-                title={showFilterRow ? "Hide filter row" : "Show filter row"}
-                aria-label={
-                  showFilterRow ? "Hide filter row" : "Show filter row"
-                }
-              >
-                <ListFilter className="size-3.5" />
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="hidden h-7 text-xs gap-1 px-2.5 lg:inline-flex"
-                    disabled={!reportReady}
-                  >
-                    Options
-                    <ChevronDown className="size-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={onExpandAll}>
-                    Expand All
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onCollapseAll}>
-                    Collapse All
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <div className="flex items-center gap-2 px-2 py-1.5">
-                    <Input
-                      value={treeLevel}
-                      onChange={(event) =>
-                        onTreeLevelChange?.(event.target.value)
-                      }
-                      className="h-7 w-12 text-center text-xs"
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-7 flex-1 text-xs"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        onSetTreeLevel?.()
-                      }}
-                    >
-                      Set Level
-                    </Button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden h-7 text-xs gap-1.5 px-2.5 lg:inline-flex"
-                disabled={!reportReady || isPrinting}
-                onClick={() => {
-                  void handlePrint()
-                }}
-              >
-                <Printer className="size-3.5" />
-                {isPrinting ? "Preparing…" : "Print"}
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="size-7 shrink-0 lg:hidden"
-                    aria-label="More actions"
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem
-                    className="md:hidden"
-                    onClick={() => onStartNewReport?.()}
-                  >
-                    <FilePlus2 className="size-3.5" />
-                    New
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="md:hidden"
-                    disabled={!activeJobId || deletingReport || reportRunning}
-                    onClick={() => onDeleteActiveReport?.()}
-                  >
-                    <Trash2 className="size-3.5" />
-                    {deletingReport ? "Deleting…" : "Delete"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="md:hidden" />
-                  <DropdownMenuItem
-                    disabled={!reportReady}
-                    onClick={onExpandAll}
-                  >
-                    Expand All
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!reportReady}
-                    onClick={onCollapseAll}
-                  >
-                    Collapse All
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <div className="flex items-center gap-2 px-2 py-1.5 lg:hidden">
-                    <Input
-                      value={treeLevel}
-                      onChange={(event) =>
-                        onTreeLevelChange?.(event.target.value)
-                      }
-                      className="h-7 w-12 text-center text-xs"
-                      disabled={!reportReady}
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-7 flex-1 text-xs"
-                      disabled={!reportReady}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        onSetTreeLevel?.()
-                      }}
-                    >
-                      Set Level
-                    </Button>
-                  </div>
-                  <DropdownMenuSeparator className="lg:hidden" />
-                  <DropdownMenuItem
-                    className="lg:hidden"
-                    disabled={!reportReady || isPrinting}
-                    onClick={() => {
-                      void handlePrint()
-                    }}
-                  >
-                    <Printer className="size-3.5" />
-                    {isPrinting ? "Preparing…" : "Print"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Separator
-                orientation="vertical"
-                className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
-              />
-
-              <AIChatAssistant variant="toolbar" />
-            </div>
-          ) : isLedgerLikeShell ? (
-            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0"
-                aria-label="Refresh"
-              >
-                <RefreshCw className="size-3.5" />
-              </Button>
-              {isStockBalance ? (
+              {!isJobCriteriaShell ? (
                 <Button
                   type="button"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs sm:px-3"
-                  onClick={handleCriteriaSubmit}
+                  variant="outline"
+                  size="icon"
+                  className="size-7 shrink-0"
+                  aria-label="Refresh"
                 >
-                  Submit
+                  <RefreshCw className="size-3.5" />
+                </Button>
+              ) : null}
+              {isJobCriteriaShell ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2.5 text-xs"
+                  onClick={() => onStartNewReport?.()}
+                  title="New report"
+                  aria-label="New report"
+                >
+                  <FilePlus2 className="size-3.5" />
+                  New
                 </Button>
               ) : null}
               <AIChatAssistant variant="toolbar" />
@@ -590,42 +450,35 @@ export function ItemForm({
           )}
         </div>
       </header>
+      </div>
 
       {showBanner && !isReportShell ? (
-        <div className="flex items-center justify-between gap-3 border-b bg-sky-500/10 px-4 py-2 text-xs text-sky-900 dark:text-sky-100">
-          <p>
-            This Item is a Variant of{" "}
-            <span className="font-semibold underline underline-offset-2">
-              12345
-            </span>{" "}
-            (Template).
-          </p>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-sky-900 hover:bg-sky-500/20 dark:text-sky-100"
-            onClick={() => setShowBanner(false)}
-          >
-            <X className="size-3.5" />
-          </Button>
-        </div>
+        <WorkspaceBanner tone="info" onDismiss={() => setShowBanner(false)}>
+          This Item is a Variant of{" "}
+          <span className="font-semibold underline underline-offset-2">
+            12345
+          </span>{" "}
+          (Template).
+        </WorkspaceBanner>
       ) : null}
 
-      {validationBanner && isStockBalance ? (
-        <div className="flex items-center justify-between gap-3 border-b bg-destructive/10 px-3 py-2 text-xs text-destructive sm:px-4">
-          <p className="min-w-0 truncate" title={validationBanner}>
-            {validationBanner}
-          </p>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-destructive hover:bg-destructive/15 hover:text-destructive"
-            onClick={() => setValidationBanner(null)}
-            aria-label="Dismiss validation"
-          >
-            <X className="size-3.5" />
-          </Button>
-        </div>
+      {listErrorBanner && isJobCriteriaShell ? (
+        <WorkspaceBanner
+          tone="error"
+          onDismiss={() => setListErrorBanner(null)}
+        >
+          <span title={listErrorBanner}>{listErrorBanner}</span>
+        </WorkspaceBanner>
+      ) : null}
+
+      {criteriaBanner && isJobCriteriaShell ? (
+        <WorkspaceBanner
+          tone={criteriaBanner.tone === "error" ? "error" : "success"}
+          href={criteriaBanner.href}
+          onDismiss={() => setCriteriaBanner(null)}
+        >
+          <span title={criteriaBanner.message}>{criteriaBanner.message}</span>
+        </WorkspaceBanner>
       ) : null}
 
       <WorkspaceAiDock
@@ -634,23 +487,53 @@ export function ItemForm({
           isLedgerLikeShell && "max-md:overflow-y-auto"
         )}
       >
-      {isStockAnalytics ? (
-        <StockAnalyticsReportTab
-          filtersOpen={filtersOpen}
-          onFiltersOpenChange={onFiltersOpenChange}
-          runReportToken={runReportToken}
-          treeAction={treeAction}
-          onReportReadyChange={onReportReadyChange}
-          showFilterRow={showFilterRow}
-        />
-      ) : isStockBalance ? (
+      {isStockBalance ? (
         <StockBalanceFilter
           ref={criteriaFilterRef}
           className="min-h-0 min-w-0 w-full flex-1"
+          jobSession={{
+            ...stockBalanceJobSession,
+            onListError: handleListError,
+          }}
+          onRun={() => void handleCriteriaSubmit()}
+          runDisabled={submittingCriteria}
+        />
+      ) : isStockAnalytics ? (
+        <StockAnalyticsFilter
+          ref={criteriaFilterRef}
+          className="min-h-0 min-w-0 w-full flex-1"
+          jobSession={{
+            ...stockAnalyticsJobSession,
+            onListError: handleListError,
+          }}
+          onRun={() => void handleCriteriaSubmit()}
+          runDisabled={submittingCriteria}
+        />
+      ) : isReportModule && reportModule ? (
+        <ReportModuleFilter
+          ref={criteriaFilterRef}
+          className="min-h-0 min-w-0 w-full flex-1"
+          jobsEndpoint={reportModule.jobsEndpoint}
+          jobName={reportModule.jobName}
+          schema={reportModule.schema}
+          emptyListHint={reportModule.emptyListHint}
+          jobSession={{
+            ...reportJobSession,
+            onListError: handleListError,
+          }}
+          onRun={() => void handleCriteriaSubmit()}
+          runDisabled={submittingCriteria}
         />
       ) : (
-      <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden gap-0">
-        <div className="shrink-0 border-b bg-background px-4">
+      <div
+        className={cn(
+          pageContentGutterClass,
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        )}
+      >
+      <div className={cn(panelCardClass, "min-h-0 flex-1")}>
+      <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+        <div className="shrink-0 border-b border-primary/15 px-3 dark:border-primary/25">
           <ScrollArea type="hover" className="w-full whitespace-nowrap">
             <div className="py-1">
               <TabsList variant="line" className="min-w-max">
@@ -682,7 +565,7 @@ export function ItemForm({
           value="details"
           className="m-0 grid grid-cols-1 @[56rem]/item-details:grid-cols-[minmax(0,1fr)_18rem] data-[state=inactive]:hidden"
         >
-          <div className="min-w-0 space-y-6 p-4 sm:p-6">
+          <div className="min-w-0 space-y-5 p-3 sm:p-4">
             <div className="grid grid-cols-1 gap-x-10 gap-y-5 @[40rem]/item-details:grid-cols-2">
               <div className="space-y-5">
                 <Field>
@@ -868,7 +751,7 @@ export function ItemForm({
             </div>
           </div>
 
-          <aside className="w-full space-y-4 border-t bg-muted/10 p-4 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0">
+          <aside className="w-full space-y-4 border-t bg-muted/10 p-3 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0 sm:p-4">
             <ItemImageUpload />
 
             <div className="space-y-1">
@@ -978,7 +861,7 @@ export function ItemForm({
             </div>
           </aside>
 
-          <div className="min-w-0 space-y-6 p-4 pt-0 sm:p-6 sm:pt-0">
+          <div className="min-w-0 space-y-5 p-3 pt-0 sm:p-4 sm:pt-0">
             <Separator />
             <DocumentComments />
             <DocumentActivity />
@@ -999,13 +882,15 @@ export function ItemForm({
           <TabsContent
             key={tab}
             value={tab}
-            className="m-0 p-6 text-xs text-muted-foreground capitalize data-[state=inactive]:hidden"
+            className="m-0 p-3 text-xs capitalize text-muted-foreground data-[state=inactive]:hidden sm:p-4"
           >
             {tab} content
           </TabsContent>
         ))}
         </div>
       </Tabs>
+      </div>
+      </div>
       )}
       </WorkspaceAiDock>
     </div>

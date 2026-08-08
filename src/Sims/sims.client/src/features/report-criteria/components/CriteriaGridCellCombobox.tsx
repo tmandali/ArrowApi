@@ -520,12 +520,12 @@ export function CriteriaGridCellCombobox({
             data-grid-cell={dataGridCell}
             aria-invalid={ariaInvalid || undefined}
             className={cn(
-              "relative flex h-9 min-h-9 w-full flex-nowrap items-center gap-1 overflow-hidden pl-2 pr-1 py-0.5",
+              "relative flex h-7 min-h-7 w-full flex-nowrap items-center gap-1 overflow-hidden pl-2 pr-1 py-0.5",
               "rounded-none border border-transparent bg-transparent",
               "focus-within:border-border focus-within:bg-background",
               ariaInvalid && "border-destructive focus-within:border-destructive",
               className,
-              "h-9 min-h-9 pl-2 pr-1 py-0.5"
+              "h-7 min-h-7 pl-2 pr-1 py-0.5"
             )}
             onClick={() => inputRef.current?.focus()}
           >
@@ -629,7 +629,7 @@ export function CriteriaGridCellCombobox({
             data-grid-cell={dataGridCell}
             aria-invalid={ariaInvalid || undefined}
             className={cn(
-              "h-9 min-h-9 w-full rounded-none border-transparent bg-transparent p-0 shadow-none",
+              "h-7 min-h-7 w-full rounded-none border-transparent bg-transparent p-0 shadow-none",
               "has-[[data-slot=input-group-control]:focus-visible]:border-border",
               "has-[[data-slot=input-group-control]:focus-visible]:ring-0",
               "[&_[data-slot=input-group-addon]]:py-0 [&_[data-slot=input-group-addon]]:pr-1",

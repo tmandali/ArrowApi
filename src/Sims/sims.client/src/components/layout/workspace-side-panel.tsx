@@ -5,6 +5,15 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
+import {
+  pageInsetGutterClass,
+  panelCardClass,
+  panelHeaderAccentBorderClass,
+  panelHeaderClass,
+  panelHeaderTitleClass,
+  panelResizeHandleClass,
+  panelShellClass,
+} from "@/components/layout/panel-chrome"
 import { cn } from "@/utils/cn"
 import { ChevronRight } from "lucide-react"
 
@@ -29,7 +38,14 @@ type WorkspaceSidePanelLayoutProps = {
   className?: string
   /** Classes for the main (left) content shell. */
   mainClassName?: string
+  /** Classes for the panel surface (card / background). */
   panelClassName?: string
+  /** Classes for the outer panel shell (gutters around a card). */
+  panelShellClassName?: string
+  /** Classes for the resize handle between main and panel. */
+  handleClassName?: string
+  /** Classes for the panel header bar. */
+  headerClassName?: string
   /**
    * When false (tablet/phone), an open panel replaces main content instead of
    * docking beside it — same rule as Yula below 1024px.
@@ -42,21 +58,23 @@ function SidePanelHeader({
   headerActions,
   collapseLabel,
   onCollapse,
+  className,
 }: {
   title: React.ReactNode
   headerActions?: React.ReactNode
   collapseLabel: string
   onCollapse: () => void
+  className?: string
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+    <div className={cn(panelHeaderClass, "gap-1", className)}>
       <button
         type="button"
         onClick={onCollapse}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-0.5 py-1 text-left transition-colors hover:bg-muted/40"
         aria-label={collapseLabel}
       >
-        <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+        <span className={cn("flex min-w-0 items-center gap-2", panelHeaderTitleClass)}>
           {title}
         </span>
       </button>
@@ -95,6 +113,9 @@ export function WorkspaceSidePanelLayout({
   className,
   mainClassName,
   panelClassName,
+  panelShellClassName,
+  handleClassName,
+  headerClassName,
   sideDockAllowed = true,
 }: WorkspaceSidePanelLayoutProps) {
   const mainDefault = 100 - defaultSizePercent
@@ -103,24 +124,36 @@ export function WorkspaceSidePanelLayout({
     collapseLabel ??
     (typeof title === "string" ? `Collapse ${title}` : "Collapse panel")
 
+  const resolvedShellClass = panelShellClassName ?? panelShellClass
+  const resolvedPanelClass = panelClassName ?? panelCardClass
+  const resolvedHeaderClass = headerClassName ?? panelHeaderAccentBorderClass
+  const resolvedHandleClass = handleClassName ?? panelResizeHandleClass
+
+  const panelSurface = (
+    <>
+      <SidePanelHeader
+        title={title}
+        headerActions={headerActions}
+        collapseLabel={resolvedCollapseLabel}
+        onCollapse={() => onOpenChange(false)}
+        className={resolvedHeaderClass}
+      />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {panel}
+      </div>
+    </>
+  )
+
   if (open && !sideDockAllowed) {
     return (
       <aside
         className={cn(
-          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-muted/10",
-          panelClassName,
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+          pageInsetGutterClass,
           className
         )}
       >
-        <SidePanelHeader
-          title={title}
-          headerActions={headerActions}
-          collapseLabel={resolvedCollapseLabel}
-          onCollapse={() => onOpenChange(false)}
-        />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {panel}
-        </div>
+        <div className={cn(resolvedPanelClass, "flex-1")}>{panelSurface}</div>
       </aside>
     )
   }
@@ -139,6 +172,7 @@ export function WorkspaceSidePanelLayout({
         <div
           className={cn(
             "flex h-full min-h-0 min-w-0 flex-col overflow-hidden",
+            open && "[&>*]:pr-0!",
             mainClassName
           )}
         >
@@ -148,7 +182,7 @@ export function WorkspaceSidePanelLayout({
 
       {open ? (
         <>
-          <ResizableHandle withHandle />
+          <ResizableHandle withHandle className={resolvedHandleClass} />
           <ResizablePanel
             defaultSize={String(defaultSizePercent)}
             minSize={String(panelMinSize)}
@@ -164,18 +198,12 @@ export function WorkspaceSidePanelLayout({
           >
             <aside
               className={cn(
-                "flex h-full min-h-0 flex-col overflow-hidden bg-muted/10",
-                panelClassName
+                "flex h-full min-h-0 flex-col overflow-hidden",
+                resolvedShellClass
               )}
             >
-              <SidePanelHeader
-                title={title}
-                headerActions={headerActions}
-                collapseLabel={resolvedCollapseLabel}
-                onCollapse={() => onOpenChange(false)}
-              />
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                {panel}
+              <div className={cn(resolvedPanelClass, "flex-1")}>
+                {panelSurface}
               </div>
             </aside>
           </ResizablePanel>

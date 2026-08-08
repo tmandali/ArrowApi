@@ -13,6 +13,10 @@ export type {
 } from "./types"
 
 export { parseCriteriaSchema } from "./lib/parse-criteria-schema"
+export {
+  assertSafeApiJobEndpoint,
+  readJobEndpoint,
+} from "./lib/job-endpoint"
 export { createInitialCriteriaRows } from "./lib/create-initial-criteria-rows"
 export {
   joinMultiValue,

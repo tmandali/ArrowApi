@@ -15,16 +15,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import {
   AiChatMessage,
   firstTextPart,
 } from "@/components/layout/ai-chat-message"
-import {
-  YULA,
-  YULA_WELCOME_MESSAGE,
-  YulaMarkIcon,
-} from "@/components/layout/yula-brand"
+import { YULA, YulaMarkIcon } from "@/components/layout/yula-brand"
 import {
   matchYulaCommands,
   type YulaCommand,
@@ -49,6 +46,8 @@ import {
 type AIChatAssistantProps = {
   variant?: "toolbar" | "floating"
   className?: string
+  /** Vertical rule to the left of the toolbar control. */
+  separator?: boolean
 }
 
 const isYulaMockMode = !env.aiChatApiUrl
@@ -63,6 +62,7 @@ type AttachedFile = {
 export function AIChatAssistant({
   variant = "toolbar",
   className,
+  separator = true,
 }: AIChatAssistantProps = {}) {
   const { open, setOpen } = useWorkspaceAiChat()
 
@@ -85,34 +85,35 @@ export function AIChatAssistant({
   }
 
   return (
-    <WorkspaceSidePanelTrigger
-      open={open}
-      onOpenChange={setOpen}
-      iconOnly
-      icon={YulaMarkIcon}
-      aria-label={YULA.ariaLabel}
-      className={cn(
-        "group/ai relative overflow-hidden transition-all duration-300 hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/25 active:scale-95 [&_svg]:!size-5 hover:[&_svg]:text-primary-foreground",
-        open &&
-          "border-primary bg-primary text-primary-foreground [&_svg]:text-primary-foreground",
-        className
-      )}
-    >
-      <YulaMarkIcon className="relative size-5 transition-transform duration-300 group-hover/ai:scale-105 group-hover/ai:text-primary-foreground" />
-    </WorkspaceSidePanelTrigger>
+    <div className={cn("flex items-center gap-1.5", className)}>
+      {separator ? (
+        <Separator
+          orientation="vertical"
+          className="mx-0.5 data-vertical:h-4 data-vertical:self-auto"
+        />
+      ) : null}
+      <WorkspaceSidePanelTrigger
+        open={open}
+        onOpenChange={setOpen}
+        iconOnly
+        icon={YulaMarkIcon}
+        aria-label={YULA.ariaLabel}
+        className={cn(
+          "group/ai border-transparent bg-background text-primary shadow-none transition-all duration-200 hover:border-transparent hover:bg-background active:scale-95 [&_svg]:!size-5",
+          open && "border-transparent bg-background hover:border-transparent"
+        )}
+      >
+        <YulaMarkIcon className="relative size-5 transition-transform duration-200 group-hover/ai:scale-105" />
+      </WorkspaceSidePanelTrigger>
+    </div>
   )
 }
 
 export function AIChatPanelTitle() {
   return (
     <>
-      <YulaMarkIcon className="size-5 shrink-0 text-primary" />
+      <YulaMarkIcon className="size-5 shrink-0" />
       {YULA.name}
-      {isYulaMockMode ? (
-        <span className="ml-1 rounded-md border px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-          mock
-        </span>
-      ) : null}
     </>
   )
 }
@@ -128,7 +129,7 @@ export function AIChatPanel() {
   )
 
   const { messages, status, sendMessage } = useChat({
-    messages: isYulaMockMode ? yulaMockInitialMessages : [YULA_WELCOME_MESSAGE],
+    messages: isYulaMockMode ? yulaMockInitialMessages : [],
     transport,
   })
 
@@ -221,11 +222,7 @@ export function AIChatPanel() {
           onScroll={onScroll}
           className="h-full overflow-y-auto overscroll-contain"
         >
-          <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-3 sm:px-6">
-            <p className="text-center text-[12px] text-muted-foreground">
-              {YULA.helpPrompt}
-            </p>
-
+          <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
             {messages.map((message) => (
               <AiChatMessage key={message.id} message={message} />
             ))}
@@ -243,7 +240,7 @@ export function AIChatPanel() {
             type="button"
             size="icon"
             variant="outline"
-            className="absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full bg-background shadow-md"
+            className="absolute bottom-2 left-1/2 size-7 -translate-x-1/2 rounded-full bg-background shadow-md"
             onClick={() => scrollToBottom()}
             aria-label="Alta kaydır"
           >
@@ -253,17 +250,17 @@ export function AIChatPanel() {
       </div>
 
       {isYulaMockMode && nextMockText ? (
-        <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-1 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-1">
           <button
             type="button"
             disabled={isLoading}
-            className="w-full rounded-xl border border-dashed bg-muted/20 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+            className="w-full rounded-lg border border-dashed border-primary/20 bg-gradient-to-br from-primary/[0.06] to-orange-500/[0.07] px-2.5 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 dark:border-primary/25 dark:from-primary/10 dark:to-orange-500/10"
             onClick={() => {
               if (!nextMockMessage || isLoading) return
               void sendMessage(nextMockMessage)
             }}
           >
-            <span className="mb-0.5 block text-[10px] font-medium text-foreground/70">
+            <span className="mb-0.5 block text-[10px] font-medium text-primary">
               Demo sorusu
             </span>
             {nextMockText}
@@ -271,9 +268,9 @@ export function AIChatPanel() {
         </div>
       ) : null}
 
-      <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-2 px-4 py-3 pt-2 sm:px-6">
+      <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
         {showCommands ? (
-          <div className="absolute inset-x-3 bottom-full z-20 mb-1 overflow-hidden rounded-xl border bg-popover shadow-lg">
+          <div className="absolute inset-x-2 bottom-full z-20 mb-1 overflow-hidden rounded-lg border bg-popover shadow-lg">
             <Command shouldFilter={false} className="max-h-56">
               <CommandList>
                 <CommandEmpty className="py-3 text-[11px]">
@@ -341,7 +338,7 @@ export function AIChatPanel() {
             if (showCommands) return
             sendDemoOrText()
           }}
-          className="rounded-2xl border bg-muted/25 p-2 shadow-sm focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
+          className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20 dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10"
         >
           <textarea
             ref={textareaRef}
@@ -362,10 +359,10 @@ export function AIChatPanel() {
               }
             }}
             placeholder={YULA.placeholder}
-            className="min-h-12 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
+            className="min-h-10 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
           />
 
-          <div className="flex items-center justify-between gap-2 px-0.5 pt-1">
+          <div className="flex items-center justify-between gap-2 px-0.5 pt-0.5">
             <div className="flex items-center gap-0.5">
               <input
                 ref={fileInputRef}
@@ -383,10 +380,10 @@ export function AIChatPanel() {
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="size-8 rounded-full text-muted-foreground"
+                    className="size-7 rounded-full text-muted-foreground"
                     aria-label="Ekle"
                   >
-                    <Plus className="size-4" />
+                    <Plus className="size-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-44">
@@ -409,19 +406,13 @@ export function AIChatPanel() {
               type="submit"
               size="icon"
               disabled={!canSubmit}
-              className="size-8 rounded-full"
+              className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90"
               aria-label="Gönder"
             >
               <ArrowUp className="size-3.5" />
             </Button>
           </div>
         </form>
-
-        {isYulaMockMode ? (
-          <p className="px-1 text-[10px] text-muted-foreground/80">
-            {YULA.mockHint}
-          </p>
-        ) : null}
       </div>
     </div>
   )

@@ -1,13 +1,10 @@
-import * as React from "react"
-import { StockAnalyticsForm } from "@/features/stock/item"
+import { useParams } from "react-router-dom"
+import { StockAnalyticsForm, StockAnalyticsJobView } from "@/features/stock/item"
 
 export default function StockAnalyticsPage() {
-  const [filtersOpen, setFiltersOpen] = React.useState(true)
-
-  return (
-    <StockAnalyticsForm
-      filtersOpen={filtersOpen}
-      onFiltersOpenChange={setFiltersOpen}
-    />
-  )
+  const { jobId } = useParams<{ jobId?: string }>()
+  if (jobId) {
+    return <StockAnalyticsJobView jobId={jobId} />
+  }
+  return <StockAnalyticsForm />
 }

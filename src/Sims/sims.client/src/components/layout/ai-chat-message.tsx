@@ -35,7 +35,7 @@ function TextPart({
 
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[88%] rounded-2xl bg-muted px-3.5 py-2.5 text-[12px] leading-relaxed text-foreground">
+      <div className="ml-auto max-w-[88%] rounded-xl bg-muted px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
         {text}
       </div>
     )
@@ -55,7 +55,7 @@ export function AiChatMessage({ message, className }: AiChatMessageProps) {
   return (
     <div
       className={cn(
-        "flex w-full flex-col gap-2",
+        "flex w-full flex-col gap-1.5",
         isUser ? "items-end" : "items-start",
         className
       )}

@@ -10,7 +10,7 @@ import { CriteriaGridCellCombobox } from "./CriteriaGridCellCombobox"
 import { CriteriaSimpleCombobox } from "./CriteriaSimpleCombobox"
 
 const cellInputClass =
-  "h-9 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
+  "h-7 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
 
 type CriteriaValueCellProps = {
   field?: CriteriaFieldDef

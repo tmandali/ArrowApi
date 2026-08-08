@@ -9,13 +9,13 @@ import {
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import {
   Select,
@@ -75,48 +75,45 @@ export default function LandedCostVoucherPage() {
 
   return (
     <>
-      {/* Sticky Header Navigation */}
-      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-            />
-            <Breadcrumb>
-              <BreadcrumbList className="text-xs">
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Stock</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Landed Cost Voucher</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-foreground flex items-center gap-2">
-                    New Landed Cost Voucher
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-[10px]">
-                      Not Saved
-                    </Badge>
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button size="sm" className="h-7 text-xs px-4">
+      <WorkspacePageHeader
+        showSearch={false}
+        actions={
+          <>
+            <Button size="sm" className="h-7 px-4 text-xs">
               Save
             </Button>
-
             <AIChatAssistant variant="toolbar" />
-          </div>
-        </header>
+          </>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">Stock</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">Landed Cost Voucher</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="flex items-center gap-2 font-semibold text-foreground">
+                New Landed Cost Voucher
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-500/10 text-[10px] text-amber-600 hover:bg-amber-500/10 dark:text-amber-400"
+                >
+                  Not Saved
+                </Badge>
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </WorkspacePageHeader>
 
         <WorkspaceAiDock>
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+        <div className="flex-1 space-y-6 overflow-y-auto px-2 pb-2 pt-0">
           {/* Top Form Fields Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
             <Field>

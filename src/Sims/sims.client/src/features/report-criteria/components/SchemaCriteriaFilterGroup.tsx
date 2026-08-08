@@ -6,6 +6,7 @@ import type {
   CriteriaValidationResult,
   JsonSchemaObject,
 } from "../types"
+import { readJobEndpoint } from "../lib/job-endpoint"
 import {
   SchemaCriteriaFilter,
   type SchemaCriteriaFilterHandle,
@@ -80,11 +81,15 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
           {},
           ...results.map((result) => result?.instance ?? {})
         )
+        const activeSchema = tabs.find((tab) => tab.id === activeTab)?.schema
         const merged: CriteriaValidationResult = {
           valid: results.every((result) => result?.valid),
           instance: mergedInstance,
           errors: mergedErrors,
           ajvErrors: results.flatMap((result) => result?.ajvErrors ?? []),
+          jobEndpoint:
+            readJobEndpoint(activeSchema) ??
+            results.find((result) => result?.jobEndpoint)?.jobEndpoint,
         }
 
         onValidate?.(merged)
@@ -137,7 +142,7 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
             }}
             schema={tab.schema}
             showHeader={false}
-            className="h-auto"
+            className="h-auto p-3 sm:p-4"
           />
         </TabsContent>
       ))}

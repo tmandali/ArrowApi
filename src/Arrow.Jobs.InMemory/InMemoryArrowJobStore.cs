@@ -216,6 +216,14 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         return Task.FromResult(job.ResultPath);
     }
 
+    public Task<object?> GetRequestAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.FromResult<object?>(null);
+
+        return Task.FromResult<object?>(job.Request);
+    }
+
     private ArrowJob<TRequest> GetRequired(Guid id) =>
         _jobs.TryGetValue(id, out ArrowJob<TRequest>? job)
             ? job

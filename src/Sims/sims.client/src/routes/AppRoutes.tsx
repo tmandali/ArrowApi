@@ -15,6 +15,7 @@ const ItemPage = lazy(() => import("@/pages/ItemPage"))
 const StockAnalyticsPage = lazy(() => import("@/pages/StockAnalyticsPage"))
 const StockLedgerPage = lazy(() => import("@/pages/StockLedgerPage"))
 const StockBalancePage = lazy(() => import("@/pages/StockBalancePage"))
+const ReportModulePage = lazy(() => import("@/pages/ReportModulePage"))
 const ManufacturingPage = lazy(() => import("@/pages/ManufacturingPage"))
 const LandedCostVoucherPage = lazy(() => import("@/pages/LandedCostVoucherPage"))
 const UserSettingsPage = lazy(() => import("@/pages/UserSettingsPage"))
@@ -78,6 +79,15 @@ export function AppRoutes() {
           />
           <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
           <Route path="stock/stock-balance" element={<StockBalancePage />} />
+          <Route
+            path="stock/stock-balance/:jobId"
+            element={<StockBalancePage />}
+          />
+          {/* Nav empty-module reports: /stock/delivery-note-trends, etc. */}
+          <Route path="stock/:slug" element={<ReportModulePage />} />
+          <Route path="accounting/:slug" element={<ReportModulePage />} />
+          <Route path="manufacturing/:slug" element={<ReportModulePage />} />
+          <Route path="selling/:slug" element={<ReportModulePage />} />
         </Route>
 
         <Route element={<AppLayout />}>

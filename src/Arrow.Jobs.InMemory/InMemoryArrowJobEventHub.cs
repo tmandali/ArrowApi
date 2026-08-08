@@ -6,7 +6,10 @@ namespace Arrow.Jobs.InMemory;
 
 public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
 {
+    private const int MaxHistoryPerJob = 200;
+
     private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, ChannelWriter<ArrowJobHubMessage>>> _subs = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentQueue<ArrowJobHubMessage>> _history = new();
 
     public ValueTask PublishAsync(
         Guid jobId,
@@ -14,14 +17,29 @@ public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
         ArrowJobEvent payload,
         CancellationToken cancellationToken = default)
     {
+        ArrowJobEvent stamped = payload.OccurredAt is null
+            ? payload with { OccurredAt = DateTimeOffset.UtcNow }
+            : payload;
+        ArrowJobHubMessage message = new(eventName, stamped);
+        AppendHistory(jobId, message);
+
         if (!_subs.TryGetValue(jobId, out ConcurrentDictionary<Guid, ChannelWriter<ArrowJobHubMessage>>? writers))
             return default;
 
-        ArrowJobHubMessage message = new(eventName, payload);
         foreach (ChannelWriter<ArrowJobHubMessage> writer in writers.Values)
             writer.TryWrite(message);
 
         return default;
+    }
+
+    public ValueTask<IReadOnlyList<ArrowJobHubMessage>> GetHistoryAsync(
+        Guid jobId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_history.TryGetValue(jobId, out ConcurrentQueue<ArrowJobHubMessage>? queue))
+            return ValueTask.FromResult<IReadOnlyList<ArrowJobHubMessage>>(Array.Empty<ArrowJobHubMessage>());
+
+        return ValueTask.FromResult<IReadOnlyList<ArrowJobHubMessage>>(queue.ToArray());
     }
 
     public IArrowJobEventSubscription Subscribe(Guid jobId)
@@ -50,6 +68,18 @@ public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
 
             channel.Writer.TryComplete();
         });
+    }
+
+    private void AppendHistory(Guid jobId, ArrowJobHubMessage message)
+    {
+        ConcurrentQueue<ArrowJobHubMessage> queue =
+            _history.GetOrAdd(jobId, static _ => new ConcurrentQueue<ArrowJobHubMessage>());
+        queue.Enqueue(message);
+
+        while (queue.Count > MaxHistoryPerJob && queue.TryDequeue(out _))
+        {
+            // trim oldest
+        }
     }
 
     private sealed class Subscription : IArrowJobEventSubscription

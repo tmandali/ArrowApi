@@ -43,3 +43,18 @@ Accept: {{ArrowMediaType}}
 }
 
 ###
+
+### 5. Create Stock Balance job (schema criteria JSON)
+# @name createStockBalance
+POST {{Sims.Server_HostAddress}}/api/arrow/jobs/stock-balance
+Content-Type: application/json
+
+{
+  "from_kayitTarihi": "20260101",
+  "to_kayitTarihi": "20260102",
+  "durum": ["AKTIF"],
+  "tutarParaBirimi": "TRY",
+  "urun": ["1"]
+}
+
+###

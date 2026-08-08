@@ -10,6 +10,7 @@ public static class ArrowJobEndpoints
     private static readonly string[] JobActionSuffixes =
     [
         "/events",
+        "/event-log",
         "/request",
         "/cancel",
         "/retry"
@@ -169,14 +170,20 @@ public static class ArrowJobEndpoints
 
             targetBuilder.MapGet(
                     "{id:guid}/request",
-                    (Guid id, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
-                        GetJobRequestAsync(id, store, cancellationToken))
+                    (Guid id, IArrowJobStore<TRequest> store, HttpContext httpContext, CancellationToken cancellationToken) =>
+                        GetJobRequestAsync(id, store, httpContext, cancellationToken))
                 .Produces<TRequest>();
 
             targetBuilder.MapGet(
                 "{id:guid}/events",
                 (Guid id, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
                     StreamJobEvents(id, store, eventHub, response, cancellationToken));
+
+            targetBuilder.MapGet(
+                    "{id:guid}/event-log",
+                    (Guid id, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
+                        GetJobEventLogAsync(id, eventHub, cancellationToken))
+                .Produces<IReadOnlyList<ArrowJobHubMessage>>();
 
             targetBuilder.MapPost(
                     "{id:guid}/cancel",
@@ -278,11 +285,22 @@ public static class ArrowJobEndpoints
     private static async Task<IResult> GetJobRequestAsync<TRequest>(
         Guid id,
         IArrowJobStore<TRequest> store,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
         ArrowJob<TRequest>? job = await store.GetAsync(id, cancellationToken);
-        return job is null ? Results.NotFound() : Results.Ok(job.Request);
+        if (job is not null)
+            return Results.Ok(job.Request);
+
+        foreach (IArrowJobStore candidate in httpContext.RequestServices.GetServices<IArrowJobStore>())
+        {
+            object? request = await candidate.GetRequestAsync(id, cancellationToken);
+            if (request is not null)
+                return Results.Ok(request);
+        }
+
+        return Results.NotFound();
     }
 
     private static async Task<IResult> CancelJobAsync<TRequest>(
@@ -461,6 +479,16 @@ public static class ArrowJobEndpoints
             response,
             jobsPath,
             cancellationToken);
+    }
+
+    private static async Task<IResult> GetJobEventLogAsync(
+        Guid id,
+        IArrowJobEventHub eventHub,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ArrowJobHubMessage> history =
+            await eventHub.GetHistoryAsync(id, cancellationToken);
+        return Results.Ok(history);
     }
 
     private static async Task<IResult> GetJobArrowResultByStatus(

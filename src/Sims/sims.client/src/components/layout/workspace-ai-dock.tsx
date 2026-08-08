@@ -5,6 +5,11 @@ import {
 } from "@/components/layout/ai-chat-assistant"
 import { YULA } from "@/components/layout/yula-brand"
 import { Button } from "@/components/ui/button"
+import {
+  pageInsetGutterClass,
+  panelCardClass,
+  panelHeaderClass,
+} from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat"
 import { cn } from "@/utils/cn"
@@ -66,29 +71,32 @@ export function WorkspaceAiDock({ children, className }: WorkspaceAiDockProps) {
     return (
       <aside
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background",
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent",
+          pageInsetGutterClass,
           className
         )}
         aria-label={YULA.name}
       >
-        <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-sm font-semibold">
-            <AIChatPanelTitle />
+        <div className={cn(panelCardClass, "flex-1")}>
+          <div className={cn(panelHeaderClass, "gap-1")}>
+            <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight text-primary dark:text-sidebar-primary">
+              <AIChatPanelTitle />
+            </div>
+            <YulaExpandToggle />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              onClick={() => setOpen(false)}
+              aria-label={YULA.collapseLabel}
+            >
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </Button>
           </div>
-          <YulaExpandToggle />
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            onClick={() => setOpen(false)}
-            aria-label={YULA.collapseLabel}
-          >
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </Button>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <AIChatPanel />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AIChatPanel />
+          </div>
         </div>
       </aside>
     )
@@ -107,7 +115,6 @@ export function WorkspaceAiDock({ children, className }: WorkspaceAiDockProps) {
       maxSizePercent={50}
       mainMinSizePercent={40}
       mainClassName="overflow-y-auto overscroll-contain"
-      panelClassName="border-l bg-background"
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
       {children}

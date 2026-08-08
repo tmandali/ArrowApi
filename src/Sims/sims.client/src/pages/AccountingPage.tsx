@@ -357,7 +357,7 @@ export default function AccountingPage() {
 
         <WorkspaceAiDock>
         {/* Top Controls & Filter Panel */}
-        <div className="p-4 space-y-4 border-b bg-muted/10">
+        <div className="space-y-2 border-b bg-muted/10 px-2 pb-2 pt-0">
           {/* Row 1: Filter Selectors */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="space-y-1">
@@ -529,7 +529,7 @@ export default function AccountingPage() {
         </div>
 
         {/* Scrollable Report Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2 pt-0">
           <div className="rounded-md border bg-card overflow-hidden">
             <Table>
               <TableHeader className="bg-muted/40 text-xs">

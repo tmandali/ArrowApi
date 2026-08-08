@@ -1,8 +1,6 @@
 import { createChat } from "@shadcn/helpers/ai-sdk"
 import type { UIMessage } from "ai"
 
-import { YULA } from "@/components/layout/yula-brand"
-
 /**
  * Predefined Yula conversation for local UI work without an AI backend.
  * Streams through the real useChat lifecycle via @shadcn/helpers/ai-sdk.
@@ -10,7 +8,6 @@ import { YULA } from "@/components/layout/yula-brand"
 export const yulaMockChat = createChat({
   messageIdPrefix: "yula-mock",
 })
-  .assistant(YULA.openingMessage, { id: YULA.welcomeMessageId })
   .user("Stok analizi raporu nasıl alınır?")
   .sleep(400)
   .assistant(({ writer }) => {
@@ -42,8 +39,8 @@ export const yulaMockChat = createChat({
     )
   })
 
-/** Welcome bubble only — scripted user turns are sent via chat.next(). */
-export const yulaMockInitialMessages = yulaMockChat.get(1)
+/** Empty start — scripted turns are sent via chat.next(). */
+export const yulaMockInitialMessages: UIMessage[] = []
 
 function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {

@@ -121,7 +121,9 @@ public sealed record ArrowJobEvent(
     string? Message = null,
     string? TraceId = null,
     string? Name = null,
-    Guid? RootJobId = null);
+    Guid? RootJobId = null,
+    /// <summary>Olayın oluştuğu UTC zaman (progress süreleri için).</summary>
+    DateTimeOffset? OccurredAt = null);
 
 /// <summary>Job SSE olay isimleri sabitleri.</summary>
 public static class ArrowJobEventNames

@@ -38,7 +38,9 @@ export type ArrowJobEvent = {
   totalRows?: number
   jobUrl?: string
   eventsUrl?: string
+  createdAt?: string | null
   completedAt?: string | null
+  occurredAt?: string | null
   name?: string
 }
 

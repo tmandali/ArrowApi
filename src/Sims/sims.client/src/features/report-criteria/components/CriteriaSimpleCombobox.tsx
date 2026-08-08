@@ -38,12 +38,12 @@ type CriteriaSimpleComboboxProps = {
 }
 
 const cellFrameClass =
-  "h-9 min-h-9 w-full rounded-none border border-transparent bg-transparent p-0 shadow-none ring-0 " +
+  "h-7 min-h-7 w-full rounded-none border border-transparent bg-transparent p-0 shadow-none ring-0 " +
   "focus-within:border-border focus-within:bg-background focus-within:ring-0 " +
   "has-[[data-slot=input-group-control]:focus-visible]:border-border " +
   "has-[[data-slot=input-group-control]:focus-visible]:ring-0 " +
   // Keep padding on the input only (same as grid textbox px-2 py-0); never on the InputGroup frame.
-  "[&_[data-slot=input-group-control]]:h-9 [&_[data-slot=input-group-control]]:px-2 [&_[data-slot=input-group-control]]:py-0 [&_[data-slot=input-group-control]]:text-xs/relaxed " +
+  "[&_[data-slot=input-group-control]]:h-7 [&_[data-slot=input-group-control]]:px-2 [&_[data-slot=input-group-control]]:py-0 [&_[data-slot=input-group-control]]:text-xs/relaxed " +
   "[&_[data-slot=input-group-addon]]:py-0 [&_[data-slot=input-group-addon]]:pr-1 " +
   "dark:bg-transparent"
 

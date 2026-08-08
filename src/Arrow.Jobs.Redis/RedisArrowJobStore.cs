@@ -317,6 +317,12 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         return job?.ResultPath;
     }
 
+    public async Task<object?> GetRequestAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        ArrowJob<TRequest>? job = await GetAsync(id, cancellationToken);
+        return job is null ? null : job.Request;
+    }
+
     private async Task<ArrowJob<TRequest>> GetRequiredAsync(Guid id)
     {
         ArrowJob<TRequest>? job = await GetAsync(id);

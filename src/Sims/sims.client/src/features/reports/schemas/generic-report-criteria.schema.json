@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report Criteria",
+  "description": "Define filter criteria for this report.",
+  "type": "object",
+  "properties": {
+    "kayitTarihi": {
+      "type": "string",
+      "format": "date",
+      "title": "Date",
+      "description": "Pick a start and end date; a single day is also allowed.",
+      "pattern": "^\\d{8}(\\.\\.\\d{8})?$",
+      "x-range-split": ".."
+    },
+    "durum": {
+      "type": "array",
+      "title": "Status",
+      "x-selection": "multiple",
+      "items": {
+        "type": "string",
+        "enum": ["AKTIF", "PASIF", "BEKLEMEDE", "IPTAL"]
+      }
+    }
+  },
+  "additionalProperties": false
+}

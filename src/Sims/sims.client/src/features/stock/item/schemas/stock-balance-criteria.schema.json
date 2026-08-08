@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Rapor Kriterleri",
   "description": "Stock Balance raporu için filtre kriterlerini tanımlayın.",
+  "x-job-endpoint": "/api/arrow/jobs/stock-balance",
   "type": "object",
   "properties": {
     "kayitTarihi": {

@@ -9,6 +9,7 @@ import type {
   JsonSchemaProperty,
 } from "../types"
 import { isValidCompactDate, rangeBoundKeys } from "./compact-date"
+import { readJobEndpoint } from "./job-endpoint"
 import { parseCriteriaSchema } from "./parse-criteria-schema"
 import { rowsToCriteriaInstance } from "./rows-to-criteria-instance"
 import { stripExtensionKeywords } from "./strip-extension-keywords"
@@ -242,5 +243,6 @@ export function validateCriteria(
     instance,
     errors,
     ajvErrors: validate.errors,
+    jobEndpoint: readJobEndpoint(schema),
   }
 }

@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import {
   Collapsible,
@@ -84,39 +84,15 @@ export default function SellingPage() {
 
   return (
     <>
-      {/* Header Navigation & Actions */}
-      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-            />
-            <Breadcrumb>
-              <BreadcrumbList className="text-xs">
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Selling</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Sales Order</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-foreground">
-                    SAL-ORD-2025-0038
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            {/* shadcn Badge */}
-            <Badge variant="destructive" className="ml-2 font-medium">
-              Overdue
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Status Select - shadcn Select */}
+      <WorkspacePageHeader
+        showSearch={false}
+        startExtra={
+          <Badge variant="destructive" className="ml-2 font-medium">
+            Overdue
+          </Badge>
+        }
+        actions={
+          <>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>Status</span>
               <Select defaultValue="overdue">
@@ -125,7 +101,10 @@ export default function SellingPage() {
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="overdue" className="text-red-600 font-semibold">
+                  <SelectItem
+                    value="overdue"
+                    className="text-red-600 font-semibold"
+                  >
                     Overdue
                   </SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
@@ -134,7 +113,6 @@ export default function SellingPage() {
               </Select>
             </div>
 
-            {/* Create Button - shadcn ButtonGroup & DropdownMenu */}
             <ButtonGroup>
               <Button size="sm" className="h-7 text-xs px-3">
                 Create
@@ -154,7 +132,6 @@ export default function SellingPage() {
               </DropdownMenu>
             </ButtonGroup>
 
-            {/* Print & Actions */}
             <Button variant="outline" size="icon" className="size-7">
               <Printer className="size-3.5" />
             </Button>
@@ -177,8 +154,27 @@ export default function SellingPage() {
             </Button>
 
             <AIChatAssistant variant="toolbar" />
-          </div>
-        </header>
+          </>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">Selling</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">Sales Order</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold text-foreground">
+                SAL-ORD-2025-0038
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </WorkspacePageHeader>
 
         <WorkspaceAiDock>
         {/* Standard shadcn Tabs Container */}

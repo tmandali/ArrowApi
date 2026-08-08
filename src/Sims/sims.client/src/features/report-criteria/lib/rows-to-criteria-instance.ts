@@ -17,23 +17,6 @@ function resolveLookupItem(
   return value
 }
 
-function coerceDateRangeValue(raw: string): { from: string; to: string } {
-  const trimmed = raw.trim()
-  if (trimmed.includes("..")) {
-    const [from = "", to = ""] = trimmed.split("..").map((part) => part.trim())
-    return { from, to: to || from }
-  }
-  return { from: trimmed, to: trimmed }
-}
-
-function isRangeDateField(field: CriteriaFieldDef): boolean {
-  return (
-    field.format === "date" &&
-    (field.dateMode === "range" ||
-      (field.patterns?.some((pattern) => pattern.includes("\\.\\.")) ?? false))
-  )
-}
-
 function coerceFieldValue(
   field: CriteriaFieldDef,
   raw: string
@@ -49,8 +32,6 @@ function coerceFieldValue(
     case "enum":
       return raw
     case "string":
-      // Range dates → { from, to } so report APIs don't confuse them with multi-select arrays.
-      if (isRangeDateField(field)) return coerceDateRangeValue(raw)
       return raw
     default: {
       const _exhaustive: never = field.kind

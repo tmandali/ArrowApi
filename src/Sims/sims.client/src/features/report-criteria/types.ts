@@ -9,6 +9,11 @@ export type JsonSchemaObject = {
   properties?: Record<string, JsonSchemaProperty>
   required?: string[]
   default?: unknown
+  /**
+   * Relative Arrow/API job path for validated criteria submit
+   * (e.g. `/api/arrow/jobs/stock-balance`).
+   */
+  "x-job-endpoint"?: string
   [key: string]: unknown
 }
 
@@ -94,6 +99,8 @@ export type CriteriaValidationResult = {
   instance: Record<string, unknown>
   errors: CriteriaFieldError[]
   ajvErrors: unknown[] | null | undefined
+  /** From schema root `x-job-endpoint`, when present. */
+  jobEndpoint?: string
 }
 
 export type ParsedCriteriaSchema = {
@@ -101,6 +108,8 @@ export type ParsedCriteriaSchema = {
   description?: string
   fields: CriteriaFieldDef[]
   rawSchema: JsonSchemaObject
+  /** From schema root `x-job-endpoint`, when present. */
+  jobEndpoint?: string
 }
 
 export type CriteriaComboboxOption = {

@@ -141,6 +141,33 @@ export function selectPendingStockAnalyticsJob(
   )
 }
 
+/** En son başlatılan pending Stock Balance job (href / name ile). */
+export function selectPendingStockBalanceJob(
+  jobs: Record<string, TrackedJob>
+): TrackedJob | null {
+  return selectPendingJobByName(jobs, "stock-balance", "/stock")
+}
+
+/** En son başlatılan pending job — name veya href prefix ile. */
+export function selectPendingJobByName(
+  jobs: Record<string, TrackedJob>,
+  jobName: string,
+  workspace: WorkspaceKey = "/stock"
+): TrackedJob | null {
+  const hrefPrefix = `${workspace}/${jobName}`
+  const pending = selectPendingJobs(jobs, workspace).filter(
+    (job) =>
+      job.href?.startsWith(hrefPrefix) ||
+      job.name === jobName ||
+      job.name.startsWith(`${jobName}-`) ||
+      job.name.startsWith(`${jobName}/`)
+  )
+  if (pending.length === 0) return null
+  return pending.reduce((latest, job) =>
+    createdAtMs(job.createdAt) > createdAtMs(latest.createdAt) ? job : latest
+  )
+}
+
 function createdAtMs(createdAt: string): number {
   const parsed = Date.parse(createdAt)
   return Number.isFinite(parsed) ? parsed : 0

@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -81,32 +81,12 @@ export default function UserSettingsPage() {
 
   return (
     <>
-      {/* Header Navigation & Actions */}
-      <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 text-xs">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-            />
-            <Breadcrumb>
-              <BreadcrumbList className="text-xs">
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Users</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-foreground">
-                    John Doe
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-
-          <div className="flex items-center gap-2">
+      <WorkspacePageHeader
+        showSearch={false}
+        actions={
+          <>
             <Select defaultValue="password">
-              <SelectTrigger className="h-7 text-xs font-normal gap-1 px-2.5">
+              <SelectTrigger className="h-7 gap-1 px-2.5 text-xs font-normal">
                 <SelectValue placeholder="Password" />
               </SelectTrigger>
               <SelectContent align="end">
@@ -116,7 +96,7 @@ export default function UserSettingsPage() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center border rounded-md divide-x">
+            <div className="flex items-center divide-x rounded-md border">
               <Button variant="ghost" size="icon" className="size-7 rounded-none">
                 <ChevronLeft className="size-3.5" />
               </Button>
@@ -137,13 +117,28 @@ export default function UserSettingsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" className="h-7 text-xs px-3">
+            <Button size="sm" className="h-7 px-3 text-xs">
               Save
             </Button>
 
             <AIChatAssistant variant="toolbar" />
-          </div>
-        </header>
+          </>
+        }
+      >
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#">Users</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-semibold text-foreground">
+                John Doe
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </WorkspacePageHeader>
 
         <WorkspaceAiDock>
         {/* Tabs Component (variant="line") matching selling template */}

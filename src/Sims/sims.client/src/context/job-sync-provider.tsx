@@ -122,7 +122,7 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
       removeJob(job.id)
       trackingRef.current.delete(job.id)
       controllersRef.current.delete(job.id)
-      listenersRef.current.delete(job.id)
+      // Keep listeners until subscribers unsubscribe — wiping here drops late UI handlers.
     },
     [updateJob, pushTerminalNotification, emitTerminal, removeJob]
   )
@@ -191,6 +191,14 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
               eventsUrl,
               controller.signal,
               (eventName, payload) => {
+                if (
+                  payload.id != null &&
+                  String(payload.id).localeCompare(job.id, undefined, {
+                    sensitivity: "accent",
+                  }) !== 0
+                ) {
+                  return
+                }
                 if (payload.status) {
                   updateJob(job.id, { status: payload.status })
                 }
@@ -198,7 +206,8 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
               }
             )
 
-            if (generationRef.current !== generation) return
+            // Always finish + notify listeners once SSE reaches a terminal
+            // event — even if a resync bumped generation mid-stream.
             const current =
               useActiveJobsStore.getState().jobs[job.id] ?? latest
             finishJob(current, terminal)
@@ -323,6 +332,19 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
         options?.signal?.addEventListener("abort", onAbort, { once: true })
 
         const existing = useActiveJobsStore.getState().jobs[jobId]
+        if (existing && isTerminalJobStatus(existing.status)) {
+          settled = true
+          cleanup()
+          resolve({
+            id: existing.id,
+            status: existing.status,
+            jobUrl: existing.jobUrl,
+            eventsUrl: existing.eventsUrl,
+            name: existing.name,
+          })
+          return
+        }
+
         if (!existing) {
           void fetchJobStatus(jobId, options?.signal)
             .then((status) => {

@@ -6,6 +6,7 @@ import type {
   JsonSchemaProperty,
   ParsedCriteriaSchema,
 } from "../types"
+import { readJobEndpoint } from "./job-endpoint"
 
 function asTypeList(type: string | string[] | undefined): string[] {
   if (!type) return []
@@ -194,5 +195,6 @@ export function parseCriteriaSchema(
     description: schema.description?.trim() || undefined,
     fields,
     rawSchema: schema,
+    jobEndpoint: readJobEndpoint(schema),
   }
 }

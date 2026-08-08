@@ -15,7 +15,7 @@ export function unslugifyModule(slug: string) {
     .join(" ")
 }
 
-/** Workspace module URL: /{workspace}/{slug} (unimplemented → 404) */
+/** Workspace module URL: /{workspace}/{slug} (report Criteria/Executions shell) */
 export function emptyModulePath(workspace: string, title: string) {
   return `/${slugifyModule(workspace)}/${slugifyModule(title)}`
 }

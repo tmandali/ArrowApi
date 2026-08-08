@@ -19,7 +19,7 @@ export function AppLayout({ fullHeight: _fullHeight = false }: AppLayoutProps) {
       <WorkspaceSearchProvider>
         <AppSidebar />
         <WorkspaceAiChatProvider>
-          <SidebarInset className="min-h-0 overflow-hidden bg-background">
+          <SidebarInset className="min-h-0 overflow-hidden bg-background bg-gradient-to-b from-primary/[0.05] via-background to-orange-500/[0.06] dark:from-primary/15 dark:via-background dark:to-orange-500/10">
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <Outlet />
             </div>

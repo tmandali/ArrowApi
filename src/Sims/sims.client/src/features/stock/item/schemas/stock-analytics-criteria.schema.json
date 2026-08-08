@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stock Analytics Criteria",
+  "description": "Define filter criteria for the Stock Analytics report.",
+  "x-job-endpoint": "/api/arrow/jobs/stock-analytics",
+  "type": "object",
+  "properties": {
+    "fromDate": {
+      "type": "string",
+      "format": "date",
+      "title": "From Date"
+    },
+    "toDate": {
+      "type": "string",
+      "format": "date",
+      "title": "To Date"
+    },
+    "fiscalYear": {
+      "type": "string",
+      "title": "Fiscal Year",
+      "enum": ["2025-2026", "2024-2025"],
+      "x-selection": "single"
+    },
+    "financeBook": {
+      "type": "string",
+      "title": "Finance Book",
+      "enum": ["Main Book", "Tax Book"],
+      "x-selection": "single",
+      "default": "Main Book"
+    },
+    "currency": {
+      "type": "string",
+      "title": "Currency",
+      "enum": ["inr", "try", "usd"],
+      "x-selection": "single",
+      "default": "inr"
+    },
+    "valuesMode": {
+      "type": "string",
+      "title": "Values",
+      "enum": ["all", "5-values"],
+      "x-selection": "single",
+      "default": "all"
+    },
+    "showZeroValues": {
+      "type": "boolean",
+      "title": "Show zero values",
+      "default": false
+    },
+    "showGroupAccounts": {
+      "type": "boolean",
+      "title": "Show Group Accounts",
+      "default": true
+    }
+  },
+  "additionalProperties": false
+}

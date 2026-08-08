@@ -11,6 +11,8 @@ public interface IArrowJobStore
     Task<bool> TryDeleteJobAsync(Guid id, CancellationToken cancellationToken = default);
     /// <summary>Job sonuç dosya yolunu çeker.</summary>
     Task<string?> GetResultPathAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Job request DTO'sunu tip bağımsız olarak çeker (yoksa <c>null</c>).</summary>
+    Task<object?> GetRequestAsync(Guid id, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Jenerik job veri deposu arayüzü.</summary>
