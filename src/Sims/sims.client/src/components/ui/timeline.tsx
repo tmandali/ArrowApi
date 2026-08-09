@@ -5,7 +5,7 @@ import { cn } from "@/utils/cn"
 const timelineVariants = cva("relative flex flex-col w-full", {
   variants: {
     orientation: {
-      vertical: "space-y-6 pl-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border",
+      vertical: "space-y-6 pl-6 before:absolute before:left-[3px] before:top-2 before:bottom-2 before:w-0.5 before:bg-border",
       horizontal: "flex-row space-x-6 pt-6 before:absolute before:top-2 before:left-2 before:right-2 before:h-0.5 before:bg-border",
     },
   },

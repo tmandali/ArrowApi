@@ -14,7 +14,7 @@ import {
   useWorkspaceNotifications,
   type WorkspaceNotification,
   type WorkspaceNotificationType,
-} from "@/context/workspace-notifications"
+} from "@/context/workspace-notifications-context"
 import {
   selectPendingJobs,
   useActiveJobsStore,

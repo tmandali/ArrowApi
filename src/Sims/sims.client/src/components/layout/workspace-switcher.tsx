@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
-import { useLocation, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
+import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
+import type { WorkspaceId } from "@/lib/workspace-nav"
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -31,34 +33,31 @@ export function WorkspaceSwitcher({
   }[]
 }) {
   const { isMobile } = useSidebar()
-  const { pathname } = useLocation()
   const navigate = useNavigate()
   const { company } = useActiveCompany()
+  const activeWorkspaceId = useActiveWorkspaceId()
+
+  const workspaceByUrl = React.useMemo(
+    () =>
+      new Map(
+        workspaces
+          .filter((ws) => ws.url)
+          .map((ws) => [ws.url as string, ws])
+      ),
+    [workspaces]
+  )
 
   const currentWorkspace = React.useMemo(() => {
-    if (
-      pathname === "/landed-cost-voucher" ||
-      pathname.startsWith("/manufacturing")
-    ) {
-      return (
-        workspaces.find((ws) => ws.name === "Manufacturing") || workspaces[0]
-      )
-    }
-    if (pathname.startsWith("/stock")) {
-      return workspaces.find((ws) => ws.name === "Stock") || workspaces[0]
-    }
-    if (pathname.startsWith("/accounting")) {
-      return (
-        workspaces.find((ws) => ws.name === "Financial Reports") ||
-        workspaces[0]
-      )
+    const byId: Record<WorkspaceId, string | undefined> = {
+      selling: "/selling",
+      accounting: "/accounting",
+      stock: "/stock",
+      manufacturing: "/manufacturing",
     }
     return (
-      workspaces.find((ws) => ws.url === pathname) ||
-      workspaces.find((ws) => ws.name === "Subcontracting") ||
-      workspaces[0]
+      workspaceByUrl.get(byId[activeWorkspaceId] ?? "") || workspaces[0]
     )
-  }, [pathname, workspaces])
+  }, [activeWorkspaceId, workspaceByUrl, workspaces])
 
   const [activeWorkspace, setActiveWorkspace] = React.useState(currentWorkspace)
 

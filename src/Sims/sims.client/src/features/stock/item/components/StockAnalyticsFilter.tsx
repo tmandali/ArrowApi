@@ -4,6 +4,7 @@ import {
   SchemaCriteriaFilter,
   type JsonSchemaObject,
   type SchemaCriteriaFilterHandle,
+  useSharedCriteriaDraft,
 } from "@/features/report-criteria"
 import {
   ArrowJobExecutionsPanel,
@@ -24,6 +25,7 @@ export type StockAnalyticsJobSession = Pick<
   | "activeRunEvents"
   | "activeRunPhase"
   | "onOpenJob"
+  | "openJobHref"
   | "onJobSelect"
   | "pendingJobs"
   | "listRefreshToken"
@@ -50,6 +52,10 @@ export const StockAnalyticsFilter = React.forwardRef<
 ) {
   const composing = Boolean(jobSession?.composing)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
+  const { rows, setRows } = useSharedCriteriaDraft(
+    "stock-analytics",
+    stockAnalyticsSchema
+  )
 
   React.useImperativeHandle(
     ref,
@@ -88,6 +94,7 @@ export const StockAnalyticsFilter = React.forwardRef<
         activeRunEvents={jobSession?.activeRunEvents}
         activeRunPhase={jobSession?.activeRunPhase}
         onOpenJob={jobSession?.onOpenJob}
+        openJobHref={jobSession?.openJobHref}
         onJobSelect={(jobId) => {
           jobSession?.onExitCompose?.()
           jobSession?.onJobSelect?.(jobId)
@@ -98,42 +105,41 @@ export const StockAnalyticsFilter = React.forwardRef<
         pendingJobs={jobSession?.pendingJobs}
         listRefreshToken={jobSession?.listRefreshToken}
         detailSlot={
-          composing ? (
-            <SchemaCriteriaFilter
-              key="stock-analytics-criteria"
-              ref={filterRef}
-              schema={stockAnalyticsSchema}
-              showHeader={false}
-              showFooterClear={false}
-              className="h-full min-h-0 min-w-0"
-            />
-          ) : undefined
+          <SchemaCriteriaFilter
+            key="stock-analytics-criteria"
+            ref={filterRef}
+            schema={stockAnalyticsSchema}
+            rows={rows}
+            onRowsChange={setRows}
+            showHeader={false}
+            showFooterClear={false}
+            className="h-full min-h-0 min-w-0"
+          />
         }
         detailSlotActions={
-          composing ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 gap-1 px-2.5 text-xs"
-                onClick={() => filterRef.current?.clear()}
-              >
-                <RotateCcw className="size-3.5" />
-                Clear
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="h-7 shrink-0 px-3 text-xs"
-                disabled={runDisabled}
-                onClick={() => onRun?.()}
-              >
-                Run
-              </Button>
-            </>
-          ) : undefined
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1 px-2.5 text-xs"
+              onClick={() => filterRef.current?.clear()}
+            >
+              <RotateCcw className="size-3.5" />
+              Clear
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 shrink-0 px-3 text-xs"
+              disabled={runDisabled}
+              onClick={() => onRun?.()}
+            >
+              Run
+            </Button>
+          </>
         }
+        criteriaActive={composing}
         className="min-h-0 flex-1"
       />
     </div>

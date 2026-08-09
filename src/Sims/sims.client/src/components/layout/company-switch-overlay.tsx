@@ -98,7 +98,7 @@ export function CompanySwitchOverlay() {
       cancelAnimationFrame(raf)
     }
   }, [
-    transition?.targetId,
+    transition,
     applyCompanySwitch,
     setSwitchProgress,
     endCompanySwitch,

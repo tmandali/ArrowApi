@@ -1,6 +1,8 @@
 import { createChat } from "@shadcn/helpers/ai-sdk"
 import type { UIMessage } from "ai"
 
+import { yulaCustomKinds } from "@/components/layout/yula-components-data"
+
 /**
  * Predefined Yula conversation for local UI work without an AI backend.
  * Streams through the real useChat lifecycle via @shadcn/helpers/ai-sdk.
@@ -36,6 +38,17 @@ export const yulaMockChat = createChat({
     )
     writer.text(
       "Landed cost (maliyet) fişi ile ithalat ve ek maliyetleri ürüne dağıtarak gerçek birim maliyeti netleştirirsiniz."
+    )
+  })
+  .user("Stock balance raporunu çalıştır")
+  .sleep(300)
+  .assistant(({ writer }) => {
+    writer.reasoning(
+      "Kullanıcı stock-balance raporunu çalıştırmak istiyor. Kriter bileşenini sohbete gömüp kriterleri doldurmasını isteyeceğim."
+    )
+    writer.custom(yulaCustomKinds.stockBalance)
+    writer.text(
+      "Kriterleri yukarıdaki kutudan doldurabilirsiniz. Raporu tam sayfada açıp çalıştırmak için karttaki “Sayfada aç” butonunu kullanabilirsiniz."
     )
   })
 

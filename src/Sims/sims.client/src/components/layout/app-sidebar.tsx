@@ -23,9 +23,9 @@ import {
   PackageIcon,
   FactoryIcon,
 } from "lucide-react"
-import { useLocation } from "react-router-dom"
-import { useWorkspaceSearch } from "@/context/workspace-search"
-import { getWorkspaceNavForPath } from "@/lib/workspace-nav"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
+import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
+import { workspaceNavById } from "@/lib/workspace-nav"
 
 const data = {
   user: {
@@ -39,7 +39,7 @@ const data = {
       name: "Subcontracting",
       logo: <RefreshCwIcon className="size-4" />,
       plan: "LCWaikiki ERP",
-      url: "/",
+      url: "/selling",
     },
     {
       id: "financial-reports",
@@ -66,13 +66,10 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { pathname } = useLocation()
   const { setOpen } = useWorkspaceSearch()
+  const activeWorkspaceId = useActiveWorkspaceId()
 
-  const currentNav = React.useMemo(
-    () => getWorkspaceNavForPath(pathname),
-    [pathname]
-  )
+  const currentNav = workspaceNavById[activeWorkspaceId]
 
   return (
     <Sidebar collapsible="icon" {...props}>

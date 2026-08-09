@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai"
 import { Brain } from "lucide-react"
 
+import { yulaCustomPartComponents } from "@/components/layout/yula-custom-parts"
 import { cn } from "@/utils/cn"
 
 type AiChatMessageProps = {
@@ -73,14 +74,13 @@ export function AiChatMessage({ message, className }: AiChatMessageProps) {
             />
           )
         }
+        if (part.type === "custom") {
+          const CustomPart = yulaCustomPartComponents[part.kind]
+          if (!CustomPart) return null
+          return <CustomPart key={`${message.id}-c-${index}`} />
+        }
         return null
       })}
     </div>
   )
-}
-
-export function firstTextPart(message: UIMessage | null | undefined): string {
-  if (!message?.parts) return ""
-  const textPart = message.parts.find((part) => part.type === "text")
-  return textPart && "text" in textPart ? textPart.text : ""
 }

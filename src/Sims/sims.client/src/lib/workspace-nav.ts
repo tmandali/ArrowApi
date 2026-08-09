@@ -23,6 +23,17 @@ import { emptyModulePath } from "@/lib/empty-module"
 
 const e = emptyModulePath
 
+/** Shared workspace dashboard (menu-boxes landing screen). */
+export const workspaceDashboardPath = "/stock/dashboard"
+
+/** Per-workspace dashboard path — only stock has a real page; others 404. */
+export const workspaceDashboardPathByWorkspace: Record<WorkspaceId, string> = {
+  selling: "/selling/dashboard",
+  accounting: "/accounting/dashboard",
+  stock: workspaceDashboardPath,
+  manufacturing: "/manufacturing/dashboard",
+}
+
 export type WorkspaceNavSubItem = {
   title: string
   url: string
@@ -41,12 +52,17 @@ export type WorkspaceId = "selling" | "accounting" | "stock" | "manufacturing"
 
 export const subcontractingNav: WorkspaceNavItem[] = [
   {
+    title: "Dashboard",
+    url: workspaceDashboardPathByWorkspace.selling,
+    icon: LayoutDashboardIcon,
+  },
+  {
     title: "Inward Order",
     url: e("selling", "Inward Order"),
     icon: ArrowRightIcon,
     isActive: true,
     items: [
-      { title: "Sales Order", url: "/" },
+      { title: "Sales Order", url: "/selling/sales-order" },
       {
         title: "Subcontracting Order",
         url: e("selling", "Inward Subcontracting Order"),
@@ -95,6 +111,11 @@ export const subcontractingNav: WorkspaceNavItem[] = [
 
 export const financialReportsNav: WorkspaceNavItem[] = [
   {
+    title: "Dashboard",
+    url: workspaceDashboardPathByWorkspace.accounting,
+    icon: LayoutDashboardIcon,
+  },
+  {
     title: "Financial Reports",
     url: e("accounting", "Financial Reports"),
     icon: BarChart2Icon,
@@ -135,7 +156,7 @@ export const financialReportsNav: WorkspaceNavItem[] = [
 export const stockNav: WorkspaceNavItem[] = [
   {
     title: "Dashboard",
-    url: "/stock",
+    url: workspaceDashboardPathByWorkspace.stock,
     icon: LayoutDashboardIcon,
   },
   {
@@ -184,9 +205,9 @@ export const stockNav: WorkspaceNavItem[] = [
     icon: BarChart2Icon,
     isActive: true,
     items: [
-      { title: "Stock Ledger", url: "/stock/stock-ledger" },
-      { title: "Stock Balance", url: "/stock/stock-balance" },
       { title: "Stock Analytics", url: "/stock/stock-analytics" },
+      { title: "Stock Balance", url: "/stock/stock-balance" },
+      { title: "Stock Ledger", url: "/stock/stock-ledger" },
       {
         title: "Serial No and Batch Traceability",
         url: "/stock/serial-batch-traceability",
@@ -206,13 +227,8 @@ export const stockNav: WorkspaceNavItem[] = [
 export const manufacturingNav: WorkspaceNavItem[] = [
   {
     title: "Dashboard",
-    url: e("manufacturing", "Dashboard"),
+    url: workspaceDashboardPathByWorkspace.manufacturing,
     icon: LayoutDashboardIcon,
-  },
-  {
-    title: "Item",
-    url: "/stock/item",
-    icon: BoxIcon,
   },
   {
     title: "Warehouse",

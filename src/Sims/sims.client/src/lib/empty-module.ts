@@ -22,8 +22,24 @@ export function emptyModulePath(workspace: string, title: string) {
 
 export const emptyWorkspaceHome: Record<string, { label: string; url: string }> =
   {
-    selling: { label: "Subcontracting", url: "/" },
+    selling: { label: "Subcontracting", url: "/selling" },
     accounting: { label: "Financial Reports", url: "/accounting" },
     stock: { label: "Stock", url: "/stock" },
     manufacturing: { label: "Manufacturing", url: "/manufacturing" },
   }
+
+/** Human-readable workspace label for a pathname (empty-page header/Yula intro). */
+export function workspaceLabelFromPath(pathname: string): string {
+  if (pathname.startsWith("/selling")) return "Subcontracting"
+  if (pathname.startsWith("/accounting")) return "Accounting"
+  if (pathname.startsWith("/stock")) return "Stock"
+  if (pathname.startsWith("/manufacturing")) return "Manufacturing"
+  return "Home"
+}
+
+const workspaceHomePaths = ["/", "/selling", "/accounting", "/stock", "/manufacturing"]
+
+/** True for the empty workspace landing pages where Yula auto-opens. */
+export function isWorkspaceHomePath(pathname: string): boolean {
+  return workspaceHomePaths.includes(pathname)
+}

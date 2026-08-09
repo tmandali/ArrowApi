@@ -31,6 +31,8 @@ type StockBalanceResultGridProps = {
   showFilterRow?: boolean
   onShowFilterRowChange?: (open: boolean) => void
   title?: string
+  /** Report/job GUID shown in the header subtitle instead of the row count. */
+  reportId?: string
   className?: string
 }
 
@@ -41,6 +43,7 @@ export function StockBalanceResultGrid({
   showFilterRow = false,
   onShowFilterRowChange,
   title = "Stock Balance",
+  reportId,
   className,
 }: StockBalanceResultGridProps) {
   const [filters, setFilters] = React.useState<Record<string, string>>({})
@@ -62,9 +65,10 @@ export function StockBalanceResultGrid({
   }, [rows, filters, showFilterRow])
 
   const subtitle =
-    columns.length === 0
+    reportId ??
+    (columns.length === 0
       ? "No columns"
-      : `${visibleRows.length} row${visibleRows.length === 1 ? "" : "s"}`
+      : `${visibleRows.length} row${visibleRows.length === 1 ? "" : "s"}`)
 
   return (
     <div className={cn(panelCardClass, "flex-1", className)}>

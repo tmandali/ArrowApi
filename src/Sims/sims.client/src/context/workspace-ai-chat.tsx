@@ -1,26 +1,12 @@
 import * as React from "react"
+import { useLocation } from "react-router-dom"
 import { useMediaQuery } from "@/hooks/use-media-query"
-
-/**
- * Below `lg` (1024px) the side dock is too narrow for page + Yula.
- * Tablet/phone: open Yula only as full content; always closable.
- */
-export const YULA_SIDE_DOCK_MIN_WIDTH = 1024
-
-type WorkspaceAiChatContextValue = {
-  open: boolean
-  setOpen: (open: boolean) => void
-  toggle: () => void
-  /** Full content area (between header and nav). Off by default — side dock opens first. */
-  expanded: boolean
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
-  /** False on tablet/phone — only full-content mode is available. */
-  sideDockAllowed: boolean
-}
-
-const WorkspaceAiChatContext =
-  React.createContext<WorkspaceAiChatContextValue | null>(null)
+import { isWorkspaceHomePath } from "@/lib/empty-module"
+import {
+  WorkspaceAiChatContext,
+  YULA_SIDE_DOCK_MIN_WIDTH,
+  type WorkspaceAiChatContextValue,
+} from "./workspace-ai-chat-context"
 
 export function WorkspaceAiChatProvider({
   children,
@@ -32,6 +18,19 @@ export function WorkspaceAiChatProvider({
   )
   const [open, setOpenState] = React.useState(false)
   const [expanded, setExpandedState] = React.useState(false)
+
+  // Never carry the home page's auto-opened Yula onto a real/404 page.
+  const { pathname } = useLocation()
+  const isHomePage = isWorkspaceHomePath(pathname)
+  const prevIsHomePageRef = React.useRef(isHomePage)
+
+  React.useEffect(() => {
+    if (prevIsHomePageRef.current && !isHomePage) {
+      setOpenState(false)
+      setExpandedState(false)
+    }
+    prevIsHomePageRef.current = isHomePage
+  }, [isHomePage])
 
   React.useEffect(() => {
     if (!sideDockAllowed && open) {
@@ -69,7 +68,7 @@ export function WorkspaceAiChatProvider({
     })
   }, [sideDockAllowed, open])
 
-  const value = React.useMemo(
+  const value = React.useMemo<WorkspaceAiChatContextValue>(
     () => ({
       open,
       setOpen,
@@ -94,14 +93,4 @@ export function WorkspaceAiChatProvider({
       {children}
     </WorkspaceAiChatContext.Provider>
   )
-}
-
-export function useWorkspaceAiChat() {
-  const context = React.useContext(WorkspaceAiChatContext)
-  if (!context) {
-    throw new Error(
-      "useWorkspaceAiChat must be used within WorkspaceAiChatProvider"
-    )
-  }
-  return context
 }

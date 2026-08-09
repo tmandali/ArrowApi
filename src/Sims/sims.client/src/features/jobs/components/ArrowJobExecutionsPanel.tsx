@@ -3,6 +3,8 @@ import {
   Check,
   CircleCheck,
   CircleX,
+  Copy,
+  Eye,
   FileText,
   Filter,
   History,
@@ -97,15 +99,49 @@ function statusTone(
   }
 }
 
-function ExecutionStatusMark({ status }: { status: string }) {
+function ExecutionStatusMark({
+  status,
+  onView,
+}: {
+  status: string
+  onView?: () => void
+}) {
   switch (status) {
-    case "Completed":
-      return (
-        <CircleCheck
-          className="size-4 shrink-0 text-primary/70 dark:text-sidebar-primary/80"
+    case "Completed": {
+      const mark = (
+        <span
+          className="relative block size-4 shrink-0"
+          role="img"
           aria-label="Completed"
-        />
+        >
+          <CircleCheck
+            className="absolute inset-0 size-4 text-primary/70 transition-opacity group-hover:opacity-0 dark:text-sidebar-primary/80"
+            aria-hidden
+          />
+          <Eye
+            className="absolute inset-0 size-4 text-primary/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-sidebar-primary/80"
+            aria-hidden
+          />
+        </span>
       )
+      if (!onView) return mark
+      return (
+        <span
+          role="button"
+          tabIndex={-1}
+          title="View report"
+          aria-label="View report"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onView()
+          }}
+          className="flex size-5 shrink-0 items-center justify-center rounded"
+        >
+          {mark}
+        </span>
+      )
+    }
     case "Failed":
       return (
         <CircleX
@@ -178,6 +214,8 @@ export type ArrowJobExecutionsPanelProps = {
   jobsEndpoint: string
   /** Placeholder job name when the active run is not yet in the list. */
   jobName?: string
+  /** Builds the report view path for a job id (e.g. `/stock/stock-balance/<id>`). */
+  openJobHref?: (jobId: string) => string
   /** Empty-state subtitle under Executions. */
   emptyListHint?: string
   /** Currently open job GUID; omit on criteria page. */
@@ -213,14 +251,20 @@ export type ArrowJobExecutionsPanelProps = {
     name?: string
   }>
   /**
-   * When set, replaces the Detail column (e.g. criteria grid).
-   * Executions list stays visible.
+   * Criteria content for the right column. Pass it unconditionally; the panel
+   * shows it in place of Detail whenever nothing is selected in Executions
+   * (including compose mode). Executions list stays visible.
    */
   detailSlot?: React.ReactNode
   /** Title for the detailSlot column header. Default: Criteria. */
   detailSlotTitle?: string
   /** Actions on the right of the detailSlot header (e.g. Run). */
   detailSlotActions?: React.ReactNode
+  /**
+   * Compose mode (New / empty list): drop any selected execution so the
+   * criteria slot takes over the Detail column. Ignored without detailSlot.
+   */
+  criteriaActive?: boolean
 }
 
 /**
@@ -229,6 +273,7 @@ export type ArrowJobExecutionsPanelProps = {
 export function ArrowJobExecutionsPanel({
   jobsEndpoint,
   jobName = "report",
+  openJobHref,
   emptyListHint = "Past report jobs",
   activeJobId = null,
   activeLiveStatus,
@@ -246,6 +291,7 @@ export function ArrowJobExecutionsPanel({
   detailSlot,
   detailSlotTitle = "Criteria",
   detailSlotActions,
+  criteriaActive = false,
 }: ArrowJobExecutionsPanelProps) {
   const showCriteriaSlot = detailSlot != null
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
@@ -338,25 +384,19 @@ export function ArrowJobExecutionsPanel({
     }
   }, [activeRunPhase, loadList])
 
-  // Criteria / compose mode: no hist row should stay highlighted.
+  // Compose mode (New / empty list): drop any highlighted execution so the
+  // criteria slot takes over the Detail column.
   React.useEffect(() => {
     if (!showCriteriaSlot) return
+    if (!criteriaActive) return
     setSelectedId(null)
-  }, [showCriteriaSlot])
+  }, [showCriteriaSlot, criteriaActive])
 
+  // Keep the active (live) run selected so its progress stays visible.
   React.useEffect(() => {
-    if (showCriteriaSlot) return
-    if (activeJobId) {
-      setSelectedId(activeJobId)
-    }
-  }, [activeJobId, showCriteriaSlot])
-
-  // Keep the live job selected while it is running so progress stays visible.
-  React.useEffect(() => {
-    if (showCriteriaSlot) return
-    if (!activeJobId || activeRunPhase !== "running") return
+    if (!activeJobId) return
     setSelectedId(activeJobId)
-  }, [activeJobId, activeRunPhase, showCriteriaSlot])
+  }, [activeJobId])
 
   React.useEffect(() => {
     if (loading || !selectedId) return
@@ -529,8 +569,20 @@ export function ArrowJobExecutionsPanel({
             e.eventName === "failed" ||
             e.eventName === "cancelled"
         )))
+  const criteriaVisible = showCriteriaSlot && !selectedId
   const canDeleteSelected =
-    Boolean(selectedId) && !showCriteriaSlot && !showRunningProgressOnly
+    Boolean(selectedId) && !criteriaVisible && !showRunningProgressOnly
+
+  const handleCopy = React.useCallback(
+    (value: string, mode: "id" | "url") => {
+      const text =
+        mode === "url" && openJobHref
+          ? `${window.location.origin}${openJobHref(value)}`
+          : value
+      void navigator.clipboard.writeText(text)
+    },
+    [openJobHref]
+  )
 
   const handleConfirmDelete = React.useCallback(
     async (event: React.MouseEvent) => {
@@ -565,10 +617,7 @@ export function ArrowJobExecutionsPanel({
 
   const detailLines = React.useMemo(() => {
     if (!selectedJob && !isActiveSelected) {
-      return [
-        { label: "Status", value: "—" },
-        { label: "Job", value: selectedId || "—" },
-      ]
+      return [{ label: "Status", value: "—" }]
     }
     const duration = formatTotalDuration({
       createdAt: selectedJob?.createdAt,
@@ -578,7 +627,6 @@ export function ArrowJobExecutionsPanel({
     })
     const lines = [
       { label: "Status", value: selectedDisplayStatus },
-      { label: "Job", value: selectedJob?.id ?? selectedId ?? "—" },
       { label: "Created", value: formatWhen(selectedJob?.createdAt) },
       { label: "Completed", value: formatWhen(selectedJob?.completedAt) },
       { label: "Duration", value: duration ?? "—" },
@@ -603,7 +651,6 @@ export function ArrowJobExecutionsPanel({
     return lines
   }, [
     selectedJob,
-    selectedId,
     selectedDisplayStatus,
     isActiveSelected,
     progressEvents,
@@ -677,11 +724,11 @@ export function ArrowJobExecutionsPanel({
                 </Empty>
               </div>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y divide-border/60 border-b border-border/60">
                 {displayItems.map((job) => {
                   const selected = sameJobId(selectedId, job.id)
                   return (
-                    <li key={job.id} className="w-full">
+                    <li key={job.id} className="group w-full">
                       <button
                         ref={selected ? selectedItemRef : undefined}
                         type="button"
@@ -704,7 +751,14 @@ export function ArrowJobExecutionsPanel({
                             className="flex size-5 shrink-0 items-center justify-center"
                             title={job.status}
                           >
-                            <ExecutionStatusMark status={job.status} />
+                            <ExecutionStatusMark
+                              status={job.status}
+                              onView={
+                                onOpenJob
+                                  ? () => onOpenJob(job.id)
+                                  : undefined
+                              }
+                            />
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
@@ -731,7 +785,7 @@ export function ArrowJobExecutionsPanel({
       />
 
       <ResizablePanel defaultSize="62%" minSize="30%" className="min-h-0 min-w-0">
-        {showCriteriaSlot ? (
+        {criteriaVisible ? (
           <section className={cn(panelCardClass, "h-full min-w-0")}>
             <div className={panelHeaderClass}>
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -758,15 +812,34 @@ export function ArrowJobExecutionsPanel({
                   <FileText className={panelHeaderIconClass} aria-hidden />
                   <span className={panelHeaderTitleClass}>Detail</span>
                 </div>
-                <span className={panelHeaderSubtitleClass}>
-                  {showRunningProgressOnly
-                    ? "Live progress"
-                    : detailLoading
-                      ? "Loading request…"
-                      : isActiveSelected
-                        ? "Selected execution · current job"
-                        : "Status, meta and request payload"}
-                </span>
+                <div className="flex min-w-0 items-center gap-1">
+                  <span
+                    className={cn(
+                      panelHeaderSubtitleClass,
+                      selectedId && "font-mono text-[11px]"
+                    )}
+                    title={selectedId ?? undefined}
+                  >
+                    {showRunningProgressOnly
+                      ? "Live progress"
+                      : detailLoading
+                        ? "Loading request…"
+                        : selectedId
+                          ? selectedId
+                          : "Status, meta and request payload"}
+                  </span>
+                  {selectedId ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(selectedId, "url")}
+                      className="shrink-0 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground"
+                      aria-label="Copy report URL"
+                      title="Copy report URL"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {canDeleteSelected ? (
@@ -807,20 +880,41 @@ export function ArrowJobExecutionsPanel({
                   {!showRunningProgressOnly ? (
                     <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
                       {detailLines.map((line) => (
-                        <div key={line.label} className="grid min-w-0 gap-0.5">
+                        <div
+                          key={line.label}
+                          className="group grid min-w-0 gap-0.5"
+                        >
                           <dt className="text-[11px] text-muted-foreground">
                             {line.label}
                           </dt>
                           <dd
                             className={cn(
-                              "truncate text-foreground",
-                              line.label === "Job" && "font-mono",
+                              "text-foreground",
                               line.label === "Error" &&
                                 "whitespace-normal break-all"
                             )}
                             title={line.value}
                           >
-                            {line.value}
+                            {line.label === "Error" ? (
+                              <span className="flex min-w-0 items-center gap-1.5">
+                                <span className="min-w-0 truncate">
+                                  {line.value}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopy(line.value, "id")
+                                  }
+                                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                                  aria-label="Copy error"
+                                  title="Copy to clipboard"
+                                >
+                                  <Copy className="size-3" />
+                                </button>
+                              </span>
+                            ) : (
+                              line.value
+                            )}
                           </dd>
                         </div>
                       ))}

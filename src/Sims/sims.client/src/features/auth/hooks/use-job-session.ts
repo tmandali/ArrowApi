@@ -1,4 +1,4 @@
-import { useJobSync } from "@/context/job-sync-provider"
+import { useJobSync } from "@/context/job-sync-context"
 import { useNotificationsStore } from "@/store/slices/notifications-store"
 
 /**

@@ -9,13 +9,15 @@ type ItemImageUploadProps = {
 
 export function ItemImageUpload({ className }: ItemImageUploadProps) {
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
-  const [fileName, setFileName] = React.useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(
+    "/images/iphone.png"
+  )
+  const [fileName, setFileName] = React.useState<string | null>("iphone.png")
   const [isDragging, setIsDragging] = React.useState(false)
 
   React.useEffect(() => {
     return () => {
-      if (previewUrl) {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl)
       }
     }
@@ -28,7 +30,7 @@ export function ItemImageUpload({ className }: ItemImageUploadProps) {
       }
 
       setPreviewUrl((prev) => {
-        if (prev) {
+        if (prev && prev.startsWith("blob:")) {
           URL.revokeObjectURL(prev)
         }
         return URL.createObjectURL(file)
@@ -40,7 +42,7 @@ export function ItemImageUpload({ className }: ItemImageUploadProps) {
 
   const clearImage = React.useCallback(() => {
     setPreviewUrl((prev) => {
-      if (prev) {
+      if (prev && prev.startsWith("blob:")) {
         URL.revokeObjectURL(prev)
       }
       return null
@@ -102,7 +104,7 @@ export function ItemImageUpload({ className }: ItemImageUploadProps) {
           <img
             src={previewUrl}
             alt={fileName ?? "Item image"}
-            className="size-full object-contain p-2"
+            className="size-full object-cover"
           />
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">

@@ -20,6 +20,7 @@ export default function Page() {
   return (
     <>
       <WorkspacePageHeader
+        showSearch={false}
         searchPlaceholder="Search..."
         actions={
           <>

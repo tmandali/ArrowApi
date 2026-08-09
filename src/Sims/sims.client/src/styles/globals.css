@@ -139,3 +139,17 @@
     display: none;
   }
 }
+@theme {
+  --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
+
+  @keyframes indeterminate {
+    0% {
+      left: -40%;
+      width: 40%;
+    }
+    100% {
+      left: 100%;
+      width: 40%;
+    }
+  }
+}

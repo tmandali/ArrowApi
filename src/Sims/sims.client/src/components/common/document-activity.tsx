@@ -101,7 +101,7 @@ export function DocumentActivity({
           if (item.type === "comment") {
             return (
               <TimelineItem key={item.id}>
-                <span className="absolute -left-7 top-0 flex size-5 items-center justify-center rounded-full border bg-background text-muted-foreground ring-4 ring-background">
+                <span className="absolute -left-[30px] top-0 flex size-5 items-center justify-center rounded-full border bg-background text-muted-foreground ring-4 ring-background">
                   <MessageSquare className="size-2.5" />
                 </span>
                 <TimelineContent className="w-full gap-2">

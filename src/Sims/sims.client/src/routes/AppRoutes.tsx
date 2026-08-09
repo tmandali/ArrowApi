@@ -1,25 +1,21 @@
-import { lazy, Suspense } from "react"
-import { Navigate, Route, Routes, useParams } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom"
 import { AppLayout } from "@/components/layout/app-layout"
-import { RouteFallback } from "@/components/layout/route-fallback"
+import { RouteTopBar } from "@/components/layout/route-top-bar"
+import { accountingRoutes } from "@/features/accounting"
+import { landedCostRoutes } from "@/features/landed-cost"
+import { manufacturingRoutes } from "@/features/manufacturing"
+import { sellingRoutes } from "@/features/selling"
+import { stockRoutes } from "@/features/stock"
+import type { WorkspaceRouteConfig } from "@/lib/workspace-route"
+import DashboardPage from "@/pages/DashboardPage"
+import HomePage from "@/pages/HomePage"
+import LoginPage from "@/pages/LoginPage"
+import NotFoundPage from "@/pages/NotFoundPage"
+import UserSettingsPage from "@/pages/UserSettingsPage"
 
-const LoginPage = lazy(() => import("@/pages/LoginPage"))
-const SellingPage = lazy(() => import("@/pages/SellingPage"))
-const DashboardPage = lazy(() => import("@/pages/DashboardPage"))
-const AccountingPage = lazy(() => import("@/pages/AccountingPage"))
-const StockPage = lazy(() => import("@/pages/StockPage"))
-const SerialBatchTraceabilityPage = lazy(
-  () => import("@/pages/SerialBatchTraceabilityPage")
-)
-const ItemPage = lazy(() => import("@/pages/ItemPage"))
-const StockAnalyticsPage = lazy(() => import("@/pages/StockAnalyticsPage"))
-const StockLedgerPage = lazy(() => import("@/pages/StockLedgerPage"))
-const StockBalancePage = lazy(() => import("@/pages/StockBalancePage"))
-const ReportModulePage = lazy(() => import("@/pages/ReportModulePage"))
-const ManufacturingPage = lazy(() => import("@/pages/ManufacturingPage"))
-const LandedCostVoucherPage = lazy(() => import("@/pages/LandedCostVoucherPage"))
-const UserSettingsPage = lazy(() => import("@/pages/UserSettingsPage"))
-const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"))
+/** Workspace home landing screens — all render the shared HomePage. */
+const workspaceHomePaths = ["", "/selling", "/accounting", "/stock", "/manufacturing"]
 
 /** /empty/{workspace}/{slug} → /{workspace}/{slug} */
 function LegacyEmptyPrefixRedirect() {
@@ -39,26 +35,42 @@ function LegacyWorkspaceEmptyRedirect() {
   return <Navigate to={`/${workspace}/${slug}`} replace />
 }
 
+function renderRoutes(configs: WorkspaceRouteConfig[], fullHeight = false) {
+  return configs
+    .filter((config) => Boolean(config.fullHeight) === fullHeight)
+    .map((config) => {
+      const Page = config.Component
+      return <Route key={config.path} path={config.path} element={<Page />} />
+    })
+}
+
 export function AppRoutes() {
+  // Route changes: slim top bar without unmounting the page.
+  const [routePending, setRoutePending] = useState(false)
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    setRoutePending(true)
+    const timer = setTimeout(() => setRoutePending(false), 350)
+    return () => clearTimeout(timer)
+  }, [pathname])
+
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <>
+      {routePending ? <RouteTopBar /> : null}
       <Routes>
         <Route path="login" element={<LoginPage />} />
 
         <Route element={<AppLayout />}>
-          <Route index element={<SellingPage />} />
-          <Route path="selling" element={<Navigate to="/" replace />} />
+          {workspaceHomePaths.map((path) => (
+            <Route key={path} path={path} element={<HomePage />} />
+          ))}
           <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="accounting" element={<AccountingPage />} />
-          <Route path="stock" element={<StockPage />} />
-          <Route
-            path="stock/serial-batch-traceability"
-            element={<SerialBatchTraceabilityPage />}
-          />
-          <Route path="stock/item" element={<ItemPage />} />
-          <Route path="products" element={<Navigate to="/stock/item" replace />} />
-          <Route path="manufacturing" element={<ManufacturingPage />} />
-          <Route path="landed-cost-voucher" element={<LandedCostVoucherPage />} />
+          {renderRoutes(sellingRoutes)}
+          {renderRoutes(stockRoutes)}
+          {renderRoutes(landedCostRoutes)}
+          {renderRoutes(accountingRoutes)}
+          {renderRoutes(manufacturingRoutes)}
           <Route path="user-settings" element={<UserSettingsPage />} />
           <Route
             path="empty/:workspace/:slug"
@@ -72,22 +84,11 @@ export function AppRoutes() {
         </Route>
 
         <Route element={<AppLayout fullHeight />}>
-          <Route path="stock/stock-analytics" element={<StockAnalyticsPage />} />
-          <Route
-            path="stock/stock-analytics/:jobId"
-            element={<StockAnalyticsPage />}
-          />
-          <Route path="stock/stock-ledger" element={<StockLedgerPage />} />
-          <Route path="stock/stock-balance" element={<StockBalancePage />} />
-          <Route
-            path="stock/stock-balance/:jobId"
-            element={<StockBalancePage />}
-          />
-          {/* Nav empty-module reports: /stock/delivery-note-trends, etc. */}
-          <Route path="stock/:slug" element={<ReportModulePage />} />
-          <Route path="accounting/:slug" element={<ReportModulePage />} />
-          <Route path="manufacturing/:slug" element={<ReportModulePage />} />
-          <Route path="selling/:slug" element={<ReportModulePage />} />
+          {renderRoutes(sellingRoutes, true)}
+          {renderRoutes(stockRoutes, true)}
+          {renderRoutes(landedCostRoutes, true)}
+          {renderRoutes(accountingRoutes, true)}
+          {renderRoutes(manufacturingRoutes, true)}
         </Route>
 
         <Route element={<AppLayout />}>
@@ -98,6 +99,6 @@ export function AppRoutes() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
-    </Suspense>
+    </>
   )
 }

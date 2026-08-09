@@ -34,6 +34,7 @@ export { validateCellPatterns } from "./lib/validate-cell-patterns"
 export { rowsToCriteriaInstance } from "./lib/rows-to-criteria-instance"
 export { stripExtensionKeywords } from "./lib/strip-extension-keywords"
 export { validateCriteria } from "./lib/validate-criteria"
+export { useSharedCriteriaDraft } from "./lib/use-shared-criteria-draft"
 
 export { CriteriaGridCellCombobox } from "./components/CriteriaGridCellCombobox"
 export { CriteriaSimpleCombobox } from "./components/CriteriaSimpleCombobox"

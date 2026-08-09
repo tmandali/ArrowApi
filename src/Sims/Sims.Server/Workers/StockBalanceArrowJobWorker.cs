@@ -18,7 +18,7 @@ namespace Sims.Server.Workers;
 public sealed class StockBalanceArrowJobWorker : IArrowJobWorker<StockBalanceRequest>
 {
     /// <summary>Demo / queue UX: job roughly runs this long before Arrow stream.</summary>
-    private static readonly TimeSpan TargetDuration = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan TargetDuration = TimeSpan.FromMinutes(0.5);
 
     private const int ProgressTicks = 5;
 
@@ -51,7 +51,7 @@ public sealed class StockBalanceArrowJobWorker : IArrowJobWorker<StockBalanceReq
         int batchSize = request.BatchSize is > 0 ? request.BatchSize.Value : 12;
         var options = new ArrowConversionOptions { BatchSize = batchSize };
 
-        // Spread remaining time across progress ticks (~1 minute total).
+        // Spread remaining time across progress ticks (~30 seconds total).
         TimeSpan remaining = TargetDuration - started.Elapsed;
         if (remaining > TimeSpan.Zero)
         {

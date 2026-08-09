@@ -1,2 +1,5 @@
 export { ItemForm } from "./item"
 export { StockDashboard } from "./components/StockDashboard"
+export { StockPageForm } from "./components/StockPageForm"
+export { SerialBatchTraceabilityForm } from "./components/SerialBatchTraceabilityForm"
+export { stockRoutes } from "./routes"

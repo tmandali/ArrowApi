@@ -46,6 +46,7 @@ export type JsonSchemaProperty = {
 export type CriteriaFieldKind =
   | "string"
   | "number"
+  | "boolean"
   | "enum"
   | "objectLookup"
 

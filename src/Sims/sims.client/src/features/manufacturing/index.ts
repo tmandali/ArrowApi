@@ -1,1 +1,2 @@
-// Feature public API placeholder.
+export { ManufacturingForm } from "./components/ManufacturingForm"
+export { manufacturingRoutes } from "./routes"

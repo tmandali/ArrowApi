@@ -1,5 +1,7 @@
 import * as React from "react"
-import { useWorkspaceNotifications } from "@/context/workspace-notifications"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
+import { useWorkspaceNotifications } from "@/context/workspace-notifications-context"
 import type { ArrowJobEvent } from "@/features/stock/item/types/stock-analytics"
 import {
   cancelArrowJob,
@@ -13,28 +15,10 @@ import {
   useActiveJobsStore,
   type TrackedJob,
 } from "@/store/slices/active-jobs-store"
-
-export type JobSyncListener = {
-  onEvent?: (eventName: string, payload: ArrowJobEvent) => void
-  onTerminal?: (payload: ArrowJobEvent) => void
-}
-
-type JobSyncContextValue = {
-  trackJob: (job: TrackedJob) => void
-  subscribe: (jobId: string, listener: JobSyncListener) => () => void
-  waitUntilTerminal: (
-    jobId: string,
-    options?: {
-      signal?: AbortSignal
-      onEvent?: (eventName: string, payload: ArrowJobEvent) => void
-    }
-  ) => Promise<ArrowJobEvent>
-  cancelTrackedJob: (jobId: string) => Promise<void>
-  resync: () => void
-  clearSession: () => void
-}
-
-const JobSyncContext = React.createContext<JobSyncContextValue | null>(null)
+import {
+  JobSyncContext,
+  type JobSyncListener,
+} from "./job-sync-context"
 
 const MAX_BACKOFF_MS = 8_000
 
@@ -42,7 +26,34 @@ function notificationIdForJob(jobId: string) {
   return `job-${jobId}`
 }
 
+function formatElapsed(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`
+}
+
+function reportSummary(job: TrackedJob, payload: ArrowJobEvent): string {
+  const parts: string[] = []
+  if (payload.totalRows != null) {
+    parts.push(`${payload.totalRows.toLocaleString("tr-TR")} rows`)
+  }
+  if (payload.batchCount != null) {
+    parts.push(`${payload.batchCount} batches`)
+  }
+  if (job.createdAt && payload.completedAt) {
+    const start = Date.parse(job.createdAt)
+    const end = Date.parse(payload.completedAt)
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+      parts.push(formatElapsed(end - start))
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Rapor tamamlandı."
+}
+
 export function JobSyncProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
   const { pushNotification } = useWorkspaceNotifications()
   const jobs = useActiveJobsStore((s) => s.jobs)
   const addJob = useActiveJobsStore((s) => s.addJob)
@@ -94,6 +105,16 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
           href: job.href,
           workspace: job.workspace,
         })
+
+        if (job.notificationType === "report" && job.href) {
+          toast.success(job.title, {
+            description: reportSummary(job, payload),
+            action: {
+              label: "View",
+              onClick: () => navigate(job.href!),
+            },
+          })
+        }
         return
       }
 
@@ -106,12 +127,18 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
           href: job.href,
           workspace: job.workspace,
         })
+
+        if (job.notificationType === "report") {
+          toast.error(job.failureTitle ?? `${job.title} Failed`, {
+            description: payload.error || "Rapor hazırlanırken bir hata oluştu.",
+          })
+        }
         return
       }
 
       // Cancelled: UI zaten local state ile bilgilendirilir; inbox gürültüsü yok.
     },
-    [pushNotification]
+    [pushNotification, navigate]
   )
 
   const finishJob = React.useCallback(
@@ -255,13 +282,16 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
   }, [ensureTracking])
 
   React.useEffect(() => {
+    const generationRefValue = generationRef
+    const controllersRefValue = controllersRef
+    const trackingRefValue = trackingRef
     return () => {
-      generationRef.current += 1
-      for (const controller of controllersRef.current.values()) {
+      generationRefValue.current += 1
+      for (const controller of controllersRefValue.current.values()) {
         controller.abort()
       }
-      controllersRef.current.clear()
-      trackingRef.current.clear()
+      controllersRefValue.current.clear()
+      trackingRefValue.current.clear()
     }
   }, [])
 
@@ -448,12 +478,4 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
   return (
     <JobSyncContext.Provider value={value}>{children}</JobSyncContext.Provider>
   )
-}
-
-export function useJobSync() {
-  const context = React.useContext(JobSyncContext)
-  if (!context) {
-    throw new Error("useJobSync must be used within JobSyncProvider")
-  }
-  return context
 }

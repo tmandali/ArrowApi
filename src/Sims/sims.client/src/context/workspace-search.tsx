@@ -1,16 +1,10 @@
 import * as React from "react"
 
 import { WorkspaceSearchDialog } from "@/components/layout/workspace-search-dialog"
-
-type WorkspaceSearchContextValue = {
-  open: boolean
-  setOpen: (open: boolean) => void
-  toggle: () => void
-  registerTrigger: (active: boolean) => void
-}
-
-const WorkspaceSearchContext =
-  React.createContext<WorkspaceSearchContextValue | null>(null)
+import {
+  WorkspaceSearchContext,
+  type WorkspaceSearchContextValue,
+} from "./workspace-search-context"
 
 export function WorkspaceSearchProvider({
   children,
@@ -35,7 +29,7 @@ export function WorkspaceSearchProvider({
     setTriggerCount((count) => Math.max(0, count + (active ? 1 : -1)))
   }, [])
 
-  const value = React.useMemo(
+  const value = React.useMemo<WorkspaceSearchContextValue>(
     () => ({
       open,
       setOpen,
@@ -55,14 +49,4 @@ export function WorkspaceSearchProvider({
       ) : null}
     </WorkspaceSearchContext.Provider>
   )
-}
-
-export function useWorkspaceSearch() {
-  const context = React.useContext(WorkspaceSearchContext)
-  if (!context) {
-    throw new Error(
-      "useWorkspaceSearch must be used within WorkspaceSearchProvider"
-    )
-  }
-  return context
 }

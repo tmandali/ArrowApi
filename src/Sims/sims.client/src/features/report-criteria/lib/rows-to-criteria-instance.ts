@@ -31,6 +31,10 @@ function coerceFieldValue(
       return resolveLookupItem(field, raw)
     case "enum":
       return raw
+    case "boolean": {
+      const t = raw.trim().toLowerCase()
+      return t === "true" || t === "1" || t === "yes"
+    }
     case "string":
       return raw
     default: {

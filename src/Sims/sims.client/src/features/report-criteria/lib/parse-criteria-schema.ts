@@ -156,6 +156,17 @@ function parseProperty(
   }
 
   if (
+    itemTypes.includes("boolean") ||
+    types.includes("boolean")
+  ) {
+    return {
+      ...base,
+      kind: "boolean",
+      defaultValue: stringifyDefaultValue(prop.default, selectionMode),
+    }
+  }
+
+  if (
     itemTypes.includes("number") ||
     itemTypes.includes("integer") ||
     types.includes("number") ||

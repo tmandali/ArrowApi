@@ -239,6 +239,12 @@ function isBlankCriteriaRow(row: CriteriaFilterRow): boolean {
 export type SchemaCriteriaFilterProps = {
   schema: JsonSchemaObject
   initialRows?: CriteriaFilterRow[]
+  /**
+   * Controlled rows. When set, the component renders these rows and reports
+   * edits through `onRowsChange` instead of owning internal state.
+   */
+  rows?: CriteriaFilterRow[]
+  onRowsChange?: (rows: CriteriaFilterRow[]) => void
   autoValidate?: boolean
   /** Show schema title/description header. Default true. */
   showHeader?: boolean
@@ -268,16 +274,22 @@ export const SchemaCriteriaFilter = React.forwardRef<
     showHeader = true,
     showFooterClear = true,
     onChange,
+    onRowsChange,
     onValidate,
     className,
+    rows: controlledRows,
   },
   ref
 ) {
   const parsed = React.useMemo(() => parseCriteriaSchema(schema), [schema])
-  const [rows, setRows] = React.useState<CriteriaFilterRow[]>(() => {
-    if (initialRows) return initialRows
-    return createInitialCriteriaRows(parseCriteriaSchema(schema).fields)
-  })
+  const [internalRows, setInternalRows] = React.useState<CriteriaFilterRow[]>(
+    () => {
+      if (initialRows) return initialRows
+      return createInitialCriteriaRows(parseCriteriaSchema(schema).fields)
+    }
+  )
+  const isControlled = controlledRows !== undefined
+  const rows = isControlled ? controlledRows : internalRows
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
   const [validation, setValidation] =
     React.useState<CriteriaValidationResult | null>(null)
@@ -452,13 +464,15 @@ export const SchemaCriteriaFilter = React.forwardRef<
 
   const setRowsAndNotify = React.useCallback(
     (updater: (prev: CriteriaFilterRow[]) => CriteriaFilterRow[]) => {
-      setRows((prev) => {
-        const next = updater(prev)
-        emitChange(next)
-        return next
-      })
+      const next = updater(isControlled ? controlledRows : internalRows)
+      emitChange(next)
+      if (isControlled) {
+        onRowsChange?.(next)
+      } else {
+        setInternalRows(next)
+      }
     },
-    [emitChange]
+    [emitChange, onRowsChange, isControlled, controlledRows, internalRows]
   )
 
   React.useEffect(() => {
@@ -552,12 +566,12 @@ export const SchemaCriteriaFilter = React.forwardRef<
     return row
   }
 
-  const resetToDefault = () => {
+  const resetToDefault = React.useCallback(() => {
     setEditingIndex(null)
     setValidation(null)
     hasValidatedRef.current = false
     setRowsAndNotify(() => createInitialCriteriaRows(parsed.fields))
-  }
+  }, [setRowsAndNotify, parsed.fields])
 
   React.useImperativeHandle(
     ref,

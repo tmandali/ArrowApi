@@ -221,6 +221,22 @@ export function CriteriaValueCell({
             )}
           />
         )
+      case "boolean":
+        return (
+          <CriteriaSimpleCombobox
+            value={value}
+            onChange={onChange}
+            options={[
+              { value: "true", label: "True" },
+              { value: "false", label: "False" },
+            ]}
+            placeholder={placeholder}
+            data-grid-cell={dataGridCell}
+            aria-invalid={invalid || undefined}
+            className={inputClass}
+            variant={variant}
+          />
+        )
       case "string":
         if (field.format === "date") {
           return (

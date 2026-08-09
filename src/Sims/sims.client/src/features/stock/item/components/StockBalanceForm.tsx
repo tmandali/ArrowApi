@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
-import { useJobSync } from "@/context/job-sync-provider"
+import { useJobSync } from "@/context/job-sync-context"
 import {
   fetchJobRequest,
   listArrowJobs,
@@ -481,6 +481,7 @@ export function StockBalanceForm() {
         },
         onJobSelect: handleJobSelect,
         onOpenJob: openJobResult,
+        openJobHref: jobHref,
         onJobDeleted: handleJobDeleted,
         onListLoaded: handleListLoaded,
       }}

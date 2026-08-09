@@ -3,7 +3,12 @@ import { ChevronDown, ListFilter, Table2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group"
+import {
   panelCardClass,
+  panelHeaderActionClass,
   panelHeaderClass,
   panelHeaderIconClass,
   panelHeaderSubtitleClass,
@@ -23,6 +28,10 @@ const headClass =
 
 const ACCOUNT_COL_STYLE = { width: `${WORKSPACE_SIDE_PANEL_PERCENT}%` } as const
 
+/** Match the header action buttons (h-7, text-xs, no shadow) in the grid header. */
+const levelToggleItemClass =
+  "!h-7 !min-w-7 !px-2 !text-xs !shadow-none !border-border"
+
 export type StockAnalyticsResultGridHandle = {
   expandAll: () => void
   collapseAll: () => void
@@ -35,6 +44,8 @@ type StockAnalyticsResultGridProps = {
   showFilterRow?: boolean
   onShowFilterRowChange?: (open: boolean) => void
   title?: string
+  /** Report/job GUID shown in the header subtitle instead of the row count. */
+  reportId?: string
   className?: string
 }
 
@@ -96,6 +107,7 @@ export const StockAnalyticsResultGrid = React.forwardRef<
     showFilterRow = false,
     onShowFilterRowChange,
     title = "Stock Analytics",
+    reportId,
     className,
   },
   ref
@@ -104,21 +116,35 @@ export const StockAnalyticsResultGrid = React.forwardRef<
   const [expandedNodes, setExpandedNodes] = React.useState<
     Record<string, boolean>
   >({})
+  const [treeLevel, setTreeLevel] = React.useState("2")
 
   React.useEffect(() => {
     setFilters({})
+    setTreeLevel("2")
     setExpandedNodes(collectExpandableIds(rows, 2))
   }, [columns, rows])
+
+  const handleExpandAll = React.useCallback(() => {
+    setExpandedNodes(collectExpandableIds(rows))
+  }, [rows])
+  const handleCollapseAll = React.useCallback(() => {
+    setExpandedNodes({})
+  }, [])
+  const handleSetLevel = React.useCallback(
+    (level: number) => {
+      setExpandedNodes(collectExpandableIds(rows, Math.max(0, level)))
+    },
+    [rows]
+  )
 
   React.useImperativeHandle(
     ref,
     () => ({
-      expandAll: () => setExpandedNodes(collectExpandableIds(rows)),
-      collapseAll: () => setExpandedNodes({}),
-      setLevel: (level: number) =>
-        setExpandedNodes(collectExpandableIds(rows, Math.max(0, level))),
+      expandAll: handleExpandAll,
+      collapseAll: handleCollapseAll,
+      setLevel: handleSetLevel,
     }),
-    [rows]
+    [handleExpandAll, handleCollapseAll, handleSetLevel]
   )
 
   const visibleRows = React.useMemo(() => {
@@ -204,9 +230,10 @@ export const StockAnalyticsResultGrid = React.forwardRef<
     })
 
   const subtitle =
-    columns.length === 0
+    reportId ??
+    (columns.length === 0
       ? "No columns"
-      : `${visibleRows.length} root row${visibleRows.length === 1 ? "" : "s"}`
+      : `${visibleRows.length} root row${visibleRows.length === 1 ? "" : "s"}`)
 
   return (
     <div className={cn(panelCardClass, "flex-1", className)}>
@@ -220,6 +247,57 @@ export const StockAnalyticsResultGrid = React.forwardRef<
         </div>
         {onShowFilterRowChange ? (
           <div className="flex shrink-0 items-center gap-1.5 self-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={panelHeaderActionClass}
+              disabled={rows.length === 0}
+              onClick={handleExpandAll}
+            >
+              Expand All
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={panelHeaderActionClass}
+              disabled={rows.length === 0}
+              onClick={handleCollapseAll}
+            >
+              Collapse All
+            </Button>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={treeLevel}
+              onValueChange={(value) => {
+                if (!value) return
+                setTreeLevel(value)
+                if (value === "all") {
+                  handleExpandAll()
+                } else {
+                  handleSetLevel(Number.parseInt(value, 10))
+                }
+              }}
+              disabled={rows.length === 0}
+              aria-label="Tree level"
+              className="!shadow-none"
+            >
+              <ToggleGroupItem value="1" className={levelToggleItemClass}>
+                1
+              </ToggleGroupItem>
+              <ToggleGroupItem value="2" className={levelToggleItemClass}>
+                2
+              </ToggleGroupItem>
+              <ToggleGroupItem value="3" className={levelToggleItemClass}>
+                3
+              </ToggleGroupItem>
+              <ToggleGroupItem value="all" className={levelToggleItemClass}>
+                All
+              </ToggleGroupItem>
+            </ToggleGroup>
             <Button
               type="button"
               variant={showFilterRow ? "secondary" : "outline"}
@@ -238,7 +316,7 @@ export const StockAnalyticsResultGrid = React.forwardRef<
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="min-w-[42rem]">
-          <div className="sticky top-0 z-10 border-b bg-card">
+          <div className="sticky top-0 z-10 bg-card">
             <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
               <colgroup>
                 {columns.map((col) => (

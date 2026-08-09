@@ -11,8 +11,9 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
-import { useJobSync } from "@/context/job-sync-provider"
+import { useJobSync } from "@/context/job-sync-context"
 import { fetchJobStatus } from "@/features/jobs/arrow-job-client"
 import { ApiError } from "@/services"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
@@ -179,20 +180,18 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <WorkspacePageHeader
         showSearch={false}
-        actions={<AIChatAssistant variant="toolbar" separator={false} />}
+        actions={<AIChatAssistant variant="toolbar" />}
       >
         <Breadcrumb className="min-w-0 overflow-hidden">
           <BreadcrumbList className="flex-nowrap text-xs">
             <BreadcrumbItem className="hidden md:inline-flex">
               <BreadcrumbLink asChild>
-                <Link to="/stock">Stock</Link>
+                <Link to="/stock" state={{ yulaClosed: true }}>Stock</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
             <BreadcrumbItem className="hidden md:inline-flex">
-              <BreadcrumbLink asChild>
-                <Link to="/stock">Reports</Link>
-              </BreadcrumbLink>
+              <BreadcrumbPage className="text-foreground">Reports</BreadcrumbPage>
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
             <BreadcrumbItem className="hidden sm:inline-flex">
@@ -210,11 +209,14 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
         </Breadcrumb>
       </WorkspacePageHeader>
 
+      {error ? (
+        <WorkspaceBanner tone="error">
+          <span title={error}>{error}</span>
+        </WorkspaceBanner>
+      ) : null}
+
       <WorkspaceAiDock className="overflow-hidden">
         <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pb-2 pt-0">
-          {error ? (
-            <p className="shrink-0 text-xs text-destructive">{error}</p>
-          ) : null}
           {loading && columns.length === 0 ? (
             <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
               <Spinner className="size-4" />
@@ -225,6 +227,7 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
               columns={columns}
               rows={rows}
               title={reportTitle}
+              reportId={jobId}
               showFilterRow={showFilterRow}
               onShowFilterRowChange={setShowFilterRow}
               className="min-h-0 flex-1"

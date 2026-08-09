@@ -18,7 +18,7 @@ export const panelHeaderClass =
 export const panelHeaderActionClass = "h-7 shrink-0 px-2.5 text-xs"
 
 export const panelHeaderIconClass =
-  "size-3.5 shrink-0 translate-y-px text-orange-600/80 dark:text-orange-400/80"
+  "size-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/80"
 
 export const panelHeaderTitleClass =
   "truncate text-sm font-semibold leading-none tracking-tight text-primary dark:text-sidebar-primary"

@@ -41,7 +41,10 @@ export default function NotFoundPage() {
 
   return (
     <>
-      <WorkspacePageHeader actions={<AIChatAssistant variant="toolbar" />}>
+      <WorkspacePageHeader
+        showSearch={false}
+        actions={<AIChatAssistant variant="toolbar" />}
+      >
         <Breadcrumb>
           <BreadcrumbList className="text-xs">
             <BreadcrumbItem>

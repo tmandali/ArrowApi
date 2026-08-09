@@ -3,11 +3,9 @@ import { Command as CommandPrimitive } from "cmdk"
 import { SearchIcon } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
-import { useWorkspaceSearch } from "@/context/workspace-search"
-import {
-  WorkspaceSearchResults,
-  useWorkspaceSearchMeta,
-} from "@/components/layout/workspace-search-panel"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
+import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
+import { WorkspaceSearchResults } from "@/components/layout/workspace-search-panel"
 import { Command } from "@/components/ui/command"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { cn } from "@/utils/cn"

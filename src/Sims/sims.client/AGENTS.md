@@ -1,0 +1,125 @@
+# AGENTS.md — Sims Client Mimari Kuralları
+
+Bu dosya, `src/Sims/sims.client` (Vite + React 19 + TypeScript + Tailwind v4) için alınmış
+mimari kararların tek kaynağıdır. **Her yeni oturumda bu dosyayı oku ve aşağıdaki kurallara uy.**
+
+## Çalışma Komutları
+
+```bash
+cd src/Sims/sims.client
+npm run dev        # dev sunucusu (https, port 56402)
+npm run build      # tsc -b && vite build
+npm run lint       # oxlint
+npx tsc -b --noEmit
+```
+
+## Mimari Model
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SHELL (host) — uygulama iskeleti, workspace'ten bağımsız     │
+│  App · routes · layout · sidebar · header · Yula · providers  │
+│  context/ · store/ · services/ · lib/ · hooks/ · components/  │
+└─────────────────────────────────────────────────────────────┘
+        ▲                          ▲
+        │ kontrat                  │ public API
+        │ (ui, context, services)  │ (index.ts + routes.ts)
+┌───────┴────────┐  ┌──────────────┴────────┐
+│  WORKSPACE A   │  │   WORKSPACE B          │
+│  features/A/   │  │   features/B/          │
+└────────────────┘  └────────────────────────┘
+```
+
+### Workspace Nedir?
+- **Workspace** = bağımsız bir iş alanı (ör. stok, satış, muhasebe, üretim). Kendi sayfalarını,
+  formlarını, servislerini, tiplerini barındırır.
+- **Shell** = root/host. Workspace'lerin yaşadığı iskelet: routing, sidebar/nav, page header,
+  AI dock, auth, user settings gibi **workspace'ten bağımsız** genel özellikler.
+- Workspace **kendini register eder**: içeriğini shell'e `index.ts` + `routes.ts` üzerinden sunar.
+- **Gelecek hedefi:** her workspace ileride module federation ile **ayrı bir React uygulaması
+  (remote)** olarak deploy edilir; shell host olur. Bu yüzden workspace sınırları her değişiklikte korunur.
+
+## Dizin Yapısı ve Sorumluluklar
+
+```
+src/
+├── pages/          → SADECE ince route wrapper'ları. İçerik yok, feature'a yönlendirir.
+├── features/<feature>/
+│   ├── components/ → sayfa/form bileşenleri
+│   ├── hooks/ · services/ · types/ · schemas/
+│   ├── routes.ts   → workspace kendi route'larını buradan register eder
+│   └── index.ts    → feature'ın public API'si
+├── shell katmanı:
+│   ├── components/ui/      → shadcn primitives (DOKUNMA, güncellemelerde çakışır)
+│   ├── components/layout/  → sidebar, page header/dock/shell, Yula
+│   ├── components/common/  → genel yeniden kullanılabilir bileşenler
+│   └── context/ · store/ · services/ · lib/ · hooks/ · routes/
+```
+
+## Kritik Mimari Kurallar
+
+1. **Global vs Workspace**
+   - Workspace'e özgü ekranlar → `features/<workspace>/`
+   - Workspace'ten bağımsız, tüm workspace'lerde ortak ekranlar → `features/<feature>/` (auth, settings, vb.)
+   - Kural: hangi workspace'e ait olduğu path'ten belli olan ekran workspace'tir; workspace'ten bağımsız olan global'dir.
+
+2. **`src/pages/` sadece wrapper**
+   ```tsx
+   import { XxxForm } from "@/features/<workspace>"
+   export default function XxxPage() { return <XxxForm /> }
+   ```
+   Sayfa mantığı asla `pages/` içinde tutulmaz.
+
+3. **shadcn `components/ui/*`'a DOKUNMA.** Paket güncellemelerinde çakışır. `.oxlintrc.json`'daki
+   `overrides` bu klasörde `react/only-export-components`'ı zaten kapatır.
+
+4. **Hook + Provider ayrı dosyalarda.** Bileşen dosyasından hook export edilmez (Fast Refresh).
+   - Provider `XxxProvider` → ayrı `xxx-context.ts` (context + hook), provider dosyası sadece bileşen.
+   - Sabitler/yardımcılar ayrı `*-data.ts` / `*-utils.ts` / `*-hooks.ts` dosyalarında.
+
+5. **Aktif workspace korunur.** Global sayfalarda (user-settings, dashboard, login vb.) workspace
+   değişmez; son ziyaret edilen korunur. Kaynak: `src/hooks/use-active-workspace.ts`
+   (`useActiveWorkspaceId`, `workspaceIdFromPath`). `WorkspaceSwitcher` + `AppSidebar` bunu kullanır.
+
+6. **Workspace sayfaları ortak shell kullanır.**
+   `src/components/layout/workspace-page-shell.tsx` → header (breadcrumb + actions + search) +
+   AI dock'u tek kontrata toplar. Sayfa formları sadece içerik + breadcrumb/actions prop'larını verir;
+   header/dock yapısını kendileri kurmaz. Yeni sayfa eklerken bu shell'i kullan.
+
+7. **Workspace route kaydı veri odaklıdır.**
+   Her workspace `features/<workspace>/routes.ts` içinde `WorkspaceRouteConfig[]` export eder
+   (`{ path, Component: lazy(...), fullHeight? }`), `index.ts`'ten re-export edilir.
+   `src/routes/AppRoutes.tsx` bunları toplar ve render eder.
+   - Yeni sayfa eklemek: `pages/XxxPage.tsx` (wrapper) + `features/<ws>/routes.ts`'e satır.
+   - Workspace home path'leri (`/`, `/selling`, `/accounting`, `/stock`, `/manufacturing`) shell'de ortak tanımlıdır.
+
+8. **Workspace sınırları her değişiklikte korunur (ZORUNLU).**
+   - Workspace içeriği sadece kendi `features/<workspace>/` altında; `pages/` yalnızca wrapper.
+   - Workspace → shell bağımlılığı sadece "kontrat" üzerinden: `components/ui/*`,
+     `components/layout/panel-chrome` + `workspace-page-shell`, `lib/empty-module`, `services`,
+     `context/*-context.ts` + store'lar. Workspace kendi iç mantığını shell'de tutmaz.
+   - Cross-workspace bağımlılığı **minimal** tut; bir workspace başka workspace'in özelliğini
+     kullanmak zorundaysa bunu ortak bir global feature'a taşı.
+   - Nav/route kaydı shell'de toplanır; ileride dinamik remote map'e dönüşür.
+
+## Routing
+
+- Route'lar `features/<ws>/routes.ts` kaynaklıdır; `AppRoutes.tsx` toplar.
+- Global sayfalar (login, user-settings, not-found, home) shell'de tanımlıdır.
+- Workspace home path'leri ortak HomePage'e gider.
+- **Route bileşenleri eager import edilir** (`WorkspaceRouteConfig.Component = ComponentType`,
+  `lazy`/`Suspense` yok). Neden: Suspense fallback'i geçişte sayfayı boşaltıyordu;
+  eager import ile geçişte içerik asla kaybolmaz. Code-splitting ileride module federation
+  remote'larına taşınır.
+
+## Dashboard / Yula
+
+- Workspace home: Yula varsayılan açık. Breadcrumb workspace linkleri `state={{ yulaClosed: true }}`
+  ile gelince Yula kapalı açılır (HomePage `location.state` okur).
+- Dashboard içeriği global bir feature'da; kutu yerine transparent Card kullanılır.
+
+## Route Geçişleri
+
+- Route değişiminde (pathname) sayfa **yerinde kalır**, üstte ince `RouteTopBar`
+  (`components/layout/route-top-bar.tsx`) 350ms belirir. `AppRoutes` içinde `useEffect` + timeout ile.
+- Yükleme ekranında şirket/marka adı gösterilmez (yalnızca şirket değiştirme overlay'i gösterir).

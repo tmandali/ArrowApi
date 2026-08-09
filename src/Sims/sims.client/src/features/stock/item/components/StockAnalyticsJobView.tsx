@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { ChevronDown, Printer } from "lucide-react"
+import { Printer } from "lucide-react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,19 +10,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
-import { useJobSync } from "@/context/job-sync-provider"
+import { useJobSync } from "@/context/job-sync-context"
 import { fetchJobRequest, fetchJobStatus } from "@/features/jobs/arrow-job-client"
 import { ApiError } from "@/services"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
@@ -86,7 +79,6 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [showFilterRow, setShowFilterRow] = React.useState(true)
-  const [treeLevel, setTreeLevel] = React.useState("2")
   const [isPrinting, setIsPrinting] = React.useState(false)
 
   const runIdRef = React.useRef(0)
@@ -223,62 +215,6 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
         showSearch={false}
         actions={
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="hidden h-7 text-xs gap-1 px-2.5 lg:inline-flex"
-                  disabled={!reportReady}
-                >
-                  Options
-                  <ChevronDown className="size-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  disabled={!reportReady}
-                  onClick={() => gridRef.current?.expandAll()}
-                >
-                  Expand All
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!reportReady}
-                  onClick={() => gridRef.current?.collapseAll()}
-                >
-                  Collapse All
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                  <Input
-                    value={treeLevel}
-                    onChange={(event) => setTreeLevel(event.target.value)}
-                    className="h-7 w-12 text-center text-xs"
-                    disabled={!reportReady}
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 flex-1 text-xs"
-                    disabled={!reportReady}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      const level = Number.parseInt(treeLevel, 10)
-                      gridRef.current?.setLevel(
-                        Number.isFinite(level) ? level : 2
-                      )
-                    }}
-                  >
-                    Set Level
-                  </Button>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             <Button
               type="button"
               variant="outline"
@@ -293,7 +229,7 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
               {isPrinting ? "Preparing…" : "Print"}
             </Button>
 
-            <AIChatAssistant variant="toolbar" separator={false} />
+            <AIChatAssistant variant="toolbar" />
           </div>
         }
       >
@@ -301,14 +237,12 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
           <BreadcrumbList className="flex-nowrap text-xs">
             <BreadcrumbItem className="hidden md:inline-flex">
               <BreadcrumbLink asChild>
-                <Link to="/stock">Stock</Link>
+                <Link to="/stock" state={{ yulaClosed: true }}>Stock</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
             <BreadcrumbItem className="hidden md:inline-flex">
-              <BreadcrumbLink asChild>
-                <Link to="/stock">Reports</Link>
-              </BreadcrumbLink>
+              <BreadcrumbPage className="text-foreground">Reports</BreadcrumbPage>
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
             <BreadcrumbItem className="hidden sm:inline-flex">
@@ -326,11 +260,14 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
         </Breadcrumb>
       </WorkspacePageHeader>
 
+      {error ? (
+        <WorkspaceBanner tone="error">
+          <span title={error}>{error}</span>
+        </WorkspaceBanner>
+      ) : null}
+
       <WorkspaceAiDock className="overflow-hidden">
         <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pb-2 pt-0">
-          {error ? (
-            <p className="shrink-0 text-xs text-destructive">{error}</p>
-          ) : null}
           {loading && columns.length === 0 ? (
             <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
               <Spinner className="size-4" />
@@ -342,6 +279,7 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
               columns={columns}
               rows={rows}
               title={reportTitle}
+              reportId={jobId}
               showFilterRow={showFilterRow}
               onShowFilterRowChange={setShowFilterRow}
               className="min-h-0 flex-1"

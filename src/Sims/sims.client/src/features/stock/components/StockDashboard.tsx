@@ -40,6 +40,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item"
 import { emptyModulePath } from "@/lib/empty-module"
+import { workspaceDashboardPath } from "@/lib/workspace-nav"
 import { cn } from "@/utils/cn"
 
 const e = emptyModulePath
@@ -142,7 +143,7 @@ const shortcuts: ShortcutItem[] = [
   },
   {
     title: "Dashboard",
-    url: "/stock",
+    url: workspaceDashboardPath,
     icon: LayoutDashboardIcon,
   },
 ]

@@ -28,7 +28,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -302,16 +301,14 @@ export function ItemForm({
             <BreadcrumbList className="flex-nowrap text-xs">
               <BreadcrumbItem className="hidden md:inline-flex">
                 <BreadcrumbLink asChild>
-                  <Link to={workspaceHome.url}>{workspaceHome.label}</Link>
+                  <Link to={workspaceHome.url} state={{ yulaClosed: true }}>{workspaceHome.label}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               {isReportShell ? (
                 <>
                   <BreadcrumbItem className="hidden md:inline-flex">
-                    <BreadcrumbLink asChild>
-                      <Link to={workspaceHome.url}>Reports</Link>
-                    </BreadcrumbLink>
+                    <BreadcrumbPage className="text-foreground">Reports</BreadcrumbPage>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem className="min-w-0">

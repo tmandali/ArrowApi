@@ -1,4 +1,3 @@
-import { useLocation, useNavigate } from "react-router-dom"
 import {
   Command,
   CommandEmpty,
@@ -27,31 +26,9 @@ import {
   CornerDownLeft,
 } from "lucide-react"
 import { emptyModulePath } from "@/lib/empty-module"
+import { workspaceDashboardPath } from "@/lib/workspace-nav"
+import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
 import { cn } from "@/utils/cn"
-
-function useWorkspaceSearchMeta() {
-  const { pathname } = useLocation()
-
-  const workspace =
-    pathname.startsWith("/accounting")
-      ? "accounting"
-      : pathname.startsWith("/stock") || pathname === "/landed-cost-voucher"
-        ? "stock"
-        : pathname.startsWith("/manufacturing")
-          ? "manufacturing"
-          : "selling"
-
-  const placeholder =
-    workspace === "accounting"
-      ? "Search Financial Reports..."
-      : workspace === "stock"
-        ? "Search Stock & Traceability..."
-        : workspace === "manufacturing"
-          ? "Search Manufacturing & BOM..."
-          : "Search Subcontracting & Orders..."
-
-  return { workspace, placeholder }
-}
 
 type WorkspaceSearchItemsProps = {
   onSelect: (url: string) => void
@@ -114,7 +91,7 @@ export function WorkspaceSearchItems({ onSelect }: WorkspaceSearchItemsProps) {
     return (
       <>
         <CommandGroup heading="Stock Pages">
-          <CommandItem onSelect={() => onSelect("/stock")}>
+          <CommandItem onSelect={() => onSelect(workspaceDashboardPath)}>
             <Package className="mr-2 size-4" />
             <span>Stock Dashboard</span>
             <CommandShortcut>↵</CommandShortcut>
@@ -293,18 +270,3 @@ export function WorkspaceSearchPanel({
     </Command>
   )
 }
-
-export function useWorkspaceSearchNavigate(
-  onOpenChange: (open: boolean) => void
-) {
-  const navigate = useNavigate()
-
-  return (url: string) => {
-    onOpenChange(false)
-    if (url && url !== "#") {
-      navigate(url)
-    }
-  }
-}
-
-export { useWorkspaceSearchMeta }

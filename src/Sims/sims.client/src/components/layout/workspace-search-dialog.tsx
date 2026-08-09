@@ -5,10 +5,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  WorkspaceSearchPanel,
-  useWorkspaceSearchNavigate,
-} from "@/components/layout/workspace-search-panel"
+import { WorkspaceSearchPanel } from "@/components/layout/workspace-search-panel"
+import { useWorkspaceSearchNavigate } from "@/components/layout/workspace-search-hooks"
 
 type WorkspaceSearchDialogProps = {
   open: boolean
