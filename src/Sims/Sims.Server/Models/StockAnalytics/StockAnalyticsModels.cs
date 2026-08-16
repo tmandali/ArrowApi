@@ -17,6 +17,8 @@ public sealed class StockAnalyticsRequest : IRequest<IAsyncEnumerable<RecordBatc
     public bool ShowZeroValues { get; init; }
     public bool ShowGroupAccounts { get; init; } = true;
     public int? BatchSize { get; init; }
+    /// <summary>Mock ağaç düğüm sayısı (demo/test). Varsayılan örnek ağaç (~53 düğüm).</summary>
+    public int? SampleRows { get; init; }
 }
 
 /// <summary>Hiyerarşik hesap satırı (örnek veri kaynağı).</summary>

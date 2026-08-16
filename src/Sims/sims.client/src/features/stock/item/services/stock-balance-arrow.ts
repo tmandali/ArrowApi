@@ -1,8 +1,5 @@
-import { tableFromIPC, type Table } from "apache-arrow"
-import { ApiError } from "@/services"
-import { getCompanyHeaders } from "@/lib/company-headers"
-
-const ARROW_ACCEPT = "application/vnd.apache.arrow.stream"
+import { type RecordBatch, type Schema } from "apache-arrow"
+import { streamArrowRecordBatches } from "@/features/jobs/arrow-job-client"
 
 export type StockBalanceColumn = {
   name: string
@@ -46,73 +43,71 @@ function isNumericField(type: { toString?: () => string } | null | undefined): b
   )
 }
 
-function columnsFromSchema(table: Table): StockBalanceColumn[] {
-  return table.schema.fields.map((field) => ({
+export function columnsFromSchema(schema: Schema): StockBalanceColumn[] {
+  return schema.fields.map((field) => ({
     name: field.name,
     label: humanizeField(field.name),
     align: isNumericField(field.type) ? "right" : "left",
   }))
 }
 
-function rowsFromTable(
-  table: Table,
+function rowsFromBatch(
+  batch: RecordBatch,
   columns: StockBalanceColumn[]
 ): StockBalanceGridRow[] {
   const rows: StockBalanceGridRow[] = []
-  const n = table.numRows
-  const idChild = table.getChild("Id")
+  const n = batch.numRows
+  const idChild = batch.getChild("Id")
 
   for (let i = 0; i < n; i += 1) {
     const id = String(idChild?.get(i) ?? i)
     const values: Record<string, string> = {}
     for (const col of columns) {
-      values[col.name] = cellToDisplay(table.getChild(col.name)?.get(i))
+      values[col.name] = cellToDisplay(batch.getChild(col.name)?.get(i))
     }
     rows.push({ id, values })
   }
   return rows
 }
 
-async function fetchArrowTable(
+/**
+ * Tamamlanmış job sonucunu batch batch okur; her Arrow `RecordBatch` geldikçe
+ * satır bloğuyla birlikte yield eder. İlk batch'in şemasından kolonlar üretilir.
+ */
+export async function* streamStockBalanceRows(
   jobUrl: string,
   signal: AbortSignal
-): Promise<Table> {
-  const response = await fetch(jobUrl, {
-    headers: { Accept: ARROW_ACCEPT, ...getCompanyHeaders() },
-    signal,
-  })
+): AsyncGenerator<StockBalanceArrowReport> {
+  let columns: StockBalanceColumn[] = []
+  let totalRows = 0
 
-  if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
+  for await (const batch of streamArrowRecordBatches(jobUrl, signal)) {
+    if (columns.length === 0) {
+      columns = columnsFromSchema(batch.schema)
     }
-    throw new ApiError(
-      response.statusText || "Arrow IPC alınamadı",
-      response.status,
-      body
-    )
+    const rows = rowsFromBatch(batch, columns)
+    totalRows += rows.length
+    yield { columns, rows, totalRows }
   }
-
-  const buffer = new Uint8Array(await response.arrayBuffer())
-  return tableFromIPC(buffer)
 }
 
+/** Stream'i toplayıp tüm raporu dönen kolaylık sarmalayıcısı. */
 export async function fetchStockBalanceArrowReport(
   jobUrl: string,
   signal?: AbortSignal
 ): Promise<StockBalanceArrowReport> {
-  const table = await fetchArrowTable(
+  const rows: StockBalanceGridRow[] = []
+  let columns: StockBalanceColumn[] = []
+  let totalRows = 0
+
+  for await (const chunk of streamStockBalanceRows(
     jobUrl,
     signal ?? new AbortController().signal
-  )
-  const columns = columnsFromSchema(table)
-  const rows = rowsFromTable(table, columns)
-  return {
-    columns,
-    rows,
-    totalRows: table.numRows,
+  )) {
+    if (columns.length === 0) columns = chunk.columns
+    rows.push(...chunk.rows)
+    totalRows = chunk.totalRows
   }
+
+  return { columns, rows, totalRows }
 }

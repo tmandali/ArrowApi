@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
+import { FilePlus2 } from "lucide-react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
@@ -17,12 +19,7 @@ import { useJobSync } from "@/context/job-sync-context"
 import { fetchJobStatus } from "@/features/jobs/arrow-job-client"
 import { ApiError } from "@/services"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
-import {
-  fetchStockBalanceArrowReport,
-  type StockBalanceColumn,
-  type StockBalanceGridRow,
-} from "../services/stock-balance-arrow"
-import { StockBalanceResultGrid } from "./StockBalanceResultGrid"
+import { ArrowReportGrid } from "@/features/jobs/components/ArrowReportGrid"
 
 const STOCK_BALANCE_PATH = "/stock/stock-balance"
 const DEFAULT_REPORT_TITLE = "Stock Balance"
@@ -65,12 +62,11 @@ type StockBalanceJobViewProps = {
 export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
   const { waitUntilTerminal } = useJobSync()
 
-  const [columns, setColumns] = React.useState<StockBalanceColumn[]>([])
-  const [rows, setRows] = React.useState<StockBalanceGridRow[]>([])
   const [reportTitle, setReportTitle] = React.useState(DEFAULT_REPORT_TITLE)
   const [error, setError] = React.useState<string | null>(null)
-  const [loading, setLoading] = React.useState(true)
   const [showFilterRow, setShowFilterRow] = React.useState(true)
+  const [reportUrl, setReportUrl] = React.useState<string | null>(null)
+  const [expectedTotalRows, setExpectedTotalRows] = React.useState<number | null>(null)
 
   const runIdRef = React.useRef(0)
   const abortRef = React.useRef<AbortController | null>(null)
@@ -80,20 +76,10 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
     abortRef.current?.abort()
     const abort = new AbortController()
     abortRef.current = abort
-
-    setLoading(true)
+    setReportUrl(null)
+    setExpectedTotalRows(null)
     setError(null)
-    setColumns([])
-    setRows([])
     setReportTitle(DEFAULT_REPORT_TITLE)
-
-    const loadReport = async (jobUrl: string) => {
-      const report = await fetchStockBalanceArrowReport(jobUrl, abort.signal)
-      if (runIdRef.current !== runId) return
-      setColumns(report.columns)
-      setRows(report.rows)
-      setLoading(false)
-    }
 
     const load = async () => {
       try {
@@ -104,7 +90,6 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
 
         if (!job?.jobUrl) {
           setError("Job bulunamadı")
-          setLoading(false)
           return
         }
 
@@ -112,17 +97,16 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
 
         if (jobStatus === "Failed") {
           setError(job.error || "Job failed")
-          setLoading(false)
           return
         }
         if (jobStatus === "Cancelled") {
           setError("Job cancelled")
-          setLoading(false)
           return
         }
 
         if (jobStatus === "Completed") {
-          await loadReport(job.jobUrl)
+          setExpectedTotalRows(job.totalRows ?? null)
+          setReportUrl(job.jobUrl)
           return
         }
 
@@ -140,31 +124,27 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
             if (fresh?.name) setReportTitle(formatReportTitle(fresh.name))
             if (!fresh?.jobUrl) {
               setError("Job sonucu bulunamadı")
-              setLoading(false)
               return
             }
-            await loadReport(fresh.jobUrl)
+            setExpectedTotalRows(fresh.totalRows ?? null)
+            setReportUrl(fresh.jobUrl)
             return
           }
 
           if (terminal.status === "Cancelled") {
             setError("Job cancelled")
-            setLoading(false)
             return
           }
 
           setError(terminal.error || "Job failed")
-          setLoading(false)
           return
         }
 
         setError(`Unexpected status: ${jobStatus || "unknown"}`)
-        setLoading(false)
       } catch (err) {
         if (runIdRef.current !== runId) return
         if (abort.signal.aborted) return
         setError(errorMessage(err, "Sonuç yüklenemedi"))
-        setLoading(false)
       }
     }
 
@@ -177,10 +157,25 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
   const shortId = jobId.slice(0, 8)
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <WorkspacePageHeader
         showSearch={false}
-        actions={<AIChatAssistant variant="toolbar" />}
+        actions={
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+            >
+              <Link to={STOCK_BALANCE_PATH}>
+                <FilePlus2 className="size-3.5" />
+                New
+              </Link>
+            </Button>
+            <AIChatAssistant variant="toolbar" />
+          </div>
+        }
       >
         <Breadcrumb className="min-w-0 overflow-hidden">
           <BreadcrumbList className="flex-nowrap text-xs">
@@ -217,22 +212,23 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
 
       <WorkspaceAiDock className="overflow-hidden">
         <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pb-2 pt-0">
-          {loading && columns.length === 0 ? (
+          {!reportUrl && !error ? (
             <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
               <Spinner className="size-4" />
               Loading result…
             </div>
-          ) : (
-            <StockBalanceResultGrid
-              columns={columns}
-              rows={rows}
+          ) : reportUrl ? (
+            <ArrowReportGrid
+              jobId={jobId}
+              jobUrl={reportUrl}
+              expectedTotalRows={expectedTotalRows}
               title={reportTitle}
-              reportId={jobId}
               showFilterRow={showFilterRow}
               onShowFilterRowChange={setShowFilterRow}
+              onError={setError}
               className="min-h-0 flex-1"
             />
-          )}
+          ) : null}
         </div>
       </WorkspaceAiDock>
     </div>

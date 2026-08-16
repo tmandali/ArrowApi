@@ -15,8 +15,6 @@ function stripValue(value: unknown): unknown {
     const result: Record<string, unknown> = {}
     for (const [key, child] of Object.entries(value)) {
       if (key.startsWith("x-")) continue
-      // `format: date` drives the calendar UI; compact YYYYMMDD patterns validate values.
-      if (key === "format" && child === "date") continue
       result[key] = stripValue(child)
     }
     return result

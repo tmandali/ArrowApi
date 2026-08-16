@@ -43,6 +43,9 @@ type NotificationsState = {
   markMockAsRead: (id: string) => void
   isMockRead: (id: string) => boolean
   isMockDismissed: (id: string) => boolean
+  removeNotification: (id: string) => void
+  removeNotificationByJobId: (jobId: string) => void
+  dismissMock: (id: string) => void
   clearRead: (options?: {
     workspace?: WorkspaceKey
     mockIds?: string[]
@@ -79,6 +82,29 @@ export const useNotificationsStore = create<NotificationsState>()(
         }
         set({ notifications: [next, ...prev] })
       },
+      removeNotification: (id) => {
+        set({
+          notifications: get().notifications.filter((item) => item.id !== id),
+        })
+      },
+      removeNotificationByJobId: (jobId) => {
+        if (!jobId) return
+        const targetPrefix = `job-${jobId}`
+        set({
+          notifications: get().notifications.filter((item) => {
+            if (item.id === targetPrefix || item.id === jobId) return false
+            if (
+              item.href &&
+              (item.href.endsWith(`/${jobId}`) ||
+                item.href.includes(`/${jobId}/`) ||
+                item.href.includes(`jobId=${jobId}`))
+            ) {
+              return false
+            }
+            return true
+          }),
+        })
+      },
       markAsRead: (id) => {
         set({
           notifications: get().notifications.map((item) =>
@@ -109,6 +135,10 @@ export const useNotificationsStore = create<NotificationsState>()(
       },
       isMockRead: (id) => get().readMockIds.includes(id),
       isMockDismissed: (id) => get().dismissedMockIds.includes(id),
+      dismissMock: (id) => {
+        if (get().dismissedMockIds.includes(id)) return
+        set({ dismissedMockIds: [...get().dismissedMockIds, id] })
+      },
       clearRead: (options = {}) => {
         const { workspace, mockIds = [] } = options
         const dismissedMockIds = new Set(get().dismissedMockIds)

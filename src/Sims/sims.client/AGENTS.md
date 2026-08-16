@@ -123,3 +123,26 @@ src/
 - Route değişiminde (pathname) sayfa **yerinde kalır**, üstte ince `RouteTopBar`
   (`components/layout/route-top-bar.tsx`) 350ms belirir. `AppRoutes` içinde `useEffect` + timeout ile.
 - Yükleme ekranında şirket/marka adı gösterilmez (yalnızca şirket değiştirme overlay'i gösterir).
+
+## Büyük Veri Raporlama Mimarisi (Arrow + OPFS + DuckDB WASM)
+
+Tüm workspace'lerdeki (Stok, Satış, Muhasebe vb.) büyük raporlama ekranları ortak **Arrow & DuckDB** altyapısını kullanır:
+
+1. **Ortak Rapor Bileşeni (`ArrowReportGrid` - `@/features/jobs`):**
+   - Rapor ekranlarında doğrudan `<ArrowReportGrid jobId={id} jobUrl={url} title="Rapor Başlığı" expectedTotalRows={total} />` şeklinde kullanılır.
+   - Kolonları, sayısal tipleri, hizalamaları ve formatlamaları otomatik algılar.
+
+2. **OPFS (Origin Private File System) Kalıcı Disk Önbelleği (`@/services`):**
+   - Sunucudan gelen Arrow akışı (`res.body.tee()`) JavaScript RAM'inde biriktirilmez; doğrudan tarayıcının yerel SSD diskine (`sims_arrow_reports/{jobId}.arrow`) yazılır.
+   - Sayfa yenilendiğinde (`F5`), sekme kapatıldığında veya tarayıcı yeniden açıldığında **sunucuya sıfır (0) HTTP isteği** gönderilir; rapor yerel SSD'den saliseler içinde açılır.
+   - Sağ üstteki "Yenile" (Refresh) butonu OPFS diskindeki eski dosyayı ve DuckDB tablosunu silerek sunucudan taze veri çeker.
+
+3. **Arka Plan Akış Yöneticisi (`duckStreamManager` - `@/features/jobs`):**
+   - Kullanıcı rapor inerken başka bir sayfaya veya workspace'e geçse dahi indirme ve diske yazma arka planda kesintisiz devam eder; geri dönüldüğünde kaldığı yerden otomatik bağlanır.
+
+4. **DuckDB WASM & Sorgu Motoru (`@/services/duckdb`):**
+   - Filtreleme, arama ve sıralama işlemlerini tarayıcı içinde C++ SIMD hızında yürütür.
+   - Dynamics 365 / Business Central arama sözdizimini (`100..500`, `>100&<500`, `SKU*`, `|`, `!`) SQL sorgularına çevirir (`filter-parser.ts`).
+   - `SET preserve_insertion_order=false;` ile bellek optimize edilir.
+   - Devasa (100M+) satırlarda tarayıcının 32-bit WASM tavanına (3.1 GB) ulaşılması halinde inen onlarca milyon satır korunarak kullanıcıya sunulur.
+

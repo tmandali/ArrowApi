@@ -130,9 +130,9 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
 
         string resultPath = _resultStorage.GetResultPath(jobId, job.Name, job.RootJobId);
 
-        IAsyncEnumerable<RecordBatch> rawBatches;
         try
         {
+            IAsyncEnumerable<RecordBatch> rawBatches;
             if (worker is IArrowJobWorker<TRequest> streamWorker)
             {
                 rawBatches = streamWorker.Handle(job.Request, cancellationToken);
@@ -142,28 +142,29 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
                 object? response = await InvokeHandlerDynamicAsync(worker, job.Request, cancellationToken);
                 rawBatches = ConvertResponseToBatches(response, cancellationToken);
             }
+
+            IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(
+                jobId,
+                rawBatches,
+                cancellationToken);
+            await _resultStorage.WriteBatchesAsync(resultPath, batches, cancellationToken);
+
+            latest = await _store.GetAsync(jobId, cancellationToken);
+            if (latest?.State == ArrowJobState.Cancelled)
+            {
+                await _resultStorage.DeleteResultAsync(resultPath, cancellationToken);
+                await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
+                return;
+            }
+
+            await _store.MarkCompletedAsync(jobId, resultPath, cancellationToken);
+            await PublishAsync(jobId, ArrowJobEventNames.Completed, cancellationToken);
+            _logger.LogInformation("Job tamamlandı: {JobId}", jobId);
         }
         finally
         {
             ArrowJobExecutionContextHolder.Current = null;
         }
-
-        IAsyncEnumerable<RecordBatch> batches = TrackProgressAsync(
-            jobId,
-            rawBatches,
-            cancellationToken);
-        await _resultStorage.WriteBatchesAsync(resultPath, batches, cancellationToken);
-
-        latest = await _store.GetAsync(jobId, cancellationToken);
-        if (latest?.State == ArrowJobState.Cancelled)
-        {
-            await _resultStorage.DeleteResultAsync(resultPath, cancellationToken);
-            await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
-            return;
-        }
-
-        await _store.MarkCompletedAsync(jobId, resultPath, cancellationToken);
-        await PublishAsync(jobId, ArrowJobEventNames.Completed, cancellationToken);
 
         ArrowJob<TRequest>? completed = await _store.GetAsync(jobId, cancellationToken);
         if (completed is not null)
@@ -171,8 +172,6 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
             activity?.SetTag("arrow.job.batch_count", completed.BatchCount);
             activity?.SetTag("arrow.job.total_rows", completed.TotalRows);
         }
-
-        _logger.LogInformation("Job tamamlandı: {JobId}", jobId);
     }
 
     private static Dictionary<string, object?> CreateLogScope(Guid jobId, Activity? activity) =>

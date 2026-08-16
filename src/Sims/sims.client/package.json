@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.51",
     "@base-ui/react": "^1.7.0",
+    "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@react-pdf/renderer": "^4.5.1",
     "@shadcn/helpers": "^0.1.0",
     "ai": "^7.0.48",

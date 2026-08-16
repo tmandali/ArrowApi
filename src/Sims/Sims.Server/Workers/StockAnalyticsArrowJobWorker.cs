@@ -1,8 +1,6 @@
-using System.Data;
-using System.Data.Common;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Apache.Arrow;
-using Arrow.Data;
 using Arrow.Jobs;
 using Sims.Server.Models.StockAnalytics;
 using Sims.Server.Services;
@@ -42,29 +40,37 @@ public sealed class StockAnalyticsArrowJobWorker : IArrowJobWorker<StockAnalytic
         await _context.PublishInfoAsync("Building account tree", cancellationToken);
         await Task.Delay(StepDelay, cancellationToken);
 
-        using DataTable table = _service.BuildArrowTable(request);
-
-        // Küçük batch → daha fazla progress SSE event'i
-        int batchSize = request.BatchSize is > 0 ? request.BatchSize.Value : 12;
-        var options = new ArrowConversionOptions { BatchSize = batchSize };
+        // Küçük raporlarda 12 (demo progress), büyük mock'ta 10k (SSE/batch flood'u önler).
+        int batchSize = request.BatchSize is > 0
+            ? request.BatchSize.Value
+            : (request.SampleRows ?? 0) > 10_000 ? 10_000 : 12;
 
         await _context.PublishInfoAsync(
-            $"Streaming Arrow batches (batchSize={batchSize}, rows={table.Rows.Count})",
+            $"Streaming Arrow batches (batchSize={batchSize})",
             cancellationToken);
         await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
-        await using DbDataReader dbReader = table.CreateDataReader();
-        await using ArrowBatchReader arrowReader = dbReader.OpenArrowReader(options);
+        long totalRows = 0;
+        int columnCount = 0;
 
-        await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
+        await foreach (RecordBatch batch in _service.StreamBatchesAsync(request, batchSize, cancellationToken))
         {
+            totalRows += batch.Length;
+            columnCount = batch.Schema.FieldsList.Count;
             await Task.Delay(BatchDelay, cancellationToken);
-            yield return batch;
+            try
+            {
+                yield return batch;
+            }
+            finally
+            {
+                batch.Dispose();
+            }
         }
 
         await Task.Delay(TimeSpan.FromMilliseconds(400), cancellationToken);
         await _context.PublishInfoAsync(
-            $"Report ready ({table.Rows.Count} accounts, {table.Columns.Count} columns)",
+            $"Report ready ({totalRows} accounts, {columnCount} columns)",
             cancellationToken);
     }
 }

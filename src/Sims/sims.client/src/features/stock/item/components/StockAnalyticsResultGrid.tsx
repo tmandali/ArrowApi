@@ -1,32 +1,22 @@
 import * as React from "react"
-import { ChevronDown, ListFilter, Table2 } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
-import {
-  panelCardClass,
-  panelHeaderActionClass,
-  panelHeaderClass,
-  panelHeaderIconClass,
-  panelHeaderSubtitleClass,
-  panelHeaderTitleClass,
-} from "@/components/layout/panel-chrome"
+import { panelHeaderActionClass } from "@/components/layout/panel-chrome"
 import { WORKSPACE_SIDE_PANEL_PERCENT } from "@/components/layout/workspace-side-panel"
 import { cn } from "@/utils/cn"
+import { formatCount } from "@/utils/format"
+import { matchCellFilter } from "@/utils/filter-matcher"
+import {
+  VirtualSpreadsheet,
+  cellInputClass,
+  cellClass,
+} from "./VirtualSpreadsheet"
 import type { ReportColumn, ReportGridRow } from "../types/stock-analytics"
-
-const cellInputClass =
-  "h-7 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
-
-const cellClass =
-  "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
-const headClass =
-  "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
-
-const ACCOUNT_COL_STYLE = { width: `${WORKSPACE_SIDE_PANEL_PERCENT}%` } as const
 
 /** Match the header action buttons (h-7, text-xs, no shadow) in the grid header. */
 const levelToggleItemClass =
@@ -43,6 +33,8 @@ type StockAnalyticsResultGridProps = {
   rows: ReportGridRow[]
   showFilterRow?: boolean
   onShowFilterRowChange?: (open: boolean) => void
+  filters?: Record<string, string>
+  onFilterChange?: (columnName: string, value: string) => void
   title?: string
   /** Report/job GUID shown in the header subtitle instead of the row count. */
   reportId?: string
@@ -74,10 +66,10 @@ function rowMatchesFilters(
 ): boolean {
   const selfMatch = active.every(([colName, q]) => {
     if (colName === "Name" || colName === "Account") {
-      return row.name.toLowerCase().includes(q)
+      return matchCellFilter(row.name, q)
     }
-    const cell = String(row.values[colName] ?? "").toLowerCase()
-    return cell.includes(q)
+    const cell = row.values[colName]
+    return matchCellFilter(cell, q)
   })
   if (selfMatch) return true
   return (row.children ?? []).some((child) => rowMatchesFilters(child, active))
@@ -96,6 +88,24 @@ function filterTree(
     }))
 }
 
+type FlatRow = { row: ReportGridRow; depth: number }
+
+/** Genişletilmiş düğümlerin çocukları dahil pre-order düz liste. */
+function flattenVisible(
+  rows: ReportGridRow[],
+  expanded: Record<string, boolean>,
+  depth = 0,
+  out: FlatRow[] = []
+): FlatRow[] {
+  for (const row of rows) {
+    out.push({ row, depth })
+    if (row.children?.length && expanded[row.id]) {
+      flattenVisible(row.children, expanded, depth + 1, out)
+    }
+  }
+  return out
+}
+
 /** Hierarchical Arrow result spreadsheet for Stock Analytics. */
 export const StockAnalyticsResultGrid = React.forwardRef<
   StockAnalyticsResultGridHandle,
@@ -106,23 +116,40 @@ export const StockAnalyticsResultGrid = React.forwardRef<
     rows,
     showFilterRow = false,
     onShowFilterRowChange,
+    filters: externalFilters,
+    onFilterChange: externalOnFilterChange,
     title = "Stock Analytics",
     reportId,
     className,
   },
   ref
 ) {
-  const [filters, setFilters] = React.useState<Record<string, string>>({})
+  const [internalFilters, setInternalFilters] = React.useState<
+    Record<string, string>
+  >({})
   const [expandedNodes, setExpandedNodes] = React.useState<
     Record<string, boolean>
   >({})
   const [treeLevel, setTreeLevel] = React.useState("2")
 
   React.useEffect(() => {
-    setFilters({})
+    setInternalFilters({})
     setTreeLevel("2")
     setExpandedNodes(collectExpandableIds(rows, 2))
   }, [columns, rows])
+
+  const activeFilters = externalFilters ?? internalFilters
+
+  const handleFilterChange = (colName: string, value: string) => {
+    if (externalOnFilterChange) {
+      externalOnFilterChange(colName, value)
+    } else {
+      setInternalFilters((prev) => ({
+        ...prev,
+        [colName]: value,
+      }))
+    }
+  }
 
   const handleExpandAll = React.useCallback(() => {
     setExpandedNodes(collectExpandableIds(rows))
@@ -149,24 +176,119 @@ export const StockAnalyticsResultGrid = React.forwardRef<
 
   const visibleRows = React.useMemo(() => {
     if (!showFilterRow) return rows
-    const active = Object.entries(filters)
+    const active = Object.entries(activeFilters)
       .filter(([, q]) => q.trim())
       .map(([k, q]) => [k, q.trim().toLowerCase()] as [string, string])
     return filterTree(rows, active)
-  }, [rows, filters, showFilterRow])
+  }, [rows, activeFilters, showFilterRow])
+
+  const flatVisible = React.useMemo(
+    () => flattenVisible(visibleRows, expandedNodes),
+    [visibleRows, expandedNodes]
+  )
 
   const toggleNode = React.useCallback((id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }))
   }, [])
 
-  const renderRows = (nodes: ReportGridRow[], depth = 0): React.ReactNode =>
-    nodes.map((row) => {
-      const hasChildren = !!row.children?.length
-      const isExpanded = !!expandedNodes[row.id]
+  const subtitle =
+    reportId ??
+    (columns.length === 0
+      ? "No columns"
+      : `${formatCount(visibleRows.length)} root row${
+          visibleRows.length === 1 ? "" : "s"
+        }`)
 
-      return (
-        <React.Fragment key={row.id}>
-          <tr className="hover:bg-muted/30 text-xs">
+  const accountColumnName = columns.find((col) => col.kind === "account")?.name
+  const initialColWidths = accountColumnName
+    ? { [accountColumnName]: `${WORKSPACE_SIDE_PANEL_PERCENT}%` }
+    : undefined
+
+  const headerActions = onShowFilterRowChange ? (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={panelHeaderActionClass}
+        disabled={rows.length === 0}
+        onClick={handleExpandAll}
+      >
+        Expand All
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={panelHeaderActionClass}
+        disabled={rows.length === 0}
+        onClick={handleCollapseAll}
+      >
+        Collapse All
+      </Button>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        variant="outline"
+        value={treeLevel}
+        onValueChange={(value) => {
+          if (!value) return
+          setTreeLevel(value)
+          if (value === "all") {
+            handleExpandAll()
+          } else {
+            handleSetLevel(Number.parseInt(value, 10))
+          }
+        }}
+        disabled={rows.length === 0}
+        aria-label="Tree level"
+        className="!shadow-none"
+      >
+        <ToggleGroupItem value="1" className={levelToggleItemClass}>
+          1
+        </ToggleGroupItem>
+        <ToggleGroupItem value="2" className={levelToggleItemClass}>
+          2
+        </ToggleGroupItem>
+        <ToggleGroupItem value="3" className={levelToggleItemClass}>
+          3
+        </ToggleGroupItem>
+        <ToggleGroupItem value="all" className={levelToggleItemClass}>
+          All
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </>
+  ) : null
+
+  return (
+    <VirtualSpreadsheet
+      columns={columns}
+      items={flatVisible}
+      title={title}
+      subtitle={subtitle}
+      className={className}
+      resetKey={columns}
+      initialColWidths={initialColWidths}
+      filterRowClassName="bg-muted/10"
+      showFilterRow={showFilterRow}
+      onToggleFilterRow={onShowFilterRowChange}
+      headerActions={headerActions}
+      renderFilterCell={(col, index) => (
+        <Input
+          className={cn(cellInputClass, index > 0 && "text-right")}
+          placeholder={index === 0 ? "Filter…" : undefined}
+          value={activeFilters[col.name] ?? ""}
+          onChange={(event) =>
+            handleFilterChange(col.name, event.target.value)
+          }
+        />
+      )}
+      renderRow={({ row, depth }) => {
+        const hasChildren = !!row.children?.length
+        const isExpanded = !!expandedNodes[row.id]
+
+        return (
+          <tr key={row.id} className="hover:bg-muted/30 text-xs">
             {columns.map((col) => {
               if (col.kind === "account") {
                 return (
@@ -222,163 +344,8 @@ export const StockAnalyticsResultGrid = React.forwardRef<
               )
             })}
           </tr>
-          {hasChildren && isExpanded
-            ? renderRows(row.children!, depth + 1)
-            : null}
-        </React.Fragment>
-      )
-    })
-
-  const subtitle =
-    reportId ??
-    (columns.length === 0
-      ? "No columns"
-      : `${visibleRows.length} root row${visibleRows.length === 1 ? "" : "s"}`)
-
-  return (
-    <div className={cn(panelCardClass, "flex-1", className)}>
-      <div className={panelHeaderClass}>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Table2 className={panelHeaderIconClass} aria-hidden />
-            <span className={panelHeaderTitleClass}>{title}</span>
-          </div>
-          <span className={panelHeaderSubtitleClass}>{subtitle}</span>
-        </div>
-        {onShowFilterRowChange ? (
-          <div className="flex shrink-0 items-center gap-1.5 self-center">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className={panelHeaderActionClass}
-              disabled={rows.length === 0}
-              onClick={handleExpandAll}
-            >
-              Expand All
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className={panelHeaderActionClass}
-              disabled={rows.length === 0}
-              onClick={handleCollapseAll}
-            >
-              Collapse All
-            </Button>
-            <ToggleGroup
-              type="single"
-              size="sm"
-              variant="outline"
-              value={treeLevel}
-              onValueChange={(value) => {
-                if (!value) return
-                setTreeLevel(value)
-                if (value === "all") {
-                  handleExpandAll()
-                } else {
-                  handleSetLevel(Number.parseInt(value, 10))
-                }
-              }}
-              disabled={rows.length === 0}
-              aria-label="Tree level"
-              className="!shadow-none"
-            >
-              <ToggleGroupItem value="1" className={levelToggleItemClass}>
-                1
-              </ToggleGroupItem>
-              <ToggleGroupItem value="2" className={levelToggleItemClass}>
-                2
-              </ToggleGroupItem>
-              <ToggleGroupItem value="3" className={levelToggleItemClass}>
-                3
-              </ToggleGroupItem>
-              <ToggleGroupItem value="all" className={levelToggleItemClass}>
-                All
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <Button
-              type="button"
-              variant={showFilterRow ? "secondary" : "outline"}
-              size="icon"
-              className="size-7"
-              onClick={() => onShowFilterRowChange(!showFilterRow)}
-              title={showFilterRow ? "Hide filter row" : "Show filter row"}
-              aria-label={
-                showFilterRow ? "Hide filter row" : "Show filter row"
-              }
-            >
-              <ListFilter className="size-3.5" />
-            </Button>
-          </div>
-        ) : null}
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className="min-w-[42rem]">
-          <div className="sticky top-0 z-10 bg-card">
-            <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-              <colgroup>
-                {columns.map((col) => (
-                  <col
-                    key={col.name}
-                    style={col.kind === "account" ? ACCOUNT_COL_STYLE : undefined}
-                  />
-                ))}
-              </colgroup>
-              <thead>
-                <tr>
-                  {columns.map((col) => (
-                    <th
-                      key={col.name}
-                      className={cn(
-                        headClass,
-                        col.align === "left" ? "text-left" : "text-right"
-                      )}
-                    >
-                      {col.label}
-                    </th>
-                  ))}
-                </tr>
-                {showFilterRow ? (
-                  <tr className="bg-muted/10">
-                    {columns.map((col, index) => (
-                      <th key={col.name} className={cellClass}>
-                        <Input
-                          className={cn(
-                            cellInputClass,
-                            index > 0 && "text-right"
-                          )}
-                          placeholder={index === 0 ? "Filter…" : undefined}
-                          value={filters[col.name] ?? ""}
-                          onChange={(event) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              [col.name]: event.target.value,
-                            }))
-                          }
-                        />
-                      </th>
-                    ))}
-                  </tr>
-                ) : null}
-              </thead>
-            </table>
-          </div>
-
-          <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
-            <colgroup>
-              {columns.map((col) => (
-                <col
-                  key={col.name}
-                  style={col.kind === "account" ? ACCOUNT_COL_STYLE : undefined}
-                />
-              ))}
-            </colgroup>
-            <tbody>{renderRows(visibleRows)}</tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+        )
+      }}
+    />
   )
 })

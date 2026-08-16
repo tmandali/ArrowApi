@@ -14,3 +14,4 @@ Kısa özet:
 - Hook + Provider ayrı dosyalarda (Fast Refresh).
 - **Workspace'ler ileride module federation ile ayrışacak** (her biri ayrı React remote'u);
   her değişiklikte workspace sınırlarını koru, cross-workspace import minimal olsun.
+- **Büyük Veri Raporları**: Ortak `<ArrowReportGrid />` bileşeni, W3C OPFS yerel disk önbelleği ve DuckDB WASM motoru kullanılır. Raporlar F5 sonrası sıfır internet maliyetiyle diskten açılır.

@@ -1,10 +1,52 @@
+import { RecordBatchReader, type RecordBatch } from "apache-arrow"
 import { ApiError } from "@/services"
 import { getCompanyHeaders } from "@/lib/company-headers"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
-} from "@/features/stock/item/types/stock-analytics"
+  ArrowJobHubMessage,
+} from "./types"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
+
+const ARROW_ACCEPT = "application/vnd.apache.arrow.stream"
+
+/**
+ * Tamamlanmış bir job'ın Arrow IPC sonucunu gövdeyi tamponlamadan,
+ * batch batch (RecordBatch) akış halinde okur.
+ * .NET client'ın `ArrowBatchReader.ReadBatchesAsync<T>()` deseninin React karşılığı.
+ */
+export async function* streamArrowRecordBatches(
+  jobUrl: string,
+  signal: AbortSignal
+): AsyncGenerator<RecordBatch> {
+  const response = await fetch(jobUrl, {
+    headers: { Accept: ARROW_ACCEPT, ...getCompanyHeaders() },
+    signal,
+  })
+
+  if (!response.ok) {
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      body = undefined
+    }
+    throw new ApiError(
+      response.statusText || "Arrow IPC alınamadı",
+      response.status,
+      body
+    )
+  }
+
+  if (!response.body) {
+    throw new ApiError("Yanıt gövdesi boş", response.status)
+  }
+
+  const reader = await RecordBatchReader.from(response)
+  for await (const batch of reader) {
+    yield batch
+  }
+}
 
 export async function createArrowJob(
   endpoint: string,
@@ -134,11 +176,6 @@ export async function fetchJobStatus(
   }
 
   return (await response.json()) as ArrowJobStatus
-}
-
-export type ArrowJobHubMessage = {
-  eventName: string
-  payload: ArrowJobEvent
 }
 
 /** Persisted SSE event log for a job (info/progress/completed…). */
@@ -275,32 +312,36 @@ export async function readJobSseEvents(
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split(/\r?\n/)
-    buffer = parts.pop() ?? ""
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split(/\r?\n/)
+      buffer = parts.pop() ?? ""
 
-    for (const line of parts) {
-      if (line === "") {
-        flush()
-        continue
+      for (const line of parts) {
+        if (line === "") {
+          flush()
+          continue
+        }
+        if (line.startsWith(":")) continue
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim()
+          continue
+        }
+        if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trimStart())
+        }
       }
-      if (line.startsWith(":")) continue
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim()
-        continue
-      }
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart())
+
+      const latest = received[received.length - 1]
+      if (latest && isTerminalSse(latest.eventName, latest.payload)) {
+        break
       }
     }
-
-    const latest = received[received.length - 1]
-    if (latest && isTerminalSse(latest.eventName, latest.payload)) {
-      break
-    }
+  } finally {
+    await reader.cancel().catch(() => {})
   }
 
   const terminalEntry = [...received]

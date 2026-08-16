@@ -17,6 +17,11 @@ export function WorkspaceNotificationsProvider({
   const markMockAsRead = useNotificationsStore((s) => s.markMockAsRead)
   const isMockRead = useNotificationsStore((s) => s.isMockRead)
   const isMockDismissed = useNotificationsStore((s) => s.isMockDismissed)
+  const dismissMock = useNotificationsStore((s) => s.dismissMock)
+  const removeNotification = useNotificationsStore((s) => s.removeNotification)
+  const removeNotificationByJobId = useNotificationsStore(
+    (s) => s.removeNotificationByJobId
+  )
   const clearRead = useNotificationsStore((s) => s.clearRead)
   const clear = useNotificationsStore((s) => s.clear)
 
@@ -29,6 +34,9 @@ export function WorkspaceNotificationsProvider({
       markMockAsRead,
       isMockRead,
       isMockDismissed,
+      dismissMock,
+      removeNotification,
+      removeNotificationByJobId,
       clearRead,
       clearNotifications: clear,
     }),
@@ -40,6 +48,9 @@ export function WorkspaceNotificationsProvider({
       markMockAsRead,
       isMockRead,
       isMockDismissed,
+      dismissMock,
+      removeNotification,
+      removeNotificationByJobId,
       clearRead,
       clear,
     ]

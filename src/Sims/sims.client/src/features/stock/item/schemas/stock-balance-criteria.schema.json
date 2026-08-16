@@ -10,7 +10,6 @@
       "format": "date",
       "title": "Kayıt Tarihi",
       "description": "Takvimden başlangıç ve bitiş tarihi seçin; tek gün de seçilebilir.",
-      "pattern": "^\\d{8}(\\.\\.\\d{8})?$",
       "x-range-split": ".."
     },
     "durum": {
@@ -67,6 +66,12 @@
         { "kod": "11", "ad": "Ürün 11", "barkod": "9999999999999" },
         { "kod": "12", "ad": "Ürün 12", "barkod": "1010101010101" }
       ]
+    },
+    "sampleRows": {
+      "type": "integer",
+      "title": "Test Satır Sayısı",
+      "description": "Mock veri satır sayısı. Boş bırakılırsa varsayılan (2). 1000000 yazarak 1M satırlık rapor üretebilirsiniz.",
+      "minimum": 1
     }
   },
   "required": ["kayitTarihi"]

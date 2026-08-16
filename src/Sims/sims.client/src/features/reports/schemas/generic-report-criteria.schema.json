@@ -9,7 +9,6 @@
       "format": "date",
       "title": "Date",
       "description": "Pick a start and end date; a single day is also allowed.",
-      "pattern": "^\\d{8}(\\.\\.\\d{8})?$",
       "x-range-split": ".."
     },
     "durum": {

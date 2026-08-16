@@ -1,11 +1,6 @@
-using System;
-using System.Data;
-using System.Data.Common;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Apache.Arrow;
-using Arrow.Data;
 using Arrow.Jobs;
 using Sims.Server.Models.StockBalance;
 using Sims.Server.Services;
@@ -14,14 +9,11 @@ namespace Sims.Server.Workers;
 
 /// <summary>
 /// Stock Balance Arrow job — schema criteria body → SSE + Arrow IPC.
+/// İlerleme gerçek satır sayısına bağlıdır (yapay zaman-yüzdesi yok);
+/// per-batch progress event'leri satır sayısını gösterir.
 /// </summary>
 public sealed class StockBalanceArrowJobWorker : IArrowJobWorker<StockBalanceRequest>
 {
-    /// <summary>Demo / queue UX: job roughly runs this long before Arrow stream.</summary>
-    private static readonly TimeSpan TargetDuration = TimeSpan.FromMinutes(0.5);
-
-    private const int ProgressTicks = 5;
-
     private readonly IStockBalanceService _service;
     private readonly IArrowJobExecutionContext _context;
 
@@ -37,8 +29,6 @@ public sealed class StockBalanceArrowJobWorker : IArrowJobWorker<StockBalanceReq
         StockBalanceRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var started = Stopwatch.StartNew();
-
         int criteriaCount = request.Criteria?.Count ?? 0;
         await _context.PublishInfoAsync(
             $"Preparing: received {criteriaCount} criteria field(s)",
@@ -46,40 +36,36 @@ public sealed class StockBalanceArrowJobWorker : IArrowJobWorker<StockBalanceReq
 
         await _context.PublishInfoAsync("Building stock balance rows", cancellationToken);
 
-        using DataTable table = _service.BuildArrowTable(request);
+        // Küçük raporlarda 12 (demo progress), büyük raporlarda 10k (SSE/batch flood'u önler).
+        int batchSize = request.BatchSize is > 0
+            ? request.BatchSize.Value
+            : (request.SampleRows ?? StockBalanceService.DefaultSampleRows) > 10_000
+                ? 10_000
+                : 12;
 
-        int batchSize = request.BatchSize is > 0 ? request.BatchSize.Value : 12;
-        var options = new ArrowConversionOptions { BatchSize = batchSize };
+        await _context.PublishInfoAsync(
+            $"Streaming Arrow batches (batchSize={batchSize})",
+            cancellationToken);
 
-        // Spread remaining time across progress ticks (~30 seconds total).
-        TimeSpan remaining = TargetDuration - started.Elapsed;
-        if (remaining > TimeSpan.Zero)
+        long totalRows = 0;
+        int columnCount = 0;
+
+        await foreach (RecordBatch batch in _service.StreamBatchesAsync(request, batchSize, cancellationToken))
         {
-            TimeSpan tick = remaining / ProgressTicks;
-            for (int i = 1; i <= ProgressTicks; i++)
+            totalRows += batch.Length;
+            columnCount = batch.Schema.FieldsList.Count;
+            try
             {
-                int pct = i * 100 / ProgressTicks;
-                await _context.PublishInfoAsync(
-                    $"Processing stock balance… {pct}%",
-                    cancellationToken);
-                await Task.Delay(tick, cancellationToken);
+                yield return batch;
+            }
+            finally
+            {
+                batch.Dispose();
             }
         }
 
         await _context.PublishInfoAsync(
-            $"Streaming Arrow batches (batchSize={batchSize}, rows={table.Rows.Count})",
-            cancellationToken);
-
-        await using DbDataReader dbReader = table.CreateDataReader();
-        await using ArrowBatchReader arrowReader = dbReader.OpenArrowReader(options);
-
-        await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
-        {
-            yield return batch;
-        }
-
-        await _context.PublishInfoAsync(
-            $"Report ready ({table.Rows.Count} rows, {table.Columns.Count} columns)",
+            $"Report ready ({totalRows} rows, {columnCount} columns)",
             cancellationToken);
     }
 }

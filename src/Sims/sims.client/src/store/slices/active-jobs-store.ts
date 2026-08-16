@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { WorkspaceKey } from "@/lib/workspace"
 import { resolveNotificationWorkspace } from "@/lib/workspace"
+import { useNotificationsStore } from "./notifications-store"
 
 export const TERMINAL_JOB_STATUSES = new Set([
   "Completed",
@@ -70,17 +71,30 @@ export const useActiveJobsStore = create<ActiveJobsState>()(
       removeJob: (id) => {
         const { [id]: _removed, ...rest } = get().jobs
         set({ jobs: rest })
+        useNotificationsStore.getState().removeNotificationByJobId(id)
       },
       clearTerminal: () => {
         const next: Record<string, TrackedJob> = {}
+        const removedIds: string[] = []
         for (const [id, job] of Object.entries(get().jobs)) {
           if (!isTerminalJobStatus(job.status)) {
             next[id] = job
+          } else {
+            removedIds.push(id)
           }
         }
         set({ jobs: next })
+        for (const id of removedIds) {
+          useNotificationsStore.getState().removeNotificationByJobId(id)
+        }
       },
-      clear: () => set({ jobs: {} }),
+      clear: () => {
+        const allIds = Object.keys(get().jobs)
+        set({ jobs: {} })
+        for (const id of allIds) {
+          useNotificationsStore.getState().removeNotificationByJobId(id)
+        }
+      },
     }),
     {
       name: "sims:active-jobs",

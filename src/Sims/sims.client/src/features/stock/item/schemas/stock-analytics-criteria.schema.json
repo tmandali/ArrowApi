@@ -51,6 +51,12 @@
       "type": "boolean",
       "title": "Show Group Accounts",
       "default": true
+    },
+    "sampleRows": {
+      "type": "integer",
+      "title": "Test Node Count",
+      "description": "Mock ağaç düğüm sayısı. Boş bırakılırsa varsayılan örnek ağaç (~53). 1000000 yazarak 1M düğümlü rapor üretebilirsiniz.",
+      "minimum": 1
     }
   },
   "additionalProperties": false

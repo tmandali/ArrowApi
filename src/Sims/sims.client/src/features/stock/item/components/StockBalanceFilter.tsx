@@ -34,6 +34,7 @@ export type StockBalanceJobSession = Pick<
   /** New / empty list → show criteria grid in the Detail column. */
   composing?: boolean
   onExitCompose?: () => void
+  onJobCancelled?: (jobId: string) => void
   onJobDeleted?: (jobId: string) => void
   onListLoaded?: (count: number) => void
 }
@@ -99,6 +100,7 @@ export const StockBalanceFilter = React.forwardRef<
           jobSession?.onExitCompose?.()
           jobSession?.onJobSelect?.(jobId)
         }}
+        onJobCancelled={jobSession?.onJobCancelled}
         onJobDeleted={jobSession?.onJobDeleted}
         onListLoaded={jobSession?.onListLoaded}
         onListError={jobSession?.onListError}
