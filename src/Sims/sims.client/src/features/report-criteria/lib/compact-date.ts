@@ -11,10 +11,36 @@ export function rangeBoundKeys(fieldKey: string): {
 }
 
 export function isValidCompactDate(value: string): boolean {
-  if (!/^\d{8}$/.test(value)) return false
-  const year = Number(value.slice(0, 4))
-  const month = Number(value.slice(4, 6)) - 1
-  const day = Number(value.slice(6, 8))
+  const trimmed = value.trim()
+  if (!trimmed) return false
+
+  let year: number
+  let month: number
+  let day: number
+
+  if (/^\d{8}$/.test(trimmed)) {
+    year = Number(trimmed.slice(0, 4))
+    month = Number(trimmed.slice(4, 6)) - 1
+    day = Number(trimmed.slice(6, 8))
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const parts = trimmed.split("-")
+    year = Number(parts[0])
+    month = Number(parts[1]) - 1
+    day = Number(parts[2])
+  } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(trimmed)) {
+    const parts = trimmed.split("/")
+    year = Number(parts[0])
+    month = Number(parts[1]) - 1
+    day = Number(parts[2])
+  } else if (/^\d{2}\.\d{2}\.\d{4}$/.test(trimmed)) {
+    const parts = trimmed.split(".")
+    day = Number(parts[0])
+    month = Number(parts[1]) - 1
+    year = Number(parts[2])
+  } else {
+    return false
+  }
+
   const date = new Date(year, month, day)
   return (
     !Number.isNaN(date.getTime()) &&
@@ -28,18 +54,37 @@ function pad2(value: number): string {
   return String(value).padStart(2, "0")
 }
 
-/** Add days to a YYYYMMDD token (for exclusive range end / full-day coverage). */
+/** Add days to a YYYYMMDD or YYYY-MM-DD token (for exclusive range end / full-day coverage). */
 export function addDaysToCompactDate(
   value: string,
   days: number
 ): string | undefined {
   if (!isValidCompactDate(value)) return undefined
-  const year = Number(value.slice(0, 4))
-  const month = Number(value.slice(4, 6)) - 1
-  const day = Number(value.slice(6, 8))
+  const trimmed = value.trim()
+  let year: number
+  let month: number
+  let day: number
+
+  if (/^\d{8}$/.test(trimmed)) {
+    year = Number(trimmed.slice(0, 4))
+    month = Number(trimmed.slice(4, 6)) - 1
+    day = Number(trimmed.slice(6, 8))
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const parts = trimmed.split("-")
+    year = Number(parts[0])
+    month = Number(parts[1]) - 1
+    day = Number(parts[2])
+  } else {
+    const d = new Date(trimmed)
+    if (Number.isNaN(d.getTime())) return undefined
+    year = d.getFullYear()
+    month = d.getMonth()
+    day = d.getDate()
+  }
+
   const date = new Date(year, month, day)
   date.setDate(date.getDate() + days)
-  return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 }
 
 /** Split a cell value with the given separator into [from, to]. */

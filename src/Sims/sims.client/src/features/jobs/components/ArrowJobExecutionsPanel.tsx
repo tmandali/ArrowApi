@@ -1,5 +1,6 @@
 import * as React from "react"
 import {
+  Ban,
   Check,
   CircleCheck,
   CircleX,
@@ -56,6 +57,7 @@ import {
   panelResizeHandleClass,
 } from "@/components/layout/panel-chrome"
 import {
+  cancelArrowJob,
   deleteArrowJob,
   fetchJobEventLog,
   fetchJobRequest,
@@ -67,10 +69,12 @@ import {
   formatTotalDuration,
   type RunEventItem,
 } from "@/features/jobs/run-events"
-import type { ArrowJobStatus } from "@/features/stock/item/types/stock-analytics"
+import type { ArrowJobStatus } from "../types"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { cn } from "@/utils/cn"
+import { formatCount } from "@/utils/format"
 import { ApiError } from "@/services"
+import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 
 function formatWhen(value?: string | null): string {
   if (!value) return "—"
@@ -232,6 +236,8 @@ export type ArrowJobExecutionsPanelProps = {
   onOpenJob?: (jobId: string) => void
   /** Fired when the user picks a row in Executions. */
   onJobSelect?: (jobId: string) => void
+  /** Fired after a job is cancelled from Detail. */
+  onJobCancelled?: (jobId: string) => void
   /** Fired after a job is deleted from Detail. */
   onJobDeleted?: (jobId: string) => void
   /** Fired when the executions list finishes loading (`count` of rows). */
@@ -249,6 +255,8 @@ export type ArrowJobExecutionsPanelProps = {
     status?: string
     createdAt?: string
     name?: string
+    totalRows?: number | null
+    batchCount?: number | null
   }>
   /**
    * Criteria content for the right column. Pass it unconditionally; the panel
@@ -283,6 +291,7 @@ export function ArrowJobExecutionsPanel({
   className,
   onOpenJob,
   onJobSelect,
+  onJobCancelled,
   onJobDeleted,
   onListLoaded,
   onListError,
@@ -297,6 +306,7 @@ export function ArrowJobExecutionsPanel({
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
   const [loading, setLoading] = React.useState(true)
   const [detailLoading, setDetailLoading] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [items, setItems] = React.useState<ArrowJobStatus[]>([])
   const [total, setTotal] = React.useState(0)
@@ -476,16 +486,35 @@ export function ArrowJobExecutionsPanel({
     return () => abort.abort()
   }, [selectedId, activeJobId, activeRunPhase])
 
+  // Live row/batch counts for the active run (from SSE progress events).
+  const liveCounts = React.useMemo(() => {
+    if (!activeJobId) return null
+    let totalRows: number | null = null
+    let batchCount: number | null = null
+    for (const event of activeRunEvents) {
+      if (typeof event.totalRows === "number") totalRows = event.totalRows
+      if (typeof event.batchCount === "number") batchCount = event.batchCount
+    }
+    return totalRows == null && batchCount == null
+      ? null
+      : { totalRows, batchCount }
+  }, [activeJobId, activeRunEvents])
+
   // Patch live status + merge pending queued jobs not yet in the API list.
   const displayItems = React.useMemo(() => {
     let next = items
 
-    // Apply SSE-driven statuses for every pending job, not only the focused one.
+    // Apply SSE-driven statuses and row counts for every pending job, not only the focused one.
     if (pendingJobs.length > 0) {
       next = next.map((job) => {
         const pending = pendingJobs.find((p) => sameJobId(p.id, job.id))
-        if (!pending?.status) return job
-        return { ...job, status: pending.status }
+        if (!pending) return job
+        return {
+          ...job,
+          status: pending.status || job.status,
+          totalRows: pending.totalRows ?? job.totalRows,
+          batchCount: pending.batchCount ?? job.batchCount,
+        }
       })
     }
 
@@ -507,6 +536,8 @@ export function ArrowJobExecutionsPanel({
         jobUrl: "",
         eventsUrl: "",
         createdAt: pending.createdAt || new Date().toISOString(),
+        totalRows: pending.totalRows ?? undefined,
+        batchCount: pending.batchCount ?? undefined,
       })
     }
 
@@ -522,11 +553,27 @@ export function ArrowJobExecutionsPanel({
         jobUrl: "",
         eventsUrl: "",
         createdAt: new Date().toISOString(),
+        totalRows: liveCounts?.totalRows ?? undefined,
+        batchCount: liveCounts?.batchCount ?? undefined,
       })
     }
 
-    return extras.length > 0 ? [...extras, ...next] : next
-  }, [items, activeJobId, activeLiveStatus, jobName, pendingJobs])
+    const combined = extras.length > 0 ? [...extras, ...next] : next
+
+    if (activeJobId && liveCounts) {
+      return combined.map((job) =>
+        sameJobId(job.id, activeJobId)
+          ? {
+              ...job,
+              totalRows: liveCounts.totalRows ?? job.totalRows,
+              batchCount: liveCounts.batchCount ?? job.batchCount,
+            }
+          : job
+      )
+    }
+
+    return combined
+  }, [items, activeJobId, activeLiveStatus, jobName, pendingJobs, liveCounts])
 
   const isActiveSelected = sameJobId(selectedId, activeJobId)
   const progressEvents =
@@ -570,6 +617,13 @@ export function ArrowJobExecutionsPanel({
             e.eventName === "cancelled"
         )))
   const criteriaVisible = showCriteriaSlot && !selectedId
+  const isRunningOrQueued =
+    selectedDisplayStatus === "Running" ||
+    selectedDisplayStatus === "Queued" ||
+    showRunningProgressOnly ||
+    (isActiveSelected && activeRunPhase === "running")
+  const canCancelSelected =
+    Boolean(selectedId) && !criteriaVisible && isRunningOrQueued
   const canDeleteSelected =
     Boolean(selectedId) && !criteriaVisible && !showRunningProgressOnly
 
@@ -583,6 +637,21 @@ export function ArrowJobExecutionsPanel({
     },
     [openJobHref]
   )
+
+  const handleCancelSelected = React.useCallback(async () => {
+    if (!selectedId || cancelling) return
+    setCancelling(true)
+    try {
+      await cancelArrowJob(selectedId)
+      removeTrackedJob(selectedId)
+      onJobCancelled?.(selectedId)
+      void loadList(undefined, { silent: true })
+    } catch (err) {
+      console.warn("Cancel job error:", err)
+    } finally {
+      setCancelling(false)
+    }
+  }, [selectedId, cancelling, removeTrackedJob, onJobCancelled, loadList])
 
   const handleConfirmDelete = React.useCallback(
     async (event: React.MouseEvent) => {
@@ -633,16 +702,20 @@ export function ArrowJobExecutionsPanel({
       {
         label: "Rows",
         value:
-          selectedJob?.totalRows != null
-            ? String(selectedJob.totalRows)
-            : "—",
+          isActiveSelected && liveCounts?.totalRows != null
+            ? formatCount(liveCounts.totalRows)
+            : selectedJob?.totalRows != null
+              ? formatCount(selectedJob.totalRows)
+              : "—",
       },
       {
         label: "Batches",
         value:
-          selectedJob?.batchCount != null
-            ? String(selectedJob.batchCount)
-            : "—",
+          isActiveSelected && liveCounts?.batchCount != null
+            ? formatCount(liveCounts.batchCount)
+            : selectedJob?.batchCount != null
+              ? formatCount(selectedJob.batchCount)
+              : "—",
       },
     ]
     if (selectedJob?.error) {
@@ -653,6 +726,7 @@ export function ArrowJobExecutionsPanel({
     selectedJob,
     selectedDisplayStatus,
     isActiveSelected,
+    liveCounts,
     progressEvents,
   ])
 
@@ -668,6 +742,16 @@ export function ArrowJobExecutionsPanel({
 
   return (
     <>
+    {deleteError ? (
+      <WorkspaceBanner
+        tone="error"
+        inset
+        className="mx-2 mt-2"
+        onDismiss={() => setDeleteError(null)}
+      >
+        <span title={deleteError}>{deleteError}</span>
+      </WorkspaceBanner>
+    ) : null}
     <ResizablePanelGroup
       orientation="horizontal"
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
@@ -682,7 +766,7 @@ export function ArrowJobExecutionsPanel({
                 </div>
                 <span className={panelHeaderSubtitleClass}>
                   {total > 0
-                    ? `${total} run${total === 1 ? "" : "s"}`
+                    ? `${formatCount(total)} run${total === 1 ? "" : "s"}`
                     : emptyListHint}
                 </span>
               </div>
@@ -765,7 +849,7 @@ export function ArrowJobExecutionsPanel({
                           <span>{formatWhen(job.createdAt)}</span>
                           <span>
                             {job.totalRows != null
-                              ? `${job.totalRows} rows`
+                              ? `${formatCount(job.totalRows)} rows`
                               : "—"}
                           </span>
                         </div>
@@ -842,6 +926,22 @@ export function ArrowJobExecutionsPanel({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
+                {canCancelSelected && selectedId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      panelHeaderActionClass,
+                      "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    )}
+                    disabled={cancelling}
+                    onClick={handleCancelSelected}
+                  >
+                    <Ban className="size-3.5" />
+                    {cancelling ? "Cancelling…" : "Cancel"}
+                  </Button>
+                ) : null}
                 {canDeleteSelected ? (
                   <Button
                     type="button"
@@ -1042,7 +1142,7 @@ export function ArrowJobExecutionsPanel({
                     <div className="mt-3 flex min-h-0 flex-col space-y-3">
                       <Marker variant="separator">
                         <MarkerContent className="text-[11px] text-muted-foreground">
-                          {detailLoading ? "Loading request…" : "Input"}
+                          Request Input
                         </MarkerContent>
                       </Marker>
                       <CodeBlock

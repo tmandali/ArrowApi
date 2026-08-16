@@ -1,36 +1,91 @@
-import { ApiError } from "@/services"
+import { RecordBatchReader, type RecordBatch } from "apache-arrow"
+import { ApiError, safeParseResponseBody } from "@/services"
 import { getCompanyHeaders } from "@/lib/company-headers"
+import { resolveApiUrl } from "@/lib/api-url"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
-} from "@/features/stock/item/types/stock-analytics"
+  ArrowJobHubMessage,
+} from "./types"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
+
+const ARROW_ACCEPT = "application/vnd.apache.arrow.stream"
+
+/**
+ * Tamamlanmış bir job'ın Arrow IPC sonucunu gövdeyi tamponlamadan,
+ * batch batch (RecordBatch) akış halinde okur.
+ * .NET client'ın `ArrowBatchReader.ReadBatchesAsync<T>()` deseninin React karşılığı.
+ */
+export async function* streamArrowRecordBatches(
+  jobUrl: string,
+  signal: AbortSignal
+): AsyncGenerator<RecordBatch> {
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(jobUrl), {
+      headers: { Accept: ARROW_ACCEPT, ...getCompanyHeaders() },
+      signal,
+    })
+  } catch (networkErr: unknown) {
+    if (signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Arrow veri akışı kurulamadı: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
+
+  if (!response.ok) {
+    const body = await safeParseResponseBody(response)
+    throw new ApiError(
+      response.statusText || "Arrow IPC alınamadı",
+      response.status,
+      body
+    )
+  }
+
+  if (!response.body) {
+    throw new ApiError("Yanıt gövdesi boş", response.status)
+  }
+
+  const reader = await RecordBatchReader.from(response)
+  for await (const batch of reader) {
+    yield batch
+  }
+}
 
 export async function createArrowJob(
   endpoint: string,
   body: unknown,
   signal?: AbortSignal
 ): Promise<ArrowJobStatus> {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...getCompanyHeaders(),
-    },
-    body: JSON.stringify(body ?? {}),
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(endpoint), {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...getCompanyHeaders(),
+      },
+      body: JSON.stringify(body ?? {}),
+      signal,
+    })
+  } catch (networkErr: unknown) {
+    if (signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Sunucuya bağlanılamadı: ${err.message || "Ağ hatası"}. Arka uç servisinin (Sims.Server) çalıştığından emin olun.`,
+      0,
+      undefined
+    )
+  }
 
   if (!response.ok) {
-    let errorBody: unknown
-    try {
-      errorBody = await response.json()
-    } catch {
-      errorBody = undefined
-    }
+    const errorBody = await safeParseResponseBody(response)
     throw new ApiError(
-      response.statusText || "Job oluşturulamadı",
+      response.statusText ? `Job oluşturulamadı: ${response.statusText}` : "Job oluşturulamadı",
       response.status,
       errorBody
     )
@@ -43,22 +98,28 @@ export async function fetchJobRequest(
   jobId: string,
   signal?: AbortSignal
 ): Promise<Record<string, unknown> | null> {
-  const response = await fetch(`/api/arrow/jobs/${jobId}/request`, {
-    headers: { Accept: "application/json", ...getCompanyHeaders() },
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/request`), {
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      signal,
+    })
+  } catch (networkErr: unknown) {
+    if (signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Job kriterleri alınamadı: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 
   if (response.status === 404) {
     return null
   }
 
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
+    const body = await safeParseResponseBody(response)
     throw new ApiError(
       response.statusText || "Job request alınamadı",
       response.status,
@@ -84,18 +145,25 @@ export async function listArrowJobs(
   if (options.state) params.set("state", options.state)
 
   const query = params.toString()
-  const response = await fetch(query ? `${endpoint}?${query}` : endpoint, {
-    headers: { Accept: "application/json", ...getCompanyHeaders() },
-    signal: options.signal,
-  })
+  const resolvedEndpoint = resolveApiUrl(query ? `${endpoint}?${query}` : endpoint)
+  let response: Response
+  try {
+    response = await fetch(resolvedEndpoint, {
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      signal: options.signal,
+    })
+  } catch (networkErr: unknown) {
+    if (options.signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Job listesi sunucusuna bağlanılamadı: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
+    const body = await safeParseResponseBody(response)
     throw new ApiError(
       response.statusText || "Job listesi alınamadı",
       response.status,
@@ -110,22 +178,28 @@ export async function fetchJobStatus(
   jobId: string,
   signal?: AbortSignal
 ): Promise<ArrowJobStatus | null> {
-  const response = await fetch(`/api/arrow/jobs/${jobId}`, {
-    headers: { Accept: "application/json", ...getCompanyHeaders() },
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}`), {
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      signal,
+    })
+  } catch (networkErr: unknown) {
+    if (signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Job durumu alınamadı: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 
   if (response.status === 404) {
     return null
   }
 
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
+    const body = await safeParseResponseBody(response)
     throw new ApiError(
       response.statusText || "Job durumu alınamadı",
       response.status,
@@ -136,32 +210,33 @@ export async function fetchJobStatus(
   return (await response.json()) as ArrowJobStatus
 }
 
-export type ArrowJobHubMessage = {
-  eventName: string
-  payload: ArrowJobEvent
-}
-
 /** Persisted SSE event log for a job (info/progress/completed…). */
 export async function fetchJobEventLog(
   jobId: string,
   signal?: AbortSignal
 ): Promise<ArrowJobHubMessage[]> {
-  const response = await fetch(`/api/arrow/jobs/${jobId}/event-log`, {
-    headers: { Accept: "application/json", ...getCompanyHeaders() },
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/event-log`), {
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      signal,
+    })
+  } catch (networkErr: unknown) {
+    if (signal?.aborted) throw networkErr
+    const err = networkErr as Error
+    throw new ApiError(
+      `Event log alınamadı: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 
   if (response.status === 404) {
     return []
   }
 
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
+    const body = await safeParseResponseBody(response)
     throw new ApiError(
       response.statusText || "Event log alınamadı",
       response.status,
@@ -190,32 +265,46 @@ export async function fetchJobEventLog(
 }
 
 export async function cancelArrowJob(jobId: string): Promise<void> {
-  await fetch(`/api/arrow/jobs/${jobId}/cancel`, {
-    method: "POST",
-    headers: { ...getCompanyHeaders() },
-  })
+  try {
+    await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/cancel`), {
+      method: "POST",
+      headers: { ...getCompanyHeaders() },
+    })
+  } catch (networkErr: unknown) {
+    const err = networkErr as Error
+    throw new ApiError(
+      `Job iptal isteği gönderilemedi: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 }
 
 export async function deleteArrowJob(jobId: string): Promise<void> {
-  const response = await fetch(`/api/arrow/jobs/${jobId}`, {
-    method: "DELETE",
-    headers: { ...getCompanyHeaders() },
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}`), {
+      method: "DELETE",
+      headers: { ...getCompanyHeaders() },
+    })
+  } catch (networkErr: unknown) {
+    const err = networkErr as Error
+    throw new ApiError(
+      `Job silme isteği başarısız: ${err.message || "Ağ hatası"}`,
+      0,
+      undefined
+    )
+  }
 
   if (response.status === 204 || response.status === 404) {
     return
   }
 
   if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
+    const body = await safeParseResponseBody(response)
     throw new ApiError(
       response.status === 409
-        ? "Running job cannot be deleted"
+        ? "Çalışan job silinemez"
         : response.statusText || "Job silinemedi",
       response.status,
       body
@@ -232,7 +321,7 @@ export async function readJobSseEvents(
   signal: AbortSignal,
   onEvent: (eventName: string, payload: ArrowJobEvent) => void
 ): Promise<ArrowJobEvent> {
-  const response = await fetch(eventsUrl, {
+  const response = await fetch(resolveApiUrl(eventsUrl), {
     headers: { Accept: "text/event-stream", ...getCompanyHeaders() },
     signal,
   })
@@ -275,32 +364,36 @@ export async function readJobSseEvents(
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split(/\r?\n/)
-    buffer = parts.pop() ?? ""
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split(/\r?\n/)
+      buffer = parts.pop() ?? ""
 
-    for (const line of parts) {
-      if (line === "") {
-        flush()
-        continue
+      for (const line of parts) {
+        if (line === "") {
+          flush()
+          continue
+        }
+        if (line.startsWith(":")) continue
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim()
+          continue
+        }
+        if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trimStart())
+        }
       }
-      if (line.startsWith(":")) continue
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim()
-        continue
-      }
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart())
+
+      const latest = received[received.length - 1]
+      if (latest && isTerminalSse(latest.eventName, latest.payload)) {
+        break
       }
     }
-
-    const latest = received[received.length - 1]
-    if (latest && isTerminalSse(latest.eventName, latest.payload)) {
-      break
-    }
+  } finally {
+    await reader.cancel().catch(() => {})
   }
 
   const terminalEntry = [...received]

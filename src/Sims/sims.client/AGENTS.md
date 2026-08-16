@@ -7,10 +7,12 @@ mimari kararların tek kaynağıdır. **Her yeni oturumda bu dosyayı oku ve aş
 
 ```bash
 cd src/Sims/sims.client
-npm run dev        # dev sunucusu (https, port 56402)
-npm run build      # tsc -b && vite build
-npm run lint       # oxlint
-npx tsc -b --noEmit
+npm run dev          # Web dev sunucusu (https, port 56402)
+npm run tauri:dev    # Tauri 2.0 Masaüstü uygulaması + dev sunucusu
+npm run tauri:build  # Tauri 2.0 Masaüstü production bundle
+npm run build        # tsc -b && vite build (Web bundle)
+npm run lint         # oxlint
+npx tsc -b --noEmit  # TypeScript tip kontrolü
 ```
 
 ## Mimari Model
@@ -123,3 +125,46 @@ src/
 - Route değişiminde (pathname) sayfa **yerinde kalır**, üstte ince `RouteTopBar`
   (`components/layout/route-top-bar.tsx`) 350ms belirir. `AppRoutes` içinde `useEffect` + timeout ile.
 - Yükleme ekranında şirket/marka adı gösterilmez (yalnızca şirket değiştirme overlay'i gösterir).
+
+## Büyük Veri Raporlama Mimarisi (Arrow + OPFS + DuckDB WASM)
+
+Tüm workspace'lerdeki (Stok, Satış, Muhasebe vb.) büyük raporlama ekranları ortak **Arrow & DuckDB** altyapısını kullanır:
+
+1. **Ortak Rapor Bileşeni (`ArrowReportGrid` - `@/features/jobs`):**
+   - Rapor ekranlarında doğrudan `<ArrowReportGrid jobId={id} jobUrl={url} title="Rapor Başlığı" expectedTotalRows={total} />` şeklinde kullanılır.
+   - Kolonları, sayısal tipleri, hizalamaları ve formatlamaları otomatik algılar.
+
+2. **OPFS (Origin Private File System) Kalıcı Disk Önbelleği (`@/services`):**
+   - Sunucudan gelen Arrow akışı (`res.body.tee()`) JavaScript RAM'inde biriktirilmez; doğrudan tarayıcının yerel SSD diskine (`sims_arrow_reports/{jobId}.arrow`) yazılır.
+   - Sayfa yenilendiğinde (`F5`), sekme kapatıldığında veya tarayıcı yeniden açıldığında **sunucuya sıfır (0) HTTP isteği** gönderilir; rapor yerel SSD'den saliseler içinde açılır.
+   - Sağ üstteki "Yenile" (Refresh) butonu OPFS diskindeki eski dosyayı ve DuckDB tablosunu silerek sunucudan taze veri çeker.
+
+3. **Arka Plan Akış Yöneticisi (`duckStreamManager` - `@/features/jobs`):**
+   - Kullanıcı rapor inerken başka bir sayfaya veya workspace'e geçse dahi indirme ve diske yazma arka planda kesintisiz devam eder; geri dönüldüğünde kaldığı yerden otomatik bağlanır.
+
+4. **DuckDB WASM & Sorgu Motoru (`@/services/duckdb`):**
+   - Filtreleme, arama ve sıralama işlemlerini tarayıcı içinde C++ SIMD hızında yürütür.
+   - Dynamics 365 / Business Central arama sözdizimini (`100..500`, `>100&<500`, `SKU*`, `|`, `!`) SQL sorgularına çevirir (`filter-parser.ts`).
+   - `SET preserve_insertion_order=false;` ile bellek optimize edilir.
+   - Devasa (100M+) satırlarda tarayıcının 32-bit WASM tavanına (3.1 GB) ulaşılması halinde inen onlarca milyon satır korunarak kullanıcıya sunulur.
+
+## Tauri 2.0 Masaüstü & Hibrit Web Mimarisi
+
+Uygulama hem web tarayıcısında (`npm run dev`) hem de Tauri 2.0 masaüstü sarmalayıcısında (`npm run tauri:dev`, `npm run tauri:build`) çalışacak şekilde **hibrit ve izole** tasarlanmıştır:
+
+1. **Ortam Tespiti (`isTauriEnv` - `@/lib/api-url`):**
+   - Kod tabanında `isTauriEnv` (`"__TAURI_INTERNALS__" in window || "__TAURI__" in window`) üzerinden dinamik kontrol yapılır.
+   - `@tauri-apps/*` paketleri React bileşenlerinde statik `import` edilmez; sadece `isTauriEnv === true` iken dinamik (`await import(...)`) çağrılır.
+   - Bu sayede React kodları web tarayıcısında sıfır import hatasıyla çalışır.
+
+2. **Gömülü Python AI Sidecar & MCP Tool Calling (`binaries/main`):**
+   - Masaüstü modunda yerel Python ajanı (`binaries/main`) bir child process (sidecar) olarak başlatılır.
+   - Ajan ile React arayüzü `sys.stdin` / `sys.stdout` JSON akışı üzerinden haberleşir.
+   - **Tool Registry (`@/lib/tool-registry`):** Frontend'deki yetenekler (örn: `update_report_filters`) sisteme kaydedilir. Ajan stdout'a `{"type": "tool_call", "tool": "...", "arguments": {...}}` bastığında dinamik olarak yürütülür ve rapor/state otomatik güncellenir.
+   - Web ortamında `useAgentBridge` otomatik olarak `browser_fallback` simülasyon moduna geçer.
+
+3. **Native Auto-Updater & İşletim Sistemi Menüsü:**
+   - **React UI Temizliği:** Güncelleme denetimi, indirme ve yeniden başlatma işlemleri React arayüzünde buton kalabalığı yaratmaz.
+   - **Native OS Menüsü:** Yalnızca macOS Apple / Help menüsünde ve Windows Pencere Menüsünde (`Check for Updates...`) native olarak çalışır (`src-tauri/src/lib.rs`).
+   - **Native Dialogs (`tauri-plugin-dialog`):** Güncelleme onayları ve hata bilgilendirmeleri işletim sisteminin native MessageBox pencereleri üzerinden gösterilir.
+   - **Açılışta Sessiz Kontrol:** Uygulama açıldığında 3 saniye sonra arka planda sessizce yeni sürüm olup olmadığı kontrol edilir; sadece yeni sürüm varsa kullanıcıya native onay çıkar.

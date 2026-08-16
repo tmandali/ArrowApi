@@ -1,22 +1,33 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Rapor Kriterleri",
-  "description": "Stock Balance raporu için filtre kriterlerini tanımlayın.",
+  "title": "Stok Bakiye Raporu (Stock Balance)",
+  "description": "Depo ve ambarlardaki mevcut ürünlerin kalan stok adetlerini, parasal değerlerini, hareket tarihlerini ve durumlarını sorgular.",
+  "x-ai-directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
+  "x-ai-quick-prompts": [
+    "Dün itibarıyla hazırla",
+    "Geçen haftanın iptallerini göster",
+    "50.000 TL üzeri stoklar",
+    "Sadece AKTIF kayıtlar"
+  ],
   "x-job-endpoint": "/api/arrow/jobs/stock-balance",
   "type": "object",
   "properties": {
     "kayitTarihi": {
       "type": "string",
       "format": "date",
-      "title": "Kayıt Tarihi",
-      "description": "Takvimden başlangıç ve bitiş tarihi seçin; tek gün de seçilebilir.",
-      "pattern": "^\\d{8}(\\.\\.\\d{8})?$",
-      "x-range-split": ".."
+      "title": "Kayıt / Hareket Tarihi",
+      "description": "Stok hareketinin gerçekleştiği tarih. Tek bir gün (örn: '2026-08-18') veya aralık (örn: '2026-08-01..2026-08-19') formatında girilir.",
+      "x-range-split": "..",
+      "x-ai-directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner.",
+      "x-ai-suggestions": ["dün", "geçen hafta", "bugün", "bu ay başından itibaren"]
     },
     "durum": {
       "type": "array",
-      "title": "Evrak Durumu",
+      "title": "Evrak / Stok Durumu",
+      "description": "Stok kaydının geçerlilik durumu. AKTIF: Depodaki mevcut mallar, IPTAL: İptal edilen kayıtlar, PASIF: Kapatılmış stoklar, BEKLEMEDE: Onay bekleyen hareketler.",
       "x-selection": "multiple",
+      "x-ai-directive": "Kullanıcı özel bir durum (iptal, pasif) talep etmediyse boş bırak veya AKTIF seç.",
+      "x-ai-suggestions": ["AKTIF", "IPTAL", "BEKLEMEDE"],
       "items": {
         "type": "string",
         "enum": ["AKTIF", "PASIF", "BEKLEMEDE", "IPTAL"]
@@ -24,14 +35,15 @@
     },
     "tutarMiktar": {
       "type": "number",
-      "title": "Tutar",
-      "description": "Filtrelenecek parasal miktar",
+      "title": "Tutar Eşiği",
+      "description": "Filtrelenecek minimum parasal tutar miktarı (örn: 10000 veya 50000)",
+      "x-ai-directive": "Kullanıcı 'X tutarından büyük', 'yüksek değerli stoklar' gibi ifadeler kullandığında bu alanı doldur.",
       "minimum": 0
     },
     "tutarParaBirimi": {
       "type": "string",
       "title": "Para Birimi",
-      "description": "Tutarın döviz cinsi",
+      "description": "Tutarın döviz cinsi. Varsayılan TRY.",
       "enum": ["TRY", "USD", "EUR"],
       "x-selection": "single",
       "default": "TRY"
@@ -39,8 +51,9 @@
     "urun": {
       "type": "array",
       "title": "Ürün Bilgileri",
-      "description": "Listeden bir veya birden fazla ürün seçin.",
+      "description": "Listeden filtrelenecek bir veya birden fazla ürün kodu, adı veya barkodu.",
       "x-selection": "multiple",
+      "x-ai-directive": "Kullanıcı belirli bir ürün adı, kodu veya barkodu söylediğinde veri kaynağındaki eşleşen kodları seç.",
       "items": {
         "type": "string"
       },
@@ -67,6 +80,12 @@
         { "kod": "11", "ad": "Ürün 11", "barkod": "9999999999999" },
         { "kod": "12", "ad": "Ürün 12", "barkod": "1010101010101" }
       ]
+    },
+    "sampleRows": {
+      "type": "integer",
+      "title": "Test Satır Sayısı",
+      "description": "Mock veri satır sayısı. Boş bırakılırsa varsayılan (2). Devasa testler için 1000000 yazılabilir.",
+      "minimum": 1
     }
   },
   "required": ["kayitTarihi"]

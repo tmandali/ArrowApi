@@ -1,7 +1,8 @@
-import { tableFromIPC, type Table } from "apache-arrow"
+import { type RecordBatch, type Schema } from "apache-arrow"
 import { ApiError } from "@/services"
 import { getCompanyHeaders } from "@/lib/company-headers"
-import { readJobSseEvents } from "@/features/jobs/arrow-job-client"
+import { resolveApiUrl } from "@/lib/api-url"
+import { readJobSseEvents, streamArrowRecordBatches } from "@/features/jobs/arrow-job-client"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
@@ -13,7 +14,6 @@ import type {
 } from "../types/stock-analytics"
 
 const JOB_BASE = "/api/arrow/jobs/stock-analytics"
-const ARROW_ACCEPT = "application/vnd.apache.arrow.stream"
 
 const META_FIELDS = new Set(["Id", "ParentId", "Level", "IsGroup"])
 
@@ -81,9 +81,9 @@ function humanizeField(name: string): string {
   return COLUMN_LABELS[name] ?? name.replace(/([a-z])([A-Z])/g, "$1 $2")
 }
 
-function columnsFromSchema(table: Table): ReportColumn[] {
+function columnsFromSchema(schema: Schema): ReportColumn[] {
   const columns: ReportColumn[] = []
-  for (const field of table.schema.fields) {
+  for (const field of schema.fields) {
     const name = field.name
     if (META_FIELDS.has(name)) continue
     if (name === "Name") {
@@ -107,27 +107,27 @@ function columnsFromSchema(table: Table): ReportColumn[] {
   return columns
 }
 
-function rowsFromTable(
-  table: Table,
+function flatRowsFromBatch(
+  batch: RecordBatch,
   columns: ReportColumn[],
   currency: string
-): ReportGridRow[] {
+): Omit<ReportGridRow, "children">[] {
   const flat: Omit<ReportGridRow, "children">[] = []
-  const n = table.numRows
+  const n = batch.numRows
 
   for (let i = 0; i < n; i += 1) {
-    const id = String(table.getChild("Id")?.get(i) ?? i)
-    const parentRaw = table.getChild("ParentId")?.get(i)
+    const id = String(batch.getChild("Id")?.get(i) ?? i)
+    const parentRaw = batch.getChild("ParentId")?.get(i)
     const parentId =
       parentRaw == null || parentRaw === "" ? null : String(parentRaw)
-    const name = String(table.getChild("Name")?.get(i) ?? "")
-    const level = Number(table.getChild("Level")?.get(i) ?? 0)
-    const isGroup = Boolean(table.getChild("IsGroup")?.get(i))
+    const name = String(batch.getChild("Name")?.get(i) ?? "")
+    const level = Number(batch.getChild("Level")?.get(i) ?? 0)
+    const isGroup = Boolean(batch.getChild("IsGroup")?.get(i))
 
     const values: Record<string, string> = { Name: name }
     for (const col of columns) {
       if (col.kind !== "money") continue
-      const child = table.getChild(col.name)
+      const child = batch.getChild(col.name)
       const raw = child?.get(i)
       const scale = fieldScale(child?.type as { scale?: number } | undefined)
       values[col.name] = formatMoney(cellToNumber(raw, scale), currency)
@@ -136,7 +136,7 @@ function rowsFromTable(
     flat.push({ id, parentId, name, level, isGroup, values })
   }
 
-  return buildTree(flat)
+  return flat
 }
 
 function buildTree(
@@ -168,30 +168,6 @@ function buildTree(
   return roots
 }
 
-async function fetchArrowTable(jobUrl: string, signal: AbortSignal): Promise<Table> {
-  const response = await fetch(jobUrl, {
-    headers: { Accept: ARROW_ACCEPT, ...getCompanyHeaders() },
-    signal,
-  })
-
-  if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
-    }
-    throw new ApiError(
-      response.statusText || "Arrow IPC alınamadı",
-      response.status,
-      body
-    )
-  }
-
-  const buffer = new Uint8Array(await response.arrayBuffer())
-  return tableFromIPC(buffer)
-}
-
 export type RunStockAnalyticsOptions = {
   signal?: AbortSignal
   onEvent?: (eventName: string, payload: ArrowJobEvent) => void
@@ -212,13 +188,11 @@ export const stockAnalyticsService = {
     if (options.state) params.set("state", options.state)
 
     const query = params.toString()
-    const response = await fetch(
-      query ? `${JOB_BASE}?${query}` : JOB_BASE,
-      {
-        headers: { Accept: "application/json", ...getCompanyHeaders() },
-        signal: options.signal,
-      }
-    )
+    const endpoint = resolveApiUrl(query ? `${JOB_BASE}?${query}` : JOB_BASE)
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      signal: options.signal,
+    })
 
     if (!response.ok) {
       let body: unknown
@@ -241,7 +215,7 @@ export const stockAnalyticsService = {
     request: StockAnalyticsRequest = {},
     signal?: AbortSignal
   ): Promise<ArrowJobStatus> {
-    const createResponse = await fetch(JOB_BASE, {
+    const createResponse = await fetch(resolveApiUrl(JOB_BASE), {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -283,7 +257,7 @@ export const stockAnalyticsService = {
     jobId: string,
     signal?: AbortSignal
   ): Promise<StockAnalyticsRequest | null> {
-    const response = await fetch(`/api/arrow/jobs/${jobId}/request`, {
+    const response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/request`), {
       headers: { Accept: "application/json", ...getCompanyHeaders() },
       signal,
     })
@@ -314,19 +288,23 @@ export const stockAnalyticsService = {
     request: StockAnalyticsRequest = {},
     signal?: AbortSignal
   ): Promise<StockAnalyticsArrowReport> {
-    const table = await fetchArrowTable(
+    const currency = request.currency || "inr"
+    let columns: ReportColumn[] = []
+    const flat: Omit<ReportGridRow, "children">[] = []
+
+    for await (const batch of streamArrowRecordBatches(
       jobUrl,
       signal ?? new AbortController().signal
-    )
-    const columns = columnsFromSchema(table)
-    const currency = request.currency || "inr"
-    const rows = rowsFromTable(table, columns, currency)
+    )) {
+      if (columns.length === 0) columns = columnsFromSchema(batch.schema)
+      flat.push(...flatRowsFromBatch(batch, columns, currency))
+    }
 
     return {
       columns,
-      rows,
+      rows: buildTree(flat),
       currency,
-      totalRows: table.numRows,
+      totalRows: flat.length,
     }
   },
 
@@ -359,14 +337,14 @@ export const stockAnalyticsService = {
   },
 
   async cancel(jobId: string): Promise<void> {
-    await fetch(`/api/arrow/jobs/${jobId}/cancel`, {
+    await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/cancel`), {
       method: "POST",
       headers: { ...getCompanyHeaders() },
     })
   },
 
   async deleteJob(jobId: string, signal?: AbortSignal): Promise<void> {
-    const response = await fetch(`/api/arrow/jobs/${jobId}`, {
+    const response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}`), {
       method: "DELETE",
       headers: { ...getCompanyHeaders() },
       signal,

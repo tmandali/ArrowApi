@@ -24,7 +24,7 @@ import {
   workspaceKeyFromPath,
 } from "@/lib/workspace"
 import { cn } from "@/utils/cn"
-import { Bell, CheckCheck, Clock, LoaderCircle, Trash2 } from "lucide-react"
+import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, X } from "lucide-react"
 
 type MockNotification = Omit<WorkspaceNotification, "createdAt" | "workspace"> & {
   time: string
@@ -148,8 +148,17 @@ export function WorkspaceNotificationPopover() {
   const [open, setOpen] = React.useState(false)
   const { isMobile, state } = useSidebar()
   const iconCollapsed = !isMobile && state === "collapsed"
-  const { notifications, markAsRead, markAllAsRead, markMockAsRead, isMockRead, isMockDismissed, clearRead } =
-    useWorkspaceNotifications()
+  const {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+    markMockAsRead,
+    isMockRead,
+    isMockDismissed,
+    dismissMock,
+    removeNotification,
+    clearRead,
+  } = useWorkspaceNotifications()
   const jobs = useActiveJobsStore((s) => s.jobs)
   const key = workspaceKeyFromPath(pathname)
   const pendingJobs = React.useMemo(
@@ -240,6 +249,18 @@ export function WorkspaceNotificationPopover() {
     }
   }
 
+  const handleDismissNotification = (
+    e: React.MouseEvent,
+    item: DisplayNotification
+  ) => {
+    e.stopPropagation()
+    if (item.source === "live") {
+      removeNotification(item.id)
+    } else if (item.source === "mock") {
+      dismissMock(item.id)
+    }
+  }
+
   const getWorkspaceTitle = () => {
     if (key === "/accounting") return "Financial Notifications"
     if (key === "/stock") return "Stock Notifications"
@@ -322,15 +343,21 @@ export function WorkspaceNotificationPopover() {
               </div>
             ) : (
               displayNotifications.map((item) => (
-                <button
+                <div
                   key={`${item.source}-${item.id}`}
-                  type="button"
                   className={cn(
-                    "flex w-full flex-col gap-1 p-3 text-left text-xs transition-colors hover:bg-muted/40",
+                    "group relative flex w-full flex-col gap-1 p-3 text-left text-xs transition-colors hover:bg-muted/40",
                     item.unread && "bg-primary/5",
                     item.href ? "cursor-pointer" : "cursor-default"
                   )}
                   onClick={() => handleOpenNotification(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      handleOpenNotification(item)
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
@@ -341,15 +368,28 @@ export function WorkspaceNotificationPopover() {
                       ) : null}
                       <span className="truncate">{item.title}</span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
-                      <Clock className="size-3" />
-                      {item.time}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Clock className="size-3" />
+                        {item.time}
+                      </span>
+                      {!item.pending ? (
+                        <button
+                          type="button"
+                          title="Bildirimi sil"
+                          aria-label="Bildirimi sil"
+                          className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                          onClick={(e) => handleDismissNotification(e, item)}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                     {item.description}
                   </p>
-                </button>
+                </div>
               ))
             )}
           </div>

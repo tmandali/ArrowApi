@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Mavi & Lacivert Premium Zemin Degradesi -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="30%" stop-color="#1d4ed8" />
+      <stop offset="70%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Turuncu Işıma Degradesi -->
+    <linearGradient id="orangeGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+
+    <!-- macOS Standart İkon Alt Gölgesi (Drop Shadow) -->
+    <filter id="macShadow" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.32" />
+    </filter>
+
+    <!-- Yıldızlar için Derinlik Gölgesi -->
+    <filter id="starShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#050814" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- macOS Standart Squircle (760x760 boyutunda, 132px kenar boşluklu) -->
+  <rect 
+    x="132" 
+    y="132" 
+    width="760" 
+    height="760" 
+    rx="172" 
+    ry="172" 
+    fill="url(#bgGrad)" 
+    filter="url(#macShadow)" 
+  />
+
+  <!-- Parlaklık / Cam efekti üst gradyan kenar çizgisi -->
+  <rect 
+    x="132" 
+    y="132" 
+    width="760" 
+    height="760" 
+    rx="172" 
+    ry="172" 
+    fill="none" 
+    stroke="#ffffff" 
+    stroke-width="2.5" 
+    stroke-opacity="0.25" 
+  />
+
+  <!-- Hafif iç parıltı dairesi -->
+  <circle cx="512" cy="512" r="260" fill="#3b82f6" opacity="0.18" />
+
+  <!-- Yula Mark: Mavi Zemin Üzerinde Beyaz Ana Yıldız + Canlı Turuncu Aksan Yıldızlar -->
+  <g transform="translate(302, 302) scale(17.5)" filter="url(#starShadow)">
+    <!-- 1. Ana Büyük Merkez Yıldızı (Parlak Beyaz) -->
+    <path 
+      d="M12 0 15.4 8.6 24 12 15.4 15.4 12 24 8.6 15.4 0 12 8.6 8.6Z" 
+      fill="#ffffff" 
+    />
+    <!-- 2. Sağ Üst Yıldız (Canlı Turuncu) -->
+    <path 
+      d="M19.2 0.4 20.7 4 24 5.5 20.7 7 19.2 10.6 17.7 7 14.1 5.5 17.7 4Z" 
+      fill="url(#orangeGlow)" 
+    />
+    <!-- 3. Sol Alt Yıldız (Canlı Turuncu) -->
+    <path 
+      d="M4.8 13.4 5.9 16.1 8.6 17.2 5.9 18.3 4.8 21 3.7 18.3 1 17.2 3.7 16.1Z" 
+      fill="url(#orangeGlow)" 
+    />
+  </g>
+</svg>

@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { WorkspaceKey } from "@/lib/workspace"
 import { resolveNotificationWorkspace } from "@/lib/workspace"
+import { useNotificationsStore } from "./notifications-store"
 
 export const TERMINAL_JOB_STATUSES = new Set([
   "Completed",
@@ -80,7 +81,9 @@ export const useActiveJobsStore = create<ActiveJobsState>()(
         }
         set({ jobs: next })
       },
-      clear: () => set({ jobs: {} }),
+      clear: () => {
+        set({ jobs: {} })
+      },
     }),
     {
       name: "sims:active-jobs",

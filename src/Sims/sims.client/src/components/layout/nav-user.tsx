@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
+import { isTauriEnv } from "@/lib/api-url"
 import { cn } from "@/utils/cn"
 import {
   Building2,
@@ -37,6 +38,7 @@ import {
   Moon,
   Monitor,
   LogOut,
+  Code2,
 } from "lucide-react"
 
 const themes = [
@@ -174,6 +176,20 @@ export function NavUser({
               <DropdownMenuItem className="cursor-pointer">
                 <Inbox />
                 Manage Accounts
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onSelect={() => {
+                  if (isTauriEnv) {
+                    import("@tauri-apps/api/core").then(({ invoke }) => {
+                      invoke("toggle_devtools")
+                    })
+                  }
+                }}
+              >
+                <Code2 />
+                Developer Tools
+                <DropdownMenuShortcut>⌥⌘I</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

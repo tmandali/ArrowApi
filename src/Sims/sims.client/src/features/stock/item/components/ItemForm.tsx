@@ -513,6 +513,7 @@ export function ItemForm({
           jobsEndpoint={reportModule.jobsEndpoint}
           jobName={reportModule.jobName}
           schema={reportModule.schema}
+          draftStorageKey={reportModule.jobName}
           emptyListHint={reportModule.emptyListHint}
           jobSession={{
             ...reportJobSession,

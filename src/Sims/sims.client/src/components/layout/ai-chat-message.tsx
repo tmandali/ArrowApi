@@ -1,11 +1,12 @@
 import type { UIMessage } from "ai"
-import { Brain } from "lucide-react"
+import { Brain, Loader2 } from "lucide-react"
 
 import { yulaCustomPartComponents } from "@/components/layout/yula-custom-parts"
 import { cn } from "@/utils/cn"
 
 type AiChatMessageProps = {
   message: UIMessage
+  isProcessingLatest?: boolean
   className?: string
 }
 
@@ -28,16 +29,23 @@ function ReasoningPart({ text }: { text: string }) {
 function TextPart({
   text,
   role,
+  isProcessingLatest,
 }: {
   text: string
   role: UIMessage["role"]
+  isProcessingLatest?: boolean
 }) {
   if (!text) return null
 
   if (role === "user") {
     return (
-      <div className="ml-auto max-w-[88%] rounded-xl bg-muted px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
-        {text}
+      <div className="ml-auto flex items-center gap-2 max-w-[88%]">
+        {isProcessingLatest ? (
+          <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+        ) : null}
+        <div className="rounded-xl bg-muted px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
+          {text}
+        </div>
       </div>
     )
   }
@@ -50,7 +58,11 @@ function TextPart({
 }
 
 /** Avatar-free message row — user bubble right, assistant text + reasoning left. */
-export function AiChatMessage({ message, className }: AiChatMessageProps) {
+export function AiChatMessage({
+  message,
+  isProcessingLatest,
+  className,
+}: AiChatMessageProps) {
   const isUser = message.role === "user"
 
   return (
@@ -71,6 +83,7 @@ export function AiChatMessage({ message, className }: AiChatMessageProps) {
               key={`${message.id}-t-${index}`}
               text={part.text}
               role={message.role}
+              isProcessingLatest={isProcessingLatest}
             />
           )
         }

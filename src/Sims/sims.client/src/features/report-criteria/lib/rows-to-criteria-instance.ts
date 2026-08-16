@@ -17,6 +17,14 @@ function resolveLookupItem(
   return value
 }
 
+function normalizeDateValue(raw: string): string {
+  const trimmed = raw.trim()
+  if (/^\d{8}$/.test(trimmed)) {
+    return `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}`
+  }
+  return trimmed
+}
+
 function coerceFieldValue(
   field: CriteriaFieldDef,
   raw: string
@@ -36,6 +44,9 @@ function coerceFieldValue(
       return t === "true" || t === "1" || t === "yes"
     }
     case "string":
+      if (field.format === "date") {
+        return normalizeDateValue(raw)
+      }
       return raw
     default: {
       const _exhaustive: never = field.kind
@@ -72,12 +83,14 @@ export function rowsToCriteriaInstance(
     if (field.rangeSplit) {
       const { from, to } = splitRangeCellValue(value, field.rangeSplit)
       const { fromKey, toKey } = rangeBoundKeys(name)
-      instance[fromKey] = from
-      // Date ranges: exclusive end (+1 day) so the selected day is fully covered.
-      instance[toKey] =
-        field.format === "date"
-          ? (addDaysToCompactDate(to, 1) ?? to)
-          : to
+      if (field.format === "date") {
+        const nextTo = addDaysToCompactDate(to, 1) ?? to
+        instance[fromKey] = normalizeDateValue(from)
+        instance[toKey] = normalizeDateValue(nextTo)
+      } else {
+        instance[fromKey] = from
+        instance[toKey] = to
+      }
       continue
     }
 

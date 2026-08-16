@@ -27,6 +27,9 @@ export type WorkspaceNotificationsContextValue = {
   markMockAsRead: (id: string) => void
   isMockRead: (id: string) => boolean
   isMockDismissed: (id: string) => boolean
+  dismissMock: (id: string) => void
+  removeNotification: (id: string) => void
+  removeNotificationByJobId: (jobId: string) => void
   clearRead: (options?: {
     workspace?: WorkspaceKey
     mockIds?: string[]

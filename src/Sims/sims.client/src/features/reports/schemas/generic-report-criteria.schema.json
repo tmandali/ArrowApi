@@ -1,20 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Report Criteria",
-  "description": "Define filter criteria for this report.",
+  "title": "Genel Rapor Kriterleri",
+  "description": "Rapor verilerini tarih ve durum bazlı filtrelemek için temel kriter şeması.",
   "type": "object",
   "properties": {
     "kayitTarihi": {
       "type": "string",
       "format": "date",
-      "title": "Date",
-      "description": "Pick a start and end date; a single day is also allowed.",
-      "pattern": "^\\d{8}(\\.\\.\\d{8})?$",
+      "title": "Kayıt Tarihi",
+      "description": "Filtrelenecek işlem tarihi (tek gün veya aralık: '2026-08-01..2026-08-19').",
       "x-range-split": ".."
     },
     "durum": {
       "type": "array",
-      "title": "Status",
+      "title": "Evrak Durumu",
+      "description": "Filtrelenecek evrak durumları (AKTIF, PASIF, BEKLEMEDE, IPTAL).",
       "x-selection": "multiple",
       "items": {
         "type": "string",

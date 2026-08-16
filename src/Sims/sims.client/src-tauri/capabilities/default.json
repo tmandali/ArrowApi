@@ -1,0 +1,85 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Sims masaüstü uygulaması ve AI Sidecar izinleri",
+  "windows": [
+    "main",
+    "*"
+  ],
+  "remote": {
+    "urls": [
+      "https://localhost:56402",
+      "https://localhost:56402/*",
+      "https://localhost:*",
+      "https://localhost:*/*",
+      "http://localhost:*",
+      "http://localhost:*/*"
+    ]
+  },
+  "local": true,
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-unlisten",
+    "core:window:default",
+    "core:webview:default",
+    "core:app:default",
+    "shell:default",
+    "shell:allow-stdin-write",
+    "shell:allow-kill",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/main",
+          "sidecar": true
+        },
+        {
+          "name": "binaries/main",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "main",
+          "sidecar": true
+        },
+        {
+          "name": "main",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/main",
+          "sidecar": true
+        },
+        {
+          "name": "binaries/main",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "main",
+          "sidecar": true
+        },
+        {
+          "name": "main",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:default",
+    "process:allow-restart",
+    "dialog:default"
+  ]
+}

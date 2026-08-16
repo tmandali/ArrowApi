@@ -2,7 +2,7 @@ import * as React from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { useWorkspaceNotifications } from "@/context/workspace-notifications-context"
-import type { ArrowJobEvent } from "@/features/stock/item/types/stock-analytics"
+import type { ArrowJobEvent } from "@/features/jobs"
 import {
   cancelArrowJob,
   fetchJobStatus,

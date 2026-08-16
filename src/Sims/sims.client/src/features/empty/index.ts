@@ -1,1 +1,1 @@
-// Feature public API placeholder.
+export { NotFoundView } from "./components/NotFoundView"

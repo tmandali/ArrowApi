@@ -47,7 +47,11 @@ function expandRangeSplitSchema(schema: JsonSchemaObject): JsonSchemaObject {
     const { fromKey, toKey } = rangeBoundKeys(key)
     const bound: JsonSchemaProperty = {
       type: "string",
-      ...(prop.format === "date" ? { pattern: "^\\d{8}$" } : {}),
+      ...(prop.format === "date"
+        ? { format: "date" }
+        : prop.pattern
+          ? { pattern: prop.pattern }
+          : {}),
     }
     delete properties[key]
     properties[fromKey] = {

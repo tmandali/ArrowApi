@@ -16,4 +16,7 @@ public sealed class StockBalanceRequest : IRequest<IAsyncEnumerable<RecordBatch>
     public Dictionary<string, JsonElement>? Criteria { get; set; }
 
     public int? BatchSize { get; init; }
+
+    /// <summary>Mock satır sayısı (demo/test). Varsayılan 2.</summary>
+    public int? SampleRows { get; init; }
 }

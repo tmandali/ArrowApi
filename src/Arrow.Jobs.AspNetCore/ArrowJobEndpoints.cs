@@ -161,23 +161,32 @@ public static class ArrowJobEndpoints
         {
             IEndpointRouteBuilder targetBuilder = string.IsNullOrEmpty(jobsPath) ? group : endpoints;
 
+            if (!string.IsNullOrEmpty(jobsPath))
+            {
+                targetBuilder.MapGet(
+                        string.Empty,
+                        (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
+                            ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, null, cancellationToken))
+                    .Produces<ArrowJobStatusList>();
+            }
+
             targetBuilder.MapGet(
                     "{id:guid}",
-                    (Guid id, HttpRequest request, IArrowJobStore<TRequest> store, CancellationToken cancellationToken) =>
-                        GetJob(id, request, store, cancellationToken))
+                    (Guid id, HttpRequest request, HttpContext httpContext, CancellationToken cancellationToken) =>
+                        GetJob(id, request, httpContext, cancellationToken))
                 .ProducesArrow()
                 .Produces<ArrowJobStatus>();
 
             targetBuilder.MapGet(
                     "{id:guid}/request",
-                    (Guid id, IArrowJobStore<TRequest> store, HttpContext httpContext, CancellationToken cancellationToken) =>
-                        GetJobRequestAsync(id, store, httpContext, cancellationToken))
+                    (Guid id, HttpContext httpContext, CancellationToken cancellationToken) =>
+                        GetJobRequestAsync(id, httpContext, cancellationToken))
                 .Produces<TRequest>();
 
             targetBuilder.MapGet(
                 "{id:guid}/events",
-                (Guid id, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
-                    StreamJobEvents(id, store, eventHub, response, cancellationToken));
+                (Guid id, HttpContext httpContext, IArrowJobEventHub eventHub, HttpResponse response, CancellationToken cancellationToken) =>
+                    StreamJobEvents(id, httpContext, eventHub, response, cancellationToken));
 
             targetBuilder.MapGet(
                     "{id:guid}/event-log",
@@ -187,8 +196,8 @@ public static class ArrowJobEndpoints
 
             targetBuilder.MapPost(
                     "{id:guid}/cancel",
-                    (Guid id, HttpRequest httpRequest, IArrowJobStore<TRequest> store, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
-                        CancelJobAsync(id, httpRequest, store, eventHub, cancellationToken))
+                    (Guid id, HttpRequest httpRequest, HttpContext httpContext, IArrowJobEventHub eventHub, CancellationToken cancellationToken) =>
+                        CancelJobAsync(id, httpRequest, httpContext, eventHub, cancellationToken))
                 .Produces<ArrowJobStatus>();
 
             targetBuilder.MapPost(
@@ -199,8 +208,8 @@ public static class ArrowJobEndpoints
 
             targetBuilder.MapDelete(
                     "{id:guid}",
-                    (Guid id, IArrowJobStore<TRequest> store, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
-                        DeleteJobAsync(id, store, resultStorage, cancellationToken));
+                    (Guid id, HttpContext httpContext, IArrowJobResultStorage resultStorage, CancellationToken cancellationToken) =>
+                        DeleteJobAsync(id, httpContext, resultStorage, cancellationToken));
         }
 
         return group;
@@ -282,73 +291,70 @@ public static class ArrowJobEndpoints
         return Results.Ok(response);
     }
 
-    private static async Task<IResult> GetJobRequestAsync<TRequest>(
+    private static async Task<IResult> GetJobRequestAsync(
         Guid id,
-        IArrowJobStore<TRequest> store,
         HttpContext httpContext,
         CancellationToken cancellationToken)
-        where TRequest : notnull
     {
-        ArrowJob<TRequest>? job = await store.GetAsync(id, cancellationToken);
-        if (job is not null)
-            return Results.Ok(job.Request);
+        IArrowJobStore? owner = await FindJobStoreAsync(httpContext, id, cancellationToken);
+        if (owner is null)
+            return Results.NotFound();
 
-        foreach (IArrowJobStore candidate in httpContext.RequestServices.GetServices<IArrowJobStore>())
-        {
-            object? request = await candidate.GetRequestAsync(id, cancellationToken);
-            if (request is not null)
-                return Results.Ok(request);
-        }
-
-        return Results.NotFound();
+        object? request = await owner.GetRequestAsync(id, cancellationToken);
+        return request is null ? Results.NotFound() : Results.Ok(request);
     }
 
-    private static async Task<IResult> CancelJobAsync<TRequest>(
+    private static async Task<IResult> CancelJobAsync(
         Guid id,
         HttpRequest httpRequest,
-        IArrowJobStore<TRequest> store,
+        HttpContext httpContext,
         IArrowJobEventHub eventHub,
         CancellationToken cancellationToken)
-        where TRequest : notnull
     {
-        ArrowJob<TRequest>? job = await store.GetAsync(id, cancellationToken);
-        if (job is null)
+        string jobsPath = ResolveJobsBasePath(httpRequest);
+
+        IArrowJobStore? store = await FindJobStoreAsync(httpContext, id, cancellationToken);
+        if (store is null)
             return Results.NotFound();
 
-        if (job.State is not (ArrowJobState.Queued or ArrowJobState.Running))
-            return Results.Conflict(ToStatusResponse(job, ResolveJobsBasePath(httpRequest)));
+        ArrowJobStatus? status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
+        if (status is null)
+            return Results.NotFound();
 
-        if (!await store.TryCancelAsync(id, cancellationToken))
+        if (status.Status is not ("Queued" or "Running"))
+            return Results.Conflict(ToStatusResponse(status, jobsPath));
+
+        if (!await store.TryCancelJobAsync(id, cancellationToken))
         {
-            job = await store.GetAsync(id, cancellationToken);
-            return job is null
+            status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
+            return status is null
                 ? Results.NotFound()
-                : Results.Conflict(ToStatusResponse(job, ResolveJobsBasePath(httpRequest)));
+                : Results.Conflict(ToStatusResponse(status, jobsPath));
         }
 
-        job = await store.GetAsync(id, cancellationToken);
-        if (job is null)
+        status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
+        if (status is null)
             return Results.NotFound();
 
-        string jobsPath = ResolveJobsBasePath(httpRequest);
-        ArrowJobStatus status = ToStatusResponse(job, jobsPath);
+        ArrowJobStatus response = ToStatusResponse(status, jobsPath);
         await eventHub.PublishAsync(
             id,
             ArrowJobEventNames.Cancelled,
             new ArrowJobEvent(
-                job.Id,
-                job.State.ToString(),
-                job.CreatedAt,
-                job.CompletedAt,
-                job.Error,
-                status.JobUrl,
-                status.EventsUrl,
-                job.BatchCount,
-                job.TotalRows,
-                TraceId: job.TraceId),
+                status.Id,
+                status.Status,
+                status.CreatedAt,
+                status.CompletedAt,
+                status.Error,
+                response.JobUrl,
+                response.EventsUrl,
+                status.BatchCount,
+                status.TotalRows,
+                Name: status.Name,
+                RootJobId: status.RootJobId),
             cancellationToken);
 
-        return Results.Ok(status);
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> RetryJobAsync<TRequest>(
@@ -376,59 +382,67 @@ public static class ArrowJobEndpoints
             ToStatusResponse(retry, jobsPath, retriedFrom: id));
     }
 
-    private static async Task<IResult> DeleteJobAsync<TRequest>(
+    private static async Task<IResult> DeleteJobAsync(
         Guid id,
-        IArrowJobStore<TRequest> store,
+        HttpContext httpContext,
         IArrowJobResultStorage resultStorage,
         CancellationToken cancellationToken)
-        where TRequest : notnull
     {
-        ArrowJob<TRequest>? job = await store.GetAsync(id, cancellationToken);
-        if (job is null)
+        IArrowJobStore? store = await FindJobStoreAsync(httpContext, id, cancellationToken);
+        if (store is null)
             return Results.NotFound();
 
-        if (job.State == ArrowJobState.Running)
+        ArrowJobStatus? status = await store.GetStatusAsync(id, cancellationToken: cancellationToken);
+        if (status is null)
+            return Results.NotFound();
+
+        if (string.Equals(status.Status, nameof(ArrowJobState.Running), StringComparison.OrdinalIgnoreCase))
             return Results.Conflict();
 
-        if (!await store.TryDeleteAsync(id, cancellationToken))
+        if (!await store.TryDeleteJobAsync(id, cancellationToken))
             return Results.Conflict();
 
-        await resultStorage.DeleteResultAsync(job.ResultPath, cancellationToken);
+        string? resultPath = await store.GetResultPathAsync(id, cancellationToken);
+        await resultStorage.DeleteResultAsync(resultPath, cancellationToken);
         return Results.NoContent();
+    }
+
+    /// <summary>Job kimliğini sahiplenen store'u tüm kayıtlı store'larda arar.</summary>
+    private static async Task<IArrowJobStore?> FindJobStoreAsync(
+        HttpContext httpContext,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        foreach (IArrowJobStore store in httpContext.RequestServices.GetServices<IArrowJobStore>())
+        {
+            ArrowJobStatus? status = await store.GetStatusAsync(id, cancellationToken: cancellationToken);
+            if (status is not null)
+                return store;
+        }
+
+        return null;
     }
 
     /// <summary>
     /// <c>Accept: application/json</c> → durum JSON.
     /// <c>Accept: application/vnd.apache.arrow.stream</c> → tamamlanınca Arrow IPC.
     /// </summary>
-    private static async Task<IResult> GetJob<TRequest>(
+    private static async Task<IResult> GetJob(
         Guid id,
         HttpRequest request,
-        IArrowJobStore<TRequest> store,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
-        where TRequest : notnull
     {
         string jobsPath = ResolveJobsBasePath(request);
 
-        ArrowJobStatus? status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
-        string? resultPath = null;
-        if (status is not null)
-        {
-            resultPath = await store.GetResultPathAsync(id, cancellationToken);
-        }
-        else
-        {
-            var stores = request.HttpContext.RequestServices.GetServices<IArrowJobStore>();
-            foreach (var s in stores)
-            {
-                status = await s.GetStatusAsync(id, jobsPath, cancellationToken);
-                if (status is not null)
-                {
-                    resultPath = await s.GetResultPathAsync(id, cancellationToken);
-                    break;
-                }
-            }
-        }
+        IArrowJobStore? owner = await FindJobStoreAsync(httpContext, id, cancellationToken);
+        if (owner is null)
+            return Results.NotFound();
+
+        ArrowJobStatus? status = await owner.GetStatusAsync(id, jobsPath, cancellationToken);
+        string? resultPath = status is not null
+            ? await owner.GetResultPathAsync(id, cancellationToken)
+            : null;
 
         if (status is null)
             return Results.NotFound();
@@ -447,30 +461,16 @@ public static class ArrowJobEndpoints
         return Results.Ok(status);
     }
 
-    private static async Task StreamJobEvents<TRequest>(
+    private static async Task StreamJobEvents(
         Guid id,
-        IArrowJobStore<TRequest> store,
+        HttpContext httpContext,
         IArrowJobEventHub eventHub,
         HttpResponse response,
         CancellationToken cancellationToken)
-        where TRequest : notnull
     {
         string jobsPath = ResolveJobsBasePath(response.HttpContext.Request);
-        IArrowJobStore? targetStore = store;
-        ArrowJobStatus? status = await store.GetStatusAsync(id, jobsPath, cancellationToken);
-        if (status is null)
-        {
-            var stores = response.HttpContext.RequestServices.GetServices<IArrowJobStore>();
-            foreach (var s in stores)
-            {
-                status = await s.GetStatusAsync(id, jobsPath, cancellationToken);
-                if (status is not null)
-                {
-                    targetStore = s;
-                    break;
-                }
-            }
-        }
+
+        IArrowJobStore? targetStore = await FindJobStoreAsync(httpContext, id, cancellationToken);
 
         await ArrowJobSse.StreamEventsAsync(
             id,
@@ -557,6 +557,25 @@ public static class ArrowJobEndpoints
             job.Name,
             job.RootJobId,
             job.ParentJobId);
+
+    private static ArrowJobStatus ToStatusResponse(
+        ArrowJobStatus status,
+        string jobsPath,
+        Guid? retriedFrom = null) =>
+        new(
+            status.Id,
+            status.Status,
+            JobUrl(jobsPath, status.Id),
+            EventsUrl(jobsPath, status.Id),
+            status.CreatedAt,
+            status.CompletedAt,
+            status.Error,
+            status.BatchCount,
+            status.TotalRows,
+            retriedFrom,
+            status.Name,
+            status.RootJobId,
+            status.ParentJobId);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 

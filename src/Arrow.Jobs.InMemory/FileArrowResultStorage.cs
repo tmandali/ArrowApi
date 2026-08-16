@@ -64,7 +64,13 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
             }
 
             if (writer is not null)
+            {
                 await writer.WriteEndAsync(cancellationToken);
+            }
+            else if (!File.Exists(resultPath))
+            {
+                File.Create(resultPath).Dispose();
+            }
         }
         finally
         {
@@ -83,6 +89,12 @@ public sealed class FileArrowResultStorage : IArrowJobResultStorage
 
         try
         {
+            var fileInfo = new FileInfo(resultPath);
+            if (fileInfo.Length == 0)
+            {
+                return Task.FromResult(Result<ArrowBatchReader>.Success(ArrowBatchReader.FromBatches([])));
+            }
+
             FileStream stream = File.OpenRead(resultPath);
             ArrowBatchReader reader = ArrowData.OpenArrowReader(stream);
             return Task.FromResult(Result<ArrowBatchReader>.Success(reader));

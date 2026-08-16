@@ -1,6 +1,4 @@
-﻿import * as React from "react"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
+import * as React from "react"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -18,19 +16,15 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { AiChatMessage } from "@/components/layout/ai-chat-message"
-import { firstTextPart } from "@/components/layout/ai-chat-message-utils"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { YULA } from "@/components/layout/yula-brand-data"
 import {
   matchYulaCommands,
   type YulaCommand,
 } from "@/components/layout/yula-commands"
-import {
-  createYulaMockTransport,
-  yulaMockChat,
-  yulaMockInitialMessages,
-} from "@/components/layout/yula-mock-chat"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
+import { useAgentBridge, useAgentBridgeStore } from "@/hooks/useAgentBridge"
+import type { UIMessage } from "ai"
 import { workspaceLabelFromPath } from "@/lib/empty-module"
 import { env } from "@/config/env"
 import { useLocation } from "react-router-dom"
@@ -41,6 +35,7 @@ import {
   FileText,
   Paperclip,
   Plus,
+  SquarePen,
   X,
 } from "lucide-react"
 
@@ -51,7 +46,6 @@ type AIChatAssistantProps = {
   separator?: boolean
 }
 
-const isYulaMockMode = !env.aiChatApiUrl
 
 type AttachedFile = {
   id: string
@@ -153,12 +147,11 @@ export function AIChatPanelTitle() {
   )
 }
 
-/** Centered intro suggestions (mirror the mock demo script). */
+/** Centered intro suggestions. */
 const introSuggestions = [
-  "Stock balance raporunu çalıştır",
-  "Stok analizi raporu nasıl alınır?",
-  "Satış siparişinde durum nasıl güncellenir?",
-  "Maliyet fişi ile neyi takip ederim?",
+  "Stock balance raporunu hazırla",
+  "Stok analitik raporunu aç",
+  "Geçen haftanın iptallerini göster",
 ]
 
 /** Docked panel body — avatar-free chat box with attach + slash commands. */
@@ -168,18 +161,42 @@ export function AIChatPanel({
   /** Centered Copilot-style intro until the user starts typing. */
   centeredIntro?: boolean
 } = {}) {
-  const transport = React.useMemo(
-    () =>
-      isYulaMockMode
-        ? createYulaMockTransport()
-        : new DefaultChatTransport({ api: env.aiChatApiUrl }),
-    []
-  )
+  const { messages: bridgeMessages, isProcessing, sendPrompt } = useAgentBridge()
 
-  const { messages, status, sendMessage } = useChat({
-    messages: isYulaMockMode ? yulaMockInitialMessages : [],
-    transport,
-  })
+  const messages = React.useMemo<UIMessage[]>(() => {
+    return bridgeMessages
+      .filter((m) => m.id !== "init-1")
+      .map((m) => {
+        const parts: any[] = []
+        if (m.isToolCall) {
+          parts.push({
+            type: "reasoning",
+            text: `${m.content}\n${JSON.stringify(m.toolDetails || {}, null, 2)}`,
+          })
+        }
+        if (m.customKind) {
+          parts.push({
+            type: "custom",
+            kind: m.customKind,
+          })
+        }
+        if (m.toolResult && !m.customKind) {
+          parts.push({
+            type: "reasoning",
+            text: `Sonuç: ${JSON.stringify(m.toolResult, null, 2)}`,
+          })
+        }
+        parts.push({
+          type: "text",
+          text: m.content,
+        })
+        return {
+          id: m.id,
+          role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+          parts,
+        }
+      })
+  }, [bridgeMessages])
 
   const [input, setInput] = React.useState("")
   const [attachments, setAttachments] = React.useState<AttachedFile[]>([])
@@ -193,9 +210,7 @@ export function AIChatPanel({
   const workspaceLabel = workspaceLabelFromPath(pathname)
   const introDescription = `${workspaceLabel} çalışma alanınızda — ${YULA.emptyDescription}`
 
-  const isLoading = status === "submitted" || status === "streaming"
-  const nextMockMessage = isYulaMockMode ? yulaMockChat.next(messages) : null
-  const nextMockText = firstTextPart(nextMockMessage)
+  const isLoading = isProcessing
   const commandMatches = matchYulaCommands(input)
   const showCommands = commandMatches !== null
   const hasUserMessages = messages.some((message) => message.role === "user")
@@ -225,19 +240,31 @@ export function AIChatPanel({
     setIsAtBottom(distance < 48)
   }
 
+  const newConversation = useAgentBridgeStore((s) => s.newConversation)
+
   const sendText = (text: string) => {
     const trimmed = text.trim()
     if (!trimmed && attachments.length === 0) return
+
+    const lower = trimmed.toLowerCase()
+    if (
+      lower === "/new" ||
+      lower === "/clear" ||
+      lower === "/reset" ||
+      lower === "/yeni"
+    ) {
+      newConversation()
+      setInput("")
+      setAttachments([])
+      return
+    }
 
     const attachmentNote =
       attachments.length > 0
         ? `\n\n[Ekler: ${attachments.map((file) => file.name).join(", ")}]`
         : ""
 
-    void sendMessage({
-      role: "user",
-      parts: [{ type: "text", text: `${trimmed}${attachmentNote}`.trim() }],
-    })
+    void sendPrompt(`${trimmed}${attachmentNote}`.trim())
     setInput("")
     setAttachments([])
   }
@@ -249,13 +276,12 @@ export function AIChatPanel({
       sendText(trimmed)
       return
     }
-    if (nextMockMessage) void sendMessage(nextMockMessage)
   }
 
   const applyCommand = (command: YulaCommand) => {
-    if (command.runDemo) {
+    if (command.id === "new" || command.id === "clear") {
+      newConversation()
       setInput("")
-      if (nextMockMessage && !isLoading) void sendMessage(nextMockMessage)
       return
     }
     setInput(command.prompt)
@@ -273,7 +299,7 @@ export function AIChatPanel({
   }
 
   const canSubmit =
-    !isLoading && (Boolean(input.trim()) || Boolean(nextMockMessage) || attachments.length > 0)
+    !isLoading && (Boolean(input.trim()) || attachments.length > 0)
 
   const inputArea = (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
@@ -395,6 +421,10 @@ export function AIChatPanel({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuItem onSelect={newConversation}>
+                  <SquarePen className="size-3.5" />
+                  Yeni sohbet (/new)
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => fileInputRef.current?.click()}
                 >
@@ -462,15 +492,19 @@ export function AIChatPanel({
               className="h-full overflow-y-auto overscroll-contain"
             >
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
-                {messages.map((message) => (
-                  <AiChatMessage key={message.id} message={message} />
-                ))}
-
-                {isLoading ? (
-                  <p className="text-[11px] text-muted-foreground italic">
-                    {YULA.loading}
-                  </p>
-                ) : null}
+                {messages.map((message, idx) => {
+                  const isLatestUser =
+                    isLoading &&
+                    message.role === "user" &&
+                    idx === messages.length - 1
+                  return (
+                    <AiChatMessage
+                      key={message.id}
+                      message={message}
+                      isProcessingLatest={isLatestUser}
+                    />
+                  )
+                })}
               </div>
             </div>
 
@@ -489,25 +523,6 @@ export function AIChatPanel({
           </>
         )}
       </div>
-
-      {!showCenteredIntro && isYulaMockMode && nextMockText ? (
-        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-1">
-          <button
-            type="button"
-            disabled={isLoading}
-            className="w-full rounded-lg border border-dashed border-primary/20 bg-gradient-to-br from-primary/[0.06] to-orange-500/[0.07] px-2.5 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50 dark:border-primary/25 dark:from-primary/10 dark:to-orange-500/10"
-            onClick={() => {
-              if (!nextMockMessage || isLoading) return
-              void sendMessage(nextMockMessage)
-            }}
-          >
-            <span className="mb-0.5 block text-[10px] font-medium text-primary">
-              Demo sorusu
-            </span>
-            {nextMockText}
-          </button>
-        </div>
-      ) : null}
 
       {!showCenteredIntro ? inputArea : null}
     </div>

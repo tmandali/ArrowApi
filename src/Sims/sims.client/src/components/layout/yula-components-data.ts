@@ -1,5 +1,6 @@
 import type { JsonSchemaObject } from "@/features/report-criteria"
 import stockBalanceCriteriaSchema from "@/features/stock/item/schemas/stock-balance-criteria.schema.json"
+import stockAnalyticsCriteriaSchema from "@/features/stock/item/schemas/stock-analytics-criteria.schema.json"
 
 /**
  * Custom message part kinds Yula can embed in the conversation.
@@ -7,6 +8,7 @@ import stockBalanceCriteriaSchema from "@/features/stock/item/schemas/stock-bala
  */
 export const yulaCustomKinds = {
   stockBalance: "yula.report.stock-balance",
+  stockAnalytics: "yula.report.stock-analytics",
 } as const
 
 export type YulaCustomKind = (typeof yulaCustomKinds)[keyof typeof yulaCustomKinds]
@@ -23,6 +25,7 @@ export type YulaReportCardConfig = {
 }
 
 const stockBalanceSchema = stockBalanceCriteriaSchema as JsonSchemaObject
+const stockAnalyticsSchema = stockAnalyticsCriteriaSchema as JsonSchemaObject
 
 /**
  * Report cards Yula can embed. Register any report here to get a shared
@@ -36,5 +39,13 @@ export const yulaReportCardConfigs: YulaReportCardConfig[] = [
     description: "Rapor kriterlerini aşağıdan doldurun",
     pagePath: "/stock/stock-balance",
     schema: stockBalanceSchema,
+  },
+  {
+    kind: yulaCustomKinds.stockAnalytics,
+    scope: "stock-analytics",
+    title: "Stock Analytics",
+    description: "Stok analitik rapor kriterlerini doldurun",
+    pagePath: "/stock/analytics",
+    schema: stockAnalyticsSchema,
   },
 ]

@@ -1,4 +1,4 @@
-using System.Data;
+using Apache.Arrow;
 using Arrow.Http.AspNetCore;
 using Sims.Server.Models.StockAnalytics;
 using Sims.Server.Services;
@@ -22,14 +22,17 @@ public static class StockAnalyticsEndpoints
         return endpoints;
     }
 
-    private static IResult GetArrowReport(
+    private static async Task<IResult> GetArrowReport(
         StockAnalyticsRequest? request,
-        IStockAnalyticsService service)
+        IStockAnalyticsService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            DataTable table = service.BuildArrowTable(request ?? new StockAnalyticsRequest());
-            return ArrowResults.FromDataTable(table);
+            var req = request ?? new StockAnalyticsRequest();
+            int batchSize = req.BatchSize is > 0 ? req.BatchSize.Value : 12;
+            IAsyncEnumerable<RecordBatch> batches = service.StreamBatchesAsync(req, batchSize, cancellationToken);
+            return ArrowResults.FromBatches(batches);
         }
         catch (ArgumentException ex)
         {

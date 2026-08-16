@@ -1,4 +1,5 @@
-import type { ArrowJobEvent } from "@/features/stock/item/types/stock-analytics"
+import type { ArrowJobEvent } from "./types"
+import { formatCount } from "@/utils/format"
 
 export type RunEventItem = {
   id: string
@@ -8,6 +9,9 @@ export type RunEventItem = {
   tone: "muted" | "success" | "danger"
   /** ISO timestamp when the step occurred (server or client receive time). */
   at?: string
+  /** Son bilinen işlem sayıları (progress/terminal event'lerinden). */
+  totalRows?: number
+  batchCount?: number
 }
 
 function resolveOccurredAt(payload: ArrowJobEvent): string {
@@ -38,9 +42,11 @@ export function mapSseToRunEvent(
       id: "progress",
       eventName,
       title: "Progress",
-      detail: `${payload.totalRows ?? 0} rows`,
+      detail: `${formatCount(payload.totalRows ?? 0)} rows`,
       tone: "success",
       at,
+      totalRows: payload.totalRows,
+      batchCount: payload.batchCount,
     }
   }
   if (eventName === "completed") {
@@ -48,9 +54,11 @@ export function mapSseToRunEvent(
       id: "completed",
       eventName,
       title: "Completed",
-      detail: `${payload.totalRows ?? 0} rows ready`,
+      detail: `${formatCount(payload.totalRows ?? 0)} rows ready`,
       tone: "success",
       at,
+      totalRows: payload.totalRows,
+      batchCount: payload.batchCount,
     }
   }
   if (eventName === "failed") {
@@ -80,6 +88,8 @@ export function mapSseToRunEvent(
     detail: payload.message || eventName,
     tone: "muted",
     at,
+    totalRows: payload.totalRows,
+    batchCount: payload.batchCount,
   }
 }
 

@@ -14,3 +14,7 @@ Kısa özet:
 - Hook + Provider ayrı dosyalarda (Fast Refresh).
 - **Workspace'ler ileride module federation ile ayrışacak** (her biri ayrı React remote'u);
   her değişiklikte workspace sınırlarını koru, cross-workspace import minimal olsun.
+- **Büyük Veri Raporları**: Ortak `<ArrowReportGrid />` bileşeni, W3C OPFS yerel disk önbelleği ve DuckDB WASM motoru kullanılır. Raporlar F5 sonrası sıfır internet maliyetiyle diskten açılır.
+- **Tauri 2.0 Masaüstü & Hibrit Web**: Proje hem tarayıcıda (`npm run dev`) hem masaüstünde (`npm run tauri:dev`) çalışır. Tauri bağımlılıkları `isTauriEnv` ile dinamik izoledir.
+- **Gömülü Python AI Sidecar**: `sys.stdin`/`sys.stdout` JSON akışıyla çift yönlü Tool Calling ve `toolRegistry` köprüsü.
+- **Native Auto-Updater**: Güncelleme kontrolleri web UI'ı kirletmeden sadece macOS/Windows native menüsü (`Check for Updates...`) ve Rust diyalogları üzerinden yürütülür.

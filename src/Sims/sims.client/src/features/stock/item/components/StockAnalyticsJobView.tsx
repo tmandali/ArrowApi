@@ -185,6 +185,7 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
       } catch (err) {
         if (runIdRef.current !== runId) return
         if (abort.signal.aborted) return
+        console.error("StockAnalyticsJobView load error:", err)
         setError(errorMessage(err, "Sonuç yüklenemedi"))
         setLoading(false)
       }
@@ -262,7 +263,15 @@ export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
 
       {error ? (
         <WorkspaceBanner tone="error">
-          <span title={error}>{error}</span>
+          <div className="flex items-center justify-between w-full">
+            <span title={error}>{error}</span>
+            <Link
+              to={STOCK_ANALYTICS_PATH}
+              className="underline text-xs font-semibold ml-4 hover:opacity-80"
+            >
+              Yeni Rapor Başlat →
+            </Link>
+          </div>
         </WorkspaceBanner>
       ) : null}
 

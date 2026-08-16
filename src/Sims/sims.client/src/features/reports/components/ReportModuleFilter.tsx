@@ -30,6 +30,7 @@ export type ReportModuleJobSession = Pick<
   /** New / empty list → show criteria grid in the Detail column. */
   composing?: boolean
   onExitCompose?: () => void
+  onJobCancelled?: (jobId: string) => void
   onJobDeleted?: (jobId: string) => void
   onListLoaded?: (count: number) => void
 }
@@ -39,6 +40,7 @@ export type ReportModuleFilterProps = {
   jobsEndpoint: string
   jobName: string
   schema: JsonSchemaObject
+  draftStorageKey: string
   emptyListHint?: string
   jobSession?: ReportModuleJobSession
   onRun?: () => void
@@ -50,11 +52,12 @@ export const ReportModuleFilter = React.forwardRef<
   ReportModuleFilterProps
 >(function ReportModuleFilter(
   {
-    className,
+    schema,
     jobsEndpoint,
     jobName,
-    schema,
+    draftStorageKey,
     emptyListHint,
+    className,
     jobSession,
     onRun,
     runDisabled = false,
@@ -63,7 +66,7 @@ export const ReportModuleFilter = React.forwardRef<
 ) {
   const composing = Boolean(jobSession?.composing)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
-  const { rows, setRows } = useSharedCriteriaDraft(jobName, schema)
+  const { rows, setRows } = useSharedCriteriaDraft(draftStorageKey, schema)
 
   React.useImperativeHandle(
     ref,
@@ -107,6 +110,7 @@ export const ReportModuleFilter = React.forwardRef<
           jobSession?.onExitCompose?.()
           jobSession?.onJobSelect?.(jobId)
         }}
+        onJobCancelled={jobSession?.onJobCancelled}
         onJobDeleted={jobSession?.onJobDeleted}
         onListLoaded={jobSession?.onListLoaded}
         onListError={jobSession?.onListError}

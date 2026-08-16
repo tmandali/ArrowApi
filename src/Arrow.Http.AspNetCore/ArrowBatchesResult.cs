@@ -18,6 +18,10 @@ internal sealed class ArrowBatchesResult : IResult
         ArgumentNullException.ThrowIfNull(httpContext);
 
         httpContext.Response.ContentType = ArrowHttpExtensions.ArrowStreamMediaType;
+        httpContext.Response.Headers.CacheControl = "no-cache, no-transform";
+        httpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>()?.DisableBuffering();
+        httpContext.Features.Get<Microsoft.AspNetCore.Server.Kestrel.Core.Features.IHttpMinResponseDataRateFeature>()?.MinDataRate = null;
+
         Stream outputStream = httpContext.Response.BodyWriter.AsStream(leaveOpen: true);
         CancellationToken cancellationToken = httpContext.RequestAborted;
 

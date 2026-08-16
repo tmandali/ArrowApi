@@ -59,6 +59,13 @@ public static class ArrowJobsStorageExtensions
             IHostEnvironment environment = sp.GetRequiredService<IHostEnvironment>();
             return new FileArrowResultStorage(environment, directoryPath);
         });
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ArrowJobFileRetentionService>(sp =>
+        {
+            IHostEnvironment environment = sp.GetRequiredService<IHostEnvironment>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ArrowJobFileRetentionService>>();
+            return new ArrowJobFileRetentionService(environment, logger, directoryPath);
+        }));
     }
 
     private static void RegisterResultStorage<TStorage>(IServiceCollection services)

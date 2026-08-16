@@ -1,8 +1,6 @@
 import {
-  BarChart3,
-  ClipboardList,
-  Package,
-  Play,
+  RotateCcw,
+  SquarePen,
   type LucideIcon,
 } from "lucide-react"
 
@@ -21,37 +19,20 @@ export type YulaCommand = {
 
 export const YULA_COMMANDS: YulaCommand[] = [
   {
-    id: "stok",
-    slash: "stok",
-    label: "Stok analizi",
-    description: "Stok analitik raporuna nasıl ulaşılır?",
-    prompt: "Stok analizi raporu nasıl alınır?",
-    icon: BarChart3,
+    id: "new",
+    slash: "new",
+    label: "Yeni sohbet",
+    description: "Mevcut konuşmayı ve bellek geçmişini sıfırla",
+    prompt: "/new",
+    icon: SquarePen,
   },
   {
-    id: "satis",
-    slash: "satis",
-    label: "Satış siparişi",
-    description: "Sipariş durumu nasıl güncellenir?",
-    prompt: "Satış siparişinde durum nasıl güncellenir?",
-    icon: ClipboardList,
-  },
-  {
-    id: "maliyet",
-    slash: "maliyet",
-    label: "Maliyet fişi",
-    description: "Landed cost ile ne takip edilir?",
-    prompt: "Maliyet fişi ile neyi takip ederim?",
-    icon: Package,
-  },
-  {
-    id: "demo",
-    slash: "demo",
-    label: "Demo sorusu",
-    description: "Önceden tanımlı mock diyaloğu ilerlet",
-    prompt: "",
-    runDemo: true,
-    icon: Play,
+    id: "clear",
+    slash: "clear",
+    label: "Sohbeti temizle",
+    description: "Ekranı temizle ve yeni bir oturum başlat",
+    prompt: "/clear",
+    icon: RotateCcw,
   },
 ]
 

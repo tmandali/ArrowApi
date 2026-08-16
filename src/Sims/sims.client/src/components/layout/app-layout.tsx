@@ -1,8 +1,10 @@
+import * as React from "react"
 import { Outlet } from "react-router-dom"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat"
 import { WorkspaceSearchProvider } from "@/context/workspace-search"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { isTauriEnv } from "@/lib/api-url"
 
 type AppLayoutProps = {
   /** @deprecated All app shells are viewport-locked; kept for call-site compatibility. */
@@ -14,6 +16,25 @@ type AppLayoutProps = {
  * Prevents the main scrollbar from running through sticky header chrome.
  */
 export function AppLayout({ fullHeight: _fullHeight = false }: AppLayoutProps) {
+  React.useEffect(() => {
+    if (!isTauriEnv) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "F12" ||
+        ((e.metaKey || e.ctrlKey) && e.altKey && (e.key === "i" || e.key === "I"))
+      ) {
+        e.preventDefault()
+        import("@tauri-apps/api/core").then(({ invoke }) => {
+          invoke("toggle_devtools")
+        })
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <WorkspaceSearchProvider>

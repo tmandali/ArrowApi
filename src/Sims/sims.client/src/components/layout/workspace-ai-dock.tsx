@@ -12,8 +12,9 @@ import {
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
+import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { cn } from "@/utils/cn"
-import { ChevronRight, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronRight, Maximize2, Minimize2, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -30,6 +31,23 @@ type WorkspaceAiDockProps = {
   defaultOpen?: boolean
 }
 
+function YulaNewChatButton() {
+  const newConversation = useAgentBridgeStore((s) => s.newConversation)
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+      onClick={newConversation}
+      title="Yeni Sohbet Başlat"
+      aria-label="Yeni Sohbet Başlat"
+    >
+      <SquarePen className="size-3.5" />
+    </Button>
+  )
+}
+
 function YulaExpandToggle() {
   const { expanded, toggleExpanded, sideDockAllowed } = useWorkspaceAiChat()
 
@@ -42,7 +60,6 @@ function YulaExpandToggle() {
       variant="ghost"
       className="size-7 shrink-0"
       onClick={toggleExpanded}
-      aria-pressed={expanded}
       aria-label={expanded ? YULA.restoreLabel : YULA.expandLabel}
       title={expanded ? YULA.restoreLabel : YULA.expandLabel}
     >
@@ -55,12 +72,6 @@ function YulaExpandToggle() {
   )
 }
 
-/**
- * Page body under the workspace header.
- * Closed: page content.
- * Open + desktop: resizable side dock (or expanded full content).
- * Open + tablet/phone (<1024px): full content only; always closable.
- */
 export function WorkspaceAiDock({
   children,
   className,
@@ -74,14 +85,17 @@ export function WorkspaceAiDock({
     useWorkspaceAiChat()
 
   React.useEffect(() => {
-    if (defaultOpen) setOpen(true)
+    if (defaultOpen) {
+      setOpen(true)
+    }
   }, [defaultOpen, setOpen])
 
   React.useEffect(() => {
-    if (startExpanded && open) {
+    if (startExpanded) {
+      setOpen(true)
       setExpanded(true)
     }
-  }, [startExpanded, open, setExpanded])
+  }, [startExpanded, setOpen, setExpanded])
 
   if (!open) {
     return (
@@ -119,6 +133,7 @@ export function WorkspaceAiDock({
               <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold tracking-tight text-primary dark:text-sidebar-primary">
                 <AIChatPanelTitle />
               </div>
+              <YulaNewChatButton />
               <YulaExpandToggle />
               <Button
                 type="button"
@@ -146,7 +161,12 @@ export function WorkspaceAiDock({
       onOpenChange={setOpen}
       title={<AIChatPanelTitle />}
       collapseLabel={YULA.collapseLabel}
-      headerActions={<YulaExpandToggle />}
+      headerActions={
+        <div className="flex items-center gap-0.5">
+          <YulaNewChatButton />
+          <YulaExpandToggle />
+        </div>
+      }
       panel={<AIChatPanel centeredIntro={centeredIntro} />}
       defaultSizePercent={34}
       minSizePercent={32}
