@@ -3,7 +3,7 @@
   "title": "Stok Analitik Raporu (Stock Analytics)",
   "description": "Dönemsel stok hareketlerini, maliyet analizlerini, defter ve para birimi bazlı stok trendlerini sorgular.",
   "x-scope": "stock-analytics",
-  "x-page-path": "/stock/analytics",
+  "x-page-path": "/stock/stock-analytics",
   "x-ai-aliases": ["stok analitik", "stok analitiği", "maliyet analizi", "trend raporu", "stock analytics", "dönemsel analiz"],
   "x-ai-directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap ve kullanıcıya 'son 7 gün' veya 'bu yıl' seçeneklerini öner.",
   "x-ai-quick-prompts": [

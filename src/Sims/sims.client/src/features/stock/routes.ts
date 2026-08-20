@@ -30,6 +30,16 @@ export const stockRoutes: WorkspaceRouteConfig[] = [
     fullHeight: true,
   },
   {
+    path: "stock/analytics",
+    Component: StockAnalyticsPage,
+    fullHeight: true,
+  },
+  {
+    path: "stock/analytics/:jobId",
+    Component: StockAnalyticsPage,
+    fullHeight: true,
+  },
+  {
     path: "stock/stock-ledger",
     Component: StockLedgerPage,
     fullHeight: true,

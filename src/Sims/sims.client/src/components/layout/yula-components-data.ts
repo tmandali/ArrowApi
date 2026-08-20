@@ -37,7 +37,7 @@ export const yulaReportCardConfigs: YulaReportCardConfig[] = [
     scope: "stock-analytics",
     title: "Stock Analytics",
     description: "Stok analitik rapor kriterlerini doldurun",
-    pagePath: "/stock/analytics",
+    pagePath: "/stock/stock-analytics",
     schema: stockAnalyticsSchema,
   },
 ]
