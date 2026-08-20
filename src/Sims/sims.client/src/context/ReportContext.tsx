@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { toolRegistry } from '../lib/tool-registry';
-import { initAutoReportRegistry } from '@/lib/auto-report-registry';
+import { initAutoReportRegistry } from '../lib/auto-report-registry';
 
 export interface ReportFilterArgs {
   date_range?: string;

@@ -1,7 +1,15 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
 import { registerReportSchemaTool } from "@/lib/schema-tool-generator";
 import { registerDuckDbChatTool } from "@/lib/duckdb-chat-tool";
-import type { YulaReportCardConfig } from "@/components/layout/yula-components-data";
+
+export interface YulaReportCardConfig {
+  kind: string;
+  scope: string;
+  title: string;
+  description?: string;
+  pagePath: string;
+  schema: JsonSchemaObject;
+}
 
 // In-memory registry of all automatically discovered report card configs
 export const autoReportCardConfigs: YulaReportCardConfig[] = [];

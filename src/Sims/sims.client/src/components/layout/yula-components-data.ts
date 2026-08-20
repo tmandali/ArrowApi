@@ -1,6 +1,9 @@
 import type { JsonSchemaObject } from "@/features/report-criteria"
+import type { YulaReportCardConfig } from "@/lib/auto-report-registry"
 import stockBalanceCriteriaSchema from "@/features/stock/item/schemas/stock-balance-criteria.schema.json"
 import stockAnalyticsCriteriaSchema from "@/features/stock/item/schemas/stock-analytics-criteria.schema.json"
+
+export type { YulaReportCardConfig }
 
 /**
  * Custom message part kinds Yula can embed in the conversation.
@@ -12,17 +15,6 @@ export const yulaCustomKinds = {
 } as const
 
 export type YulaCustomKind = (typeof yulaCustomKinds)[keyof typeof yulaCustomKinds]
-
-export type YulaReportCardConfig = {
-  kind: string
-  /** Draft criteria store scope shared with the report page filter. */
-  scope: string
-  title: string
-  description?: string
-  /** Where "Sayfada aç" navigates (the report's full page). */
-  pagePath: string
-  schema: JsonSchemaObject
-}
 
 const stockBalanceSchema = stockBalanceCriteriaSchema as JsonSchemaObject
 const stockAnalyticsSchema = stockAnalyticsCriteriaSchema as JsonSchemaObject
