@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { toolRegistry } from "../lib/tool-registry";
 import { isTauriEnv } from "@/lib/api-url";
+import { resolveGenericToolIntent } from "@/lib/generic-nlp-resolver";
 
 export interface ChatMessage {
   id: string;
@@ -260,78 +261,26 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
           throw new Error("Sidecar child process is not ready.");
         }
       } else {
-        // Fallback / Tarayıcı simülasyonu
+        // Fallback / Tarayıcı simülasyonu — 100% Generic Schema-Driven Resolver
         setTimeout(async () => {
-          const pLower = promptText.toLowerCase();
-          const isAnalytics = pLower.includes("analytic") || pLower.includes("analitik") || pLower.includes("trend") || pLower.includes("maliyet");
-          const isBalance = pLower.includes("balance") || pLower.includes("bakiye") || pLower.includes("kalan") || pLower.includes("stok");
+          const allTools = toolRegistry.getAll();
+          const resolved = resolveGenericToolIntent(promptText, allTools);
 
-          const today = new Date();
-          const todayIso = today.toISOString().split("T")[0];
-          const last7Days = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
-          const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
-          const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-
-          let startDate = last30Days;
-          let endDate = todayIso;
-          let dateRange = `${last30Days}..${todayIso}`;
-
-          if (pLower.includes("7 gün") || pLower.includes("hafta") || pLower.includes("last week")) {
-            startDate = last7Days;
-            dateRange = `${last7Days}..${todayIso}`;
-          } else if (pLower.includes("dün") || pLower.includes("yesterday")) {
-            startDate = yesterday;
-            endDate = yesterday;
-            dateRange = yesterday;
-          } else if (pLower.includes("bugün") || pLower.includes("today")) {
-            startDate = todayIso;
-            endDate = todayIso;
-            dateRange = todayIso;
-          }
-
-          if (isAnalytics) {
-            let currency = "try";
-            if (pLower.includes("usd") || pLower.includes("dolar")) currency = "usd";
-            if (pLower.includes("inr") || pLower.includes("rupi")) currency = "inr";
-
-            const exec = await toolRegistry.executeTool("filter_stock_analytics", {
-              fromDate: startDate,
-              toDate: endDate,
-              currency,
-            });
+          if (resolved.tool) {
+            const exec = await toolRegistry.executeTool(resolved.tool, resolved.arguments);
             get().appendMessage({
               sender: "agent",
-              content: `Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.`,
-              customKind: "yula.report.stock-analytics",
+              content: resolved.message,
+              customKind: exec.result?.customKind,
               toolResult: exec.result,
+              toolDetails: resolved.arguments,
             });
-            if (processingTimeout) clearTimeout(processingTimeout);
-            set({ isProcessing: false });
-            return;
-          }
-
-          if (isBalance) {
-            const isIptal = pLower.includes("iptal");
-            const durum = isIptal ? ["IPTAL"] : ["AKTIF"];
-            const exec = await toolRegistry.executeTool("filter_stock_balance", {
-              kayitTarihi: dateRange,
-              ...(isIptal ? { durum } : {}),
-            });
+          } else {
             get().appendMessage({
               sender: "agent",
-              content: `Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.`,
-              customKind: "yula.report.stock-balance",
-              toolResult: exec.result,
+              content: `Merhaba! Size nasıl yardımcı olabilirim? Yula ERP bünyesindeki tüm rapor ve sorgulamalar için bana doğal dilde talimat verebilirsiniz.`,
             });
-            if (processingTimeout) clearTimeout(processingTimeout);
-            set({ isProcessing: false });
-            return;
           }
-
-          get().appendMessage({
-            sender: "agent",
-            content: `Hello! How can I help you? I can assist you with managing reports and queries in Yula ERP.`,
-          });
           if (processingTimeout) clearTimeout(processingTimeout);
           set({ isProcessing: false });
         }, 400);

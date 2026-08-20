@@ -52,6 +52,13 @@ class ToolRegistry {
   }
 
   /**
+   * Tüm kayıtlı araçları döner.
+   */
+  getAll(): ToolDefinition[] {
+    return Array.from(this.tools.values());
+  }
+
+  /**
    * Tüm kayıtlı araçların tanımlarını LLM şeması formatında döner.
    */
   getAllDefinitions(): Omit<ToolDefinition, "execute">[] {

@@ -39,8 +39,8 @@ def get_system_prompt():
     year_start_str = first_of_year.strftime("%Y-%m-%d")
 
     return (
-        f"You are Yula, the intelligent AI assistant of the ERP system.\n"
-        f"Today's date: {today_str}.\n"
+        f"You are Yula, the intelligent ERP AI assistant.\n"
+        f"Current Date: {today_str}.\n"
         f"Reference Dates:\n"
         f"- Today: {today_iso}\n"
         f"- Yesterday: {yesterday_str}\n"
@@ -48,22 +48,14 @@ def get_system_prompt():
         f"- 30 days ago: {last_30_str}\n"
         f"- Month start: {month_start_str}\n"
         f"- Year start: {year_start_str}\n\n"
-        f"YOUR TASKS & TOOL SELECTION RULES:\n"
-        f"1. When user asks for 'Stock Analytics' or 'analitik' or 'trend' or 'maliyet' or 'kar/zarar':\n"
-        f"   - MUST invoke 'filter_stock_analytics'.\n"
-        f"   - Set 'fromDate' and 'toDate' as individual 'YYYY-MM-DD' strings.\n"
-        f"     * 'Son 30 gün' / 'Last 30 days': fromDate='{last_30_str}', toDate='{today_iso}'\n"
-        f"     * 'Son 7 gün' / 'Last week': fromDate='{last_week_str}', toDate='{today_iso}'\n"
-        f"     * 'Bu ay' / 'This month': fromDate='{month_start_str}', toDate='{today_iso}'\n"
-        f"     * 'Bu yıl' / 'This year': fromDate='{year_start_str}', toDate='{today_iso}'\n"
-        f"   - Set 'currency' (e.g. 'try', 'usd', 'inr') if mentioned by user (default is 'try').\n"
-        f"2. When user asks for 'Stock Balance' or 'stok bakiye' or 'kalan stok' or 'mevcut stok':\n"
-        f"   - MUST invoke 'filter_stock_balance'.\n"
-        f"   - Set 'kayitTarihi' as 'YYYY-MM-DD..YYYY-MM-DD' for date ranges (e.g. '{last_30_str}..{today_iso}' for 30 days, '{last_week_str}..{today_iso}' for 7 days).\n"
-        f"   - Set 'kayitTarihi' as single 'YYYY-MM-DD' (e.g. '{yesterday_str}') for single day queries ('dün', 'bugün').\n"
-        f"   - When user mentions 'iptal' or 'cancelled', set durum=['IPTAL']. When 'aktif' or 'active', set durum=['AKTIF'].\n"
+        f"GENERIC SCHEMA-DRIVEN TOOL CALLING RULES:\n"
+        f"1. You have a set of registered tools dynamically created from ERP JSON schemas.\n"
+        f"2. Read the tool descriptions and parameter schemas carefully:\n"
+        f"   - If a tool has separate start/end date parameters (e.g. fromDate/toDate, startDate/endDate, baslangicTarihi/bitisTarihi), pass separate YYYY-MM-DD strings for start and end.\n"
+        f"   - If a tool has a single date parameter (e.g. kayitTarihi, date, tarih) and user specifies a range (e.g. last 7 days, 30 days), pass 'YYYY-MM-DD..YYYY-MM-DD'. For a single day, pass 'YYYY-MM-DD'.\n"
+        f"   - For enum parameters (e.g. status, currency, document type), map user terms to the closest allowed enum value (e.g. 'iptal' -> 'IPTAL', 'aktif' -> 'AKTIF', 'dolar' -> 'usd', 'lira' -> 'try').\n"
         f"3. Direct the user with: 'Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.'\n"
-        f"4. Always respond politely, professionally, and in Turkish or the user's language."
+        f"4. Always respond politely, professionally, and in Turkish if the user speaks Turkish or in the user's language."
     )
 
 def convert_to_ollama_tools(tools_list):
@@ -78,39 +70,6 @@ def convert_to_ollama_tools(tools_list):
                     "parameters": tool.get("parameters", {"type": "object", "properties": {}})
                 }
             })
-    
-    if not ollama_tools:
-        ollama_tools.append({
-            "type": "function",
-            "function": {
-                "name": "filter_stock_analytics",
-                "description": "Fills criteria for Stock Analytics report. Fields: fromDate, toDate, currency, fiscalYear.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "fromDate": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
-                        "toDate": {"type": "string", "description": "End date (YYYY-MM-DD)"},
-                        "currency": {"type": "string", "enum": ["try", "usd", "inr"]}
-                    }
-                }
-            }
-        })
-        ollama_tools.append({
-            "type": "function",
-            "function": {
-                "name": "filter_stock_balance",
-                "description": "Fills criteria for Stock Balance report. Fields: kayitTarihi, durum, tutarMiktar.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "kayitTarihi": {"type": "string", "description": "Date or date range (YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD)"},
-                        "durum": {"type": "array", "description": "Document Status (AKTIF, PASIF, BEKLEMEDE, IPTAL)"},
-                        "tutarMiktar": {"type": "number"}
-                    },
-                    "required": ["kayitTarihi"]
-                }
-            }
-        })
     return ollama_tools
 
 def fallback_rule_parser(prompt, tools_list=None):
@@ -129,78 +88,83 @@ def fallback_rule_parser(prompt, tools_list=None):
     month_start_str = first_of_month.strftime("%Y-%m-%d")
     year_start_str = first_of_year.strftime("%Y-%m-%d")
 
-    # 1. Date Range Resolution
+    # 1. Universal Date Resolution
+    is_range = True
     if any(k in prompt_lower for k in ["30 gün", "30 gun", "last 30", "1 ay", "bir ay", "aylık", "aylik"]):
-        start_date = last_30_str
-        end_date = today_iso
-        range_date = f"{last_30_str}..{today_iso}"
+        start_date, end_date = last_30_str, today_iso
     elif any(k in prompt_lower for k in ["7 gün", "7 gun", "hafta", "last week", "son 7"]):
-        start_date = last_week_str
-        end_date = today_iso
-        range_date = f"{last_week_str}..{today_iso}"
+        start_date, end_date = last_week_str, today_iso
     elif any(k in prompt_lower for k in ["bu ay", "this month"]):
-        start_date = month_start_str
-        end_date = today_iso
-        range_date = f"{month_start_str}..{today_iso}"
+        start_date, end_date = month_start_str, today_iso
     elif any(k in prompt_lower for k in ["bu yıl", "bu yil", "this year"]):
-        start_date = year_start_str
-        end_date = today_iso
-        range_date = f"{year_start_str}..{today_iso}"
+        start_date, end_date = year_start_str, today_iso
     elif any(k in prompt_lower for k in ["dün", "dun", "yesterday"]):
-        start_date = yesterday_str
-        end_date = yesterday_str
-        range_date = yesterday_str
+        start_date, end_date, is_range = yesterday_str, yesterday_str, False
     elif any(k in prompt_lower for k in ["bugün", "bugun", "today"]):
-        start_date = today_iso
-        end_date = today_iso
-        range_date = today_iso
+        start_date, end_date, is_range = today_iso, today_iso, False
     else:
-        # Default for analytics is 30 days, for balance is yesterday
-        start_date = last_30_str
-        end_date = today_iso
-        range_date = f"{last_week_str}..{today_iso}"
+        start_date, end_date = last_30_str, today_iso
 
-    # 2. Tool Resolution (Analytics vs Balance)
-    is_analytics = any(k in prompt_lower for k in ["analytic", "analitik", "trend", "maliyet", "gelir", "gider"])
-    is_balance = any(k in prompt_lower for k in ["balance", "bakiye", "kalan", "mevcut"])
+    # 2. Dynamic Tool Matching by relevance scoring
+    best_tool = None
+    max_score = -1
 
-    matched_tool = None
     if tools_list:
         for tool in tools_list:
             if not isinstance(tool, dict):
                 continue
-            name = tool.get("name", "").lower()
-            if is_analytics and "analytics" in name:
-                matched_tool = tool
-                break
-            elif is_balance and "balance" in name:
-                matched_tool = tool
-                break
+            name = tool.get("name", "").lower().replace("filter_", "")
+            desc = tool.get("description", "").lower()
+            score = 0
+            for word in name.replace("_", " ").split():
+                if len(word) > 2 and word in prompt_lower:
+                    score += 5
+            for word in desc.split():
+                if len(word) > 3 and word in prompt_lower:
+                    score += 2
+            if score > max_score:
+                max_score = score
+                best_tool = tool
 
-    if not matched_tool:
-        if is_analytics:
-            tool_name = "filter_stock_analytics"
-        else:
-            tool_name = "filter_stock_balance"
-    else:
-        tool_name = matched_tool.get("name")
+    if not best_tool and tools_list:
+        best_tool = tools_list[0]
 
+    tool_name = best_tool.get("name", "filter_stock_balance") if best_tool else "filter_stock_balance"
     args = {}
-    if "analytics" in tool_name:
-        args["fromDate"] = start_date
-        args["toDate"] = end_date
-        if "usd" in prompt_lower or "dolar" in prompt_lower:
-            args["currency"] = "usd"
-        elif "inr" in prompt_lower or "rupi" in prompt_lower:
-            args["currency"] = "inr"
-        elif "try" in prompt_lower or "tl" in prompt_lower or "lira" in prompt_lower:
-            args["currency"] = "try"
-    else:
-        args["kayitTarihi"] = range_date
-        if "iptal" in prompt_lower or "cancel" in prompt_lower:
-            args["durum"] = ["IPTAL"]
-        elif "aktif" in prompt_lower or "active" in prompt_lower:
-            args["durum"] = ["AKTIF"]
+
+    # 3. Dynamic schema-driven property extraction
+    props = best_tool.get("parameters", {}).get("properties", {}) if best_tool else {}
+    
+    # Date fields detection
+    from_key = next((k for k in props if any(p in k.lower() for p in ["from", "start", "baslangic"])), None)
+    to_key = next((k for k in props if any(p in k.lower() for p in ["to", "end", "bitis"])), None)
+    single_date_key = next((k for k in props if any(p in k.lower() for p in ["kayit", "date", "tarih"])), None)
+
+    if from_key and to_key:
+        args[from_key] = start_date
+        args[to_key] = end_date
+    elif single_date_key:
+        args[single_date_key] = f"{start_date}..{end_date}" if is_range else start_date
+
+    # Enums & Selection detection
+    for prop_name, prop_def in props.items():
+        if prop_name in [from_key, to_key, single_date_key]:
+            continue
+        enums = prop_def.get("enum", [])
+        if enums:
+            for opt in enums:
+                opt_str = str(opt).lower()
+                if opt_str in prompt_lower:
+                    args[prop_name] = [opt] if prop_def.get("type") == "array" else opt
+                    break
+                elif opt_str == "iptal" and ("cancel" in prompt_lower or "iptal" in prompt_lower):
+                    args[prop_name] = [opt] if prop_def.get("type") == "array" else opt
+                elif opt_str == "aktif" and ("active" in prompt_lower or "aktif" in prompt_lower):
+                    args[prop_name] = [opt] if prop_def.get("type") == "array" else opt
+                elif opt_str == "try" and any(w in prompt_lower for w in ["tl", "lira", "türk lirası"]):
+                    args[prop_name] = opt
+                elif opt_str == "usd" and any(w in prompt_lower for w in ["dolar", "dollar"]):
+                    args[prop_name] = opt
 
     msg = "Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen."
     return {
