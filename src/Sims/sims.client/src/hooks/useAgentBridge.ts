@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { toolRegistry } from "../lib/tool-registry";
 import { isTauriEnv } from "@/lib/api-url";
-import { resolveGenericToolIntent } from "@/lib/generic-nlp-resolver";
+import { resolveGenericToolIntent, detectUnsupportedCriteriaGuidance } from "@/lib/generic-nlp-resolver";
 
 export interface ChatMessage {
   id: string;
@@ -21,6 +21,7 @@ interface AgentBridgeStore {
   status: ProcessStatus;
   messages: ChatMessage[];
   isProcessing: boolean;
+  lastPrompt: string;
   appendMessage: (msg: Omit<ChatMessage, "id" | "timestamp">) => void;
   sendPrompt: (promptText: string) => Promise<void>;
   ensureStarted: () => Promise<void>;
@@ -33,6 +34,7 @@ let processingTimeout: any = null;
 
 export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   status: "idle",
+  lastPrompt: "",
   messages: [
     {
       id: "init-1",
@@ -150,9 +152,16 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
 
               if (execution.success) {
                 const customKind = execution.result?.customKind;
-                const messageText = parsed.message || (customKind
+                const toolDef = toolRegistry.get(toolName);
+                const guidance = detectUnsupportedCriteriaGuidance(get().lastPrompt, toolDef);
+
+                let messageText = parsed.message || (customKind
                   ? `Lütfen aşağıdaki karttaki kriterleri inceleyin ve raporunuzu oluşturmak için **Çalıştır (Run)** veya tam ekran görmek için **Sayfada Aç** butonuna tıklayın.`
                   : `✓ "${toolName}" başarıyla uygulandı.`);
+
+                if (guidance && !messageText.includes("💡")) {
+                  messageText = `${guidance}${messageText}`;
+                }
 
                 get().appendMessage({
                   sender: "agent",
@@ -240,7 +249,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
       content: promptText,
     });
 
-    set({ isProcessing: true });
+    set({ isProcessing: true, lastPrompt: promptText });
 
     if (processingTimeout) clearTimeout(processingTimeout);
     processingTimeout = setTimeout(() => {

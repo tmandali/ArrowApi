@@ -137,6 +137,47 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
 }
 
 /**
+ * Detects keywords in prompt requesting filters not supported by the schema and returns guidance text.
+ */
+export function detectUnsupportedCriteriaGuidance(prompt: string, tool?: ToolDefinition): string {
+  if (!tool || !prompt) return "";
+  const pLower = prompt.toLowerCase();
+  const props = tool.parameters?.properties || {};
+
+  const domainKeywords: Record<string, string[]> = {
+    "Depo": ["depo", "kadıköy", "kadikoy", "ambar", "lokasyon", "şube", "sube", "mağaza", "magaza"],
+    "Renk / Beden": ["renk", "kırmızı", "kirmizi", "mavi", "yeşil", "yesil", "siyah", "beyaz", "beden", "numara", "boyut"],
+    "Cari / Müşteri": ["müşteri", "musteri", "cari", "tedarikçi", "tedarikci", "bayi"],
+    "Kategori / Marka": ["kategori", "marka", "grup", "reyon", "sezon"],
+  };
+
+  const detected: string[] = [];
+
+  for (const [domainName, keywords] of Object.entries(domainKeywords)) {
+    const matched = keywords.find((kw) => pLower.includes(kw));
+    if (matched) {
+      const isCovered = Object.entries(props).some(([k, p]) => {
+        const fullDesc = `${k} ${p.description || ""}`.toLowerCase();
+        return keywords.some((kw) => fullDesc.includes(kw));
+      });
+
+      if (!isCovered) {
+        detected.push(`${matched} (${domainName})`);
+      }
+    }
+  }
+
+  if (detected.length === 0) return "";
+
+  const validFieldTitles = Object.values(props)
+    .map((p) => p.description?.split(":")[0]?.trim() || "")
+    .filter((t) => t.length > 0 && !t.startsWith("["))
+    .slice(0, 5);
+
+  return `💡 **Bilgi:** Bu raporda **${detected.join(", ")}** filtresi bulunmamaktadır. Rapor desteklenen kriterlerle hazırlandı.\n*(Mevcut kriterler: ${validFieldTitles.join(", ") || "Tarih, Durum, Para Birimi"})*\n\n`;
+}
+
+/**
  * Dynamically resolves the best tool and binds criteria parameters from schema definitions.
  */
 export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]): ResolvedToolCall {
@@ -270,29 +311,8 @@ export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]
     }
   }
 
-  // 3. Unsupported Criteria Detection & User Guidance
-  const commonUnsupportedConcepts = ["renk", "depo", "şube", "sube", "müşteri", "musteri", "marka", "kategori", "beden", "sezon", "tedarikçi", "tedarikci"];
-  const detectedUnsupported: string[] = [];
-
-  for (const concept of commonUnsupportedConcepts) {
-    if (pLower.includes(concept)) {
-      // Check if schema actually has this property
-      const hasProp = Object.keys(props).some((k) => k.toLowerCase().includes(concept) || (props[k].description || "").toLowerCase().includes(concept));
-      if (!hasProp) {
-        detectedUnsupported.push(concept);
-      }
-    }
-  }
-
-  let guidanceNote = "";
-  if (detectedUnsupported.length > 0) {
-    const validFieldTitles = Object.values(props)
-      .map((p) => p.description?.split(":")[0]?.trim() || "")
-      .filter((t) => t.length > 0 && !t.startsWith("["))
-      .slice(0, 4);
-
-    guidanceNote = `💡 **Bilgi:** Bu raporda **${detectedUnsupported.join(", ")}** filtresi bulunmamaktadır. Rapor desteklenen kriterlerle hazırlandı.\n*(Mevcut kriterler: ${validFieldTitles.join(", ") || "Tarih, Durum, Para Birimi"})*\n\n`;
-  }
+  // 3. Guidance Note
+  const guidanceNote = detectUnsupportedCriteriaGuidance(prompt, bestTool);
 
   return {
     tool: bestTool.name,
