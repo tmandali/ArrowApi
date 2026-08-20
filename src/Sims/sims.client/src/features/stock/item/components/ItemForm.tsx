@@ -79,6 +79,7 @@ import {
 } from "@/features/report-criteria"
 import { emptyWorkspaceHome } from "@/lib/empty-module"
 import { createArrowJob } from "@/features/jobs/arrow-job-client"
+import { findActiveJobByPayload, findCompletedJobByPayload } from "@/store/slices/active-jobs-store"
 import { ApiError } from "@/services"
 import { cn } from "@/utils/cn"
 
@@ -253,6 +254,24 @@ export function ItemForm({
         tone: "error",
         message: "Schema x-job-endpoint is missing",
       })
+      return
+    }
+
+    const currentScope = mode || "report"
+
+    // 1. Aynı kriterlerle zaten ÇALIŞMAKTA OLAN aktif bir iş var mı?
+    const activeExisting = findActiveJobByPayload(currentScope, result.instance)
+    if (activeExisting) {
+      const existingJobStatus = {
+        id: activeExisting.id,
+        status: (activeExisting.status as any) || "Queued",
+        eventsUrl: activeExisting.eventsUrl,
+        jobUrl: activeExisting.jobUrl,
+      }
+      onStockBalanceJobCreated?.(existingJobStatus, result.instance)
+      onStockAnalyticsJobCreated?.(existingJobStatus, result.instance)
+      onReportJobCreated?.(existingJobStatus, result.instance)
+      setCriteriaBanner(null)
       return
     }
 

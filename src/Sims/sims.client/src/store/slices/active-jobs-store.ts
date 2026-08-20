@@ -14,6 +14,70 @@ export function isTerminalJobStatus(status: string | undefined): boolean {
   return status != null && TERMINAL_JOB_STATUSES.has(status)
 }
 
+/**
+ * Canonical JSON representation of payload for exact criteria comparison.
+ */
+export function getCanonicalPayloadKey(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return ""
+  try {
+    const sortObject = (obj: any): any => {
+      if (Array.isArray(obj)) {
+        return obj.map(sortObject)
+      } else if (obj !== null && typeof obj === "object") {
+        return Object.keys(obj)
+          .sort()
+          .reduce((result: any, key: string) => {
+            const val = obj[key]
+            if (val !== undefined && val !== null && val !== "") {
+              result[key] = sortObject(val)
+            }
+            return result
+          }, {})
+      }
+      return obj
+    }
+    return JSON.stringify(sortObject(payload))
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * Finds any running/queued job with the exact same criteria payload.
+ */
+export function findActiveJobByPayload(
+  name: string,
+  payload: Record<string, unknown>
+): TrackedJob | undefined {
+  const targetKey = getCanonicalPayloadKey(payload)
+  if (!targetKey) return undefined
+
+  const jobs = Object.values(useActiveJobsStore.getState().jobs)
+  return jobs.find((j) => {
+    if (j.name !== name) return false
+    if (isTerminalJobStatus(j.status)) return false
+    return getCanonicalPayloadKey(j.payload) === targetKey
+  })
+}
+
+/**
+ * Finds any completed job with the exact same criteria payload.
+ */
+export function findCompletedJobByPayload(
+  name: string,
+  payload: Record<string, unknown>
+): TrackedJob | undefined {
+  const targetKey = getCanonicalPayloadKey(payload)
+  if (!targetKey) return undefined
+
+  const jobs = Object.values(useActiveJobsStore.getState().jobs)
+  return jobs.find((j) => {
+    if (j.name !== name) return false
+    if (j.status !== "Completed") return false
+    return getCanonicalPayloadKey(j.payload) === targetKey
+  })
+}
+
 export type TrackedJobNotificationType =
   | "order"
   | "report"

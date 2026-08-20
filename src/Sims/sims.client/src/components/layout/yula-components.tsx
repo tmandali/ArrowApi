@@ -11,7 +11,7 @@ import {
 } from "@/features/report-criteria"
 import { createArrowJob } from "@/features/jobs/arrow-job-client"
 import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
-import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
+import { useActiveJobsStore, findActiveJobByPayload, findCompletedJobByPayload } from "@/store/slices/active-jobs-store"
 import { useNotificationsStore } from "@/store/slices/notifications-store"
 import type { YulaReportCardConfig } from "./yula-components-data"
 
@@ -39,6 +39,39 @@ export function YulaReportCriteriaCard({
       }
 
       const instance = rowsToCriteriaInstance(rows, parsed.fields)
+
+      // 1. Aynı kriterlerle zaten ÇALIŞMAKTA OLAN aktif bir iş var mı kontrol et
+      const activeExisting = findActiveJobByPayload(config.scope, instance)
+      if (activeExisting) {
+        useAgentBridgeStore.getState().appendMessage({
+          sender: "agent",
+          content: `⚡ **${config.title}:** Bu kriterlerle zaten hazırlanmakta olan aktif bir rapor var (${activeExisting.id.slice(0, 8)}...). Mevcut işe bağlanılıyor.`,
+        })
+        navigate(config.pagePath, {
+          state: {
+            focusJobId: activeExisting.id,
+            composing: false,
+          },
+        })
+        return
+      }
+
+      // 2. Aynı kriterlerle önceden TAMAMLANMIŞ mevcut bir iş var mı kontrol et
+      const completedExisting = findCompletedJobByPayload(config.scope, instance)
+      if (completedExisting) {
+        useAgentBridgeStore.getState().appendMessage({
+          sender: "agent",
+          content: `✓ **${config.title}:** Bu kriterlerle hazırlanmış güncel rapor bulundu (${completedExisting.id.slice(0, 8)}...). Rapor sonuçlarına yönlendiriliyorsunuz.`,
+        })
+        navigate(config.pagePath, {
+          state: {
+            focusJobId: completedExisting.id,
+            composing: false,
+          },
+        })
+        return
+      }
+
       const endpoint = assertSafeApiJobEndpoint(parsed.jobEndpoint)
       const job = await createArrowJob(endpoint, instance)
 
