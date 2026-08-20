@@ -82,6 +82,13 @@ export async function createArrowJob(
     )
   }
 
+  // 409 Conflict: Sunucuda bu kriterlerle zaten çalışan/tamamlanmış bir iş var (Deduplication)
+  if (response.status === 409) {
+    const existingJob = (await response.json()) as ArrowJobStatus
+    console.log(`[ArrowJobClient] Reusing existing job from server (409 Conflict):`, existingJob)
+    return existingJob
+  }
+
   if (!response.ok) {
     const errorBody = await safeParseResponseBody(response)
     throw new ApiError(

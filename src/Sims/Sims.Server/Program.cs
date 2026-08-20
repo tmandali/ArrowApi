@@ -37,8 +37,8 @@ app.MapStaticAssets();
 
 app.UseArrowApi("/api/arrow/jobs", jobs =>
 {
-    jobs.MapJob("stock-analytics");
-    jobs.MapJob("stock-balance");
+    jobs.MapJob("stock-analytics").PreventDuplicates(TimeSpan.FromMinutes(30));
+    jobs.MapJob("stock-balance").PreventDuplicates(TimeSpan.FromMinutes(30));
 });
 
 app.MapStockAnalyticsEndpoints();
