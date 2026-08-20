@@ -263,22 +263,58 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
         // Fallback / Tarayıcı simülasyonu
         setTimeout(async () => {
           const pLower = promptText.toLowerCase();
-          if (
-            pLower.includes("stock") ||
-            pLower.includes("balance") ||
-            pLower.includes("bakiye") ||
-            pLower.includes("stok") ||
-            pLower.includes("iptal") ||
-            pLower.includes("aktif")
-          ) {
+          const isAnalytics = pLower.includes("analytic") || pLower.includes("analitik") || pLower.includes("trend") || pLower.includes("maliyet");
+          const isBalance = pLower.includes("balance") || pLower.includes("bakiye") || pLower.includes("kalan") || pLower.includes("stok");
+
+          const today = new Date();
+          const todayIso = today.toISOString().split("T")[0];
+          const last7Days = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+          const last30Days = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+          const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+          let startDate = last30Days;
+          let endDate = todayIso;
+          let dateRange = `${last30Days}..${todayIso}`;
+
+          if (pLower.includes("7 gün") || pLower.includes("hafta") || pLower.includes("last week")) {
+            startDate = last7Days;
+            dateRange = `${last7Days}..${todayIso}`;
+          } else if (pLower.includes("dün") || pLower.includes("yesterday")) {
+            startDate = yesterday;
+            endDate = yesterday;
+            dateRange = yesterday;
+          } else if (pLower.includes("bugün") || pLower.includes("today")) {
+            startDate = todayIso;
+            endDate = todayIso;
+            dateRange = todayIso;
+          }
+
+          if (isAnalytics) {
+            let currency = "try";
+            if (pLower.includes("usd") || pLower.includes("dolar")) currency = "usd";
+            if (pLower.includes("inr") || pLower.includes("rupi")) currency = "inr";
+
+            const exec = await toolRegistry.executeTool("filter_stock_analytics", {
+              fromDate: startDate,
+              toDate: endDate,
+              currency,
+            });
+            get().appendMessage({
+              sender: "agent",
+              content: `Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.`,
+              customKind: "yula.report.stock-analytics",
+              toolResult: exec.result,
+            });
+            if (processingTimeout) clearTimeout(processingTimeout);
+            set({ isProcessing: false });
+            return;
+          }
+
+          if (isBalance) {
             const isIptal = pLower.includes("iptal");
-            const isGecenHafta = pLower.includes("hafta");
-            const kayitTarihi = isGecenHafta
-              ? "2026-08-13..2026-08-20"
-              : "2026-08-19";
             const durum = isIptal ? ["IPTAL"] : ["AKTIF"];
             const exec = await toolRegistry.executeTool("filter_stock_balance", {
-              kayitTarihi,
+              kayitTarihi: dateRange,
               ...(isIptal ? { durum } : {}),
             });
             get().appendMessage({

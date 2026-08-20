@@ -26,26 +26,44 @@ def get_system_prompt():
     today = datetime.now()
     yesterday = today - timedelta(days=1)
     last_week = today - timedelta(days=7)
+    last_30_days = today - timedelta(days=30)
+    first_of_month = today.replace(day=1)
+    first_of_year = today.replace(month=1, day=1)
+    
     today_str = today.strftime("%Y-%m-%d (%A)")
+    today_iso = today.strftime("%Y-%m-%d")
     yesterday_str = yesterday.strftime("%Y-%m-%d")
     last_week_str = last_week.strftime("%Y-%m-%d")
-    today_iso = today.strftime("%Y-%m-%d")
+    last_30_str = last_30_days.strftime("%Y-%m-%d")
+    month_start_str = first_of_month.strftime("%Y-%m-%d")
+    year_start_str = first_of_year.strftime("%Y-%m-%d")
+
     return (
         f"You are Yula, the intelligent AI assistant of the ERP system.\n"
         f"Today's date: {today_str}.\n"
-        f"Yesterday: {yesterday_str}.\n"
-        f"7 days ago: {last_week_str}.\n\n"
-        f"YOUR TASKS:\n"
-        f"1. Analyze user requests in natural language and invoke registered functions (e.g., 'filter_stock_balance', 'filter_stock_analytics').\n"
-        f"2. DATE RANGE RULES:\n"
-        f"   - When user asks for 'last week', 'past 7 days', or 'hafta', put a DATE RANGE 'YYYY-MM-DD..YYYY-MM-DD' into 'kayitTarihi' (Example: '{last_week_str}..{today_iso}'). Never put a single day!\n"
-        f"   - When user asks for 'this month', put 'YYYY-MM-01..YYYY-MM-DD'.\n"
-        f"   - When user asks for a single day ('yesterday', 'today', 'dün'), put a single date (e.g. '{yesterday_str}').\n"
-        f"3. STATUS RULES:\n"
-        f"   - When user mentions 'cancelled' or 'iptal', add ['IPTAL'] to 'durum'.\n"
-        f"   - When user mentions 'active' or 'aktif', add ['AKTIF'] to 'durum'.\n"
-        f"4. Direct the user to 'Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.'\n"
-        f"5. Always respond politely, professionally, and in English or the user's language."
+        f"Reference Dates:\n"
+        f"- Today: {today_iso}\n"
+        f"- Yesterday: {yesterday_str}\n"
+        f"- 7 days ago: {last_week_str}\n"
+        f"- 30 days ago: {last_30_str}\n"
+        f"- Month start: {month_start_str}\n"
+        f"- Year start: {year_start_str}\n\n"
+        f"YOUR TASKS & TOOL SELECTION RULES:\n"
+        f"1. When user asks for 'Stock Analytics' or 'analitik' or 'trend' or 'maliyet' or 'kar/zarar':\n"
+        f"   - MUST invoke 'filter_stock_analytics'.\n"
+        f"   - Set 'fromDate' and 'toDate' as individual 'YYYY-MM-DD' strings.\n"
+        f"     * 'Son 30 gün' / 'Last 30 days': fromDate='{last_30_str}', toDate='{today_iso}'\n"
+        f"     * 'Son 7 gün' / 'Last week': fromDate='{last_week_str}', toDate='{today_iso}'\n"
+        f"     * 'Bu ay' / 'This month': fromDate='{month_start_str}', toDate='{today_iso}'\n"
+        f"     * 'Bu yıl' / 'This year': fromDate='{year_start_str}', toDate='{today_iso}'\n"
+        f"   - Set 'currency' (e.g. 'try', 'usd', 'inr') if mentioned by user (default is 'try').\n"
+        f"2. When user asks for 'Stock Balance' or 'stok bakiye' or 'kalan stok' or 'mevcut stok':\n"
+        f"   - MUST invoke 'filter_stock_balance'.\n"
+        f"   - Set 'kayitTarihi' as 'YYYY-MM-DD..YYYY-MM-DD' for date ranges (e.g. '{last_30_str}..{today_iso}' for 30 days, '{last_week_str}..{today_iso}' for 7 days).\n"
+        f"   - Set 'kayitTarihi' as single 'YYYY-MM-DD' (e.g. '{yesterday_str}') for single day queries ('dün', 'bugün').\n"
+        f"   - When user mentions 'iptal' or 'cancelled', set durum=['IPTAL']. When 'aktif' or 'active', set durum=['AKTIF'].\n"
+        f"3. Direct the user with: 'Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.'\n"
+        f"4. Always respond politely, professionally, and in Turkish or the user's language."
     )
 
 def convert_to_ollama_tools(tools_list):
@@ -65,23 +83,29 @@ def convert_to_ollama_tools(tools_list):
         ollama_tools.append({
             "type": "function",
             "function": {
-                "name": "filter_stock_balance",
-                "description": "Fills criteria for Stock Balance report and renders conversation card. Required field: kayitTarihi.",
+                "name": "filter_stock_analytics",
+                "description": "Fills criteria for Stock Analytics report. Fields: fromDate, toDate, currency, fiscalYear.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "kayitTarihi": {
-                            "type": "string",
-                            "description": "Required date (e.g. '2026-08-18' or '2026-08-01..2026-08-19')"
-                        },
-                        "durum": {
-                            "type": "array",
-                            "description": "Document Status (AKTIF, PASIF, BEKLEMEDE, IPTAL)"
-                        },
-                        "tutarMiktar": {
-                            "type": "number",
-                            "description": "Amount threshold"
-                        }
+                        "fromDate": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
+                        "toDate": {"type": "string", "description": "End date (YYYY-MM-DD)"},
+                        "currency": {"type": "string", "enum": ["try", "usd", "inr"]}
+                    }
+                }
+            }
+        })
+        ollama_tools.append({
+            "type": "function",
+            "function": {
+                "name": "filter_stock_balance",
+                "description": "Fills criteria for Stock Balance report. Fields: kayitTarihi, durum, tutarMiktar.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "kayitTarihi": {"type": "string", "description": "Date or date range (YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD)"},
+                        "durum": {"type": "array", "description": "Document Status (AKTIF, PASIF, BEKLEMEDE, IPTAL)"},
+                        "tutarMiktar": {"type": "number"}
                     },
                     "required": ["kayitTarihi"]
                 }
@@ -94,15 +118,51 @@ def fallback_rule_parser(prompt, tools_list=None):
     today = datetime.now()
     yesterday = today - timedelta(days=1)
     last_week = today - timedelta(days=7)
-    
-    if "geçen hafta" in prompt_lower or "last week" in prompt_lower or "son 7 gün" in prompt_lower or "hafta" in prompt_lower:
-        target_date = f"{last_week.strftime('%Y-%m-%d')}..{today.strftime('%Y-%m-%d')}"
-    elif "dün" in prompt_lower or "yesterday" in prompt_lower:
-        target_date = yesterday.strftime("%Y-%m-%d")
-    elif "bugün" in prompt_lower or "today" in prompt_lower:
-        target_date = today.strftime("%Y-%m-%d")
+    last_30_days = today - timedelta(days=30)
+    first_of_month = today.replace(day=1)
+    first_of_year = today.replace(month=1, day=1)
+
+    today_iso = today.strftime("%Y-%m-%d")
+    yesterday_str = yesterday.strftime("%Y-%m-%d")
+    last_week_str = last_week.strftime("%Y-%m-%d")
+    last_30_str = last_30_days.strftime("%Y-%m-%d")
+    month_start_str = first_of_month.strftime("%Y-%m-%d")
+    year_start_str = first_of_year.strftime("%Y-%m-%d")
+
+    # 1. Date Range Resolution
+    if any(k in prompt_lower for k in ["30 gün", "30 gun", "last 30", "1 ay", "bir ay", "aylık", "aylik"]):
+        start_date = last_30_str
+        end_date = today_iso
+        range_date = f"{last_30_str}..{today_iso}"
+    elif any(k in prompt_lower for k in ["7 gün", "7 gun", "hafta", "last week", "son 7"]):
+        start_date = last_week_str
+        end_date = today_iso
+        range_date = f"{last_week_str}..{today_iso}"
+    elif any(k in prompt_lower for k in ["bu ay", "this month"]):
+        start_date = month_start_str
+        end_date = today_iso
+        range_date = f"{month_start_str}..{today_iso}"
+    elif any(k in prompt_lower for k in ["bu yıl", "bu yil", "this year"]):
+        start_date = year_start_str
+        end_date = today_iso
+        range_date = f"{year_start_str}..{today_iso}"
+    elif any(k in prompt_lower for k in ["dün", "dun", "yesterday"]):
+        start_date = yesterday_str
+        end_date = yesterday_str
+        range_date = yesterday_str
+    elif any(k in prompt_lower for k in ["bugün", "bugun", "today"]):
+        start_date = today_iso
+        end_date = today_iso
+        range_date = today_iso
     else:
-        target_date = yesterday.strftime("%Y-%m-%d")
+        # Default for analytics is 30 days, for balance is yesterday
+        start_date = last_30_str
+        end_date = today_iso
+        range_date = f"{last_week_str}..{today_iso}"
+
+    # 2. Tool Resolution (Analytics vs Balance)
+    is_analytics = any(k in prompt_lower for k in ["analytic", "analitik", "trend", "maliyet", "gelir", "gider"])
+    is_balance = any(k in prompt_lower for k in ["balance", "bakiye", "kalan", "mevcut"])
 
     matched_tool = None
     if tools_list:
@@ -110,40 +170,39 @@ def fallback_rule_parser(prompt, tools_list=None):
             if not isinstance(tool, dict):
                 continue
             name = tool.get("name", "").lower()
-            desc = tool.get("description", "").lower()
-            words = [w for w in prompt_lower.split() if len(w) > 3]
-            if any(w in name or w in desc for w in words) or ("balance" in name and any(w in prompt_lower for w in ["bakiye", "stok", "stock", "iptal", "cancel", "aktif", "tutar", "göster", "hazırla"])):
+            if is_analytics and "analytics" in name:
+                matched_tool = tool
+                break
+            elif is_balance and "balance" in name:
                 matched_tool = tool
                 break
 
-    tool_name = matched_tool.get("name") if matched_tool else "filter_stock_balance"
-    args = {}
+    if not matched_tool:
+        if is_analytics:
+            tool_name = "filter_stock_analytics"
+        else:
+            tool_name = "filter_stock_balance"
+    else:
+        tool_name = matched_tool.get("name")
 
-    if matched_tool and "parameters" in matched_tool:
-        props = matched_tool.get("parameters", {}).get("properties", {})
-        for prop_name, prop_def in props.items():
-            if prop_name in ["kayitTarihi", "date", "date_range"]:
-                args[prop_name] = target_date
-            elif prop_name == "durum":
-                enums = prop_def.get("enum", [])
-                if "iptal" in prompt_lower or "cancel" in prompt_lower:
-                    args["durum"] = ["IPTAL"]
-                elif "aktif" in prompt_lower or "active" in prompt_lower:
-                    args["durum"] = ["AKTIF"]
-            elif prop_name in ["fromDate", "toDate"]:
-                if prop_name == "fromDate":
-                    args["fromDate"] = (today - timedelta(days=30)).strftime("%Y-%m-%d")
-                elif prop_name == "toDate":
-                    args["toDate"] = today.strftime("%Y-%m-%d")
-    
-    if not args:
-        args = {"kayitTarihi": target_date}
+    args = {}
+    if "analytics" in tool_name:
+        args["fromDate"] = start_date
+        args["toDate"] = end_date
+        if "usd" in prompt_lower or "dolar" in prompt_lower:
+            args["currency"] = "usd"
+        elif "inr" in prompt_lower or "rupi" in prompt_lower:
+            args["currency"] = "inr"
+        elif "try" in prompt_lower or "tl" in prompt_lower or "lira" in prompt_lower:
+            args["currency"] = "try"
+    else:
+        args["kayitTarihi"] = range_date
         if "iptal" in prompt_lower or "cancel" in prompt_lower:
             args["durum"] = ["IPTAL"]
         elif "aktif" in prompt_lower or "active" in prompt_lower:
             args["durum"] = ["AKTIF"]
 
-    msg = "Criteria derived from schema. Please review the criteria on the card below and click **Run** or **Open on page**."
+    msg = "Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen."
     return {
         "tool": tool_name,
         "args": args,

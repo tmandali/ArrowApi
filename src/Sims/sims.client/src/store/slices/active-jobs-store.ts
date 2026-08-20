@@ -95,9 +95,6 @@ export const useActiveJobsStore = create<ActiveJobsState>()(
           useNotificationsStore.getState().removeNotificationByJobId(id)
         }
       },
-      clear: () => {
-        set({ jobs: {} })
-      },
     }),
     {
       name: "sims:active-jobs",
