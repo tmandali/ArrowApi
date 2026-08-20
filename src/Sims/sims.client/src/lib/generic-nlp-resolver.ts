@@ -270,9 +270,33 @@ export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]
     }
   }
 
+  // 3. Unsupported Criteria Detection & User Guidance
+  const commonUnsupportedConcepts = ["renk", "depo", "şube", "sube", "müşteri", "musteri", "marka", "kategori", "beden", "sezon", "tedarikçi", "tedarikci"];
+  const detectedUnsupported: string[] = [];
+
+  for (const concept of commonUnsupportedConcepts) {
+    if (pLower.includes(concept)) {
+      // Check if schema actually has this property
+      const hasProp = Object.keys(props).some((k) => k.toLowerCase().includes(concept) || (props[k].description || "").toLowerCase().includes(concept));
+      if (!hasProp) {
+        detectedUnsupported.push(concept);
+      }
+    }
+  }
+
+  let guidanceNote = "";
+  if (detectedUnsupported.length > 0) {
+    const validFieldTitles = Object.values(props)
+      .map((p) => p.description?.split(":")[0]?.trim() || "")
+      .filter((t) => t.length > 0 && !t.startsWith("["))
+      .slice(0, 4);
+
+    guidanceNote = `💡 **Bilgi:** Bu raporda **${detectedUnsupported.join(", ")}** filtresi bulunmamaktadır. Rapor desteklenen kriterlerle hazırlandı.\n*(Mevcut kriterler: ${validFieldTitles.join(", ") || "Tarih, Durum, Para Birimi"})*\n\n`;
+  }
+
   return {
     tool: bestTool.name,
     arguments: args,
-    message: `Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.`,
+    message: `${guidanceNote}Lütfen aşağıdaki karttaki kriterleri inceleyin ve raporunuzu oluşturmak için **Çalıştır (Run)** veya tam ekran görmek için **Sayfada Aç** butonuna tıklayın.`,
   };
 }

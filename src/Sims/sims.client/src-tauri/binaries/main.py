@@ -54,8 +54,13 @@ def get_system_prompt():
         f"   - If a tool has separate start/end date parameters (e.g. fromDate/toDate, startDate/endDate, baslangicTarihi/bitisTarihi), pass separate YYYY-MM-DD strings for start and end.\n"
         f"   - If a tool has a single date parameter (e.g. kayitTarihi, date, tarih) and user specifies a range (e.g. last 7 days, 30 days), pass 'YYYY-MM-DD..YYYY-MM-DD'. For a single day, pass 'YYYY-MM-DD'.\n"
         f"   - For enum parameters (e.g. status, currency, document type), map user terms to the closest allowed enum value (e.g. 'iptal' -> 'IPTAL', 'aktif' -> 'AKTIF', 'dolar' -> 'usd', 'lira' -> 'try').\n"
-        f"3. Direct the user with: 'Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.'\n"
-        f"4. Always respond politely, professionally, and in Turkish if the user speaks Turkish or in the user's language."
+        f"3. UNSUPPORTED CRITERIA & USER GUIDANCE:\n"
+        f"   - If the user asks for a filter or dimension that does NOT exist in the selected tool's schema (e.g. 'renk', 'depo', 'şube', 'müşteri', 'kategori' when not in schema):\n"
+        f"     * In your text response, politely inform the user that this report does not contain that specific filter.\n"
+        f"     * Guide the user by listing the available valid criteria for this report.\n"
+        f"     * Still invoke the tool with the valid parameters (or defaults) so the user gets their report card.\n"
+        f"4. Direct the user with: 'Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.'\n"
+        f"5. Always respond politely, professionally, and in Turkish if the user speaks Turkish or in the user's language."
     )
 
 def convert_to_ollama_tools(tools_list):
