@@ -2,6 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Genel Rapor Kriterleri",
   "description": "Rapor verilerini tarih ve durum bazlı filtrelemek için temel kriter şeması.",
+  "x-scope": "generic-report",
+  "x-page-path": "/reports",
+  "x-ai-aliases": ["genel rapor", "tüm raporlar", "genel kriterler"],
   "type": "object",
   "properties": {
     "kayitTarihi": {
@@ -9,7 +12,8 @@
       "format": "date",
       "title": "Kayıt Tarihi",
       "description": "Filtrelenecek işlem tarihi (tek gün veya aralık: '2026-08-01..2026-08-19').",
-      "x-range-split": ".."
+      "x-range-split": "..",
+      "x-date-behavior": "range_string"
     },
     "durum": {
       "type": "array",

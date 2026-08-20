@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "./tool-registry";
+import { useDraftCriteriaStore } from "@/store/slices/draft-criteria-store";
 
 export interface ResolvedToolCall {
   tool: string;
@@ -11,6 +12,7 @@ export interface DateIntent {
   startDate: string;
   endDate: string;
   isRange: boolean;
+  isExplicit: boolean;
   rawLabel: string;
 }
 
@@ -48,6 +50,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: rangeMatch[1],
       endDate: rangeMatch[3],
       isRange: true,
+      isExplicit: true,
       rawLabel: `${rangeMatch[1]}..${rangeMatch[3]}`,
     };
   }
@@ -58,6 +61,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: singleIsoMatch[1],
       endDate: singleIsoMatch[1],
       isRange: false,
+      isExplicit: true,
       rawLabel: singleIsoMatch[1],
     };
   }
@@ -67,6 +71,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: last30DaysIso,
       endDate: todayIso,
       isRange: true,
+      isExplicit: true,
       rawLabel: "Son 30 Gün",
     };
   }
@@ -76,6 +81,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: last7DaysIso,
       endDate: todayIso,
       isRange: true,
+      isExplicit: true,
       rawLabel: "Son 7 Gün",
     };
   }
@@ -85,6 +91,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: monthStartIso,
       endDate: todayIso,
       isRange: true,
+      isExplicit: true,
       rawLabel: "Bu Ay Başı - Bugün",
     };
   }
@@ -94,6 +101,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: yearStartIso,
       endDate: todayIso,
       isRange: true,
+      isExplicit: true,
       rawLabel: "Bu Yıl Başı - Bugün",
     };
   }
@@ -103,6 +111,7 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: yesterdayIso,
       endDate: yesterdayIso,
       isRange: false,
+      isExplicit: true,
       rawLabel: "Dün",
     };
   }
@@ -112,15 +121,17 @@ export function parseDateIntent(prompt: string, referenceDate = new Date()): Dat
       startDate: todayIso,
       endDate: todayIso,
       isRange: false,
+      isExplicit: true,
       rawLabel: "Bugün",
     };
   }
 
-  // Default fallback date range (Last 30 Days for analytics/reports)
+  // Default implicit date range
   return {
     startDate: last30DaysIso,
     endDate: todayIso,
     isRange: true,
+    isExplicit: false,
     rawLabel: "Varsayılan Aralık",
   };
 }
@@ -140,19 +151,30 @@ export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]
   const pLower = prompt.toLowerCase();
   const dateIntent = parseDateIntent(prompt);
 
-  // 1. Tool Matching by Relevance Score
+  // 1. Tool Matching by Relevance Score (including x-ai-aliases)
   let bestTool = tools[0];
   let maxScore = -1;
 
   for (const t of tools) {
     let score = 0;
     const nameWords = t.name.toLowerCase().replace(/^filter_/, "").split(/[_\s-]+/);
-    const descWords = t.description.toLowerCase().split(/[\s,.:;!?"'()[\]{}]+/);
+    const desc = t.description.toLowerCase();
+
+    // Check aliases in description (e.g. [Eşanlamlılar / Aliases: ...])
+    const aliasMatch = desc.match(/\[eşanlamlılar \/ aliases:\s*([^\]]+)\]/i);
+    if (aliasMatch && aliasMatch[1]) {
+      const aliases = aliasMatch[1].split(",").map((a) => a.trim().toLowerCase());
+      for (const alias of aliases) {
+        if (alias.length > 2 && pLower.includes(alias)) {
+          score += 15;
+        }
+      }
+    }
 
     for (const w of nameWords) {
       if (w.length > 2 && pLower.includes(w)) score += 5;
     }
-    for (const w of descWords) {
+    for (const w of desc.split(/[\s,.:;!?"'()[\]{}]+/)) {
       if (w.length > 3 && pLower.includes(w)) score += 2;
     }
 
@@ -162,22 +184,45 @@ export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]
     }
   }
 
-  // 2. Schema Property Binding
+  // 2. Schema Property Binding & Semantic Date Behaviors
   const args: Record<string, any> = {};
   const props = bestTool.parameters?.properties || {};
 
-  // Check for separate from/to date fields
-  const fromKey = Object.keys(props).find((k) => /^(from.*date|start.*date|baslangic.*tarih.*)/i.test(k));
-  const toKey = Object.keys(props).find((k) => /^(to.*date|end.*date|bitis.*tarih.*)/i.test(k));
-  const singleDateKey = Object.keys(props).find((k) => /^(kayit.*tarih.*|date|tarih)/i.test(k));
+  // Declarative Date Behavior Detection
+  let fromKey: string | undefined;
+  let toKey: string | undefined;
+  let singleDateKey: string | undefined;
 
-  if (fromKey && toKey) {
-    args[fromKey] = dateIntent.startDate;
-    args[toKey] = dateIntent.endDate;
-  } else if (singleDateKey) {
-    args[singleDateKey] = dateIntent.isRange
-      ? `${dateIntent.startDate}..${dateIntent.endDate}`
-      : dateIntent.startDate;
+  for (const [key, propDef] of Object.entries(props)) {
+    const desc = propDef.description || "";
+    if (desc.includes("[Tarih Davranışı: range_start]")) {
+      fromKey = key;
+    } else if (desc.includes("[Tarih Davranışı: range_end]")) {
+      toKey = key;
+    } else if (desc.includes("[Tarih Davranışı: range_string]")) {
+      singleDateKey = key;
+    }
+  }
+
+  // Heuristic Fallback if declarative annotations are absent
+  if (!fromKey) fromKey = Object.keys(props).find((k) => /^(from.*date|start.*date|baslangic.*tarih.*)/i.test(k));
+  if (!toKey) toKey = Object.keys(props).find((k) => /^(to.*date|end.*date|bitis.*tarih.*)/i.test(k));
+  if (!singleDateKey) singleDateKey = Object.keys(props).find((k) => /^(kayit.*tarih.*|date|tarih)/i.test(k));
+
+  // Determine if we should set date fields (if explicit or no existing draft)
+  const scope = bestTool.name.replace(/^filter_/, "");
+  const existingRows = useDraftCriteriaStore.getState().rowsByScope[scope] || [];
+  const hasExistingDates = existingRows.some((r) => r.name === fromKey || r.name === singleDateKey);
+
+  if (dateIntent.isExplicit || !hasExistingDates) {
+    if (fromKey && toKey) {
+      args[fromKey] = dateIntent.startDate;
+      args[toKey] = dateIntent.endDate;
+    } else if (singleDateKey) {
+      args[singleDateKey] = dateIntent.isRange
+        ? `${dateIntent.startDate}..${dateIntent.endDate}`
+        : dateIntent.startDate;
+    }
   }
 
   // Enum and Value Matching
@@ -206,6 +251,8 @@ export function resolveGenericToolIntent(prompt: string, tools: ToolDefinition[]
         } else if (optLower === "try" && (pLower.includes("tl") || pLower.includes("lira") || pLower.includes("türk lirası"))) {
           args[key] = opt;
         } else if (optLower === "usd" && (pLower.includes("dolar") || pLower.includes("dollar"))) {
+          args[key] = opt;
+        } else if (optLower === "eur" && (pLower.includes("euro") || pLower.includes("avro"))) {
           args[key] = opt;
         }
       }

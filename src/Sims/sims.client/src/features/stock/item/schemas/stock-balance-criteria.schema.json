@@ -2,6 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Stok Bakiye Raporu (Stock Balance)",
   "description": "Depo ve ambarlardaki mevcut ürünlerin kalan stok adetlerini, parasal değerlerini, hareket tarihlerini ve durumlarını sorgular.",
+  "x-scope": "stock-balance",
+  "x-page-path": "/stock/stock-balance",
+  "x-ai-aliases": ["stok bakiye", "kalan stok", "mevcut stok", "envanter durumu", "stock balance", "depo bakiye"],
   "x-ai-directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
   "x-ai-quick-prompts": [
     "Dün itibarıyla hazırla",
@@ -18,6 +21,7 @@
       "title": "Kayıt / Hareket Tarihi",
       "description": "Stok hareketinin gerçekleştiği tarih. Tek bir gün (örn: '2026-08-18') veya aralık (örn: '2026-08-01..2026-08-19') formatında girilir.",
       "x-range-split": "..",
+      "x-date-behavior": "range_string",
       "x-ai-directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner.",
       "x-ai-suggestions": ["dün", "geçen hafta", "bugün", "bu ay başından itibaren"]
     },

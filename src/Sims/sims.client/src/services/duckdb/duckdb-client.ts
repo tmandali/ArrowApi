@@ -185,6 +185,14 @@ class DuckDbClient {
   }
 
   /**
+   * Doğrudan SQL sorgusu çalıştırır ve satırları döner (AI / Text-to-SQL analitiği için).
+   */
+  async executeCustomSql(sql: string): Promise<Record<string, unknown>[]> {
+    const res = await this.postMessage<WorkerResponse>("QUERY_ROWS", { sql })
+    return res.rows ?? []
+  }
+
+  /**
    * Tablo şemasını ve kolon tiplerini sorgular.
    */
   async describeTable(tableName: string): Promise<

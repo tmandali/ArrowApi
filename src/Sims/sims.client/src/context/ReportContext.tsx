@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { toolRegistry } from '../lib/tool-registry';
-import { yulaReportCardConfigs } from '@/components/layout/yula-components-data';
-import { registerAllReportSchemaTools } from '@/lib/schema-tool-generator';
+import { initAutoReportRegistry } from '@/lib/auto-report-registry';
 
 export interface ReportFilterArgs {
   date_range?: string;
@@ -73,12 +72,12 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
     });
 
-    // Tüm raporların JSON Schema'larını otomatik AI Tool olarak kaydet
-    const unregisterSchemaTools = registerAllReportSchemaTools(yulaReportCardConfigs);
+    // Tüm raporların JSON Schema'larını otomatik olarak keşfet ve AI Tool olarak kaydet
+    const unregisterAutoTools = initAutoReportRegistry();
 
     return () => {
       unregisterFilters();
-      unregisterSchemaTools();
+      unregisterAutoTools();
     };
   }, [setFiltersFromAI]);
 

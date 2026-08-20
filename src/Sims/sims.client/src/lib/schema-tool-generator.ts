@@ -27,6 +27,10 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
     let desc = p.title ? `${p.title}: ${p.description || ""}`.trim() : (p.description || key);
     
     // Semantic AI Schema Extensions
+    const dateBehavior = (p as any)["x-date-behavior"];
+    if (dateBehavior) {
+      desc += ` [Tarih Davranışı: ${dateBehavior}]`;
+    }
     const aiDirective = (p as any)["x-ai-directive"];
     if (aiDirective) {
       desc += ` [AI Kuralı: ${aiDirective}]`;
@@ -44,6 +48,10 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
   }
 
   let toolDescription = `${config.title} raporunun kriterlerini doldurur ve sohbet kartında görüntüler. ${config.description || ""}`;
+  const aliases = (config.schema as any)["x-ai-aliases"];
+  if (Array.isArray(aliases) && aliases.length > 0) {
+    toolDescription += ` [Eşanlamlılar / Aliases: ${aliases.join(", ")}]`;
+  }
   const rootAiDirective = config.schema["x-ai-directive"];
   if (rootAiDirective) {
     toolDescription += ` [AI Direktifi: ${rootAiDirective}]`;

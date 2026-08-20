@@ -2,6 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Stok Analitik Raporu (Stock Analytics)",
   "description": "Dönemsel stok hareketlerini, maliyet analizlerini, defter ve para birimi bazlı stok trendlerini sorgular.",
+  "x-scope": "stock-analytics",
+  "x-page-path": "/stock/analytics",
+  "x-ai-aliases": ["stok analitik", "stok analitiği", "maliyet analizi", "trend raporu", "stock analytics", "dönemsel analiz"],
   "x-ai-directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap ve kullanıcıya 'son 7 gün' veya 'bu yıl' seçeneklerini öner.",
   "x-ai-quick-prompts": [
     "Son 30 günün analitiğini hazırla",
@@ -16,6 +19,7 @@
       "format": "date",
       "title": "Başlangıç Tarihi",
       "description": "Analiz başlangıç tarihi (YYYY-MM-DD formatında, örn: '2026-08-01')",
+      "x-date-behavior": "range_start",
       "x-ai-suggestions": ["son 30 gün", "bu ay başı", "son 7 gün", "bu yıl başı"]
     },
     "toDate": {
@@ -23,6 +27,7 @@
       "format": "date",
       "title": "Bitiş Tarihi",
       "description": "Analiz bitiş tarihi (YYYY-MM-DD formatında, örn: '2026-08-19')",
+      "x-date-behavior": "range_end",
       "x-ai-suggestions": ["bugün", "dün", "ay sonu"]
     },
     "fiscalYear": {
