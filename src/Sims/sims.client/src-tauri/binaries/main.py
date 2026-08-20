@@ -171,7 +171,21 @@ def fallback_rule_parser(prompt, tools_list=None):
                 elif opt_str == "usd" and any(w in prompt_lower for w in ["dolar", "dollar"]):
                     args[prop_name] = opt
 
-    msg = "Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen."
+    # 4. Unsupported Criteria Detection & User Guidance
+    common_unsupported = ["renk", "depo", "kadıköy", "kadikoy", "şube", "sube", "müşteri", "musteri", "marka", "kategori", "beden", "sezon", "tedarikçi", "tedarikci"]
+    detected_unsupported = []
+    for concept in common_unsupported:
+        if concept in prompt_lower:
+            has_prop = any(concept in k.lower() or concept in str(p.get("description", "")).lower() for k, p in props.items())
+            if not has_prop:
+                detected_unsupported.append(concept)
+
+    guidance_note = ""
+    if detected_unsupported:
+        valid_titles = [str(p.get("description", k)).split(":")[0].strip() for k, p in props.items() if not str(p.get("description", "")).startswith("[")][:4]
+        guidance_note = f"💡 **Bilgi:** Bu raporda **{', '.join(detected_unsupported)}** filtresi bulunmamaktadır. Rapor desteklenen kriterlerle hazırlandı.\n*(Mevcut kriterler: {', '.join(valid_titles) or 'Tarih, Durum, Para Birimi'})*\n\n"
+
+    msg = f"{guidance_note}Lütfen aşağıdaki karttaki kriterleri inceleyin ve raporunuzu oluşturmak için **Çalıştır (Run)** veya tam ekran görmek için **Sayfada Aç** butonuna tıklayın."
     return {
         "tool": tool_name,
         "args": args,
@@ -225,6 +239,8 @@ def handle_user_task(prompt_text):
         conversation_history.append(message_data)
         
         tool_calls = message_data.get("tool_calls", [])
+        text_content = message_data.get("content", "").strip()
+        
         if tool_calls:
             for tc in tool_calls:
                 func_obj = tc.get("function", {})
@@ -234,11 +250,11 @@ def handle_user_task(prompt_text):
                 send_json({
                     "type": "tool_call",
                     "tool": tool_name,
-                    "arguments": args
+                    "arguments": args,
+                    "message": text_content or "Lütfen aşağıdaki karttaki kriterleri inceleyin ve raporunuzu oluşturmak için **Çalıştır (Run)** veya tam ekran görmek için **Sayfada Aç** butonuna tıklayın."
                 })
         
-        text_content = message_data.get("content", "").strip()
-        if text_content:
+        if text_content and not tool_calls:
             send_json({
                 "type": "message",
                 "content": text_content
@@ -246,24 +262,17 @@ def handle_user_task(prompt_text):
         elif not tool_calls:
             send_json({
                 "type": "message",
-                "content": "Your command has been processed."
+                "content": "Komutunuz işlendi."
             })
             
     except Exception as e:
-        send_json({
-            "type": "message",
-            "content": f"⚡ **Rule Engine Mode:** Processed based on registered report criteria."
-        })
         fallback = fallback_rule_parser(prompt_text, registered_tools)
         send_json({
             "type": "tool_call",
             "tool": fallback["tool"],
             "arguments": fallback["args"],
+            "message": fallback["message"],
             "is_fallback": True
-        })
-        send_json({
-            "type": "message",
-            "content": fallback["message"]
         })
 
 def handle_tool_result(tool_name, result_data):

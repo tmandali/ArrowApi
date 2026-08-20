@@ -150,11 +150,13 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
 
               if (execution.success) {
                 const customKind = execution.result?.customKind;
+                const messageText = parsed.message || (customKind
+                  ? `Lütfen aşağıdaki karttaki kriterleri inceleyin ve raporunuzu oluşturmak için **Çalıştır (Run)** veya tam ekran görmek için **Sayfada Aç** butonuna tıklayın.`
+                  : `✓ "${toolName}" başarıyla uygulandı.`);
+
                 get().appendMessage({
                   sender: "agent",
-                  content: customKind
-                    ? `Please review the criteria on the card below and click **Run** to generate your report, or click **Open on page** to view full screen.`
-                    : `✓ "${toolName}" applied successfully.`,
+                  content: messageText,
                   toolResult: execution.result,
                   toolDetails: toolArgs,
                   customKind,
