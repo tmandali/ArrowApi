@@ -71,15 +71,29 @@ export const useActiveJobsStore = create<ActiveJobsState>()(
       removeJob: (id) => {
         const { [id]: _removed, ...rest } = get().jobs
         set({ jobs: rest })
+        useNotificationsStore.getState().removeNotificationByJobId(id)
       },
       clearTerminal: () => {
         const next: Record<string, TrackedJob> = {}
+        const removedIds: string[] = []
         for (const [id, job] of Object.entries(get().jobs)) {
           if (!isTerminalJobStatus(job.status)) {
             next[id] = job
+          } else {
+            removedIds.push(id)
           }
         }
         set({ jobs: next })
+        for (const id of removedIds) {
+          useNotificationsStore.getState().removeNotificationByJobId(id)
+        }
+      },
+      clear: () => {
+        const allIds = Object.keys(get().jobs)
+        set({ jobs: {} })
+        for (const id of allIds) {
+          useNotificationsStore.getState().removeNotificationByJobId(id)
+        }
       },
       clear: () => {
         set({ jobs: {} })
