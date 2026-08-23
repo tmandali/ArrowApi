@@ -4,13 +4,13 @@
   "description": "Dönemsel stok hareketlerini, maliyet analizlerini, defter ve para birimi bazlı stok trendlerini sorgular.",
   "x-scope": "stock-analytics",
   "x-page-path": "/stock/stock-analytics",
-  "x-ai-aliases": ["stok analitik", "stok analitiği", "maliyet analizi", "trend raporu", "stock analytics", "dönemsel analiz"],
-  "x-ai-directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap ve kullanıcıya 'son 7 gün' veya 'bu yıl' seçeneklerini öner.",
-  "x-ai-quick-prompts": [
-    "Son 30 günün analitiğini hazırla",
-    "Son 7 gün (TRY)",
-    "Mali Yıl: 2025-2026"
-  ],
+  "x-ai": {
+    "schemaVersion": 1,
+    "aliases": ["stok analiz", "stok analizi", "stok analiz raporu", "stok analitik", "stok analitiği", "maliyet analizi", "trend raporu", "stock analytics", "dönemsel analiz", "analiz raporu"],
+    "directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap ve kullanıcıya 'son 7 gün' veya 'bu yıl' seçeneklerini öner.",
+    "quickPrompts": ["Son 30 günün analitiğini hazırla", "Son 7 gün (TRY)", "Mali Yıl: 2025-2026"],
+    "resultsPrompts": ["🚨 Riskli Kapanış & Anomali Analizi", "En Yüksek 5 Maliyet / Borç Kalemi", "Dönem İçi Giriş ve Çıkış Özeti", "Filtreleri Temizle"]
+  },
   "x-job-endpoint": "/api/arrow/jobs/stock-analytics",
   "type": "object",
   "properties": {
@@ -19,16 +19,26 @@
       "format": "date",
       "title": "Başlangıç Tarihi",
       "description": "Analiz başlangıç tarihi (YYYY-MM-DD formatında, örn: '2026-08-01')",
-      "x-date-behavior": "range_start",
-      "x-ai-suggestions": ["son 30 gün", "bu ay başı", "son 7 gün", "bu yıl başı"]
+      "x-ai": {
+        "intent": "analysis_start_date",
+        "priority": 100,
+        "columnHints": ["date", "movement_date", "posting_date"],
+        "dateBehavior": "range_start",
+        "suggestions": ["son 30 gün", "bu ay başı", "son 7 gün", "bu yıl başı"]
+      }
     },
     "toDate": {
       "type": "string",
       "format": "date",
       "title": "Bitiş Tarihi",
       "description": "Analiz bitiş tarihi (YYYY-MM-DD formatında, örn: '2026-08-19')",
-      "x-date-behavior": "range_end",
-      "x-ai-suggestions": ["bugün", "dün", "ay sonu"]
+      "x-ai": {
+        "intent": "analysis_end_date",
+        "priority": 100,
+        "columnHints": ["date", "movement_date", "posting_date"],
+        "dateBehavior": "range_end",
+        "suggestions": ["bugün", "dün", "ay sonu"]
+      }
     },
     "fiscalYear": {
       "type": "string",
@@ -36,7 +46,10 @@
       "description": "Raporun ait olduğu mali çalışma yılı.",
       "enum": ["2025-2026", "2024-2025"],
       "x-selection": "single",
-      "x-ai-suggestions": ["2025-2026", "2024-2025"]
+      "x-ai": {
+        "intent": "fiscal_year",
+        "suggestions": ["2025-2026", "2024-2025"]
+      }
     },
     "financeBook": {
       "type": "string",
@@ -53,7 +66,10 @@
       "enum": ["try", "usd", "inr"],
       "x-selection": "single",
       "default": "try",
-      "x-ai-suggestions": ["try", "usd", "eur"]
+      "x-ai": {
+        "intent": "currency",
+        "suggestions": ["try", "usd", "eur"]
+      }
     },
     "valuesMode": {
       "type": "string",

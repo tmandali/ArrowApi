@@ -320,15 +320,16 @@ export const workspaceNavById: Record<WorkspaceId, WorkspaceNavItem[]> = {
 }
 
 export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
-  if (pathname === "/accounting" || pathname.startsWith("/accounting/")) {
-    return financialReportsNav
-  }
   if (
+    pathname === "/" ||
     pathname === "/stock" ||
     pathname.startsWith("/stock/") ||
     pathname === "/landed-cost-voucher"
   ) {
     return stockNav
+  }
+  if (pathname === "/accounting" || pathname.startsWith("/accounting/")) {
+    return financialReportsNav
   }
   if (
     pathname === "/manufacturing" ||
@@ -336,5 +337,8 @@ export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
   ) {
     return manufacturingNav
   }
-  return subcontractingNav
+  if (pathname === "/selling" || pathname.startsWith("/selling/")) {
+    return subcontractingNav
+  }
+  return stockNav
 }

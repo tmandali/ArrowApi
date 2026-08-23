@@ -1,5 +1,22 @@
 export type CriteriaSelectionMode = "single" | "multiple"
 
+export type CriteriaAiMetadata = {
+  intent?: string
+  priority?: number
+  columnHints?: string[]
+  dateBehavior?: "range_start" | "range_end" | "range_string"
+  directive?: string
+  suggestions?: string[]
+}
+
+export type ReportAiMetadata = {
+  schemaVersion?: number
+  aliases?: string[]
+  directive?: string
+  quickPrompts?: string[]
+  resultsPrompts?: string[]
+}
+
 export type JsonSchemaObject = {
   $schema?: string
   $id?: string
@@ -14,6 +31,7 @@ export type JsonSchemaObject = {
    * (e.g. `/api/arrow/jobs/stock-balance`).
    */
   "x-job-endpoint"?: string
+  "x-ai"?: ReportAiMetadata
   [key: string]: unknown
 }
 
@@ -40,6 +58,7 @@ export type JsonSchemaProperty = {
    * `from_<key>` / `to_<key>` instead of the property key.
    */
   "x-range-split"?: string
+  "x-ai"?: CriteriaAiMetadata
   [key: string]: unknown
 }
 

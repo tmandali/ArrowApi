@@ -311,7 +311,7 @@ export function SerialBatchTraceabilityForm() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >

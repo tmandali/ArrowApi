@@ -9,17 +9,18 @@ import type { WorkspaceId } from "@/lib/workspace-nav"
  */
 export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
   if (
-    pathname === "/accounting" ||
-    pathname.startsWith("/accounting/")
-  ) {
-    return "accounting"
-  }
-  if (
+    pathname === "/" ||
     pathname === "/stock" ||
     pathname.startsWith("/stock/") ||
     pathname === "/landed-cost-voucher"
   ) {
     return "stock"
+  }
+  if (
+    pathname === "/accounting" ||
+    pathname.startsWith("/accounting/")
+  ) {
+    return "accounting"
   }
   if (
     pathname === "/manufacturing" ||
@@ -28,7 +29,6 @@ export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
     return "manufacturing"
   }
   if (
-    pathname === "/" ||
     pathname === "/selling" ||
     pathname.startsWith("/selling/")
   ) {
@@ -37,7 +37,7 @@ export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
   return null
 }
 
-const DEFAULT_WORKSPACE: WorkspaceId = "selling"
+const DEFAULT_WORKSPACE: WorkspaceId = "stock"
 
 /**
  * Active workspace based on the current path.

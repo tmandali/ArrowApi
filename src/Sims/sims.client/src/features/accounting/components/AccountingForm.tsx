@@ -349,7 +349,7 @@ export function AccountingForm() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >

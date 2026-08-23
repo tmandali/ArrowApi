@@ -4,14 +4,13 @@
   "description": "Depo ve ambarlardaki mevcut ürünlerin kalan stok adetlerini, parasal değerlerini, hareket tarihlerini ve durumlarını sorgular.",
   "x-scope": "stock-balance",
   "x-page-path": "/stock/stock-balance",
-  "x-ai-aliases": ["stok bakiye", "kalan stok", "mevcut stok", "envanter durumu", "stock balance", "depo bakiye"],
-  "x-ai-directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
-  "x-ai-quick-prompts": [
-    "Dün itibarıyla hazırla",
-    "Geçen haftanın iptallerini göster",
-    "50.000 TL üzeri stoklar",
-    "Sadece AKTIF kayıtlar"
-  ],
+  "x-ai": {
+    "schemaVersion": 1,
+    "aliases": ["stok bakiye", "stok bakiye raporu", "stock balance", "stock balance raporu", "stok bakiyesi", "kalan stok", "mevcut stok", "envanter durumu", "depo bakiye", "bakiye raporu", "stok bakiye kriterleri", "bakiye"],
+    "directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
+    "quickPrompts": ["Dün itibarıyla hazırla", "Geçen haftanın iptallerini göster", "50.000 TL üzeri stoklar", "Sadece AKTIF kayıtlar"],
+    "resultsPrompts": ["🚨 Anomali & Eksi Bakiye Taraması", "En Yüksek Bakiyeli 5 Ürün", "Genel Toplam & Stok Metrikleri", "Stokta Olanları Süz", "Filtreleri Temizle"]
+  },
   "x-job-endpoint": "/api/arrow/jobs/stock-balance",
   "type": "object",
   "properties": {
@@ -21,17 +20,27 @@
       "title": "Kayıt / Hareket Tarihi",
       "description": "Stok hareketinin gerçekleştiği tarih. Tek bir gün (örn: '2026-08-18') veya aralık (örn: '2026-08-01..2026-08-19') formatında girilir.",
       "x-range-split": "..",
-      "x-date-behavior": "range_string",
-      "x-ai-directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner.",
-      "x-ai-suggestions": ["dün", "geçen hafta", "bugün", "bu ay başından itibaren"]
+      "x-ai": {
+        "intent": "movement_date",
+        "priority": 100,
+        "columnHints": ["movement_date", "posting_date", "date"],
+        "dateBehavior": "range_string",
+        "directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner.",
+        "suggestions": ["dün", "geçen hafta", "bugün", "bu ay başından itibaren"]
+      }
     },
     "durum": {
       "type": "array",
       "title": "Evrak / Stok Durumu",
       "description": "Stok kaydının geçerlilik durumu. AKTIF: Depodaki mevcut mallar, IPTAL: İptal edilen kayıtlar, PASIF: Kapatılmış stoklar, BEKLEMEDE: Onay bekleyen hareketler.",
       "x-selection": "multiple",
-      "x-ai-directive": "Kullanıcı özel bir durum (iptal, pasif) talep etmediyse boş bırak veya AKTIF seç.",
-      "x-ai-suggestions": ["AKTIF", "IPTAL", "BEKLEMEDE"],
+      "x-ai": {
+        "intent": "record_status",
+        "priority": 90,
+        "columnHints": ["status", "durum", "is_passive"],
+        "directive": "Kullanıcı özel bir durum (iptal, pasif) talep etmediyse boş bırak veya AKTIF seç.",
+        "suggestions": ["AKTIF", "IPTAL", "BEKLEMEDE"]
+      },
       "items": {
         "type": "string",
         "enum": ["AKTIF", "PASIF", "BEKLEMEDE", "IPTAL"]
@@ -41,7 +50,12 @@
       "type": "number",
       "title": "Tutar Eşiği",
       "description": "Filtrelenecek minimum parasal tutar miktarı (örn: 10000 veya 50000)",
-      "x-ai-directive": "Kullanıcı 'X tutarından büyük', 'yüksek değerli stoklar' gibi ifadeler kullandığında bu alanı doldur.",
+      "x-ai": {
+        "intent": "minimum_inventory_value",
+        "priority": 80,
+        "columnHints": ["total_value", "amount", "cost", "tutar"],
+        "directive": "Kullanıcı 'X tutarından büyük', 'yüksek değerli stoklar' gibi ifadeler kullandığında bu alanı doldur."
+      },
       "minimum": 0
     },
     "tutarParaBirimi": {
@@ -50,14 +64,23 @@
       "description": "Tutarın döviz cinsi. Varsayılan TRY.",
       "enum": ["TRY", "USD", "EUR"],
       "x-selection": "single",
-      "default": "TRY"
+      "default": "TRY",
+      "x-ai": {
+        "intent": "currency",
+        "suggestions": ["TRY", "USD", "EUR"]
+      }
     },
     "urun": {
       "type": "array",
       "title": "Ürün Bilgileri",
       "description": "Listeden filtrelenecek bir veya birden fazla ürün kodu, adı veya barkodu.",
       "x-selection": "multiple",
-      "x-ai-directive": "Kullanıcı belirli bir ürün adı, kodu veya barkodu söylediğinde veri kaynağındaki eşleşen kodları seç.",
+      "x-ai": {
+        "intent": "product_lookup",
+        "priority": 85,
+        "columnHints": ["item_code", "sku", "barcode", "description"],
+        "directive": "Kullanıcı belirli bir ürün adı, kodu veya barkodu söylediğinde veri kaynağındaki eşleşen kodları seç."
+      },
       "items": {
         "type": "string"
       },

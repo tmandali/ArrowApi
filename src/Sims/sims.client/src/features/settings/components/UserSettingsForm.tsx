@@ -70,7 +70,11 @@ import {
   Share2,
   Copy,
   Pencil,
+  Check,
+  Eye,
+  EyeOff,
 } from "lucide-react"
+import { useAgentBridgeStore, type AiProviderConfig } from "@/hooks/useAgentBridge"
 
 export function UserSettingsForm() {
   const [isEnabled, setIsEnabled] = React.useState(true)
@@ -80,6 +84,62 @@ export function UserSettingsForm() {
   const [workspaceOpen, setWorkspaceOpen] = React.useState(false)
   const [appOpen, setAppOpen] = React.useState(false)
   const [thirdPartyAuthOpen, setThirdPartyAuthOpen] = React.useState(true)
+  const [yulaAiSettingsOpen, setYulaAiSettingsOpen] = React.useState(true)
+
+  const aiConfig = useAgentBridgeStore((s) => s.aiConfig)
+  const configHydrated = useAgentBridgeStore((s) => s.configHydrated)
+  const setAiConfig = useAgentBridgeStore((s) => s.setAiConfig)
+
+  const [aiProvider, setAiProvider] = React.useState<AiProviderConfig["provider"]>(aiConfig.provider)
+  const [aiModel, setAiModel] = React.useState(aiConfig.model)
+  const [aiEndpoint, setAiEndpoint] = React.useState(aiConfig.endpoint || "")
+  const [aiApiKey, setAiApiKey] = React.useState(aiConfig.apiKey || "")
+  const [aiThinkingLevel, setAiThinkingLevel] =
+    React.useState<NonNullable<AiProviderConfig["thinkingLevel"]>>(aiConfig.thinkingLevel || "low")
+  const [showApiKey, setShowApiKey] = React.useState(false)
+  const [aiSaved, setAiSaved] = React.useState(false)
+
+  // Güvenli depodan API anahtarı yüklendiğinde formu bir kez senkronla
+  React.useEffect(() => {
+    if (!configHydrated) return
+    setAiProvider(aiConfig.provider)
+    setAiModel(aiConfig.model)
+    setAiEndpoint(aiConfig.endpoint || "")
+    setAiApiKey(aiConfig.apiKey || "")
+    setAiThinkingLevel(aiConfig.thinkingLevel || "low")
+    // Yalnızca hidrasyon tamamlanınca çalışır; kullanıcı düzenlemelerini ezmez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configHydrated])
+
+  const handleSaveAiConfig = () => {
+    setAiConfig({
+      provider: aiProvider,
+      model: aiModel,
+      endpoint: aiEndpoint,
+      apiKey: aiApiKey,
+      thinkingLevel: aiThinkingLevel,
+    })
+    setAiSaved(true)
+    setTimeout(() => setAiSaved(false), 2500)
+  }
+
+  // Pre-fill model and endpoint presets when provider changes
+  const handleProviderChange = (newProvider: AiProviderConfig["provider"]) => {
+    setAiProvider(newProvider)
+    if (newProvider === "ollama") {
+      setAiModel("gemma4:12b-mlx")
+      setAiEndpoint("http://127.0.0.1:11434")
+    } else if (newProvider === "google") {
+      setAiModel("gemini-2.5-flash")
+      setAiEndpoint("https://generativelanguage.googleapis.com")
+    } else if (newProvider === "azure") {
+      setAiModel("gpt-5.4")
+      setAiEndpoint("https://tmandali-resource.services.ai.azure.com/openai/v1")
+    } else if (newProvider === "openai") {
+      setAiModel("gpt-4o-mini")
+      setAiEndpoint("https://api.openai.com/v1")
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -123,7 +183,7 @@ export function UserSettingsForm() {
               Save
             </Button>
 
-            <AIChatAssistant variant="toolbar" />
+            <AIChatAssistant />
           </>
         }
       >
@@ -394,6 +454,139 @@ export function UserSettingsForm() {
             <div className="flex-1 p-6 space-y-6">
               {/* Collapsible Sections List matching screenshot */}
               <div className="space-y-3">
+                {/* 🤖 Yula AI & LLM Settings (Collapsible matching standard layout) */}
+                <Collapsible open={yulaAiSettingsOpen} onOpenChange={setYulaAiSettingsOpen} className="border-b pb-3">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
+                    <span>Yula AI & LLM Settings</span>
+                    <ChevronDown
+                      className={`size-4 text-muted-foreground transition-transform duration-200 ${
+                        yulaAiSettingsOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-3 pl-2 space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                      Yula AI 2. kademe akıl yürütme motorunu ve model sağlayıcısını yapılandırın (1. Kademe Needle Engine her zaman yerel ve anlık çalışır).
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Provider Selector */}
+                      <Field>
+                        <FieldLabel className="text-xs text-muted-foreground">
+                          AI Provider
+                        </FieldLabel>
+                        <Select
+                          value={aiProvider}
+                          onValueChange={(val: any) => handleProviderChange(val)}
+                        >
+                          <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
+                            <SelectValue placeholder="Select Provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ollama">Yerel Ollama (Gemma 4 / Llama 3 / Offline)</SelectItem>
+                            <SelectItem value="google">Google AI SDK (Gemini 2.5 Flash / Pro)</SelectItem>
+                            <SelectItem value="azure">Microsoft AI Foundry (Azure OpenAI / Phi-4)</SelectItem>
+                            <SelectItem value="openai">OpenAI / Custom OpenAI-Compatible</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+
+                      {/* Model Name */}
+                      <Field>
+                        <FieldLabel className="text-xs text-muted-foreground">
+                          Model Name
+                        </FieldLabel>
+                        <Input
+                          value={aiModel}
+                          onChange={(e) => setAiModel(e.target.value)}
+                          placeholder="gemma4:12b-mlx, gemini-2.5-flash, gpt-4o-mini"
+                          className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
+                        />
+                      </Field>
+
+                      {/* Endpoint */}
+                      <Field>
+                        <FieldLabel className="text-xs text-muted-foreground">
+                          API / Host Endpoint URL
+                        </FieldLabel>
+                        <Input
+                          value={aiEndpoint}
+                          onChange={(e) => setAiEndpoint(e.target.value)}
+                          placeholder="http://127.0.0.1:11434 or https://your-resource.openai.azure.com/"
+                          className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
+                        />
+                      </Field>
+
+                      {/* API Key */}
+                      <Field>
+                        <FieldLabel className="text-xs text-muted-foreground">
+                          API Key
+                        </FieldLabel>
+                        <div className="relative">
+                          <Input
+                            type={showApiKey ? "text" : "password"}
+                            value={aiApiKey}
+                            onChange={(e) => setAiApiKey(e.target.value)}
+                            placeholder={aiProvider === "ollama" ? "Not required for local model" : "sk-..."}
+                            className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs pr-8"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                          >
+                            {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
+                        </div>
+                      </Field>
+
+                      {/* Thinking Level */}
+                      <Field>
+                        <FieldLabel className="text-xs text-muted-foreground">
+                          Düşünme Derinliği (Thinking Level)
+                        </FieldLabel>
+                        <Select
+                          value={aiThinkingLevel}
+                          onValueChange={(val: NonNullable<AiProviderConfig["thinkingLevel"]>) =>
+                            setAiThinkingLevel(val)
+                          }
+                        >
+                          <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
+                            <SelectValue placeholder="Seviye seçin" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="off">Kapalı (En hızlı)</SelectItem>
+                            <SelectItem value="low">Düşük</SelectItem>
+                            <SelectItem value="medium">Orta</SelectItem>
+                            <SelectItem value="high">Yüksek (En derin akıl yürütme)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs text-muted-foreground">
+                        Aktif: <strong className="text-foreground">{aiProvider.toUpperCase()}</strong> ({aiModel})
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveAiConfig}
+                        className="h-7 px-3 text-xs gap-1.5"
+                      >
+                        {aiSaved ? (
+                          <>
+                            <Check className="size-3 text-emerald-300" />
+                            Saved & Active
+                          </>
+                        ) : (
+                          "Save AI Configuration"
+                        )}
+                      </Button>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
                 <Collapsible open={changePasswordOpen} onOpenChange={setChangePasswordOpen} className="border-b pb-3">
                   <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
                     <span>Change Password</span>

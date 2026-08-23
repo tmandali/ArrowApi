@@ -41,7 +41,7 @@ export function NotFoundView() {
   return (
     <WorkspacePageShell
       showSearch={false}
-      actions={<AIChatAssistant variant="toolbar" />}
+      actions={<AIChatAssistant />}
       breadcrumb={
         <Breadcrumb>
           <BreadcrumbList className="text-xs">

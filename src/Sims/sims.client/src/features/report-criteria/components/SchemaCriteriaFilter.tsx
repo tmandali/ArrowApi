@@ -246,6 +246,12 @@ export type SchemaCriteriaFilterProps = {
   rows?: CriteriaFilterRow[]
   onRowsChange?: (rows: CriteriaFilterRow[]) => void
   autoValidate?: boolean
+  /**
+   * Schema field keys (row.name) to subtly highlight — used to mark criteria
+   * that were just filled by the AI agent (Yula / Needle). Renders a soft
+   * orange tint on those rows; purely visual, no behavior change.
+   */
+  highlightRowNames?: string[]
   /** Show schema title/description header. Default true. */
   showHeader?: boolean
   /** Show Clear in the grid footer. Default true. */
@@ -271,6 +277,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
     schema,
     initialRows,
     autoValidate = false,
+    highlightRowNames,
     showHeader = true,
     showFooterClear = true,
     onChange,
@@ -398,6 +405,11 @@ export const SchemaCriteriaFilter = React.forwardRef<
   const fieldMap = React.useMemo(
     () => new Map(parsed.fields.map((field) => [field.key, field])),
     [parsed.fields]
+  )
+
+  const highlightedNames = React.useMemo(
+    () => new Set((highlightRowNames ?? []).map((n) => n.trim()).filter(Boolean)),
+    [highlightRowNames]
   )
 
   const invalidFields = React.useMemo(() => {
@@ -790,6 +802,9 @@ export const SchemaCriteriaFilter = React.forwardRef<
                 (row.name && invalidFields.has(row.name)) || patternMessage
               )
               const description = field?.description?.trim() || ""
+              // AI doldurulan kriterler için hafif turuncu satır vurgusu
+              const aiFilled = highlightedNames.has(row.name.trim())
+              const highlightClass = aiFilled ? "bg-orange-500/[0.12]" : undefined
               return (
                 <TableRow
                   key={row.id}
@@ -818,7 +833,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                     </button>
                   </TableCell>
                   {stackedLayout ? (
-                    <TableCell className={cellClass}>
+                    <TableCell className={cn(cellClass, highlightClass)}>
                       <div className="flex min-w-0 flex-col divide-y divide-border/60">
                         <CriteriaSimpleCombobox
                           value={row.name}
@@ -849,7 +864,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                     </TableCell>
                   ) : (
                     <>
-                      <TableCell className={cellClass}>
+                      <TableCell className={cn(cellClass, highlightClass)}>
                         <CriteriaSimpleCombobox
                           value={row.name}
                           onChange={(value) =>
@@ -866,7 +881,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                           showClear={false}
                         />
                       </TableCell>
-                      <TableCell className={cellClass}>
+                      <TableCell className={cn(cellClass, highlightClass)}>
                         <CriteriaValueCell
                           field={field}
                           value={row.value}

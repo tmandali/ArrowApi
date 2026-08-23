@@ -1,5 +1,6 @@
 export type {
   CriteriaComboboxOption,
+  CriteriaAiMetadata,
   CriteriaFieldDef,
   CriteriaFieldError,
   CriteriaFieldKind,
@@ -10,6 +11,7 @@ export type {
   JsonSchemaObject,
   JsonSchemaProperty,
   ParsedCriteriaSchema,
+  ReportAiMetadata,
 } from "./types"
 
 export { parseCriteriaSchema } from "./lib/parse-criteria-schema"

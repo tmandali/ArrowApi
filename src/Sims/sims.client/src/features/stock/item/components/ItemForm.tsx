@@ -79,9 +79,13 @@ import {
 } from "@/features/report-criteria"
 import { emptyWorkspaceHome } from "@/lib/empty-module"
 import { createArrowJob } from "@/features/jobs/arrow-job-client"
-import { findActiveJobByPayload, findCompletedJobByPayload } from "@/store/slices/active-jobs-store"
+import { findActiveJobByPayload } from "@/store/slices/active-jobs-store"
 import { ApiError } from "@/services"
 import { cn } from "@/utils/cn"
+import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
+import { readReportAiMetadata } from "@/lib/report-ai-metadata"
+import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
+import stockAnalyticsCriteriaSchema from "../schemas/stock-analytics-criteria.schema.json"
 
 export type ItemFormTab =
   | "details"
@@ -196,6 +200,31 @@ export function ItemForm({
           ? "Stock Ledger"
           : "Report"
   const criteriaFilterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
+
+  const currentSchema = isStockBalance
+    ? (stockBalanceCriteriaSchema as JsonSchemaObject)
+    : isStockAnalytics
+      ? (stockAnalyticsCriteriaSchema as JsonSchemaObject)
+      : reportModule?.schema
+
+  const activeJobId =
+    stockBalanceJobSession?.activeJobId ||
+    stockAnalyticsJobSession?.activeJobId ||
+    reportJobSession?.activeJobId
+
+  useScreenAgentContext({
+    screenId: isReportShell ? mode : "item-form",
+    screenTitle: isReportShell ? reportTitle : "Item Details",
+    workspaceId: reportModule?.workspace || "stock",
+    activeDataSummary: {
+      isViewingResults: Boolean(activeJobId),
+      jobId: activeJobId,
+    },
+    quickPrompts: isReportShell && currentSchema
+      ? readReportAiMetadata(currentSchema).quickPrompts || []
+      : [],
+  })
+
   const initialTab =
     defaultTab && visibleTabs.has(defaultTab)
       ? defaultTab
@@ -388,7 +417,7 @@ export function ItemForm({
                   New
                 </Button>
               ) : null}
-              <AIChatAssistant variant="toolbar" />
+              <AIChatAssistant />
             </div>
           ) : (
             <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
@@ -461,7 +490,7 @@ export function ItemForm({
               <Button size="sm" className="h-7 text-xs px-3">
                 Save
               </Button>
-              <AIChatAssistant variant="toolbar" />
+              <AIChatAssistant />
             </div>
           )}
         </div>

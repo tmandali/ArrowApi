@@ -173,7 +173,7 @@ export function SellingForm() {
             Cancel
           </Button>
 
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >

@@ -173,7 +173,7 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
                 New
               </Link>
             </Button>
-            <AIChatAssistant variant="toolbar" />
+            <AIChatAssistant />
           </div>
         }
       >

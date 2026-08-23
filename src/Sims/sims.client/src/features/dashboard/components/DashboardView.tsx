@@ -53,7 +53,7 @@ export function DashboardView() {
             </Button>
           </ButtonGroup>
 
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >

@@ -53,7 +53,7 @@ export function StockPageForm() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >
