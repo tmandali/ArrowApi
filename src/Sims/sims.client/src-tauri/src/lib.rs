@@ -104,6 +104,38 @@ fn toggle_devtools(app: AppHandle) {
     }
 }
 
+/// OS anahtar zinciri servis adı (macOS Keychain / Windows Credential Manager / Linux Secret Service)
+const KEYCHAIN_SERVICE: &str = "com.arrowapi.yula";
+
+/// API anahtarı gibi hassas değerleri OS seviyesinde güvenli depolamaya yazar
+#[tauri::command]
+fn set_secret(key: String, value: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &key).map_err(|e| e.to_string())?;
+    entry.set_password(&value).map_err(|e| e.to_string())
+}
+
+/// Güvenli depolamadan Hassas değeri okur; kayıt yoksa None döner
+#[tauri::command]
+fn get_secret(key: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &key).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Güvenli depolamadan Hassas değeri siler; kayıt yoksa sessizce başarılı sayar
+#[tauri::command]
+fn delete_secret(key: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &key).map_err(|e| e.to_string())?;
+    match entry.delete_credential() {
+        Ok(_) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 // Tauri 2.0 ana kütüphane başlatıcı fonksiyonu
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -118,7 +150,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             check_for_updates,
-            toggle_devtools
+            toggle_devtools,
+            set_secret,
+            get_secret,
+            delete_secret
         ])
         .setup(|app| {
             let handle = app.handle().clone();
