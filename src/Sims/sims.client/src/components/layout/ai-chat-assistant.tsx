@@ -158,16 +158,7 @@ export function AIChatPanel({
         })
       }
 
-      // 1. Tool Call Reasoning (Sadece teknik argümanlar, mesaj metni tekrarlanmaz)
-      if (m.isToolCall) {
-        parts.push({
-          type: "reasoning",
-          meta: "tool-args",
-          text: `Araç Parametreleri:\n${JSON.stringify(m.toolDetails || {}, null, 2)}`,
-        })
-      }
-
-      // 2. Custom Kart olmayan başarılı araç sonuçları için teknik çıktı
+      // 1. Custom Kart olmayan başarılı araç sonuçları için teknik çıktı
       if (m.toolResult && !m.customKind && m.toolResult.status !== "error") {
         parts.push({
           type: "reasoning",
@@ -256,12 +247,7 @@ export function AIChatPanel({
     if (!trimmed && attachments.length === 0) return
 
     const lower = trimmed.toLowerCase()
-    if (
-      lower === "/new" ||
-      lower === "/clear" ||
-      lower === "/reset" ||
-      lower === "/yeni"
-    ) {
+    if (lower === "/new") {
       newConversation()
       setInput("")
       setAttachments([])
@@ -285,7 +271,7 @@ export function AIChatPanel({
   }
 
   const applyCommand = (command: YulaCommand) => {
-    if (command.id === "new" || command.id === "clear") {
+    if (command.id === "new") {
       newConversation()
       setInput("")
       return

@@ -1,8 +1,4 @@
-import {
-  RotateCcw,
-  SquarePen,
-  type LucideIcon,
-} from "lucide-react"
+import { SquarePen, type LucideIcon } from "lucide-react"
 
 export type YulaCommand = {
   id: string
@@ -23,14 +19,6 @@ export const YULA_COMMANDS: YulaCommand[] = [
     description: "Mevcut konuşmayı ve bellek geçmişini sıfırla",
     prompt: "/new",
     icon: SquarePen,
-  },
-  {
-    id: "clear",
-    slash: "clear",
-    label: "Sohbeti temizle",
-    description: "Ekranı temizle ve yeni bir oturum başlat",
-    prompt: "/clear",
-    icon: RotateCcw,
   },
 ]
 
