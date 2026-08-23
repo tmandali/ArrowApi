@@ -12,8 +12,6 @@ export type YulaCommand = {
   description: string
   /** Text inserted into the composer (or sent) when selected. */
   prompt: string
-  /** When true, run the next scripted mock turn instead of freeform send. */
-  runDemo?: boolean
   icon: LucideIcon
 }
 

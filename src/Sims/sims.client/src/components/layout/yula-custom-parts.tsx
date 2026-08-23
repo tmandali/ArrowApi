@@ -15,12 +15,16 @@ export const yulaCustomPartComponents: Record<
       // 1. Check auto-discovered report configs
       const autoCfg = autoReportCardConfigs.find((c) => c.kind === prop);
       if (autoCfg) {
-        return () => <YulaReportCriteriaCard config={autoCfg} />;
+        return (props: Record<string, unknown>) => (
+          <YulaReportCriteriaCard config={autoCfg} details={props.details as Record<string, any> | undefined} />
+        );
       }
       // 2. Check static fallback configs
       const staticCfg = yulaReportCardConfigs.find((c) => c.kind === prop);
       if (staticCfg) {
-        return () => <YulaReportCriteriaCard config={staticCfg} />;
+        return (props: Record<string, unknown>) => (
+          <YulaReportCriteriaCard config={staticCfg} details={props.details as Record<string, any> | undefined} />
+        );
       }
       return undefined;
     },

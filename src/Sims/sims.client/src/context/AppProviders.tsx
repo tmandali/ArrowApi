@@ -3,7 +3,6 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { WorkspaceNotificationsProvider } from "@/context/workspace-notifications"
 import { JobSyncProvider } from "@/context/job-sync-provider"
-import { ReportProvider } from "@/context/ReportContext"
 import { CompanySwitchOverlay } from "@/components/layout/company-switch-overlay"
 import { useCompanyStore } from "@/store/slices/company-store"
 
@@ -18,7 +17,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <div key={activeCompanyId ?? "no-company"} className="contents">
           <WorkspaceNotificationsProvider>
             <JobSyncProvider>
-              <ReportProvider>{children}</ReportProvider>
+              {children}
             </JobSyncProvider>
           </WorkspaceNotificationsProvider>
         </div>

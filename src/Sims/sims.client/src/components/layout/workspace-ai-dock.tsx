@@ -84,18 +84,18 @@ export function WorkspaceAiDock({
   const { open, setOpen, expanded, setExpanded, sideDockAllowed } =
     useWorkspaceAiChat()
 
+  const mountedRef = React.useRef(false)
   React.useEffect(() => {
-    if (defaultOpen) {
-      setOpen(true)
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      if (defaultOpen) {
+        setOpen(true)
+      }
+      if (startExpanded) {
+        setExpanded(true)
+      }
     }
-  }, [defaultOpen, setOpen])
-
-  React.useEffect(() => {
-    if (startExpanded) {
-      setOpen(true)
-      setExpanded(true)
-    }
-  }, [startExpanded, setOpen, setExpanded])
+  }, [defaultOpen, startExpanded, setOpen, setExpanded])
 
   if (!open) {
     return (
@@ -110,7 +110,7 @@ export function WorkspaceAiDock({
     )
   }
 
-  if (expanded || !sideDockAllowed) {
+  if (expanded || !sideDockAllowed || startExpanded) {
     return (
       <aside
         className={cn(

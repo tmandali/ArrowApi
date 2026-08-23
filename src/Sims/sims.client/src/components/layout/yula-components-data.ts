@@ -27,6 +27,7 @@ export const yulaReportCardConfigs: YulaReportCardConfig[] = [
   {
     kind: yulaCustomKinds.stockBalance,
     scope: "stock-balance",
+    workspace: "stock",
     title: "Stock Balance",
     description: "Rapor kriterlerini aşağıdan doldurun",
     pagePath: "/stock/stock-balance",
@@ -35,6 +36,7 @@ export const yulaReportCardConfigs: YulaReportCardConfig[] = [
   {
     kind: yulaCustomKinds.stockAnalytics,
     scope: "stock-analytics",
+    workspace: "stock",
     title: "Stock Analytics",
     description: "Stok analitik rapor kriterlerini doldurun",
     pagePath: "/stock/stock-analytics",

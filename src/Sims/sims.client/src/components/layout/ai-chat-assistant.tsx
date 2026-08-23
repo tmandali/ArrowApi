@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
+import { Marker, MarkerContent } from "@/components/ui/marker"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { AiChatMessage } from "@/components/layout/ai-chat-message"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
@@ -26,12 +27,13 @@ import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useAgentBridge, useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import type { UIMessage } from "ai"
 import { workspaceLabelFromPath } from "@/lib/empty-module"
-import { env } from "@/config/env"
 import { useLocation } from "react-router-dom"
 import { cn } from "@/utils/cn"
+import { YulaQuickActionChips } from "@/components/layout/yula-quick-chips"
 import {
   ArrowDown,
   ArrowUp,
+  Brain,
   FileText,
   Paperclip,
   Plus,
@@ -40,7 +42,6 @@ import {
 } from "lucide-react"
 
 type AIChatAssistantProps = {
-  variant?: "toolbar" | "floating"
   className?: string
   /** Vertical rule to the left of the toolbar control. */
   separator?: boolean
@@ -53,9 +54,8 @@ type AttachedFile = {
   size: number
 }
 
-/** Toolbar / floating control — opens the workspace docked AI panel. */
+/** Toolbar control — opens the workspace docked AI panel. */
 export function AIChatAssistant({
-  variant = "toolbar",
   className,
   separator = true,
 }: AIChatAssistantProps = {}) {
@@ -89,24 +89,6 @@ export function AIChatAssistant({
       resizeObserver.disconnect()
     }
   }, [])
-
-  if (variant === "floating") {
-    return (
-      <Button
-        type="button"
-        size="icon"
-        className={cn(
-          "fixed bottom-5 right-5 z-50 size-11 rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 hover:scale-105 hover:bg-primary/90",
-          className
-        )}
-        onClick={() => setOpen(!open)}
-        aria-pressed={open}
-        aria-label={YULA.ariaLabel}
-      >
-        <YulaMarkIcon className="size-7 text-primary-foreground" glow />
-      </Button>
-    )
-  }
 
   const showSeparator = separator !== false && !isAlone
 
@@ -147,13 +129,6 @@ export function AIChatPanelTitle() {
   )
 }
 
-/** Centered intro suggestions. */
-const introSuggestions = [
-  "Stock balance raporunu hazırla",
-  "Stok analitik raporunu aç",
-  "Geçen haftanın iptallerini göster",
-]
-
 /** Docked panel body — avatar-free chat box with attach + slash commands. */
 export function AIChatPanel({
   centeredIntro = false,
@@ -161,41 +136,75 @@ export function AIChatPanel({
   /** Centered Copilot-style intro until the user starts typing. */
   centeredIntro?: boolean
 } = {}) {
-  const { messages: bridgeMessages, isProcessing, sendPrompt } = useAgentBridge()
+  const { messages: bridgeMessages, isProcessing, streamingThinking, streamingContent, sendPrompt } = useAgentBridge()
 
   const messages = React.useMemo<UIMessage[]>(() => {
-    return bridgeMessages
-      .filter((m) => m.id !== "init-1")
-      .map((m) => {
-        const parts: any[] = []
-        if (m.isToolCall) {
-          parts.push({
-            type: "reasoning",
-            text: `${m.content}\n${JSON.stringify(m.toolDetails || {}, null, 2)}`,
-          })
-        }
-        if (m.customKind) {
-          parts.push({
-            type: "custom",
-            kind: m.customKind,
-          })
-        }
-        if (m.toolResult && !m.customKind) {
-          parts.push({
-            type: "reasoning",
-            text: `Sonuç: ${JSON.stringify(m.toolResult, null, 2)}`,
-          })
-        }
+    const validMessages = bridgeMessages.filter((m) => m.id !== "init-1")
+    // En son kriter kartı mesajının ID'sini bul (sadece en sonuncusu tam açık render edilecek)
+    const lastCriteriaMsgId = [...validMessages]
+      .reverse()
+      .find((m) => m.customKind && m.customKind !== "yula_chart_card")?.id
+
+    return validMessages.map((m) => {
+      const parts: any[] = []
+      const isLatestCriteria = !m.customKind || m.customKind === "yula_chart_card" || m.id === lastCriteriaMsgId
+
+      // 0. Model Düşünme Çıktısı (Reasoning / Plan)
+      if (m.thinking) {
+        parts.push({
+          type: "reasoning",
+          text: m.thinking,
+          meta: "thinking",
+        })
+      }
+
+      // 1. Tool Call Reasoning (Sadece teknik argümanlar, mesaj metni tekrarlanmaz)
+      if (m.isToolCall) {
+        parts.push({
+          type: "reasoning",
+          meta: "tool-args",
+          text: `Araç Parametreleri:\n${JSON.stringify(m.toolDetails || {}, null, 2)}`,
+        })
+      }
+
+      // 2. Custom Kart olmayan başarılı araç sonuçları için teknik çıktı
+      if (m.toolResult && !m.customKind && m.toolResult.status !== "error") {
+        parts.push({
+          type: "reasoning",
+          meta: "tool-result",
+          text: `Sonuç: ${JSON.stringify(m.toolResult, null, 2)}`,
+        })
+      }
+
+      // 3. Kullanıcıya Yönelik Açıklama / Rehberlik Metni — TÜM mesajlarda görünür
+      //    (eski kartların açıklamaları tarihte kaybolmaz)
+      if (m.content) {
         parts.push({
           type: "text",
           text: m.content,
         })
-        return {
-          id: m.id,
-          role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-          parts,
-        }
-      })
+      }
+
+      // 4. Görsel Kart: Yalnızca en son aktif kriter formu render edilir
+      if (m.customKind && isLatestCriteria) {
+        parts.push({
+          type: "custom",
+          kind: m.customKind,
+          data: m.toolResult,
+          // AI (tool call) ile dolan kriterler — kartta satır vurgusu için.
+          // Not: isToolCall bayrağı appendMessage'da set edilmediği için
+          // toolDetails varlığından türetilir; kart mesajlarında toolResult
+          // taşıyan kullanıcı "Çalıştır" bildirimleri toolDetails içermez.
+          details: m.toolDetails ?? undefined,
+        })
+      }
+
+      return {
+        id: m.id,
+        role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+        parts,
+      }
+    }).filter((m) => m.role === "user" || m.parts.length > 0)
   }, [bridgeMessages])
 
   const [input, setInput] = React.useState("")
@@ -224,7 +233,7 @@ export function AIChatPanel({
 
   React.useEffect(() => {
     if (isAtBottom) scrollToBottom(isLoading ? "auto" : "smooth")
-  }, [messages, isLoading, isAtBottom, scrollToBottom])
+  }, [messages, isLoading, streamingThinking, streamingContent, isAtBottom, scrollToBottom])
 
   // Keep the cursor in the centered textbox while the intro is showing.
   React.useEffect(() => {
@@ -269,13 +278,10 @@ export function AIChatPanel({
     setAttachments([])
   }
 
-  const sendDemoOrText = () => {
+  const handleSend = () => {
     if (isLoading) return
     const trimmed = input.trim()
-    if (trimmed) {
-      sendText(trimmed)
-      return
-    }
+    if (trimmed) sendText(trimmed)
   }
 
   const applyCommand = (command: YulaCommand) => {
@@ -304,13 +310,13 @@ export function AIChatPanel({
   const inputArea = (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
       {showCommands ? (
-        <div className="absolute inset-x-2 bottom-full z-20 mb-1 overflow-hidden rounded-lg border bg-popover shadow-lg">
-          <Command shouldFilter={false} className="max-h-56">
-            <CommandList>
-              <CommandEmpty className="py-3 text-[11px]">
+        <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
+          <Command shouldFilter={false} className="p-1">
+            <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
+              <CommandEmpty className="py-2 text-[11px] text-muted-foreground text-center">
                 Komut bulunamadı
               </CommandEmpty>
-              <CommandGroup heading="Komutlar">
+              <CommandGroup heading="Komutlar" className="p-0 **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-0.5 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground/70">
                 {(commandMatches ?? []).map((command) => {
                   const Icon = command.icon
                   return (
@@ -318,19 +324,15 @@ export function AIChatPanel({
                       key={command.id}
                       value={command.slash}
                       onSelect={() => applyCommand(command)}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 data-selected:bg-accent hover:bg-accent/80 transition-colors"
                     >
-                      <Icon className="size-3.5 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">
-                          /{command.slash}
-                          <span className="ml-1.5 font-normal text-muted-foreground">
-                            {command.label}
-                          </span>
-                        </div>
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {command.description}
-                        </div>
-                      </div>
+                      <Icon className="size-3.5 text-primary shrink-0" />
+                      <span className="font-semibold text-foreground shrink-0">
+                        /{command.slash}
+                      </span>
+                      <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
+                        {command.description || command.label}
+                      </span>
                     </CommandItem>
                   )
                 })}
@@ -370,7 +372,7 @@ export function AIChatPanel({
         onSubmit={(event) => {
           event.preventDefault()
           if (showCommands) return
-          sendDemoOrText()
+          handleSend()
         }}
         className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20 dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10"
       >
@@ -386,7 +388,7 @@ export function AIChatPanel({
                 applyCommand(commandMatches[0])
                 return
               }
-              sendDemoOrText()
+              handleSend()
             }
             if (event.key === "Escape" && showCommands) {
               setInput("")
@@ -444,13 +446,15 @@ export function AIChatPanel({
             type="submit"
             size="icon"
             disabled={!canSubmit}
-            className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90"
+            className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90 transition-all"
             aria-label="Gönder"
           >
             <ArrowUp className="size-3.5" />
           </Button>
         </div>
       </form>
+
+      <YulaQuickActionChips />
     </div>
   )
 
@@ -469,20 +473,6 @@ export function AIChatPanel({
               {introDescription}
             </p>
             <div className="mt-8 flex w-full justify-center">{inputArea}</div>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              {introSuggestions.map((suggestion) => (
-                <Button
-                  key={suggestion}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => sendText(suggestion)}
-                >
-                  {suggestion}
-                </Button>
-              ))}
-            </div>
           </div>
         ) : (
           <>
@@ -493,18 +483,47 @@ export function AIChatPanel({
             >
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
                 {messages.map((message, idx) => {
-                  const isLatestUser =
-                    isLoading &&
-                    message.role === "user" &&
-                    idx === messages.length - 1
+                  const isLiveAssistant =
+                    message.role === "assistant" && idx === messages.length - 1
                   return (
                     <AiChatMessage
                       key={message.id}
                       message={message}
-                      isProcessingLatest={isLatestUser}
+                      isLive={isLiveAssistant}
                     />
                   )
                 })}
+                {isLoading && streamingThinking ? (
+                  <Marker role="status" className="py-1">
+                    <MarkerContent className="w-full items-start gap-2">
+                      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-medium text-muted-foreground">
+                        <Brain className="size-3.5 shrink-0 animate-pulse text-orange-500/80 dark:text-orange-400/80" />
+                        Düşünme Süreci
+                      </span>
+                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words border-l-2 border-orange-500/30 pl-3 text-left text-[11px] leading-relaxed text-muted-foreground dark:border-orange-400/30">
+                        {streamingThinking}
+                      </span>
+                    </MarkerContent>
+                  </Marker>
+                ) : null}
+                {isLoading && streamingContent ? (
+                  <div className="px-3 py-1 text-[12px] leading-relaxed whitespace-pre-wrap break-words text-foreground">
+                    {streamingContent}
+                    <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-foreground/60 align-middle" />
+                  </div>
+                ) : null}
+                {isLoading && messages[messages.length - 1]?.role === "user" ? (
+                  <Marker role="status" className="py-1 px-1 text-xs text-muted-foreground animate-in fade-in duration-200">
+                    <MarkerContent className="flex items-center gap-1.5 font-medium text-foreground/80">
+                      <span>Çalışıyor</span>
+                      <span className="inline-flex gap-0.5 items-center">
+                        <span className="size-1 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.3s]" />
+                        <span className="size-1 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.15s]" />
+                        <span className="size-1 rounded-full bg-orange-500 animate-bounce" />
+                      </span>
+                    </MarkerContent>
+                  </Marker>
+                ) : null}
               </div>
             </div>
 

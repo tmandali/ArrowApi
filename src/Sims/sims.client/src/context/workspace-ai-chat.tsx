@@ -54,19 +54,21 @@ export function WorkspaceAiChatProvider({
 
   const setExpanded = React.useCallback(
     (next: boolean) => {
-      if (!sideDockAllowed && open && !next) return
-      setExpandedState(next)
+      setExpandedState((current) => {
+        if (!sideDockAllowed && !next) return current
+        return next
+      })
     },
-    [sideDockAllowed, open]
+    [sideDockAllowed]
   )
 
   const toggleExpanded = React.useCallback(() => {
     setExpandedState((current) => {
       const next = !current
-      if (!sideDockAllowed && open && !next) return current
+      if (!sideDockAllowed && !next) return current
       return next
     })
-  }, [sideDockAllowed, open])
+  }, [sideDockAllowed])
 
   const value = React.useMemo<WorkspaceAiChatContextValue>(
     () => ({

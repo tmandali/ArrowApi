@@ -1,7 +1,19 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
-import { ExternalLink, Play, Loader2, Sparkles } from "lucide-react"
+import { ExternalLink, Play, Loader2, Sparkles, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/utils/cn"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts"
 import {
   SchemaCriteriaFilter,
   useSharedCriteriaDraft,
@@ -14,11 +26,15 @@ import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { useActiveJobsStore, findActiveJobByPayload, findCompletedJobByPayload } from "@/store/slices/active-jobs-store"
 import { useNotificationsStore } from "@/store/slices/notifications-store"
 import type { YulaReportCardConfig } from "./yula-components-data"
+import { readReportAiMetadata } from "@/lib/report-ai-metadata"
 
 export function YulaReportCriteriaCard({
   config,
+  details,
 }: {
   config: YulaReportCardConfig
+  /** AI'nın bu turda doldurduğu kriterler — kartta vurgu çipi olarak gösterilir. */
+  details?: Record<string, any>
 }) {
   const navigate = useNavigate()
   const { rows, setRows } = useSharedCriteriaDraft(config.scope, config.schema)
@@ -26,7 +42,31 @@ export function YulaReportCriteriaCard({
   const [isRunning, setIsRunning] = React.useState(false)
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
 
-  const quickPrompts: string[] = (config.schema as any)["x-ai-quick-prompts"] || []
+  const quickPrompts = readReportAiMetadata(config.schema).quickPrompts || []
+
+  // AI (tool call) veya Needle'ın doldurduğu kriter alanları — gridde hafif turuncu vurgulanır.
+  const [aiFilledNames, setAiFilledNames] = React.useState<string[]>([])
+  // details her parent render'da yeni obje olarak gelir; içeriğe göre stabil anahtar kullan.
+  const detailsKey = React.useMemo(
+    () => JSON.stringify(details ?? {}),
+    [details]
+  )
+  const detailsData = React.useMemo(
+    () => (detailsKey === "{}" ? null : (JSON.parse(detailsKey) as Record<string, any>)),
+    [detailsKey]
+  )
+  React.useEffect(() => {
+    if (!detailsData) return
+    const names = Object.entries(detailsData)
+      .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
+      .map(([k]) => k.trim())
+      .filter(Boolean)
+    if (names.length === 0) return
+    setAiFilledNames(names)
+    // Vurgu kalıcı gürültü olmasın: birkaç saniye sonra solarak kaybolur.
+    const timer = setTimeout(() => setAiFilledNames([]), 5000)
+    return () => clearTimeout(timer)
+  }, [detailsData])
 
   const handleRun = async () => {
     try {
@@ -46,13 +86,14 @@ export function YulaReportCriteriaCard({
         useAgentBridgeStore.getState().appendMessage({
           sender: "agent",
           content: `⚡ **${config.title}:** Bu kriterlerle zaten hazırlanmakta olan aktif bir rapor var (${activeExisting.id.slice(0, 8)}...). Mevcut işe bağlanılıyor.`,
-        })
-        navigate(config.pagePath, {
-          state: {
-            focusJobId: activeExisting.id,
-            composing: false,
+          toolResult: {
+            scope: config.scope,
+            title: config.title,
+            jobId: activeExisting.id,
+            pagePath: `${config.pagePath}/${activeExisting.id}`,
           },
         })
+        navigate(`${config.pagePath}/${activeExisting.id}`)
         return
       }
 
@@ -62,13 +103,14 @@ export function YulaReportCriteriaCard({
         useAgentBridgeStore.getState().appendMessage({
           sender: "agent",
           content: `✓ **${config.title}:** Bu kriterlerle hazırlanmış güncel rapor bulundu (${completedExisting.id.slice(0, 8)}...). Rapor sonuçlarına yönlendiriliyorsunuz.`,
-        })
-        navigate(config.pagePath, {
-          state: {
-            focusJobId: completedExisting.id,
-            composing: false,
+          toolResult: {
+            scope: config.scope,
+            title: config.title,
+            jobId: completedExisting.id,
+            pagePath: `${config.pagePath}/${completedExisting.id}`,
           },
         })
+        navigate(`${config.pagePath}/${completedExisting.id}`)
         return
       }
 
@@ -113,15 +155,16 @@ export function YulaReportCriteriaCard({
         useAgentBridgeStore.getState().appendMessage({
           sender: "agent",
           content: `📊 **${config.title} Report Started:** Processing in background. You can track live execution from the details panel.`,
-        })
-
-        // Doğrudan çalışan execution panelinde bu job'ı seçili açmak için state ile yönlendir
-        navigate(config.pagePath, {
-          state: {
-            focusJobId: job.id,
-            composing: false,
+          toolResult: {
+            scope: config.scope,
+            title: config.title,
+            jobId: job.id,
+            pagePath: jobPath,
           },
         })
+
+        // Doğrudan çalışan execution ve tablo sonuç ekranına yönlendir
+        navigate(jobPath)
       } else {
         navigate(config.pagePath)
       }
@@ -133,12 +176,28 @@ export function YulaReportCriteriaCard({
     }
   }
 
+  const workspaceTitles: Record<string, string> = {
+    stock: "Stok",
+    accounting: "Muhasebe",
+    selling: "Satış",
+    subcontracting: "Subcontracting",
+    manufacturing: "Üretim",
+  };
+  const wsBadge = config.workspace ? workspaceTitles[config.workspace] || config.workspace : null;
+
   return (
     <div className="w-full max-w-[95%] overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
         <div className="min-w-0">
-          <div className="text-xs font-semibold leading-none text-foreground">
-            {config.title}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold leading-none text-foreground">
+              {config.title}
+            </span>
+            {wsBadge && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                {wsBadge}
+              </span>
+            )}
           </div>
           {config.description ? (
             <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
@@ -185,6 +244,7 @@ export function YulaReportCriteriaCard({
         onRowsChange={setRows}
         showHeader={false}
         showFooterClear={false}
+        highlightRowNames={aiFilledNames}
         className="max-h-64"
       />
       {quickPrompts.length > 0 ? (
@@ -194,13 +254,136 @@ export function YulaReportCriteriaCard({
             <button
               key={idx}
               type="button"
-              onClick={() => void sendPrompt(qp)}
+              onClick={() => void sendPrompt(`${config.title}: ${qp}`)}
               className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary active:scale-95 cursor-pointer"
             >
               <Sparkles className="size-2.5 text-primary" />
               {qp}
             </button>
           ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"]
+
+export interface YulaAnalyticsCardData {
+  title: string
+  chartType?: "bar" | "pie" | "kpi"
+  chartData?: Array<{ name: string; value: number }>
+  kpis?: Array<{ label: string; value: string | number; sublabel?: string }>
+  summary?: string
+}
+
+export function YulaAnalyticsCard({ data }: { data: YulaAnalyticsCardData }) {
+  const [activeTab, setActiveTab] = React.useState<"bar" | "pie">(data.chartType === "pie" ? "pie" : "bar")
+  const chartData = data.chartData || []
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-primary/20 bg-card text-card-foreground shadow-md transition-all">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3.5 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <TrendingUp className="size-3.5" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-foreground">{data.title}</div>
+            {data.summary ? (
+              <div className="text-[10px] text-muted-foreground">{data.summary}</div>
+            ) : null}
+          </div>
+        </div>
+        {chartData.length > 0 && data.chartType !== "kpi" ? (
+          <div className="flex items-center rounded-md border bg-muted/50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("bar")}
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer",
+                activeTab === "bar" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <BarChart3 className="size-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("pie")}
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer",
+                activeTab === "pie" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <PieChartIcon className="size-3" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* KPI Stats Grid */}
+      {data.kpis && data.kpis.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border-b bg-muted/10 p-3">
+          {data.kpis.map((kpi, i) => (
+            <div key={i} className="rounded-lg border bg-background/80 p-2 shadow-2xs">
+              <div className="text-[10px] text-muted-foreground truncate">{kpi.label}</div>
+              <div className="text-sm font-bold text-foreground tabular-nums">{kpi.value}</div>
+              {kpi.sublabel ? <div className="text-[9px] text-muted-foreground/80 truncate">{kpi.sublabel}</div> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Chart Section */}
+      {chartData.length > 0 ? (
+        <div className="p-3">
+          <div className="h-44 w-full min-w-0 min-h-[176px]">
+            <ResponsiveContainer width="100%" height={176} minWidth={0} minHeight={176}>
+              {activeTab === "pie" ? (
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={30}
+                    outerRadius={60}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {chartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    formatter={(value: any) => [value?.toLocaleString?.() ?? value, "Değer"]}
+                    contentStyle={{ fontSize: "11px", borderRadius: "8px", background: "hsl(var(--popover))", borderColor: "hsl(var(--border))" }}
+                  />
+                </PieChart>
+              ) : (
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 9 }}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis tick={{ fontSize: 9 }} stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    formatter={(value: any) => [value?.toLocaleString?.() ?? value, "Değer"]}
+                    contentStyle={{ fontSize: "11px", borderRadius: "8px", background: "hsl(var(--popover))", borderColor: "hsl(var(--border))" }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {chartData.map((_, index) => (
+                      <Cell key={`bar-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
         </div>
       ) : null}
     </div>

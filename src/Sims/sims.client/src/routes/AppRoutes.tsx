@@ -13,7 +13,6 @@ import HomePage from "@/pages/HomePage"
 import LoginPage from "@/pages/LoginPage"
 import NotFoundPage from "@/pages/NotFoundPage"
 import UserSettingsPage from "@/pages/UserSettingsPage"
-import { AiAgentDemoPage } from "@/features/ai-agent/AiAgentDemoPage"
 
 /** Workspace home landing screens — all render the shared HomePage. */
 const workspaceHomePaths = ["", "/selling", "/accounting", "/stock", "/manufacturing"]
@@ -73,7 +72,6 @@ export function AppRoutes() {
           {renderRoutes(accountingRoutes)}
           {renderRoutes(manufacturingRoutes)}
           <Route path="user-settings" element={<UserSettingsPage />} />
-          <Route path="ai-agent" element={<AiAgentDemoPage />} />
           <Route
             path="empty/:workspace/:slug"
             element={<LegacyEmptyPrefixRedirect />}

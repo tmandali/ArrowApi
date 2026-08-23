@@ -35,6 +35,13 @@ const data = {
   },
   workspaces: [
     {
+      id: "stock",
+      name: "Stock",
+      logo: <PackageIcon className="size-4" />,
+      plan: "LCWaikiki ERP",
+      url: "/stock",
+    },
+    {
       id: "subcontracting",
       name: "Subcontracting",
       logo: <RefreshCwIcon className="size-4" />,
@@ -47,13 +54,6 @@ const data = {
       logo: <BarChart2Icon className="size-4" />,
       plan: "LCWaikiki ERP",
       url: "/accounting",
-    },
-    {
-      id: "stock",
-      name: "Stock",
-      logo: <PackageIcon className="size-4" />,
-      plan: "LCWaikiki ERP",
-      url: "/stock",
     },
     {
       id: "manufacturing",
