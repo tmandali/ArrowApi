@@ -21,6 +21,8 @@ export interface UseScreenAgentContextOptions {
   activeFilters?: Record<string, any>;
   quickPrompts?: string[];
   resultsPrompts?: string[];
+  criteriaDigest?: Array<Record<string, unknown>>;
+  activeReportScope?: string;
   tools?: ScreenAgentToolOptions[];
 }
 

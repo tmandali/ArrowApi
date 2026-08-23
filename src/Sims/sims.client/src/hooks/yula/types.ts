@@ -23,6 +23,8 @@ export interface ScreenContext {
   activeFilters?: Record<string, any>;
   quickPrompts?: string[];
   resultsPrompts?: string[];
+  /** Kriter-formu ekranları: JSON Schema alan sindirimi (başlık/açıklama/enum) */
+  criteriaDigest?: Array<Record<string, unknown>>;
 }
 
 export type ProcessStatus = "idle" | "starting" | "running" | "error" | "browser_fallback";

@@ -84,6 +84,7 @@ import { ApiError } from "@/services"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
 import { readReportAiMetadata } from "@/lib/report-ai-metadata"
+import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest"
 import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
 import stockAnalyticsCriteriaSchema from "../schemas/stock-analytics-criteria.schema.json"
 
@@ -212,6 +213,17 @@ export function ItemForm({
     stockAnalyticsJobSession?.activeJobId ||
     reportJobSession?.activeJobId
 
+  // Aktif rapor şemasının alan sindirimi — Yula "bu rapor ne hakkında"
+  // sorularını JSON Schema'daki gerçek kriterlerle yanıtlar.
+  const activeCriteriaDigest = React.useMemo(() => {
+    if (!isReportShell || !currentSchema) return undefined;
+    const digest = buildCriteriaDigest(currentSchema);
+    // Sözleşme: criteriaDigest = ALAN DİZİSİ (python isinstance(list) kontrolü)
+    return digest.fields.length > 0
+      ? (digest.fields as unknown as Array<Record<string, unknown>>)
+      : undefined;
+  }, [isReportShell, currentSchema])
+
   useScreenAgentContext({
     screenId: isReportShell ? mode : "item-form",
     screenTitle: isReportShell ? reportTitle : "Item Details",
@@ -223,6 +235,7 @@ export function ItemForm({
     quickPrompts: isReportShell && currentSchema
       ? readReportAiMetadata(currentSchema).quickPrompts || []
       : [],
+    criteriaDigest: activeCriteriaDigest,
   })
 
   const initialTab =

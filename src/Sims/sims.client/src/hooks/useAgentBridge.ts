@@ -11,6 +11,8 @@ import {
 import {
   detectGridIntent,
   isAskingNewReport,
+  hasDirectGridFilterSignal,
+  hasGridFilterEvidence,
   resolveGridFastRoute,
 } from "./yula/grid-intent";
 import {
@@ -22,6 +24,8 @@ import {
 } from "./yula/sidecar-protocol";
 import { composeToolResultMessage } from "./yula/tool-result";
 import { extractCleanFilterValue } from "@/lib/bc-filter-synthesizer";
+import { autoReportCardConfigs } from "@/lib/auto-report-registry";
+import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest";
 import { resolveColumnCandidates } from "@/lib/grid-filter-resolver";
 
 export type {
@@ -82,6 +86,62 @@ const CONFIG_STORAGE_KEY = "yula_ai_config";
   * localStorage'dan yapılandırmayı okur. API anahtarı BURADA TUTULMAZ —
   * o, güvenli depoda yaşar (secure-config.ts) ve hidrasyon sırasında eklenir.
   */
+/**
+ * Son bilinen kriter sindirimi: kriter formu unmount olup screenContext
+ * temizlendiğinde (örn. kullanıcı Yula ana ekranına döndüğünde) dahi son
+ * raporun alan tanımlarını bağlamda tutar.
+ */
+let lastKnownCriteriaDigest: Array<Record<string, unknown>> | null =
+  loadPersistedCriteriaDigest();
+
+const CRITERIA_DIGEST_STORAGE_KEY = "sims:last-criteria-digest";
+
+function loadPersistedCriteriaDigest(): Array<Record<string, unknown>> | null {
+  try {
+    const raw = localStorage.getItem(CRITERIA_DIGEST_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistCriteriaDigest(
+  digest: Array<Record<string, unknown>>
+): void {
+  lastKnownCriteriaDigest = digest;
+  try {
+    localStorage.setItem(CRITERIA_DIGEST_STORAGE_KEY, JSON.stringify(digest));
+    console.debug(
+      `[CriteriaDigest] saklandı (${digest.length} alan) → ${CRITERIA_DIGEST_STORAGE_KEY}`
+    );
+  } catch {
+    // Kota dolu vb. — bellek içi önbellek yeterli
+  }
+}
+
+/**
+ * Kriter aracı çalıştığında (örn. ana ekrandan "stok raporu hazırla") raporun
+ * şemasını kayıt defterinden bulup sindirimi önbelleğe alır; böylece form
+ * mount olmasa bile sonraki "bu rapor ne hakkında" soruları şemadan yanıtlanır.
+ */
+function captureCriteriaDigestFromResult(result?: Record<string, any>): void {
+  const scope = String(result?.scope || "").trim();
+  if (!scope) return;
+  const cfg = autoReportCardConfigs.find((c) => c.scope === scope);
+  if (!cfg?.schema) return;
+  try {
+    const digest = buildCriteriaDigest(cfg.schema);
+    if (digest.fields.length > 0) {
+      persistCriteriaDigest(
+        digest.fields as unknown as Array<Record<string, unknown>>
+      );
+    }
+  } catch {
+    // Şema çözümlemesi başarısızsa mevcut önbellek korunur
+  }
+}
+
 function loadStoredAiConfig(): AiProviderConfig {
   const defaults: AiProviderConfig = {
     provider: "ollama",
@@ -162,6 +222,9 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   isProcessing: false,
 
   newConversation: () => {
+    // Bellek sıfırlanınca son raporun kriter sindirimi önbelleği de temizlenir
+    lastKnownCriteriaDigest = null;
+    try { localStorage.removeItem(CRITERIA_DIGEST_STORAGE_KEY); } catch {}
     set({
       messages: [
         {
@@ -337,7 +400,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
         const execution = await toolRegistry.executeTool(route.toolName, route.args);
 
         logAiTelemetry({
-          source: "Deterministic Fast Router (Web Engine)",
+          source: "Deterministic Fast Router (Rule Engine)",
           model: "TypeScript Rule & Schema Synthesizer (0 Tokens)",
           userPrompt: promptText,
           context: effectiveScreen,
@@ -383,6 +446,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
 
           if (execution.success && (execution.result?.scope || execution.result?.customKind)) {
             set({ lastActiveReport: toReportMemory(fastResolved.tool, execution.result) });
+            captureCriteriaDigestFromResult(execution.result);
           }
 
           logAiTelemetry({
@@ -438,6 +502,19 @@ function handleSidecarEvent(evt: SidecarEvent) {
     const lastPrompt = getState().lastPrompt || "";
     const lastPromptLower = lastPrompt.toLowerCase();
 
+    // Pozitif kanıt sözleşmesi: filter_active_grid için veri-eylemi kanıtı yoksa
+    // prompt filtre OLMAZ — yerel rehber yanıta düşülür (ifade sözlüğü tutulmaz).
+    if (
+      evt.tool === "filter_active_grid" &&
+      !hasGridFilterEvidence(lastPrompt, currentScreen ?? buildEffectiveScreen(), toolArgs)
+    ) {
+      void (async () => {
+        await browserSchemaFallback(lastPrompt, currentScreen ?? buildEffectiveScreen());
+        finishProcessing();
+      })();
+      return;
+    }
+
     // State-Driven Guard + parametre kesinleştirme
     toolName = applyViewingStateGuard(toolName, lastPromptLower, isViewingResults, isAskingNewReport(lastPromptLower));
     if (toolName === "filter_active_grid") {
@@ -484,6 +561,7 @@ function handleSidecarEvent(evt: SidecarEvent) {
           toolDef?.scope?.type === "workspace"
         ) {
           setState({ lastActiveReport: toReportMemory(toolName, execution.result, composition.targetWorkspace) });
+          captureCriteriaDigestFromResult(execution.result);
         }
 
         logAiTelemetry({
@@ -614,6 +692,7 @@ function buildEffectiveScreen(): ScreenContext {
     activeDataSummary: currentScreen?.activeDataSummary,
     activeFilters: currentScreen?.activeFilters,
     quickPrompts: currentScreen?.quickPrompts,
+    criteriaDigest: currentScreen?.criteriaDigest,
   };
 }
 
@@ -652,9 +731,34 @@ function dispatchToSidecar(
       summary.sampleRows
     )
   }
+
+  // Kriter sindirimi: canlı form > önbellek (ana ekran). main.py üst seviyeden okur.
+  const liveDigest = effectiveScreen?.criteriaDigest;
+  if (Array.isArray(liveDigest) && liveDigest.length > 0) {
+    persistCriteriaDigest(liveDigest);
+  }
+  // Son raporun kriter sindirimi grid görünümünde de değerlidir ("bu rapor
+  // ne hakkında" sorusu sonuç ekranında sorulabilir); columnDigest ile çakışmaz.
+  const digestOut =
+    Array.isArray(liveDigest) && liveDigest.length > 0
+      ? liveDigest
+      : lastKnownCriteriaDigest ?? undefined;
+  console.debug(
+    "[SidecarDispatch] giden bağlam:",
+    JSON.stringify({
+      screenId: effectiveScreen?.screenId,
+      criteriaDigest: digestOut ? `${digestOut.length} alan` : "YOK",
+      columnDigest: summary.columnDigest ? "var" : "yok",
+      columnTypes: summary.columnTypes ? "var" : "yok",
+      columnCandidates: columnCandidates.length,
+      isViewingResults: Boolean(summary.isViewingResults),
+    })
+  );
+
   const enrichedScreen: ScreenContext = {
     ...effectiveScreen,
     activeDataSummary: { ...summary, columnCandidates },
+    ...(digestOut ? { criteriaDigest: digestOut } : {}),
   }
 
   const requestId = createRequestId();
@@ -740,6 +844,12 @@ async function browserSchemaFallback(promptText: string, effectiveScreen: Screen
   }
 
   finishProcessing();
+}
+
+// Geliştirme doğrulaması: konsoldan __yulaDebug() ile aktif ekran bağlamını incele
+if (typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__yulaDebug = () =>
+    useAgentBridgeStore.getState().screenContext;
 }
 
 export function useAgentBridge() {

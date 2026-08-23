@@ -12,10 +12,10 @@ import {
 } from "@/features/jobs"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
-import stockAnalyticsCriteriaSchema from "../schemas/stock-analytics-criteria.schema.json"
+import stockAnalyticsCriteriaJson from "../schemas/stock-analytics-criteria.schema.json"
 
 const STOCK_ANALYTICS_JOBS = "/api/arrow/jobs/stock-analytics"
-const stockAnalyticsSchema = stockAnalyticsCriteriaSchema as JsonSchemaObject
+const stockAnalyticsSchema = stockAnalyticsCriteriaJson as unknown as JsonSchemaObject
 
 export type StockAnalyticsJobSession = Pick<
   ArrowJobExecutionsPanelProps,
@@ -57,6 +57,7 @@ export const StockAnalyticsFilter = React.forwardRef<
     "stock-analytics",
     stockAnalyticsSchema
   )
+
 
   React.useImperativeHandle(
     ref,
