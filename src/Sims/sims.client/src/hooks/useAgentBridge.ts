@@ -21,6 +21,8 @@ import {
   ensureChartType,
 } from "./yula/sidecar-protocol";
 import { composeToolResultMessage } from "./yula/tool-result";
+import { extractCleanFilterValue } from "@/lib/bc-filter-synthesizer";
+import { resolveColumnCandidates } from "@/lib/grid-filter-resolver";
 
 export type {
   ChatMessage,
@@ -77,12 +79,9 @@ function createRequestId() {
 const CONFIG_STORAGE_KEY = "yula_ai_config";
 
 /**
- * localStorage'dan yapılandırmayı okur. API anahtarı BURADA TUTULMAZ —
- * o, güvenli depoda yaşar (secure-config.ts) ve hidrasyon sırasında eklenir.
- * Eski sürümden kalan düz metin anahtar, güvenli depoya taşınmak üzere ayrılır.
- */
-let legacyPlainKey = "";
-
+  * localStorage'dan yapılandırmayı okur. API anahtarı BURADA TUTULMAZ —
+  * o, güvenli depoda yaşar (secure-config.ts) ve hidrasyon sırasında eklenir.
+  */
 function loadStoredAiConfig(): AiProviderConfig {
   const defaults: AiProviderConfig = {
     provider: "ollama",
@@ -94,9 +93,6 @@ function loadStoredAiConfig(): AiProviderConfig {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
     if (raw) {
       const parsed = { ...defaults, ...JSON.parse(raw) } as AiProviderConfig;
-      if (typeof parsed.apiKey === "string" && parsed.apiKey) {
-        legacyPlainKey = parsed.apiKey;
-      }
       return { ...parsed, apiKey: "" };
     }
   } catch {
@@ -210,17 +206,9 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
       configHydratedOnce = true;
       try {
         const current = get().aiConfig;
-        const secureKey = await loadSecret();
-        // Eski sürüm kalıntısı: localStorage'da düz metin anahtar kalmışsa güvenli depoya taşı
-        const legacyKey = !secureKey && legacyPlainKey ? legacyPlainKey : "";
-        const apiKey = secureKey ?? "";
+        const apiKey = (await loadSecret()) ?? "";
         set({ aiConfig: { ...current, apiKey }, configHydrated: true });
-        if (legacyKey) {
-          await saveSecret(legacyKey);
-          set({ aiConfig: { ...get().aiConfig, apiKey: legacyKey } });
-        }
         persistAiConfigWithoutSecret(get().aiConfig);
-        legacyPlainKey = "";
       } catch (err) {
         console.warn("[SecureConfig] Yaplandırma hidrasyonu başarısız:", err);
         set({ configHydrated: true });
@@ -467,6 +455,15 @@ function handleSidecarEvent(evt: SidecarEvent) {
     }
 
     void (async () => {
+      // Needle kayıtlı olmayan bir araç adı ürettiyse (örn. kriter formu ekranında
+      // grid aracı halüsinasyonu) hata baloncuğu yerine yerel şema çözümleyicisine düş.
+      if (!toolRegistry.get(toolName)) {
+        console.warn(`[Sidecar] Kayıtsız araç önerildi: "${toolName}" → şema çözümleyicisine düşülüyor.`);
+        await browserSchemaFallback(lastPrompt, currentScreen ?? buildEffectiveScreen());
+        finishProcessing();
+        return;
+      }
+
       const execution = await toolRegistry.executeTool(toolName, toolArgs);
 
       if (execution.success) {
@@ -641,6 +638,25 @@ function dispatchToSidecar(
   effectiveScreen: ScreenContext,
   scopedTools: ReturnType<typeof toolRegistry.getScopedDefinitions>
 ) {
+  // Step-1 (deterministik): şema + örnek kanıtından top-3 kolon adayı.
+  // Needle/Gemma yalnızca bu dar listeden seçim yapar (Step-2).
+  const summary = (effectiveScreen?.activeDataSummary || {}) as Record<string, any>
+  const colNames = Array.isArray(summary.columns) ? (summary.columns as string[]) : []
+  let columnCandidates: string[] = []
+  if (colNames.length > 0) {
+    const clean = extractCleanFilterValue(promptText)
+    columnCandidates = resolveColumnCandidates(
+      clean.columnHint,
+      colNames.map((n) => ({ name: n })),
+      clean.value,
+      summary.sampleRows
+    )
+  }
+  const enrichedScreen: ScreenContext = {
+    ...effectiveScreen,
+    activeDataSummary: { ...summary, columnCandidates },
+  }
+
   const requestId = createRequestId();
   const payload = JSON.stringify({
     action: "task",
@@ -648,7 +664,7 @@ function dispatchToSidecar(
     prompt: promptText,
     context: {
       active_workspace: effectiveScreen?.workspaceId || "selling",
-      current_screen: effectiveScreen,
+      current_screen: enrichedScreen,
     },
     tools: scopedTools,
   });

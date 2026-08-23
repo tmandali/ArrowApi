@@ -66,6 +66,76 @@ def _norm_date(value: str) -> str:
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Bileşik nitelik grameri (frontend bc-filter-synthesizer ile aynı sözleşme):
+#   "itemname timur"  → nitelik=name  → aracın İSİM/açıklama alanına "timur"
+#   "item kodu X"     → nitelik=code  → aracın KOD alanına
+# Kriter formu araçlarında (grid kapalıyken) Needle tek yetkili olduğu için
+# bu deterministik katman SLM/kural çıktısını burada da kesinleştirir.
+# ---------------------------------------------------------------------------
+_QUAL_COMPOUND_RE = re.compile(
+    r"^(sku|item|ürün|urun|malzeme|product)\s*(name|ad[ıi]?|code|kod[u]?|no|numara(?:s[ıi])?|id)\s+(.+)$"
+)
+_QUAL_FIRST_RE = re.compile(
+    r"^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m|kod[u]?|code|numara(?:s[ıi])?)\s+(.+)$"
+)
+_QUAL_NAME_ONLY_RE = re.compile(r"^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m)$")
+
+_DESC_KEY_RE = re.compile(
+    r"\b(name|adi|adı|description|aciklama|açıklama|tanim|tanım|itemname|itemad)\b"
+)
+_CODE_KEY_RE = re.compile(r"\b(code|kod|kodu|sku|no|numara|itemcode|itemkod)\b")
+
+
+def apply_compound_qualifier_args(prompt_lower: str, tool: Dict[str, Any], args: Dict[str, Any]) -> Dict[str, Any]:
+    """Prompt'taki bileşik niteliği tespit edip aracın şemasında eşleşen ALANA değer yazar.
+
+    Yalnızca henüz set EDİLMEMİŞ bir alan bulunursa ve şemada güvenilir eşleşme varsa müdahale eder;
+    aksi halde args olduğu gibi döner. Grid araçları (query/column sözleşmesi) çağrı tarafında atlanır.
+    """
+    if not isinstance(tool, dict) or not isinstance(args, dict):
+        return args
+    p = (prompt_lower or "").strip()
+    value: Optional[str] = None
+    want_desc: Optional[bool] = None
+
+    m = _QUAL_COMPOUND_RE.match(p)
+    if m:
+        want_desc = bool(_QUAL_NAME_ONLY_RE.match(m.group(2)))
+        value = m.group(3).strip()
+    else:
+        q = _QUAL_FIRST_RE.match(p)
+        if q:
+            want_desc = bool(_QUAL_NAME_ONLY_RE.match(q.group(1)))
+            value = q.group(2).strip()
+
+    if not value or want_desc is None:
+        return args
+
+    props = ((tool.get("parameters") or {}).get("properties")) or {}
+    key_re = _DESC_KEY_RE if want_desc else _CODE_KEY_RE
+
+    best_key: Optional[str] = None
+    best_score = 0
+    for k in props:
+        pdef = props.get(k) if isinstance(props.get(k), dict) else {}
+        text = _fold(str(k).lower()) + " " + _fold(str(pdef.get("title", "")).lower()) + " " + _fold(str(pdef.get("description", "")).lower())
+        hits = len(key_re.findall(text))
+        if hits == 0:
+            continue
+        # Alan adındaki doğrudan eşleşme daha güçlü sinyaldir
+        score = hits + (5 if key_re.search(_fold(str(k).lower())) else 0)
+        if score > best_score:
+            best_score = score
+            best_key = k
+
+    if best_key and best_key not in args:
+        out = dict(args)
+        out[best_key] = value
+        return out
+    return args
+
+
 class NeedleEngine:
     def __init__(self, model_name: str = "needle-2:45m"):
         self.model_name = model_name
@@ -556,21 +626,39 @@ class NeedleEngine:
                 extracted_args["query"] = prompt.strip()
 
         # 7. Few-Shot Data Grounding (sampleRows matching)
+        # Sıra bağımlılığı yok: en güçlü eşleşme kazanır (tam > ön ek > içerir).
         if context and isinstance(context, dict):
             cur_screen = context.get("current_screen")
             sample_rows = (cur_screen.get("activeDataSummary") or {}).get("sampleRows", []) if cur_screen and isinstance(cur_screen, dict) else []
-            if sample_rows and isinstance(sample_rows, list):
+            if sample_rows and isinstance(sample_rows, list) and "column" in props:
+                prompt_l = prompt_lower
+                best_col: Optional[str] = None
+                best_val: Optional[str] = None
+                best_strength = 0
                 for row in sample_rows:
-                    if isinstance(row, dict):
-                        for col_name, raw_val in row.items():
-                            if raw_val is not None:
-                                val_str = str(raw_val).strip().lower()
-                                if len(val_str) >= 2 and val_str in prompt_lower:
-                                    if "column" in props and "column" not in extracted_args:
-                                        extracted_args["column"] = col_name
-                                    if "query" in props and "query" not in extracted_args:
-                                        extracted_args["query"] = str(raw_val)
-                                    break
+                    if not isinstance(row, dict):
+                        continue
+                    for col_name, raw_val in row.items():
+                        if raw_val is None:
+                            continue
+                        val_str = str(raw_val).strip().lower()
+                        if len(val_str) < 2:
+                            continue
+                        strength = 0
+                        if val_str == prompt_l.strip():
+                            strength = 3
+                        elif len(val_str) >= 4 and (prompt_l.startswith(val_str.rsplit("-", 1)[0]) or val_str.split("-")[0] in prompt_l):
+                            strength = 2
+                        elif len(val_str) >= 3 and val_str in prompt_l:
+                            strength = 1
+                        if strength > best_strength:
+                            best_strength = strength
+                            best_col = col_name
+                            best_val = str(raw_val)
+                if best_col and "column" not in extracted_args:
+                    extracted_args["column"] = best_col
+                if best_val and "query" not in extracted_args and best_strength >= 1:
+                    extracted_args["query"] = best_val
 
         # 8. Unsupported Criteria Detection
         common_unsupported = ["renk", "depo", "kadıköy", "kadikoy", "şube", "sube", "müşteri", "musteri", "marka", "kategori", "beden", "sezon", "tedarikçi", "tedarikci"]
@@ -789,6 +877,12 @@ class NeedleEngine:
             single_notes: List[str] = []
         else:
             args, unsupported, single_notes = self.extract_and_validate(prompt, best_tool or {}, context)
+
+        # 0a. Bileşik nitelik grameri (kriter formu araçları): "itemname timur" → {<isim-alanı>: timur}.
+        # Grid araçları frontend'in synthesizeGridFilterArgs sözleşmesinde olduğundan burada atlanır.
+        _GRID_TOOLS = {"filter_active_grid", "analyze_grid_data", "clear_grid_filters", "detect_grid_anomalies"}
+        if tool_name not in _GRID_TOOLS:
+            args = apply_compound_qualifier_args(prompt_lower, best_tool or {}, args if isinstance(args, dict) else {})
 
         # 0. JSON Schema Guard Validation & Sanitization (Zero hallucination & Enum guard)
         sanitized_args, rejected_reasons, guard_notes = SchemaGuard.validate_and_sanitize(best_tool or {}, args)

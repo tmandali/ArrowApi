@@ -117,6 +117,27 @@ def get_system_prompt(context=None):
                 "- If the user's message is a QUESTION or aggregation (count/how many/kaç kayıt/total/average), DO NOT call filter tools — call 'analyze_grid_data' instead.\n"
             )
 
+        # Kolon sindirimi: şekil imzası + örnek değer (kompakt few-shot; ham satır basmadan)
+        column_digest = screen.get("activeDataSummary", {}).get("columnDigest")
+        if isinstance(column_digest, dict) and column_digest:
+            context_info += "- Column Digest (shape signature + sample value per column): " + json.dumps(column_digest, ensure_ascii=False) + "\n"
+            context_info += (
+                "COLUMN DIGEST DIRECTIVE: In each digest, 'shape' maps letter-runs to 'a' and digit-runs to '#' "
+                "(e.g. 'Sample 8' -> 'a #', 'SKU-001' -> 'aaa-###'). Before choosing the 'column' argument, "
+                "match the SHAPE of the user's searched value against these digests and prefer the matching column. "
+                "The final column is still resolved authoritatively by the frontend — your choice serves as a strong hint.\n"
+            )
+
+        # Deterministik ön-ranked aday listesi (Step-1 TS) → model yalnız bunlardan seçer (Step-2)
+        column_candidates = screen.get("activeDataSummary", {}).get("columnCandidates")
+        if isinstance(column_candidates, list) and column_candidates:
+            context_info += "- Column Candidates (pre-ranked by deterministic schema/sample analysis, best first): " + json.dumps(column_candidates, ensure_ascii=False) + "\n"
+            context_info += (
+                "COLUMN CANDIDATES DIRECTIVE (MANDATORY when present): When a tool has a 'column' argument, "
+                "you MUST use one of these EXACT names (best match first). "
+                "If none fits the user's intent, OMIT the 'column' argument entirely — never invent another name.\n"
+            )
+
         if screen.get("activeDataSummary", {}).get("isViewingResults"):
             context_info += (
                 "\n*** MANDATORY RESULT GRID DIRECTIVE ***\n"
@@ -167,10 +188,12 @@ def get_system_prompt(context=None):
         f"   - Eğer bir araçta ayrı başlangıç/bitiş tarihleri varsa, YYYY-MM-DD olarak ayrı gönder.\n"
         f"   - Eğer tek tarih parametresi varsa ve aralık istendiyse 'YYYY-MM-DD..YYYY-MM-DD' gönder.\n"
         f"   - DYNAMICS 365 / BUSINESS CENTRAL FİLTRE SÖZDİZİMİ: Aralık: '100..500', Alt sınır: '50000..', Üst sınır: '..1000', Hariç tutma: '!Ankara' veya '!Ankara&!İzmir', Veya: 'Ankara|İzmir', Joker: 'SKU*', Sıfır olmayan: '<>0', Boş: '''' .\n"
-        f"3. EKRANDA TABLO AÇIKKEN (RESULT GRID):\n"
-        f"   - Kullanıcı filtreleme istediğinde DAİMA 'filter_active_grid' aracını çağır.\n"
-        f"   - Kullanıcı özet, toplam, grafik veya metrik istediğinde DAİMA 'analyze_grid_data' aracını çağır.\n"
+        f"3. EKRANDA TABLO AÇIKKEN (RESULT GRID) — YALNIZCA verilen araç listesinde 'filter_active_grid' / 'analyze_grid_data' / 'clear_grid_filters' araçları GERÇEKTEN varsa:\n"
+        f"   - Kullanıcı filtreleme istediğinde 'filter_active_grid' aracını çağır.\n"
+        f"   - Kullanıcı özet, toplam, grafik veya metrik istediğinde 'analyze_grid_data' aracını çağır.\n"
         f"   - Kullanıcı filtreleri temizlemek istediğinde 'clear_grid_filters' aracını çağır.\n"
+        f"   - Bu araçlar listede YOKSA (örn. kriter formu ekranındaysa) ASLA uydurma! Kullanıcının filtre talebini o ekranda kayıtlı olan rapor/kriter aracıyla karşıla; hiç uygun araç yoksa araç çağırmadan Türkçe yönlendirme yap.\n"
+        f"   - GENEL KURAL: Yalnızca sana verilen araç listesindeki İSİMLERLE, birebir aynı yazımla araç çağır.\n"
         f"4. DESTEKLENMEYEN KRİTERLERDE REHBERLİK:\n"
         f"   - Kullanıcı şemada olmayan bir filtre talep ederse Türkçe olarak bu raporda bu filtrenin olmadığını ve mevcut geçerli kriterleri belirt.\n"
         f"5. GENEL BİLGİ, SORU-CEVAP VE SOHBET: Kullanıcı 'sistemde kaç workspace var', 'bu ekran ne işe yarıyor', 'kimsin', 'nasıl kullanılır' gibi bilgi/soru cümleleri sorduğunda ASLA ARAÇ ÇAĞIRMA (tool call yapma). Doğrudan akıcı, net ve kurumsal bir Türkçe dille soruyu yanıtla.\n"
