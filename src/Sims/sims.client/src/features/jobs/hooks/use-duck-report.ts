@@ -7,6 +7,8 @@ export type ReportColumnMeta = {
   label?: string
   align?: "left" | "right"
   isNumeric?: boolean
+  /** Ham DuckDB tipi (DATE, TIMESTAMP, VARCHAR, DECIMAL...) — AI şema grounding'i için. */
+  duckType?: string
 }
 
 export type UseDuckReportOptions = {

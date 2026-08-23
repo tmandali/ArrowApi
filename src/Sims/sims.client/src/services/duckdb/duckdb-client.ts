@@ -201,6 +201,8 @@ class DuckDbClient {
       label: string
       align: "left" | "right"
       isNumeric: boolean
+      /** Ham DuckDB tipi (DATE, TIMESTAMP, VARCHAR, DECIMAL...) — AI şema grounding'i için. */
+      duckType?: string
     }[]
   > {
     const res = await this.postMessage<{
@@ -211,6 +213,7 @@ class DuckDbClient {
         label: string
         align: "left" | "right"
         isNumeric: boolean
+        duckType?: string
       }[]
     }>("DESCRIBE_TABLE", { tableName })
     return res.columns ?? []

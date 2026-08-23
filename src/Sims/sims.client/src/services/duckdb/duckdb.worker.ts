@@ -240,6 +240,7 @@ self.onmessage = async (e: MessageEvent) => {
                   label: colName.replace(/([a-z])([A-Z])/g, "$1 $2"),
                   align: isNumeric ? ("right" as const) : ("left" as const),
                   isNumeric,
+                  duckType: colType,
                 }
               })
               .filter((c) => c.name.length > 0)
@@ -254,16 +255,23 @@ self.onmessage = async (e: MessageEvent) => {
           const { tableName, jobId } = payload as { tableName: string; jobId?: string }
           const parquetFileName = `${jobId || tableName}.parquet`
 
-          // 1. Önce bellekteki mevcut tablo veya view kontrolü
+          // 1. Önce bellekteki mevcut tablo veya view kontrolü (information_schema ile güvenli kontrol — hata fırlatmaz)
           try {
-            const res = await conn.query(
-              `SELECT COUNT(*) as count FROM "${tableName}"`
+            const escapedName = tableName.replace(/'/g, "''")
+            const checkRes = await conn.query(
+              `SELECT table_name FROM information_schema.tables WHERE table_name = '${escapedName}'`
             )
-            const countRows = arrowTableToObjects(res)
-            const rowCount = Number(countRows[0]?.count ?? 0)
-            if (rowCount > 0) {
-              self.postMessage({ id, success: true, exists: true, rowCount })
-              break
+            const checkRows = arrowTableToObjects(checkRes)
+            if (checkRows && checkRows.length > 0) {
+              const res = await conn.query(
+                `SELECT COUNT(*) as count FROM "${tableName}"`
+              )
+              const countRows = arrowTableToObjects(res)
+              const rowCount = Number(countRows[0]?.count ?? 0)
+              if (rowCount > 0) {
+                self.postMessage({ id, success: true, exists: true, rowCount })
+                break
+              }
             }
           } catch {
             // Tablo veya view henüz bellekte yok
