@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { detectGridIntent, resolveGridFastRoute } from "./grid-intent"
+import {
+  detectGridIntent,
+  hasGridFilterEvidence,
+  resolveGridFastRoute,
+} from "./grid-intent"
 import { applyViewingStateGuard } from "./sidecar-protocol"
 import type { ScreenContext } from "./types"
 
@@ -10,9 +14,21 @@ const gridScreen: ScreenContext = {
   activeDataSummary: {
     isViewingResults: true,
     totalRows: 1200,
-    columns: ["Posting Date", "Item", "Quantity"],
-    columnTypes: { "Posting Date": "date", Item: "text", Quantity: "number" },
-    sampleRows: [{ "Posting Date": "2025-01-15", Item: "SKU-001", Quantity: 5 }],
+    columns: ["Posting Date", "Item Code", "Item Name", "Quantity"],
+    columnTypes: {
+      "Posting Date": "date",
+      "Item Code": "text",
+      "Item Name": "text",
+      Quantity: "number",
+    },
+    sampleRows: [
+      {
+        "Posting Date": "2025-01-15",
+        "Item Code": "SKU-001",
+        "Item Name": "Sample 8",
+        Quantity: 5,
+      },
+    ],
   },
 } as unknown as ScreenContext
 
@@ -74,5 +90,36 @@ describe("applyViewingStateGuard — Needle yanlış araç seçerse", () => {
       false
     )
     expect(t).toBe("filter_active_grid")
+  })
+})
+
+describe("hasGridFilterEvidence — pozitif kanıt sözleşmesi", () => {
+  it.each([
+    ["bu tabloyu nasıl yorumlamalıyım", {}],
+    ["bu ekran ne işe yarar?", {}],
+  ])("kanıtsız soru cümlesi → false: %s", (p, args) => {
+    expect(hasGridFilterEvidence(p, gridScreen, args)).toBe(false)
+  })
+
+  it.each([
+    ["SKU-102 filtrele", {}],
+    ["kaç kayıt var", {}],
+    ['depo "MAIN"', {}],
+  ])("yapısal kanıt → true: %s", (p, args) => {
+    expect(hasGridFilterEvidence(p, gridScreen, args)).toBe(true)
+  })
+
+  it("model gerçek değer çıkardıysa (query ≠ prompt) true", () => {
+    expect(
+      hasGridFilterEvidence(
+        "bana timur ile ilgili satırları getirir misin",
+        gridScreen,
+        { query: "timur" }
+      )
+    ).toBe(true)
+  })
+
+  it("örnek-set kanıtıyla yalın değer true (Sample 8 vakası)", () => {
+    expect(hasGridFilterEvidence("sample 8", gridScreen, {})).toBe(true)
   })
 })

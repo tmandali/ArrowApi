@@ -3,8 +3,17 @@
  * Hem sendPrompt hızlı router'ı hem de sidecar tool_call düzeltmesi aynı
  * anahtar kelime setini bu modül üzerinden kullanır (tek kaynak).
  */
-import { extractCleanFilterValue, synthesizeBcFilter, unwrapQuotedValue } from "@/lib/bc-filter-synthesizer";
-import { resolveGridColumn, stripColumnTokensFromValue } from "@/lib/grid-filter-resolver";
+import {
+  extractCleanFilterValue,
+  matchExplicitColumn,
+  synthesizeBcFilter,
+  unwrapQuotedValue,
+} from "@/lib/bc-filter-synthesizer";
+import {
+  resolveColumnCandidates,
+  resolveGridColumn,
+  stripColumnTokensFromValue,
+} from "@/lib/grid-filter-resolver";
 import type { ScreenContext } from "./types";
 import intentsJson from "./intents.tr.json";
 
@@ -53,6 +62,63 @@ function buildKnownColumnNames(summary?: Record<string, any>): string[] {
   return [...set];
 }
 
+/**
+ * Pozitif kanıt sözleşmesi: filter_active_grid çalıştırmak için promptta VEYA
+ * model çıktısında en az bir VERİ EYLEMİ kanıtı aranır. Kanıt yoksa prompt
+ * konuşma/rehber yoluna düşer — ifade sözlüğü tutulmaz, yeni kalıplar otomatik
+ * doğru tarafa ayrışır.
+ */
+export function hasGridFilterEvidence(
+  promptText: string,
+  effectiveScreen: ScreenContext,
+  toolArgs?: Record<string, any>
+): boolean {
+  const summaryAny = effectiveScreen.activeDataSummary as Record<string, any> | undefined;
+  const knownColumns = buildKnownColumnNames(summaryAny);
+
+  // 1. BC operatörü / şekil kodu / tırnaklı literal / GERÇEK kolon adı (şemadan)
+  if (hasDirectGridFilterSignal(promptText, knownColumns)) return true;
+  // 2. Net grid niyeti (temizle / sayım / özet / anomali)
+  if (detectGridIntent(promptText) !== null) return true;
+
+  // 3. Kolon ipucu (açık kolon adı, bileşik nitelik) veya tırnaklı literal
+  const clean = extractCleanFilterValue(promptText, knownColumns);
+  if (clean.columnHint || clean.quoted) return true;
+
+  // 4. Model ham promptu kopyalamak yerine gerçek bir değer çıkardı mı?
+  const q = String(toolArgs?.query ?? "").trim();
+  if (
+    q.length >= 2 &&
+    q.toLowerCase() !== promptText.trim().toLowerCase() &&
+    !isFullSentenceQuery(q)
+  ) {
+    return true;
+  }
+
+  // 5. Örnek-set/şekil kanıtıyla aday kolon bulunuyor mu?
+  const colNames = Array.isArray(summaryAny?.columns)
+    ? (summaryAny.columns as string[])
+    : [];
+  if (
+    colNames.length > 0 &&
+    resolveColumnCandidates(
+      clean.columnHint,
+      colNames.map((n) => ({ name: n })),
+      clean.value,
+      summaryAny?.sampleRows
+    ).length > 0
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Serbest cümle koruması: ≥4 kelime ve BC operatörü içermeyen değer. */
+function isFullSentenceQuery(q: string): boolean {
+  return q.includes("?") || (q.split(/\s+/).length >= 4 && !/[><=..|&!]/.test(q));
+}
+
 export type GridIntent = "anomaly" | "count" | "summary" | "clear" | null;
 
 /** Serbest metinden grid aksiyon niyetini yakalar. */
@@ -78,12 +144,22 @@ export function inferChartType(promptLower: string): "pie" | "kpi" | "bar" {
   return "bar";
 }
 
-/** Doğrudan grid filtre sinyali var mı? (operatör / kod kalıbı) */
-export function hasDirectGridFilterSignal(promptText: string): boolean {
+/** Doğrudan grid filtre sinyali — TAMAMI şema/şekil türevli, kavram sözlüğü YOKTUR:
+ *  1. Herhangi bir kelime + karşılaştırma operatörü ("unit price > 100", "qty<50")
+ *  2. Harf-ayraç-rakam şekli ("SKU-001", "WH-01") — kavramdan bağımsız yapı sinyali
+ *  3. Tırnaklı literal
+ *  4. Prompt, Arrow şemasından gelen GERÇEK kolon adı/etiketi içeriyor (knownColumns)
+ */
+export function hasDirectGridFilterSignal(
+  promptText: string,
+  knownColumns?: string[]
+): boolean {
+  const p = promptText.trim();
   return Boolean(
-    extractCleanFilterValue(promptText).value ||
-      /\b(?:qty|quantity|bakiye|balance|stok|stock|miktar)\s*(?:>=|<=|<>|!=|>|<|=)/i.test(promptText) ||
-      /\b(?:sku|item|ürün|malzeme)[-_ ]?\d+/i.test(promptText)
+    /(?:^|\s)[a-zA-ZçğıöşüÇĞİÖŞÜ0-9_]+\s*(?:>=|<=|<>|!=|=|>|<|\.\.)\s*\S/.test(p) ||
+      /\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,}[-_]\d+\b/.test(p) ||
+      /["“'«].+["”'»]/.test(p) ||
+      (matchExplicitColumn(p, knownColumns ?? []) !== undefined)
   );
 }
 
@@ -105,10 +181,10 @@ export function resolveGridFastRoute(
 ): GridRouteDecision {
   const promptLower = promptText.toLowerCase();
   const isViewingResults = Boolean(effectiveScreen.activeDataSummary?.isViewingResults);
-  const hasDirectGridFilter = hasDirectGridFilterSignal(promptText);
   // Kullanıcı gerçek kolon adı/etiketini yazdıysa ("unit price 25") açık öncelik
   const summaryAny = effectiveScreen.activeDataSummary as Record<string, any> | undefined;
   const knownColumns = buildKnownColumnNames(summaryAny);
+  const hasDirectGridFilter = hasDirectGridFilterSignal(promptText, knownColumns);
 
   const gate =
     (isViewingResults || (hasActiveGridTool && hasDirectGridFilter)) && !isAskingNewReport(promptLower);

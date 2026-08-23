@@ -6,6 +6,7 @@ import {
   stripColumnTokensFromValue,
   unwrapQuotedValue,
 } from "./grid-filter-resolver"
+import { hasDirectGridFilterSignal } from "@/hooks/yula/grid-intent"
 
 describe("stripColumnTokensFromValue", () => {
   it("'itemname timur' + Item Code → 'timur'", () => {
@@ -270,5 +271,29 @@ describe("açık kolon adı önceliği (unit price vakası)", () => {
       { name: "ItemName", label: "Item Name" },
     ]
     expect(resolveGridColumn("Unit Price", cols, "25")).toBe("UnitPrice")
+  })
+})
+
+
+describe("hasDirectGridFilterSignal — şema/şekil türevli (sözlüksüz)", () => {
+  it.each([
+    ["unit price > 100", undefined],
+    ["qty<50", undefined],
+    ["SKU-102 filtrele", undefined],
+    ["WH-01 kayıtları", undefined],
+    ['depo "MAIN"', undefined],
+    ["unit price 25", ["Unit Price", "Qty"]],
+    ["posting date haziran", ["Posting Date"]],
+  ])("sinyal: %s", (p, cols) => {
+    expect(hasDirectGridFilterSignal(p as string, cols as string[] | undefined)).toBe(true)
+  })
+
+  it.each([
+    ["bu tabloyu nasıl yorumlamalıyım", undefined],
+    ["sample 8", undefined],
+    ["merhaba", undefined],
+    ["unit price 25", undefined],
+  ])("sinyal değil: %s", (p, cols) => {
+    expect(hasDirectGridFilterSignal(p as string, cols as string[] | undefined)).toBe(false)
   })
 })
