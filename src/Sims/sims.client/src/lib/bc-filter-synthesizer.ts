@@ -382,9 +382,118 @@ export function synthesizeBcFilter(
  * Doğal dildeki filtre cümlelerinden gereksiz sohbet kelimelerini ayıklayarak
  * temiz arama terimini veya BC sözdizimini (SKU-001, >0, 100..500 vb.) çıkarır.
  */
-export function extractCleanFilterValue(prompt: string): { value: string; columnHint?: string } {
+/**
+ * Değersiz kalan kısa ifadelerden (örn. tırnağı çıkarınca geriye sadece
+ * "itemname" kalan promptlar) kolon kavram ipucu üretir.
+ */
+function detectHintFromBarePhrase(pLower: string): string | undefined {
+  const p = pLower.trim();
+  const compound = p.match(
+    /^(sku|item|ürün|urun|malzeme|product)\s*(name|ad[ıi]?|code|kod[u]?|no|numara(?:s[ıi])?|id)$/
+  );
+  if (compound) {
+    const qual = compound[2]!;
+    return /^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m)$/.test(qual)
+      ? "description"
+      : "item_code";
+  }
+  if (/^(aktif|pasif|iptal|onay|bekle|taslak|kapalı|açık|active|inactive|cancel|approved|pending|draft|open|closed)\b/.test(p))
+    return "status";
+  if (/\b(sku|item|ürün|malzeme|kod|code)\b/.test(p)) return "item_code";
+  if (/\b(depo|warehouse)\b/.test(p)) return "warehouse";
+  if (/\b(şehir|sehir|city)\b/.test(p)) return "city";
+  if (/\b(tarih|date|ay|yıl|yil)\b/.test(p)) return "date";
+  return undefined;
+}
+
+/**
+ * Prompt içinde GERÇEK bir kolon adı/etiketi geçiyor mu? (kelime dizisi eşleşmesi,
+ * aksan-sade). Bulursa {name, start, end} döner — kullanıcı açıkça kolon belirtmiştir.
+ */
+export function matchExplicitColumn(
+  prompt: string,
+  knownColumns: string[]
+): { name: string; start: number; end: number } | undefined {
+  if (!prompt || !knownColumns?.length) return undefined;
+  const words: Array<{ w: string; s: number; e: number }> = [];
+  const re = /[^\s,.;:!?]+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(prompt))) {
+    words.push({ w: foldWord(m[0]), s: m.index, e: m.index + m[0].length });
+  }
+  let best: { name: string; start: number; end: number } | undefined;
+  for (const col of knownColumns) {
+    if (!col) continue;
+    const parts = String(col)
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(Boolean)
+      .map(foldWord);
+    if (parts.length === 0) continue;
+    for (let i = 0; i + parts.length <= words.length; i++) {
+      let ok = true;
+      for (let j = 0; j < parts.length; j++) {
+        if (words[i + j]!.w !== parts[j]) {
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) continue;
+      const start = words[i]!.s;
+      const end = words[i + parts.length - 1]!.e;
+      const longer = !best || end - start > best.end - best.start;
+      if (longer) best = { name: col, start, end };
+    }
+  }
+  return best;
+}
+
+function foldWord(w: string): string {
+  const FOLD: Record<string, string> = {
+    ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u",
+    Ç: "c", Ğ: "g", İ: "i", I: "i", Ö: "o", Ş: "s", Ü: "u",
+  };
+  return w
+    .replace(/[çğıöşüÇĞİIÖŞÜ]/g, (ch) => FOLD[ch] ?? ch)
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function extractCleanFilterValue(
+  prompt: string,
+  knownColumns?: string[]
+): { value: string; columnHint?: string; quoted?: boolean } {
   const p = prompt.trim();
   const pLower = p.toLowerCase();
+
+  // -2. AÇIK KOLON ADI: kullanıcı prompt'ta gerçek bir kolon adı/etiketi yazdıysa
+  // (örn. "unit price 25" + tabloda "Unit Price") bu EN YÜKSEK önceliktir; değer,
+  // kolon kelimeleri çıkarılarak kalır.
+  if (knownColumns?.length) {
+    const explicit = matchExplicitColumn(p, knownColumns);
+    if (explicit) {
+      const outside =
+        (p.slice(0, explicit.start) + " " + p.slice(explicit.end)).trim();
+      const rest = extractCleanFilterValue(outside);
+      return { value: rest.value, columnHint: explicit.name };
+    }
+  }
+
+  // -1. TIRNAKLI LITERAL: "..." içindeki metin olduğu gibi alınır; stopwords,
+  // bileşik ayırma ve kolon-kelime sökme ASLA uygulanmaz. Kolon ipucu yalnızca
+  // tırnak DIŞINDAKİ kelimelerden çıkarılır.
+  //   örnek: itemname "Sample Item 14" → value:'"Sample Item 14"', hint=item adı kavramı
+  const quoteMatch = p.match(/(["“'«])(.+?)\1/);
+  if (quoteMatch && quoteMatch[2].trim()) {
+    const outside = p.replace(quoteMatch[0], " ");
+    const innerHint =
+      extractCleanFilterValue(outside).columnHint ??
+      detectHintFromBarePhrase(outside.toLowerCase());
+    return {
+      value: `${quoteMatch[1]}${quoteMatch[2].trim()}${quoteMatch[1]}`,
+      columnHint: innerHint,
+      quoted: true,
+    };
+  }
 
   // 0.0 Doğrudan ! ile başlayan BC Hariç Tutma (örn: "!SKU-020", "!Ankara", "!0")
   if (p.startsWith("!")) {
@@ -465,19 +574,50 @@ export function extractCleanFilterValue(prompt: string): { value: string; column
   const remaining = words.filter((w) => w && !stopWords.has(w.toLowerCase()));
   const cleaned = remaining.join(" ").trim();
 
-  // Kolon ipucu tespiti
+  // Kolon ipucu tespiti — kelime sınırıyla: "items"/"itemname" gibi bileşikler yanlış hint üretmesin.
+  // Item ailesi bileşikleri NİTELİĞE göre ayrışır: itemname/item adı → description kavramı,
+  // itemcode/item kodu → item_code kavramı. Değer, ipucu kelimelerinden arındırılır.
+  //   "itemname timur" → hint=description, değer="timur"
+  //   "ame timur" gibi eksik önekli girişlerde nitelik-kelimesi başta yakalanır.
   let columnHint: string | undefined;
-  if (/^(aktif|pasif|iptal|onay|bekle|taslak|kapalı|açık|active|inactive|cancel|approved|pending|draft|open|closed)/i.test(pLower)) {
+  let preStripped: string | undefined;
+  const itemCompound = pLower.match(
+    /^(sku|item|ürün|urun|malzeme|product)\s*(name|ad[ıi]?|code|kod[u]?|no|numara(?:s[ıi])?|id)\s+(.+)$/
+  );
+  const qualFirst = pLower.match(
+    /^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m|kod[u]?|code|numara(?:s[ıi])?)\s+(.+)$/
+  );
+  const NAME_QUAL_RE = /^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m)$/;
+  if (itemCompound) {
+    const qual = itemCompound[2]!;
+    columnHint = NAME_QUAL_RE.test(qual) ? "description" : "item_code";
+    preStripped = itemCompound[3]!.trim();
+  } else if (qualFirst) {
+    const qual = qualFirst[1]!;
+    columnHint = NAME_QUAL_RE.test(qual) ? "description" : "item_code";
+    preStripped = qualFirst[2]!.trim();
+  } else if (/^(aktif|pasif|iptal|onay|bekle|taslak|kapalı|açık|active|inactive|cancel|approved|pending|draft|open|closed)\b/.test(pLower)) {
     columnHint = "status";
-  } else if (/^(sku|item|ürün|malzeme|kod)/i.test(pLower) || pLower.includes("item") || pLower.includes("sku")) {
+  } else if (/\b(sku|item|ürün|malzeme|kod|code)\b/.test(pLower)) {
     columnHint = "item_code";
-  } else if (pLower.includes("depo") || pLower.includes("warehouse")) {
+  } else if (/\b(depo|warehouse)\b/.test(pLower)) {
     columnHint = "warehouse";
-  } else if (pLower.includes("şehir") || pLower.includes("city")) {
+  } else if (/\b(şehir|sehir|city)\b/.test(pLower)) {
     columnHint = "city";
-  } else if (pLower.includes("tarih") || pLower.includes("date") || pLower.includes("ay") || pLower.includes("yıl") || pLower.includes("yil")) {
+  } else if (/\b(tarih|date|ay|yıl|yil)\b/.test(pLower)) {
     columnHint = "date";
   }
 
-  return { value: cleaned, columnHint };
+  return { value: preStripped ?? cleaned, columnHint };
+}
+
+/**
+ * Değer tırnakla sarılmışsa içeriği döndürür (literal sözleşmesi).
+ * '"Sample Item 14"' → { content:"Sample Item 14", quoted:true }
+ */
+export function unwrapQuotedValue(v: string): { content: string; quoted: boolean } {
+  const s = String(v ?? "").trim();
+  const m = s.match(/^(["“'«])(.+)\1$/s);
+  if (!m || !m[2].trim()) return { content: s, quoted: false };
+  return { content: m[2].trim(), quoted: true };
 }

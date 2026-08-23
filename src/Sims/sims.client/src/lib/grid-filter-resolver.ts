@@ -1,12 +1,56 @@
-import { extractCleanFilterValue } from "@/lib/bc-filter-synthesizer"
+import { extractCleanFilterValue, unwrapQuotedValue } from "@/lib/bc-filter-synthesizer"
+import { shapeSignature } from "@/features/jobs/lib/column-digest"
 
-export { extractCleanFilterValue }
+export { extractCleanFilterValue, unwrapQuotedValue }
 
 export interface MinimalGridColumn {
   name: string
   label?: string
   align?: "left" | "right" | "center"
   isNumeric?: boolean
+}
+
+const FOLD_TR_MAP: Record<string, string> = {
+  ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u",
+  Ç: "c", Ğ: "g", İ: "i", I: "i", Ö: "o", Ş: "s", Ü: "u",
+}
+const foldTrLocal = (s: string): string =>
+  s.replace(/[çğıöşüÇĞİIÖŞÜ]/g, (ch) => FOLD_TR_MAP[ch] ?? ch)
+
+/**
+ * Filtre değerinden hedef kolonun kendi ad/etiket kelimelerini söker.
+ * Örn: kolon "Item Code" + değer "itemname timur" → "timur".
+ *
+ * Jeneriktir (kelime listesi yok): tokenlar çözümlenen kolonun kendisinden
+ * türetilir. Bileşik yazımlar da yakalanır ("itemname" → "item" içerir).
+ * Tüm kelimeler sökülecek olsaydı orijinal değer korunur.
+ */
+export function stripColumnTokensFromValue(
+  value: string,
+  ...columnNames: Array<string | undefined | null>
+): string {
+  const raw = String(value ?? "").trim()
+  if (!raw || !raw.includes(" ")) {
+    // Tek kelimelik değer zaten kolon kelimesi olamaz (kolon eşleşmesi ayrı yapılır)
+    if (!raw) return raw
+  }
+  const tokens = new Set<string>()
+  for (const name of columnNames) {
+    if (!name) continue
+    for (const part of String(name).split(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]+/)) {
+      const f = foldTrLocal(part).toLowerCase()
+      if (f.length >= 3) tokens.add(f)
+    }
+  }
+  const words = raw.split(/\s+/).filter(Boolean)
+  const kept = words.filter((w) => {
+    const f = foldTrLocal(w).toLowerCase()
+    for (const t of tokens) {
+      if (f === t || (t.length >= 4 && f.includes(t))) return false
+    }
+    return true
+  })
+  return kept.length > 0 ? kept.join(" ") : raw
 }
 
 /**
@@ -43,6 +87,122 @@ const COLUMN_SYNONYMS: Record<string, string[]> = {
 }
 
 /**
+ * Few-shot örnek-seti eşleşmesi: değerin hangi kolonda yaşadığını Arrow/DuckDB
+ * örnek satırlarından bulur. Güç kademeleri: tam=3 > kod-ön eki=2 > içerir=1.
+ */
+function findSampleColumnMatch(
+  appliedValue: string | undefined,
+  columns: MinimalGridColumn[],
+  sampleRows?: Array<Record<string, any>>
+): { name: string; strength: number } | undefined {
+  if (!appliedValue || !sampleRows || sampleRows.length === 0) return undefined
+  const cleanVal = appliedValue.trim().replace(/^([!<>]=?|<>|!=|\*)/, "").replace(/\*$/, "").toLowerCase()
+  if (!cleanVal) return undefined
+  const prefixMatch = cleanVal.match(/^([a-zA-Z0-9]+)[-_]/)?.[1]
+
+  let bestHit: { name: string; strength: number } | undefined
+  for (const col of columns) {
+    for (const row of sampleRows) {
+      const sampleVal = String(row[col.name] || "").trim().toLowerCase()
+      if (!sampleVal) continue
+
+      let strength = 0
+      if (sampleVal === cleanVal) strength = 3
+      else if (prefixMatch && (sampleVal.startsWith(prefixMatch + "-") || sampleVal.startsWith(prefixMatch + "_"))) strength = 2
+      else if (cleanVal.length >= 3 && sampleVal.includes(cleanVal)) strength = 1
+
+      if (strength > (bestHit?.strength ?? 0)) bestHit = { name: col.name, strength }
+    }
+  }
+  return bestHit
+}
+
+/**
+ * Deterministik aday listesi (Step-1): Arrow şeması + tipler + örnek kanıtı +
+ * şekil imzasından en güçlü `limit` kolonu sıralar. Model (Needle/Gemma) yalnızca
+ * bu dar listeden seçim yapar (Step-2); yetkili çözüm yine resolveGridColumn'dadır.
+ */
+export function resolveColumnCandidates(
+  requestedColumn: string | undefined,
+  columns: MinimalGridColumn[],
+  appliedValue?: string,
+  sampleRows?: Array<Record<string, any>>,
+  limit = 3
+): string[] {
+  if (!columns || columns.length === 0) return []
+  const sampleHit = findSampleColumnMatch(appliedValue, columns, sampleRows)
+  const shapeSet = new Set(findShapeColumnMatch(appliedValue, columns, sampleRows))
+  const cleanReq = requestedColumn
+    ? requestedColumn.toLowerCase().replace(/[\s_-]+/g, "")
+    : ""
+  const synonyms = cleanReq ? COLUMN_SYNONYMS[cleanReq] || [] : []
+
+  const scored = columns.map((c) => {
+    const cName = c.name.toLowerCase().replace(/[\s_-]+/g, "")
+    const cLabel = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
+    let s = 0
+    for (const t of [cName, cLabel]) {
+      if (!t) continue
+      if (cleanReq) {
+        if (t === cleanReq) s = Math.max(s, 100)
+        else if (cleanReq.length >= 3 && t.startsWith(cleanReq)) s = Math.max(s, 70)
+        else if (cleanReq.length >= 3 && t.includes(cleanReq)) s = Math.max(s, 50)
+        else if (t.length >= 3 && cleanReq.includes(t)) s = Math.max(s, 40)
+      }
+      for (const syn of synonyms) {
+        const sc = syn.toLowerCase().replace(/[\s_-]+/g, "")
+        if (!sc) continue
+        if (t === sc) s = Math.max(s, 90)
+        else if (t.startsWith(sc)) s = Math.max(s, 60)
+        else if (t.includes(sc)) s = Math.max(s, 45)
+      }
+    }
+    if (sampleHit && sampleHit.name === c.name) {
+      s += sampleHit.strength >= 3 ? 80 : sampleHit.strength === 2 ? 60 : 20
+    }
+    if (shapeSet.has(c.name)) s += 25
+    return { name: c.name, s }
+  })
+
+  return scored
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map((x) => x.name)
+}
+
+/**
+ * Örnek-sette birebir değer olmasa bile veri DOKUSU eşleşmesini sağlar.
+ * (İmza üretimi tek kaynakta: features/jobs/lib/column-digest.ts)
+ */
+function findShapeColumnMatch(
+  appliedValue: string | undefined,
+  columns: MinimalGridColumn[],
+  sampleRows?: Array<Record<string, any>>
+): string[] {
+  if (!appliedValue || !sampleRows || sampleRows.length === 0) return []
+  const sig = shapeSignature(appliedValue.trim())
+  // Şekilsiz/kaba imzalar kanıt sayılmaz: en az bir rakam (#) VEYA çok parçalı
+  // yapı gerekir ("sample 222"→"a #" ✓, "MAIN"→"a" ✗).
+  const informative =
+    sig.includes("#") || sig.replace(/[\s\-.]/g, "").length > 1
+  if (!sig || !informative || !/[a#]/.test(sig.replace(/[\s\-.]/g, ""))) return []
+
+  const matching: string[] = []
+  for (const col of columns) {
+    for (const row of sampleRows) {
+      const sampleVal = String(row[col.name] ?? "").trim()
+      if (!sampleVal) continue
+      if (shapeSignature(sampleVal) === sig) {
+        matching.push(col.name)
+        break
+      }
+    }
+  }
+  return matching
+}
+
+/**
  * Grid kolonlarını doğal dil kriterine, veri örneklerine veya veri tipine göre eşleştiren çözümleyici.
  */
 export function resolveGridColumn(
@@ -53,39 +213,77 @@ export function resolveGridColumn(
 ): string | undefined {
   if (!columns || columns.length === 0) return undefined
 
+  // 0. VERİ KANITI ÖNCE (Arrow şema tipleri + örnek seti): değer örnek satırlarda
+  // birebir veya kod-ön ekiyle bulunuyorsa bu, anahtar-kelime ipucundan güçlüdür.
+  //   "Sample 8" ItemName örneklerinde birebir varsa → ItemName (hint item_code olsa bile).
+  const sampleHit = findSampleColumnMatch(appliedValue, columns, sampleRows)
+  if (sampleHit && sampleHit.strength >= 2) return sampleHit.name
+
+  // 0b. ŞEKİL-İMZASI kanıtı: örnek-sette birebir değer yoksa bile veri dokusu
+  // uyuşan kolonlar ("Sample 222" ↔ ItemName örneği "Sample 8") adaydır.
+  const shapeCols = findShapeColumnMatch(appliedValue, columns, sampleRows)
+  if (shapeCols.length === 1) return shapeCols[0]
+
   // 1. Kullanıcı veya sentezleyici spesifik bir kolon / kavram talep ettiyse
   if (requestedColumn) {
     const cleanReq = requestedColumn.toLowerCase().replace(/[\s_-]+/g, "")
 
-    // 1.1 Doğrudan veya İsim/Etiket Eşleşmesi
-    const directMatch = columns.find((c) => {
+    // 1.1 Skorlu ad/etiket eşleşmesi: tam eşleşme > başlangıç > içerir.
+    // İlk-hits kazandıran eski davranış, item-code ailesine sistematik eğilim üretiyordu.
+    let best: { name: string; score: number } | undefined
+    for (const c of columns) {
       const cNameClean = c.name.toLowerCase().replace(/[\s_-]+/g, "")
       const cLabelClean = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
-      return (
-        cNameClean === cleanReq ||
-        cLabelClean === cleanReq ||
-        cNameClean.includes(cleanReq) ||
-        cLabelClean.includes(cleanReq)
-      )
-    })
-    if (directMatch) return directMatch.name
-
-    // 1.2 Eşanlamlı Kavram Eşleşmesi (örn: "qty" -> "balance", "status" -> "is_passive", "durum")
-    const synonyms = COLUMN_SYNONYMS[cleanReq] || []
-    if (synonyms.length > 0) {
-      const synonymMatch = columns.find((c) => {
-        const cNameClean = c.name.toLowerCase().replace(/[\s_-]+/g, "")
-        const cLabelClean = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
-        return synonyms.some((s) => {
-          const sClean = s.toLowerCase().replace(/[\s_-]+/g, "")
-          return cNameClean.includes(sClean) || cLabelClean.includes(sClean) || sClean.includes(cNameClean)
-        })
-      })
-      if (synonymMatch) return synonymMatch.name
+      for (const target of [cNameClean, cLabelClean]) {
+        if (!target) continue
+        let score = 0
+        if (target === cleanReq) score = 100
+        else if (cleanReq.length >= 3 && target.startsWith(cleanReq)) score = 70
+        else if (cleanReq.length >= 3 && target.includes(cleanReq)) score = 50
+        else if (target.length >= 3 && cleanReq.includes(target)) score = 40
+        if (score > (best?.score ?? -1)) best = { name: c.name, score }
+      }
+    }
+    if (best && best.score >= 40) {
+      // Zayıf veri kanıtı (yalnız 'içerir') + zayıf ipucu (<70) → örnek-set kazanır
+      if (sampleHit && best.score < 70) return sampleHit.name
+      // Şekil kanıtı ipucunu yalanlıyorsa (Item Code önerildi ama dokusu uyuşmuyor) → uyumlu kolon
+      if (shapeCols.length > 0 && !shapeCols.includes(best.name)) {
+        return shapeCols[0]
+      }
+      return best.name
     }
 
-    // Kullanıcı açıkça bir kolon türü istemiş ama tabloda bu kolon yoksa (örn: tabloda durum kolonu yok), körü körüne başka kolona yönelme!
-    return undefined
+    // 1.2 Eşanlamlı Kavram Eşleşmesi — skorlu: en güçlü sinonym hit kazanır
+    const synonyms = COLUMN_SYNONYMS[cleanReq] || []
+    if (synonyms.length > 0) {
+      let synBest: { name: string; score: number } | undefined
+      for (const c of columns) {
+        const cNameClean = c.name.toLowerCase().replace(/[\s_-]+/g, "")
+        const cLabelClean = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
+        for (const s of synonyms) {
+          const sClean = s.toLowerCase().replace(/[\s_-]+/g, "")
+          if (!sClean) continue
+          let score = 0
+          if (cNameClean === sClean || cLabelClean === sClean) score = 90
+          else if (cNameClean.startsWith(sClean) || cLabelClean.startsWith(sClean)) score = 60
+          else if (cNameClean.includes(sClean) || cLabelClean.includes(sClean)) score = 45
+          else if (sClean.includes(cNameClean) && cNameClean.length >= 3) score = 30
+          if (score > (synBest?.score ?? -1)) synBest = { name: c.name, score }
+        }
+      }
+      if (synBest && synBest.score >= 30) {
+        if (sampleHit && synBest.score < 70) return sampleHit.name
+        if (shapeCols.length > 0 && !shapeCols.includes(synBest.name)) {
+          return shapeCols[0]
+        }
+        return synBest.name
+      }
+    }
+
+    // Kullanıcı açıkça bir kolon türü istemiş ama tabloda bu kolon yoksa:
+    // körü körüne başka kolona yönelme — yalnızca veri kanıtı varsa ona güven.
+    return sampleHit?.name
   }
 
   // 2. Semantik Değer Analizi (Boolean / Durum Kavramları)
@@ -117,28 +315,11 @@ export function resolveGridColumn(
   }
 
   // 3. Veri Odaklı Örnekleme Eşleşmesi (Few-Shot Data Grounding)
-  // Değerin ekrandaki örnek satırlarda hangi kolona ait olduğunu veriden bulur
-  if (appliedValue && sampleRows && sampleRows.length > 0) {
-    const cleanVal = appliedValue.trim().replace(/^([!<>]=?|<>|!=|\*)/, "").replace(/\*$/, "").toLowerCase()
-    const prefixMatch = cleanVal.match(/^([a-zA-Z0-9]+)[-_]/)?.[1]
-
-    for (const col of columns) {
-      for (const row of sampleRows) {
-        const sampleVal = String(row[col.name] || "").trim().toLowerCase()
-        if (!sampleVal) continue
-
-        // A. Tam değer eşleşmesi (örn: "Aktif", "Tamamlandı", "İstanbul", "EUR", "!SKU-020" -> "SKU-020")
-        if (sampleVal === cleanVal) {
-          return col.name
-        }
-
-        // B. Kod ön eki eşleşmesi (örn: örnek satırda "BATCH-001" var, aranan "!BATCH-006")
-        if (prefixMatch && (sampleVal.startsWith(prefixMatch + "-") || sampleVal.startsWith(prefixMatch + "_"))) {
-          return col.name
-        }
-      }
-    }
-  }
+  // Zayıf kanıt (yalnızca 'içerir', strength=1) bu aşamada kullanılır;
+  // güçlü kanıt zaten adım 0'da döndü.
+  if (sampleHit) return sampleHit.name
+  // Hiçbir ipucu eşleşmediyse şekil-imzası uyuşan ilk kolon
+  if (shapeCols.length > 0) return shapeCols[0]
 
   // 4. Veri Tipi Odaklı Eşleştirme (Type-Driven Fallbacks)
   // 4.1 Tarih Tipi
@@ -184,7 +365,14 @@ export function resolveGridColumn(
     const isStructuredCode = /^[a-zA-Z0-9_-]{2,30}$/.test(valTrimmed)
 
     if (hasBcOperator || isStructuredCode) {
-      const descriptiveCol = columns.find((c) => !/^(id|row_id|guid)$/i.test(c.name) && c.align !== "right")
+      // İlk metin kolonu yerine: tarih görünümlü kolonları da dışla (Posting Date eğilimini kır)
+      const descriptiveCol = columns.find(
+        (c) =>
+          !/^(id|row_id|guid)$/i.test(c.name) &&
+          c.align !== "right" &&
+          !/date|tarih/i.test(c.name) &&
+          !/date|tarih/i.test(c.label || "")
+      )
       return descriptiveCol ? descriptiveCol.name : columns[0]?.name
     }
   }

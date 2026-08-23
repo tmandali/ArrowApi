@@ -3,8 +3,8 @@
  * Hem sendPrompt hızlı router'ı hem de sidecar tool_call düzeltmesi aynı
  * anahtar kelime setini bu modül üzerinden kullanır (tek kaynak).
  */
-import { extractCleanFilterValue, synthesizeBcFilter } from "@/lib/bc-filter-synthesizer";
-import { resolveGridColumn } from "@/lib/grid-filter-resolver";
+import { extractCleanFilterValue, synthesizeBcFilter, unwrapQuotedValue } from "@/lib/bc-filter-synthesizer";
+import { resolveGridColumn, stripColumnTokensFromValue } from "@/lib/grid-filter-resolver";
 import type { ScreenContext } from "./types";
 import intentsJson from "./intents.tr.json";
 
@@ -39,6 +39,18 @@ function hasAnyBoundary(foldedPrompt: string, key: string): boolean {
 /** Kullanıcı yeni bir rapor ekranı mı istiyor? */
 export function isAskingNewReport(promptLower: string): boolean {
   return hasAny(foldTr(promptLower), "newReport");
+}
+
+/** Bağlamdaki kolon adları + etiketlerinden tekil açık-kolon aday listesi üretir. */
+function buildKnownColumnNames(summary?: Record<string, any>): string[] {
+  const names = Array.isArray(summary?.columns) ? (summary.columns as string[]) : [];
+  const labels = (summary?.columnLabels || {}) as Record<string, string>;
+  const set = new Set<string>();
+  for (const n of names) {
+    if (labels[n]) set.add(labels[n]);
+    set.add(n);
+  }
+  return [...set];
 }
 
 export type GridIntent = "anomaly" | "count" | "summary" | "clear" | null;
@@ -94,6 +106,9 @@ export function resolveGridFastRoute(
   const promptLower = promptText.toLowerCase();
   const isViewingResults = Boolean(effectiveScreen.activeDataSummary?.isViewingResults);
   const hasDirectGridFilter = hasDirectGridFilterSignal(promptText);
+  // Kullanıcı gerçek kolon adı/etiketini yazdıysa ("unit price 25") açık öncelik
+  const summaryAny = effectiveScreen.activeDataSummary as Record<string, any> | undefined;
+  const knownColumns = buildKnownColumnNames(summaryAny);
 
   const gate =
     (isViewingResults || (hasActiveGridTool && hasDirectGridFilter)) && !isAskingNewReport(promptLower);
@@ -120,7 +135,7 @@ export function resolveGridFastRoute(
   }
 
   // Doğrudan filtre: önce Business Central sözdizimi, sonra temiz değer
-  const clean = extractCleanFilterValue(promptText);
+  const clean = extractCleanFilterValue(promptText, knownColumns);
   const bc = synthesizeBcFilter(promptText, effectiveScreen.activeDataSummary?.columns || []);
   if (bc.hasBcFilter) {
     args.query = bc.filterExpression;
@@ -133,9 +148,14 @@ export function resolveGridFastRoute(
       label: column,
     }));
     const sampleRows = effectiveScreen.activeDataSummary?.sampleRows || [];
-    const resolvedCol = resolveGridColumn(clean.columnHint, cols, clean.value, sampleRows);
+    // Literal sözleşmesi: tırnaklı değerin İÇERİĞİYLE kolon çöz, sorguyu tırnaklı taşı
+    const unwrapped = unwrapQuotedValue(clean.value);
+    const resolvedCol = resolveGridColumn(clean.columnHint, cols, unwrapped.content, sampleRows);
     if (resolvedCol || clean.columnHint || hasDirectGridFilter) {
-      args.query = clean.value;
+      // Kolon ipucu sözcüklerini değerden ayır: "itemname timur" → "timur"
+      args.query = unwrapped.quoted
+        ? clean.value
+        : stripColumnTokensFromValue(clean.value, resolvedCol, clean.columnHint);
       args.column = resolvedCol || clean.columnHint;
       return { matched: true, toolName: "filter_active_grid", args };
     }
