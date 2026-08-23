@@ -157,8 +157,9 @@ Uygulama hem web tarayıcısında (`npm run dev`) hem de Tauri 2.0 masaüstü sa
    - `@tauri-apps/*` paketleri React bileşenlerinde statik `import` edilmez; sadece `isTauriEnv === true` iken dinamik (`await import(...)`) çağrılır.
    - Bu sayede React kodları web tarayıcısında sıfır import hatasıyla çalışır.
 
-2. **Gömülü Python AI Sidecar & MCP Tool Calling (`binaries/main`):**
+2. **Gömülü Python AI Sidecar & Bağımsız Binary (`binaries/main`):**
    - Masaüstü modunda yerel Python ajanı (`binaries/main`) bir child process (sidecar) olarak başlatılır.
+   - **Sıfır Python Bağımlılığı (Zero-Dependency):** Canlı dağıtımda `npm run build:sidecar` (PyInstaller) ile Python motoru, Needle SLM ve tüm betikler tek bir bağımsız native binary'ye (`main-aarch64-apple-darwin`, `main-x86_64-pc-windows-msvc.exe`) derlenir. Son kullanıcının makinesinde Python kurulu olması gerekmez.
    - Ajan ile React arayüzü `sys.stdin` / `sys.stdout` JSON akışı üzerinden haberleşir.
    - **Tool Registry (`@/lib/tool-registry`):** Frontend'deki yetenekler (örn: `update_report_filters`) sisteme kaydedilir. Ajan stdout'a `{"type": "tool_call", "tool": "...", "arguments": {...}}` bastığında dinamik olarak yürütülür ve rapor/state otomatik güncellenir.
    - Web ortamında `useAgentBridge` otomatik olarak `browser_fallback` simülasyon moduna geçer.
@@ -168,3 +169,111 @@ Uygulama hem web tarayıcısında (`npm run dev`) hem de Tauri 2.0 masaüstü sa
    - **Native OS Menüsü:** Yalnızca macOS Apple / Help menüsünde ve Windows Pencere Menüsünde (`Check for Updates...`) native olarak çalışır (`src-tauri/src/lib.rs`).
    - **Native Dialogs (`tauri-plugin-dialog`):** Güncelleme onayları ve hata bilgilendirmeleri işletim sisteminin native MessageBox pencereleri üzerinden gösterilir.
    - **Açılışta Sessiz Kontrol:** Uygulama açıldığında 3 saniye sonra arka planda sessizce yeni sürüm olup olmadığı kontrol edilir; sadece yeni sürüm varsa kullanıcıya native onay çıkar.
+
+## Context-Aware (Bağlam Duyarlı) & Scoped Yula AI Ajanı Mimarisi
+
+Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi **Workspace** ve hangi **Ekran/Rapor** üzerinde çalıştığını bilen, hiyerarşik kapsamlı (Scoped) ve React State'leri ile çift yönlü konuşabilen bir mimaride çalışır:
+
+1. **3 Kademeli Hiyerarşik Kapsam (Scope Hierarchy):**
+   - **Global / Shell Scope:** Her zaman aktif araçlar (tema değiştir, workspace değiştir, update kontrol et).
+   - **Workspace Scope:** Aktif workspace (`stock`, `accounting`, `selling`, `manufacturing`) değiştikçe dinamik filtrelenen araçlar.
+   - **Page / Screen Scope:** Kullanıcının baktığı ekrana/rapora özel anlık araçlar (Örn: `filter_current_grid`, `inspect_selected_row`).
+   - **Öncelik Kuralı:** `Screen Scope > Workspace Scope > Global Scope`.
+
+2. **Dinamik Ekran Bağlamı (`useScreenAgentContext` - `@/hooks/use-screen-agent-context`):**
+   - Rapor ve form bileşenleri açıldığında Yula'ya `screenId`, `screenTitle`, `workspaceId`, `activeDataSummary` ve ekrana özel araç setini kaydeder.
+   - Sayfadan çıkıldığında (`unmount`) ekrana ait tüm araçlar `toolRegistry`'den ve Yula bağlamından **otomatik temizlenir (`unregister`)**.
+
+3. **Çift Yönlü Canlı React State Paylaşımı:**
+   - Yula'dan gelen Tool Call (`filter_current_grid`), doğrudan ekranın React `setState` / form kancasını tetikler.
+   - Ekrandaki filtre input kutuları (`sku`, `city`, `date_range`) canlı dolar ve veri tablosu/grid anında yeniden filtrelenir.
+   - Kullanıcı da aynı inputları elle değiştirebilir (tam çift yönlü reaktif senkronizasyon).
+
+4. **Context Envelope (Bağlam Zarfı):**
+   - Kullanıcı her komut gönderdiğinde, arkadaki Python Sidecar (`binaries/main`) veya Browser NLP motoruna o an ekranda hangi veri ve filtrelerin açık olduğu bir `context` zarfı içinde iletilir.
+   - Kullanıcı ekranda bir rapor açıkken *"SKU-102 filtrele"* dediğinde, AI başka bir rapora atlamak yerine **mevcut açık tablonun filtresini önceliklendirir**.
+
+5. **Çapraz Workspace Yönlendirme & Farkındalığı (Cross-Workspace Awareness):**
+   - Kullanıcı `Subcontracting` alanındayken `Stock` raporu istediğinde, AI *"Böyle bir rapor yok"* demez.
+   - Raporun `Stock` alanına ait olduğunu belirten bilgilendirici not (`💡 Bu rapor **Stok (Stock)** çalışma alanı altında yer almaktadır`) döner ve kriter kartını üretir.
+   - Karttaki "Sayfada Aç" tıklandığında hem ilgili rotaya yönlenir hem de Shell aktif workspace'i otomatik olarak hedef alana geçirir.
+
+6. **Yula UI Rol Dağılımı:**
+   - **Yandan Açılan Yula (Sağ Dock / Drawer):** Sayfa içi mikro asistan (Page Scope). Açık olan tabloyu ve filtreleri yönetir.
+   - **Genel Yula Ekranı (Workspace AI Home / Fullscreen):** Workspace yöneticisi (Workspace Scope). Makro rapor keşfi ve yönlendirme yapar.
+
+7. **Rapor Yaşam Evreleri & State-Driven Tool Swapping (Kriter vs Sonuç Tablosu):**
+   - Bir rapor ekranı 2 temel yaşam evresine sahiptir ve `useScreenAgentContext` bu duruma göre araç setini dinamik değiştirir:
+     1. **Kriter Belirleme Modu (Criteria Phase):** Ekranda henüz veri yokken `update_report_criteria` aracı aktiftir; tarih, şehir, depo form parametrelerini doldurur.
+     2. **Sonuç İzleme Modu (Results / Grid Phase):** Rapor çalıştırılıp ekranda `<ArrowReportGrid />` açıldığında Yula'ya anında `filter_active_grid` aracı bağlanır. Kullanıcı *"SKU-001 filtrele"* dediğinde geriye dönüp yeni rapor oluşturmaz; doğrudan o anki açık tablonun/DuckDB'nin filtre state'ini günceller.
+
+8. **Few-Shot Data Grounding (Canlı Örnek Satır ile Kolon & Veri Eşleştirme):**
+   - Ekranda tablo/grid açıkken, `useScreenAgentContext` bağlamı içerisine tablonun ilk 3 satırı (`sampleRows: displayRows.slice(0, 3)`) yerleştirilir.
+   - LLM (Ollama/Python Sidecar veya Browser Resolver); kullanıcının girdiği bir terimin (`SKU-001`, `Ankara`, `Vana`) hangi kolona ait olduğunu sadece kolon isimlerinden tahmin etmez; **örnek veri satırlarını inceleyerek** ilgili kolon adını (`item_code`, `warehouse`, `description`) %100 doğrulukla tespit eder.
+
+9. **Doğal Dilden Business Central / D365 Filtre Sözdizimi Çevirici (`@/lib/bc-filter-synthesizer`):**
+   - Kullanıcı karmaşık filtre operatörlerini bilmek zorunda kalmaz. Doğal dildeki istekler standart Business Central sözdizimine dönüştürülür:
+     * *"100 ile 500 arası"* ➔ `100..500`
+     * *"50000 üzeri"* ➔ `50000..`
+     * *"1000 altı"* ➔ `..1000`
+     * *"Ankara ve İzmir hariç"* ➔ `!Ankara&!İzmir`
+     * *"Ankara veya İzmir"* ➔ `Ankara|İzmir`
+     * *"SKU ile başlayanlar"* ➔ `SKU*`
+     * *"Stokta bitenler"* ➔ `=0`
+     * *"Stokta olanlar / Sıfır olmayan"* ➔ `<>0`
+     * *"Boş olanlar"* ➔ `''`
+
+10. **Sohbet İçi Canlı DuckDB SQL Analizi & Grafik / KPI Kartı (`YulaAnalyticsCard` & `analyze_grid_data`):**
+    - Kullanıcı sadece filtrelemekle kalmayıp *"En yüksek bakiyeli 5 ürünü grafikle özetle"* veya *"Genel toplam ve metrikleri göster"* dediğinde:
+    - `analyze_grid_data` aracı açık olan DuckDB/Arrow tablosu üzerinde toplama ve gruplama çalıştırır.
+    - Yula, sohbet penceresi içerisinde dinamik Recharts (Pasta / Çubuk) ve KPI metrik kartlarını (`YulaAnalyticsCard`) canlı çizer.
+
+11. **Dinamik Hızlı Aksiyon Butonları (`YulaQuickActionChips`):**
+    - Kullanıcının bulunduğu ekrana ve yaşam evresine göre sohbet alanının üstünde proaktif öneri butonları belirir:
+      * **Sonuç Tablosu Açıkken:** `[En Yüksek 5]`, `[Genel Toplam & KPI]`, `[Stokta Olanlar]`, `[Filtreleri Temizle]`
+      * **Kriter Formundayken:** `[Son 7 Gün (TRY)]`, `[Sadece Aktifler]`, `[Raporu Çalıştır]`
+      * **Genel Workspace Modundayken:** `[Stok Bakiye Raporu]`, `[Stok Analiz Raporu]`, `[Satış Raporu]`
+
+12. **3 Kademeli Hibrit AI Yönlendirme (Fast Intent Router + Needle Micro SLM + LLM Fallback):**
+    - **1. Kademe (Fast Intent Router - ~12 ms):** Net ve şemaya doğrudan eşleşen rapor/kriter istekleri (`x-ai-quick-prompts`, doğrudan komutlar) güven skoru > %80 ise sıfır gecikmeyle çalıştırılır.
+    - **2. Kademe (Needle 2 Micro SLM - ~20-30 ms):** Kullanıcının doğal dilde ilettiği karmaşık parametreler (tarih aralıkları, Business Central filtre sözdizimi, slot-filling, durum enumları) ~14 MB boyutundaki yerel **Cactus Compute Needle 2** mikro modeli ve deterministik doğrulayıcı ile milisaniyeler içinde çıkarılır. Harici ağır Ollama/VRAM bağımlılığı olmadan yerel çalışır.
+    - **3. Kademe (Gemma 4 LLM Fallback - ~2 sn):** Kullanıcı serbest dilli, derin akıl yürütme veya uzun diyalog gerektiren sorular sorduğunda devreye girer.
+
+13. **DevTools AI Telemetri ve Şeffaflık Motoru (`🤖 [Yula AI Telemetry]`):**
+    - Yapılan her AI etkileşiminde tarayıcı konsolunda renkli ve hiyerarşik bir telemetri kartı (`console.groupCollapsed`) basılır.
+    - Çalışan model adı (Fast Intent, Needle 2 veya Gemma 4), giriş/çıkış/toplam token adetleri, uçtan uca milisaniye işlem süresi, AI'a gönderilen prompt/context ve tetiklenen Tool Call detayları anlık izlenebilir.
+
+## Geliştirici & Kodlama Ajanı Rehberi (Yeni Özellik Ekleme Standartları)
+
+Kodlama ajanları ve geliştiriciler yeni bir özellik eklerken aşağıdaki katı kuralları izler:
+
+1. **Yeni Bir Ekran / Form Eklerken:**
+   - **Bileşen Mantığı:** `src/features/<workspace>/components/XxxView.tsx` veya `XxxForm.tsx` içine yazılır.
+   - **Sayfa Wrapper'ı:** `src/pages/XxxPage.tsx` SADECE feature bileşenini import edip döndürür (3 satır).
+   - **Route Kaydı:** `src/features/<workspace>/routes.ts` dizisine eklenir (`WorkspaceRouteConfig`).
+   - **Yula Entegrasyonu:** Ekrandaki filtre ve verileri `useScreenAgentContext(...)` ile bağlayarak Yula'ya çift yönlü aç.
+
+2. **Yeni Bir Rapor Eklerken (Tak-Çalıştır / Plug & Play Standartı):**
+   - **Kriter Şeması & Config:** `src/features/<workspace>/schemas/` veya rapor dosyasında `YulaReportCardConfig` tipinde yapılandırılır:
+     ```typescript
+     export const xxxReportConfig: YulaReportCardConfig = {
+       scope: "xxx-report",
+       workspace: "stock", // veya "selling", "accounting", "manufacturing"
+       title: "Rapor Başlığı",
+       pagePath: "/stock/reports/xxx-report",
+       kind: "yula_criteria_form",
+       schema: XxxReportCriteriaSchema, // JSON Schema
+     };
+     ```
+   - **Gelişmiş AI Şema Direktifleri (JSON Schema Extensions):**
+     * `x-ai-aliases`: `["stok bakiye", "depo dökümü", "malzeme bakiye"]` ➔ Fast Intent Router ve LLM sinonim sözlüğü.
+     * `x-ai-quick-prompts`: `["Sadece AKTIF kayıtlar", "50.000 TL üzeri"]` ➔ Karta eklenen hızlı tıklama önerileri.
+     * `x-date-behavior`: `range_start`, `range_end`, `range_string` ➔ Tarih alanlarının göreceli bağlanma kuralları.
+   - **Otomatik Kayıt:** `registerReportSchemaTool(xxxReportConfig)` veya `initAutoReportRegistry()` çağrıldığı anda rapor hem Fast Intent Router'a (12 ms) hem de Python Sidecar'a otomatik kaydolur. AI iç kodlarında hiçbir değişiklik gerekmez.
+   - **Büyük Veri Tablosu:** Doğrudan `<ArrowReportGrid />` bileşenini kullan (DuckDB WASM + OPFS disk önbelleği otomatik çalışır).
+
+3. **UI & Stil Kuralları:**
+   - **Tailwind v4:** `tailwind.config.js` aranmaz; CSS `@theme` değişkenleri `src/index.css` dosyasındadır.
+   - **shadcn `components/ui/*` Dokunulmazdır:** Bileşenleri doğrudan düzenlemek yerine `cn(...)`, slot'lar veya üst wrapper'lar ile stil verilir.
+
+

@@ -17,8 +17,17 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
 *.sln
 *.sw?
+
+# Python
+.venv
+__pycache__
+*.pyc
+*.spec
+src-tauri/binaries/build/
+src-tauri/binaries/dist/
+checkpoints/
+data/
+tokenizer/
+

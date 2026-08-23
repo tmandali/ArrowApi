@@ -17,4 +17,7 @@ Kısa özet:
 - **Büyük Veri Raporları**: Ortak `<ArrowReportGrid />` bileşeni, W3C OPFS yerel disk önbelleği ve DuckDB WASM motoru kullanılır. Raporlar F5 sonrası sıfır internet maliyetiyle diskten açılır.
 - **Tauri 2.0 Masaüstü & Hibrit Web**: Proje hem tarayıcıda (`npm run dev`) hem masaüstünde (`npm run tauri:dev`) çalışır. Tauri bağımlılıkları `isTauriEnv` ile dinamik izoledir.
 - **Gömülü Python AI Sidecar**: `sys.stdin`/`sys.stdout` JSON akışıyla çift yönlü Tool Calling ve `toolRegistry` köprüsü.
+- **Context-Aware & Scoped AI Ajanı**: 3 kademeli hiyerarşik kapsam (Global > Workspace > Page Scope), `useScreenAgentContext` ile dinamik araç kaydı/temizliği, çift yönlü canlı React state paylaşımı, State-Driven Tool Swapping (Kriter vs Sonuç modu), Few-Shot Data Grounding (örnek satır ile kolon eşleme) ve akıllı çapraz workspace yönlendirmesi.
+- **2 Kademeli Hibrit AI Yönlendirici (Fast Intent Router + Gemma 4 LLM)**: Yüksek güvenilirlikli rapor ve öneri istekleri yerel şema eşleştiriciyle anında (**~12 ms**), serbest dilli karmaşık talepler **Gemma 4 LLM** ile işlenir. DevTools konsolunda renkli AI telemetrisi (`🤖 [Yula AI Telemetry]`) basılır.
+- **Tak-Çalıştır Workspace Rapor Kaydı**: Workspace'ler raporlarını `YulaReportCardConfig` ve JSON Schema (`x-ai-aliases`, `x-ai-quick-prompts`) ile tanımlar; AI iç kodlarına dokunmadan hem Fast Router'a hem de LLM'e otomatik kaydolur.
 - **Native Auto-Updater**: Güncelleme kontrolleri web UI'ı kirletmeden sadece macOS/Windows native menüsü (`Check for Updates...`) ve Rust diyalogları üzerinden yürütülür.
