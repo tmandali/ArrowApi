@@ -109,7 +109,7 @@ export function LandedCostVoucherForm() {
           <Button size="sm" className="h-7 px-4 text-xs">
             Save
           </Button>
-          <AIChatAssistant variant="toolbar" />
+          <AIChatAssistant />
         </>
       }
     >
