@@ -20,6 +20,8 @@ export function shapeSignature(v: string): string {
 }
 
 export interface ColumnDigestEntry {
+  /** İnsan-okur etiket (varsa) — modelin anlam yorumunu sabitler */
+  label?: string
   /** Örnek değerin şekil imzası */
   shape: string
   /** Temsili örnek değer (kırpılmış) */
@@ -28,6 +30,8 @@ export interface ColumnDigestEntry {
 
 export interface MinimalDigestColumn {
   name: string
+  /** İnsan-okur etiket — AI bağlamında anlam grounding'i sağlar */
+  label?: string
 }
 
 /**
@@ -52,10 +56,12 @@ export function buildColumnDigest(
       }
     }
     if (!example) continue
-    digest[col.name] = {
+    const entry: ColumnDigestEntry = {
       shape: shapeSignature(example),
       example: example.slice(0, maxExampleLength),
     }
+    if (col.label && col.label !== col.name) entry.label = col.label
+    digest[col.name] = entry
   }
   return digest
 }

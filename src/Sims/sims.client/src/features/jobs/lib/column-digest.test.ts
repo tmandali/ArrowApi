@@ -17,7 +17,11 @@ describe("shapeSignature", () => {
 })
 
 describe("buildColumnDigest", () => {
-  const cols = [{ name: "ItemCode" }, { name: "ItemName" }, { name: "EmptyCol" }]
+  const cols = [
+    { name: "ItemCode", label: "Item Code" },
+    { name: "ItemName", label: "Item Name" },
+    { name: "EmptyCol" },
+  ]
   const rows = [
     { ItemCode: "SKU-001", ItemName: "Sample 8", EmptyCol: "" },
     { ItemCode: "", ItemName: "", EmptyCol: "   " },
@@ -26,8 +30,8 @@ describe("buildColumnDigest", () => {
 
   it("kolon başına ilk dolu örnek + imza üretir; boş kolonları atlar", () => {
     expect(buildColumnDigest(cols, rows)).toEqual({
-      ItemCode: { shape: "a-#", example: "SKU-001" },
-      ItemName: { shape: "a #", example: "Sample 8" },
+      ItemCode: { label: "Item Code", shape: "a-#", example: "SKU-001" },
+      ItemName: { label: "Item Name", shape: "a #", example: "Sample 8" },
     })
   })
 

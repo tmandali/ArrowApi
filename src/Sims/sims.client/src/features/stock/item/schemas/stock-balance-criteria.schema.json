@@ -6,10 +6,34 @@
   "x-page-path": "/stock/stock-balance",
   "x-ai": {
     "schemaVersion": 1,
-    "aliases": ["stok bakiye", "stok bakiye raporu", "stock balance", "stock balance raporu", "stok bakiyesi", "kalan stok", "mevcut stok", "envanter durumu", "depo bakiye", "bakiye raporu", "stok bakiye kriterleri", "bakiye"],
+    "aliases": [
+      "stok bakiye",
+      "stok bakiye raporu",
+      "stock balance",
+      "stock balance raporu",
+      "stok bakiyesi",
+      "kalan stok",
+      "mevcut stok",
+      "envanter durumu",
+      "depo bakiye",
+      "bakiye raporu",
+      "stok bakiye kriterleri",
+      "bakiye"
+    ],
     "directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
-    "quickPrompts": ["Dün itibarıyla hazırla", "Geçen haftanın iptallerini göster", "50.000 TL üzeri stoklar", "Sadece AKTIF kayıtlar"],
-    "resultsPrompts": ["🚨 Anomali & Eksi Bakiye Taraması", "En Yüksek Bakiyeli 5 Ürün", "Genel Toplam & Stok Metrikleri", "Stokta Olanları Süz", "Filtreleri Temizle"]
+    "quickPrompts": [
+      "Dün itibarıyla hazırla",
+      "Geçen haftanın iptallerini göster",
+      "50.000 TL üzeri stoklar",
+      "Sadece AKTIF kayıtlar"
+    ],
+    "resultsPrompts": [
+      "🚨 Anomali & Eksi Bakiye Taraması",
+      "En Yüksek Bakiyeli 5 Ürün",
+      "Genel Toplam & Stok Metrikleri",
+      "Stokta Olanları Süz",
+      "Filtreleri Temizle"
+    ]
   },
   "x-job-endpoint": "/api/arrow/jobs/stock-balance",
   "type": "object",
@@ -23,10 +47,19 @@
       "x-ai": {
         "intent": "movement_date",
         "priority": 100,
-        "columnHints": ["movement_date", "posting_date", "date"],
+        "columnHints": [
+          "PostingDate",
+          "posting_date",
+          "date"
+        ],
         "dateBehavior": "range_string",
-        "directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner.",
-        "suggestions": ["dün", "geçen hafta", "bugün", "bu ay başından itibaren"]
+        "directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner. Format YYYY-MM-DD veya YYYY-MM-DD..YYYY-MM-DD.",
+        "suggestions": [
+          "dün",
+          "geçen hafta",
+          "bugün",
+          "bu ay başından itibaren"
+        ]
       }
     },
     "durum": {
@@ -37,23 +70,42 @@
       "x-ai": {
         "intent": "record_status",
         "priority": 90,
-        "columnHints": ["status", "durum", "is_passive"],
+        "columnHints": [
+          "IsActive",
+          "status",
+          "is_passive",
+          "durum"
+        ],
         "directive": "Kullanıcı özel bir durum (iptal, pasif) talep etmediyse boş bırak veya AKTIF seç.",
-        "suggestions": ["AKTIF", "IPTAL", "BEKLEMEDE"]
+        "suggestions": [
+          "AKTIF",
+          "IPTAL",
+          "BEKLEMEDE"
+        ]
       },
       "items": {
         "type": "string",
-        "enum": ["AKTIF", "PASIF", "BEKLEMEDE", "IPTAL"]
+        "enum": [
+          "AKTIF",
+          "PASIF",
+          "BEKLEMEDE",
+          "IPTAL"
+        ]
       }
     },
     "tutarMiktar": {
       "type": "number",
       "title": "Tutar Eşiği",
-      "description": "Filtrelenecek minimum parasal tutar miktarı (örn: 10000 veya 50000)",
+      "description": "Minimum parasal stok değeri eşiği (birim fiyat × miktar toplamı). Örn: '50.000 TL üzeri stoklar' → 50000. Para birimi tutarParaBirimi ile birlikte kullanılır.",
       "x-ai": {
         "intent": "minimum_inventory_value",
         "priority": 80,
-        "columnHints": ["total_value", "amount", "cost", "tutar"],
+        "columnHints": [
+          "UnitPrice",
+          "total_value",
+          "amount",
+          "tutar"
+        ],
         "directive": "Kullanıcı 'X tutarından büyük', 'yüksek değerli stoklar' gibi ifadeler kullandığında bu alanı doldur."
       },
       "minimum": 0
@@ -62,31 +114,51 @@
       "type": "string",
       "title": "Para Birimi",
       "description": "Tutarın döviz cinsi. Varsayılan TRY.",
-      "enum": ["TRY", "USD", "EUR"],
+      "enum": [
+        "TRY",
+        "USD",
+        "EUR"
+      ],
       "x-selection": "single",
       "default": "TRY",
       "x-ai": {
         "intent": "currency",
-        "suggestions": ["TRY", "USD", "EUR"]
+        "suggestions": [
+          "TRY",
+          "USD",
+          "EUR"
+        ],
+        "directive": "tutarMiktar doldurulduysa varsayılan TRY ile birlikte gönder; kullanıcı farklı bir döviz belirtmedikçe değiştirme."
       }
     },
     "urun": {
       "type": "array",
       "title": "Ürün Bilgileri",
-      "description": "Listeden filtrelenecek bir veya birden fazla ürün kodu, adı veya barkodu.",
+      "description": "Filtrelenecek ürünlerin kodları ve/veya ticari adları. Kod (ItemCode) ile ad (ItemName) ayrı kolonlardır; kullanıcının verdiği değer hangisine uyuyorsa o kolona yazılır.",
       "x-selection": "multiple",
       "x-ai": {
         "intent": "product_lookup",
         "priority": 85,
-        "columnHints": ["item_code", "sku", "barcode", "description"],
+        "columnHints": [
+          "ItemCode",
+          "ItemName",
+          "sku",
+          "barcode"
+        ],
         "directive": "Kullanıcı belirli bir ürün adı, kodu veya barkodu söylediğinde veri kaynağındaki eşleşen kodları seç."
       },
       "items": {
         "type": "string"
       },
       "properties": {
-        "kod": { "type": "string", "title": "Ürün Kodu" },
-        "ad": { "type": "string", "title": "Ürün Adı" },
+        "kod": {
+          "type": "string",
+          "title": "Ürün Kodu"
+        },
+        "ad": {
+          "type": "string",
+          "title": "Ürün Adı"
+        },
         "barkod": {
           "type": "string",
           "title": "Ürün Barkodu",
@@ -94,26 +166,80 @@
         }
       },
       "x-datasource": [
-        { "kod": "1", "ad": "Ürün 1", "barkod": "1234567890123" },
-        { "kod": "2", "ad": "Ürün 2", "barkod": "9876543210987" },
-        { "kod": "3", "ad": "Ürün 3", "barkod": "1111111111111" },
-        { "kod": "4", "ad": "Ürün 4", "barkod": "2222222222222" },
-        { "kod": "5", "ad": "Ürün 5", "barkod": "3333333333333" },
-        { "kod": "6", "ad": "Ürün 6", "barkod": "4444444444444" },
-        { "kod": "7", "ad": "Ürün 7", "barkod": "5555555555555" },
-        { "kod": "8", "ad": "Ürün 8", "barkod": "6666666666666" },
-        { "kod": "9", "ad": "Ürün 9", "barkod": "7777777777777" },
-        { "kod": "10", "ad": "Ürün 10", "barkod": "8888888888888" },
-        { "kod": "11", "ad": "Ürün 11", "barkod": "9999999999999" },
-        { "kod": "12", "ad": "Ürün 12", "barkod": "1010101010101" }
+        {
+          "kod": "1",
+          "ad": "Ürün 1",
+          "barkod": "1234567890123"
+        },
+        {
+          "kod": "2",
+          "ad": "Ürün 2",
+          "barkod": "9876543210987"
+        },
+        {
+          "kod": "3",
+          "ad": "Ürün 3",
+          "barkod": "1111111111111"
+        },
+        {
+          "kod": "4",
+          "ad": "Ürün 4",
+          "barkod": "2222222222222"
+        },
+        {
+          "kod": "5",
+          "ad": "Ürün 5",
+          "barkod": "3333333333333"
+        },
+        {
+          "kod": "6",
+          "ad": "Ürün 6",
+          "barkod": "4444444444444"
+        },
+        {
+          "kod": "7",
+          "ad": "Ürün 7",
+          "barkod": "5555555555555"
+        },
+        {
+          "kod": "8",
+          "ad": "Ürün 8",
+          "barkod": "6666666666666"
+        },
+        {
+          "kod": "9",
+          "ad": "Ürün 9",
+          "barkod": "7777777777777"
+        },
+        {
+          "kod": "10",
+          "ad": "Ürün 10",
+          "barkod": "8888888888888"
+        },
+        {
+          "kod": "11",
+          "ad": "Ürün 11",
+          "barkod": "9999999999999"
+        },
+        {
+          "kod": "12",
+          "ad": "Ürün 12",
+          "barkod": "1010101010101"
+        }
       ]
     },
     "sampleRows": {
       "type": "integer",
       "title": "Test Satır Sayısı",
       "description": "Mock veri satır sayısı. Boş bırakılırsa varsayılan (2). Devasa testler için 1000000 yazılabilir.",
-      "minimum": 1
+      "minimum": 1,
+      "x-ai": {
+        "intent": "test_only",
+        "directive": "AI bu alanı ASLA doldurmaz ve önermez; yalnızca geliştirici test verisi üretimi içindir."
+      }
     }
   },
-  "required": ["kayitTarihi"]
+  "required": [
+    "kayitTarihi"
+  ]
 }
