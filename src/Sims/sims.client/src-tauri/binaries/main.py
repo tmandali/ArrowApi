@@ -7,6 +7,7 @@ Sims AI Agent Sidecar — Ollama (gemma4:12b-mlx) Tool Calling & MCP Bridge
 import sys
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from schema_guard import fuzzy_similarity
 from intents import INTENTS, has_any, fold_tr
@@ -117,13 +118,26 @@ def get_system_prompt(context=None):
                 "- If the user's message is a QUESTION or aggregation (count/how many/kaç kayıt/total/average), DO NOT call filter tools — call 'analyze_grid_data' instead.\n"
             )
 
+        # Kriter-formu sindirimi: raporun GERÇEK filtre alanları (JSON Schema'dan)
+        criteria_digest = screen.get("criteriaDigest")
+        if isinstance(criteria_digest, list) and criteria_digest:
+            context_info += "- Report Criteria Digest (actual filterable fields, from JSON Schema): " + json.dumps(criteria_digest, ensure_ascii=False) + "\n"
+            context_info += (
+                "REPORT CRITERIA DIRECTIVE (MANDATORY when present): These are the ONLY filterable fields of the "
+                "current report. When describing this report or answering 'ne hakkında / hangi kriterler / nasıl "
+                "kullanılır' questions, ground your answer EXACTLY in these field titles/descriptions/enums — "
+                "do not invent criteria or values beyond them.\n"
+            )
+
         # Kolon sindirimi: şekil imzası + örnek değer (kompakt few-shot; ham satır basmadan)
         column_digest = screen.get("activeDataSummary", {}).get("columnDigest")
         if isinstance(column_digest, dict) and column_digest:
             context_info += "- Column Digest (shape signature + sample value per column): " + json.dumps(column_digest, ensure_ascii=False) + "\n"
             context_info += (
                 "COLUMN DIGEST DIRECTIVE: In each digest, 'shape' maps letter-runs to 'a' and digit-runs to '#' "
-                "(e.g. 'Sample 8' -> 'a #', 'SKU-001' -> 'aaa-###'). Before choosing the 'column' argument, "
+                "(e.g. 'Sample 8' -> 'a #', 'SKU-001' -> 'aaa-###'). When a digest has a human-readable 'label', "
+                "use it as the authoritative business meaning of that column — do not invent meanings beyond it. "
+                "Before choosing the 'column' argument, "
                 "match the SHAPE of the user's searched value against these digests and prefer the matching column. "
                 "The final column is still resolved authoritatively by the frontend — your choice serves as a strong hint.\n"
             )
@@ -240,8 +254,24 @@ def handle_user_task(prompt_text, context=None):
             has_actionable_args = bool(needle_res.get("arguments")) or needle_res.get("argless") is True
             is_new_report = has_any(fold_tr(prompt_lower), "newReport")
 
+            # Pozitif kanıt sözleşmesi: yapısal veri sinyali (operatör / kod şekli /
+            # tarih) yoksa yüksek güven bile aksiyona dönüşmez — soru cümleleri
+            # LLM'e kalır ve kriter alanlarına çöp yazılması engellenir.
+            data_signal = bool(
+                re.search(r"(?:^|\s)[a-zçğıöşü0-9_]+\s*(?:>=|<=|<>|!=|=|>|<|\.\.)\s*\S", prompt_lower)
+                or re.search(r"\b[a-zçğıöşü]+[-_]\d+\b", prompt_lower)
+                or re.search(r"[\u201c\u2019'\u00ab].+[\u201d\u2019'\u00bb]", prompt_text)
+                or re.search(r"\b20\d\d\b", prompt_text)
+                or any(m in prompt_lower for m in [
+                    "ocak","subat","şubat","mart","nisan","mayis","mayıs","haziran",
+                    "temmuz","agustos","ağustos","eylul","eylül","ekim","kasim","kasım","aralik","aralık",
+                    "dun","dün","bugun","bugün","gecen hafta","geçen hafta","bu ay","bu yil","bu yıl",
+                ])
+            )
             # Yalnızca gerçekten somut bir işlem yapabiliyorsa (argüman çıkardıysa veya yeni rapor açıyorsa) Needle yanıtlasın
-            if confidence >= 80 and (has_actionable_args or is_new_report):
+            if confidence >= 80 and (has_actionable_args or is_new_report) and (
+                data_signal or is_new_report or needle_res.get("aliasMatched")
+            ):
                 duration = needle_res.get("telemetry", {}).get("durationMs", 0)
                 sys.stderr.write(f"[Needle SLM Action] tool={needle_res.get('tool')} args={list(needle_res.get('arguments', {}).keys())} ({confidence}%) in {duration}ms\n")
                 sys.stderr.flush()

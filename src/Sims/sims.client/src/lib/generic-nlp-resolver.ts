@@ -549,13 +549,6 @@ export function resolveGenericToolIntent(
     }
     score += bestQpScore;
 
-    // 3. Specific Report Root Matching
-    if (t.name.includes("stock_analytics") && (pLower.includes("analiti") || pLower.includes("analitik") || pLower.includes("analiz") || pLower.includes("analytics"))) {
-      score += 160;
-    } else if (t.name.includes("stock_balance") && (pLower.includes("bakiye") || pLower.includes("bakiyesi") || pLower.includes("mevcut") || pLower.includes("balance"))) {
-      score += 160;
-    }
-
     // 4. Direct Report Name / Title Matching & Token Matching
     const titleClean = cleanTopicPhrase(desc.split(" raporunun kriterlerini")[0]);
     const titleTokens = titleClean.split(/\s+/).filter((w) => w.length >= 3);

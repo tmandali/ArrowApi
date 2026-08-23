@@ -588,31 +588,15 @@ class NeedleEngine:
             else:
                 extracted_args["chartType"] = "bar"
 
-        # 6. Column Hints & Query Extraction
-        if "column" in props and "column" not in extracted_args:
-            if any(w in prompt_lower for w in ["aktif", "pasif", "iptal", "beklemede", "taslak", "durum", "status"]):
-                extracted_args["column"] = "status"
-            elif any(w in prompt_lower for w in ["qty", "quantity", "bakiye", "stok", "stock", "miktar", "balance"]):
-                extracted_args["column"] = "balance"
-            elif any(w in prompt_lower for w in ["batch", "lot", "parti"]):
-                extracted_args["column"] = "batch_number"
-            elif any(w in prompt_lower for w in ["seri", "serial", "sn"]):
-                extracted_args["column"] = "serial_number"
-            elif any(w in prompt_lower for w in ["item code", "itemcode", "ürün kodu", "malzeme kodu", "sku", "kod"]):
-                extracted_args["column"] = "item_code"
-            elif any(w in prompt_lower for w in ["açıklama", "description", "ürün adı", "tanım"]):
-                extracted_args["column"] = "description"
-            elif any(w in prompt_lower for w in ["depo", "warehouse", "ambar", "wh"]):
-                extracted_args["column"] = "warehouse"
-            elif any(w in prompt_lower for w in ["fiyat", "tutar", "maliyet", "cost", "price"]):
-                extracted_args["column"] = "cost"
-
-        # 6.1 Direct Comparison or Operator Expression (örn: "qty>100", ">0", "100..500", "!SKU-002", "SKU-001")
+        # 6. Query Extraction (BC operatör sözdizimi)
         if "query" in props and "query" not in extracted_args:
-            col_expr_match = re.search(r"([a-zA-ZçğıöşüÇĞİÖŞÜ0-9_]+)\s*([<>]=?|=|:|!=|<>|\.\.)\s*(.+)", prompt)
+            col_expr_match = re.match(
+                r"^([a-zA-ZçğıöşüÇĞİÖŞÜ0-9_]+)\s*([<>]=?|=|:|!=|<>|\.\.)\s*(.+)$",
+                prompt.strip(),
+            )
             if col_expr_match:
-                c_part = col_expr_match.group(1).lower()
-                op_part = col_expr_match.group(2)
+                op_part = col_expr_match.group(2).strip()
+                c_part = col_expr_match.group(1).strip()
                 v_part = col_expr_match.group(3).strip()
                 if op_part in [">", ">=", "<", "<=", "<>"]:
                     extracted_args["query"] = f"{op_part}{v_part}"
@@ -727,9 +711,12 @@ class NeedleEngine:
         is_asking_new_report = has_any(_fold(prompt_lower), "newReport")
         clear_intent = has_any(_fold(prompt_lower), "clear")
         is_general_question = False
+        # Şema/şekil türevli sinyal (kavram sözlüğü yok): kelime+operatör,
+        # harf-ayraç-rakam şekli veya tırnaklı literal.
         has_direct_grid_filter = bool(
-            re.search(r"\b(?:qty|quantity|bakiye|balance|stok|stock|miktar)\s*(?:>=|<=|<>|!=|>|<|=)", prompt_lower)
-            or re.search(r"\b(?:sku|item|ürün|malzeme)[-_ ]?\d+", prompt_lower)
+            re.search(r"(?:^|\s)[a-zçğıöşü0-9_]+\s*(?:>=|<=|<>|!=|=|>|<|\.\.)\s*\S", prompt_lower)
+            or re.search(r"\b[a-zçğıöşü]+[-_]\d+\b", prompt_lower)
+            or re.search(r"""["“'«].+["”'»]""", prompt_lower)
         )
 
         # 1. ⚡ SLM önce denenir (direktifler system'e enjekte edilmiş halde)
@@ -800,11 +787,6 @@ class NeedleEngine:
                     if len(p_title) >= 4 and p_title in prompt_lower:
                         score += 60
 
-            # 3. Specific Report Name Matching
-            if "stock_analytics" in tool_name_str and any(w in prompt_lower for w in ["analiti", "analitik", "analizi", "analiz", "analytics", "maliyet", "trend"]):
-                score += 500
-            elif "stock_balance" in tool_name_str and any(w in prompt_lower for w in ["bakiye", "bakiyesi", "mevcut", "balance", "envanter", "kalan"]):
-                score += 500
 
             is_general_question = any(q in prompt_lower for q in ["kaç", "kac", "nedir", "neler", "kimsin", "kimdir", "nasıl", "nasil", "nerede", "nereden", "ne zaman", "ne işe", "yardım", "yardim", "bilgi", "anlat", "workspace"]) and not any(a in prompt_lower for a in ["hazırla", "hazirla", "filtrele", "süz", "suz", "çalıştır", "calistir", "seç", "sec", "ayarla"])
 
@@ -859,7 +841,7 @@ class NeedleEngine:
 
         if not best_tool and tools:
             # Context'e göre en uygun fallback
-            best_tool = next((t for t in tools if "stock_balance" in t.get("name", "")), tools[0])
+            best_tool = tools[0]
 
         # 2. ⚖️ Arbitraj: SLM tahmini ile kural sinyali çelişirse güçlü kural kazanır
         if slm_result:
@@ -870,9 +852,35 @@ class NeedleEngine:
                 best_tool = matched
                 slm_used = True
 
-        tool_name = best_tool.get("name", "filter_stock_balance") if best_tool else "filter_stock_balance"
+        tool_name = best_tool.get("name", "") if best_tool else ""
         if slm_used:
             args = dict(slm_args or {})
+            # Şema-davranış hizalaması: kullanıcı açık tarih vermediyse SLM'in
+            # tahminini kural motoru varsayılanıyla değiştir (tek alan→dün,
+            # başlangıç/bitiş çifti→son 30 gün..bugün).
+            if not date_signal and isinstance(args, dict):
+                runish = any(w in prompt_lower for w in [
+                    "hazırla", "hazirla", "çalıştır", "calistir",
+                    "oluştur", "olustur", "getir", "göster", "goster"])
+                if runish:
+                    slm_props = ((best_tool or {}).get("parameters") or {}).get("properties") or {}
+                    date_keys = [k for k in slm_props if any(
+                        x in k.lower() for x in ["kayit", "date", "tarih", "from", "to"])]
+                    if date_keys:
+                        today_dt = datetime.now()
+                        y_str = (today_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+                        t_str = today_dt.strftime("%Y-%m-%d")
+                        last30 = (today_dt - timedelta(days=30)).strftime("%Y-%m-%d")
+                        from_k = next((k for k in date_keys if any(
+                            x in k.lower() for x in ["from", "start", "baslangic", "başlangıç"])), None)
+                        to_k = next((k for k in date_keys if any(
+                            x in k.lower() for x in ["to", "end", "bitis", "bitiş"])), None)
+                        single_k = next((k for k in date_keys if k not in (from_k, to_k)), None)
+                        if from_k and to_k:
+                            args[from_k] = last30
+                            args[to_k] = t_str
+                        elif single_k:
+                            args[single_k] = y_str
             unsupported: List[str] = []
             single_notes: List[str] = []
         else:
@@ -946,6 +954,8 @@ class NeedleEngine:
             "arguments": args,
             # main.py gate'i için: argümansız ama kesin aksiyon (temizle / direktifli rapor açma / SLM call vb.)
             "argless": bool(has_extracted_args),
+            # Şema türevi eşleşme: x-ai-aliases / quick-prompts promptla buluştu mu?
+            "aliasMatched": bool(directive_matched),
             "message": combined_msg.strip(),
             "telemetry": {
                 # Şeffaf telemetri: hangi katman ürettiyse o etiketlenir; token üretilmez
