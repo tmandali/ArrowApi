@@ -26,100 +26,6 @@ import {
 import { cn } from "@/utils/cn"
 import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, X } from "lucide-react"
 
-type MockNotification = Omit<WorkspaceNotification, "createdAt" | "workspace"> & {
-  time: string
-}
-
-const mockNotifications: Record<string, MockNotification[]> = {
-  "/selling": [
-    {
-      id: "s1",
-      title: "Yeni Satış Siparişi",
-      description:
-        "Raymond firması SAL-ORD-2025-0039 numaralı siparişi onayladı.",
-      time: "10 dakika önce",
-      unread: true,
-      type: "order",
-    },
-    {
-      id: "s2",
-      title: "Fason İrsaliyesi Tamamlandı",
-      description: "SUB-ITEM-001 fason teslimatı tedarikçiye ulaştı.",
-      time: "1 saat önce",
-      unread: true,
-      type: "order",
-    },
-    {
-      id: "s3",
-      title: "Ödeme Bekliyor",
-      description:
-        "Müşteri satın alma siparişi için avans ödemesi oluşturuldu.",
-      time: "3 saat önce",
-      unread: false,
-      type: "order",
-    },
-  ],
-  "/accounting": [
-    {
-      id: "a1",
-      title: "Bilanço Raporu Güncellendi",
-      description:
-        "Consolidated Financial Report için dönemsel kapanış girdisi işlendi.",
-      time: "5 dakika önce",
-      unread: true,
-      type: "report",
-    },
-    {
-      id: "a2",
-      title: "Kasa/Mizan Uyarısı",
-      description:
-        "Customer Ledger üzerinde tutarsızlık tespiti kontrol edildi.",
-      time: "2 saat önce",
-      unread: true,
-      type: "report",
-    },
-  ],
-  "/stock": [
-    {
-      id: "st1",
-      title: "Seri No / İzlenebilirlik Kaydı",
-      description:
-        "M4 MacBook Air (M4MCBA0004) stok girişi başarıyla eklendi.",
-      time: "15 dakika önce",
-      unread: true,
-      type: "stock",
-    },
-    {
-      id: "st2",
-      title: "Minimum Stok Seviyesi",
-      description:
-        "M4 Motherboard (M4MBD0001) stok seviyesi kritiğin altına düştü.",
-      time: "4 saat önce",
-      unread: true,
-      type: "stock",
-    },
-  ],
-  "/manufacturing": [
-    {
-      id: "m1",
-      title: "Otomatik Stok Rezervasyonu",
-      description:
-        "Sales Order rezervasyonu için Auto Reserve Stock tetiklendi.",
-      time: "20 dakika önce",
-      unread: true,
-      type: "manufacturing",
-    },
-    {
-      id: "m2",
-      title: "İş Emri (Work Order) Onayı",
-      description: "BOM-M4-AIR-001 üretimi başarıyla başlatıldı.",
-      time: "1 gün önce",
-      unread: false,
-      type: "manufacturing",
-    },
-  ],
-}
-
 type DisplayNotification = {
   id: string
   title: string
@@ -128,7 +34,7 @@ type DisplayNotification = {
   unread: boolean
   type: WorkspaceNotificationType
   href?: string
-  source: "pending" | "live" | "mock"
+  source: "pending" | "live"
   pending?: boolean
 }
 
@@ -152,10 +58,6 @@ export function WorkspaceNotificationPopover() {
     notifications,
     markAsRead,
     markAllAsRead,
-    markMockAsRead,
-    isMockRead,
-    isMockDismissed,
-    dismissMock,
     removeNotification,
     clearRead,
   } = useWorkspaceNotifications()
@@ -165,8 +67,6 @@ export function WorkspaceNotificationPopover() {
     () => selectPendingJobs(jobs, key),
     [jobs, key]
   )
-
-  const mockList = mockNotifications[key] ?? mockNotifications["/selling"]
 
   const displayNotifications = React.useMemo<DisplayNotification[]>(() => {
     const pending = pendingJobs.map((job) => ({
@@ -199,21 +99,8 @@ export function WorkspaceNotificationPopover() {
         source: "live" as const,
       }))
 
-    const mocks = mockList
-      .filter((item) => !isMockDismissed(item.id))
-      .map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        time: item.time,
-        unread: item.unread && !isMockRead(item.id),
-        type: item.type,
-        href: item.href,
-        source: "mock" as const,
-      }))
-
-    return [...pending, ...live, ...mocks]
-  }, [notifications, mockList, pendingJobs, isMockRead, isMockDismissed, key])
+    return [...pending, ...live]
+  }, [notifications, pendingJobs, key])
 
   const unreadCount = displayNotifications.filter((n) => n.unread).length
   const readCount = displayNotifications.filter(
@@ -221,26 +108,16 @@ export function WorkspaceNotificationPopover() {
   ).length
 
   const handleMarkAllAsRead = () => {
-    markAllAsRead({
-      workspace: key,
-      mockIds: mockList.map((item) => item.id),
-    })
+    markAllAsRead({ workspace: key })
   }
 
   const handleClearRead = () => {
-    clearRead({
-      workspace: key,
-      mockIds: displayNotifications
-        .filter((item) => item.source === "mock" && !item.unread)
-        .map((item) => item.id),
-    })
+    clearRead({ workspace: key })
   }
 
   const handleOpenNotification = (item: DisplayNotification) => {
     if (item.source === "live") {
       markAsRead(item.id)
-    } else if (item.source === "mock") {
-      markMockAsRead(item.id)
     }
 
     if (item.href) {
@@ -256,8 +133,6 @@ export function WorkspaceNotificationPopover() {
     e.stopPropagation()
     if (item.source === "live") {
       removeNotification(item.id)
-    } else if (item.source === "mock") {
-      dismissMock(item.id)
     }
   }
 

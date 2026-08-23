@@ -1,7 +1,6 @@
 /**
  * Yula AI köprüsünün paylaşılan tipleri.
- * (Kullanım: import { ChatMessage } from "@/hooks/useAgentBridge" geriye dönük uyumlu kalır —
- *  useAgentBridge.ts bu modülü re-export eder.)
+ * (useAgentBridge.ts bu modülü re-export eder.)
  */
 
 export interface ChatMessage {
@@ -10,7 +9,6 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   thinking?: string;
-  isToolCall?: boolean;
   toolDetails?: any;
   toolResult?: any;
   customKind?: string;

@@ -14,10 +14,6 @@ export function WorkspaceNotificationsProvider({
   const pushNotification = useNotificationsStore((s) => s.pushNotification)
   const markAsRead = useNotificationsStore((s) => s.markAsRead)
   const markAllAsRead = useNotificationsStore((s) => s.markAllAsRead)
-  const markMockAsRead = useNotificationsStore((s) => s.markMockAsRead)
-  const isMockRead = useNotificationsStore((s) => s.isMockRead)
-  const isMockDismissed = useNotificationsStore((s) => s.isMockDismissed)
-  const dismissMock = useNotificationsStore((s) => s.dismissMock)
   const removeNotification = useNotificationsStore((s) => s.removeNotification)
   const removeNotificationByJobId = useNotificationsStore(
     (s) => s.removeNotificationByJobId
@@ -31,10 +27,6 @@ export function WorkspaceNotificationsProvider({
       pushNotification,
       markAsRead,
       markAllAsRead,
-      markMockAsRead,
-      isMockRead,
-      isMockDismissed,
-      dismissMock,
       removeNotification,
       removeNotificationByJobId,
       clearRead,
@@ -45,10 +37,6 @@ export function WorkspaceNotificationsProvider({
       pushNotification,
       markAsRead,
       markAllAsRead,
-      markMockAsRead,
-      isMockRead,
-      isMockDismissed,
-      dismissMock,
       removeNotification,
       removeNotificationByJobId,
       clearRead,

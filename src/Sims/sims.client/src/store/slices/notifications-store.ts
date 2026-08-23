@@ -23,8 +23,6 @@ export type WorkspaceNotification = {
 
 type NotificationsState = {
   notifications: WorkspaceNotification[]
-  readMockIds: string[]
-  dismissedMockIds: string[]
   pushNotification: (
     input: Omit<
       WorkspaceNotification,
@@ -36,20 +34,10 @@ type NotificationsState = {
     }
   ) => void
   markAsRead: (id: string) => void
-  markAllAsRead: (options?: {
-    workspace?: WorkspaceKey
-    mockIds?: string[]
-  }) => void
-  markMockAsRead: (id: string) => void
-  isMockRead: (id: string) => boolean
-  isMockDismissed: (id: string) => boolean
+  markAllAsRead: (options?: { workspace?: WorkspaceKey }) => void
   removeNotification: (id: string) => void
   removeNotificationByJobId: (jobId: string) => void
-  dismissMock: (id: string) => void
-  clearRead: (options?: {
-    workspace?: WorkspaceKey
-    mockIds?: string[]
-  }) => void
+  clearRead: (options?: { workspace?: WorkspaceKey }) => void
   clear: () => void
 }
 
@@ -57,8 +45,6 @@ export const useNotificationsStore = create<NotificationsState>()(
   persist(
     (set, get) => ({
       notifications: [],
-      readMockIds: [],
-      dismissedMockIds: [],
       pushNotification: (input) => {
         const next: WorkspaceNotification = {
           id:
@@ -113,11 +99,7 @@ export const useNotificationsStore = create<NotificationsState>()(
         })
       },
       markAllAsRead: (options = {}) => {
-        const { workspace, mockIds = [] } = options
-        const readMockIds = new Set(get().readMockIds)
-        for (const id of mockIds) {
-          readMockIds.add(id)
-        }
+        const { workspace } = options
         set({
           notifications: get().notifications.map((item) => {
             const itemWorkspace = resolveNotificationWorkspace(item)
@@ -126,25 +108,10 @@ export const useNotificationsStore = create<NotificationsState>()(
             }
             return { ...item, unread: false }
           }),
-          readMockIds: [...readMockIds],
         })
       },
-      markMockAsRead: (id) => {
-        if (get().readMockIds.includes(id)) return
-        set({ readMockIds: [...get().readMockIds, id] })
-      },
-      isMockRead: (id) => get().readMockIds.includes(id),
-      isMockDismissed: (id) => get().dismissedMockIds.includes(id),
-      dismissMock: (id) => {
-        if (get().dismissedMockIds.includes(id)) return
-        set({ dismissedMockIds: [...get().dismissedMockIds, id] })
-      },
       clearRead: (options = {}) => {
-        const { workspace, mockIds = [] } = options
-        const dismissedMockIds = new Set(get().dismissedMockIds)
-        for (const id of mockIds) {
-          dismissedMockIds.add(id)
-        }
+        const { workspace } = options
         set({
           notifications: get().notifications.filter((item) => {
             if (item.unread) return true
@@ -153,18 +120,14 @@ export const useNotificationsStore = create<NotificationsState>()(
             }
             return false
           }),
-          dismissedMockIds: [...dismissedMockIds],
         })
       },
-      clear: () =>
-        set({ notifications: [], readMockIds: [], dismissedMockIds: [] }),
+      clear: () => set({ notifications: [] }),
     }),
     {
       name: "sims:notifications",
       partialize: (state) => ({
         notifications: state.notifications,
-        readMockIds: state.readMockIds,
-        dismissedMockIds: state.dismissedMockIds,
       }),
       merge: (persisted, current) => {
         const raw = (persisted ?? {}) as Partial<NotificationsState>
@@ -176,8 +139,6 @@ export const useNotificationsStore = create<NotificationsState>()(
           ...current,
           ...raw,
           notifications,
-          readMockIds: raw.readMockIds ?? [],
-          dismissedMockIds: raw.dismissedMockIds ?? [],
         }
       },
     }

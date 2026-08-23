@@ -243,6 +243,40 @@ Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi 
     - Yapılan her AI etkileşiminde tarayıcı konsolunda renkli ve hiyerarşik bir telemetri kartı (`console.groupCollapsed`) basılır.
     - Çalışan model adı (Fast Intent, Needle 2 veya Gemma 4), giriş/çıkış/toplam token adetleri, uçtan uca milisaniye işlem süresi, AI'a gönderilen prompt/context ve tetiklenen Tool Call detayları anlık izlenebilir.
 
+14. **Filtre Değeri Çözümleme Sözleşmesi (Öncelik Hiyerarşisi) — RAPOR-AGNOSTİK:**
+    - Bu sözleşme uygulamanın TÜM raporları için tektir; yeni bir rapor eklemek bu katmanlarda kod değişikliği gerektirmez. Aşağıdaki kolon adları yalnızca temsilî örneklerdir.
+    - Grid kolon seçimi (`resolveGridColumn` — `src/lib/grid-filter-resolver.ts`) KESİNLİKLE bu sırayla yapılır:
+      1. **Örnek-set kanıtı** (Arrow/DuckDB `sampleRows`) — iki katman:
+         - **Birebir/kod-ön eki** (`findSampleColumnMatch`): tam=3, kod-ön eki=2 → her şeyi EZER.
+         - **Şekil-imzası** (`shapeSignature`: harf dizisi→`a`, sayı dizisi→`#`): örnek-sette değer yoksa bile veri dokusu uyuşan kolona gider ("Sample 222" ↔ ItemName örneği "Sample 8", imzalar "a #" =). İpucu kolonun dokusuyla çelişirse uyumlu kolon seçilir. Kaba imza (rakamsız tek parça, örn. `"MAIN"`→`a`) kanıt SAYILMAZ.
+      2. **İpucu/kavram skorlaması**: skor ≥70 korunur; <70 ise zayıf kanıt (içerir=1) kazanır.
+      3. Durum semantiği (aktif/pasif) → zayıf örnek kanıtı → tip odaklı (tarih/sayı) → desen koruması.
+    - **Kelime-listesi guard ve rapor-özel kural YASAK.** Her koruma kolonun fiziksel tipinden türetilir; yeni rapor/kolon geldiğinde mevcut jenerik mekanizma otomatik çalışır ("her şeye özel guard yazmak sürdürülebilir değil" kararı).
+    - Filtre değerinden hedef kolonun kendi ad/etiket kelimeleri `stripColumnTokensFromValue` ile sökülür: `"itemname timur"` + Item Code → `"timur"`.
+    - **İki-Adımlı Model İşleyişi:** Dispatch anında `resolveColumnCandidates` (grid-filter-resolver.ts) yukarıdaki kanıt zinciriyle top-3 `columnCandidates` üretip bağlam zarfına ekler (`useAgentBridge.dispatchToSidecar`); Needle/Gemma **yalnızca bu dar listeden** seçer (`main.py` COLUMN CANDIDATES DIRECTIVE — listede yoksa `column` argümanını boş bırakır). Step-1 deterministik kodda, Step-2 modelde; yetkili çözüm yine execution'daki `resolveGridColumn`'dır.
+
+15. **Şema-Tipi Grounding Zinciri (Arrow/DuckDB → Needle → Execution):**
+    - `duckdb.worker` `DESCRIBE_TABLE` ham `duckType` döner → `ArrowReportGrid` bunu `columnTypes: {kolon: date|number|bool|text}` haritasına çevirir.
+    - Bu harita üç yerden akar: (a) bağlam zarfı `activeDataSummary.columnTypes`, (b) `main.py` system prompt'una **SCHEMA TYPE DIRECTIVE** enjeksiyonu, (c) `filter_active_grid` tool açıklamasındaki tipli kolon özeti.
+    - Jenerik doğrulama iki uca asılıdır: frontend `column-type-utils.ts` (`isDateLikeValue`/`isNumericLikeValue`) ve Python `schema_type_guard.py` (`self_correct_grid_filter`: DATE kolona serbest metin gelirse tool_call'ı `analyze_grid_data {chartType:kpi}` olarak öz-düzeltir).
+    - Zincir tamamen şema-sürümlüdür: yüzlerce raporda tipler Arrow'dan okunduğu için rapor başına yapılandırma/kod yoktur.
+
+16. **Bileşik Nitelik Grameri (Aile Bazlı, İki Kopya Tek Sözleşme):**
+    - Dilbilgisi kavram-ailesi şeklindedir, rapor-ailesi değil: `<kavram ön eki> + <nitelik>` kalıbı. Mevcut aileler: item/ürün/malzeme (kod→item_code, ad/name→description), depo/warehouse, tarih/date... Nitelikler: `name/ad`→isim kavramı, `code/kod/no/id`→kod kavramı. Değer, ipucu kelimelerinden arındırılır.
+    - Aynı gramer iki yerde yaşar: TS `bc-filter-synthesizer.ts` (web fast router + masaüstünde `synthesizeGridFilterArgs` düzeltme katmanı) ve Python `needle_engine.apply_compound_qualifier_args` (kriter formu araçları — grid kapalıyken Needle tek yetkili). **Biri değişirse diğeri de değişmeli**; grid araçları Python tarafında kasıtlı atlanır (frontend sözleşmesi yetkili).
+    - YENİ BİR KAVRAM AİLESİ eklemek = iki dosyadaki ORTAK regex listesine tek satır; hiçbir zaman rapor/dosya başına kural yazılmaz.
+
+17. **Araç-Halüsinasyonu Savunması:**
+    - System prompt'ta araç isimleri koşulsuz emir olarak verilemez ("DAİMA X çağır" yalnızca o araç o ekranın verilen listesinde GERÇEKTEN varsa); genel kural: *"yalnızca verilen araç listesindeki isimlerle, birebir aynı yazımla çağrı yap"*.
+    - Frontend son savunma: sidecar'dan kayıtsız bir araç adı gelirse hata baloncuğu yerine sessizce `browserSchemaFallback`'a düşülür (`useAgentBridge.ts`).
+
+18. **Sayım Niyeti Yönlendirmesi:**
+    - `"kaç kayıt var"` / `"how many"` gibi sorular herhangi bir tabloda filtre değeri OLAMAZ. Sözlükteki `count` intent'i (kelime-sınırı eşleşmeli, `"kac"` ≠ `"kaçak"`) promptu deterministik olarak `analyze_grid_data {chartType:"kpi"}` aracına çevirir (~12 ms); bu vaka için Gemma delegasyonu gerekmez. Tüm rapor gridlerinde otomatik geçerlidir.
+
+19. **Yula Test Altyapısı ve Test Edilebilirlik Deseni:**
+    - TS: `npm test` (vitest, `vitest.config.ts`, `@` alias'lı). Python: `src-tauri/binaries/test_*.py` (stdlib unittest).
+    - Kural: AI karar mantığı saf, çerçevesiz modüllere yazılır (`features/jobs/lib/column-type-utils.ts`, `binaries/schema_type_guard.py` pattern'i) — bileşen/sidecar içine gömülü mantık test edilemez.
+
 ## Geliştirici & Kodlama Ajanı Rehberi (Yeni Özellik Ekleme Standartları)
 
 Kodlama ajanları ve geliştiriciler yeni bir özellik eklerken aşağıdaki katı kuralları izler:
@@ -271,6 +305,7 @@ Kodlama ajanları ve geliştiriciler yeni bir özellik eklerken aşağıdaki kat
      * `x-date-behavior`: `range_start`, `range_end`, `range_string` ➔ Tarih alanlarının göreceli bağlanma kuralları.
    - **Otomatik Kayıt:** `registerReportSchemaTool(xxxReportConfig)` veya `initAutoReportRegistry()` çağrıldığı anda rapor hem Fast Intent Router'a (12 ms) hem de Python Sidecar'a otomatik kaydolur. AI iç kodlarında hiçbir değişiklik gerekmez.
    - **Büyük Veri Tablosu:** Doğrudan `<ArrowReportGrid />` bileşenini kullan (DuckDB WASM + OPFS disk önbelleği otomatik çalışır).
+   - **AI Sözleşmeleri Otomatik Geçerlidir (Yukarı madde 14-18):** Yeni rapor; şema-tipi grounding, örnek-set kanıtı, bileşik nitelik grameri, sayım niyeti ve araç-halüsinasyonu savunmalarından SIFIR ek kodla yararlanır. Rapora özel filtre kuralı/guard/kelime listesi YAZILMAZ — ihtiyaç görülürse ilgili JENERİK mekanizma (ortak regex ailesi, tip doğrulayıcı) genişletilir.
 
 3. **UI & Stil Kuralları:**
    - **Tailwind v4:** `tailwind.config.js` aranmaz; CSS `@theme` değişkenleri `src/index.css` dosyasındadır.

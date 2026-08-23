@@ -6,16 +6,11 @@ import { WorkspaceSearchProvider } from "@/context/workspace-search"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { isTauriEnv } from "@/lib/api-url"
 
-type AppLayoutProps = {
-  /** @deprecated All app shells are viewport-locked; kept for call-site compatibility. */
-  fullHeight?: boolean
-}
-
 /**
  * Viewport-locked shell: header stays put, page/Yula scroll lives below it.
  * Prevents the main scrollbar from running through sticky header chrome.
  */
-export function AppLayout({ fullHeight: _fullHeight = false }: AppLayoutProps) {
+export function AppLayout() {
   React.useEffect(() => {
     if (!isTauriEnv) return
 

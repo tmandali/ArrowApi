@@ -83,7 +83,7 @@ export function AppRoutes() {
           <Route path="empty" element={<Navigate to="/" replace />} />
         </Route>
 
-        <Route element={<AppLayout fullHeight />}>
+        <Route element={<AppLayout />}>
           {renderRoutes(sellingRoutes, true)}
           {renderRoutes(stockRoutes, true)}
           {renderRoutes(landedCostRoutes, true)}
