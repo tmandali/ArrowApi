@@ -3,6 +3,8 @@ import { toolRegistry, type ToolDefinition, type ToolParameter } from "@/lib/too
 import { useDraftCriteriaStore } from "@/store/slices/draft-criteria-store";
 import { parseCriteriaSchema, createInitialCriteriaRows } from "@/features/report-criteria";
 import type { CriteriaFilterRow } from "@/features/report-criteria/types";
+import { validateAndSanitizeSchemaArgs } from "./schema-validator-guard";
+import { readCriteriaAiMetadata, readReportAiMetadata } from "./report-ai-metadata";
 
 /**
  * Converts a report's JSON Schema into a ToolDefinition and registers it into toolRegistry.
@@ -27,15 +29,25 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
     let desc = p.title ? `${p.title}: ${p.description || ""}`.trim() : (p.description || key);
     
     // Semantic AI Schema Extensions
-    const dateBehavior = (p as any)["x-date-behavior"];
+    const aiMetadata = readCriteriaAiMetadata(p);
+    if (aiMetadata.intent) {
+      desc += ` [AI Niyeti: ${aiMetadata.intent}]`;
+    }
+    if (aiMetadata.priority !== undefined) {
+      desc += ` [AI Önceliği: ${aiMetadata.priority}]`;
+    }
+    if (aiMetadata.columnHints?.length) {
+      desc += ` [Kolon İpuçları: ${aiMetadata.columnHints.join(", ")}]`;
+    }
+    const dateBehavior = aiMetadata.dateBehavior;
     if (dateBehavior) {
       desc += ` [Tarih Davranışı: ${dateBehavior}]`;
     }
-    const aiDirective = (p as any)["x-ai-directive"];
+    const aiDirective = aiMetadata.directive;
     if (aiDirective) {
       desc += ` [AI Kuralı: ${aiDirective}]`;
     }
-    const aiSuggestions = (p as any)["x-ai-suggestions"];
+    const aiSuggestions = aiMetadata.suggestions;
     if (Array.isArray(aiSuggestions) && aiSuggestions.length > 0) {
       desc += ` [Öneriler: ${aiSuggestions.join(", ")}]`;
     }
@@ -48,11 +60,16 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
   }
 
   let toolDescription = `${config.title} raporunun kriterlerini doldurur ve sohbet kartında görüntüler. ${config.description || ""}`;
-  const aliases = (config.schema as any)["x-ai-aliases"];
+  const reportAi = readReportAiMetadata(config.schema);
+  const aliases = reportAi.aliases;
   if (Array.isArray(aliases) && aliases.length > 0) {
     toolDescription += ` [Eşanlamlılar / Aliases: ${aliases.join(", ")}]`;
   }
-  const rootAiDirective = config.schema["x-ai-directive"];
+  const quickPrompts = reportAi.quickPrompts;
+  if (Array.isArray(quickPrompts) && quickPrompts.length > 0) {
+    toolDescription += ` [Hızlı Öneriler / Quick Prompts: ${quickPrompts.join(" | ")}]`;
+  }
+  const rootAiDirective = reportAi.directive;
   if (rootAiDirective) {
     toolDescription += ` [AI Direktifi: ${rootAiDirective}]`;
   }
@@ -60,13 +77,29 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
   const toolDef: ToolDefinition = {
     name: toolName,
     description: toolDescription.trim(),
+    ai: {
+      aliases: Array.isArray(aliases) ? aliases.map(String) : undefined,
+      quickPrompts: Array.isArray(quickPrompts) ? quickPrompts.map(String) : undefined,
+    },
+    scope: {
+      type: "workspace",
+      id: config.workspace,
+    },
     parameters: {
       type: "object",
       properties,
       required: config.schema.required,
     },
     execute: (args: Record<string, any>) => {
-      console.log(`[SchemaToolGenerator] Executing ${toolName} with args:`, args);
+      console.log(`[SchemaToolGenerator] Executing ${toolName} with raw args:`, args);
+
+      // 0. JSON Schema Guard & Legal Enum Validator (Sıfır halüsinasyon, yasal enum doğrulaması)
+      const validation = validateAndSanitizeSchemaArgs(config.schema, args);
+      const sanitizedArgs = validation.validArgs;
+
+      if (validation.rejectedFields.length > 0) {
+        console.warn(`[SchemaToolGenerator] Rejected invalid args for ${toolName}:`, validation.rejectedFields);
+      }
 
       // 1. Şemanın varsayılan alanlarını (required ve default değerler: örn. Para Birimi = TRY) al
       const parsed = parseCriteriaSchema(config.schema);
@@ -88,8 +121,8 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
         }
       }
 
-      // 4. AI'ın sağladığı filtreleri üzerine yaz veya yeni satır olarak ekle
-      for (const [key, val] of Object.entries(args)) {
+      // 4. Doğrulanmış AI filtrelerini üzerine yaz veya yeni satır olarak ekle
+      for (const [key, val] of Object.entries(sanitizedArgs)) {
         if (val !== undefined && val !== null && val !== "") {
           const stringVal = Array.isArray(val) ? val.join(", ") : String(val);
           const existing = rowMap.get(key);
@@ -113,9 +146,11 @@ export function registerReportSchemaTool(config: YulaReportCardConfig): () => vo
         status: "success",
         customKind: config.kind,
         scope: config.scope,
+        workspace: config.workspace,
         pagePath: config.pagePath,
         title: config.title,
-        appliedFilters: args,
+        appliedFilters: sanitizedArgs,
+        message: validation.notes.join("\n\n"),
       };
     },
   };

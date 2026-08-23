@@ -5,6 +5,7 @@ import { registerDuckDbChatTool } from "@/lib/duckdb-chat-tool";
 export interface YulaReportCardConfig {
   kind: string;
   scope: string;
+  workspace?: string;
   title: string;
   description?: string;
   pagePath: string;
@@ -33,23 +34,28 @@ export function initAutoReportRegistry(): () => void {
   for (const [path, mod] of Object.entries(schemaModules)) {
     const schema = (mod.default || mod) as JsonSchemaObject & {
       "x-scope"?: string;
+      "x-workspace"?: string;
       "x-page-path"?: string;
       "x-custom-kind"?: string;
     };
 
     if (!schema || typeof schema !== "object") continue;
 
-    // Derive scope from x-scope or filename
-    const filename = path.split("/").pop()?.replace("-criteria.schema.json", "") || "report";
+    // Derive scope and workspace from path or schema annotations
+    const pathParts = path.split("/");
+    const filename = pathParts.pop()?.replace("-criteria.schema.json", "") || "report";
+    const featureWorkspace = pathParts[3] || "stock";
+    const workspace = schema["x-workspace"] || featureWorkspace;
     const scope = schema["x-scope"] || filename;
     const kind = schema["x-custom-kind"] || `yula.report.${scope}`;
     const title = schema.title || scope;
     const description = schema.description || `${title} rapor kriterleri`;
-    const pagePath = schema["x-page-path"] || `/reports/${scope}`;
+    const pagePath = schema["x-page-path"] || `/${workspace}/${scope}`;
 
     const config: YulaReportCardConfig = {
       kind,
       scope,
+      workspace,
       title,
       description,
       pagePath,

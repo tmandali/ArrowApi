@@ -30,11 +30,41 @@ export function registerDuckDbChatTool(): () => void {
         }
         console.log("[DuckDbChatTool] Executing SQL:", sql);
         const rows = await duckDbClient.executeCustomSql(sql);
+
+        if (rows && rows.length > 0) {
+          const firstRow = rows[0];
+          const keys = Object.keys(firstRow);
+          const numKey = keys.find((k) => typeof firstRow[k] === "number") || keys[1];
+          const lblKey = keys.find((k) => typeof firstRow[k] === "string" && k.toLowerCase() !== "id") || keys[0];
+
+          const chartData = rows.slice(0, 5).map((r) => ({
+            name: String(r[lblKey] || "Kayıt"),
+            value: typeof r[numKey] === "number" ? (r[numKey] as number) : parseFloat(String(r[numKey]).replace(/[^0-9.-]/g, "")) || 0,
+          }));
+
+          return {
+            success: true,
+            customKind: "yula_chart_card",
+            title: args.description || "Rapor Veri Analizi",
+            summary: `${rows.length} satır bulundu`,
+            chartType: "bar",
+            chartData,
+            kpis: [
+              { label: "Sonuç Sayısı", value: rows.length },
+              { label: "En Yüksek", value: chartData[0]?.value?.toLocaleString() ?? 0, sublabel: chartData[0]?.name },
+            ],
+            message: `📊 **SQL Analiz Sonucu:** ${rows.length} satır analiz edildi.`,
+            rowCount: rows.length,
+            rows: rows.slice(0, 50),
+          };
+        }
+
         return {
           status: "success",
-          rowCount: rows.length,
-          rows: rows.slice(0, 50), // Cap for chat performance
+          rowCount: 0,
+          rows: [],
           description: args.description,
+          message: "Sorgu çalıştırıldı ancak eşleşen sonuç dönmedi.",
         };
       } catch (err: any) {
         console.error("[DuckDbChatTool] SQL Error:", err);

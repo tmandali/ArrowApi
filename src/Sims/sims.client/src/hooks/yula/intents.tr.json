@@ -1,0 +1,88 @@
+{
+  "_comment": "Yula niyet sözlüğü — tek kaynak (K1). Anahtar kelimeler aksan-sade (folded) tutulur; karşılaştırma yapan her katman promptu aynı katlama fonksiyonundan geçirir.",
+  "newReport": [
+    "yeni rapor",
+    "farkli rapor",
+    "baska rapor",
+    "raporunu ac",
+    "raporunu hazirla",
+    "raporu hazirla",
+    "raporu ac",
+    "rapor hazirla",
+    "rapor ac",
+    "sayfasina gec",
+    "ekranina git"
+  ],
+  "clear": [
+    "temizle",
+    "sifirla",
+    "kaldir",
+    "tumunu goster",
+    "hepsini goster",
+    "tumunu"
+  ],
+  "anomaly": [
+    "anomali",
+    "anormal",
+    "risk",
+    "eksi",
+    "negatif",
+    "kritik",
+    "olu stok",
+    "sorun"
+  ],
+  "count": [
+    "kac kayit",
+    "kac satir",
+    "kac tane",
+    "kac adet",
+    "kac urun",
+    "kac musteri",
+    "toplam kayit",
+    "kayit sayisi",
+    "satir sayisi",
+    "adet sayisi",
+    "kac",
+    "how many",
+    "record count",
+    "row count",
+    "count"
+  ],
+  "summary": [
+    "ozet",
+    "grafik",
+    "analiz",
+    "toplam",
+    "en yuksek",
+    "dagilim",
+    "kpi",
+    "metrik"
+  ],
+  "greeting": [
+    "merhaba",
+    "merhba",
+    "meraba",
+    "mrb",
+    "selam",
+    "slm",
+    "selamlar",
+    "gunaydin",
+    "iyi gunler",
+    "iyi aksamlar",
+    "nasilsin",
+    "kimsin",
+    "yardim",
+    "hey",
+    "hi",
+    "hello"
+  ],
+  "reportDiscovery": [
+    "hangi rapor",
+    "raporlar var",
+    "raporlari listele",
+    "rapor listesi",
+    "neler yapabilirsin",
+    "mevcut raporlar",
+    "hangi moduller"
+  ]
+}
