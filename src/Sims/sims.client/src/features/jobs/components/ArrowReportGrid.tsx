@@ -7,8 +7,14 @@ import { Spinner } from "@/components/ui/spinner"
 import { useDuckReport, type ReportColumnMeta } from "../hooks/use-duck-report"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
 import { duckDbClient, buildCombinedWhereClause } from "@/services/duckdb"
-import { extractCleanFilterValue, resolveGridColumn } from "@/lib/grid-filter-resolver"
+import {
+  extractCleanFilterValue,
+  resolveGridColumn,
+  stripColumnTokensFromValue,
+  unwrapQuotedValue,
+} from "@/lib/grid-filter-resolver"
 import { deriveColumnKind, isDateLikeValue, isNumericLikeValue } from "../lib/column-type-utils"
+import { buildColumnDigest } from "../lib/column-digest"
 import {
   VirtualSpreadsheet,
   cellInputClass,
@@ -136,6 +142,20 @@ export function ArrowReportGrid({
     })
   }, [displayRows, effectiveColumns])
 
+  /**
+   * Kolon sindirimi (shape + örnek değer) — Needle/Gemma bağlamı için kompakt
+   * "hangi kolon neye benzer" özeti (ilk 20 satırdan). Yetkili çözüm yine
+   * execution katmanındadır; bu özet yalnızca ipucu kalitesini artırır.
+   */
+  const columnDigest = React.useMemo(
+    () =>
+      buildColumnDigest(
+        effectiveColumns,
+        displayRows.slice(0, 20) as Array<Record<string, unknown>>
+      ),
+    [effectiveColumns, displayRows]
+  )
+
   const { pathname } = useLocation()
   const currentWorkspace = pathname.split("/")[1] || undefined
 
@@ -153,6 +173,12 @@ export function ArrowReportGrid({
       columns: effectiveColumns.map((c) => c.name),
       // Arrow/DuckDB şema tipleri — Needle/LLM şema grounding'i
       columnTypes,
+      // Açık kolon adı eşleşmesi için ad→etiket haritası
+      columnLabels: Object.fromEntries(
+        effectiveColumns.map((c) => [c.name, c.label || c.name])
+      ),
+      // Kolon sindirimi: şekil imzası + örnek değer (SLM/LLM bağlamı)
+      columnDigest,
       sampleRows,
     },
     tools: [
@@ -210,10 +236,30 @@ export function ArrowReportGrid({
 
           if (!rawVal) return { success: false, message: "Filtre değeri bulunamadı." };
 
-          const cleanResult = extractCleanFilterValue(String(rawVal));
+          const knownCols = [
+            ...new Set(
+              effectiveColumns.flatMap((c) => [c.label || c.name, c.name])
+            ),
+          ];
+          const cleanResult = extractCleanFilterValue(String(rawVal), knownCols);
           const val = cleanResult.value || String(rawVal).trim();
           if (!val || val.trim().length === 0) {
             return { success: false, message: "Filtrelenecek geçerli bir değer veya kriter bulunamadı." };
+          }
+
+          // LITERAL sözleşmesi: tırnaklı değer birebir uygulanır — stopwords,
+          // kolon-kelime sökme ve aktif/pasif normalizasyonu ASLA dokunmaz.
+          const literal = unwrapQuotedValue(String(rawVal));
+          if (literal.quoted) {
+            const litCol = resolveGridColumn(columnHint || cleanResult.columnHint, effectiveColumns, literal.content, sampleRows);
+            if (!litCol) {
+              return { success: false, message: `Tabloda "${columnHint || cleanResult.columnHint || literal.content}" kriteriyle eşleşen bir kolon bulunamadı (literal değer).` };
+            }
+            setFilter(litCol, literal.content);
+            onShowFilterRowChange?.(true);
+            const litLabel = effectiveColumns.find((c) => c.name === litCol)?.label || litCol;
+            console.log("[ArrowReportGrid:filter_active_grid] Literal filtre:", { value: literal.content, column: litCol });
+            return { success: true, appliedColumn: litCol, appliedValue: literal.content, message: `Tablonun "${litLabel}" filtresine birebir "${literal.content}" uygulandı.` };
           }
 
           // Cümle/soru koruması: Doğal dil sorularını filtre kutularına yazmayı engelle
@@ -248,6 +294,9 @@ export function ArrowReportGrid({
           }
 
           let finalVal = val;
+          // Kolon ipucu sözcüklerini değerden söker: "itemname timur" + Item Code → "timur"
+          const resolvedLabel = effectiveColumns.find((c) => c.name === targetCol)?.label || targetCol;
+          finalVal = stripColumnTokensFromValue(finalVal, targetCol, resolvedLabel, columnHint || cleanResult.columnHint);
           const targetColLower = targetCol.toLowerCase();
           const valLower = val.toLowerCase();
           if (targetColLower.includes("passiv") || targetColLower.includes("pasif") || targetColLower.includes("disabled") || targetColLower.includes("blocked")) {
