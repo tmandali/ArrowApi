@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "build:sidecar": "NEEDLE_DYLIB=$(ls -t \"$HOME\"/.cache/cactus-needle/*/libneedle.dylib 2>/dev/null | head -1); EXTRA=\"--hidden-import needle --hidden-import needle.agent.fetch --hidden-import needle.agent.tools --add-data src-tauri/binaries/intents.tr.json:.\"; if [ -n \"$NEEDLE_DYLIB\" ]; then EXTRA=\"$EXTRA --add-binary $NEEDLE_DYLIB:.\"; fi; ([ -f src-tauri/binaries/.venv/bin/pyinstaller ] && src-tauri/binaries/.venv/bin/pyinstaller --onefile --clean --name main-aarch64-apple-darwin src-tauri/binaries/main.py --distpath src-tauri/binaries $EXTRA --copy-metadata genai_prices --copy-metadata pydantic_ai_slim --copy-metadata pydantic_graph --copy-metadata openai --copy-metadata pydantic --copy-metadata pydantic_core --copy-metadata httpx --copy-metadata anyio --copy-metadata google_genai || python3 -m PyInstaller --onefile --clean --name main-aarch64-apple-darwin src-tauri/binaries/main.py --distpath src-tauri/binaries $EXTRA --copy-metadata genai_prices --copy-metadata pydantic_ai_slim --copy-metadata pydantic_graph --copy-metadata openai --copy-metadata pydantic --copy-metadata pydantic_core --copy-metadata httpx --copy-metadata anyio --copy-metadata google_genai) && cp -f src-tauri/binaries/main-aarch64-apple-darwin src-tauri/target/debug/main 2>/dev/null || true && rm -rf src-tauri/binaries/build build main-aarch64-apple-darwin.spec",
+    "build:sidecar": "bash scripts/build-sidecar.sh",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "npm run build:sidecar && tauri build",
