@@ -84,6 +84,7 @@ def emit_skills_list():
                     "name": f.name,
                     "description": f.description,
                     "needs_session_data": f.needs_session_data,
+                    "buttons": f.buttons,
                 }
                 for f in s.functions
             ],
