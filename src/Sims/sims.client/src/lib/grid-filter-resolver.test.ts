@@ -284,8 +284,19 @@ describe("hasDirectGridFilterSignal — şema/şekil türevli (sözlüksüz)", (
     ['depo "MAIN"', undefined],
     ["unit price 25", ["Unit Price", "Qty"]],
     ["posting date haziran", ["Posting Date"]],
+    // Sayısal eşik niyeti: sayı + şemada numeric kolon
+    ["fiyatı 100 den büyük olanlar", undefined],
   ])("sinyal: %s", (p, cols) => {
-    expect(hasDirectGridFilterSignal(p as string, cols as string[] | undefined)).toBe(true)
+    // Üçüncü case şema-numerik kanıtıyla çalışır; diğerleri operatör/kod/quote/kolon-adı
+    const numericCols =
+      p === "fiyatı 100 den büyük olanlar" ? { "Unit Price": "number", Qty: "number" } : undefined
+    expect(
+      hasDirectGridFilterSignal(
+        p as string,
+        cols as string[] | undefined,
+        numericCols as Record<string, string> | undefined
+      )
+    ).toBe(true)
   })
 
   it.each([
@@ -293,7 +304,15 @@ describe("hasDirectGridFilterSignal — şema/şekil türevli (sözlüksüz)", (
     ["sample 8", undefined],
     ["merhaba", undefined],
     ["unit price 25", undefined],
+    // Sayı var AMA şemada numeric kolon bilgisi yoksa sinyal değildir
+    ["fiyatı 100 den büyük olanlar", undefined],
   ])("sinyal değil: %s", (p, cols) => {
-    expect(hasDirectGridFilterSignal(p as string, cols as string[] | undefined)).toBe(false)
+    expect(
+      hasDirectGridFilterSignal(
+        p as string,
+        cols as string[] | undefined,
+        undefined as unknown as Record<string, string> | undefined
+      )
+    ).toBe(false)
   })
 })

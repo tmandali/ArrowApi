@@ -228,6 +228,9 @@ export function resolveGridColumn(
   if (requestedColumn) {
     const cleanReq = requestedColumn.toLowerCase().replace(/[\s_-]+/g, "")
 
+    // Eski dönem kalıntısı "numeric" sahte ipucunu yok say (gerçek tip fallback'ı var)
+    if (cleanReq === "numeric") return undefined
+
     // 1.1 Skorlu ad/etiket eşleşmesi: tam eşleşme > başlangıç > içerir.
     // İlk-hits kazandıran eski davranış, item-code ailesine sistematik eğilim üretiyordu.
     let best: { name: string; score: number } | undefined

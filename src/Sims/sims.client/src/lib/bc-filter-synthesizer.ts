@@ -270,7 +270,6 @@ export function synthesizeBcFilter(
     return {
       hasBcFilter: true,
       filterExpression: `${op}${num}`,
-      targetColumnHint: "numeric",
       explanation: `${op}${num} değerleri süzülüyor`,
     };
   }
@@ -284,7 +283,6 @@ export function synthesizeBcFilter(
     return {
       hasBcFilter: true,
       filterExpression: `>${num}`,
-      targetColumnHint: "numeric",
       explanation: `${num} üzeri değerler süzülüyor`,
     };
   }
@@ -298,7 +296,6 @@ export function synthesizeBcFilter(
     return {
       hasBcFilter: true,
       filterExpression: `<${num}`,
-      targetColumnHint: "numeric",
       explanation: `${num} altı değerler süzülüyor`,
     };
   }

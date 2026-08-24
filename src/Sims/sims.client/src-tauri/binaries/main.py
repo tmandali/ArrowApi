@@ -262,6 +262,11 @@ def handle_user_task(prompt_text, context=None):
                 or re.search(r"\b[a-zçğıöşü]+[-_]\d+\b", prompt_lower)
                 or re.search(r"[\u201c\u2019'\u00ab].+[\u201d\u2019'\u00bb]", prompt_text)
                 or re.search(r"\b20\d\d\b", prompt_text)
+                # Sayısal eşik niyeti (şema-türevli): promptta sayı + Arrow
+                # şemasında numeric kolon → filtre adayı
+                or (re.search(r"\b\d+(?:[.,]\d+)?\b", prompt_text)
+                    and any(v == "number" for v in ((context or {}).get("current_screen") or {})
+                            .get("activeDataSummary", {}).get("columnTypes", {}).values()))
                 or any(m in prompt_lower for m in [
                     "ocak","subat","şubat","mart","nisan","mayis","mayıs","haziran",
                     "temmuz","agustos","ağustos","eylul","eylül","ekim","kasim","kasım","aralik","aralık",

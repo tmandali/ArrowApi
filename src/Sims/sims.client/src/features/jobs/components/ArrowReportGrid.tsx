@@ -156,6 +156,15 @@ export function ArrowReportGrid({
     [effectiveColumns, displayRows]
   )
 
+  // Parent callback bağlı değilse (örn. Yula içine gömülü grid) AI filtre
+  // satırını kendisi açabilsin diye dahil yedek durum.
+  const [internalShowFilterRow, setInternalShowFilterRow] = React.useState(false);
+  const effectiveShowFilterRow = onShowFilterRowChange ? showFilterRow : (showFilterRow || internalShowFilterRow);
+  const revealFilterRow = React.useCallback(() => {
+    if (onShowFilterRowChange) onShowFilterRowChange(true);
+    else setInternalShowFilterRow(true);
+  }, [onShowFilterRowChange]);
+
   const { pathname } = useLocation()
   const currentWorkspace = pathname.split("/")[1] || undefined
 
@@ -251,12 +260,15 @@ export function ArrowReportGrid({
           // kolon-kelime sökme ve aktif/pasif normalizasyonu ASLA dokunmaz.
           const literal = unwrapQuotedValue(String(rawVal));
           if (literal.quoted) {
-            const litCol = resolveGridColumn(columnHint || cleanResult.columnHint, effectiveColumns, literal.content, sampleRows);
+            const litResolvable = effectiveColumns.filter(
+              (c) => !/^(id|row_id|guid)$/i.test(c.name)
+            );
+            const litCol = resolveGridColumn(columnHint || cleanResult.columnHint, litResolvable.length ? litResolvable : effectiveColumns, literal.content, sampleRows);
             if (!litCol) {
               return { success: false, message: `Tabloda "${columnHint || cleanResult.columnHint || literal.content}" kriteriyle eşleşen bir kolon bulunamadı (literal değer).` };
             }
             setFilter(litCol, literal.content);
-            onShowFilterRowChange?.(true);
+            revealFilterRow();
             const litLabel = effectiveColumns.find((c) => c.name === litCol)?.label || litCol;
             console.log("[ArrowReportGrid:filter_active_grid] Literal filtre:", { value: literal.content, column: litCol });
             return { success: true, appliedColumn: litCol, appliedValue: literal.content, message: `Tablonun "${litLabel}" filtresine birebir "${literal.content}" uygulandı.` };
@@ -268,7 +280,16 @@ export function ArrowReportGrid({
             return { success: false, message: "Belirtilen ifade bir soru/cümledir; filtrelenecek geçerli bir veri değeri bulunamadı." };
           }
 
-          const targetCol = resolveGridColumn(columnHint || cleanResult.columnHint, effectiveColumns, String(val), sampleRows);
+          // Meta kolonlar (Id/GUID) çözümleyiciye hiç sunulmaz
+          const resolvableColumns = effectiveColumns.filter(
+            (c) => !/^(id|row_id|guid)$/i.test(c.name)
+          );
+          const targetCol = resolveGridColumn(
+            columnHint || cleanResult.columnHint,
+            resolvableColumns.length > 0 ? resolvableColumns : effectiveColumns,
+            String(val),
+            sampleRows
+          );
 
           if (!targetCol) {
             return {
@@ -279,24 +300,39 @@ export function ArrowReportGrid({
 
           // Şema-tipi doğrulaması (Arrow/DuckDB): değerin fiziksel tipi kolonla uyumlu mu?
           // Kelime listesi tutmak yerine tipten türetilen JENERİK kontrol.
-          const colKind = columnTypes[targetCol] || "text";
+          // Taşıyıcı kolon (Id/GUID) hedeflenmişse ve tabloda gerçek veri kolonu
+          // varsa oraya yönlendir — modelin kolon tahmini meta kolona düşebilir.
+          let targetColFinal = targetCol;
+          if (/^(id|row_id|guid)$/i.test(targetColFinal)) {
+            const alt = effectiveColumns.find(
+              (c) =>
+                !/^(id|row_id|guid)$/i.test(c.name) &&
+                !/date|tarih/i.test(c.name) &&
+                c.align !== "right"
+            );
+            if (alt) {
+              console.warn("[filter_active_grid] Meta kolon hedefi düzeltildi:", targetCol, "→", alt.name);
+              targetColFinal = alt.name;
+            }
+          }
+          const colKind = columnTypes[targetColFinal] || "text";
           if (colKind === "date" && !isDateLikeValue(val)) {
             return {
               success: false,
-              message: `"${targetCol}" bir TARİH kolonu; "${val}" geçerli bir tarih değil. Örn: 2025-01-31 veya 2025-01-01..2025-01-31. Kayıt sayısı gibi sorular için KPI özeti isteyin.`,
+              message: `"${targetColFinal}" bir TARİH kolonu; "${val}" geçerli bir tarih değil. Örn: 2025-01-31 veya 2025-01-01..2025-01-31. Kayıt sayısı gibi sorular için KPI özeti isteyin.`,
             };
           }
           if (colKind === "number" && !isNumericLikeValue(val)) {
             return {
               success: false,
-              message: `"${targetCol}" bir SAYI kolonu; "${val}" sayısal değil. Örn: 100..500, >1000, <>0. Kayıt sayısı gibi sorular için KPI özeti isteyin.`,
+              message: `"${targetColFinal}" bir SAYI kolonu; "${val}" sayısal değil. Örn: 100..500, >1000, <>0. Kayıt sayısı gibi sorular için KPI özeti isteyin.`,
             };
           }
 
           let finalVal = val;
           // Kolon ipucu sözcüklerini değerden söker: "itemname timur" + Item Code → "timur"
-          const resolvedLabel = effectiveColumns.find((c) => c.name === targetCol)?.label || targetCol;
-          finalVal = stripColumnTokensFromValue(finalVal, targetCol, resolvedLabel, columnHint || cleanResult.columnHint);
+          const resolvedLabel = effectiveColumns.find((c) => c.name === targetColFinal)?.label || targetColFinal;
+          finalVal = stripColumnTokensFromValue(finalVal, targetColFinal, resolvedLabel, columnHint || cleanResult.columnHint);
           const targetColLower = targetCol.toLowerCase();
           const valLower = val.toLowerCase();
           if (targetColLower.includes("passiv") || targetColLower.includes("pasif") || targetColLower.includes("disabled") || targetColLower.includes("blocked")) {
@@ -326,7 +362,7 @@ export function ArrowReportGrid({
 
           return {
             success: true,
-            appliedColumn: targetCol,
+            appliedColumn: targetColFinal,
             appliedValue: finalVal,
             message: `Tablonun "${colLabel || targetCol}" filtresine "${finalVal}" uygulandı.`,
           };
@@ -708,7 +744,7 @@ export function ArrowReportGrid({
       emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
       progressValue={progressPercent}
       resetKey={jobId}
-      showFilterRow={showFilterRow}
+      showFilterRow={effectiveShowFilterRow}
       onToggleFilterRow={onShowFilterRowChange}
       headerActions={
         <>

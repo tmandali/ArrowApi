@@ -77,7 +77,14 @@ export function hasGridFilterEvidence(
   const knownColumns = buildKnownColumnNames(summaryAny);
 
   // 1. BC operatörü / şekil kodu / tırnaklı literal / GERÇEK kolon adı (şemadan)
-  if (hasDirectGridFilterSignal(promptText, knownColumns)) return true;
+  if (
+    hasDirectGridFilterSignal(
+      promptText,
+      knownColumns,
+      (summaryAny?.columnTypes as Record<string, string>) || undefined
+    )
+  )
+    return true;
   // 2. Net grid niyeti (temizle / sayım / özet / anomali)
   if (detectGridIntent(promptText) !== null) return true;
 
@@ -152,13 +159,19 @@ export function inferChartType(promptLower: string): "pie" | "kpi" | "bar" {
  */
 export function hasDirectGridFilterSignal(
   promptText: string,
-  knownColumns?: string[]
+  knownColumns?: string[],
+  /** Arrow/DuckDB kolon tipleri — sayısal eşik sinyali için gerekli */
+  columnTypes?: Record<string, string>
 ): boolean {
   const p = promptText.trim();
   return Boolean(
     /(?:^|\s)[a-zA-ZçğıöşüÇĞİÖŞÜ0-9_]+\s*(?:>=|<=|<>|!=|=|>|<|\.\.)\s*\S/.test(p) ||
       /\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,}[-_]\d+\b/.test(p) ||
       /["“'«].+["”'»]/.test(p) ||
+      // Sayısal eşik niyeti (şema-türevli): promptta SAYI varsa ve aktif
+      // Arrow şemasında numeric kolon bulunuyorsa filtre adayıdır.
+      (/\b\d+(?:[.,]\d+)?\b/.test(p) &&
+       Object.values(columnTypes ?? {}).some((v) => v === "number")) ||
       (matchExplicitColumn(p, knownColumns ?? []) !== undefined)
   );
 }
@@ -184,7 +197,11 @@ export function resolveGridFastRoute(
   // Kullanıcı gerçek kolon adı/etiketini yazdıysa ("unit price 25") açık öncelik
   const summaryAny = effectiveScreen.activeDataSummary as Record<string, any> | undefined;
   const knownColumns = buildKnownColumnNames(summaryAny);
-  const hasDirectGridFilter = hasDirectGridFilterSignal(promptText, knownColumns);
+  const hasDirectGridFilter = hasDirectGridFilterSignal(
+    promptText,
+    knownColumns,
+    (summaryAny?.columnTypes as Record<string, string>) || undefined
+  );
 
   const gate =
     (isViewingResults || (hasActiveGridTool && hasDirectGridFilter)) && !isAskingNewReport(promptLower);
