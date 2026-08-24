@@ -24,6 +24,13 @@ except Exception:
     cactus_needle = None
     HAS_CACTUS_NEEDLE = False
 
+RUN_EXEC_VERBS = ["çalıştır", "calistir", "run"]
+
+RUN_ACTION_VERBS = [
+    "hazırla", "hazirla", "çalıştır", "calistir", "raporu aç", "rapor aç",
+    "oluştur", "olustur", "getir", "göster", "goster",
+]
+
 TURKISH_MONTHS = {
     "ocak": ("01", 31), "subat": ("02", 29), "şubat": ("02", 29),
     "mart": ("03", 31), "nisan": ("04", 30), "mayis": ("05", 31), "mayıs": ("05", 31),
@@ -419,7 +426,7 @@ class NeedleEngine:
         single_select_notes: List[str] = []
 
         # 1. Date Param Extraction (Only when user explicitly asked or report preparation is targeted)
-        is_explicit_run_action = any(w in prompt_lower for w in ["hazırla", "hazirla", "çalıştır", "calistir", "raporu aç", "rapor aç", "oluştur", "olustur", "getir", "göster", "goster"])
+        is_explicit_run_action = any(w in prompt_lower for w in RUN_ACTION_VERBS)
         from_key = next((k for k in props if any(p in k.lower() for p in ["from", "start", "baslangic"])), None)
         to_key = next((k for k in props if any(p in k.lower() for p in ["to", "end", "bitis"])), None)
         single_date_key = next((k for k in props if any(p in k.lower() for p in ["kayit", "date", "tarih"])), None)
@@ -688,7 +695,7 @@ class NeedleEngine:
 
     def process_task(
         self,
-        prompt: str,
+        prompt_text: str,
         tools: List[Dict[str, Any]],
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -699,7 +706,7 @@ class NeedleEngine:
         3. Her iki yolun çıktısı SchemaGuard ile deterministik doğrulanır
         """
         start_time = time.perf_counter()
-        prompt_lower = prompt.lower()
+        prompt_lower = prompt_text.lower()
 
         # Ekranda sonuç tablosu açık mı?
         is_viewing_results = False
@@ -722,13 +729,20 @@ class NeedleEngine:
         # 1. ⚡ SLM önce denenir (direktifler system'e enjekte edilmiş halde)
         # İstisna: promptta AÇIK tarih sinyali (yıl/ay adı) varsa tarihler deterministik
         # kural motorundan gelmeli — 45M modelin tarih tahmini güvenli değildir.
+        run_verb = any(w in prompt_lower for w in RUN_ACTION_VERBS)
         date_signal = (
-            bool(re.search(r"\b20\d\d\b", prompt))
+            bool(re.search(r"\b20\d\d\b", prompt_text))
             or any(_fold(m) in _fold(prompt_lower) for m in TURKISH_MONTHS)
         )
+        # Pozitif kanıt: AÇIK çalıştır fiili yokken SLM'in run_* tahmini geçersizdir
+        # ("hazırla/getir/göster" kriter doldurma yoluna gider, çalıştırmaya değil).
+        def _slm_forces_run(prompt_l: str, name_: str) -> bool:
+            return str(name_ or "").lower().startswith("run_") and not any(
+                v in prompt_l for v in RUN_EXEC_VERBS)
+
         slm_result: Optional[Tuple[str, Dict[str, Any]]] = None
         if not date_signal:
-            slm_result = self._slm_extract(prompt, [t for t in tools if isinstance(t, dict)],
+            slm_result = self._slm_extract(prompt_text, [t for t in tools if isinstance(t, dict)],
                                            system_text=self._directive_system(tools))
         slm_used = False
         slm_args: Optional[Dict[str, Any]] = None
@@ -797,8 +811,19 @@ class NeedleEngine:
                     active_scope = cur_screen.get("activeReportScope") or cur_screen.get("screenId", "")
                     if active_scope and active_scope not in ["home", "item-form"] and not is_viewing_results and not is_asking_new_report:
                         clean_id = str(active_scope).replace("-", "_").replace("filter_", "").lower()
-                        if clean_id in tool_name_str.lower():
+                        # Araç adında tire/alt-tire farkını normalizasyonla kır
+                        norm_tool = tool_name_str.lower().replace("-", "_")
+                        if clean_id and clean_id in norm_tool:
                             score += 550
+                            # Aktif raporun KENDİ çalıştırma aracı + fiil → net öncelik
+                            if norm_tool.startswith("run_") and run_verb:
+                                score += 400
+
+            # 4.5 Run aracı yalnızca AÇIK çalıştır fiiliyle seçilir;
+            # "hazırla/getir/göster" gibi fiiller kriter doldurma (prepare) yoluna gider.
+            if tool_name_str.startswith("run_") and not any(
+                v in prompt_lower for v in RUN_EXEC_VERBS):
+                score -= 600
 
             # 5. State-Driven Scope Bias
             if is_viewing_results and not is_asking_new_report:
@@ -844,6 +869,10 @@ class NeedleEngine:
             best_tool = tools[0]
 
         # 2. ⚖️ Arbitraj: SLM tahmini ile kural sinyali çelişirse güçlü kural kazanır
+        if slm_result and _slm_forces_run(prompt_lower, slm_result[0]):
+            sys.stderr.write(f"[Needle SLM] run_* tahmini reddedildi (çalıştır fiili yok): {slm_result[0]}\n")
+            slm_result = None
+
         if slm_result:
             slm_name, slm_args = slm_result
             matched = next((t for t in tools if isinstance(t, dict) and t.get("name") == slm_name), None)
@@ -884,7 +913,7 @@ class NeedleEngine:
             unsupported: List[str] = []
             single_notes: List[str] = []
         else:
-            args, unsupported, single_notes = self.extract_and_validate(prompt, best_tool or {}, context)
+            args, unsupported, single_notes = self.extract_and_validate(prompt_text, best_tool or {}, context)
 
         # 0a. Bileşik nitelik grameri (kriter formu araçları): "itemname timur" → {<isim-alanı>: timur}.
         # Grid araçları frontend'in synthesizeGridFilterArgs sözleşmesinde olduğundan burada atlanır.
@@ -892,14 +921,100 @@ class NeedleEngine:
         if tool_name not in _GRID_TOOLS:
             args = apply_compound_qualifier_args(prompt_lower, best_tool or {}, args if isinstance(args, dict) else {})
 
+        # JENERİK RAPOR ARAÇLARI: kapsam çözümü + SENTETİK DÜZ ÇIKARICI
+        # Kural motorunun tarih/tutar/enum zekası, raporun alanlarından üretilen
+        # düz şema üzerinde çalıştırılır; sonuç criteria nesnesine yerleşir.
+        if tool_name in ("prepare_report_criteria", "run_report") and isinstance(args, dict):
+            tdef_pre = next((t for t in tools if isinstance(t, dict) and t.get("name") == tool_name), {})
+            desc_pre = str(tdef_pre.get("description", ""))
+            scopes_meta_pre: Dict[str, Dict[str, Any]] = {}
+            for m_ in re.finditer(r"([a-z0-9_-]+)\{([^}]*)\}:\s*([^|]+)", desc_pre):
+                aliases_ = [a.strip().lower() for a in m_.group(2).split("|") if a.strip()]
+                keys_: Dict[str, List[str]] = {}
+                for seg_ in m_.group(3).split(","):
+                    seg_ = seg_.strip()
+                    if not seg_:
+                        continue
+                    if "=" in seg_:
+                        kn_, ev_ = seg_.split("=", 1)
+                        keys_[kn_.strip()] = [v_.strip() for v_ in ev_.split("/") if v_.strip()]
+                    else:
+                        keys_[seg_] = []
+                scopes_meta_pre[m_.group(1)] = {"aliases": aliases_, "keys": keys_}
+
+            ctx_pre = (context or {}).get("current_screen") or {}
+            default_scope = ((ctx_pre.get("activeReportScope")) or (ctx_pre.get("defaultReportScope"))
+                             if isinstance(ctx_pre, dict) else None)
+            default_scope = str(default_scope).lower() if default_scope else None
+            pl_folded = _fold(prompt_lower)
+
+            def _scope_score(name_: str) -> int:
+                info_ = scopes_meta_pre.get(name_, {})
+                score_ = 2 if name_.replace("_", " ") in pl_folded else 0
+                return score_ + sum(1 for a in info_.get("aliases", []) if a and a in pl_folded)
+
+            raw_rep = str(args.get("report") or "").strip().lower()
+            scores = {name_: _scope_score(name_) for name_ in scopes_meta_pre}
+            max_score = max(scores.values()) if scores else 0
+
+            # ÖNCELİK: prompt_text kanıtı > aktif ekran/son rapor > model tahmini
+            if max_score > 0:
+                tops = [n for n, sc in scores.items() if sc == max_score]
+                if raw_rep in tops:
+                    rep = raw_rep
+                elif default_scope and default_scope in tops:
+                    rep = default_scope
+                else:
+                    rep = tops[0]
+            elif raw_rep in scopes_meta_pre:
+                rep = raw_rep
+            elif default_scope and default_scope in scopes_meta_pre:
+                rep = default_scope
+            else:
+                rep = ""
+
+            field_map = (scopes_meta_pre.get(rep) or {}).get("keys") or {}
+
+            # FLAT EXTRACTION (yalnız prepare): tarih aralığı ("geçen hafta"),
+            # tutar eşiği ("50.000 TL üzeri"), enum ("AKTIF"), serbest kod
+            crit_merged = dict(args.get("criteria") or {})
+            if tool_name == "prepare_report_criteria":
+                flat_props: Dict[str, Any] = {}
+                for k_, enums_ in field_map.items():
+                    flat_props[k_] = ({"type": "string", "enum": enums_} if enums_
+                                      else {"type": "string"})
+                flat_tool = {"name": "prepare_report_criteria",
+                             "parameters": {"type": "object", "properties": flat_props}}
+                try:
+                    flat_args, _uns, _notes = self.extract_and_validate(
+                        prompt_text, flat_tool, context)
+                except Exception as _e:
+                    import traceback as _tb
+                    _sys.stderr.write("[GENERIC FLAT EXC] "+repr(_e)+"\n"+_tb.format_exc()+"\n")
+                    flat_args = {}
+                for k_, v_ in (flat_args or {}).items():
+                    if v_ not in (None, "", []):
+                        crit_merged[k_] = v_
+
+            args = {"report": rep} if tool_name == "run_report" else {
+                "report": rep,
+                "criteria": crit_merged,
+            }
+
         # 0. JSON Schema Guard Validation & Sanitization (Zero hallucination & Enum guard)
-        sanitized_args, rejected_reasons, guard_notes = SchemaGuard.validate_and_sanitize(best_tool or {}, args)
-        single_notes.extend(guard_notes)
-        args = sanitized_args
+        # Jenerik rapor araçları muaf: 'criteria' nest'i frontend executor'da
+        # ilgili raporun GERÇEK şeması ile doğrulanır (validateAndSanitizeSchemaArgs).
+        if tool_name in ("prepare_report_criteria", "run_report"):
+            single_notes.extend(guard_notes := [])  # not yok
+            pass
+        else:
+            sanitized_args, rejected_reasons, guard_notes = SchemaGuard.validate_and_sanitize(best_tool or {}, args)
+            single_notes.extend(guard_notes)
+            args = sanitized_args
 
         # 0b. Yıl tutarlılık koruması: promptta açıkça geçen TEK bir yıl varsa,
         # tarih argümanlarının yılı buna zorlanır ("2025 yılı ocak" -> 2026-01 üretme hatası).
-        explicit_years = set(re.findall(r"\b(20\d\d)\b", prompt))
+        explicit_years = set(re.findall(r"\b(20\d\d)\b", prompt_text))
         if len(explicit_years) == 1:
             forced_year = next(iter(explicit_years))
             for key in ("date_start", "date_end", "start_date", "end_date"):
@@ -916,6 +1031,31 @@ class NeedleEngine:
             if isinstance(cur_screen_ctx, dict):
                 col_types = (cur_screen_ctx.get("activeDataSummary") or {}).get("columnTypes") or {}
         tool_name, args = self_correct_grid_filter(tool_name, args if isinstance(args, dict) else {}, col_types)
+
+        # JENERİK RAPOR ARAÇLARI: halüsinasyon anahtar temizliği + güven ayarı
+        # (kapsam çözümü ve flat extraction yukarıda yapıldı)
+        all_junk = False
+        if tool_name == "prepare_report_criteria" and isinstance(args, dict) \
+                and isinstance(args.get("criteria"), dict):
+            crit_final = args["criteria"]
+            tdef_c = next((t for t in tools if isinstance(t, dict) and t.get("name") == tool_name), {})
+            desc_c = str(tdef_c.get("description", ""))
+            allowed_all: Dict[str, set] = {}
+            for m_ in re.finditer(r"([a-z0-9_-]+)\{([^}]*)\}:\s*([^|]+)", desc_c):
+                kn_list = []
+                for seg_ in m_.group(3).split(","):
+                    kn_ = seg_.split("=")[0].strip()
+                    if kn_:
+                        kn_list.append(kn_)
+                allowed_all[m_.group(1).lower()] = set(kn_list)
+
+            rep_norm = str(args.get("report", "")).lower()
+            allowed = allowed_all.get(rep_norm)
+            if allowed:
+                bad = [k for k in crit_final if k not in allowed]
+                for k in bad:
+                    del crit_final[k]
+                all_junk = len(bad) > 0 and len(crit_final) == 0
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
@@ -948,6 +1088,12 @@ class NeedleEngine:
         else:
             confidence = 0
 
+        # Tüm criteria halüsinasyondıysa bu vaka kural motoru için belirsizdir → LLM
+        result_confidence = 5 if (
+            tool_name in ("prepare_report_criteria", "run_report")
+            and isinstance(locals().get("all_junk"), bool) and all_junk
+        ) else confidence
+
         return {
             "type": "tool_call",
             "tool": tool_name,
@@ -956,6 +1102,8 @@ class NeedleEngine:
             "argless": bool(has_extracted_args),
             # Şema türevi eşleşme: x-ai-aliases / quick-prompts promptla buluştu mu?
             "aliasMatched": bool(directive_matched),
+            # Ekran-kapsamlı çalıştırma aracı için fiil kanıtı
+            "runVerb": bool(run_verb),
             "message": combined_msg.strip(),
             "telemetry": {
                 # Şeffaf telemetri: hangi katman ürettiyse o etiketlenir; token üretilmez
@@ -965,6 +1113,6 @@ class NeedleEngine:
                 "completionTokens": 0,
                 "totalTokens": 0,
                 "durationMs": elapsed_ms,
-                "confidence": confidence,
+                "confidence": result_confidence,
             }
         }

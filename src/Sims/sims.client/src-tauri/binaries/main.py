@@ -270,7 +270,9 @@ def handle_user_task(prompt_text, context=None):
             )
             # Yalnızca gerçekten somut bir işlem yapabiliyorsa (argüman çıkardıysa veya yeni rapor açıyorsa) Needle yanıtlasın
             if confidence >= 80 and (has_actionable_args or is_new_report) and (
-                data_signal or is_new_report or needle_res.get("aliasMatched")
+                data_signal or is_new_report
+                or needle_res.get("aliasMatched")
+                or needle_res.get("runVerb")
             ):
                 duration = needle_res.get("telemetry", {}).get("durationMs", 0)
                 sys.stderr.write(f"[Needle SLM Action] tool={needle_res.get('tool')} args={list(needle_res.get('arguments', {}).keys())} ({confidence}%) in {duration}ms\n")
