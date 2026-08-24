@@ -802,9 +802,10 @@ export const SchemaCriteriaFilter = React.forwardRef<
                 (row.name && invalidFields.has(row.name)) || patternMessage
               )
               const description = field?.description?.trim() || ""
-              // AI doldurulan kriterler için hafif turuncu satır vurgusu
+              // AI doldurulan kriterler: arka plan yerine turuncu YAZI rengi
+              // (kalıcıdır; kullanıcı alana dokunana veya yeni dolum olana dek)
               const aiFilled = highlightedNames.has(row.name.trim())
-              const highlightClass = aiFilled ? "bg-orange-500/[0.12]" : undefined
+              const aiFilledText = aiFilled ? "text-orange-600 dark:text-orange-300" : undefined
               return (
                 <TableRow
                   key={row.id}
@@ -833,7 +834,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                     </button>
                   </TableCell>
                   {stackedLayout ? (
-                    <TableCell className={cn(cellClass, highlightClass)}>
+                    <TableCell className={cellClass}>
                       <div className="flex min-w-0 flex-col divide-y divide-border/60">
                         <CriteriaSimpleCombobox
                           value={row.name}
@@ -845,7 +846,8 @@ export const SchemaCriteriaFilter = React.forwardRef<
                           data-grid-cell={`${index}-0`}
                           className={cn(
                             cellInputClass,
-                            row.name && "font-medium"
+                            row.name && "font-medium",
+                            aiFilledText
                           )}
                           variant="cell"
                           showClear={false}
@@ -859,12 +861,13 @@ export const SchemaCriteriaFilter = React.forwardRef<
                           data-grid-cell={`${index}-1`}
                           invalid={rowInvalid}
                           descriptionAsPlaceholder
+                          className={aiFilledText}
                         />
                       </div>
                     </TableCell>
                   ) : (
                     <>
-                      <TableCell className={cn(cellClass, highlightClass)}>
+                      <TableCell className={cellClass}>
                         <CriteriaSimpleCombobox
                           value={row.name}
                           onChange={(value) =>
@@ -875,13 +878,14 @@ export const SchemaCriteriaFilter = React.forwardRef<
                           data-grid-cell={`${index}-0`}
                           className={cn(
                             cellInputClass,
-                            row.name && "font-medium"
+                            row.name && "font-medium",
+                            aiFilledText
                           )}
                           variant="cell"
                           showClear={false}
                         />
                       </TableCell>
-                      <TableCell className={cn(cellClass, highlightClass)}>
+                      <TableCell className={cellClass}>
                         <CriteriaValueCell
                           field={field}
                           value={row.value}
@@ -893,6 +897,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
                           descriptionAsPlaceholder={
                             !descriptionColumnVisible
                           }
+                          className={aiFilledText}
                         />
                       </TableCell>
                       {descriptionColumnVisible ? (

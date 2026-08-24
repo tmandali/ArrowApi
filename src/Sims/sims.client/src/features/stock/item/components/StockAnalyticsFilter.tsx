@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { RotateCcw } from "lucide-react"
 import {
   SchemaCriteriaFilter,
@@ -53,6 +54,14 @@ export const StockAnalyticsFilter = React.forwardRef<
 ) {
   const composing = Boolean(jobSession?.composing)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
+  const aiFilled = useAgentBridgeStore(
+    (s) => s.aiFilledCriteria["stock-analytics"]
+  );
+  const aiFilledNames = React.useMemo(
+    () => (aiFilled && Date.now() - aiFilled.at < 10 * 60_000 ? aiFilled.names : []),
+    [aiFilled]
+  )
+
   const { rows, setRows } = useSharedCriteriaDraft(
     "stock-analytics",
     stockAnalyticsSchema
@@ -111,6 +120,7 @@ export const StockAnalyticsFilter = React.forwardRef<
           <SchemaCriteriaFilter
             key="stock-analytics-criteria"
             ref={filterRef}
+            highlightRowNames={aiFilledNames}
             schema={stockAnalyticsSchema}
             rows={rows}
             onRowsChange={setRows}

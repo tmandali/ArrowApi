@@ -58,10 +58,13 @@ interface AgentBridgeStore {
   configHydrated: boolean;
   lastPrompt: string;
   screenContext: ScreenContext | null;
+  /** Rapor scope'u → son AI doldurmasında yazılan kriter alan adları (sayfa formu vurgusu) */
+  aiFilledCriteria: Record<string, { names: string[]; at: number }>;
   lastActiveReport: ActiveReportMemory | null;
   aiConfig: AiProviderConfig;
   setAiConfig: (config: Partial<AiProviderConfig>) => void;
   setScreenContext: (ctx: ScreenContext) => void;
+  setAiFilledCriteria: (scope: string, names: string[]) => void;
   clearScreenContext: (screenId?: string) => void;
   appendMessage: (msg: Omit<ChatMessage, "id" | "timestamp">) => void;
   sendPrompt: (promptText: string) => Promise<void>;
@@ -125,6 +128,27 @@ function persistCriteriaDigest(
  * şemasını kayıt defterinden bulup sindirimi önbelleğe alır; böylece form
  * mount olmasa bile sonraki "bu rapor ne hakkında" soruları şemadan yanıtlanır.
  */
+/**
+ * AI kriter aracı çalıştıysa hangi alanları yazdığını rapor scope'uyla işaretle —
+ * sayfadaki kriter formu bu isimleri turuncu yazıyla vurgular.
+ */
+function recordAiFilledCriteria(
+  toolName: string,
+  args?: Record<string, any>,
+  result?: Record<string, any>
+): void {
+  if (!args || typeof args !== "object") return;
+  const keys = Object.keys(args).filter(
+    (k) => args[k] !== undefined && args[k] !== null && String(args[k]).trim() !== ""
+  );
+  if (keys.length === 0) return;
+  const scope = String(
+    result?.scope || toolName.replace(/^filter_/, "").replace(/_criteria$/, "")
+  ).trim();
+  if (!scope || toolName.startsWith("filter_active_grid")) return;
+  useAgentBridgeStore.getState().setAiFilledCriteria(scope, keys);
+}
+
 function captureCriteriaDigestFromResult(result?: Record<string, any>): void {
   const scope = String(result?.scope || "").trim();
   if (!scope) return;
@@ -181,6 +205,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   status: "idle",
   lastPrompt: "",
   screenContext: null,
+  aiFilledCriteria: {},
   lastActiveReport: null,
   streamingThinking: "",
   streamingContent: "",
@@ -203,6 +228,10 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   },
 
   setScreenContext: (ctx) => set({ screenContext: ctx }),
+  setAiFilledCriteria: (scope, names) =>
+    set((state) => ({
+      aiFilledCriteria: { ...state.aiFilledCriteria, [scope]: { names, at: Date.now() } },
+    })),
   clearScreenContext: (screenId) =>
     set((state) => {
       if (!screenId || state.screenContext?.screenId === screenId) {
@@ -447,6 +476,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
           if (execution.success && (execution.result?.scope || execution.result?.customKind)) {
             set({ lastActiveReport: toReportMemory(fastResolved.tool, execution.result) });
             captureCriteriaDigestFromResult(execution.result);
+            recordAiFilledCriteria(fastResolved.tool, fastResolved.arguments, execution.result);
           }
 
           logAiTelemetry({
@@ -562,6 +592,7 @@ function handleSidecarEvent(evt: SidecarEvent) {
         ) {
           setState({ lastActiveReport: toReportMemory(toolName, execution.result, composition.targetWorkspace) });
           captureCriteriaDigestFromResult(execution.result);
+          recordAiFilledCriteria(toolName, toolArgs, execution.result);
         }
 
         logAiTelemetry({
