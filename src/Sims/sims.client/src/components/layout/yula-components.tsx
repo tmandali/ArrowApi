@@ -58,8 +58,13 @@ export function YulaReportCriteriaCard({
   )
   React.useEffect(() => {
     if (!detailsData) return
-    const names = Object.entries(detailsData)
-      .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
+    // Jenerik araç sözleşmesi: { report, criteria: {alan:değer} }
+    const source =
+      detailsData.criteria && typeof detailsData.criteria === "object"
+        ? (detailsData.criteria as Record<string, any>)
+        : detailsData
+    const names = Object.entries(source)
+      .filter(([k, v]) => k !== "report" && v !== undefined && v !== null && String(v).trim() !== "")
       .map(([k]) => k.trim())
       .filter(Boolean)
     setAiFilledNames(names)
