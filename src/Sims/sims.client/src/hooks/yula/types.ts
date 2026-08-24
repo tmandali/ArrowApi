@@ -63,10 +63,6 @@ export interface SkillHeaderButton {
   };
 }
 
-export interface SkillUi {
-  header_buttons?: SkillHeaderButton[];
-}
-
 /** Sidecar skill fonksiyonu (skills/<klasör>/SKILL.md + *.py sözleşmesi). */
 export interface SkillFunctionInfo {
   name: string;
@@ -81,7 +77,6 @@ export interface SkillFunctionInfo {
 export interface SkillInfo {
   folder: string;
   recipe_md?: string | null;
-  ui?: SkillUi;
   functions: SkillFunctionInfo[];
 }
 

@@ -1,12 +1,16 @@
 """Yula Skill Registry — skills/<ad>/SKILL.md + *.py konvansiyonunun yükleyicisi.
 
 Sözleşme:
-- Her skill bir klasördür: en az biri `TOOL` dict'i + `run()` fonksiyonu içeren .py dosya(lar)ı.
-- SKILL.md varsa frontmatter'daki `name`/`description` TOOL metadata'sını ezer (tarife gövdesi
-  LLM'e talep üzerine enjekte edilmek üzere saklanır).
-- TOOL["needs_session_data"]=True ise skill BRIDGED'dir: verisini frontend'ten alır
-  (`bridge_call` aksiyonu), asla LLM tarafından doğrudan çağrılmaz.
-- Değilse INTERNAL'dir: pydantic-ai Tool olarak agent toolset'ine girer, grafik içinde çalışır.
+- Her skill bir klasördür; .py içindeki her aksiyon `@skill(...)` ile süslenir:
+      @skill(name=..., description=..., needs_session=True,
+             buttons=[Button("Excel'e Aktar", icon="download", ...)])
+      def run(rows=None, **_): ...
+- needs_session=True ise skill BRIDGED'dir: verisini frontend'ten alır
+  (`bridge_call` aksiyonu), LLM tool_call'ıyla tetiklenir.
+- False ise INTERNAL'dir: pydantic-ai Tool olarak agent toolset'ine girer,
+  grafik içinde çalışır.
+- SKILL.md yalnızca tarife gövdesidir (panel önizlemesi + LLM bağlamı);
+  tüm meta tek kaynaktan gelir: dekoratör.
 """
 
 from __future__ import annotations
@@ -68,7 +72,7 @@ def skill(name: str, *, description: str = "", needs_session: bool = False,
 
 @dataclass
 class SkillFunction:
-    """Bir .py dosyasındaki skill fonksiyonu (decorator veya TOOL/run sözleşmesi)."""
+    """Bir .py dosyasındaki @skill'li aksiyon fonksiyonu."""
 
     name: str
     description: str
@@ -87,8 +91,6 @@ class Skill:
     dir_path: Path
     recipe_md: Optional[str] = None  # SKILL.md gövdesi (frontmatter hariç tarife)
     functions: List[SkillFunction] = field(default_factory=list)
-    # Frontmatter'daki bildirimsel UI bağları (örn. ui.header_buttons)
-    ui: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def internal_functions(self) -> List[SkillFunction]:
@@ -114,7 +116,7 @@ def _parse_frontmatter(md_text: str) -> tuple[Dict[str, Any], str]:
 
 
 def _load_skill_module(py_path: Path, skill_dir: Path) -> List[SkillFunction]:
-    """Modülü yükler; öncelik @skill dekoratörlü fonksiyonlar, yoksa TOOL/run çifti."""
+    """Modülü yükler ve @skill'li fonksiyonları döner."""
     mod_name = f"yula_skill_{skill_dir.name}_{py_path.stem}"
     try:
         spec = importlib.util.spec_from_file_location(mod_name, py_path)
@@ -142,21 +144,6 @@ def _load_skill_module(py_path: Path, skill_dir: Path) -> List[SkillFunction]:
                 skill_dir=skill_dir,
                 buttons=list(meta.get("buttons") or []),
             ))
-    if out:
-        return out
-
-    # 2) Eski TOOL + run() sözleşmesi (geriye dönük uyumluluk)
-    tool = getattr(module, "TOOL", None)
-    run_fn = getattr(module, "run", None)
-    if isinstance(tool, dict) and callable(run_fn) and tool.get("name"):
-        out.append(SkillFunction(
-            name=str(tool["name"]),
-            description=str(tool.get("description") or ""),
-            parameters=tool.get("parameters") or {"type": "object", "properties": {}},
-            needs_session_data=bool(tool.get("needs_session_data")),
-            run_callable=run_fn,
-            skill_dir=skill_dir,
-        ))
     return out
 
 
@@ -175,20 +162,12 @@ def discover_skill_dirs(base_dirs: List[Path]) -> List[Skill]:
             md_path = skill_dir / "SKILL.md"
             if md_path.exists() and skill.recipe_md is None:
                 try:
-                    meta, body = _parse_frontmatter(md_path.read_text(encoding="utf-8"))
-                    skill.recipe_md = body or None
-                    if meta.get("description"):
-                        skill.description_override = str(meta["description"])
-                    if isinstance(meta.get("ui"), dict):
-                        skill.ui = meta["ui"]
+                    _, skill.recipe_md = _parse_frontmatter(md_path.read_text(encoding="utf-8"))
                 except Exception:
                     pass
 
             for py_path in sorted(skill_dir.glob("*.py")):
                 for fn in _load_skill_module(py_path, skill_dir):
-                    override = getattr(skill, "description_override", None)
-                    if override and (fn.description == ""):
-                        fn.description = f"{override} ({fn.name})"
                     if not any(f.name == fn.name for f in skill.functions):
                         skill.functions.append(fn)
     return list(skills.values())

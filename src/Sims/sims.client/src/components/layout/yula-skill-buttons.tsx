@@ -12,7 +12,7 @@ import {
 import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { invokeSkillDirect } from "@/lib/skills-bridge"
 import { WorkspaceAiChatContext } from "@/context/workspace-ai-chat-context"
-import type { SkillHeaderButton, SkillUi } from "@/hooks/yula/types"
+import type { SkillHeaderButton } from "@/hooks/yula/types"
 import { cn } from "@/utils/cn"
 
 /**
@@ -67,15 +67,13 @@ export function YulaSkillButtons({ className }: { className?: string }) {
 
   const buttons: Array<{ skill: string; btn: SkillHeaderButton }> = [];
   for (const s of skills) {
-    const uiButtons = (s.ui as SkillUi | undefined)?.header_buttons || [];
-    // Öncelik: @skill(buttons=[...]) dekoratörü → frontmatter ui.header_buttons
-    const fnButtons = s.functions.flatMap((f) =>
-      (f.buttons || []).map((b) => ({ ...b, call: b.call || f.name }))
-    );
-    const source = fnButtons.length ? fnButtons : uiButtons;
-    for (const btn of source) {
-      if (btn.call && btn.label && matchesScope(btn, workspaceId, screenId)) {
-        buttons.push({ skill: s.folder, btn });
+    // Tek kaynak: fonksiyonun @skill(buttons=[...]) dekoratörü
+    for (const f of s.functions) {
+      for (const b of f.buttons || []) {
+        const btn: SkillHeaderButton = { ...b, call: b.call || f.name };
+        if (btn.call && btn.label && matchesScope(btn, workspaceId, screenId)) {
+          buttons.push({ skill: s.folder, btn });
+        }
       }
     }
   }

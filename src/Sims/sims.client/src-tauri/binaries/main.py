@@ -78,7 +78,6 @@ def emit_skills_list():
         {
             "folder": s.folder_name,
             "recipe_md": s.recipe_md,
-            "ui": s.ui,
             "functions": [
                 {
                     "name": f.name,
