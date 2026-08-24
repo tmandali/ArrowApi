@@ -73,6 +73,8 @@ export interface SkillFunctionInfo {
   description: string;
   /** true → verisini frontend'ten alır (bridge_call); false → agent içinde çalışır */
   needs_session_data: boolean;
+  /** @skill(buttons=[...]) dekoratöründen gelen header-butonlar (öncelikli) */
+  buttons?: Array<Omit<SkillHeaderButton, "call"> & { call?: string }>;
 }
 
 /** Yula skill klasörü. */

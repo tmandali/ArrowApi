@@ -1,36 +1,15 @@
 """Aktif rapor satırlarını XLSX/CSV dosyasına aktarır (bridged skill).
 
 Sözleşme: run(rows=..., **args) imzası zorunludur; veri frontend executor'ından gelir.
-Dönüş: {file_path, file_name, rows_written} — file_link kartı bununla çizilir.
+Dönüş: {file_path, file_name, rows_written} — [[file:...]] chip'i bununla çizilir.
 """
 
 import csv
 import datetime
 import pathlib
+import tempfile
 
-TOOL = {
-    "name": "report_export_xlsx",
-    "description": (
-        "Aktif raporun satırlarını XLSX veya CSV dosyasına aktarır ve indirme "
-        "yolunu döndürür. Kullanıcı 'excel'e aktar', 'dışa aktar', 'indir' dediğinde kullan."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "format": {
-                "type": "string",
-                "enum": ["xlsx", "csv"],
-                "description": "Çıktı biçimi; belirtilmezse xlsx.",
-            },
-            "file_name": {
-                "type": "string",
-                "description": "İsteğe bağlı dosya adı (uzantısız).",
-            },
-        },
-        "required": [],
-    },
-    "needs_session_data": True,
-}
+from skill_registry import Button, skill
 
 MAX_ROWS = 100_000
 
@@ -46,6 +25,22 @@ def _export_dir() -> pathlib.Path:
         return fallback
 
 
+@skill(
+    name="report_export_xlsx",
+    description=(
+        "Aktif raporun satırlarını XLSX veya CSV dosyasına aktarır ve indirme "
+        "yolunu döndürür. Kullanıcı 'excel'e aktar', 'dışa aktar', 'indir' dediğinde kullan."
+    ),
+    needs_session=True,
+    buttons=[
+        Button(
+            "Excel'e Aktar",
+            icon="download",
+            scope={"screens": ["report-grid-*"]},
+            args={"format": "xlsx"},
+        ),
+    ],
+)
 def run(rows=None, format: str = "xlsx", file_name=None, **_):
     rows = [dict(r) for r in (rows or [])]
     if not rows:

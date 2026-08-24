@@ -26,9 +26,49 @@ except ImportError:  # PyYAML pydantic-ai ile gelir; yoksa frontmatter atlanır
 MAX_BRIDGE_ROWS = 100_000
 
 
+# ---------------------------------------------------------------------------
+# Dekoratör API — UI/meta bilgisini fonksiyonun üzerine mühürler.
+#
+#     @skill(name=..., description=..., needs_session=True,
+#            buttons=[Button("Excel'e Aktar", icon="download", ...)])
+#     def run(rows=None, **_): ...
+#
+# Frontmatter'daki ui.header_buttons'a göre ÖNCELİKLİDİR; birden fazla aksiyon
+# için her fonksiyona kendi @skill'i verilir.
+# ---------------------------------------------------------------------------
+
+def Button(label: str, *, icon: str = "play", id: Optional[str] = None,
+           args: Optional[Dict[str, Any]] = None,
+           scope: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Bildirimsel header-buton tanımı (kapalı ikon seti frontend'de doğrulanır)."""
+    return {"id": id, "label": label, "icon": icon, "args": args or {}, "scope": scope}
+
+
+def skill(name: str, *, description: str = "", needs_session: bool = False,
+          params: Optional[Dict[str, Any]] = None,
+          buttons: Optional[List[Dict[str, Any]]] = None):
+    def deco(fn):
+        sealed = []
+        for i, b in enumerate(buttons or []):
+            sealed.append({
+                **b,
+                "id": b.get("id") or f"{name}-{i}",
+                "call": b.get("call") or name,
+            })
+        fn.__yula_meta__ = {
+            "name": name,
+            "description": description,
+            "needs_session": needs_session,
+            "parameters": params or {"type": "object", "properties": {}},
+            "buttons": sealed,
+        }
+        return fn
+    return deco
+
+
 @dataclass
 class SkillFunction:
-    """Bir .py dosyasındaki TOOL + run() çifti."""
+    """Bir .py dosyasındaki skill fonksiyonu (decorator veya TOOL/run sözleşmesi)."""
 
     name: str
     description: str
@@ -36,6 +76,7 @@ class SkillFunction:
     needs_session_data: bool
     run_callable: Any
     skill_dir: Path
+    buttons: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -72,30 +113,51 @@ def _parse_frontmatter(md_text: str) -> tuple[Dict[str, Any], str]:
     return (meta if isinstance(meta, dict) else {}), parts[2].strip()
 
 
-def _load_skill_module(py_path: Path, skill_dir: Path) -> Optional[SkillFunction]:
+def _load_skill_module(py_path: Path, skill_dir: Path) -> List[SkillFunction]:
+    """Modülü yükler; öncelik @skill dekoratörlü fonksiyonlar, yoksa TOOL/run çifti."""
     mod_name = f"yula_skill_{skill_dir.name}_{py_path.stem}"
     try:
         spec = importlib.util.spec_from_file_location(mod_name, py_path)
         if spec is None or spec.loader is None:
-            return None
+            return []
         module = importlib.util.module_from_spec(spec)
         sys.modules[mod_name] = module
         spec.loader.exec_module(module)
-        tool = getattr(module, "TOOL", None)
-        run_fn = getattr(module, "run", None)
-        if not isinstance(tool, dict) or not callable(run_fn) or not tool.get("name"):
-            return None
-        return SkillFunction(
+    except Exception as e:  # bozuk skill tüm sidecar'ı düşürmesin
+        print(f"[skill_registry] {py_path} yüklenemedi: {e}", file=sys.stderr)
+        return []
+
+    out: List[SkillFunction] = []
+
+    # 1) @skill dekoratörlü fonksiyonlar (öncelikli, çoklu aksiyon destekli)
+    for attr in vars(module).values():
+        meta = getattr(attr, "__yula_meta__", None)
+        if isinstance(meta, dict) and callable(attr):
+            out.append(SkillFunction(
+                name=str(meta["name"]),
+                description=str(meta.get("description") or ""),
+                parameters=meta.get("parameters") or {"type": "object", "properties": {}},
+                needs_session_data=bool(meta.get("needs_session")),
+                run_callable=attr,
+                skill_dir=skill_dir,
+                buttons=list(meta.get("buttons") or []),
+            ))
+    if out:
+        return out
+
+    # 2) Eski TOOL + run() sözleşmesi (geriye dönük uyumluluk)
+    tool = getattr(module, "TOOL", None)
+    run_fn = getattr(module, "run", None)
+    if isinstance(tool, dict) and callable(run_fn) and tool.get("name"):
+        out.append(SkillFunction(
             name=str(tool["name"]),
             description=str(tool.get("description") or ""),
             parameters=tool.get("parameters") or {"type": "object", "properties": {}},
             needs_session_data=bool(tool.get("needs_session_data")),
             run_callable=run_fn,
             skill_dir=skill_dir,
-        )
-    except Exception as e:  # bozuk skill tüm sidecar'ı düşürmesin
-        print(f"[skill_registry] {py_path} yüklenemedi: {e}", file=sys.stderr)
-        return None
+        ))
+    return out
 
 
 def discover_skill_dirs(base_dirs: List[Path]) -> List[Skill]:
@@ -123,10 +185,9 @@ def discover_skill_dirs(base_dirs: List[Path]) -> List[Skill]:
                     pass
 
             for py_path in sorted(skill_dir.glob("*.py")):
-                fn = _load_skill_module(py_path, skill_dir)
-                if fn is not None:
+                for fn in _load_skill_module(py_path, skill_dir):
                     override = getattr(skill, "description_override", None)
-                    if override and (fn.description == "" ):
+                    if override and (fn.description == ""):
                         fn.description = f"{override} ({fn.name})"
                     if not any(f.name == fn.name for f in skill.functions):
                         skill.functions.append(fn)

@@ -1,19 +1,3 @@
----
-name: report_export_xlsx
-description: Aktif raporun verisini XLSX veya CSV dosyasına aktarır ve indirme bağlantısı döndürür.
-ui:
-  header_buttons:
-    - id: export-xlsx
-      label: "Excel'e Aktar"
-      icon: download
-      call: report_export_xlsx
-      args:
-        format: xlsx
-      scope:
-        screens:
-          - "report-grid-*"
----
-
 # Rapor Dışa Aktarma (XLSX/CSV)
 
 ## Ne zaman kullanılır
@@ -28,3 +12,6 @@ executor tarafından alınır ve skill'e beslenir. Skill yalnızca dosya üretir
 1. `report_export_xlsx` aracını `format` parametresiyle çağır (varsayılan xlsx).
 2. Kullanıcı biçim belirtmediyse xlsx kullan; sadece ham veri istiyorsa csv.
 3. Sonuçtaki `file_name` bilgisini kullanıcıya Türkçe olarak bildir.
+
+> Meta ve header-buton bildirimi artık `report_export_xlsx.py` içindeki
+> `@skill(...)` dekoratöründe — frontmatter yerine tek kaynak kod.

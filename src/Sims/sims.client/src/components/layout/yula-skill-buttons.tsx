@@ -67,8 +67,13 @@ export function YulaSkillButtons({ className }: { className?: string }) {
 
   const buttons: Array<{ skill: string; btn: SkillHeaderButton }> = [];
   for (const s of skills) {
-    const ui = s.ui as SkillUi | undefined;
-    for (const btn of ui?.header_buttons || []) {
+    const uiButtons = (s.ui as SkillUi | undefined)?.header_buttons || [];
+    // Öncelik: @skill(buttons=[...]) dekoratörü → frontmatter ui.header_buttons
+    const fnButtons = s.functions.flatMap((f) =>
+      (f.buttons || []).map((b) => ({ ...b, call: b.call || f.name }))
+    );
+    const source = fnButtons.length ? fnButtons : uiButtons;
+    for (const btn of source) {
       if (btn.call && btn.label && matchesScope(btn, workspaceId, screenId)) {
         buttons.push({ skill: s.folder, btn });
       }
