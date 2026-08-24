@@ -226,6 +226,7 @@ export function ItemForm({
 
   useScreenAgentContext({
     screenId: isReportShell ? mode : "item-form",
+    activeReportScope: isReportShell ? mode : undefined,
     screenTitle: isReportShell ? reportTitle : "Item Details",
     workspaceId: reportModule?.workspace || "stock",
     activeDataSummary: {

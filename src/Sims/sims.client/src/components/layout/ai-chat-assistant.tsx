@@ -138,6 +138,8 @@ export function AIChatPanel({
 } = {}) {
   const { messages: bridgeMessages, isProcessing, streamingThinking, streamingContent, sendPrompt } = useAgentBridge()
 
+  const activeScreenContext = useAgentBridgeStore((s) => s.screenContext)
+
   const messages = React.useMemo<UIMessage[]>(() => {
     const validMessages = bridgeMessages.filter((m) => m.id !== "init-1")
     // En son kriter kartı mesajının ID'sini bul (sadece en sonuncusu tam açık render edilecek)
@@ -148,6 +150,14 @@ export function AIChatPanel({
     return validMessages.map((m) => {
       const parts: any[] = []
       const isLatestCriteria = !m.customKind || m.customKind === "yula_chart_card" || m.id === lastCriteriaMsgId
+
+      // Kriter kartı zaten EKRANDA açıksa sohbette tekrar render etme:
+      // aktif ekran, mesajın rapor scope'una ait kriter formuysa yeterli.
+      const criteriaOnActiveScreen =
+        Boolean(m.toolResult?.scope) &&
+        (activeScreenContext?.activeReportScope === m.toolResult.scope ||
+          activeScreenContext?.screenId === m.toolResult.scope ||
+          activeScreenContext?.screenId === `report-criteria-${m.toolResult.scope}`)
 
       // 0. Model Düşünme Çıktısı (Reasoning / Plan)
       if (m.thinking) {
@@ -177,7 +187,7 @@ export function AIChatPanel({
       }
 
       // 4. Görsel Kart: Yalnızca en son aktif kriter formu render edilir
-      if (m.customKind && isLatestCriteria) {
+      if (m.customKind && isLatestCriteria && !criteriaOnActiveScreen) {
         parts.push({
           type: "custom",
           kind: m.customKind,
