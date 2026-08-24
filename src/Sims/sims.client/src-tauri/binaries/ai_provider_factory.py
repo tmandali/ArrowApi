@@ -4,6 +4,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic_ai import Agent, DeferredToolRequests, Tool
+from pydantic_ai.capabilities import WebFetch
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
@@ -17,6 +18,7 @@ from pydantic_ai.messages import (
     ToolCallPartDelta,
     ToolReturnPart,
     UserPromptPart,
+    FunctionToolCallEvent,
 )
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.ollama import OllamaModel
@@ -49,7 +51,15 @@ class AiProviderFactory:
         "model": "gemma4:12b-mlx",
         "endpoint": "http://127.0.0.1:11434",
         "apiKey": "",
+        # Web fetch yeteneği (sidecar içinde yerel markdownify ile çalışır;
+        # SSRF koruması kütüphanede gömülüdür — özel IP/metadata uçları engelli).
+        "webFetch": True,
+        # Opsiyonel domain filtreleri: ["docs.example.com", ...] (None = tüm herkes alanı)
+        "webFetchAllowedDomains": None,
+        "webFetchBlockedDomains": None,
     }
+
+    WEB_FETCH_TOOL_NAME = "web_fetch"
 
     BASE_MODEL_SETTINGS = {
         "temperature": 0.1,
@@ -210,14 +220,27 @@ class AiProviderFactory:
         return msgs
 
     @staticmethod
-    async def _run_agent(agent: Agent, prompt: str, history, on_delta) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    async def _run_agent(agent: Agent, prompt: str, history, on_delta, external_tool_names=None, on_internal_tool=None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        external_tool_names = external_tool_names or set()
         think_chunks: List[str] = []
         text_chunks: List[str] = []
         pending_calls: Dict[int, Dict[str, Any]] = {}
-        saw_tool_call = False
+        saw_external_call = False
 
         async with agent.iter(prompt, message_history=history or None) as run:
             async for node in run:
+                # Sidecar-içi yetenek yürütmesi (örn. web_fetch) → frontend'e bildir
+                if Agent.is_call_tools_node(node):
+                    if callable(on_internal_tool):
+                        async with node.stream(run.ctx) as tool_stream:
+                            async for ev in tool_stream:
+                                if isinstance(ev, FunctionToolCallEvent) and ev.part.tool_name not in external_tool_names:
+                                    try:
+                                        args = ev.part.args_as_dict()
+                                    except Exception:
+                                        args = {}
+                                    on_internal_tool(ev.part.tool_name, args)
+                    continue
                 if not Agent.is_model_request_node(node):
                     continue
                 async with node.stream(run.ctx) as stream:
@@ -225,7 +248,11 @@ class AiProviderFactory:
                         if isinstance(ev, PartStartEvent):
                             part = ev.part
                             if isinstance(part, ToolCallPart):
-                                saw_tool_call = True
+                                # Yalnızca FRONTEND araçları kısa devreye sokulur;
+                                # sidecar-içi yetenekler (web_fetch vb.) pydantic-ai
+                                # tarafından grafik içinde çalıştırılıp tur devam eder.
+                                if part.tool_name in external_tool_names:
+                                    saw_external_call = True
                                 raw_args = part.args if isinstance(part.args, str) else json.dumps(part.args or {}, ensure_ascii=False)
                                 pending_calls[ev.index] = {"function": {"name": part.tool_name, "arguments_raw": raw_args or ""}}
                             elif isinstance(part, ThinkingPart) and part.content:
@@ -247,16 +274,20 @@ class AiProviderFactory:
                                 if entry is not None:
                                     entry["function"]["arguments_raw"] += delta.args_delta
 
-                if saw_tool_call:
+                if saw_external_call:
                     # Kısa devre: pydantic-ai 2.33'te streamed istek + deferred araç çağrısı
                     # CallToolsNode'da çözülemiyor. Araç çağrısını akıştan kendimiz yakaladık;
                     # grafiği ilerletmeden durup çağrıları frontend'e aktarıyoruz.
                     break
 
-            result = None if saw_tool_call else run.result
+            result = None if saw_external_call else run.result
 
         tool_calls: List[Dict[str, Any]] = []
         for entry in pending_calls.values():
+            # Karışık turda (internal + external paralel çağrı) yalnızca frontend
+            # araçları devredilir; sidecar-içi araçlar buraya düşmemeli.
+            if entry["function"]["name"] not in external_tool_names:
+                continue
             raw = entry["function"].pop("arguments_raw") or "{}"
             try:
                 args = json.loads(raw)
@@ -274,6 +305,8 @@ class AiProviderFactory:
             thinking_final = "".join(p.content for p in resp_parts if isinstance(p, ThinkingPart)).strip()
             for p in resp_parts:
                 if isinstance(p, ToolCallPart):
+                    if p.tool_name not in external_tool_names:
+                        continue
                     try:
                         p_args = p.args_as_dict()
                     except Exception:
@@ -332,16 +365,49 @@ class AiProviderFactory:
         return f"Pydantic AI / Ollama ({model or 'gemma4:12b-mlx'})", model
 
     @classmethod
+    def _build_capabilities(cls, cfg: Dict[str, Any]):
+        """
+        Sidecar-içinde yürütülen (frontend'e devredilmeyen) yetenekler.
+        WebFetch: native=False → tüm sağlayıcılarda deterministik yerel markdownify fetch.
+        Domain filtreleri config'ten gelir; SSRF koruması kütüphanede gömülüdür.
+        """
+        if cfg.get("webFetch") is False:
+            return None
+        allowed = cfg.get("webFetchAllowedDomains") or None
+        blocked = cfg.get("webFetchBlockedDomains") or None
+        return [
+            WebFetch(
+                native=False,
+                local=True,
+                allowed_domains=allowed,
+                blocked_domains=blocked,
+            )
+        ]
+
+    @staticmethod
+    def _external_tool_names(tool_schemas) -> set:
+        """Frontend toolRegistry'den gelen (deferred/devredilen) araç adları."""
+        names = set()
+        for t in tool_schemas or []:
+            func = t.get("function") if isinstance(t, dict) and isinstance(t.get("function"), dict) else t
+            if isinstance(func, dict) and func.get("name"):
+                names.add(func["name"])
+        return names
+
+    @classmethod
     def execute_chat(
         cls,
         conversation_history: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         config: Optional[Dict[str, Any]] = None,
-        on_delta: Optional[Any] = None
+        on_delta: Optional[Any] = None,
+        on_internal_tool: Optional[Any] = None
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Aktif yapılandırmaya göre ilgili sağlayıcıyı çalıştırır.
         on_delta(kind, text) verildiyse düşünce/metin parçaları üretim sırasında canlı iletilir.
+        on_internal_tool(name, args) verildiyse sidecar-içinde yürütülen yetenekler
+        (örn. web_fetch) çağrı anında bildirilir.
 
         Dönüş: ({"role":"assistant","content":..., "thinking":..., "tool_calls":[...]}, telemetry)
         """
@@ -367,16 +433,27 @@ class AiProviderFactory:
             cls._build_model(cfg),
             instructions=system_prompt or None,
             tools=cls._build_tools(tools),
+            capabilities=cls._build_capabilities(cfg),
             model_settings=cls._build_model_settings(cfg),
             # External (frontend'te yürütülen) araçlar için deferred output tipi zorunlu
             output_type=[str, DeferredToolRequests],
-            retries=0,
+            # retries: sidecar-içi araçların (web_fetch) ağ hatalarını model'e
+            # RetryPromptPart olarak beslemesi için; external araçlar yerelde hiç
+            # çalıştırılmadığından (deferred) bu artış onları etkilemez.
+            retries=2,
             end_strategy="early",
         )
 
         try:
             message_data, telemetry = asyncio.run(
-                cls._run_agent(agent, prompt, cls._convert_history(rest), on_delta)
+                cls._run_agent(
+                    agent,
+                    prompt,
+                    cls._convert_history(rest),
+                    on_delta,
+                    external_tool_names=cls._external_tool_names(tools),
+                    on_internal_tool=on_internal_tool,
+                )
             )
         except Exception as err:
             raise RuntimeError(cls._translate_error(err, cfg)) from err

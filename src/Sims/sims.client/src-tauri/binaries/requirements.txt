@@ -1,6 +1,6 @@
 cactus-needle>=2.0.8
 pyinstaller>=6.0.0
-pydantic-ai-slim[openai,google]>=2.33.0
+pydantic-ai-slim[openai,google,web-fetch]>=2.33.0
 pydantic>=2.10.0
 httpx>=0.28.0
 openai>=1.55.0

@@ -6,7 +6,9 @@ set -e
 cd "$(dirname "$0")/.."
 
 NEEDLE_DYLIB=$(ls -t "$HOME"/.cache/cactus-needle/*/libneedle.dylib 2>/dev/null | head -1)
-EXTRA="--hidden-import needle --hidden-import needle.agent.fetch --hidden-import needle.agent.tools --add-data src-tauri/binaries/intents.tr.json:."
+EXTRA="--hidden-import needle --hidden-import needle.agent.fetch --hidden-import needle.agent.tools \
+--hidden-import markdownify --hidden-import bs4 --hidden-import soupsieve --hidden-import httpx2 \
+--add-data src-tauri/binaries/intents.tr.json:."
 if [ -n "$NEEDLE_DYLIB" ]; then
   EXTRA="$EXTRA --add-binary $NEEDLE_DYLIB:."
 fi

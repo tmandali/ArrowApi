@@ -705,6 +705,25 @@ function handleSidecarEvent(evt: SidecarEvent) {
     return;
   }
 
+  // 2c. Sidecar-içinde yürütülen yetenekler (örn. web_fetch) — DevTools telemetrisi + sohbet bildirimi
+  if (evt.type === "internal_tool") {
+    logAiTelemetry({
+      source: "Yula Internal Capability (Sidecar-içi)",
+      model: evt.tool || "internal_tool",
+      userPrompt: getState().lastPrompt || "",
+      context: getState().screenContext,
+      toolCall: { tool: evt.tool || "", arguments: evt.arguments },
+    });
+    const url = typeof evt.arguments?.url === "string" ? evt.arguments.url : "";
+    if (evt.tool === "web_fetch" && url) {
+      getState().appendMessage({
+        sender: "system",
+        content: `🌐 Web sayfası çekiliyor: ${url}`,
+      });
+    }
+    return;
+  }
+
   // 3. Durum Bildirimi
   if (evt.type === "status") {
     console.log(`[Sidecar Status]: ${evt.status} - ${evt.message || ""}`);

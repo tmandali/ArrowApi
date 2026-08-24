@@ -207,14 +207,15 @@ def get_system_prompt(context=None):
         f"   - Kullanıcı özet, toplam, grafik veya metrik istediğinde 'analyze_grid_data' aracını çağır.\n"
         f"   - Kullanıcı filtreleri temizlemek istediğinde 'clear_grid_filters' aracını çağır.\n"
         f"   - Bu araçlar listede YOKSA (örn. kriter formu ekranındaysa) ASLA uydurma! Kullanıcının filtre talebini o ekranda kayıtlı olan rapor/kriter aracıyla karşıla; hiç uygun araç yoksa araç çağırmadan Türkçe yönlendirme yap.\n"
-        f"   - GENEL KURAL: Yalnızca sana verilen araç listesindeki İSİMLERLE, birebir aynı yazımla araç çağır.\n"
+        f"   - GENEL KURAL: Yalnızca sana verilen araç listesindeki İSİMLERLE, birebir aynı yazımla araç çağır. TEK İSTİSNA: 'web_fetch' aracı yerleşiktir ve listede görünmese dahi çağrılabilir.\n"
         f"4. DESTEKLENMEYEN KRİTERLERDE REHBERLİK:\n"
         f"   - Kullanıcı şemada olmayan bir filtre talep ederse Türkçe olarak bu raporda bu filtrenin olmadığını ve mevcut geçerli kriterleri belirt.\n"
         f"5. GENEL BİLGİ, SORU-CEVAP VE SOHBET: Kullanıcı 'sistemde kaç workspace var', 'bu ekran ne işe yarıyor', 'kimsin', 'nasıl kullanılır' gibi bilgi/soru cümleleri sorduğunda ASLA ARAÇ ÇAĞIRMA (tool call yapma). Doğrudan akıcı, net ve kurumsal bir Türkçe dille soruyu yanıtla.\n"
         f"6. SELAMLAMA VE BAĞLAMA DUYARLI REHBERLİK: Kullanıcı 'merhaba', 'selam', 'nasılsın' gibi bir selamlama yazdığında ASLA ARAÇ ÇAĞIRMA. Kullanıcıya sıcak ve profesyonel bir dille karşılık ver, şu an bulunduğu aktif çalışma alanını ({context.get('active_workspace', '') if context else ''}) ve ekranı belirt. Madde imi (bullet list) vereceksen YALNIZCA gerçek ERP rapor adlarını listele (örn: '• **Stok Bakiyesi**', '• **Stok Analitik Raporu**'). 'Filtreleme' veya 'Arama' gibi genel eylemleri bağımsız bir rapor maddesi gibi listeleme; bunları cümle içinde 'Bu raporlar üzerinde tarih, ambar veya ürün bazında filtrelemeler yapabilirsiniz' şeklinde açıkla.\n"
         f"7. ANLAŞILAMAYAN / BELİRSİZ İFADELER: Kullanıcı anlamsız veya belirsiz bir kelime yazdığında (örn: 'ddw', 'asdf', 'deneme'), bunu nezaketle belirtip şu anki aktif çalışma alanında yapabileceği işlemleri hatırlatarak yönlendir.\n"
         f"8. EYLEM VE ARAÇ ÇAĞIRMA (TOOL CALLING): Kullanıcı somut bir rapor, filtre veya kriter değişikliği talep ettiğinde DAİMA ilgili aracı (function tool_call) çağırarak parametreleri sisteme uygula.\n"
-        f"9. Tüm yanıtlarını daima akıcı, kurumsal ve kusursuz Türkçe olarak üret."
+        f"9. Tüm yanıtlarını daima akıcı, kurumsal ve kusursuz Türkçe olarak üret.\n"
+        f"10. WEB FETCH (URL İÇERİĞİ OKUMA): Kullanıcı bir web adresi/URL verirse veya cevap bir sayfanın güncel içeriğini gerektiriyorsa 'web_fetch' aracını çağır ({{\"url\": \"https://...\"}}). Sayfa içeriği sana markdown olarak döner; bunu Türkçe özetleyip yanıtla. Sayfaya erişilemezse bunu Türkçe olarak belirt ve içeriği UYDURMA. Sıradan sohbet/bilgi sorularında bu aracı çağırma."
     )
 
 def handle_user_task(prompt_text, context=None):
@@ -315,9 +316,15 @@ def handle_user_task(prompt_text, context=None):
         # LLM üretirken düşünme/metin parçalarını canlı akıt (UI anında görsün)
         send_json({"type": "llm_delta", "delta_kind": kind, "text": text})
 
+    def _forward_internal_tool(tool_name, args):
+        # Sidecar-içinde yürütülen yetenekler (örn. web_fetch) → DevTools telemetrisi + sohbet bildirimi
+        send_json({"type": "internal_tool", "tool": tool_name, "arguments": args})
+
     try:
         message_data, telemetry_info = AiProviderFactory.execute_chat(
-            conversation_history, tools, active_ai_config, on_delta=_forward_delta
+            conversation_history, tools, active_ai_config,
+            on_delta=_forward_delta,
+            on_internal_tool=_forward_internal_tool
         )
         telemetry_info["systemPrompt"] = conversation_history[0]["content"] if conversation_history else ""
         
