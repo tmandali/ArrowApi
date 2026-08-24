@@ -11,6 +11,7 @@ import {
 
 import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { invokeSkillDirect } from "@/lib/skills-bridge"
+import { WorkspaceAiChatContext } from "@/context/workspace-ai-chat-context"
 import type { SkillHeaderButton, SkillUi } from "@/hooks/yula/types"
 import { cn } from "@/utils/cn"
 
@@ -56,6 +57,7 @@ export function YulaSkillButtons({ className }: { className?: string }) {
   const skills = useAgentBridgeStore((s) => s.skills);
   const screenContext = useAgentBridgeStore((s) => s.screenContext);
   const appendMessage = useAgentBridgeStore((s) => s.appendMessage);
+  const aiChat = React.useContext(WorkspaceAiChatContext);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
   const workspaceId =
@@ -80,6 +82,8 @@ export function YulaSkillButtons({ className }: { className?: string }) {
     try {
       const outcome = await invokeSkillDirect(entry.btn.call, entry.btn.args || {});
       const res = outcome.result || {};
+      // Sonuç Yula sohbetine düşer → panel kapalıysa kullanıcı görebilsin diye aç
+      aiChat?.setOpen(true);
       if (res.file_path) {
         const rowsTxt = typeof res.rows_written === "number" ? ` (${res.rows_written.toLocaleString("tr-TR")} satır)` : "";
         appendMessage({
