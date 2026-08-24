@@ -2,6 +2,7 @@ import * as React from "react"
 import { Sparkles, BarChart2, Filter, RotateCcw, Play, Package, TrendingUp, AlertTriangle } from "lucide-react"
 import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
+import { PromptChipsRow } from "./prompt-chips"
 import { autoReportCardConfigs } from "@/lib/auto-report-registry"
 import { readReportAiMetadata } from "@/lib/report-ai-metadata"
 
@@ -131,22 +132,10 @@ export function YulaQuickActionChips() {
   if (chips.length === 0) return null
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scrollbar-none">
-      {chips.map((chip, i) => {
-        const Icon = chip.icon || Sparkles
-        return (
-          <button
-            key={i}
-            type="button"
-            disabled={isProcessing}
-            onClick={() => void sendPrompt(chip.prompt)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-2xs transition-all hover:border-orange-500/40 hover:bg-orange-500/8 hover:text-orange-600 dark:hover:text-orange-400 active:scale-95 disabled:opacity-50 cursor-pointer group"
-          >
-            <Icon className="size-3 text-orange-500/80 dark:text-orange-400/80 group-hover:text-orange-600 dark:group-hover:text-orange-300 shrink-0 transition-colors" />
-            <span className="truncate">{chip.label}</span>
-          </button>
-        )
-      })}
-    </div>
+    <PromptChipsRow
+      items={chips}
+      onPick={(chip) => sendPrompt((chip as QuickChip).prompt)}
+      className="py-1 px-0.5"
+    />
   )
 }

@@ -27,6 +27,7 @@ import { useActiveJobsStore, findActiveJobByPayload, findCompletedJobByPayload }
 import { useNotificationsStore } from "@/store/slices/notifications-store"
 import type { YulaReportCardConfig } from "./yula-components-data"
 import { readReportAiMetadata } from "@/lib/report-ai-metadata"
+import { PromptChipsRow } from "./prompt-chips"
 
 export function YulaReportCriteriaCard({
   config,
@@ -61,11 +62,8 @@ export function YulaReportCriteriaCard({
       .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
       .map(([k]) => k.trim())
       .filter(Boolean)
-    if (names.length === 0) return
     setAiFilledNames(names)
-    // Vurgu kalıcı gürültü olmasın: birkaç saniye sonra solarak kaybolur.
-    const timer = setTimeout(() => setAiFilledNames([]), 5000)
-    return () => clearTimeout(timer)
+    // Vurgu kalıcıdır: bir sonraki AI dolumuna ya da bağlam değişimine dek sürer.
   }, [detailsData])
 
   const handleRun = async () => {
@@ -248,19 +246,13 @@ export function YulaReportCriteriaCard({
         className="max-h-64"
       />
       {quickPrompts.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/20 px-3 py-2">
-          <span className="text-[10px] font-medium text-muted-foreground">Öneriler:</span>
-          {quickPrompts.map((qp, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => void sendPrompt(`${config.title}: ${qp}`)}
-              className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary active:scale-95 cursor-pointer"
-            >
-              <Sparkles className="size-2.5 text-primary" />
-              {qp}
-            </button>
-          ))}
+        <div className="border-t bg-muted/20 px-3 py-2">
+          <span className="mr-1 text-[10px] font-medium text-muted-foreground">Öneriler:</span>
+          <PromptChipsRow
+            items={quickPrompts.map((qp) => ({ label: qp }))}
+            onPick={(item) => void sendPrompt(`${config.title}: ${item.label}`)}
+            className="inline-flex align-middle"
+          />
         </div>
       ) : null}
     </div>
