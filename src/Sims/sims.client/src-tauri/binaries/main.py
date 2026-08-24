@@ -623,7 +623,10 @@ def main():
                 try:
                     tool_name = payload.get("tool")
                     result_data = payload.get("result")
-                    handle_tool_result(tool_name, result_data)
+                    if not payload.get("skip_followup"):
+                        handle_tool_result(tool_name, result_data)
+                    # skip_followup: frontend deterministik yanıtı zaten gösterdi
+                    # (örn. skill export) → ikinci LLM özet turu gereksiz.
                 finally:
                     # Tüm yanıt zinciri bitti: UI işleme durumunu kapatabilir
                     send_json({"type": "status", "status": "agent_settled"})

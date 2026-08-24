@@ -105,17 +105,16 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
     return { status: "error", message: String(res.error) };
   }
   if (res.file_path) {
+    // Tek-satır sözleşme: [[file:<mutlak yol>|<etiket>]] token'ı TextPart tarafından
+    // tıklanabilir dosya adına çevrilir (tıkla → varsayılan uygulamada aç).
+    const label = res.file_name || "Dosya";
+    const rowsTxt = (res.rows_written ?? rows.length).toLocaleString("tr-TR");
     return {
       success: true,
-      // Kart sözleşmesi: customKind = skill adı → src/skills/<ad>/<ad>.card.tsx
-      // Bilinçli olarak `message` YOK: kart tek gösterimdir (çift baloncuk olmasın).
-      customKind: fn.name,
-      title: res.file_name || "Dışa aktarılan dosya",
-      file_path: res.file_path,
-      file_name: res.file_name,
-      rows_written: res.rows_written ?? rows.length,
-      format: res.format,
-      warning: res.warning,
+      skipFollowup: true, // sidecar ikinci LLM özet turu çalışmasın
+      message:
+        `📄 Rapor Excel'e aktarıldı: [[file:${res.file_path}|${label}]] (${rowsTxt} satır)` +
+        (res.warning ? `\n⚠️ ${res.warning}` : ""),
     };
   }
   return { success: true, raw: res, message: "Skill tamamlandı." };

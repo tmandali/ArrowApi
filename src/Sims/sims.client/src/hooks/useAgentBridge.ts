@@ -673,6 +673,7 @@ function handleSidecarEvent(evt: SidecarEvent) {
               requestId: evt.requestId,
               tool: toolName,
               result: execution.result,
+              skip_followup: Boolean(execution.result?.skipFollowup),
             }) + "\n"
           );
         }

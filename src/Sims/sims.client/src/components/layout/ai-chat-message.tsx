@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
 import type { UIMessage } from "ai"
-import { ArrowUpRight, Brain, ChevronDown, Wrench, Zap } from "lucide-react"
+import { ArrowUpRight, Brain, ChevronDown, FileSpreadsheet, Wrench, Zap } from "lucide-react"
 
 import { yulaCustomPartComponents } from "@/components/layout/yula-custom-parts"
 import { YulaAnalyticsCard } from "@/components/layout/yula-components"
@@ -556,6 +556,32 @@ function TextPart({
 }) {
   if (!text) return null
 
+  // Skill çıktısı dosya token'ı: [[file:<mutlak yol>|<etiket>]] → tıkla & varsayılan uygulamada aç
+  const FILE_TOKEN = /\[\[file:(.+?)\|(.+?)\]\]/g
+  if (role !== "user" && FILE_TOKEN.test(text)) {
+    FILE_TOKEN.lastIndex = 0
+    const segments: Array<{ type: "text" | "file"; value: string; path?: string }> = []
+    let last = 0
+    for (const m of text.matchAll(FILE_TOKEN)) {
+      if (m.index! > last) segments.push({ type: "text", value: text.slice(last, m.index) })
+      segments.push({ type: "file", value: m[2], path: m[1] })
+      last = m.index! + m[0].length
+    }
+    if (last < text.length) segments.push({ type: "text", value: text.slice(last) })
+
+    return (
+      <div className="text-[12px] leading-relaxed">
+        {segments.map((seg, i) =>
+          seg.type === "file" && seg.path ? (
+            <FileOpenChip key={i} path={seg.path} label={seg.value} />
+          ) : (
+            <span key={i}>{seg.value}</span>
+          )
+        )}
+      </div>
+    )
+  }
+
   if (role === "user") {
     return (
       <div className="ml-auto flex items-center max-w-[88%]">
@@ -567,6 +593,38 @@ function TextPart({
   }
 
   return <FormattedAssistantText text={text} message={message} />
+}
+
+function FileOpenChip({ path, label }: { path: string; label: string }) {
+  const [failed, setFailed] = React.useState(false)
+
+  const open = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-shell")
+      await open(path)
+      setFailed(false)
+    } catch (err) {
+      console.warn("[FileChip] açılamadı:", err)
+      setFailed(true)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      title={failed ? `Açılamadı — yol: ${path}` : path}
+      className={cn(
+        "mx-0.5 inline-flex max-w-64 items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 align-middle text-[11px] font-medium shadow-xs transition-colors",
+        failed
+          ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+          : "cursor-pointer text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+      )}
+    >
+      <FileSpreadsheet className="size-3 shrink-0" />
+      <span className="truncate">{label}</span>
+    </button>
+  )
 }
 
 /** Avatar-free message row — user bubble right, assistant text + reasoning left. */

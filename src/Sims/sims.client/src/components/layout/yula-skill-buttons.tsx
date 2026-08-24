@@ -81,18 +81,10 @@ export function YulaSkillButtons({ className }: { className?: string }) {
       const outcome = await invokeSkillDirect(entry.btn.call, entry.btn.args || {});
       const res = outcome.result || {};
       if (res.file_path) {
-        // Kart sözleşmesi: customKind = skill adı → *.card.tsx render eder
+        const rowsTxt = typeof res.rows_written === "number" ? ` (${res.rows_written.toLocaleString("tr-TR")} satır)` : "";
         appendMessage({
-          sender: "system",
-          content: "",
-          customKind: entry.btn.call,
-          toolResult: {
-            file_path: res.file_path,
-            file_name: res.file_name,
-            rows_written: res.rows_written,
-            format: res.format,
-            warning: res.warning,
-          },
+          sender: "agent",
+          content: `📄 Hazır: [[file:${res.file_path}|${res.file_name || "Dosya"}]]${rowsTxt}`,
         });
       } else if (!outcome.ok || res.error) {
         appendMessage({
