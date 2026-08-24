@@ -11,7 +11,8 @@ import { cn } from "@/utils/cn"
  *
  * - "Session" rozetli fonksiyonlar bridged'dir: aktif rapor verisiyle frontend
  *   üzerinden çalışır (örn. report_export_xlsx).
- * - Rozetsizler internal'dir: agent grafik içinde çalıştırır (örn. get_current_time).
+ * - Rozetsizler internal'dir: agent grafik içinde çalıştırır (sidecar'daki
+ *   needs_session_data=false fonksiyonlar).
  */
 export function YulaSkillsPanel({ className }: { className?: string }) {
   const skills = useAgentBridgeStore((s) => s.skills)
