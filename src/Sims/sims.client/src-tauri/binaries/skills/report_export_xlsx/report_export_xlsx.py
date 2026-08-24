@@ -9,7 +9,7 @@ import datetime
 import pathlib
 import tempfile
 
-from skill_registry import Button, skill
+from skill_registry import skill
 
 MAX_ROWS = 100_000
 
@@ -32,9 +32,9 @@ def _export_dir() -> pathlib.Path:
         "yolunu döndürür. Kullanıcı 'excel'e aktar', 'dışa aktar', 'indir' dediğinde kullan."
     ),
     needs_session=True,
-    buttons=[
-        Button("Excel'e Aktar", icon="download", scope={"screens": ["report-grid-*"]}),
-    ],
+    button="Excel'e Aktar",
+    icon="download",
+    scope={"screens": ["report-grid-*"]},
 )
 def run(rows=None, format: str = "xlsx", file_name=None, **_):
     rows = [dict(r) for r in (rows or [])]

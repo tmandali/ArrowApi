@@ -41,41 +41,33 @@ MAX_BRIDGE_ROWS = 100_000
 # için her fonksiyona kendi @skill'i verilir.
 # ---------------------------------------------------------------------------
 
-def Button(label: str, *, icon: str = "play", id: Optional[str] = None,
-           args: Optional[Dict[str, Any]] = None,
-           scope: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Bildirimsel header-buton tanımı (kapalı ikon seti frontend'de doğrulanır)."""
-    return {"id": id, "label": label, "icon": icon, "args": args or {}, "scope": scope}
-
-
 def skill(name: str, *, description: str = "", needs_session: bool = False,
           params: Optional[Dict[str, Any]] = None,
-          buttons: Optional[List[Dict[str, Any]]] = None):
-    """Bir aksiyon = bir fonksiyon. EN FAZLA BİR buton verilebilir.
+          button: Optional[str] = None, icon: str = "play",
+          scope: Optional[Dict[str, Any]] = None):
+    """Bir aksiyon = bir fonksiyon.
 
-    Butonun kimliği fonksiyon adıdır: farklı bir aksiyon isteniyorsa aynı
-    mantığı çağıran yeni bir fonksiyon yazılır (örn. run_xlsx / run_csv)
-    ve her biri kendi @skill'ini alır. Buton tıklamasında hangi aksiyonun
-    çalıştığı böylece hiçbir zaman belirsiz olmaz.
+    button: header'da görünecek etiket. Verilirse buton kimliği fonksiyon adıdır
+    (farklı aksiyon = farklı fonksiyon). None ise skill yalnızca LLM aracıdır,
+    UI'da buton çıkmaz.
     """
     def deco(fn):
-        btns = list(buttons or [])
-        if len(btns) > 1:
-            raise ValueError(
-                f"@skill({name!r}): birden fazla buton verilmez. Her aksiyon için "
-                f"ayrı fonksiyon + ayrı @skill tanımlayın (buton=fonksiyon birebir)."
-            )
-        sealed = [{
-            **b,
-            "id": b.get("id") or name,
-            "call": b.get("call") or name,
-        } for b in btns]
+        buttons = []
+        if button:
+            buttons.append({
+                "id": name,
+                "label": button,
+                "icon": icon,
+                "args": {},
+                "scope": scope,
+                "call": name,
+            })
         fn.__yula_meta__ = {
             "name": name,
             "description": description,
             "needs_session": needs_session,
             "parameters": params or {"type": "object", "properties": {}},
-            "buttons": sealed,
+            "buttons": buttons,
         }
         return fn
     return deco
