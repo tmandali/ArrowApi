@@ -587,19 +587,24 @@ function handleSidecarEvent(evt: SidecarEvent) {
     }
 
     // State-Driven Guard + parametre kesinleştirme
-    toolName = applyViewingStateGuard(toolName, lastPromptLower, isViewingResults, isAskingNewReport(lastPromptLower));
-    if (toolName === "filter_active_grid") {
-      // Needle'ın yanlış çıkarımına karşı deterministik guard:
-      // "kaç kayıt var" gibi sayım soruları filtre değeri OLAMAZ → KPI özetine delege edilir.
-      if (detectGridIntent(lastPromptLower) === "count") {
-        toolName = "analyze_grid_data";
-        toolArgs = ensureChartType({}, lastPromptLower);
-      } else {
-        toolArgs = synthesizeGridFilterArgs(toolArgs, lastPrompt);
+    // Skill araçları (örn. report_export_xlsx) muaftır: sonuç grid'i açıkken bile
+    // kendi amacıyla çalışmalı, filter_active_grid'e ezilmemeli.
+    const isSkillTool = Boolean(toolRegistry.get(toolName)?.skill);
+    if (!isSkillTool) {
+      toolName = applyViewingStateGuard(toolName, lastPromptLower, isViewingResults, isAskingNewReport(lastPromptLower));
+      if (toolName === "filter_active_grid") {
+        // Needle'ın yanlış çıkarımına karşı deterministik guard:
+        // "kaç kayıt var" gibi sayım soruları filtre değeri OLAMAZ → KPI özetine delege edilir.
+        if (detectGridIntent(lastPromptLower) === "count") {
+          toolName = "analyze_grid_data";
+          toolArgs = ensureChartType({}, lastPromptLower);
+        } else {
+          toolArgs = synthesizeGridFilterArgs(toolArgs, lastPrompt);
+        }
       }
-    }
-    if (toolName === "analyze_grid_data") {
-      toolArgs = ensureChartType(toolArgs, lastPromptLower);
+      if (toolName === "analyze_grid_data") {
+        toolArgs = ensureChartType(toolArgs, lastPromptLower);
+      }
     }
 
     void (async () => {

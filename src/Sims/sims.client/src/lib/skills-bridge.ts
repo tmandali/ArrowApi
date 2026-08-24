@@ -159,6 +159,8 @@ export function syncSkillsTools(
           " (Aktif raporun satırları otomatik alınır ve skill'e gönderilir.)",
         parameters: toToolParameters(fn),
         scope: { type: "global" },
+        // Sonuç grid'i açıkken bile export vb. skill'ler filter_active_grid'e ezilmez
+        skill: true,
         ai: { aliases: [skill.folder.replace(/_/g, " ")] },
         execute: (args: Record<string, any>) => executeBridgedSkill(fn, args),
       };

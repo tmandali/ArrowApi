@@ -23,6 +23,8 @@ export interface ToolDefinition {
   name: string;
   description: string;
   scope?: ToolScope;
+  /** Skill köprüsünden kaydedilen araçlar: state-driven viewing guard'ından muaftır. */
+  skill?: boolean;
   ai?: {
     aliases?: string[];
     quickPrompts?: string[];
