@@ -4,7 +4,7 @@ import type { UIMessage } from "ai"
 import { ArrowUpRight, Brain, ChevronDown, Wrench, Zap } from "lucide-react"
 
 import { yulaCustomPartComponents } from "@/components/layout/yula-custom-parts"
-import { YulaAnalyticsCard, YulaFileLinkCard } from "@/components/layout/yula-components"
+import { YulaAnalyticsCard } from "@/components/layout/yula-components"
 import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -613,12 +613,6 @@ export function AiChatMessage({
             const chartData = (part as any).data || (message as any).toolResult
             if (chartData) {
               return <YulaAnalyticsCard key={`${message.id}-c-${index}`} data={chartData} />
-            }
-          }
-          if (kindStr === "file_link") {
-            const fileData = (part as any).data || (message as any).toolResult
-            if (fileData?.file_path) {
-              return <YulaFileLinkCard key={`${message.id}-c-${index}`} data={fileData} />
             }
           }
           const CustomPart = yulaCustomPartComponents[part.kind]

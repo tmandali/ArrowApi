@@ -107,7 +107,9 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
   if (res.file_path) {
     return {
       success: true,
-      customKind: "file_link",
+      // Kart sözleşmesi: customKind = skill adı → src/skills/<ad>/<ad>.card.tsx
+      // (kartı olmayan skill'lerde sohbette yalnızca message metni görünür)
+      customKind: fn.name,
       title: res.file_name || "Dışa aktarılan dosya",
       file_path: res.file_path,
       file_name: res.file_name,

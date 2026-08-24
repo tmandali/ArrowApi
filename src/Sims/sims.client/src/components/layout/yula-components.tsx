@@ -1,7 +1,6 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
-import { ExternalLink, Play, Loader2, Sparkles, TrendingUp, BarChart3, PieChart as PieChartIcon, FileText, FileSpreadsheet, Copy, Check, AlertTriangle } from "lucide-react"
-import { isTauriEnv } from "@/lib/api-url"
+import { ExternalLink, Play, Loader2, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
 import {
@@ -397,74 +396,6 @@ export interface YulaFileLinkCardData {
   warning?: string
 }
 
-/** Bridged skill çıktısı: tek satırlık sade dosya kartı — isme tıkla → varsayılan uygulamada aç; hover'da kopyala. */
-export function YulaFileLinkCard({ data }: { data: YulaFileLinkCardData }) {
-  const [copied, setCopied] = React.useState(false)
-
-  const openFile = async () => {
-    if (isTauriEnv) {
-      try {
-        const { open } = await import("@tauri-apps/plugin-shell")
-        await open(data.file_path)
-        return
-      } catch {}
-    }
-    // Web modunda dosya sistemi yok: yolu panoya al
-    try {
-      await navigator.clipboard.writeText(data.file_path)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {}
-  }
-
-  const copyPath = async () => {
-    try {
-      await navigator.clipboard.writeText(data.file_path)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {}
-  }
-
-  return (
-    <div className="inline-block max-w-full">
-      <div className="group inline-flex max-w-full items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs shadow-xs">
-        {data.format === "csv" ? (
-          <FileText className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        ) : (
-          <FileSpreadsheet className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        )}
-        <button
-          type="button"
-          onClick={openFile}
-          title={data.file_path}
-          className="min-w-0 cursor-pointer truncate text-xs font-medium text-foreground underline-offset-2 hover:underline"
-        >
-          {data.file_name || data.title || "Dosya"}
-        </button>
-        {typeof data.rows_written === "number" ? (
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {data.rows_written.toLocaleString("tr-TR")}
-          </span>
-        ) : null}
-        <button
-          type="button"
-          onClick={copyPath}
-          aria-label="Yolu kopyala"
-          title={data.file_path}
-          className={cn(
-            "shrink-0 text-muted-foreground transition-opacity hover:text-foreground",
-            copied ? "opacity-100 text-emerald-600 dark:text-emerald-400" : "opacity-0 group-hover:opacity-100"
-          )}
-        >
-          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-        </button>
-      </div>
-      {data.warning ? (
-        <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="size-3 shrink-0" />
-          <span>{data.warning}</span>
-        </div>
-      ) : null}
-    </div>
-  )
-}
+// Kart bileşeni skill klasorune tasindi:
+// src/skills/report_export_xlsx/report_export_xlsx.card.tsx
+// (customKind = "report_export_xlsx" → yulaCustomPartComponents proxy'si cozer.)
