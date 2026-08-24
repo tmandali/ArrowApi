@@ -6,26 +6,13 @@ Dönüş: {file_path, file_name, rows_written} — [[file:...]] chip'i bununla �
 
 import csv
 import datetime
-import pathlib
-import tempfile
 
-from skill_registry import skill
+import yula
 
-MAX_ROWS = 100_000
+MAX_ROWS = yula.MAX_ROWS
 
 
-def _export_dir() -> pathlib.Path:
-    base = pathlib.Path.home() / "Downloads" / "yula-exports"
-    try:
-        base.mkdir(parents=True, exist_ok=True)
-        return base
-    except Exception:
-        fallback = pathlib.Path(tempfile.gettempdir()) / "yula-exports"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
-
-
-@skill(
+@yula.skill(
     name="report_export_xlsx",
     description=(
         "Aktif raporun satırlarını XLSX veya CSV dosyasına aktarır ve indirme "
@@ -47,10 +34,11 @@ def run(rows=None, format: str = "xlsx", file_name=None, **_):
         truncated = False
 
     columns = list(rows[0].keys())
-    out_dir = _export_dir()
+    out_dir = yula.exports_dir()
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     stem = (file_name or f"rapor-{stamp}").strip()
     fmt = "csv" if str(format).lower() == "csv" else "xlsx"
+    yula.log(f"dışa aktarma başladı: {stem}.{fmt} ({len(rows)} satır)")
 
     if fmt == "csv":
         path = out_dir / f"{stem}.csv"

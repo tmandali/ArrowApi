@@ -14,6 +14,7 @@ from intents import INTENTS, has_any, fold_tr
 from ai_provider_factory import AiProviderFactory
 from pydantic_ai_tool_adapter import PydanticAiToolAdapter
 import skill_registry
+import yula  # noqa: F401 — skill .py'larının `import yula` SDK'sı; PyInstaller bundle'a düşsün diye
 
 # PyInstaller bundle'indaki native Needle motorunu kullan (son kullanici makinesinde
 # ilk calistirmada ~14MB indirme gereksinimini ortadan kaldirir)
