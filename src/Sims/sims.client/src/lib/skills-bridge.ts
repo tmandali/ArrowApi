@@ -108,7 +108,7 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
     return {
       success: true,
       // Kart sözleşmesi: customKind = skill adı → src/skills/<ad>/<ad>.card.tsx
-      // (kartı olmayan skill'lerde sohbette yalnızca message metni görünür)
+      // Bilinçli olarak `message` YOK: kart tek gösterimdir (çift baloncuk olmasın).
       customKind: fn.name,
       title: res.file_name || "Dışa aktarılan dosya",
       file_path: res.file_path,
@@ -116,9 +116,6 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
       rows_written: res.rows_written ?? rows.length,
       format: res.format,
       warning: res.warning,
-      message:
-        `📄 **${res.file_name}** hazır — ${(res.rows_written ?? rows.length).toLocaleString("tr-TR")} satır aktarıldı.` +
-        (res.warning ? `\n\n⚠️ ${res.warning}` : ""),
     };
   }
   return { success: true, raw: res, message: "Skill tamamlandı." };
