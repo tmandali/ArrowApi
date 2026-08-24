@@ -85,10 +85,11 @@ import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
 import { readReportAiMetadata } from "@/lib/report-ai-metadata"
 import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest"
+import { registerReportRunner } from "@/lib/report-run-bus"
 import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
 import stockAnalyticsCriteriaSchema from "../schemas/stock-analytics-criteria.schema.json"
 
-export type ItemFormTab =
+export type StockModuleTab =
   | "details"
   | "dashboard"
   | "inventory"
@@ -101,7 +102,7 @@ export type ItemFormTab =
   | "quality"
   | "manufacturing"
 
-const TAB_ITEMS: { value: ItemFormTab; label: string }[] = [
+const TAB_ITEMS: { value: StockModuleTab; label: string }[] = [
   { value: "details", label: "Details" },
   { value: "dashboard", label: "Dashboard" },
   { value: "inventory", label: "Inventory" },
@@ -115,7 +116,7 @@ const TAB_ITEMS: { value: ItemFormTab; label: string }[] = [
   { value: "manufacturing", label: "Manufacturing" },
 ]
 
-const PLACEHOLDER_TABS: ItemFormTab[] = [
+const PLACEHOLDER_TABS: StockModuleTab[] = [
   "dashboard",
   "inventory",
   "variants",
@@ -126,10 +127,10 @@ const PLACEHOLDER_TABS: ItemFormTab[] = [
   "manufacturing",
 ]
 
-type ItemFormProps = {
-  tabs?: ItemFormTab[]
-  tabLabels?: Partial<Record<ItemFormTab, string>>
-  defaultTab?: ItemFormTab
+type StockModuleShellProps = {
+  tabs?: StockModuleTab[]
+  tabLabels?: Partial<Record<StockModuleTab, string>>
+  defaultTab?: StockModuleTab
   mode?:
     | "item"
     | "stock-analytics"
@@ -165,7 +166,7 @@ type ItemFormProps = {
   reportJobSession?: ReportModuleJobSession
 }
 
-export function ItemForm({
+export function StockModuleShell({
   tabs = TAB_ITEMS.map((tab) => tab.value),
   tabLabels,
   defaultTab,
@@ -178,7 +179,7 @@ export function ItemForm({
   reportModule,
   onReportJobCreated,
   reportJobSession,
-}: ItemFormProps) {
+}: StockModuleShellProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isStockAnalytics = mode === "stock-analytics"
   const isStockLedger = mode === "stock-ledger"
@@ -223,6 +224,18 @@ export function ItemForm({
       ? (digest.fields as unknown as Array<Record<string, unknown>>)
       : undefined;
   }, [isReportShell, currentSchema])
+
+  // Run tuşunun aynısını AI'a aç: jenerik run_report aracı bu otobüsü tetikler
+  const runCriteriaRef = React.useRef<() => void>(() => {});
+  runCriteriaRef.current = () => {
+    if (!isReportShell) return;
+    void handleCriteriaSubmit();
+  };
+
+  React.useEffect(() => {
+    if (!isReportShell) return;
+    return registerReportRunner(mode, () => runCriteriaRef.current());
+  }, [isReportShell, mode]);
 
   useScreenAgentContext({
     screenId: isReportShell ? mode : "item-form",

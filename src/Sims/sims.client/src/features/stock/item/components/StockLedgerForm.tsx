@@ -1,8 +1,8 @@
-import { ItemForm } from "./ItemForm"
+import { StockModuleShell } from "./StockModuleShell"
 
 export function StockLedgerForm() {
   return (
-    <ItemForm
+    <StockModuleShell
       mode="stock-ledger"
       tabs={["tax"]}
       defaultTab="tax"

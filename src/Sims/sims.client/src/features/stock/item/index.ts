@@ -1,5 +1,5 @@
-export { ItemForm } from "./components/ItemForm"
-export type { ItemFormTab } from "./components/ItemForm"
+export { StockModuleShell } from "./components/StockModuleShell"
+export type { StockModuleTab } from "./components/StockModuleShell"
 export { ItemImageUpload } from "./components/ItemImageUpload"
 export { ItemTaxTab } from "./components/ItemTaxTab"
 export { StockAnalyticsForm } from "./components/StockAnalyticsForm"

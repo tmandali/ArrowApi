@@ -2,7 +2,7 @@ import * as React from "react"
 import { useArrowJobRunner } from "@/features/jobs"
 import { selectPendingStockAnalyticsJob } from "@/store/slices/active-jobs-store"
 import type { ArrowJobStatus } from "@/features/jobs"
-import { ItemForm } from "./ItemForm"
+import { StockModuleShell } from "./StockModuleShell"
 
 const STOCK_ANALYTICS_PATH = "/stock/stock-analytics"
 const STOCK_ANALYTICS_JOBS = "/api/arrow/jobs/stock-analytics"
@@ -48,7 +48,7 @@ export function StockAnalyticsForm() {
   )
 
   return (
-    <ItemForm
+    <StockModuleShell
       mode="stock-analytics"
       tabs={[]}
       onStartNewReport={() => {
