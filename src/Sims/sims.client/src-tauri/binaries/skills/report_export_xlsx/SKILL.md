@@ -1,6 +1,17 @@
 ---
 name: report_export_xlsx
 description: Aktif raporun verisini XLSX veya CSV dosyasına aktarır ve indirme bağlantısı döndürür.
+ui:
+  header_buttons:
+    - id: export-xlsx
+      label: "Excel'e Aktar"
+      icon: download
+      call: report_export_xlsx
+      args:
+        format: xlsx
+      scope:
+        screens:
+          - "report-grid-*"
 ---
 
 # Rapor Dışa Aktarma (XLSX/CSV)

@@ -121,6 +121,53 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
   return { success: true, raw: res, message: "Skill tamamlandı." };
 }
 
+/**
+ * Header-buton gibi LLM'siz doğrudan tetiklemeler için.
+ * needs_session_data=true ise aktif tablo satırları otomatik eklenir.
+ * Dönüş: ham skill sonucu (örn. {file_path, ...}) veya hata.
+ */
+export async function invokeSkillDirect(
+  fnName: string,
+  args: Record<string, any> = {}
+): Promise<{ ok: boolean; result?: Record<string, any>; error?: string }> {
+  const skills = useAgentBridgeStore.getState().skills;
+  let needsSession = false;
+  let found = false;
+  for (const s of skills) {
+    const f = s.functions.find((x) => x.name === fnName);
+    if (f) {
+      found = true;
+      needsSession = f.needs_session_data;
+      break;
+    }
+  }
+  if (!found) {
+    return { ok: false, error: `Skill fonksiyonu bulunamadı: ${fnName}` };
+  }
+
+  if (!needsSession) {
+    return await callBridge(fnName, null, args);
+  }
+
+  const table = await resolveActiveTable(args?.table);
+  if (!table) {
+    return { ok: false, error: "Aktif rapor tablosu bulunamadı." };
+  }
+  let rows: Record<string, unknown>[];
+  try {
+    const escaped = `"${String(table).replace(/"/g, '""')}"`;
+    rows = await duckDbClient.executeCustomSql(`SELECT * FROM ${escaped} LIMIT ${MAX_EXPORT_ROWS}`);
+  } catch (err: any) {
+    return { ok: false, error: `Tablo okunamadı (${table}): ${err?.message || err}` };
+  }
+  if (!rows.length) {
+    return { ok: false, error: `"${table}" tablosu boş.` };
+  }
+
+  const { table: _ignored, ...skillArgs } = args;
+  return await callBridge(fnName, rows, skillArgs);
+}
+
 function toToolParameters(fn: SkillFunctionInfo): ToolDefinition["parameters"] {
   // Sidecar TOOL.parameters JSON-Schema'dır; ToolParameter'a çevir
   const schema = (fn as any).parameters || {};

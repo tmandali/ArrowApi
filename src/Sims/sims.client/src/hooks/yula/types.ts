@@ -79,6 +79,7 @@ export interface SkillFunctionInfo {
 export interface SkillInfo {
   folder: string;
   recipe_md?: string | null;
+  ui?: SkillUi;
   functions: SkillFunctionInfo[];
 }
 

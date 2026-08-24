@@ -5,6 +5,7 @@ import {
   pageHeaderShellClass,
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
+import { YulaSkillButtons } from "@/components/layout/yula-skill-buttons"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { cn } from "@/utils/cn"
@@ -55,6 +56,8 @@ export function WorkspacePageHeader({
         ) : null}
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          {/* Skill'lerin ui.header_buttons bildirimi: yüklü skill varsa LLM'siz aksiyon butonları */}
+          <YulaSkillButtons />
           {actions}
         </div>
       </header>
