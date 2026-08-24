@@ -47,6 +47,26 @@ export interface ActiveReportMemory {
   pagePath?: string;
 }
 
+/** Skill'in SKILL.md frontmatter'ındaki bildirimsel UI bağları. */
+export interface SkillHeaderButton {
+  id: string;
+  label: string;
+  /** Kapalı lucide ikon adları: plus | trash | download | upload | refresh | play */
+  icon?: string;
+  /** Tetiklenecek TOOL adı (skill fonksiyonu). */
+  call: string;
+  args?: Record<string, any>;
+  scope?: {
+    workspaces?: string[];
+    /** screenId öneki; "report-grid-*" gibi yıldızlı eşleşme */
+    screens?: string[];
+  };
+}
+
+export interface SkillUi {
+  header_buttons?: SkillHeaderButton[];
+}
+
 /** Sidecar skill fonksiyonu (skills/<klasör>/SKILL.md + *.py sözleşmesi). */
 export interface SkillFunctionInfo {
   name: string;

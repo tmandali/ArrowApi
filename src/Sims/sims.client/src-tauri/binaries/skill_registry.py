@@ -46,6 +46,8 @@ class Skill:
     dir_path: Path
     recipe_md: Optional[str] = None  # SKILL.md gövdesi (frontmatter hariç tarife)
     functions: List[SkillFunction] = field(default_factory=list)
+    # Frontmatter'daki bildirimsel UI bağları (örn. ui.header_buttons)
+    ui: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def internal_functions(self) -> List[SkillFunction]:
@@ -115,6 +117,8 @@ def discover_skill_dirs(base_dirs: List[Path]) -> List[Skill]:
                     skill.recipe_md = body or None
                     if meta.get("description"):
                         skill.description_override = str(meta["description"])
+                    if isinstance(meta.get("ui"), dict):
+                        skill.ui = meta["ui"]
                 except Exception:
                     pass
 

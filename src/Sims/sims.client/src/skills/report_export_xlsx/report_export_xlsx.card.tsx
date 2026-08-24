@@ -26,27 +26,33 @@ export interface SkillCardProps {
 export default function ReportExportXlsxCard({ data }: SkillCardProps) {
   const d = data
   const [copied, setCopied] = React.useState(false)
+  const [openFailed, setOpenFailed] = React.useState(false)
 
   if (!d?.file_path) return null
 
+  // İSİM TIKI → yalnızca AÇ. Kopyaya asla düşmez; hata görünür işaretlenir.
+  const openFile = async () => {
+    setOpenFailed(false)
+    if (!isTauriEnv) {
+      setOpenFailed(true)
+      return
+    }
+    try {
+      const { open } = await import("@tauri-apps/plugin-shell")
+      await open(d.file_path)
+    } catch (err) {
+      console.warn("[skill card] Dosya açılamadı:", err)
+      setOpenFailed(true)
+    }
+  }
+
+  // İKON → yalnızca KOPYALA.
   const copyPath = async () => {
     try {
       await navigator.clipboard.writeText(d.file_path)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {}
-  }
-
-  const openFile = async () => {
-    if (isTauriEnv) {
-      try {
-        const { open } = await import("@tauri-apps/plugin-shell")
-        await open(d.file_path)
-        return
-      } catch {}
-    }
-    // Web modunda dosya sistemi yok: yolu panoya al
-    void copyPath()
   }
 
   return (
@@ -60,8 +66,11 @@ export default function ReportExportXlsxCard({ data }: SkillCardProps) {
         <button
           type="button"
           onClick={openFile}
-          title={d.file_path}
-          className="min-w-0 cursor-pointer truncate text-xs font-medium text-foreground underline-offset-2 hover:underline"
+          title={openFailed ? "Açılamadı — ikonla yolu kopyalayın" : d.file_path}
+          className={cn(
+            "min-w-0 cursor-pointer truncate text-xs font-medium underline-offset-2 hover:underline",
+            openFailed ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+          )}
         >
           {d.file_name || d.title || "Dosya"}
         </button>
