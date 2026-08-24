@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
-import { ExternalLink, Play, Loader2, Sparkles, TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react"
+import { ExternalLink, Play, Loader2, Sparkles, TrendingUp, BarChart3, PieChart as PieChartIcon, FileText, FileSpreadsheet, Copy, Check, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
 import {
@@ -383,6 +383,69 @@ export function YulaAnalyticsCard({ data }: { data: YulaAnalyticsCardData }) {
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+export interface YulaFileLinkCardData {
+  title?: string
+  file_path: string
+  file_name: string
+  rows_written?: number
+  format?: string
+  warning?: string
+}
+
+/** Bridged skill çıktısı: indirilebilir dosya kartı (örn. report_export_xlsx). */
+export function YulaFileLinkCard({ data }: { data: YulaFileLinkCardData }) {
+  const [copied, setCopied] = React.useState(false)
+
+  const copyPath = async () => {
+    try {
+      await navigator.clipboard.writeText(data.file_path)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {}
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-emerald-500/25 bg-card text-card-foreground shadow-md">
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3.5 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            {data.format === "csv" ? <FileText className="size-3.5" /> : <FileSpreadsheet className="size-3.5" />}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold text-foreground">{data.title || data.file_name}</div>
+            {typeof data.rows_written === "number" ? (
+              <div className="text-[10px] text-muted-foreground">
+                {data.rows_written.toLocaleString("tr-TR")} satır · {(data.format || "xlsx").toUpperCase()}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px]"
+          onClick={copyPath}
+        >
+          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+          {copied ? "Kopyalandı" : "Yolu Kopyala"}
+        </Button>
+      </div>
+      <div className="px-3.5 py-2.5">
+        <div className="truncate font-mono text-[11px] text-muted-foreground" title={data.file_path}>
+          {data.file_path}
+        </div>
+        {data.warning ? (
+          <div className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+            <span>{data.warning}</span>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

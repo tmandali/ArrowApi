@@ -30,13 +30,16 @@ import { workspaceLabelFromPath } from "@/lib/empty-module"
 import { useLocation } from "react-router-dom"
 import { cn } from "@/utils/cn"
 import { YulaQuickActionChips } from "@/components/layout/yula-quick-chips"
+import { YulaSkillsPanel } from "@/components/layout/yula-skills-panel"
 import {
   ArrowDown,
   ArrowUp,
   Brain,
+  ChevronDown,
   FileText,
   Paperclip,
   Plus,
+  Puzzle,
   SquarePen,
   X,
 } from "lucide-react"
@@ -225,6 +228,8 @@ export function AIChatPanel({
   const showCommands = commandMatches !== null
   const hasUserMessages = messages.some((message) => message.role === "user")
   const showCenteredIntro = centeredIntro && !hasUserMessages
+  const skillCount = useAgentBridgeStore((s) => s.skills.length)
+  const [skillsOpen, setSkillsOpen] = React.useState(false)
 
   const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current
@@ -469,6 +474,9 @@ export function AIChatPanel({
               {introDescription}
             </p>
             <div className="mt-8 flex w-full justify-center">{inputArea}</div>
+            {skillCount > 0 ? (
+              <YulaSkillsPanel className="mt-6 w-full max-w-md" />
+            ) : null}
           </div>
         ) : (
           <>
@@ -538,6 +546,24 @@ export function AIChatPanel({
           </>
         )}
       </div>
+
+      {skillCount > 0 && !showCenteredIntro ? (
+        <div className="mx-auto w-full max-w-3xl px-3 pb-1">
+          <button
+            type="button"
+            onClick={() => setSkillsOpen((v) => !v)}
+            className={cn(
+              "flex cursor-pointer items-center gap-1.5 rounded-full border bg-card/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground",
+              skillsOpen && "border-primary/30 text-foreground"
+            )}
+          >
+            <Puzzle className="size-3" />
+            Yetenekler ({skillCount})
+            <ChevronDown className={cn("size-3 transition-transform", !skillsOpen && "-rotate-90")} />
+          </button>
+          {skillsOpen ? <YulaSkillsPanel className="mt-1.5 max-h-56 overflow-y-auto" /> : null}
+        </div>
+      ) : null}
 
       {!showCenteredIntro ? inputArea : null}
     </div>

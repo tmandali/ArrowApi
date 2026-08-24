@@ -177,6 +177,8 @@ export function ArrowReportGrid({
     activeDataSummary: {
       isViewingResults: true,
       jobId,
+      // Skill köprüsü (örn. report_export_xlsx) aktif tabloyu buradan çözer
+      tableName: jobId ? `report_${jobId.replace(/[^a-zA-Z0-9_]/g, "_")}` : "current_report",
       totalRows,
       totalFiltered,
       columns: effectiveColumns.map((c) => c.name),

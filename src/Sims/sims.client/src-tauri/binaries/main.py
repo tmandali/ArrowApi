@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sims AI Agent Sidecar — Ollama (gemma4:12b-mlx) Tool Calling & MCP Bridge
+Sims AI Agent Sidecar — Multi-Provider Pydantic AI Engine & Skill Bridge
 """
 
 import sys
@@ -13,6 +13,7 @@ from schema_guard import fuzzy_similarity
 from intents import INTENTS, has_any, fold_tr
 from ai_provider_factory import AiProviderFactory
 from pydantic_ai_tool_adapter import PydanticAiToolAdapter
+import skill_registry
 
 # PyInstaller bundle'indaki native Needle motorunu kullan (son kullanici makinesinde
 # ilk calistirmada ~14MB indirme gereksinimini ortadan kaldirir)
@@ -52,6 +53,65 @@ conversation_history = []
 registered_tools = []
 active_request_id = None
 awaiting_llm_tool_result = False
+
+# Skill Registry: skills/<klasör>/SKILL.md + *.py (internal → agent içinde; bridged → frontend köprüsü)
+loaded_skills = []
+
+
+def _skill_base_dirs():
+    dirs = [skill_registry.Path(__file__).resolve().parent / "skills"]
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            dirs.insert(0, skill_registry.Path(meipass) / "skills")
+    return dirs
+
+
+def refresh_skills():
+    global loaded_skills
+    loaded_skills = skill_registry.discover_skill_dirs(_skill_base_dirs())
+    return loaded_skills
+
+
+def emit_skills_list():
+    items = [
+        {
+            "folder": s.folder_name,
+            "recipe_md": s.recipe_md,
+            "functions": [
+                {
+                    "name": f.name,
+                    "description": f.description,
+                    "needs_session_data": f.needs_session_data,
+                }
+                for f in s.functions
+            ],
+        }
+        for s in loaded_skills
+    ]
+    send_json({"type": "skills_list", "skills": items})
+
+
+def internal_skill_tools():
+    """Internal skill fonksiyonlarını pydantic_ai Tool'a çevirir (grafik içinde çalışırlar)."""
+    from pydantic_ai import Tool as PaiTool
+
+    tools = []
+    for s in loaded_skills:
+        for f in s.internal_functions:
+            try:
+                tools.append(
+                    PaiTool.from_schema(
+                        f.run_callable,
+                        name=f.name,
+                        description=f.description,
+                        json_schema=f.parameters,
+                    )
+                )
+            except Exception as e:
+                sys.stderr.write(f"[Skill Registry] {f.name} Tool'a çevrilemedi: {e}\n")
+    return tools
+
 
 def send_json(data):
     """stdout kanalına tek satır JSON basar ve tamponu hemen boşaltır (flush)."""
@@ -324,7 +384,8 @@ def handle_user_task(prompt_text, context=None):
         message_data, telemetry_info = AiProviderFactory.execute_chat(
             conversation_history, tools, active_ai_config,
             on_delta=_forward_delta,
-            on_internal_tool=_forward_internal_tool
+            on_internal_tool=_forward_internal_tool,
+            internal_tools=internal_skill_tools()
         )
         telemetry_info["systemPrompt"] = conversation_history[0]["content"] if conversation_history else ""
         
@@ -416,22 +477,26 @@ def handle_user_task(prompt_text, context=None):
             })
             return
 
-        provider = active_ai_config.get("provider", "ollama").upper()
+        provider_raw = (active_ai_config.get("provider") or "ollama").lower()
+        provider = provider_raw.upper()
         model = active_ai_config.get("model", "")
         err_msg = str(e)
-        err_lower = err_msg.lower()
+        err_kind = getattr(e, "kind", None)  # ProviderError: connection | timeout | forbidden | provider
 
-        if "403" in err_msg or "policy" in err_lower:
-            user_msg = f"⚠️ **AI Sağlayıcı Bağlantı Hatası ({provider} - {model}):**\nSunucuya erişim reddedildi (`HTTP 403 Forbidden`). Lütfen Azure / bulut portalınızdan ağ ve IP erişim izinlerinizi kontrol edin."
-        elif "11434" in err_lower or "connection refused" in err_lower or "ollama" in err_lower or "errno 61" in err_lower or "timed out" in err_lower or "timeout" in err_lower:
-            endpoint = active_ai_config.get("endpoint", "http://127.0.0.1:11434")
+        if err_kind == "forbidden":
+            user_msg = f"⚠️ **AI Sağlayıcı Erişim Reddi ({provider} - {model}):**\nSunucuya erişim reddedildi (`HTTP 403 Forbidden`). Lütfen bulut portalınızdan ağ ve IP erişim izinlerinizi kontrol edin."
+        elif provider_raw == "ollama" and err_kind in ("connection", "timeout"):
+            # Gerçekten yerel servis erişilemedi (istisna tipinden sınıflandırıldı,
+            # metin aramasıyla değil) → yerel kontrol listesi göster.
+            endpoint = active_ai_config.get("endpoint", "")
             user_msg = (
-                f"⚠️ **Yerel Model Bağlantı Hatası (Ollama - {model}):**\n\n"
-                f"`{endpoint}` adresindeki Ollama servisine bağlanılamadı veya istek zaman aşımına uğradı.\n\n"
+                f"⚠️ **Yerel Model Bağlantı Hatası ({provider} - {model}):**\n\n"
+                f"`{endpoint}` adresindeki model servisine {'erişilemedi' if err_kind == 'connection' else 'gönderilen istek zaman aşımına uğradı'}.\n\n"
                 f"**Kontrol Listesi:**\n"
-                f"1. Ollama uygulamasının açık olduğunu kontrol edin (`ollama serve`).\n"
-                f"2. `{model}` modelinin yüklü olduğunu doğrulayın (`ollama list`).\n"
-                f"3. Dilerseniz Ayarlar sayfasından bulut AI sağlayıcılarına (OpenAI, Gemini, Azure) geçiş yapabilirsiniz."
+                f"1. Yerel model sunucusunun (Ollama vb.) açık olduğunu kontrol edin.\n"
+                f"2. `{model}` modelinin yüklü olduğunu doğrulayın.\n"
+                f"3. Dilerseniz Ayarlar sayfasından bulut AI sağlayıcılarına (OpenAI, Gemini, Azure) geçiş yapabilirsiniz.\n\n"
+                f"_Teknik detay: {err_msg}_"
             )
         else:
             user_msg = f"⚠️ **AI Sağlayıcı Hatası ({provider}):** {err_msg}\nLütfen Ayarlar sayfasından model, API key veya endpoint tercihlerinizi kontrol edin."
@@ -514,6 +579,12 @@ def main():
         "message": f"Yula AI Sidecar (Needle 2 SLM & Multi-Provider Pydantic AI Engine) aktif ve dinliyor."
     })
 
+    try:
+        refresh_skills()
+        emit_skills_list()
+    except Exception as e:
+        sys.stderr.write(f"[Skill Registry] keşif hatası: {e}\n")
+
     while True:
         line = sys.stdin.readline()
         if not line:
@@ -568,6 +639,28 @@ def main():
                     send_json({"type": "status", "status": "agent_settled"})
                     active_request_id = None
                 
+            elif action == "list_skills":
+                refresh_skills()
+                emit_skills_list()
+
+            elif action == "bridge_call":
+                # Frontend köprüsü: session verisiyle çalışan skill fonksiyonunu yürüt
+                active_request_id = payload.get("requestId")
+                tool_name = payload.get("tool") or ""
+                rows = payload.get("rows")
+                args = payload.get("args") or {}
+                fn = skill_registry.find_function(loaded_skills, tool_name)
+                if fn is None:
+                    send_json({"type": "bridge_result", "ok": False, "error": f"Skill fonksiyonu bulunamadı: {tool_name}"})
+                elif not fn.needs_session_data and rows is None:
+                    # Internal skill'ler agent içinde çalışır; buraya düşmemeli ama güvenli davran
+                    outcome = skill_registry.safe_run(fn, None, args)
+                    send_json({"type": "bridge_result", "tool": tool_name, **outcome})
+                else:
+                    outcome = skill_registry.safe_run(fn, rows, args)
+                    send_json({"type": "bridge_result", "tool": tool_name, **outcome})
+                active_request_id = None
+
             elif action == "reset":
                 awaiting_llm_tool_result = False
                 conversation_history = [{

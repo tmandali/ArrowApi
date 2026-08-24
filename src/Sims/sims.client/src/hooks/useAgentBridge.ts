@@ -35,6 +35,7 @@ export type {
   AiProviderConfig,
   ActiveReportMemory,
   SidecarEvent,
+  SkillInfo,
 } from "./yula/types";
 
 import type {
@@ -44,6 +45,7 @@ import type {
   AiProviderConfig,
   ActiveReportMemory,
   SidecarEvent,
+  SkillInfo,
 } from "./yula/types";
 
 interface AgentBridgeStore {
@@ -62,6 +64,10 @@ interface AgentBridgeStore {
   aiFilledCriteria: Record<string, { names: string[]; at: number }>;
   lastActiveReport: ActiveReportMemory | null;
   aiConfig: AiProviderConfig;
+  /** Sidecar skill klasörleri (skills_list event'i ile doldurulur). */
+  skills: SkillInfo[];
+  /** Sidecar stdin'e ham satır yazar; bağlı değilse false döner. */
+  writeToSidecar: (line: string) => boolean;
   setAiConfig: (config: Partial<AiProviderConfig>) => void;
   setScreenContext: (ctx: ScreenContext) => void;
   setAiFilledCriteria: (scope: string, names: string[]) => void;
@@ -271,6 +277,15 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
     },
   ],
   isProcessing: false,
+  skills: [],
+
+  writeToSidecar: (line) => {
+    if (!sharedChildProcess) return false;
+    sharedChildProcess
+      .write(line.endsWith("\n") ? line : line + "\n")
+      .catch((err: any) => console.error("[Sidecar Write Error]:", err));
+    return true;
+  },
 
   newConversation: () => {
     // Bellek sıfırlanınca son raporun kriter sindirimi önbelleği de temizlenir
@@ -705,9 +720,37 @@ function handleSidecarEvent(evt: SidecarEvent) {
     return;
   }
 
+  // 2b-1. Skill keşfi: klasör listesi store'a + bridged skill'ler toolRegistry'ye
+  if (evt.type === "skills_list") {
+    const skills = Array.isArray(evt.skills) ? evt.skills : [];
+    useAgentBridgeStore.setState({ skills });
+    void (async () => {
+      try {
+        const { syncSkillsTools } = await import("@/lib/skills-bridge");
+        syncSkillsTools(skills);
+        console.log(`[Skills] ${skills.length} skill klasörü senkronlandı.`);
+      } catch (err) {
+        console.error("[Skills] toolRegistry senkronizasyonu başarısız:", err);
+      }
+    })();
+    return;
+  }
+
+  // 2b-2. Bridged skill yürütme sonucu (skills-bridge bekleyenlerini çöz)
+  if (evt.type === "bridge_result") {
+    void (async () => {
+      const { resolveBridgeWaiter } = await import("@/lib/skills-bridge");
+      resolveBridgeWaiter(evt.requestId, {
+        ok: Boolean(evt.ok),
+        result: evt.result,
+        error: evt.error,
+      });
+    })();
+    return;
+  }
+
   // 2c. Sidecar-içinde yürütülen yetenekler (örn. web_fetch) — DevTools telemetrisi + sohbet bildirimi
-  if (evt.type === "internal_tool") {
-    logAiTelemetry({
+  if (evt.type === "internal_tool") {    logAiTelemetry({
       source: "Yula Internal Capability (Sidecar-içi)",
       model: evt.tool || "internal_tool",
       userPrompt: getState().lastPrompt || "",

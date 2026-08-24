@@ -29,6 +29,14 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
 
+class ProviderError(RuntimeError):
+    """Sağlayıcı çağrısı hatası. kind: connection | timeout | forbidden | provider."""
+
+    def __init__(self, message: str, kind: str = "provider"):
+        super().__init__(message)
+        self.kind = kind
+
+
 class AiProviderFactory:
     """
     Pydantic AI tabanlı Model-Agnostik Çoklu Sağlayıcı Fabrikası.
@@ -334,8 +342,53 @@ class AiProviderFactory:
         }
         return message_data, telemetry
 
+    @staticmethod
+    def _classify_exception(err: BaseException) -> Optional[str]:
+        """İstisna tipinden gerçek hata sınıfını çıkarır (metin araması YOK).
+
+        Dönüş: connection | timeout | None (sınıflandırılamadı).
+        OpenAI SDK ve pydantic-ai hataları sardığı için cause zinciri izlenir;
+        hem httpx hem httpx2 (pydantic-ai taşıyıcısı) tipleri kontrol edilir.
+        """
+        connection_types = []
+        timeout_types = []
+
+        try:
+            import httpx
+            connection_types += [httpx.ConnectError, httpx.ConnectTimeout]
+            timeout_types += [httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout]
+        except ImportError:
+            pass
+        try:
+            import httpx2  # pydantic-ai Ollama/OpenAI transport'u bunu kullanır
+            connection_types += [httpx2.ConnectError, httpx2.ConnectTimeout]
+            timeout_types += [httpx2.ReadTimeout, httpx2.WriteTimeout, httpx2.PoolTimeout]
+        except ImportError:
+            pass
+        try:
+            from openai import APIConnectionError, APITimeoutError
+            timeout_types.append(APITimeoutError)
+            connection_types.append(APIConnectionError)
+        except ImportError:
+            pass
+
+        seen = set()
+        cur: Optional[BaseException] = err
+        while cur is not None and id(cur) not in seen:
+            seen.add(id(cur))
+            for t in timeout_types:
+                if isinstance(cur, t):
+                    return "timeout"
+            for t in connection_types:
+                if isinstance(cur, t):
+                    return "connection"
+            cur = cur.__cause__ or cur.__context__
+        return None
+
     @classmethod
-    def _translate_error(cls, err: Exception, cfg: Dict[str, Any]) -> str:
+    def _translate_error(cls, err: Exception, cfg: Dict[str, Any]) -> Tuple[str, str]:
+        """(kullanıcı mesajı, hata türü) döner. Hata türü istisna tipinden üretilir;
+        sağlayıcı adı içeren metin araması yapılmaz."""
         provider = (cfg.get("provider") or "ollama").lower()
         model = cfg.get("model") or ""
         err_text = str(err)
@@ -343,13 +396,25 @@ class AiProviderFactory:
 
         if status == 403 or "403" in err_text or "policy" in err_text.lower():
             return (
-                f"⚠️ **AI Sağlayıcı Bağlantı Hatası ({provider.upper()} - {model}):**\n"
-                f"Sunucuya erişim reddedildi (`HTTP 403 Forbidden`). Lütfen bulut portalınızdan ağ ve IP erişim izinlerinizi kontrol edin."
+                f"⚠️ **AI Sağlayıcı Erişim Reddi ({provider.upper()} - {model}):**\n"
+                f"Sunucuya erişim reddedildi (`HTTP 403 Forbidden`). Lütfen bulut portalınızdan ağ ve IP erişim izinlerinizi kontrol edin.",
+                "forbidden",
             )
-        if provider == "ollama":
-            endpoint = cfg.get("endpoint") or "http://127.0.0.1:11434"
-            return f"Ollama servisine bağlanılamadı ({endpoint}): {err_text}"
-        return f"Sağlayıcı çağrısı başarısız ({provider} - {model}): {err_text}"
+
+        kind = cls._classify_exception(err) or "provider"
+
+        if kind == "connection":
+            endpoint = cfg.get("endpoint") or "(yapılandırılmamış)"
+            return (
+                f"⚠️ **Model servisine bağlanılamadı ({provider} - {model}):**\n`{endpoint}`",
+                kind,
+            )
+        if kind == "timeout":
+            return (
+                f"⚠️ **Model isteği zaman aşımına uğradı ({provider} - {model}):**\n{err_text}",
+                kind,
+            )
+        return (f"Sağlayıcı çağrısı başarısız ({provider} - {model}): {err_text}", kind)
 
     @classmethod
     def engine_label(cls, cfg: Dict[str, Any]) -> Tuple[str, str]:
@@ -395,19 +460,32 @@ class AiProviderFactory:
         return names
 
     @classmethod
+    def _internal_capability_directive(cls, internal_tools) -> str:
+        """Sidecar-içinde çalışan araçların (web_fetch + internal skill'ler) prompt beyanı."""
+        names = [cls.WEB_FETCH_TOOL_NAME] + [t.name for t in (internal_tools or [])]
+        return (
+            "\nYERLEŞİK YETENEKLER (SİDECAR-İÇİ ARAÇLAR):\n"
+            + "- Şu araçlar listede görünmese dahi çağrılabilir ve SİSTEMİN KENDİSİNCE çalıştırılır: "
+            + ", ".join(names)
+            + ".\n"
+        )
+
+    @classmethod
     def execute_chat(
         cls,
         conversation_history: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         config: Optional[Dict[str, Any]] = None,
         on_delta: Optional[Any] = None,
-        on_internal_tool: Optional[Any] = None
+        on_internal_tool: Optional[Any] = None,
+        internal_tools: Optional[List[Tool]] = None
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Aktif yapılandırmaya göre ilgili sağlayıcıyı çalıştırır.
         on_delta(kind, text) verildiyse düşünce/metin parçaları üretim sırasında canlı iletilir.
         on_internal_tool(name, args) verildiyse sidecar-içinde yürütülen yetenekler
-        (örn. web_fetch) çağrı anında bildirilir.
+        (örn. web_fetch, internal skill'ler) çağrı anında bildirilir.
+        internal_tools: pydantic-ai Tool olarak grafik içinde çalışacak yetenekler.
 
         Dönüş: ({"role":"assistant","content":..., "thinking":..., "tool_calls":[...]}, telemetry)
         """
@@ -429,10 +507,13 @@ class AiProviderFactory:
                 prompt = rest[-1].get("content")
                 rest = rest[:-1]
 
+        internal = list(internal_tools or [])
+        system_prompt_full = (system_prompt or "") + cls._internal_capability_directive(internal)
+
         agent = Agent(
             cls._build_model(cfg),
-            instructions=system_prompt or None,
-            tools=cls._build_tools(tools),
+            instructions=system_prompt_full or None,
+            tools=[*cls._build_tools(tools), *internal],
             capabilities=cls._build_capabilities(cfg),
             model_settings=cls._build_model_settings(cfg),
             # External (frontend'te yürütülen) araçlar için deferred output tipi zorunlu
@@ -456,7 +537,8 @@ class AiProviderFactory:
                 )
             )
         except Exception as err:
-            raise RuntimeError(cls._translate_error(err, cfg)) from err
+            msg, kind = cls._translate_error(err, cfg)
+            raise ProviderError(msg, kind) from err
 
         elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
         engine, _ = cls.engine_label(cfg)

@@ -47,6 +47,21 @@ export interface ActiveReportMemory {
   pagePath?: string;
 }
 
+/** Sidecar skill fonksiyonu (skills/<klasör>/SKILL.md + *.py sözleşmesi). */
+export interface SkillFunctionInfo {
+  name: string;
+  description: string;
+  /** true → verisini frontend'ten alır (bridge_call); false → agent içinde çalışır */
+  needs_session_data: boolean;
+}
+
+/** Yula skill klasörü. */
+export interface SkillInfo {
+  folder: string;
+  recipe_md?: string | null;
+  functions: SkillFunctionInfo[];
+}
+
 /** Sidecar stdout satırından parse edilen olay (şema kasıtlı olarak esnek tutulur). */
 export interface SidecarEvent {
   type?: string;
