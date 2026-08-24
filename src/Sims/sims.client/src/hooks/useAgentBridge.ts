@@ -409,7 +409,9 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
 
           const evt = parseSidecarLine(trimmed);
           if (!evt) continue; // raw text log satırı
-          if (isStaleEvent(evt, activeRequestId)) {
+          // bridge_result kendi requestId'siyle (bridge-*) bekleyen executor'a eşleşir;
+          // görev requestId'sinden farklı olduğu için staleness süzgeci ONU yakalamamalı.
+          if (evt.type !== "bridge_result" && isStaleEvent(evt, activeRequestId)) {
             console.warn("[Yula] Eski sidecar yanıtı yok sayıldı:", evt.requestId);
             continue;
           }
