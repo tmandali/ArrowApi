@@ -51,14 +51,25 @@ def Button(label: str, *, icon: str = "play", id: Optional[str] = None,
 def skill(name: str, *, description: str = "", needs_session: bool = False,
           params: Optional[Dict[str, Any]] = None,
           buttons: Optional[List[Dict[str, Any]]] = None):
+    """Bir aksiyon = bir fonksiyon. EN FAZLA BİR buton verilebilir.
+
+    Butonun kimliği fonksiyon adıdır: farklı bir aksiyon isteniyorsa aynı
+    mantığı çağıran yeni bir fonksiyon yazılır (örn. run_xlsx / run_csv)
+    ve her biri kendi @skill'ini alır. Buton tıklamasında hangi aksiyonun
+    çalıştığı böylece hiçbir zaman belirsiz olmaz.
+    """
     def deco(fn):
-        sealed = []
-        for i, b in enumerate(buttons or []):
-            sealed.append({
-                **b,
-                "id": b.get("id") or f"{name}-{i}",
-                "call": b.get("call") or name,
-            })
+        btns = list(buttons or [])
+        if len(btns) > 1:
+            raise ValueError(
+                f"@skill({name!r}): birden fazla buton verilmez. Her aksiyon için "
+                f"ayrı fonksiyon + ayrı @skill tanımlayın (buton=fonksiyon birebir)."
+            )
+        sealed = [{
+            **b,
+            "id": b.get("id") or name,
+            "call": b.get("call") or name,
+        } for b in btns]
         fn.__yula_meta__ = {
             "name": name,
             "description": description,

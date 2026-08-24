@@ -33,12 +33,7 @@ def _export_dir() -> pathlib.Path:
     ),
     needs_session=True,
     buttons=[
-        Button(
-            "Excel'e Aktar",
-            icon="download",
-            scope={"screens": ["report-grid-*"]},
-            args={"format": "xlsx"},
-        ),
+        Button("Excel'e Aktar", icon="download", scope={"screens": ["report-grid-*"]}),
     ],
 )
 def run(rows=None, format: str = "xlsx", file_name=None, **_):
