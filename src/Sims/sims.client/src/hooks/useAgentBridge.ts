@@ -96,6 +96,9 @@ const CONFIG_STORAGE_KEY = "yula_ai_config";
  */
 let lastKnownCriteriaDigest: Array<Record<string, unknown>> | null =
   loadPersistedCriteriaDigest();
+const CRITERIA_SCOPE_STORAGE_KEY = "sims:last-report-scope";
+let lastKnownReportScope: string | null =
+  localStorage.getItem(CRITERIA_SCOPE_STORAGE_KEY) || null;
 
 const CRITERIA_DIGEST_STORAGE_KEY = "sims:last-criteria-digest";
 
@@ -138,20 +141,39 @@ function recordAiFilledCriteria(
   result?: Record<string, any>
 ): void {
   if (!args || typeof args !== "object") return;
-  const keys = Object.keys(args).filter(
-    (k) => args[k] !== undefined && args[k] !== null && String(args[k]).trim() !== ""
+  if (toolName === "filter_active_grid") return;
+
+  // Jenerik sözleşme: { report, criteria: {alan:değer} }
+  const scope = normalizeReportScope(
+    args.report ?? result?.scope ?? toolName
+  ).replace(/_/g, "-");
+  const criteriaObj =
+    typeof args.criteria === "object" && args.criteria !== null
+      ? args.criteria
+      : args;
+  const keys = Object.keys(criteriaObj).filter(
+    (k) =>
+      criteriaObj[k] !== undefined &&
+      criteriaObj[k] !== null &&
+      String(criteriaObj[k]).trim() !== ""
   );
-  if (keys.length === 0) return;
-  const scope = String(
-    result?.scope || toolName.replace(/^filter_/, "").replace(/_criteria$/, "")
-  ).trim();
-  if (!scope || toolName.startsWith("filter_active_grid")) return;
+  if (!scope || keys.length === 0) return;
   useAgentBridgeStore.getState().setAiFilledCriteria(scope, keys);
+}
+
+function normalizeReportScope(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^filter_/, "");
 }
 
 function captureCriteriaDigestFromResult(result?: Record<string, any>): void {
   const scope = String(result?.scope || "").trim();
   if (!scope) return;
+  lastKnownReportScope = scope;
+  try { localStorage.setItem(CRITERIA_SCOPE_STORAGE_KEY, scope); } catch {}
   const cfg = autoReportCardConfigs.find((c) => c.scope === scope);
   if (!cfg?.schema) return;
   try {
@@ -253,7 +275,11 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   newConversation: () => {
     // Bellek sıfırlanınca son raporun kriter sindirimi önbelleği de temizlenir
     lastKnownCriteriaDigest = null;
-    try { localStorage.removeItem(CRITERIA_DIGEST_STORAGE_KEY); } catch {}
+    lastKnownReportScope = null;
+    try {
+      localStorage.removeItem(CRITERIA_DIGEST_STORAGE_KEY);
+      localStorage.removeItem(CRITERIA_SCOPE_STORAGE_KEY);
+    } catch {}
     set({
       messages: [
         {
@@ -763,6 +789,11 @@ function dispatchToSidecar(
     )
   }
 
+  // Varsayılan rapor kapsamı: aktif ekran > son çalıştırılan rapor
+  const defaultReportScope =
+    effectiveScreen?.activeReportScope || lastKnownReportScope || undefined;
+  if (defaultReportScope) summary.defaultReportScope = defaultReportScope;
+
   // Kriter sindirimi: canlı form > önbellek (ana ekran). main.py üst seviyeden okur.
   const liveDigest = effectiveScreen?.criteriaDigest;
   if (Array.isArray(liveDigest) && liveDigest.length > 0) {
@@ -789,6 +820,7 @@ function dispatchToSidecar(
   const enrichedScreen: ScreenContext = {
     ...effectiveScreen,
     activeDataSummary: { ...summary, columnCandidates },
+    ...(defaultReportScope ? { defaultReportScope } : {}),
     ...(digestOut ? { criteriaDigest: digestOut } : {}),
   }
 

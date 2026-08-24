@@ -1,5 +1,5 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
-import { registerReportSchemaTool } from "@/lib/schema-tool-generator";
+import { registerGenericReportTools } from "@/lib/schema-tool-generator";
 import { registerDuckDbChatTool } from "@/lib/duckdb-chat-tool";
 
 export interface YulaReportCardConfig {
@@ -69,11 +69,11 @@ export function initAutoReportRegistry(): () => void {
     } else {
       autoReportCardConfigs.push(config);
     }
-
-    const unregister = registerReportSchemaTool(config);
-    cleanupFns.push(unregister);
-    console.log(`[AutoReportRegistry] Auto-registered report: "${title}" (scope: ${scope}, tool: filter_${scope.replace(/[^a-zA-Z0-9_]/g, "_")})`);
   }
+
+  // Rapor başına araç YERİNE tek çift jenerik araç (prepare/run)
+  cleanupFns.push(registerGenericReportTools(autoReportCardConfigs));
+  console.log(`[AutoReportRegistry] ${autoReportCardConfigs.length} rapor → jenerik prepare_report_criteria / run_report araçlarına bağlandı`);
 
   return () => {
     cleanupFns.forEach((fn) => fn());
