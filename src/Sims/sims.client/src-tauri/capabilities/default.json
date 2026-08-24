@@ -81,13 +81,6 @@
     "process:default",
     "process:allow-restart",
     "dialog:default",
-    {
-      "identifier": "shell:allow-open",
-      "allow": [
-        { "validator": "^((mailto:\\w+)|(tel:\\w+)|(https?://\\w+)).+" },
-        { "validator": "^.*/yula-exports/[^/]+$" },
-        { "validator": "^[A-Za-z]:[\\\\/].*yula-exports[\\\\/][^\\\\/]+$" }
-      ]
-    }
+    "shell:allow-open"
   ]
 }
