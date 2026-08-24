@@ -603,10 +603,33 @@ export function ArrowReportGrid({
             return { success: false, message: "Analiz edilecek kolon bulunamadı." };
           }
 
-          const numCol = effectiveColumns.find(
-            (c) => c.align === "right" || (displayRows[0] && typeof displayRows[0][c.name] === "number")
+          // Anlamlı değer kolonu seçimi: meta/tarih hariç numerik adaylar arasında
+          // negatif içeren → sıfır içeren → ilk numerik önceliğiyle (ilk 500 satır dokusu)
+          const metaRe_ano = /^(id|row_id|guid)$/i;
+          const numericColsAno = effectiveColumns.filter(
+            (c) =>
+              !metaRe_ano.test(c.name) &&
+              !/date|tarih/i.test(c.name) &&
+              (c.align === "right" ||
+                (displayRows[0] && typeof displayRows[0][c.name] === "number"))
           );
-          const valCol = numCol ? numCol.name : effectiveColumns[0]?.name;
+          const statsOf = (name_: string) => {
+            let negs = 0, zeros = 0;
+            for (const row of displayRows.slice(0, 500)) {
+              const raw = row[name_];
+              const n = typeof raw === "number" ? raw : parseFloat(String(raw ?? "").replace(/[^0-9.-]/g, "")) || 0;
+              if (n < 0) negs++;
+              else if (n === 0) zeros++;
+            }
+            return { negs, zeros };
+          };
+          const ranked = numericColsAno
+            .map((c) => ({ name: c.name, ...statsOf(c.name) }))
+            .sort((a, b) => b.negs - a.negs || b.zeros - a.zeros);
+          const valCol =
+            numericColsAno.find((c) => c.name === ranked[0]?.name)?.name ||
+            numericColsAno[0]?.name ||
+            effectiveColumns[0]?.name;
           const valLabel = effectiveColumns.find((c) => c.name === valCol)?.label || valCol || "Değer";
 
           const descriptiveCol = effectiveColumns.find(
