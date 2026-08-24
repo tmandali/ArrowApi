@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Sims masaüstü uygulaması ve AI Sidecar izinleri",
+  "description": "Sims masa\u00fcst\u00fc uygulamas\u0131 ve AI Sidecar izinleri",
   "windows": [
     "main",
     "*"
@@ -80,6 +80,7 @@
     "updater:allow-download-and-install",
     "process:default",
     "process:allow-restart",
-    "dialog:default"
+    "dialog:default",
+    "shell:allow-open"
   ]
 }
