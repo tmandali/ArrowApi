@@ -1,16 +1,20 @@
 """Yula Skill SDK — skill .py dosyaları içinde tek satırla kullanılır:
 
     import yula
+    from pydantic import BaseModel, Field
 
-    @yula.skill(name="...", description="...", needs_session=True,
-                button="Etiket", icon="download", scope={"screens": [...]})
-    def run(rows=None, **_):
+    class IndirimSemasi(BaseModel):
+        fiyat: float = Field(..., gt=0, description="Orijinal fiyat")
+        indirim_orani: int = Field(..., ge=0, le=100, description="İndirim yüzdesi")
+
+    @yula.skill(name="indirim_uygula", sema=IndirimSemasi,
+                needs_session=True, button="İndirim Uygula")
+    def run(fiyat: float, indirim_orani: int, **_):
         out = yula.exports_dir() / "cikti.xlsx"
-        yula.log("dışa aktarma başladı")
         ...
 
-Meta/dekoratör `skill_registry`'de yaşar; bu modül onu yeniden dışa açar ve
-skill'lerin tekrar tekrar kopyalayacağı yardımcıları sunar.
+sema verilirse: LLM şeması model_json_schema()'dan üretilir (Field açıklamaları +
+gt/ge/le kısıtları dahil), argümanlar yürütme öncesi model_validate ile doğrulanır.
 """
 
 from __future__ import annotations

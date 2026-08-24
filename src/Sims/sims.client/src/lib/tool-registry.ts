@@ -10,6 +10,8 @@ export interface ToolParameter {
   description: string;
   enum?: string[];
   required?: boolean;
+  /** Ham JSON-Schema anahtarları (minimum, exclusiveMinimum, items, properties...) aynen taşınır */
+  [key: string]: unknown;
 }
 
 export type ToolScopeType = "global" | "workspace" | "screen";

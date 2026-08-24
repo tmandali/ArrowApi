@@ -43,13 +43,15 @@ MAX_BRIDGE_ROWS = 100_000
 
 def skill(name: str, *, description: str = "", needs_session: bool = False,
           params: Optional[Dict[str, Any]] = None,
+          sema: Optional[type] = None,
           button: Optional[str] = None, icon: str = "play",
           scope: Optional[Dict[str, Any]] = None):
     """Bir aksiyon = bir fonksiyon.
 
-    button: header'da görünecek etiket. Verilirse buton kimliği fonksiyon adıdır
-    (farklı aksiyon = farklı fonksiyon). None ise skill yalnızca LLM aracıdır,
-    UI'da buton çıkmaz.
+    sema: Pydantic BaseModel sınıfı. Verilirse girdi şeması `model_json_schema()`
+    ile üretilir (Field açıklamaları + gt/ge/le kısıtları dahil) ve yürütme öncesi
+    argümanlar `model_validate` ile doğrulanıp tipli değerlere çözülür.
+    button: header'da görünecek etiket. None ise yalnızca LLM aracıdır.
     """
     def deco(fn):
         buttons = []
@@ -66,9 +68,12 @@ def skill(name: str, *, description: str = "", needs_session: bool = False,
             "name": name,
             "description": description,
             "needs_session": needs_session,
-            "parameters": params or {"type": "object", "properties": {}},
+            "parameters": params or (sema.model_json_schema() if sema else {"type": "object", "properties": {}}),
+            "model": sema,
             "buttons": buttons,
         }
+        # safe_run hem SkillFunction hem çıplak fonksiyonla çalışabilsin diye
+        fn.__yula_input_model__ = sema
         return fn
     return deco
 
@@ -84,6 +89,8 @@ class SkillFunction:
     run_callable: Any
     skill_dir: Path
     buttons: List[Dict[str, Any]] = field(default_factory=list)
+    # sema=BaseModel verildiyse: yürütme öncesi model_validate + tipli kwargs
+    input_model: Optional[type] = None
 
 
 @dataclass
@@ -146,6 +153,7 @@ def _load_skill_module(py_path: Path, skill_dir: Path) -> List[SkillFunction]:
                 run_callable=attr,
                 skill_dir=skill_dir,
                 buttons=list(meta.get("buttons") or []),
+                input_model=meta.get("model"),
             ))
     return out
 
@@ -185,11 +193,33 @@ def find_function(skills: List[Skill], tool_name: str) -> Optional[SkillFunction
 
 
 def safe_run(fn: SkillFunction, rows: Optional[List[Dict[str, Any]]], args: Dict[str, Any]) -> Dict[str, Any]:
-    """Bridge çağrısı için güvenli yürütme: satır limiti + istisna yakalama."""
+    """Bridge çağrısı için güvenli yürütme: satır limiti + pydantic doğrulama + istisna yakalama.
+
+    fn.input_model (sema=BaseModel) verildiyse:
+        args → model_validate → tipli kwargs olarak run()'a geçer;
+        ValidationError durumunda hata alan bazlı Türkçe mesajla döner
+        (LLM'e RetryPrompt olarak beslenir → self-correction).
+    """
     if rows is not None and len(rows) > MAX_BRIDGE_ROWS:
         return {"ok": False, "error": f"Satır sayısı limiti aşıldı ({len(rows)} > {MAX_BRIDGE_ROWS})."}
     try:
-        result = fn.run_callable(rows=rows, **(args or {}))
+        kwargs = dict(args or {})
+        model = getattr(fn, "input_model", None) or getattr(fn, "__yula_input_model__", None)
+        if model is not None:
+            try:
+                validated = model.model_validate(kwargs)
+            except Exception as ve:
+                errors = getattr(ve, "errors", lambda: [])()
+                detail = "; ".join(
+                    f"{'.'.join(str(l) for l in e.get('loc', []))}: {e.get('msg', '')}"
+                    for e in errors[:5]
+                ) or str(ve)
+                return {"ok": False, "error": f"Geçersiz parametre → {detail}"}
+            kwargs = validated.model_dump()
+        if hasattr(fn, "run_callable"):
+            result = fn.run_callable(rows=rows, **kwargs)
+        else:  # çıplak dekoratörlü fonksiyon (test/kolay çağrı)
+            result = fn(rows=rows, **kwargs)
         return {"ok": True, "result": result}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}

@@ -179,23 +179,29 @@ export async function invokeSkillDirect(
 }
 
 function toToolParameters(fn: SkillFunctionInfo): ToolDefinition["parameters"] {
-  // Sidecar TOOL.parameters JSON-Schema'dır; ToolParameter'a çevir
+  // Sidecar TOOL.parameters / sema.model_json_schema() ham haliyle taşınır:
+  // description, enum, minimum/exclusiveMinimum, items, nested properties
+  // LLM şemasına ve SchemaGuard'a eksiksiz gitsin (pydantic kısıtları korunur).
   const schema = (fn as any).parameters || {};
   const props = schema.properties || {};
   const required: string[] = Array.isArray(schema.required) ? schema.required : [];
+  const ALLOWED = ["string", "number", "boolean", "object", "array"];
   const properties: Record<string, ToolParameter> = {};
   for (const [key, raw] of Object.entries(props) as [string, any]) {
-    const t = ["string", "number", "boolean", "object", "array"].includes(raw?.type)
-      ? (raw.type === "boolean" ? "boolean" : raw.type === "object" ? "object" : raw.type === "array" ? "array" : raw.type === "number" ? "number" : "string")
-      : "string";
+    const t = ALLOWED.includes(raw?.type) ? raw.type : "string";
     properties[key] = {
-      type: t as ToolParameter["type"],
+      ...(raw && typeof raw === "object" ? raw : {}),
+      type: t,
       description: raw?.description || "",
       ...(Array.isArray(raw?.enum) ? { enum: raw.enum } : {}),
       ...(required.includes(key) ? { required: true } : {}),
     };
   }
-  return { type: "object", properties };
+  return {
+    type: "object",
+    properties,
+    ...(Array.isArray(required) && required.length ? { required } : {}),
+  };
 }
 
 /** skills_list event'inde bridged skill'leri toolRegistry ile senkronlar. */
