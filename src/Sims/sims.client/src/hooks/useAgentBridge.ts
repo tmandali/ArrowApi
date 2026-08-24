@@ -66,6 +66,8 @@ interface AgentBridgeStore {
   aiConfig: AiProviderConfig;
   /** Sidecar skill klasörleri (skills_list event'i ile doldurulur). */
   skills: SkillInfo[];
+  /** Önkoşulu eksik kalan skill çağrısı (örn. tablo kapalıydı); kısa onayda LLM'siz yeniden denenir. */
+  pendingSkillRetry: { tool: string; args: Record<string, any> } | null;
   /** Sidecar stdin'e ham satır yazar; bağlı değilse false döner. */
   writeToSidecar: (line: string) => boolean;
   setAiConfig: (config: Partial<AiProviderConfig>) => void;
@@ -278,6 +280,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
   ],
   isProcessing: false,
   skills: [],
+  pendingSkillRetry: null,
 
   writeToSidecar: (line) => {
     if (!sharedChildProcess) return false;
@@ -305,6 +308,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
         },
       ],
       lastActiveReport: null,
+      pendingSkillRetry: null,
       streamingThinking: "",
       streamingContent: "",
       isProcessing: false,
@@ -462,6 +466,45 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
     processingTimeout = setTimeout(() => {
       set({ isProcessing: false, streamingThinking: "", streamingContent: "" });
     }, 120000);
+
+    // 🔁 Bekleyen skill onayı: önceki deneme önkoşul yüzünden başarısızsa
+    // (örn. "önce raporu açın") kısa onay ("açtım/tamam/hazır") LLM'siz yeniden dener.
+    const pendingRetry = get().pendingSkillRetry;
+    if (pendingRetry) {
+      const p = promptText.trim().toLocaleLowerCase("tr");
+      const isShortConfirm =
+        p.length <= 24 &&
+        /^(tamam|tamamdır|ok|oldu|hazır|açtım|açıldı|yaptım|evet|devam)\b/.test(p);
+      if (isShortConfirm) {
+        void (async () => {
+          try {
+            const { invokeSkillDirect } = await import("@/lib/skills-bridge");
+            const outcome = await invokeSkillDirect(pendingRetry.tool, pendingRetry.args);
+            const res = outcome.result || {};
+            if (outcome.ok && res.file_path) {
+              set({ pendingSkillRetry: null });
+              const rowsTxt =
+                typeof res.rows_written === "number"
+                  ? ` (${res.rows_written.toLocaleString("tr-TR")} satır)`
+                  : "";
+              get().appendMessage({
+                sender: "agent",
+                content: `📄 Hazır: [[file:${res.file_path}|${res.file_name || "Dosya"}]]${rowsTxt}`,
+              });
+            } else {
+              const errMsg = outcome.error || res.error || "Yeniden denenemedi.";
+              get().appendMessage({ sender: "system", content: `⚠️ ${errMsg}` });
+            }
+          } finally {
+            if (processingTimeout) clearTimeout(processingTimeout);
+            set({ isProcessing: false });
+          }
+        })();
+        return;
+      }
+      // Kullanıcı başka bir konuya geçtiyse bekleyen niyeti düşür
+      if (p.length > 0) set({ pendingSkillRetry: null });
+    }
 
     const effectiveScreen = buildEffectiveScreen();
 

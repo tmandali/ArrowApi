@@ -78,9 +78,19 @@ async function resolveActiveTable(argsTable?: string): Promise<string | null> {
 }
 
 async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, any>) {
+  const { table: _ignored, ...skillArgs } = args || {};
   const table = await resolveActiveTable(args?.table);
   if (!table) {
-    return { status: "error", message: "Aktif rapor tablosu bulunamadı. Önce bir rapor açın." };
+    // Bekleyen niyet: kullanıcı raporu açıp "açtım/tamam" dediğinde LLM'siz yeniden denenir
+    useAgentBridgeStore.setState({
+      pendingSkillRetry: { tool: fn.name, args: skillArgs },
+    });
+    return {
+      status: "error",
+      message:
+        "Aktif rapor tablosu bulunamadı. Kullanıcıdan önce ilgili raporu açmasını iste; " +
+        "kullanıcı açtığını belirttiğinde bu aracı aynı parametrelerle YENİDEN çağır.",
+    };
   }
 
   let rows: Record<string, unknown>[];
@@ -94,7 +104,6 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
     return { status: "error", message: `"${table}" tablosunda aktarıacak satır bulunamadı.` };
   }
 
-  const { table: _ignored, ...skillArgs } = args || {};
   const outcome = await callBridge(fn.name, rows, skillArgs);
   if (!outcome.ok) {
     return { status: "error", message: outcome.error || "Skill yürütmesi başarısız oldu." };
@@ -105,6 +114,8 @@ async function executeBridgedSkill(fn: SkillFunctionInfo, args: Record<string, a
     return { status: "error", message: String(res.error) };
   }
   if (res.file_path) {
+    // Başarı: bekleyen niyet varsa temizle
+    useAgentBridgeStore.setState({ pendingSkillRetry: null });
     // Tek-satır sözleşme: [[file:<mutlak yol>|<etiket>]] token'ı TextPart tarafından
     // tıklanabilir dosya adına çevrilir (tıkla → varsayılan uygulamada aç).
     const label = res.file_name || "Dosya";
