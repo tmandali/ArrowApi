@@ -246,8 +246,12 @@ def get_system_prompt(context=None):
             f"- Listede filtre aracı varsa değer/kolon bazında filtreleme önerebilirsin.\n"
             f"- Analiz/KPI aracı varsa toplam-en yüksek-grafik özetleri önerebilirsin.\n"
             f"- Dışa aktarma (Excel) aracı varsa 'Excel'e aktar' demenin yeterli olduğunu belirt.\n"
-            f"- LİSTEDE OLMAYAN hiçbir yeteneği VAAT ETME. Rapor menüsü LİSTELEME; "
-            f"kullanıcıya hangi işlemi istediğini sorarak bitir."
+            f"- LİSTEDE OLMAYAN hiçbir yeteneği VAAT ETME. Rapor menüsü LİSTELEME.\n"
+            f"- Önerilerini madde madde ver ve HER maddeyi şu birebir biçimde yaz — frontend bu "
+            f"maddeleri TIKLANABİLİR yapar: \n"
+            f"  - **Kısa Başlık:** kullanıcının aynen gönderebileceği somut istek cümlesi\n"
+            f"  En fazla 3 madde; her istek yalnızca verilen araç listesindeki bir yeteneğe "
+            f"dönüşebilmelidir."
         )
     else:
         greeting_rule = (

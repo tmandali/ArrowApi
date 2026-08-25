@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useNavigate } from "react-router-dom"
 import type { UIMessage } from "ai"
-import { ArrowUpRight, Brain, ChevronDown, FileSpreadsheet, Wrench, Zap } from "lucide-react"
+import { ArrowUpRight, Brain, ChevronDown, FileSpreadsheet, Wrench, Zap, Sparkles } from "lucide-react"
 
 import { yulaCustomPartComponents } from "@/components/layout/yula-custom-parts"
 import { YulaAnalyticsCard } from "@/components/layout/yula-components"
@@ -9,6 +9,7 @@ import { useAgentBridgeStore } from "@/hooks/useAgentBridge"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/utils/cn"
+import { parseBulletActions } from "@/hooks/yula/bullet-actions"
 
 type AiChatMessageProps = {
   message: UIMessage
@@ -549,12 +550,38 @@ function TextPart({
   text,
   role,
   message,
+  interactive,
 }: {
   text: string
   role: UIMessage["role"]
   message?: UIMessage
+  /** En son asistan mesajı: madde önerileri tıklanabilir olur. */
+  interactive?: boolean
 }) {
   if (!text) return null
+
+  // Selamlama/öneri maddeleri: '- **Başlık:** somut istek' → tıkla & gönder
+  if (interactive && role === "assistant") {
+    const segments = parseBulletActions(text)
+    const hasActions = segments.some((s) => s.type === "actions")
+    if (hasActions) {
+      return (
+        <div className="space-y-2">
+          {segments.map((seg, i) =>
+            seg.type === "actions" ? (
+              <div key={`a-${i}`} className="space-y-1.5">
+                {seg.actions.map((a) => (
+                  <BulletActionButton key={a.title + a.request} title={a.title} request={a.request} />
+                ))}
+              </div>
+            ) : seg.value.trim() ? (
+              <FormattedAssistantText key={`t-${i}`} text={seg.value} message={message} />
+            ) : null
+          )}
+        </div>
+      )
+    }
+  }
 
   // Skill çıktısı dosya token'ı: [[file:<mutlak yol>|<etiket>]] → tıkla & varsayılan uygulamada aç
   const FILE_TOKEN = /\[\[file:(.+?)\|(.+?)\]\]/g
@@ -593,6 +620,30 @@ function TextPart({
   }
 
   return <FormattedAssistantText text={text} message={message} />
+}
+
+function BulletActionButton({ title, request }: { title: string; request: string }) {
+  const sendPrompt = useAgentBridgeStore((s) => s.sendPrompt)
+  const isProcessing = useAgentBridgeStore((s) => s.isProcessing)
+
+  return (
+    <button
+      type="button"
+      disabled={isProcessing}
+      onClick={() => void sendPrompt(request)}
+      className={cn(
+        "group flex w-full cursor-pointer items-start gap-2 rounded-xl border bg-card px-3 py-2 text-left text-[12px] shadow-xs transition-colors",
+        "hover:border-primary/30 hover:bg-primary/5",
+        isProcessing && "cursor-wait opacity-60"
+      )}
+    >
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-orange-500/80 dark:text-orange-400/80" />
+      <span className="min-w-0">
+        <span className="font-semibold text-foreground group-hover:underline">{title}</span>
+        <span className="text-muted-foreground"> — {request}</span>
+      </span>
+    </button>
+  )
 }
 
 function FileOpenChip({ path, label }: { path: string; label: string }) {
@@ -662,6 +713,7 @@ export function AiChatMessage({
               text={part.text}
               role={message.role}
               message={message}
+              interactive={isLive}
             />
           )
         }
