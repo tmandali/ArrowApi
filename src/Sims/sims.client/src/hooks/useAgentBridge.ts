@@ -913,6 +913,21 @@ function dispatchToSidecar(
     )
   }
 
+  // Kapalı-enum istisnası (AGENTS md.14): durum niyeti ("pasif olanlar") ve
+  // adaylar boşsa şemadaki BOOL kolonlar aday olarak enjekte edilir — IsActive
+  // gibi kolonlar Needle'ın durum-enum makinesine böyle ulaşır. Kelime listesi
+  // değildir: tetikleyici extractCleanFilterValue'nun kapalı 'status' kavramı,
+  // kaynak ise Arrow/DuckDB fiziksel tipleridir.
+  if (columnCandidates.length === 0) {
+    const statusHint = extractCleanFilterValue(promptText).columnHint === "status";
+    const colTypes = summary.columnTypes as Record<string, string> | undefined;
+    if (statusHint && colTypes) {
+      columnCandidates = Object.entries(colTypes)
+        .filter(([, t]) => String(t).toLowerCase() === "bool")
+        .map(([n]) => n);
+    }
+  }
+
   // Varsayılan rapor kapsamı: aktif ekran > son çalıştırılan rapor
   const defaultReportScope =
     effectiveScreen?.activeReportScope || lastKnownReportScope || undefined;

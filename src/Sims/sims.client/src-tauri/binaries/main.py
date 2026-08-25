@@ -445,6 +445,8 @@ def handle_user_task(prompt_text, context=None):
                 })
             
     except Exception as e:
+        import traceback as _tb
+        sys.stderr.write("[Task Error]\n" + _tb.format_exc() + "\n")
         greetings = INTENTS.get("greeting", [])
         prompt_folded = fold_tr(prompt_lower)
         is_greeting = any(prompt_folded == g or prompt_folded.startswith(g + " ") or (len(prompt_folded) <= 12 and fuzzy_similarity(prompt_folded, g) >= 0.72) for g in greetings)
@@ -611,7 +613,7 @@ def main():
                 })
 
             elif action == "register_tools":
-                registered_tools = payload.get("tools", [])
+                registered_tools = [t for t in payload.get("tools", []) if isinstance(t, dict) and t.get("name")]
                 tool_names = [t.get("name") for t in registered_tools]
                 send_json({
                     "type": "status",
@@ -693,6 +695,8 @@ def main():
                 "message": f"Geçersiz JSON formatı: {str(e)}"
             })
         except Exception as e:
+            import traceback as _tb2
+            sys.stderr.write("[Dispatch Error]\n" + _tb2.format_exc() + "\n")
             send_json({
                 "type": "error",
                 "message": f"İşlem hatası: {str(e)}"
