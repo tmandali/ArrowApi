@@ -32,3 +32,20 @@ describe("parseBulletActions", () => {
     expect(parseBulletActions(undefined)).toEqual([])
   })
 })
+
+describe("gerçek Gemma çıktısı (markdown * maddesi)", () => {
+  const REAL = `Merhaba! Şu an Stok Bakiyesi Tablosu üzerindeyiz.\n\n*   **Stok miktarını filtrele:** "Stok miktarı 0'dan büyük olanları göster" gibi filtreler uygulayabilirim.\n*   **Excel'e aktar:** Mevcut tabloyu dışa aktarabilirim.`
+
+  it("'*   **Başlık:** ...' biçimi aksiyona dönüşür", () => {
+    const segs = parseBulletActions(REAL)
+    const actions = segs.find((s) => s.type === "actions")
+    expect(actions).toBeDefined()
+    if (actions?.type === "actions") {
+      expect(actions.actions.map((a) => a.title)).toEqual([
+        "Stok miktarını filtrele",
+        "Excel'e aktar",
+      ])
+      expect(actions.actions[1].request).toContain("dışa aktarabilirim")
+    }
+  })
+})
