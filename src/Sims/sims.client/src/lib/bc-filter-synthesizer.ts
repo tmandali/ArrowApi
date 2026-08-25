@@ -376,34 +376,6 @@ export function synthesizeBcFilter(
 }
 
 /**
- * Doğal dildeki filtre cümlelerinden gereksiz sohbet kelimelerini ayıklayarak
- * temiz arama terimini veya BC sözdizimini (SKU-001, >0, 100..500 vb.) çıkarır.
- */
-/**
- * Değersiz kalan kısa ifadelerden (örn. tırnağı çıkarınca geriye sadece
- * "itemname" kalan promptlar) kolon kavram ipucu üretir.
- */
-function detectHintFromBarePhrase(pLower: string): string | undefined {
-  const p = pLower.trim();
-  const compound = p.match(
-    /^(sku|item|ürün|urun|malzeme|product)\s*(name|ad[ıi]?|code|kod[u]?|no|numara(?:s[ıi])?|id)$/
-  );
-  if (compound) {
-    const qual = compound[2]!;
-    return /^(name|ad[ıi]?|description|açıklama|aciklama|tan[ıi]m)$/.test(qual)
-      ? "description"
-      : "item_code";
-  }
-  if (/^(aktif|pasif|iptal|onay|bekle|taslak|kapalı|açık|active|inactive|cancel|approved|pending|draft|open|closed)\b/.test(p))
-    return "status";
-  if (/\b(sku|item|ürün|malzeme|kod|code)\b/.test(p)) return "item_code";
-  if (/\b(depo|warehouse)\b/.test(p)) return "warehouse";
-  if (/\b(şehir|sehir|city)\b/.test(p)) return "city";
-  if (/\b(tarih|date|ay|yıl|yil)\b/.test(p)) return "date";
-  return undefined;
-}
-
-/**
  * Prompt içinde GERÇEK bir kolon adı/etiketi geçiyor mu? (kelime dizisi eşleşmesi,
  * aksan-sade). Bulursa {name, start, end} döner — kullanıcı açıkça kolon belirtmiştir.
  */
@@ -472,8 +444,16 @@ export function extractCleanFilterValue(
       const outside =
         (p.slice(0, explicit.start) + " " + p.slice(explicit.end)).trim();
       // Kalan metin prompt DEĞİL, değerdir: stopword/bileşik sökme uygulanmaz
-      const rest = extractCleanFilterValue(outside, undefined, { valueMode: true });
-      return { value: rest.value, columnHint: explicit.name };
+      const rest = extractCleanFilterValue(
+        outside,
+        undefined,
+        { valueMode: true }
+      );
+      return {
+        value: rest.value,
+        columnHint: explicit.name,
+        quoted: rest.quoted,
+      };
     }
   }
 
@@ -484,9 +464,9 @@ export function extractCleanFilterValue(
   const quoteMatch = p.match(/(["“'«])(.+?)\1/);
   if (quoteMatch && quoteMatch[2].trim()) {
     const outside = p.replace(quoteMatch[0], " ");
-    const innerHint =
-      extractCleanFilterValue(outside).columnHint ??
-      detectHintFromBarePhrase(outside.toLowerCase());
+    const innerHint = extractCleanFilterValue(outside, knownColumns, {
+      valueMode: true,
+    }).columnHint;
     return {
       value: `${quoteMatch[1]}${quoteMatch[2].trim()}${quoteMatch[1]}`,
       columnHint: innerHint,
@@ -551,7 +531,7 @@ export function extractCleanFilterValue(
   // valueMode: kalan metin değerdir — stopword/nitelik sökme ASLA uygulanmaz.
   // Yalnızca BC sentezi/kod tespiti gibi değer-güvenli adımlar yukarıda koştu.
   if (opts?.valueMode) {
-    return { value: p, columnHint: detectHintFromBarePhrase(pLower) };
+    return { value: p };
   }
 
   // 3. Türkçe Unicode uyumlu stop-words ve eylem kelimeleri (yazım hataları dahil)

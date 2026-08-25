@@ -241,18 +241,22 @@ describe("resolveColumnCandidates — Step-1 aday listesi", () => {
 })
 
 describe("literal sözleşmesi — tırnaklı değer birebir taşınır", () => {
-  it("'itemname \"Sample Item 14\"' → tırnaklı değer korunur, hint=item adı kavramı", () => {
+  it("'itemname \"Sample Item 14\"' → tırnaklı değer korunur, hint sözlüksüz tanımsız (çözüm örnek kanıtıyla)", () => {
     const r = extractCleanFilterValue('itemname "Sample Item 14"')
     expect(r.quoted).toBe(true)
     expect(r.value).toBe('"Sample Item 14"')
-    expect(r.columnHint).toBe("description")
+    expect(r.columnHint).toBeUndefined()
   })
 
-  it("tırnak dışındaki kelimelerden ipucu çıkarılır", () => {
-    const r = extractCleanFilterValue('depo "MAIN"')
+  it("tırnak dışı açık kolon adı varsa hint taşınır ('Unit Price \"X\"'), sözlüksüz kavram taşınmaz", () => {
+    const r = extractCleanFilterValue('Unit Price "X"', ["Unit Price", "Qty"])
     expect(r.quoted).toBe(true)
-    expect(r.value).toBe('"MAIN"')
-    expect(r.columnHint).toBe("warehouse")
+    expect(r.value).toBe('"X"')
+    expect(r.columnHint).toBe("Unit Price")
+    const r2 = extractCleanFilterValue('depo "MAIN"')
+    expect(r2.quoted).toBe(true)
+    expect(r2.value).toBe('"MAIN"')
+    expect(r2.columnHint).toBeUndefined()
   })
 
   it("unwrapQuotedValue içeriği açar; düz değere dokunmaz", () => {
