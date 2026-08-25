@@ -555,9 +555,15 @@ export function extractCleanFilterValue(
     "yıl", "yılı", "yılına", "yil", "yili", "yilina", "sene", "senesi", "senesine"
   ]);
 
-  const words = p.split(/[\s,.;:!?]+/);
-  const remaining = words.filter((w) => w && !stopWords.has(w.toLowerCase()));
-  const cleaned = remaining.join(" ").trim();
+  // Kenar temizliği: yalnızca BAŞTAKİ ve SONDAKİ stopword/eylem kelimeleri
+  // düşürülür; değerin İÇİNDEKİ kelimeler korunur ("Sample Item 4" bozulmaz).
+  const words = p.split(/[\s,.;:!?]+/).filter(Boolean);
+  const isStop = (w?: string) => (w ? stopWords.has(w.toLowerCase()) : false);
+  let lo = 0;
+  let hi = words.length - 1;
+  while (lo <= hi && isStop(words[lo])) lo++;
+  while (hi >= lo && isStop(words[hi])) hi--;
+  const cleaned = words.slice(lo, hi + 1).join(" ").trim();
 
   // Kolon ipucu tespiti — kelime sınırıyla: "items"/"itemname" gibi bileşikler yanlış hint üretmesin.
   // Item ailesi bileşikleri NİTELİĞE göre ayrışır: itemname/item adı → description kavramı,

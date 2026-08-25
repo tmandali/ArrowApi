@@ -14,3 +14,12 @@ describe("explicit column → remainder is value (valueMode)", () => {
     expect(r.value).toBe(">100")
   })
 })
+
+describe("step-3 kenar temizliği — iç değer korunur", () => {
+  it("'Sample Item 4' → 'item' stopword'ü içerde olsa bile değer bozulmaz", () => {
+    expect(extractCleanFilterValue("Sample Item 4").value).toBe("Sample Item 4")
+  })
+  it("kenar eylem kelimeleri düşer: 'filtrele Sample Item 4 göster' → 'Sample Item 4'", () => {
+    expect(extractCleanFilterValue("filtrele Sample Item 4 göster").value).toBe("Sample Item 4")
+  })
+})
