@@ -42,14 +42,20 @@ export function stripColumnTokensFromValue(
       if (f.length >= 3) tokens.add(f)
     }
   }
+  // Yalnızca BAŞTAN soyulur: kavram/nitelik kelimeleri değerin ÖN EKİ olarak
+  // yazılır ("item name X"→"X"). Değer İÇİNDEKİ eşleşen kelimeler (örn.
+  // "Sample Item 10" içindeki "Item") ASLA silinmez — veri bütünlüğü önce gelir.
   const words = raw.split(/\s+/).filter(Boolean)
-  const kept = words.filter((w) => {
-    const f = foldTrLocal(w).toLowerCase()
-    for (const t of tokens) {
-      if (f === t || (t.length >= 4 && f.includes(t))) return false
-    }
-    return true
-  })
+  let start = 0
+  while (start < words.length) {
+    const f = foldTrLocal(words[start]!).toLowerCase()
+    const hit = [...tokens].some(
+      (t) => f === t || (t.length >= 4 && f.includes(t))
+    )
+    if (!hit) break
+    start++
+  }
+  const kept = words.slice(start)
   return kept.length > 0 ? kept.join(" ") : raw
 }
 

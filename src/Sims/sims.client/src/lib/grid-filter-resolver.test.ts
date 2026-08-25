@@ -36,6 +36,12 @@ describe("stripColumnTokensFromValue", () => {
     expect(stripColumnTokensFromValue("ankara", undefined)).toBe("ankara")
   })
 
+  it("değer İÇİNDEKİ eşleşen kelime korunur: 'Sample Item 10' → olduğu gibi", () => {
+    expect(stripColumnTokensFromValue("Sample Item 10", "ItemName", "Item Name")).toBe(
+      "Sample Item 10"
+    )
+  })
+
   it("Türkçe katlama ile eşler", () => {
     // "Kodu" token'ı (fold sonrası) değerde birebir sökülür
     expect(stripColumnTokensFromValue("kodu timur", "Malzeme Kodu")).toBe(
