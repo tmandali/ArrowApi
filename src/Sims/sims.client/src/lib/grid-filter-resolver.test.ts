@@ -114,8 +114,8 @@ describe("nitelik-sözdizimi: name/ad → Description kavramı", () => {
     expect(r.value).toBe("timur")
   })
 
-  it("hint=description → ItemName kolonu (Item Code DEĞİL)", () => {
-    expect(resolveGridColumn("description", cols)).toBe("ItemName")
+  it("sözlüksüz: kavramsal hint ('description') ad/örnek kanıtı yoksa tanımsız döner (model katmanına devredilir)", () => {
+    expect(resolveGridColumn("description", cols)).toBeUndefined()
   })
 
   it("hint=item_code → ItemCode kolonu", () => {
@@ -173,8 +173,8 @@ describe("şekil-imzası kanıtı (Sample Item 222 vakası)", () => {
     expect(resolveGridColumn("item_code", cols, "Sample 222", samples)).toBe("ItemName")
   })
 
-  it("şekil kanıtı ipucuyla uyumluysa ipucu korunur", () => {
-    expect(resolveGridColumn("description", cols, "Pompalar", samples)).toBe("ItemName")
+  it("kaba imza ('a') kanıt sayılmaz + sözlüksüz hint → tanımsız döner", () => {
+    expect(resolveGridColumn("description", cols, "Pompalar", samples)).toBeUndefined()
   })
 
   it("saf sayı/operator değerleri şekil kanalına girmez", () => {

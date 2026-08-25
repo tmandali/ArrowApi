@@ -74,38 +74,6 @@ function coreLiteral(value?: string): string | undefined {
   return value?.trim() || undefined
 }
 
-/**
- * Grid kolonlarını doğal dil kriterine, veri örneklerine veya veri tipine göre eşleştiren çözümleyici.
- */
-const COLUMN_SYNONYMS: Record<string, string[]> = {
-  status: ["status", "durum", "state", "is_passive", "ispassive", "passive", "pasif", "is_active", "isactive", "aktif", "disabled", "blocked", "engelli"],
-  durum: ["status", "durum", "state", "is_passive", "ispassive", "passive", "pasif", "is_active", "isactive", "aktif", "disabled", "blocked", "engelli"],
-  item_code: ["item_code", "itemcode", "item", "sku", "code", "kod", "malzeme", "urun", "ürün", "product"],
-  itemcode: ["item_code", "itemcode", "item", "sku", "code", "kod", "malzeme", "urun", "ürün", "product"],
-  sku: ["item_code", "itemcode", "item", "sku", "code", "kod", "malzeme", "urun", "ürün", "product"],
-  code: ["item_code", "itemcode", "item", "sku", "code", "kod", "malzeme", "urun", "ürün", "product"],
-  kod: ["item_code", "itemcode", "item", "sku", "code", "kod", "malzeme", "urun", "ürün", "product"],
-  description: ["description", "açıklama", "aciklama", "tanım", "tanim", "name", "ad", "adı", "item_description"],
-  desc: ["description", "açıklama", "aciklama", "tanım", "tanim", "name", "ad", "adı", "item_description"],
-  aciklama: ["description", "açıklama", "aciklama", "tanım", "tanim", "name", "ad", "adı", "item_description"],
-  warehouse: ["warehouse", "depo", "ambar", "location", "lokasyon", "tesis", "plant"],
-  depo: ["warehouse", "depo", "ambar", "location", "lokasyon", "tesis", "plant"],
-  wh: ["warehouse", "depo", "ambar", "location", "lokasyon", "tesis", "plant"],
-  date: ["date", "tarih", "time", "posting_date", "tarihi", "islem_tarihi", "kayit_tarihi"],
-  tarih: ["date", "tarih", "time", "posting_date", "tarihi", "islem_tarihi", "kayit_tarihi"],
-  cost: ["cost", "maliyet", "unit_cost", "birim_maliyet", "price", "fiyat", "tutar", "total_value"],
-  fiyat: ["cost", "maliyet", "unit_cost", "birim_maliyet", "price", "fiyat", "tutar", "total_value"],
-  price: ["cost", "maliyet", "unit_cost", "birim_maliyet", "price", "fiyat", "tutar", "total_value"],
-  tutar: ["cost", "maliyet", "unit_cost", "birim_maliyet", "price", "fiyat", "tutar", "total_value"],
-  amount: ["cost", "maliyet", "unit_cost", "birim_maliyet", "price", "fiyat", "tutar", "total_value"],
-  balance: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  qty: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  quantity: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  miktar: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  bakiye: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  stok: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-  stock: ["balance", "bakiye", "quantity", "qty", "miktar", "stok", "stock", "kalan", "mevcut"],
-}
 
 /**
  * Few-shot örnek-seti eşleşmesi: değerin hangi kolonda yaşadığını Arrow/DuckDB
@@ -157,8 +125,6 @@ export function resolveColumnCandidates(
   const cleanReq = requestedColumn
     ? requestedColumn.toLowerCase().replace(/[\s_-]+/g, "")
     : ""
-  const synonyms = cleanReq ? COLUMN_SYNONYMS[cleanReq] || [] : []
-
   const scored = columns.map((c) => {
     const cName = c.name.toLowerCase().replace(/[\s_-]+/g, "")
     const cLabel = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
@@ -170,13 +136,6 @@ export function resolveColumnCandidates(
         else if (cleanReq.length >= 3 && t.startsWith(cleanReq)) s = Math.max(s, 70)
         else if (cleanReq.length >= 3 && t.includes(cleanReq)) s = Math.max(s, 50)
         else if (t.length >= 3 && cleanReq.includes(t)) s = Math.max(s, 40)
-      }
-      for (const syn of synonyms) {
-        const sc = syn.toLowerCase().replace(/[\s_-]+/g, "")
-        if (!sc) continue
-        if (t === sc) s = Math.max(s, 90)
-        else if (t.startsWith(sc)) s = Math.max(s, 60)
-        else if (t.includes(sc)) s = Math.max(s, 45)
       }
     }
     if (sampleHit && sampleHit.name === c.name) {
@@ -288,33 +247,6 @@ export function resolveGridColumn(
         return shapeCols[0]
       }
       return best.name
-    }
-
-    // 1.2 Eşanlamlı Kavram Eşleşmesi — skorlu: en güçlü sinonym hit kazanır
-    const synonyms = COLUMN_SYNONYMS[cleanReq] || []
-    if (synonyms.length > 0) {
-      let synBest: { name: string; score: number } | undefined
-      for (const c of columns) {
-        const cNameClean = c.name.toLowerCase().replace(/[\s_-]+/g, "")
-        const cLabelClean = (c.label || "").toLowerCase().replace(/[\s_-]+/g, "")
-        for (const s of synonyms) {
-          const sClean = s.toLowerCase().replace(/[\s_-]+/g, "")
-          if (!sClean) continue
-          let score = 0
-          if (cNameClean === sClean || cLabelClean === sClean) score = 90
-          else if (cNameClean.startsWith(sClean) || cLabelClean.startsWith(sClean)) score = 60
-          else if (cNameClean.includes(sClean) || cLabelClean.includes(sClean)) score = 45
-          else if (sClean.includes(cNameClean) && cNameClean.length >= 3) score = 30
-          if (score > (synBest?.score ?? -1)) synBest = { name: c.name, score }
-        }
-      }
-      if (synBest && synBest.score >= 30) {
-        if (sampleHit && synBest.score < 70) return sampleHit.name
-        if (shapeCols.length > 0 && !shapeCols.includes(synBest.name)) {
-          return shapeCols[0]
-        }
-        return synBest.name
-      }
     }
 
     // Kullanıcı açıkça bir kolon türü istemiş ama tabloda bu kolon yoksa:
