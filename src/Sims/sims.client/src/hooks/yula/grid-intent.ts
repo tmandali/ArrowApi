@@ -244,12 +244,20 @@ export function resolveGridFastRoute(
     // Literal sözleşmesi: tırnaklı değerin İÇERİĞİYLE kolon çöz, sorguyu tırnaklı taşı
     const unwrapped = unwrapQuotedValue(clean.value);
     const resolvedCol = resolveGridColumn(clean.columnHint, cols, unwrapped.content, sampleRows);
-    if (resolvedCol || clean.columnHint || hasDirectGridFilter) {
-      // Kolon ipucu sözcüklerini değerden ayır: "itemname timur" → "timur"
+    // Kolon ÇÖZÜLDÜYSE uygula. Yalnızca hint var ama kolon yoksa EŞLEŞME SAYMA:
+    // anlamsal eşleme (örn. "pasif"→IsActive) Needle/Gemma katmanının işidir;
+    // çözülemeyen hint'i grid'e göndermek hataya mahkumdur.
+    if (resolvedCol) {
       args.query = unwrapped.quoted
         ? clean.value
         : stripColumnTokensFromValue(clean.value, resolvedCol, clean.columnHint);
-      args.column = resolvedCol || clean.columnHint;
+      args.column = resolvedCol;
+      return { matched: true, toolName: "filter_active_grid", args };
+    }
+    // Tırnaklı literal: kolon belirsiz olsa da grid literal yolunda denenir.
+    if (unwrapped.quoted && clean.value) {
+      args.query = clean.value;
+      args.column = clean.columnHint;
       return { matched: true, toolName: "filter_active_grid", args };
     }
   }
