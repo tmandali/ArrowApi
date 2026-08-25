@@ -457,7 +457,8 @@ function foldWord(w: string): string {
 
 export function extractCleanFilterValue(
   prompt: string,
-  knownColumns?: string[]
+  knownColumns?: string[],
+  opts?: { valueMode?: boolean }
 ): { value: string; columnHint?: string; quoted?: boolean } {
   const p = prompt.trim();
   const pLower = p.toLowerCase();
@@ -470,7 +471,8 @@ export function extractCleanFilterValue(
     if (explicit) {
       const outside =
         (p.slice(0, explicit.start) + " " + p.slice(explicit.end)).trim();
-      const rest = extractCleanFilterValue(outside);
+      // Kalan metin prompt DEĞİL, değerdir: stopword/bileşik sökme uygulanmaz
+      const rest = extractCleanFilterValue(outside, undefined, { valueMode: true });
       return { value: rest.value, columnHint: explicit.name };
     }
   }
@@ -544,6 +546,12 @@ export function extractCleanFilterValue(
       colHint = "item_code";
     }
     return { value: codeVal, columnHint: colHint };
+  }
+
+  // valueMode: kalan metin değerdir — stopword/nitelik sökme ASLA uygulanmaz.
+  // Yalnızca BC sentezi/kod tespiti gibi değer-güvenli adımlar yukarıda koştu.
+  if (opts?.valueMode) {
+    return { value: p, columnHint: detectHintFromBarePhrase(pLower) };
   }
 
   // 3. Türkçe Unicode uyumlu stop-words ve eylem kelimeleri (yazım hataları dahil)
