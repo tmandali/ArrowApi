@@ -54,6 +54,27 @@ export function stripColumnTokensFromValue(
 }
 
 /**
+ * BC filtre ifadesi tespiti: ">500", "100..500", "!Ankara", "SKU*", "<>0" gibi
+ * değerler ARANAN LITERAL değil, KISIT ifadesidir → bunlardan örnek/şekil kanıtı
+ * üretilmez (ifade imzası yanlış kolona kilitlememesi için).
+ */
+export function isFilterExpression(value?: string): boolean {
+  const t = (value ?? "").trim()
+  if (!t) return false
+  return /^[<>=!~*|]/.test(t) || /\.\./.test(t)
+}
+
+/** BC filtre ifadesinden aranan literal çekirdeği soyar: ">500"→"500", "SKU*"→"SKU". */
+function coreLiteral(value?: string): string | undefined {
+  if (isFilterExpression(value)) {
+    const t = (value ?? "").trim().replace(/^[<>=!~*|]+/, "")
+    const core = t.split("..")[0].trim()
+    return core || undefined
+  }
+  return value?.trim() || undefined
+}
+
+/**
  * Grid kolonlarını doğal dil kriterine, veri örneklerine veya veri tipine göre eşleştiren çözümleyici.
  */
 const COLUMN_SYNONYMS: Record<string, string[]> = {
@@ -130,8 +151,9 @@ export function resolveColumnCandidates(
   limit = 3
 ): string[] {
   if (!columns || columns.length === 0) return []
-  const sampleHit = findSampleColumnMatch(appliedValue, columns, sampleRows)
-  const shapeSet = new Set(findShapeColumnMatch(appliedValue, columns, sampleRows))
+  const literalVal = coreLiteral(appliedValue)
+  const sampleHit = findSampleColumnMatch(literalVal, columns, sampleRows)
+  const shapeSet = new Set(findShapeColumnMatch(literalVal, columns, sampleRows))
   const cleanReq = requestedColumn
     ? requestedColumn.toLowerCase().replace(/[\s_-]+/g, "")
     : ""
@@ -189,7 +211,9 @@ function findShapeColumnMatch(
   if (!sig || !informative || !/[a#]/.test(sig.replace(/[\s\-.]/g, ""))) return []
 
   const matching: string[] = []
+  const META_COL = /^(id|row_id|guid)$/i
   for (const col of columns) {
+    if (META_COL.test(col.name)) continue // Id gibi meta kolonlar şekil kanıtı üretemez
     for (const row of sampleRows) {
       const sampleVal = String(row[col.name] ?? "").trim()
       if (!sampleVal) continue
@@ -216,13 +240,17 @@ export function resolveGridColumn(
   // 0. VERİ KANITI ÖNCE (Arrow şema tipleri + örnek seti): değer örnek satırlarda
   // birebir veya kod-ön ekiyle bulunuyorsa bu, anahtar-kelime ipucundan güçlüdür.
   //   "Sample 8" ItemName örneklerinde birebir varsa → ItemName (hint item_code olsa bile).
-  const sampleHit = findSampleColumnMatch(appliedValue, columns, sampleRows)
+  // Filtre ifadelerinde kanıt, operatörden SOYULMUŞ çekirdek değerle üretilir:
+  // ">500" → "500" (şekil "#"); böylece Id gibi meta kolonlara kilitlemez ve
+  // gerçek sayısal kolonlar (Qty/UnitPrice) aday kalır.
+  const literalVal = coreLiteral(appliedValue)
+  const sampleHit = findSampleColumnMatch(literalVal, columns, sampleRows)
   if (sampleHit && sampleHit.strength >= 2) return sampleHit.name
 
   // 0b. ŞEKİL-İMZASI kanıtı: örnek-sette birebir değer yoksa bile veri dokusu
   // uyuşan kolonlar ("Sample 222" ↔ ItemName örneği "Sample 8") adaydır.
-  const shapeCols = findShapeColumnMatch(appliedValue, columns, sampleRows)
-  if (shapeCols.length === 1) return shapeCols[0]
+  const shapeCols = findShapeColumnMatch(literalVal, columns, sampleRows)
+  if (shapeCols.length === 1 && !isFilterExpression(appliedValue)) return shapeCols[0]
 
   // 1. Kullanıcı veya sentezleyici spesifik bir kolon / kavram talep ettiyse
   if (requestedColumn) {
@@ -249,9 +277,14 @@ export function resolveGridColumn(
     }
     if (best && best.score >= 40) {
       // Zayıf veri kanıtı (yalnız 'içerir') + zayıf ipucu (<70) → örnek-set kazanır
-      if (sampleHit && best.score < 70) return sampleHit.name
-      // Şekil kanıtı ipucunu yalanlıyorsa (Item Code önerildi ama dokusu uyuşmuyor) → uyumlu kolon
-      if (shapeCols.length > 0 && !shapeCols.includes(best.name)) {
+      if (sampleHit && best.score < 70 && !isFilterExpression(appliedValue)) return sampleHit.name
+      // Şekil kanıtı: doğal literallerde ipucu skoruna bakılmaksızın kazanır;
+      // ifade çekirdeklerinde (">500"→"500") yalnızca zayıf ipucu yönlendirilir.
+      if (
+        shapeCols.length > 0 &&
+        !shapeCols.includes(best.name) &&
+        (best.score < 70 || !isFilterExpression(appliedValue))
+      ) {
         return shapeCols[0]
       }
       return best.name

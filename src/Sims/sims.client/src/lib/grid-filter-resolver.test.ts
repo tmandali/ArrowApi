@@ -206,6 +206,29 @@ describe("resolveColumnCandidates — Step-1 aday listesi", () => {
     expect(c[0]).toBe("Quantity")
   })
 
+  it("ifade çekirdeği meta kolona kilitlemez: '>500' + hint 'qty' → Qty (Unit Price DEĞİL)", () => {
+    // qty>500 vakası: ">500" çekirdeğinin şekli ("#") UnitPrice örneğiyle eşleşse de
+    // güçlü ipucu (tam isim eşleşmesi) şekle yenik düşmez; Id meta olarak hariçtir.
+    const cols = [
+      { name: "Id", label: "Id" },
+      { name: "ItemCode", label: "Item Code" },
+      { name: "ItemName", label: "Item Name" },
+      { name: "Warehouse", label: "Warehouse" },
+      { name: "Qty", label: undefined as unknown as string },
+      { name: "UnitPrice", label: "Unit Price" },
+      { name: "PostingDate", label: "Posting Date" },
+      { name: "IsActive", label: "Is Active" },
+      { name: "BatchNumber", label: "Batch Number" },
+    ]
+    const samples = [
+      { Id: "1", ItemCode: "SKU-001", ItemName: "Sample Item 1", Warehouse: "WH-01", Qty: 1.5, UnitPrice: 11.75, PostingDate: "2026-08-15", IsActive: true, BatchNumber: "BATCH-001" },
+      { Id: "2", ItemCode: "SKU-002", ItemName: "Sample Item 2", Warehouse: "WH-02", Qty: 2.5, UnitPrice: 13, PostingDate: "2026-08-14", IsActive: true, BatchNumber: "BATCH-002" },
+      { Id: "3", ItemCode: "SKU-003", ItemName: "Sample Item 3", Warehouse: "WH-03", Qty: 3.5, UnitPrice: 14.25, PostingDate: "2026-08-13", IsActive: false, BatchNumber: "BATCH-003" },
+    ]
+    expect(resolveGridColumn("qty", cols, ">500", samples)).toBe("Qty")
+    expect(resolveColumnCandidates("qty", cols, undefined, samples)[0]).toBe("Qty")
+  })
+
   it("hiç sinyal yoksa boş liste (model serbest, uydurma yok)", () => {
     expect(resolveColumnCandidates(undefined, cols, undefined, undefined)).toEqual([])
   })
