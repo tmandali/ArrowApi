@@ -349,3 +349,30 @@ describe("hasDirectGridFilterSignal — şema/şekil türevli (sözlüksüz)", (
     ).toBe(false)
   })
 })
+
+describe("x-ai.columnAliases — şema sözleşmeli kavram köprüsü", () => {
+  const cols = [
+    { name: "ItemCode", label: "Item Code" },
+    { name: "ItemName", label: "Item Name" },
+    { name: "Qty", label: undefined as unknown as string },
+    { name: "UnitPrice", label: "Unit Price" },
+  ]
+  const samples = [
+    { ItemCode: "SKU-001", ItemName: "Sample 8", Qty: 5, UnitPrice: 11.75 },
+    { ItemCode: "SKU-002", ItemName: "Pompa", Qty: 0, UnitPrice: 13 },
+  ]
+  const ALIASES = {
+    Qty: ["miktar", "adet"],
+    UnitPrice: ["fiyat", "birim fiyat"],
+  }
+
+  it("hint='fiyat' → alias ile UnitPrice (sözlüksüz katmanda şema kaynağı)", () => {
+    expect(resolveGridColumn("fiyat", cols, ">100", samples, ALIASES)).toBe("UnitPrice")
+    const c = resolveColumnCandidates("fiyat", cols, ">100", samples, 3, ALIASES)
+    expect(c[0]).toBe("UnitPrice")
+  })
+
+  it("alias'sız kavram hâlâ tanımsız (model katmanına devredilir)", () => {
+    expect(resolveGridColumn("fiyat", cols, ">100", samples)).toBeUndefined()
+  })
+})

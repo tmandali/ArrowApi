@@ -24,7 +24,7 @@ import {
 } from "./yula/sidecar-protocol";
 import { composeToolResultMessage } from "./yula/tool-result";
 import { extractCleanFilterValue } from "@/lib/bc-filter-synthesizer";
-import { autoReportCardConfigs } from "@/lib/auto-report-registry";
+import { autoReportCardConfigs, getColumnAliasesForScope } from "@/lib/auto-report-registry";
 import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest";
 import { resolveColumnCandidates } from "@/lib/grid-filter-resolver";
 
@@ -506,7 +506,24 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
       if (p.length > 0) set({ pendingSkillRetry: null });
     }
 
-    const effectiveScreen = buildEffectiveScreen();
+    let effectiveScreen = buildEffectiveScreen();
+    // Şema sözleşmesi: x-ai.columnAliases → Step-1 kavram köprüsü (sözlüksüz)
+    {
+      const scopeHint =
+        effectiveScreen?.activeReportScope ||
+        useAgentBridgeStore.getState().lastActiveReport?.scope ||
+        undefined;
+      const colAliases = getColumnAliasesForScope(scopeHint);
+      if (colAliases) {
+        effectiveScreen = {
+          ...effectiveScreen,
+          activeDataSummary: {
+            ...(effectiveScreen?.activeDataSummary || {}),
+            columnAliases: colAliases,
+          },
+        } as ScreenContext;
+      }
+    }
 
     // ⚡ Hızlı Router: sonuç tablosu açıkken / net filtre sinyalinde deterministik aksiyon
     const route = resolveGridFastRoute(promptText, effectiveScreen, Boolean(toolRegistry.get("filter_active_grid")));
@@ -918,6 +935,24 @@ function dispatchToSidecar(
   // gibi kolonlar Needle'ın durum-enum makinesine böyle ulaşır. Kelime listesi
   // değildir: tetikleyici extractCleanFilterValue'nun kapalı 'status' kavramı,
   // kaynak ise Arrow/DuckDB fiziksel tipleridir.
+  if (columnCandidates.length === 0) {
+    const pLowerAll = promptText.toLowerCase();
+    for (const [col, arr] of Object.entries(
+      ((effectiveScreen?.activeDataSummary as Record<string, any>)?.columnAliases as
+        | Record<string, string[]>
+        | undefined) || {}
+    )) {
+      if (
+        (arr || []).some((a) => {
+          const aLow = String(a).toLowerCase();
+          return aLow.length >= 3 && pLowerAll.includes(aLow);
+        })
+      ) {
+        columnCandidates = [col];
+        break;
+      }
+    }
+  }
   if (columnCandidates.length === 0) {
     const statusHint = extractCleanFilterValue(promptText).columnHint === "status";
     const colTypes = summary.columnTypes as Record<string, string> | undefined;

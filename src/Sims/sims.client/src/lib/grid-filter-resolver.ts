@@ -122,7 +122,8 @@ export function resolveColumnCandidates(
   columns: MinimalGridColumn[],
   appliedValue?: string,
   sampleRows?: Array<Record<string, any>>,
-  limit = 3
+  limit = 3,
+  columnAliases?: Record<string, string[]>
 ): string[] {
   if (!columns || columns.length === 0) return []
   const literalVal = coreLiteral(appliedValue)
@@ -143,6 +144,15 @@ export function resolveColumnCandidates(
         else if (cleanReq.length >= 3 && t.includes(cleanReq)) s = Math.max(s, 50)
         else if (t.length >= 3 && cleanReq.includes(t)) s = Math.max(s, 40)
       }
+    }
+    // Şema alias'ları (x-ai.columnAliases): kavram eşleşmesi — koddaki sözlük yerine
+    const aliases = columnAliases?.[c.name] || []
+    for (const phrase of aliases) {
+      const aClean = String(phrase).toLowerCase().replace(/[\s_-]+/g, "")
+      if (!aClean || !cleanReq) continue
+      if (aClean === cleanReq) s = Math.max(s, 95)
+      else if (cleanReq.length >= 3 && aClean.startsWith(cleanReq)) s = Math.max(s, 65)
+      else if (cleanReq.length >= 3 && aClean.includes(cleanReq)) s = Math.max(s, 45)
     }
     if (sampleHit && sampleHit.name === c.name) {
       s += sampleHit.strength >= 3 ? 80 : sampleHit.strength === 2 ? 60 : 20
@@ -198,7 +208,8 @@ export function resolveGridColumn(
   requestedColumn: string | undefined,
   columns: MinimalGridColumn[],
   appliedValue?: string,
-  sampleRows?: Array<Record<string, any>>
+  sampleRows?: Array<Record<string, any>>,
+  columnAliases?: Record<string, string[]>
 ): string | undefined {
   if (!columns || columns.length === 0) return undefined
 
@@ -253,6 +264,24 @@ export function resolveGridColumn(
         return shapeCols[0]
       }
       return best.name
+    }
+    // 1.1b Şema alias eşleşmesi (x-ai.columnAliases) — isim bulunamadıysa kavram köprüsü
+    for (const c of columns) {
+      const aliases = columnAliases?.[c.name] || []
+      let aBest: number | undefined
+      for (const phrase of aliases) {
+        const aClean = String(phrase).toLowerCase().replace(/[\s_-]+/g, "")
+        if (!aClean || !cleanReq) continue
+        let score = 0
+        if (aClean === cleanReq) score = 95
+        else if (cleanReq.length >= 3 && aClean.startsWith(cleanReq)) score = 65
+        else if (cleanReq.length >= 3 && aClean.includes(cleanReq)) score = 45
+        aBest = Math.max(aBest ?? -1, score)
+      }
+      // Alias kanıtı şekil/örnek çelişkisinde yalnızca güçlüyse (95) kazanır
+      if (aBest !== undefined && aBest >= 95) {
+        if (!shapeCols.length || shapeCols.includes(c.name)) return c.name
+      }
     }
 
     // Kullanıcı açıkça bir kolon türü istemiş ama tabloda bu kolon yoksa:

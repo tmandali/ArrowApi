@@ -79,3 +79,20 @@ export function initAutoReportRegistry(): () => void {
     cleanupFns.forEach((fn) => fn());
   };
 }
+
+/**
+ * Raporun şemasındaki `x-ai.columnAliases` sözleşmesini döner:
+ * { gridKolonAdı: ["doğal dil eşanlamlıları"] }
+ * Step-1 kolon çözümlemesi bu sözlükle zenginleştirir (kodda kelime listesi YOK).
+ */
+export function getColumnAliasesForScope(
+  scope?: string | null
+): Record<string, string[]> | undefined {
+  if (!scope) return undefined;
+  const cfg = autoReportCardConfigs.find((c) => c.scope === scope);
+  const xai = cfg?.schema?.["x-ai"] as Record<string, any> | undefined;
+  const ca = xai?.columnAliases;
+  return ca && typeof ca === "object" && !Array.isArray(ca)
+    ? (ca as Record<string, string[]>)
+    : undefined;
+}

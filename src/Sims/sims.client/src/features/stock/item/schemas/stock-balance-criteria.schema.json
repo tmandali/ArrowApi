@@ -33,7 +33,31 @@
       "Genel Toplam & Stok Metrikleri",
       "Stokta Olanları Süz",
       "Filtreleri Temizle"
-    ]
+    ],
+    "columnAliases": {
+      "Qty": [
+        "miktar",
+        "adet",
+        "stok adedi"
+      ],
+      "UnitPrice": [
+        "fiyat",
+        "birim fiyat"
+      ],
+      "Warehouse": [
+        "depo",
+        "ambar"
+      ],
+      "ItemCode": [
+        "ürün kodu",
+        "stok kodu",
+        "malzeme kodu"
+      ],
+      "PostingDate": [
+        "tarih",
+        "kayıt tarihi"
+      ]
+    }
   },
   "x-job-endpoint": "/api/arrow/jobs/stock-balance",
   "type": "object",

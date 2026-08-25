@@ -267,7 +267,13 @@ export function resolveGridFastRoute(
     const sampleRows = effectiveScreen.activeDataSummary?.sampleRows || [];
     // Literal sözleşmesi: tırnaklı değerin İÇERİĞİYLE kolon çöz, sorguyu tırnaklı taşı
     const unwrapped = unwrapQuotedValue(clean.value);
-    const resolvedCol = resolveGridColumn(clean.columnHint, cols, unwrapped.content, sampleRows);
+    const resolvedCol = resolveGridColumn(
+      clean.columnHint,
+      cols,
+      unwrapped.content,
+      sampleRows,
+      summaryAny?.columnAliases as Record<string, string[]> | undefined
+    );
     // Kolon ÇÖZÜLDÜYSE uygula. Yalnızca hint var ama kolon yoksa EŞLEŞME SAYMA:
     // anlamsal eşleme (örn. "pasif"→IsActive) Needle/Gemma katmanının işidir;
     // çözülemeyen hint'i grid'e göndermek hataya mahkumdur.
