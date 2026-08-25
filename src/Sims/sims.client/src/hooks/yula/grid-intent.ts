@@ -212,6 +212,30 @@ export function resolveGridFastRoute(
   const intent = detectGridIntent(promptLower);
   const args: Record<string, any> = {};
 
+  // Durum niyeti + TEK bool kolon → sıfır model, deterministik bool filtre
+  // (md.14 kapalı-enum istisnası: aktif/pasif kapalı bir enum'dur; kaynak şemadaki
+  // columnTypes'tır). Birden fazla bool kolon varsa belirsiz → modele bırakılır.
+  const clean0 = extractCleanFilterValue(promptText, knownColumns);
+  if (clean0.columnHint === "status" && !clean0.quoted) {
+    const colTypes = (summaryAny?.columnTypes as Record<string, string>) || {};
+    const boolCols = Object.entries(colTypes)
+      .filter(([, t]) => String(t).toLowerCase() === "bool")
+      .map(([n]) => n);
+    if (boolCols.length === 1) {
+      const pTrimmed = promptLower.trim();
+      const isPassive =
+        /\b(pasif|passive|pasfi|kapal[iı]|kapali|iptal|iptaller|değil|degil)\b/.test(pTrimmed);
+      const isActiveW =
+        /\b(aktif|active|açık|acik|onaylı|onayli|approved)\b/.test(pTrimmed);
+      if (isPassive !== isActiveW) {
+        args.column = boolCols[0];
+        args.query = isPassive ? "false" : "true";
+        return { matched: true, toolName: "filter_active_grid", args };
+      }
+    }
+  }
+
+
   if (intent === "anomaly") {
     return { matched: true, toolName: "detect_grid_anomalies", args };
   }
