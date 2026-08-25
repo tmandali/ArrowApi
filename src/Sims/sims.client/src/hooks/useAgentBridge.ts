@@ -638,12 +638,23 @@ function handleSidecarEvent(evt: SidecarEvent) {
     if (!isSkillTool) {
       toolName = applyViewingStateGuard(toolName, lastPromptLower, isViewingResults, isAskingNewReport(lastPromptLower));
       if (toolName === "filter_active_grid") {
-        // Needle'ın yanlış çıkarımına karşı deterministik guard:
-        // "kaç kayıt var" gibi sayım soruları filtre değeri OLAMAZ → KPI özetine delege edilir.
+        // Model GEÇERLİ bir kolon verdiyse deterministik sentez DOKUNMAZ:
+        // "pasif olanlar" → Gemma: IsActive/false doğruyken prompt-hint ('status')
+        // üzerine yazmak hataya mahkum ediyordu. Sentez yalnızca kolon
+        // yok/şemada değilken veya query boşken devreye girer.
+        const cols = ((currentScreen?.activeDataSummary?.columns as string[]) || []).map((c) =>
+          String(c).toLowerCase()
+        );
+        const modelCol =
+          typeof toolArgs.column === "string" ? toolArgs.column.trim().toLowerCase() : "";
+        const modelColValid = modelCol.length > 0 && cols.includes(modelCol);
         if (detectGridIntent(lastPromptLower) === "count") {
+          // Sayım soruları filtre değeri OLAMAZ → KPI özetine delege edilir.
           toolName = "analyze_grid_data";
           toolArgs = ensureChartType({}, lastPromptLower);
-        } else {
+        } else if (!modelColValid) {
+          toolArgs = synthesizeGridFilterArgs(toolArgs, lastPrompt);
+        } else if (!String(toolArgs.query ?? "").trim()) {
           toolArgs = synthesizeGridFilterArgs(toolArgs, lastPrompt);
         }
       }
