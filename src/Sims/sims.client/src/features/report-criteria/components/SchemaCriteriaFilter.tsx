@@ -248,7 +248,7 @@ export type SchemaCriteriaFilterProps = {
   autoValidate?: boolean
   /**
    * Schema field keys (row.name) to subtly highlight — used to mark criteria
-   * that were just filled by the AI agent (Yula / Needle). Renders a soft
+   * that were just filled by the AI agent (Yula). Renders a soft
    * orange tint on those rows; purely visual, no behavior change.
    */
   highlightRowNames?: string[]

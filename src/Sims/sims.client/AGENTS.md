@@ -159,9 +159,11 @@ Uygulama hem web tarayıcısında (`npm run dev`) hem de Tauri 2.0 masaüstü sa
 
 2. **Gömülü Python AI Sidecar & Bağımsız Binary (`binaries/main`):**
    - Masaüstü modunda yerel Python ajanı (`binaries/main`) bir child process (sidecar) olarak başlatılır.
-   - **Sıfır Python Bağımlılığı (Zero-Dependency):** Canlı dağıtımda `npm run build:sidecar` (PyInstaller) ile Python motoru, Needle SLM ve tüm betikler tek bir bağımsız native binary'ye (`main-aarch64-apple-darwin`, `main-x86_64-pc-windows-msvc.exe`) derlenir. Son kullanıcının makinesinde Python kurulu olması gerekmez.
+   - **Sıfır Python Bağımlılığı (Zero-Dependency):** Canlı dağıtımda `npm run build:sidecar` (PyInstaller) ile Python motoru ve tüm betikler tek bir bağımsız native binary'ye (`main-aarch64-apple-darwin`, `main-x86_64-pc-windows-msvc.exe`) derlenir. Son kullanıcının makinesinde Python kurulu olması gerekmez.
    - Ajan ile React arayüzü `sys.stdin` / `sys.stdout` JSON akışı üzerinden haberleşir.
    - **Tool Registry (`@/lib/tool-registry`):** Frontend'deki yetenekler (örn: `update_report_filters`) sisteme kaydedilir. Ajan stdout'a `{"type": "tool_call", "tool": "...", "arguments": {...}}` bastığında dinamik olarak yürütülür ve rapor/state otomatik güncellenir.
+   - **Kalıcı Sistem Bilgileri (`system_facts.py`):** Frontend stdin'e `{action:"system_facts", op:"set"|"get"|"clear", facts?:{k:v}, keys?:[...]}` yazar; bilgiler `~/.yula/system_facts.json`'da kalıcıdır (YULA_DATA_DIR ile taşınabilir) ve her task turunda system prompt'a **KALICI SİSTEM BİLGİLERİ** bloğu olarak enjekte edilir. Kayıt daima kullanıcı onayıyla yapılır; bütçe üst sınırı modülde (`MAX_FACTS`/`MAX_VALUE_LEN`) korunur. Kullanıcı yüzü: Ayarlar > Settings > **"Yula Kalıcı Sistem Bilgileri"** kartı; store metotları `useAgentBridgeStore.loadSystemFacts/saveSystemFact/deleteSystemFact` (yanıt `system_facts_result` event'iyle `systemFacts` state'ine dolar).
+   - **Fast Router Eşiği Tek Kaynağı:** Güven eşiği `src/lib/ai-confidence-gate.ts`'te tanımlanır ve `configure_ai` payload'ındaki `confidenceGate` alanıyla sidecar'a bildirilir; Python tarafındaki varsayılan (%80) yalnızca yedektir.
    - Web ortamında `useAgentBridge` otomatik olarak `browser_fallback` simülasyon moduna geçer.
 
 3. **Native Auto-Updater & İşletim Sistemi Menüsü:**
@@ -234,14 +236,13 @@ Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi 
       * **Kriter Formundayken:** `[Son 7 Gün (TRY)]`, `[Sadece Aktifler]`, `[Raporu Çalıştır]`
       * **Genel Workspace Modundayken:** `[Stok Bakiye Raporu]`, `[Stok Analiz Raporu]`, `[Satış Raporu]`
 
-12. **3 Kademeli Hibrit AI Yönlendirme (Fast Intent Router + Needle Micro SLM + LLM Fallback):**
-    - **1. Kademe (Fast Intent Router - ~12 ms):** Net ve şemaya doğrudan eşleşen rapor/kriter istekleri (`x-ai-quick-prompts`, doğrudan komutlar) güven skoru > %80 ise sıfır gecikmeyle çalıştırılır.
-    - **2. Kademe (Needle 2 Micro SLM - ~20-30 ms):** Kullanıcının doğal dilde ilettiği karmaşık parametreler (tarih aralıkları, Business Central filtre sözdizimi, slot-filling, durum enumları) ~14 MB boyutundaki yerel **Cactus Compute Needle 2** mikro modeli ve deterministik doğrulayıcı ile milisaniyeler içinde çıkarılır. Harici ağır Ollama/VRAM bağımlılığı olmadan yerel çalışır.
-    - **3. Kademe (Gemma 4 LLM Fallback - ~2 sn):** Kullanıcı serbest dilli, derin akıl yürütme veya uzun diyalog gerektiren sorular sorduğunda devreye girer.
+12. **2 Kademeli Hibrit AI Yönlendirme (Fast Intent Router + LLM Fallback):**
+    - **1. Kademe (Fast Intent Router / Intent Engine — 0-15 ms):** Net ve şemaya doğrudan eşleşen rapor/kriter istekleri (`x-ai.quickPrompts`, doğrudan komutlar) güven skoru eşiği geçtiğinde sıfır gecikmeyle çalıştırılır. Eşik TEK KAYNAKTIR: `src/lib/ai-confidence-gate.ts` (varsayılan %80); `configure_ai` payload'ındaki `confidenceGate` alanıyla sidecar'a da bildirilir. Kabul/devir oranları gate telemetrisiyle izlenir (kalibrasyon için). Sidecar tarafında deterministik çıkarımı `intent_engine.py` (kural motoru: intent skorlama + slot-filling) yapar; çıktı SchemaGuard ile doğrulanır.
+    - **2. Kademe (Gemma 4 LLM Fallback - ~2 sn):** Kullanıcı serbest dilli, derin akıl yürütme veya uzun diyalog gerektiren sorular sorduğunda ya da kural motoru somut işlem üretmediğinde devreye girer.
 
 13. **DevTools AI Telemetri ve Şeffaflık Motoru (`🤖 [Yula AI Telemetry]`):**
     - Yapılan her AI etkileşiminde tarayıcı konsolunda renkli ve hiyerarşik bir telemetri kartı (`console.groupCollapsed`) basılır.
-    - Çalışan model adı (Fast Intent, Needle 2 veya Gemma 4), giriş/çıkış/toplam token adetleri, uçtan uca milisaniye işlem süresi, AI'a gönderilen prompt/context ve tetiklenen Tool Call detayları anlık izlenebilir.
+    - Çalışan model adı (Fast Intent, Yula Intent Engine veya Gemma 4), giriş/çıkış/toplam token adetleri, uçtan uca milisaniye işlem süresi, AI'a gönderilen prompt/context ve tetiklenen Tool Call detayları anlık izlenebilir.
 
 14. **Filtre Değeri Çözümleme Sözleşmesi (Öncelik Hiyerarşisi) — RAPOR-AGNOSTİK:**
     - Bu sözleşme uygulamanın TÜM raporları için tektir; yeni bir rapor eklemek bu katmanlarda kod değişikliği gerektirmez. Aşağıdaki kolon adları yalnızca temsilî örneklerdir.
@@ -253,11 +254,11 @@ Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi 
       3. Durum semantiği (aktif/pasif) → zayıf örnek kanıtı → tip odaklı (tarih/sayı) → desen koruması.
     - **Kelime-listesi guard ve rapor-özel kural YASAK.** Her koruma kolonun fiziksel tipinden türetilir; yeni rapor/kolon geldiğinde mevcut jenerik mekanizma otomatik çalışır ("her şeye özel guard yazmak sürdürülebilir değil" kararı).
     - Filtre değerinden hedef kolonun kendi ad/etiket kelimeleri `stripColumnTokensFromValue` ile sökülür: `"itemname timur"` + Item Code → `"timur"`.
-    - **İki-Adımlı Model İşleyişi:** Dispatch anında `resolveColumnCandidates` (grid-filter-resolver.ts) yukarıdaki kanıt zinciriyle top-3 `columnCandidates` üretip bağlam zarfına ekler (`useAgentBridge.dispatchToSidecar`); Needle/Gemma **yalnızca bu dar listeden** seçer (`main.py` COLUMN CANDIDATES DIRECTIVE — listede yoksa `column` argümanını boş bırakır). Step-1 deterministik kodda, Step-2 modelde; yetkili çözüm yine execution'daki `resolveGridColumn`'dır.
+    - **İki-Adımlı Model İşleyişi:** Dispatch anında `resolveColumnCandidates` (grid-filter-resolver.ts) yukarıdaki kanıt zinciriyle top-3 `columnCandidates` üretip bağlam zarfına ekler (`useAgentBridge.dispatchToSidecar`); Gemma **yalnızca bu dar listeden** seçer (`main.py` COLUMN CANDIDATES DIRECTIVE — listede yoksa `column` argümanını boş bırakır). Step-1 deterministik kodda, Step-2 modelde; yetkili çözüm yine execution'daki `resolveGridColumn`'dır.
     - **Sıfır-Sözlük Sinyal + Pozitif Kanıt:** Grid filtre sinyali (`hasDirectGridFilterSignal`) kelime listesi DEĞİLDR: yapısal desenler (herhangi kelime+operatör, `harf[-_]rakam` şekli, tırnaklı literal) + Arrow şemasından gelen gerçek kolon adları (`matchExplicitColumn`). Filtre çalıştırma ise `hasGridFilterEvidence` ile ŞARTA bağlıdır: operatör/kod/niyet/ipucu/literal/model-çıkarımı/örnek-set adayı kanıtlarından biri yoksa prompt filtre OLMAZ, konuşma/rehber yoluna düşer. Konuşma-kelimesi listesi tutmak da yasaktır — yeni kalıplar bu yapı sayesinde otomatik doğru tarafa ayrışır.
-    - **Rapor-Özel Skor/Boost Yasağı:** Araç seçim skorlarına kod içinde rapor-adı bazlı puanlama eklenmez (örn. `"stock_balance"` +500); yetki kaynağı şemanın `x-ai-aliases`/`x-ai-quick-prompts` verisidir. Kod tarafındaki eşleşme yalnızca yapısal/kavram-ailesi seviyesinde kalır.
+    - **Rapor-Özel Skor/Boost Yasağı:** Araç seçim skorlarına kod içinde rapor-adı bazlı puanlama eklenmez (örn. `"stock_balance"` +500); yetki kaynağı şemanın `x-ai.aliases`/`x-ai.quickPrompts` verisidir. Kod tarafındaki eşleşme yalnızca yapısal/kavram-ailesi seviyesinde kalır.
 
-15. **Şema-Tipi Grounding Zinciri (Arrow/DuckDB → Needle → Execution):**
+15. **Şema-Tipi Grounding Zinciri (Arrow/DuckDB → Model → Execution):**
     - `duckdb.worker` `DESCRIBE_TABLE` ham `duckType` döner → `ArrowReportGrid` bunu `columnTypes: {kolon: date|number|bool|text}` haritasına çevirir.
     - Bu harita üç yerden akar: (a) bağlam zarfı `activeDataSummary.columnTypes`, (b) `main.py` system prompt'una **SCHEMA TYPE DIRECTIVE** enjeksiyonu, (c) `filter_active_grid` tool açıklamasındaki tipli kolon özeti.
     - Jenerik doğrulama iki uca asılıdır: frontend `column-type-utils.ts` (`isDateLikeValue`/`isNumericLikeValue`) ve Python `schema_type_guard.py` (`self_correct_grid_filter`: DATE kolona serbest metin gelirse tool_call'ı `analyze_grid_data {chartType:kpi}` olarak öz-düzeltir).
@@ -265,7 +266,7 @@ Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi 
 
 16. **Bileşik Nitelik Grameri (Aile Bazlı, İki Kopya Tek Sözleşme):**
     - Dilbilgisi kavram-ailesi şeklindedir, rapor-ailesi değil: `<kavram ön eki> + <nitelik>` kalıbı. Mevcut aileler: item/ürün/malzeme (kod→item_code, ad/name→description), depo/warehouse, tarih/date... Nitelikler: `name/ad`→isim kavramı, `code/kod/no/id`→kod kavramı. Değer, ipucu kelimelerinden arındırılır.
-    - Aynı gramer iki yerde yaşar: TS `bc-filter-synthesizer.ts` (web fast router + masaüstünde `synthesizeGridFilterArgs` düzeltme katmanı) ve Python `needle_engine.apply_compound_qualifier_args` (kriter formu araçları — grid kapalıyken Needle tek yetkili). **Biri değişirse diğeri de değişmeli**; grid araçları Python tarafında kasıtlı atlanır (frontend sözleşmesi yetkili).
+    - Aynı gramer iki yerde yaşar: TS `bc-filter-synthesizer.ts` (web fast router + masaüstünde `synthesizeGridFilterArgs` düzeltme katmanı) ve Python `intent_engine.apply_compound_qualifier_args` (kriter formu araçları — grid kapalıyken kural motoru tek yetkili). **Biri değişirse diğeri de değişmeli**; grid araçları Python tarafında kasıtlı atlanır (frontend sözleşmesi yetkili).
     - YENİ BİR KAVRAM AİLESİ eklemek = iki dosyadaki ORTAK regex listesine tek satır; hiçbir zaman rapor/dosya başına kural yazılmaz.
 
 17. **Araç-Halüsinasyonu Savunması:**
@@ -277,7 +278,7 @@ Yula AI asistanı; monolitik bir sohbet botu yerine, kullanıcının o an hangi 
 
 19. **Yula Test Altyapısı ve Test Edilebilirlik Deseni:**
     - TS: `npm test` (vitest, `vitest.config.ts`, `@` alias'lı). Python: `src-tauri/binaries/test_*.py` (stdlib unittest).
-    - Kural: AI karar mantığı saf, çerçevesiz modüllere yazılır (`features/jobs/lib/column-type-utils.ts`, `binaries/schema_type_guard.py` pattern'i) — bileşen/sidecar içine gömülü mantık test edilemez.
+    - Kural: AI karar mantığı saf, çerçevesiz modüllere yazılır (`features/jobs/lib/column-type-utils.ts`, `binaries/schema_type_guard.py`, `binaries/json_arg_repair.py` pattern'i) — bileşen/sidecar içine gömülü mantık test edilemez.
 
 ## Geliştirici & Kodlama Ajanı Rehberi (Yeni Özellik Ekleme Standartları)
 
@@ -301,16 +302,17 @@ Kodlama ajanları ve geliştiriciler yeni bir özellik eklerken aşağıdaki kat
        schema: XxxReportCriteriaSchema, // JSON Schema
      };
      ```
-   - **Gelişmiş AI Şema Direktifleri (JSON Schema Extensions):**
-     * `x-ai-aliases`: `["stok bakiye", "depo dökümü", "malzeme bakiye"]` ➔ Fast Intent Router ve LLM sinonim sözlüğü.
-     * `x-ai-quick-prompts`: `["Sadece AKTIF kayıtlar", "50.000 TL üzeri"]` ➔ Karta eklenen hızlı tıklama önerileri.
-     * `x-date-behavior`: `range_start`, `range_end`, `range_string` ➔ Tarih alanlarının göreceli bağlanma kuralları.
+   - **Gelişmiş AI Şema Direktifleri (JSON Schema Extensions):** TÜMÜ yapılandırılmış `x-ai` bloğunda yaşar; okuyucu `report-ai-metadata.ts`'dir. `x-ai-aliases`, `x-date-behavior` gibi düz-anahtar varyantları YOKTUR:
+     * Rapor seviyesi — `schema["x-ai"]`: `aliases` (Fast Intent Router + LLM sinonim sözlüğü), `quickPrompts` (kartın hızlı tıklama önerileri), `resultsPrompts` (sonuç evresi önerileri), `directive`, `columnAliases` (`{"<kolon>": ["eşanlamlılar"]}` kavram köprüsü), `dynamicColumns` (`true` → grid kolonları iş anında hesaplanır demektir; `columnAliases` bilinçli olarak YOKTUR ve lint uyarısı bastırılır — ör. analitik raporlar).
+     * Alan seviyesi — `properties.<alan>["x-ai"]`: `intent`, `priority`, `columnHints`, `dateBehavior` (`range_start` | `range_end` | `range_string` → tarih alanlarının göreceli bağlanma kuralları), `suggestions`, `directive`.
+     * Minimum meta lint ile güvence altındadır: `criteria-schema-lint.test.ts` (alias ≥3, quickPrompt ≥2, title/description dolu).
+   - **Araç Description Standardı (üçlü şablon):** Her tool açıklaması şu sırayla yazılır: NE YAPAR → NE ZAMAN KULLANILMAZ → ÖRNEKLER. Referans implementasyon: `schema-tool-generator.ts` içindeki `prepare_report_criteria` / `run_report`.
    - **Otomatik Kayıt:** `registerReportSchemaTool(xxxReportConfig)` veya `initAutoReportRegistry()` çağrıldığı anda rapor hem Fast Intent Router'a (12 ms) hem de Python Sidecar'a otomatik kaydolur. AI iç kodlarında hiçbir değişiklik gerekmez.
    - **Büyük Veri Tablosu:** Doğrudan `<ArrowReportGrid />` bileşenini kullan (DuckDB WASM + OPFS disk önbelleği otomatik çalışır).
    - **AI Sözleşmeleri Otomatik Geçerlidir (Yukarı madde 14-18):** Yeni rapor; şema-tipi grounding, örnek-set kanıtı, bileşik nitelik grameri, sayım niyeti ve araç-halüsinasyonu savunmalarından SIFIR ek kodla yararlanır. Rapora özel filtre kuralı/guard/kelime listesi YAZILMAZ — ihtiyaç görülürse ilgili JENERİK mekanizma (ortak regex ailesi, tip doğrulayıcı) genişletilir.
    - **Kelime-Listesi Sınıflandırma Kuralı:** Kodda sabit kelime kümesi yalnızca iki sınıfta kabul edilir: (1) **Dil verisi** (stopword'ler, Türkçe aylar) ve (2) **Kapalı enum'lar** (aktif/pasif, pasta/bar/kpi, parasal birimler). Kavram/kolon/rapor adları içeren HERHANGİ bir liste yasaktır; o ihtiyaç Arrow/DuckDB şemasından veya JSON Schema `x-ai` sözleşmesinden türetilir.
-   - **Kavram köprüsünün kaynağı şemadır (`x-ai.columnAliases`):** Anlamsal kolon eşlemesi kodda değil, raporun kendi şema dosyasında yaşar: `x-ai.columnAliases: { "<grid kolonu>": ["doğal dil eşanlamlıları"] }`. `resolveGridColumn/resolveColumnCandidates` bu sözlüğü opsiyonel parametre olarak alır; dispatch boş aday durumunda alias-token eşleşmesiyle Needle/Gemma'ya aday besler. Örnek: `stock-balance-criteria.schema.json`.
-   - **Kavram-Eş Anlamlı Sözlüğü YASAK (COLUMN_SYNONYMS kaldırıldı):** `grid-filter-resolver` artık kavram→kolon eş anlamlı sözlüğü İÇERMEZ. Step-1 yalnızca (a) ad/etiket birebir-başlangıç eşleşmesi, (b) örnek-set kanıtı, (c) şekil imzası (meta kolonlar hariç, filtre ifadelerinde çekirdek değerle) kullanır; bu kanıtlarla çözülmeyen anlamsal ipuçları (`fiyat`, `description` vb.) tanımsız döner ve Needle/Gemma katmanlarına devredilir. Testler: `grid-filter-resolver.test.ts` "sözlüksüz" vakaları.
+   - **Kavram köprüsünün kaynağı şemadır (`x-ai.columnAliases`):** Anlamsal kolon eşlemesi kodda değil, raporun kendi şema dosyasında yaşar: `x-ai.columnAliases: { "<grid kolonu>": ["doğal dil eşanlamlıları"] }`. `resolveGridColumn/resolveColumnCandidates` bu sözlüğü opsiyonel parametre olarak alır; dispatch boş aday durumunda alias-token eşleşmesiyle Gemma'ya aday besler. Örnek: `stock-balance-criteria.schema.json`.
+   - **Kavram-Eş Anlamlı Sözlüğü YASAK (COLUMN_SYNONYMS kaldırıldı):** `grid-filter-resolver` artık kavram→kolon eş anlamlı sözlüğü İÇERMEZ. Step-1 yalnızca (a) ad/etiket birebir-başlangıç eşleşmesi, (b) örnek-set kanıtı, (c) şekil imzası (meta kolonlar hariç, filtre ifadelerinde çekirdek değerle) kullanır; bu kanıtlarla çözülmeyen anlamsal ipuçları (`fiyat`, `description` vb.) tanımsız döner ve Gemma katmanına devredilir. Testler: `grid-filter-resolver.test.ts` "sözlüksüz" vakaları.
 
 3. **UI & Stil Kuralları:**
    - **Tailwind v4:** `tailwind.config.js` aranmaz; CSS `@theme` değişkenleri `src/index.css` dosyasındadır.

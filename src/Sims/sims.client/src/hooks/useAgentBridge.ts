@@ -11,7 +11,6 @@ import {
 import {
   detectGridIntent,
   isAskingNewReport,
-  hasDirectGridFilterSignal,
   hasGridFilterEvidence,
   resolveGridFastRoute,
 } from "./yula/grid-intent";
@@ -24,6 +23,7 @@ import {
 } from "./yula/sidecar-protocol";
 import { composeToolResultMessage } from "./yula/tool-result";
 import { extractCleanFilterValue } from "@/lib/bc-filter-synthesizer";
+import { FAST_ROUTE_CONFIDENCE_THRESHOLD, recordFastGateOutcome } from "@/lib/ai-confidence-gate";
 import { autoReportCardConfigs, getColumnAliasesForScope } from "@/lib/auto-report-registry";
 import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest";
 import { resolveColumnCandidates } from "@/lib/grid-filter-resolver";
@@ -68,6 +68,12 @@ interface AgentBridgeStore {
   skills: SkillInfo[];
   /** Önkoşulu eksik kalan skill çağrısı (örn. tablo kapalıydı); kısa onayda LLM'siz yeniden denenir. */
   pendingSkillRetry: { tool: string; args: Record<string, any> } | null;
+  /** Kalıcı sistem bilgileri (~/.yula/system_facts.json; system_facts_result ile dolar). */
+  systemFacts: Record<string, string>;
+  /** Kullanıcı onaylı kalıcı bilgi işlemleri (sidecar system_facts protokolü). */
+  loadSystemFacts: () => boolean;
+  saveSystemFact: (key: string, value: string) => boolean;
+  deleteSystemFact: (key: string) => boolean;
   /** Sidecar stdin'e ham satır yazar; bağlı değilse false döner. */
   writeToSidecar: (line: string) => boolean;
   setAiConfig: (config: Partial<AiProviderConfig>) => void;
@@ -89,6 +95,15 @@ let unsubscribeToolRegistry: (() => void) | null = null;
 
 function createRequestId() {
   return `yula-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Sidecar'a tek satır JSON yazar; bağlı değilse false döner (protokol yardımcısı). */
+function writeToSidecarLine(payload: Record<string, unknown>): boolean {
+  if (!sharedChildProcess) return false;
+  sharedChildProcess
+    .write(JSON.stringify(payload) + "\n")
+    .catch((err: any) => console.error("[Sidecar Write Error]:", err));
+  return true;
 }
 
 const CONFIG_STORAGE_KEY = "yula_ai_config";
@@ -250,7 +265,13 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
       void saveSecret(updated.apiKey || "");
       if (sharedChildProcess) {
         sharedChildProcess
-          .write(JSON.stringify({ action: "configure_ai", config: updated }) + "\n")
+          .write(
+            JSON.stringify({
+              action: "configure_ai",
+              confidenceGate: FAST_ROUTE_CONFIDENCE_THRESHOLD,
+              config: updated,
+            }) + "\n"
+          )
           .catch(() => {});
       }
       return { aiConfig: updated };
@@ -274,13 +295,45 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
     {
       id: "init-1",
       sender: "system",
-      content: "Yula AI Ajan Köprüsü hazır (Needle 2 SLM & Multi-Provider Pydantic AI Engine).",
+      content: "Yula AI Ajan Köprüsü hazır (Intent Rule Engine & Multi-Provider Pydantic AI Engine).",
       timestamp: new Date().toLocaleTimeString("tr-TR"),
     },
   ],
   isProcessing: false,
   skills: [],
   pendingSkillRetry: null,
+  systemFacts: {},
+
+  loadSystemFacts: () =>
+    writeToSidecarLine({ action: "system_facts", op: "get" }),
+
+  saveSystemFact: (key, value) => {
+    const k = key.trim();
+    const v = value.trim();
+    if (!k || !v) return false;
+    // İyimser güncelleme: disk onayı system_facts_result ile tazelenir
+    set((state) => ({ systemFacts: { ...state.systemFacts, [k]: v } }));
+    return writeToSidecarLine({
+      action: "system_facts",
+      op: "set",
+      facts: { [k]: v },
+    });
+  },
+
+  deleteSystemFact: (key) => {
+    const k = key.trim();
+    if (!k) return false;
+    set((state) => {
+      const { [k]: _removed, ...rest } = state.systemFacts;
+      void _removed;
+      return { systemFacts: rest };
+    });
+    return writeToSidecarLine({
+      action: "system_facts",
+      op: "clear",
+      keys: [k],
+    });
+  },
 
   writeToSidecar: (line) => {
     if (!sharedChildProcess) return false;
@@ -303,7 +356,7 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
         {
           id: "init-1",
           sender: "system",
-          content: "Yula AI hazır (Needle Rule Engine & Pydantic AI Multi-Provider).",
+          content: "Yula AI hazır (Intent Rule Engine & Pydantic AI Multi-Provider).",
           timestamp: new Date().toLocaleTimeString("tr-TR"),
         },
       ],
@@ -428,7 +481,13 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
       isStartingProcess = false;
       set({ status: "running" });
 
-      await child.write(JSON.stringify({ action: "configure_ai", config: get().aiConfig }) + "\n");
+      await child.write(
+        JSON.stringify({
+          action: "configure_ai",
+          confidenceGate: FAST_ROUTE_CONFIDENCE_THRESHOLD,
+          config: get().aiConfig,
+        }) + "\n"
+      );
 
       const syncScopedTools = () => {
         if (sharedChildProcess) {
@@ -572,7 +631,12 @@ export const useAgentBridgeStore = create<AgentBridgeStore>((set, get) => ({
     if (!isTauriEnv) {
       const fastResolved = resolveGenericToolIntent(promptText, scopedTools, effectiveScreen);
       const hasActionableArgs = Object.keys(fastResolved.arguments || {}).length > 0;
-      if (fastResolved.tool && fastResolved.confidence >= 80 && (hasActionableArgs || isAskingNewReport(promptText.toLowerCase()))) {
+      const fastGatePassed =
+        Boolean(fastResolved.tool) &&
+        fastResolved.confidence >= FAST_ROUTE_CONFIDENCE_THRESHOLD &&
+        (hasActionableArgs || isAskingNewReport(promptText.toLowerCase()));
+      recordFastGateOutcome(fastGatePassed, fastResolved.confidence);
+      if (fastGatePassed) {
         setTimeout(async () => {
           const execution = await toolRegistry.executeTool(fastResolved.tool, fastResolved.arguments);
 
@@ -681,7 +745,7 @@ function handleSidecarEvent(evt: SidecarEvent) {
     }
 
     void (async () => {
-      // Needle kayıtlı olmayan bir araç adı ürettiyse (örn. kriter formu ekranında
+      // Model kayıtlı olmayan bir araç adı ürettiyse (örn. kriter formu ekranında
       // grid aracı halüsinasyonu) hata baloncuğu yerine yerel şema çözümleyicisine düş.
       if (!toolRegistry.get(toolName)) {
         console.warn(`[Sidecar] Kayıtsız araç önerildi: "${toolName}" → şema çözümleyicisine düşülüyor.`);
@@ -715,8 +779,8 @@ function handleSidecarEvent(evt: SidecarEvent) {
         }
 
         logAiTelemetry({
-          source: evt.telemetry?.engine || "Needle Engine (On-Device SLM)",
-          model: evt.telemetry?.model || "Needle 2 (SLM)",
+          source: evt.telemetry?.engine || "Yula Rule Engine",
+          model: evt.telemetry?.model || "Yula Intent Engine",
           userPrompt: lastPrompt,
           systemPrompt: evt.telemetry?.systemPrompt,
           context: currentScreen,
@@ -763,8 +827,8 @@ function handleSidecarEvent(evt: SidecarEvent) {
   // 2. Normal Mesaj (Yalnızca önceki mesajla birebir aynı değilse ekle)
   if (evt.type === "message") {
     logAiTelemetry({
-      source: evt.telemetry?.engine || "Needle Engine (On-Device SLM)",
-      model: evt.telemetry?.model || "Needle 2 (SLM)",
+      source: evt.telemetry?.engine || "Yula Rule Engine",
+      model: evt.telemetry?.model || "Yula Intent Engine",
       userPrompt: getState().lastPrompt || "",
       systemPrompt: evt.telemetry?.systemPrompt,
       context: getState().screenContext,
@@ -825,6 +889,16 @@ function handleSidecarEvent(evt: SidecarEvent) {
         error: evt.error,
       });
     })();
+    return;
+  }
+
+  // 2b-3. Kalıcı sistem bilgileri anlık görüntüsü (system_facts protokol yanıtı)
+  if (evt.type === "system_facts_result") {
+    const facts =
+      evt.facts && typeof evt.facts === "object" && !Array.isArray(evt.facts)
+        ? (evt.facts as Record<string, string>)
+        : {};
+    setState({ systemFacts: facts });
     return;
   }
 
@@ -916,7 +990,7 @@ function dispatchToSidecar(
   scopedTools: ReturnType<typeof toolRegistry.getScopedDefinitions>
 ) {
   // Step-1 (deterministik): şema + örnek kanıtından top-3 kolon adayı.
-  // Needle/Gemma yalnızca bu dar listeden seçim yapar (Step-2).
+  // Gemma yalnızca bu dar listeden seçim yapar (Step-2).
   const summary = (effectiveScreen?.activeDataSummary || {}) as Record<string, any>
   const colNames = Array.isArray(summary.columns) ? (summary.columns as string[]) : []
   let columnCandidates: string[] = []
@@ -932,7 +1006,7 @@ function dispatchToSidecar(
 
   // Kapalı-enum istisnası (AGENTS md.14): durum niyeti ("pasif olanlar") ve
   // adaylar boşsa şemadaki BOOL kolonlar aday olarak enjekte edilir — IsActive
-  // gibi kolonlar Needle'ın durum-enum makinesine böyle ulaşır. Kelime listesi
+  // gibi kolonlar durum-enum makinesine böyle ulaşır. Kelime listesi
   // değildir: tetikleyici extractCleanFilterValue'nun kapalı 'status' kavramı,
   // kaynak ise Arrow/DuckDB fiziksel tipleridir.
   if (columnCandidates.length === 0) {

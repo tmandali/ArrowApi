@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
-# Needle sidecar PyInstaller build — npm script'inden çağrılır.
+# Sidecar PyInstaller build — npm script'inden çağrılır.
 # NOT: Bu dosya MSBuild tarafından package.g.props'a gömülür; burada $(...)
 # kalıpları sorun değildir çünkü artık package.json'a yazılmıyor.
 set -e
 cd "$(dirname "$0")/.."
 
-NEEDLE_DYLIB=$(ls -t "$HOME"/.cache/cactus-needle/*/libneedle.dylib 2>/dev/null | head -1)
-EXTRA="--hidden-import needle --hidden-import needle.agent.fetch --hidden-import needle.agent.tools \
---hidden-import markdownify --hidden-import bs4 --hidden-import soupsieve --hidden-import httpx2 \
+EXTRA="--hidden-import markdownify --hidden-import bs4 --hidden-import soupsieve --hidden-import httpx2 \
 --hidden-import openpyxl --hidden-import openpyxl.cell --hidden-import openpyxl.workbook \
 --add-data src-tauri/binaries/intents.tr.json:. \
 --add-data src-tauri/binaries/skills:skills"
-if [ -n "$NEEDLE_DYLIB" ]; then
-  EXTRA="$EXTRA --add-binary $NEEDLE_DYLIB:."
-fi
 
 PYINSTALLER="python3 -m PyInstaller"
 [ -f src-tauri/binaries/.venv/bin/pyinstaller ] && PYINSTALLER="src-tauri/binaries/.venv/bin/pyinstaller"

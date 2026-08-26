@@ -1,5 +1,5 @@
 /**
- * Kolon sindirimi (schema digest): Needle/Gemma bağlamına ucuz şekilde
+ * Kolon sindirimi (schema digest): LLM bağlamına ucuz şekilde
  * "hangi kolon neye benzer" bilgisini taşıyan saf yardımcılar.
  * Karar yetkilisi yine frontend execution katmanıdır; bu özet yalnızca
  * SLM/LLM'in ipucu kalitesini artırır.

@@ -39,7 +39,7 @@ class ValueMatchesPhysicalTypeTests(unittest.TestCase):
 class SelfCorrectGridFilterTests(unittest.TestCase):
     COLS = {"Posting Date": "date", "Quantity": "number", "Item": "text"}
 
-    def test_needle_hallucination_rerouted_to_kpi(self):
+    def test_model_hallucination_rerouted_to_kpi(self):
         # Gerçek hata senaryosu: DATE kolona soru metni
         tool, args = self_correct_grid_filter(
             "filter_active_grid",

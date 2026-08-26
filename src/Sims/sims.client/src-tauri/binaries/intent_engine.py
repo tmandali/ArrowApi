@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Needle Engine — On-Device Micro SLM & Parameter Extraction / Validation Engine
-Inspired by Cactus Compute Needle (45M / 14MB tool-calling model).
-Extracts structured JSON arguments from natural language and validates with strict schema rules.
+Intent Engine — Kural Tabanlı Parameter Extraction / Validation Motoru
+Doğal dilden yapılandırılmış JSON argümanları çıkarır ve katı şema kurallarıyla doğrular.
 """
 
 import json
@@ -16,13 +15,6 @@ from typing import Dict, Any, List, Optional, Tuple
 from schema_guard import SchemaGuard, fuzzy_similarity
 from schema_type_guard import self_correct_grid_filter
 from intents import INTENTS, has_any, fold_tr as _fold
-
-try:
-    import needle as cactus_needle
-    HAS_CACTUS_NEEDLE = True
-except Exception:
-    cactus_needle = None
-    HAS_CACTUS_NEEDLE = False
 
 RUN_EXEC_VERBS = ["çalıştır", "calistir", "run"]
 
@@ -77,7 +69,7 @@ def _norm_date(value: str) -> str:
 # Bileşik nitelik grameri (frontend bc-filter-synthesizer ile aynı sözleşme):
 #   "itemname timur"  → nitelik=name  → aracın İSİM/açıklama alanına "timur"
 #   "item kodu X"     → nitelik=code  → aracın KOD alanına
-# Kriter formu araçlarında (grid kapalıyken) Needle tek yetkili olduğu için
+# Kriter formu araçlarında (grid kapalıyken) kural motoru tek yetkili olduğu için
 # bu deterministik katman SLM/kural çıktısını burada da kesinleştirir.
 # ---------------------------------------------------------------------------
 _QUAL_COMPOUND_RE = re.compile(
@@ -143,54 +135,11 @@ def apply_compound_qualifier_args(prompt_lower: str, tool: Dict[str, Any], args:
     return args
 
 
-class NeedleEngine:
-    def __init__(self, model_name: str = "needle-2:45m"):
-        self.model_name = model_name
-        self.has_neural = HAS_CACTUS_NEEDLE
-        self.neural_agent = None
-        # Gerçek Cactus Needle SLM önbelleği: araç kümesi parmak izine göre ajan yeniden kullanılır
-        self._slm_fail_until = 0.0
+class IntentEngine:
+    """Kural tabanlı niyet motoru: intent skorlaması + slot-filling + şema doğrulama."""
 
-    def _slm_extract(self, prompt: str, tools: List[Dict[str, Any]],
-                     system_text: Optional[str] = None) -> Optional[Tuple[str, Dict[str, Any]]]:
-        """
-        Resmi Cactus Needle SLM'ini dener (on-device ~50ms).
-        Başarılıysa (tool_name, arguments) döner; değilse None (kural motoruna düşülür).
-        NOT: Native motor complete() çağrıları arasında konuşma durumu TUTAR; bu yüzden
-        her çıkarımda taze Needle örneği kullanılır (deterministik tek-tur davranış).
-        """
-        if not self.has_neural or not tools:
-            return None
-        if time.time() < self._slm_fail_until:
-            return None
-        try:
-            import needle as cactus_needle
-
-            agent = cactus_needle.Needle(tools=[t for t in tools if isinstance(t, dict)],
-                                         system=system_text)
-            response = agent.complete(prompt)
-            if response.get("type") != "call":
-                return None
-            calls = response.get("function_calls") or []
-            if not calls:
-                return None
-            name = calls[0].get("name")
-            args = calls[0].get("arguments")
-            valid_names = {t.get("name") for t in tools}
-            if name not in valid_names or not isinstance(args, dict):
-                return None
-            # Argümansız aksiyon araçları (örn. temizle) için boş args geçerlidir
-            target = next((t for t in tools if t.get("name") == name), {})
-            schema_props = ((target.get("parameters") or {}).get("properties")) or {}
-            if args or not schema_props:
-                return name, args
-            return None
-        except Exception as err:
-            # SLM hatası üretimi bloklamasın: 60 sn kural motoruna düş, sonra tekrar dene
-            sys.stderr.write(f"[Needle SLM] atlandı: {err}\n")
-            sys.stderr.flush()
-            self._slm_fail_until = time.time() + 60
-            return None
+    def __init__(self):
+        pass
 
     def parse_relative_dates(self, text: str, ref_date: Optional[datetime] = None) -> Tuple[str, str, bool]:
         """
@@ -320,25 +269,6 @@ class NeedleEngine:
             return yesterday_str, yesterday_str, False, True
         if any(k in text_lower for k in ["bugün", "bugun", "today"]):
             return today_iso, today_iso, False, True
-
-        # Son çare: on-device structured extraction (needle.extract) — regex'in kaçtığı
-        # sıra dışı tarih kalıpları (örn. "2026/08/03 - 2026/08/10", "3 Ağustos'tan 10 Ağustos'a")
-        if HAS_CACTUS_NEEDLE:
-            try:
-                import pydantic
-
-                class _DateRange(pydantic.BaseModel):
-                    start_date: str
-                    end_date: str
-
-                res = cactus_needle.extract(_fold(text), _DateRange)
-                if res is not None:
-                    sd = _norm_date(getattr(res, "start_date", ""))
-                    ed = _norm_date(getattr(res, "end_date", ""))
-                    if sd and ed:
-                        return sd, ed, (sd != ed), True
-            except Exception:
-                pass
 
         return None, None, False, False
 
@@ -664,35 +594,6 @@ class NeedleEngine:
 
         return extracted_args, unsupported_criteria, single_select_notes
 
-    @staticmethod
-    def _directive_system(tools: List[Dict[str, Any]]) -> Optional[str]:
-        """
-        x-ai-aliases / x-ai-quick-prompts direktiflerini SLM system prompt'una enjekte eder.
-        Native motorun iç prompt limitini aşmamak için metin aksan-sadeleştirilmiş ve
-        uzunlukla sınırlı tutulur (eşleşme yine de Python tarafında orijinal metinle yapılır).
-        """
-        def fold(s: str) -> str:
-            return _fold(s)
-
-        lines: List[str] = []
-        total = 0
-        for t in tools:
-            if not isinstance(t, dict):
-                continue
-            ai = t.get("ai") or {}
-            phrases = [fold(str(x)) for x in (ai.get("aliases") or [])] + \
-                      [fold(str(x)) for x in (ai.get("quickPrompts") or [])]
-            phrases = [p for p in phrases if p]
-            if phrases and t.get("name"):
-                line = f"- {t['name']}: {', '.join(phrases)}"
-                lines.append(line)
-                total += len(line)
-                if total > 400:
-                    break
-        if not lines:
-            return None
-        return "If the user message resembles these phrases, call the related tool:\n" + "\n".join(lines)
-
     def process_task(
         self,
         prompt_text: str,
@@ -700,10 +601,9 @@ class NeedleEngine:
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Uçtan uca Needle çıkarım ve doğrulama akışı (SLM-first):
-        1. Gerçek Cactus Needle SLM (~50ms) — x-ai-* direktifleri system'e enjekte edilerek
-        2. SLM üretmezse kural motoru fallback (intent scoring + slot filling)
-        3. Her iki yolun çıktısı SchemaGuard ile deterministik doğrulanır
+        Uçtan uca kural motoru çıkarım ve doğrulama akışı:
+        1. Intent skorlama + slot-filling (extract_and_validate)
+        2. Çıktı SchemaGuard ile deterministik doğrulanır
         """
         start_time = time.perf_counter()
         prompt_lower = prompt_text.lower()
@@ -727,26 +627,7 @@ class NeedleEngine:
         )
 
         # 1. ⚡ SLM önce denenir (direktifler system'e enjekte edilmiş halde)
-        # İstisna: promptta AÇIK tarih sinyali (yıl/ay adı) varsa tarihler deterministik
-        # kural motorundan gelmeli — 45M modelin tarih tahmini güvenli değildir.
         run_verb = any(w in prompt_lower for w in RUN_ACTION_VERBS)
-        date_signal = (
-            bool(re.search(r"\b20\d\d\b", prompt_text))
-            or any(_fold(m) in _fold(prompt_lower) for m in TURKISH_MONTHS)
-        )
-        # Pozitif kanıt: AÇIK çalıştır fiili yokken SLM'in run_* tahmini geçersizdir
-        # ("hazırla/getir/göster" kriter doldurma yoluna gider, çalıştırmaya değil).
-        def _slm_forces_run(prompt_l: str, name_: str) -> bool:
-            return str(name_ or "").lower().startswith("run_") and not any(
-                v in prompt_l for v in RUN_EXEC_VERBS)
-
-        slm_result: Optional[Tuple[str, Dict[str, Any]]] = None
-        if not date_signal:
-            slm_result = self._slm_extract(prompt_text, [t for t in tools if isinstance(t, dict)],
-                                           system_text=self._directive_system(tools))
-        slm_used = False
-        slm_args: Optional[Dict[str, Any]] = None
-
         # Tool Scoring & Matching (her zaman çalışır — arbitraj için sinyal gerekir)
         best_tool = None
         max_score = -999
@@ -868,52 +749,8 @@ class NeedleEngine:
             # Context'e göre en uygun fallback
             best_tool = tools[0]
 
-        # 2. ⚖️ Arbitraj: SLM tahmini ile kural sinyali çelişirse güçlü kural kazanır
-        if slm_result and _slm_forces_run(prompt_lower, slm_result[0]):
-            sys.stderr.write(f"[Needle SLM] run_* tahmini reddedildi (çalıştır fiili yok): {slm_result[0]}\n")
-            slm_result = None
-
-        if slm_result:
-            slm_name, slm_args = slm_result
-            matched = next((t for t in tools if isinstance(t, dict) and t.get("name") == slm_name), None)
-            rule_strong = best_tool is not None and max_score >= 300 and best_tool.get("name") != slm_name
-            if matched is not None and not (rule_strong or directive_matched):
-                best_tool = matched
-                slm_used = True
-
         tool_name = best_tool.get("name", "") if best_tool else ""
-        if slm_used:
-            args = dict(slm_args or {})
-            # Şema-davranış hizalaması: kullanıcı açık tarih vermediyse SLM'in
-            # tahminini kural motoru varsayılanıyla değiştir (tek alan→dün,
-            # başlangıç/bitiş çifti→son 30 gün..bugün).
-            if not date_signal and isinstance(args, dict):
-                runish = any(w in prompt_lower for w in [
-                    "hazırla", "hazirla", "çalıştır", "calistir",
-                    "oluştur", "olustur", "getir", "göster", "goster"])
-                if runish:
-                    slm_props = ((best_tool or {}).get("parameters") or {}).get("properties") or {}
-                    date_keys = [k for k in slm_props if any(
-                        x in k.lower() for x in ["kayit", "date", "tarih", "from", "to"])]
-                    if date_keys:
-                        today_dt = datetime.now()
-                        y_str = (today_dt - timedelta(days=1)).strftime("%Y-%m-%d")
-                        t_str = today_dt.strftime("%Y-%m-%d")
-                        last30 = (today_dt - timedelta(days=30)).strftime("%Y-%m-%d")
-                        from_k = next((k for k in date_keys if any(
-                            x in k.lower() for x in ["from", "start", "baslangic", "başlangıç"])), None)
-                        to_k = next((k for k in date_keys if any(
-                            x in k.lower() for x in ["to", "end", "bitis", "bitiş"])), None)
-                        single_k = next((k for k in date_keys if k not in (from_k, to_k)), None)
-                        if from_k and to_k:
-                            args[from_k] = last30
-                            args[to_k] = t_str
-                        elif single_k:
-                            args[single_k] = y_str
-            unsupported: List[str] = []
-            single_notes: List[str] = []
-        else:
-            args, unsupported, single_notes = self.extract_and_validate(prompt_text, best_tool or {}, context)
+        args, unsupported, single_notes = self.extract_and_validate(prompt_text, best_tool or {}, context)
 
         # 0a. Bileşik nitelik grameri (kriter formu araçları): "itemname timur" → {<isim-alanı>: timur}.
         # Grid araçları frontend'in synthesizeGridFilterArgs sözleşmesinde olduğundan burada atlanır.
@@ -1072,11 +909,9 @@ class NeedleEngine:
         # Argümansız aksiyon araçları (örn. clear_grid_filters): niyet eşleştiyse eylemin kendisi yeterlidir
         argless_action = bool(best_tool) and not (((best_tool.get("parameters") or {}).get("properties")) or {})
         # SLM 'call' döndüyse veya direktif eşleştiyse eylem niyeti kesindir (args boş olsa da: form açma)
-        has_extracted_args = bool(args) or slm_used or directive_matched or (argless_action and not is_general_question)
-        if is_general_question and not slm_used:
+        has_extracted_args = bool(args) or directive_matched or (argless_action and not is_general_question)
+        if is_general_question:
             confidence = 0
-        elif slm_used:
-            confidence = 88
         elif directive_matched:
             confidence = 92
         elif max_score >= 400 and has_extracted_args:
@@ -1107,8 +942,8 @@ class NeedleEngine:
             "message": combined_msg.strip(),
             "telemetry": {
                 # Şeffaf telemetri: hangi katman ürettiyse o etiketlenir; token üretilmez
-                "model": "Needle 2 SLM (on-device)" if slm_used else "Needle Rule Engine",
-                "engine": "Needle Engine",
+                "model": "Yula Intent Engine",
+                "engine": "Yula Rule Engine",
                 "promptTokens": 0,
                 "completionTokens": 0,
                 "totalTokens": 0,

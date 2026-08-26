@@ -3,7 +3,7 @@
 
 import unittest
 
-from needle_engine import apply_compound_qualifier_args
+from intent_engine import apply_compound_qualifier_args
 
 
 CRITERIA_TOOL = {

@@ -114,7 +114,7 @@ function findSampleColumnMatch(
 
 /**
  * Deterministik aday listesi (Step-1): Arrow şeması + tipler + örnek kanıtı +
- * şekil imzasından en güçlü `limit` kolonu sıralar. Model (Needle/Gemma) yalnızca
+ * şekil imzasından en güçlü `limit` kolonu sıralar. Model (Gemma) yalnızca
  * bu dar listeden seçim yapar (Step-2); yetkili çözüm yine resolveGridColumn'dadır.
  */
 export function resolveColumnCandidates(

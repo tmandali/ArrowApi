@@ -73,6 +73,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  Trash2,
 } from "lucide-react"
 import { useAgentBridgeStore, type AiProviderConfig } from "@/hooks/useAgentBridge"
 
@@ -85,10 +86,35 @@ export function UserSettingsForm() {
   const [appOpen, setAppOpen] = React.useState(false)
   const [thirdPartyAuthOpen, setThirdPartyAuthOpen] = React.useState(true)
   const [yulaAiSettingsOpen, setYulaAiSettingsOpen] = React.useState(true)
+  const [systemFactsOpen, setSystemFactsOpen] = React.useState(false)
 
   const aiConfig = useAgentBridgeStore((s) => s.aiConfig)
   const configHydrated = useAgentBridgeStore((s) => s.configHydrated)
   const setAiConfig = useAgentBridgeStore((s) => s.setAiConfig)
+
+  // Kalıcı sistem bilgileri (Yula System Facts) — kullanıcı onayıyla sidecar'a yazılır
+  const systemFacts = useAgentBridgeStore((s) => s.systemFacts)
+  const loadSystemFacts = useAgentBridgeStore((s) => s.loadSystemFacts)
+  const saveSystemFact = useAgentBridgeStore((s) => s.saveSystemFact)
+  const deleteSystemFact = useAgentBridgeStore((s) => s.deleteSystemFact)
+  const sidecarStatus = useAgentBridgeStore((s) => s.status)
+
+  const [factKey, setFactKey] = React.useState("")
+  const [factValue, setFactValue] = React.useState("")
+  const [factSaved, setFactSaved] = React.useState(false)
+
+  // Sidecar hazır olunca mevcut kalıcı bilgileri çek
+  React.useEffect(() => {
+    if (sidecarStatus === "running") loadSystemFacts()
+  }, [sidecarStatus, loadSystemFacts])
+
+  const handleSaveSystemFact = () => {
+    if (!saveSystemFact(factKey, factValue)) return
+    setFactKey("")
+    setFactValue("")
+    setFactSaved(true)
+    setTimeout(() => setFactSaved(false), 2500)
+  }
 
   const [aiProvider, setAiProvider] = React.useState<AiProviderConfig["provider"]>(aiConfig.provider)
   const [aiModel, setAiModel] = React.useState(aiConfig.model)
@@ -466,7 +492,7 @@ export function UserSettingsForm() {
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-3 pl-2 space-y-4">
                     <p className="text-xs text-muted-foreground">
-                      Yula AI 2. kademe akıl yürütme motorunu ve model sağlayıcısını yapılandırın (1. Kademe Needle Engine her zaman yerel ve anlık çalışır).
+                      Yula AI'ın akıl yürütme motorunu ve model sağlayıcısını yapılandırın.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -581,6 +607,93 @@ export function UserSettingsForm() {
                           </>
                         ) : (
                           "Save AI Configuration"
+                        )}
+                      </Button>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* 🧠 Yula Kalıcı Sistem Bilgileri (System Facts) */}
+                <Collapsible open={systemFactsOpen} onOpenChange={setSystemFactsOpen} className="border-b pb-3">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
+                    <span>Yula Kalıcı Sistem Bilgileri (System Facts)</span>
+                    <ChevronDown
+                      className={`size-4 text-muted-foreground transition-transform duration-200 ${
+                        systemFactsOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-3 pl-2 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Yula'nın her sohbette hatırlayacağı kalıcı bilgiler (örn: varsayılan depo, para birimi,
+                      rapor tercihi). Kayıt kullanıcı onayınızla yapılır ve diskte saklanır; her task turunda
+                      sistem bağlamına eklenir.
+                    </p>
+                    {sidecarStatus !== "running" && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Bu bölüm masaüstü modunda, Yula yardımcısı çalışırken kullanılabilir.
+                      </p>
+                    )}
+
+                    {Object.keys(systemFacts).length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Henüz kalıcı bilgi kaydedilmedi.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {Object.entries(systemFacts)
+                          .sort(([a], [b]) => a.localeCompare(b, "tr"))
+                          .map(([k, v]) => (
+                            <div
+                              key={k}
+                              className="flex items-center gap-2 rounded-md border border-muted-foreground/15 bg-muted/20 px-2.5 py-1.5"
+                            >
+                              <span className="text-xs font-semibold text-foreground">{k}</span>
+                              <span className="text-xs text-muted-foreground truncate flex-1">{v}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-6 text-muted-foreground hover:text-red-500"
+                                aria-label={`${k} bilgisini sil`}
+                                onClick={() => deleteSystemFact(k)}
+                              >
+                                <Trash2 className="size-3" />
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-end gap-2 pt-1">
+                      <div className="w-44">
+                        <Input
+                          value={factKey}
+                          onChange={(e) => setFactKey(e.target.value)}
+                          placeholder="Anahtar (örn: varsayılan depo)"
+                          className="bg-muted/30 border-muted-foreground/20 h-9 text-xs"
+                        />
+                      </div>
+                      <Input
+                        value={factValue}
+                        onChange={(e) => setFactValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveSystemFact()
+                        }}
+                        placeholder="Değer (örn: MAIN)"
+                        className="flex-1 bg-muted/30 border-muted-foreground/20 h-9 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveSystemFact}
+                        disabled={!factKey.trim() || !factValue.trim()}
+                        className="h-9 px-3 text-xs gap-1.5"
+                      >
+                        {factSaved ? (
+                          <>
+                            <Check className="size-3 text-emerald-300" />
+                            Kaydedildi
+                          </>
+                        ) : (
+                          "Hatırla"
                         )}
                       </Button>
                     </div>

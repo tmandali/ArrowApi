@@ -129,7 +129,7 @@ export function executeReportCriteria(
 
 /**
  * Rapor meta satırı: scope{alias1|alias2}: alan1=v1/v2, alan2 — AI için.
- * `=değer/değer` bölümü enum seçenekleridir; Needle prompt içinde geçen
+ * `=değer/değer` bölümü enum seçenekleridir; Model prompt içinde geçen
  * enum değerini gördüğünde ilgili alana yazar (sözlüksüz doldurma).
  */
 function reportMetaLine(config: YulaReportCardConfig): string {
@@ -183,10 +183,13 @@ export function registerGenericReportTools(
 
   const prepareDef: ToolDefinition = {
     name: "prepare_report_criteria",
+    // Description standardı (üçlü şablon): NE YAPAR / NE ZAMAN KULLANILMAZ / ÖRNEKLER.
     description:
       "Kullanıcının istediği raporun KRİTER FORMUNU doldurur (raporu çalıştırmaz). " +
       `Kayıtlı rapor alanları → ${fieldDigest}. ` +
-      "'criteria' nesnesinin anahtarları seçilen raporun alan adlarıyla birebir aynı olmalıdır.",
+      "'criteria' nesnesinin anahtarları seçilen raporun alan adlarıyla birebir aynı olmalıdır. " +
+      "NE ZAMAN KULLANILMAZ: Rapor çalıştırılıp SONUÇ TABLOSU açıldıysa satır filtresi için bu araç çağrılmaz — araç listesinde 'filter_active_grid' varsa onu, özet/grafik için 'analyze_grid_data'yi kullan; kriterleri doldurup ÇALIŞTIRMAK isteniyorsa 'run_report' çağrılır. " +
+      "ÖRNEKLER: 'stok bakiye raporu hazırla', 'geçen haftanın iptalleri için kriterleri doldur', '50.000 TL üzeri stoklar filtresini kur'.",
     ai: {
       aliases: [...aliasSet],
       quickPrompts: [...quickSet],
@@ -223,9 +226,12 @@ export function registerGenericReportTools(
 
   const runDef: ToolDefinition = {
     name: "run_report",
+    // Description standardı (üçlü şablon): NE YAPAR / NE ZAMAN KULLANILMAZ / ÖRNEKLER.
     description:
       "Seçilen raporu mevcut kriterlerle ÇALIŞTIRIR ve sonuç ekranını açar (Çalıştır tuşu). " +
-      `Kayıtlı raporlar → ${fieldDigest}`,
+      `Kayıtlı raporlar → ${fieldDigest}. ` +
+      "NE ZAMAN KULLANILMAZ: Sadece KRİTERLERİ değiştirmek isteniyorsa çağrılmaz — o durumda 'prepare_report_criteria' kullanılır. " +
+      "ÖRNEKLER: 'stok bakiyesini getir', 'raporu çalıştır', 'analitik raporu son 30 günle göster'.",
     ai: { aliases: ["raporu çalıştır", "rapor çalıştır"] },
     scope: { type: "global" },
     parameters: {

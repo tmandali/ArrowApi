@@ -3,7 +3,7 @@
 Arrow/DuckDB fiziksel şema tiplerinden türetilen jenerik filtre-değeri doğrulaması.
 
 Kelime listesi YOKTUR: kontrol tamamen kolonun physical tipinden (date/number/text)
-gelir. Needle'ın filter_active_grid çıkarımı kolon tipiyle uyumsuzsa çağrı
+gelir. Model'in filter_active_grid çıkarımı kolon tipiyle uyumsuzsa çağrı
 analyze_grid_data'ya (KPI sayım) delege edilir.
 """
 

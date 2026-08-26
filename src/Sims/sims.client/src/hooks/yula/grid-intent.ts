@@ -275,7 +275,7 @@ export function resolveGridFastRoute(
       summaryAny?.columnAliases as Record<string, string[]> | undefined
     );
     // Kolon ÇÖZÜLDÜYSE uygula. Yalnızca hint var ama kolon yoksa EŞLEŞME SAYMA:
-    // anlamsal eşleme (örn. "pasif"→IsActive) Needle/Gemma katmanının işidir;
+    // anlamsal eşleme (örn. "pasif"→IsActive) Gemma katmanının işidir;
     // çözülemeyen hint'i grid'e göndermek hataya mahkumdur.
     if (resolvedCol) {
       args.query = unwrapped.quoted

@@ -71,8 +71,8 @@ describe("resolveGridFastRoute — count soruları filtre OLMAZ", () => {
   })
 })
 
-describe("applyViewingStateGuard — Needle yanlış araç seçerse", () => {
-  it("Needle filter dedi ama prompt sayım sorusu → analyze_grid_data", () => {
+describe("applyViewingStateGuard — model yanlış araç seçerse", () => {
+  it("Model filter dedi ama prompt sayım sorusu → analyze_grid_data", () => {
     const t = applyViewingStateGuard(
       "filter_active_grid",
       "kaç kayıt var",

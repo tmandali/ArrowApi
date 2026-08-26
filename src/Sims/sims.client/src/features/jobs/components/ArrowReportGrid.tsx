@@ -116,7 +116,7 @@ export function ArrowReportGrid({
 
   /**
    * Arrow/DuckDB şemasından türetilmiş kolon tip haritası.
-   * Yula'ya (Needle/LLM) şema grounding olarak verilir; filtre değerlerinin
+   * Yula'ya (LLM) şema grounding olarak verilir; filtre değerlerinin
    * kolon tipiyle (tarih/sayı/metin) uyumlu olmasını hem modele öğretir hem
    * execution anında jenerik olarak doğrular.
    */
@@ -127,7 +127,7 @@ export function ArrowReportGrid({
     return map
   }, [metaColumns, discoveredCols])
 
-  /** Needle'a tool tanımı içinde giden tipli kolon özeti. */
+  /** Tool tanımı içinde LLM'e giden tipli kolon özeti. */
   const columnTypesHint = React.useMemo(() => columnTypesHintOf(columnTypes), [columnTypes])
 
   const displayRows = rows.length > 0 ? rows : initialRows
@@ -143,7 +143,7 @@ export function ArrowReportGrid({
   }, [displayRows, effectiveColumns])
 
   /**
-   * Kolon sindirimi (shape + örnek değer) — Needle/Gemma bağlamı için kompakt
+   * Kolon sindirimi (shape + örnek değer) — LLM bağlamı için kompakt
    * "hangi kolon neye benzer" özeti (ilk 20 satırdan). Yetkili çözüm yine
    * execution katmanındadır; bu özet yalnızca ipucu kalitesini artırır.
    */
@@ -182,7 +182,7 @@ export function ArrowReportGrid({
       totalRows,
       totalFiltered,
       columns: effectiveColumns.map((c) => c.name),
-      // Arrow/DuckDB şema tipleri — Needle/LLM şema grounding'i
+      // Arrow/DuckDB şema tipleri — LLM şema grounding'i
       columnTypes,
       // Açık kolon adı eşleşmesi için ad→etiket haritası
       columnLabels: Object.fromEntries(

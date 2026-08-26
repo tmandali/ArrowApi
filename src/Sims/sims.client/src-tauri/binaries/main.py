@@ -14,20 +14,8 @@ from intents import INTENTS, has_any, fold_tr
 from ai_provider_factory import AiProviderFactory
 from pydantic_ai_tool_adapter import PydanticAiToolAdapter
 import skill_registry
+import system_facts
 import yula  # noqa: F401 — skill .py'larının `import yula` SDK'sı; PyInstaller bundle'a düşsün diye
-
-# PyInstaller bundle'indaki native Needle motorunu kullan (son kullanici makinesinde
-# ilk calistirmada ~14MB indirme gereksinimini ortadan kaldirir)
-if getattr(sys, "frozen", False):
-    try:
-        meipass = getattr(sys, "_MEIPASS", "")
-        if meipass:
-            from needle.agent import fetch as _needle_fetch
-            _bundled = os.path.join(meipass, _needle_fetch._lib_name())
-            if os.path.exists(_bundled):
-                os.environ.setdefault("NEEDLE_LIB_PATH", _bundled)
-    except Exception:
-        pass
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
@@ -35,13 +23,13 @@ if hasattr(sys.stdin, "reconfigure"):
     sys.stdin.reconfigure(line_buffering=True)
 
 try:
-    from needle_engine import NeedleEngine
-    needle_engine = NeedleEngine()
+    from intent_engine import IntentEngine
+    intent_engine = IntentEngine()
 except Exception as e:
     import traceback
-    sys.stderr.write(f"[Needle Init Error] {e}\n{traceback.format_exc()}\n")
+    sys.stderr.write(f"[Intent Engine Init Error] {e}\n{traceback.format_exc()}\n")
     sys.stderr.flush()
-    needle_engine = None
+    intent_engine = None
 
 active_ai_config = {
     "provider": "ollama",
@@ -54,6 +42,12 @@ conversation_history = []
 registered_tools = []
 active_request_id = None
 awaiting_llm_tool_result = False
+
+# Kural-motoru kademesi güven eşiği — TEK KAYNAK frontend'deki ai-confidence-gate.ts;
+# configure_ai payload'ındaki "confidenceGate" alanı bu değeri üzerine yazar.
+confidence_gate_threshold = 80
+# Gate kalibrasyon telemetrisi: kabul vs eşik-altı LLM'e devir oranları.
+gate_stats = {"accepted": 0, "fallback": 0}
 
 # Skill Registry: skills/<klasör>/SKILL.md + *.py (internal → agent içinde; bridged → frontend köprüsü)
 loaded_skills = []
@@ -235,6 +229,12 @@ def get_system_prompt(context=None):
                 "PRIORITIZE executing the current screen's filter/update tool instead of opening a different report.\n"
             )
 
+    # Kalıcı sistem bilgileri (system_facts): depo boşsa prompt'a hiç dokunulmaz.
+    facts_block = ""
+    facts_directive = system_facts.prompt_directive()
+    if facts_directive:
+        facts_block = facts_directive + "\n"
+
     ws_name = (context.get("active_workspace", "") if context else "") or "stok"
     if viewing_results:
         greeting_rule = (
@@ -275,6 +275,7 @@ def get_system_prompt(context=None):
         f"- Ay başı: {month_start_str}\n"
         f"- Yıl başı: {year_start_str}\n"
         f"{context_info}\n"
+        f"{facts_block}"
         f"SİSTEMDEKİ ÇALIŞMA ALANLARI VE GERÇEK MENÜLER (GROUNDED WORKSPACES):\n"
         f"1. Stock (Stok Yönetimi / stock):\n"
         f"   - Aktif AI Raporları: Stok Bakiyesi (Stock Balance), Stok Analitik Raporu (Stock Analytics).\n"
@@ -334,20 +335,20 @@ def handle_user_task(prompt_text, context=None):
             "type": "message",
             "content": f"📊 **Sistemde Kullanabileceğiniz Raporlar:**\n\n{list_str}\n\nİstediğiniz raporu açmak veya kriterlerini ayarlamak için raporun adını ya da görmek istediğiniz filtreleri (tarih, ambar, SKU vb.) yazabilirsiniz.",
             "telemetry": {
-                "model": "Needle 2 (SLM)",
-                "engine": "Needle Engine",
+                "model": "Yula Intent Engine",
+                "engine": "Yula Rule Engine",
                 "durationMs": 0.5,
                 "totalTokens": 0
             }
         })
         return
 
-    # 2. ⚡ Needle On-Device SLM Parameter Extractor & Validator
-    if needle_engine and registered_tools:
+    # 2. ⚡ Intent Engine (kural motoru) — Parameter Extractor & Validator
+    if intent_engine and registered_tools:
         try:
-            needle_res = needle_engine.process_task(prompt_text, registered_tools, context)
-            confidence = needle_res.get("telemetry", {}).get("confidence", 0)
-            has_actionable_args = bool(needle_res.get("arguments")) or needle_res.get("argless") is True
+            intent_res = intent_engine.process_task(prompt_text, registered_tools, context)
+            confidence = intent_res.get("telemetry", {}).get("confidence", 0)
+            has_actionable_args = bool(intent_res.get("arguments")) or intent_res.get("argless") is True
             is_new_report = has_any(fold_tr(prompt_lower), "newReport")
 
             # Pozitif kanıt sözleşmesi: yapısal veri sinyali (operatör / kod şekli /
@@ -369,23 +370,32 @@ def handle_user_task(prompt_text, context=None):
                     "dun","dün","bugun","bugün","gecen hafta","geçen hafta","bu ay","bu yil","bu yıl",
                 ])
             )
-            # Yalnızca gerçekten somut bir işlem yapabiliyorsa (argüman çıkardıysa veya yeni rapor açıyorsa) Needle yanıtlasın
-            if confidence >= 80 and (has_actionable_args or is_new_report) and (
+            # Yalnızca gerçekten somut bir işlem yapabiliyorsa (argüman çıkardıysa veya yeni rapor açıyorsa) kural motoru yanıtlasın
+            if confidence >= confidence_gate_threshold and (has_actionable_args or is_new_report) and (
                 data_signal or is_new_report
-                or needle_res.get("aliasMatched")
-                or needle_res.get("runVerb")
+                or intent_res.get("aliasMatched")
+                or intent_res.get("runVerb")
             ):
-                duration = needle_res.get("telemetry", {}).get("durationMs", 0)
-                sys.stderr.write(f"[Needle SLM Action] tool={needle_res.get('tool')} args={list(needle_res.get('arguments', {}).keys())} ({confidence}%) in {duration}ms\n")
+                gate_stats["accepted"] += 1
+                duration = intent_res.get("telemetry", {}).get("durationMs", 0)
+                sys.stderr.write(f"[Intent Action] tool={intent_res.get('tool')} args={list(intent_res.get('arguments', {}).keys())} ({confidence}% >= eşik {confidence_gate_threshold}) in {duration}ms\n")
                 sys.stderr.flush()
-                send_json(needle_res)
+                send_json(intent_res)
                 return
             else:
-                sys.stderr.write(f"[Needle -> Gemma 4 LLM Fallback] Somut işlem üretilemedi (argüman={has_actionable_args}, confidence={confidence}%), Gemma 4 LLM devreye giriyor...\n")
+                stats = gate_stats
+                total = stats["accepted"] + stats["fallback"]
+                ratio = round(100 * stats["fallback"] / total, 1) if total else 0.0
+                stats["fallback"] += 1
+                sys.stderr.write(
+                    f"[Rules -> LLM Fallback] Somut işlem üretilemedi "
+                    f"(argüman={has_actionable_args}, confidence={confidence}% < eşik={confidence_gate_threshold}), "
+                    f"Gemma 4 LLM devreye giriyor... | Gate: {total} tur, %{ratio} düşüş\n"
+                )
                 sys.stderr.flush()
         except Exception as err:
             import traceback
-            sys.stderr.write(f"[Needle Exception] Error: {err}\n{traceback.format_exc()}\n")
+            sys.stderr.write(f"[Intent Exception] Error: {err}\n{traceback.format_exc()}\n")
             sys.stderr.flush()
 
     # 3. Parametrik LLM / Pydantic AI Sağlayıcı Çağrısı (Gemma 4, Microsoft Foundry, Google Gemini vb.)
@@ -610,10 +620,11 @@ def handle_tool_result(tool_name, result_data):
 
 def main():
     global registered_tools, active_ai_config, active_request_id, conversation_history, awaiting_llm_tool_result
+    global confidence_gate_threshold
     send_json({
         "type": "status",
         "status": "ready",
-        "message": f"Yula AI Sidecar (Needle 2 SLM & Multi-Provider Pydantic AI Engine) aktif ve dinliyor."
+        "message": f"Yula AI Sidecar (Intent Rule Engine & Multi-Provider Pydantic AI Engine) aktif ve dinliyor."
     })
 
     try:
@@ -639,10 +650,14 @@ def main():
             if action == "configure_ai":
                 new_cfg = payload.get("config", {})
                 active_ai_config.update(new_cfg)
+                # Fast Router güven eşiği: frontend'deki tek kaynaktan (ai-confidence-gate.ts) gelir
+                gate_val = payload.get("confidenceGate")
+                if isinstance(gate_val, (int, float)) and 0 < float(gate_val) <= 100:
+                    confidence_gate_threshold = int(gate_val)
                 send_json({
                     "type": "status",
                     "status": "ai_configured",
-                    "message": f"AI Yapılandırması Güncellendi: {active_ai_config.get('provider')} / {active_ai_config.get('model')}"
+                    "message": f"AI Yapılandırması Güncellendi: {active_ai_config.get('provider')} / {active_ai_config.get('model')} (eşik %{confidence_gate_threshold})"
                 })
 
             elif action == "register_tools":
@@ -713,6 +728,25 @@ def main():
                     "message": "Konuşma geçmişi sıfırlandı."
                 })
                 
+            elif action == "system_facts":
+                # Kalıcı sistem bilgileri (kullanıcı onaylı kayıt sözleşmesi):
+                # {action:"system_facts", op:"get"|"set"|"clear", facts?:{k:v}, keys?:[...]}
+                op = str(payload.get("op") or "").lower()
+                if op == "set":
+                    merged = system_facts.set_many(payload.get("facts") or {})
+                    send_json({"type": "status", "status": "system_facts",
+                               "message": f"{len(merged)} kalıcı bilgi kayıtlı.", "count": len(merged)})
+                elif op == "clear":
+                    removed = system_facts.clear(payload.get("keys"))
+                    send_json({"type": "status", "status": "system_facts",
+                               "message": f"{removed} kalıcı bilgi temizlendi.",
+                               "count": len(system_facts.get_all())})
+                elif op == "get":
+                    send_json({"type": "system_facts_result", "facts": system_facts.get_all()})
+                else:
+                    send_json({"type": "error",
+                               "message": f"Bilinmeyen system_facts işlemi: '{op or '(boş)'}'. Beklenen: get | set | clear."})
+
             elif action == "ping":
                 send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
                 

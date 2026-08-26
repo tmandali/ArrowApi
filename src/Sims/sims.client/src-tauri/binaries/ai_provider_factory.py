@@ -1,7 +1,10 @@
 import asyncio
 import json
+import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
+
+from json_arg_repair import repair_tool_arguments
 
 from pydantic_ai import Agent, DeferredToolRequests, Tool
 from pydantic_ai.capabilities import WebFetch
@@ -297,11 +300,17 @@ class AiProviderFactory:
             if entry["function"]["name"] not in external_tool_names:
                 continue
             raw = entry["function"].pop("arguments_raw") or "{}"
-            try:
-                args = json.loads(raw)
-            except Exception:
+            # Onarım zinciri: ham parse → fence/prose soyumu → artık-virgül/tırnak/
+            # eksik-parantez onarımı. Hepsi başarısızsa stderr'e düşüp {} ile devam.
+            args = repair_tool_arguments(raw)
+            if args is None:
+                sys.stderr.write(
+                    f"[Tool Arg JSON Repair] '{entry['function']['name']}' argümanları "
+                    f"çözülemedi, {{}} ile devam ediliyor: {str(raw)[:200]!r}\n"
+                )
+                sys.stderr.flush()
                 args = {}
-            entry["function"]["arguments"] = args if isinstance(args, dict) else {}
+            entry["function"]["arguments"] = args
             tool_calls.append(entry)
 
         if result is not None:

@@ -45,7 +45,7 @@ export function YulaReportCriteriaCard({
 
   const quickPrompts = readReportAiMetadata(config.schema).quickPrompts || []
 
-  // AI (tool call) veya Needle'ın doldurduğu kriter alanları — gridde hafif turuncu vurgulanır.
+  // AI (tool call) ile doldurulmuş kriter alanları — gridde hafif turuncu vurgulanır.
   const [aiFilledNames, setAiFilledNames] = React.useState<string[]>([])
   // details her parent render'da yeni obje olarak gelir; içeriğe göre stabil anahtar kullan.
   const detailsKey = React.useMemo(

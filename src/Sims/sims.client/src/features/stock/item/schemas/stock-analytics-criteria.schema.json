@@ -19,6 +19,7 @@
       "analiz raporu"
     ],
     "directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap ve kullanıcıya 'son 7 gün' veya 'bu yıl' seçeneklerini öner.",
+    "dynamicColumns": true,
     "quickPrompts": [
       "Son 30 günün analitiğini hazırla",
       "Son 7 gün (TRY)",
