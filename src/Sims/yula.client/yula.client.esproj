@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.5581896">
+  <PropertyGroup>
+    <!-- Next.js App Router projesi — standart next altyapısı -->
+    <StartupCommand>npm run dev</StartupCommand>
+    <ShouldRunBuildScript>false</ShouldRunBuildScript>
+    <!-- next build çıktısı (SSR server) — publish sürecinde ayrı Node servisi olarak koşar -->
+    <BuildOutputFolder>$(MSBuildProjectDirectory)\.next\standalone</BuildOutputFolder>
+  </PropertyGroup>
+</Project>

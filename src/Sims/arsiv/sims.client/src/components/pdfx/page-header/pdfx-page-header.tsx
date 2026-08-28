@@ -1,0 +1,421 @@
+import { Text as PDFText, StyleSheet, View } from '@react-pdf/renderer';
+import type { Style } from '@react-pdf/types';
+import type { ReactNode } from 'react';
+import { usePdfxTheme, useSafeMemo } from '../../../lib/pdfx-theme-context';
+type PdfxTheme = ReturnType<typeof usePdfxTheme>;
+
+export type PageHeaderVariant =
+  | 'simple'
+  | 'centered'
+  | 'minimal'
+  | 'branded'
+  | 'logo-left'
+  | 'logo-right'
+  | 'two-column';
+
+/**
+ * Header row with layout variants, logo support, and optional fixed positioning.
+ * Props - `title` | `subtitle` | `rightText` | `rightSubText` | `variant` | `background` | `titleColor` | `marginBottom` | `address` | `phone` | `email` | `logo` | `fixed` | `noWrap` | `style`
+ * @see {@link PageHeaderProps}
+ */
+export interface PageHeaderProps {
+  /** Custom styles to merge with component defaults */
+  style?: Style;
+  title: string;
+  subtitle?: string;
+  rightText?: string;
+  rightSubText?: string;
+  /**
+   * @default 'simple'
+   */
+  variant?: PageHeaderVariant;
+  background?: string;
+  titleColor?: string;
+  marginBottom?: number;
+  address?: string;
+  phone?: string;
+  email?: string;
+  logo?: ReactNode;
+  /**
+   * @default false
+   */
+  fixed?: boolean;
+  /**
+   * @default true
+   */
+  noWrap?: boolean;
+}
+
+const THEME_COLOR_KEYS = ['foreground','muted','mutedForeground','primary','primaryForeground','accent','destructive','success','warning','info'] as const;
+function resolveColor(value: string, colors: Record<string, string>): string {
+  return THEME_COLOR_KEYS.includes(value as (typeof THEME_COLOR_KEYS)[number]) ? colors[value] : value;
+}
+function createPageHeaderStyles(t: PdfxTheme) {
+  const { spacing, borderRadius, fontWeights } = t.primitives;
+  const c = t.colors;
+  const { heading, body } = t.typography;
+
+  return StyleSheet.create({
+    simpleContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingBottom: spacing[4],
+      borderBottomWidth: spacing[0.5],
+      borderBottomColor: c.border,
+      borderBottomStyle: 'solid',
+    },
+    simpleLeft: {
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1,
+    },
+    simpleRight: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+    },
+
+    centeredContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      paddingBottom: spacing[4],
+      borderBottomWidth: spacing[0.5],
+      borderBottomColor: c.border,
+      borderBottomStyle: 'solid',
+    },
+
+    minimalContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: spacing[1],
+      borderBottomColor: c.primary,
+      borderBottomStyle: 'solid',
+      paddingBottom: spacing[3],
+    },
+    minimalLeft: {
+      flex: 1,
+    },
+    minimalRight: {
+      alignItems: 'flex-end',
+    },
+
+    brandedContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      backgroundColor: c.primary,
+      padding: spacing[6],
+      borderRadius: borderRadius.sm,
+    },
+
+    title: {
+      fontFamily: heading.fontFamily,
+      fontSize: heading.fontSize.h3,
+      fontWeight: fontWeights.bold,
+      color: c.foreground,
+      lineHeight: heading.lineHeight,
+      marginBottom: 0,
+    },
+    titleCentered: {
+      textAlign: 'center',
+    },
+    titleBranded: {
+      color: c.primaryForeground,
+    },
+    titleMinimal: {
+      fontSize: heading.fontSize.h3,
+      fontWeight: fontWeights.bold,
+    },
+
+    subtitle: {
+      fontFamily: body.fontFamily,
+      fontSize: body.fontSize,
+      color: c.mutedForeground,
+      marginTop: spacing[1],
+      lineHeight: body.lineHeight,
+    },
+    subtitleCentered: {
+      textAlign: 'center',
+    },
+    subtitleBranded: {
+      color: c.primaryForeground,
+      marginTop: spacing[1],
+    },
+
+    rightText: {
+      fontFamily: body.fontFamily,
+      fontSize: body.fontSize,
+      color: c.foreground,
+      fontWeight: fontWeights.medium,
+      textAlign: 'right',
+    },
+    rightSubText: {
+      fontFamily: body.fontFamily,
+      fontSize: t.primitives.typography.xs,
+      color: c.mutedForeground,
+      textAlign: 'right',
+      marginTop: spacing[1],
+    },
+
+    logoLeftContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: spacing[4],
+      borderBottomWidth: spacing[0.5],
+      borderBottomColor: c.border,
+      borderBottomStyle: 'solid',
+    },
+    logoContainer: {
+      marginRight: spacing[4],
+      width: 48,
+      height: 48,
+    },
+    logoContent: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+    },
+
+    logoRightContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing[4],
+      borderBottomWidth: spacing[0.5],
+      borderBottomColor: c.border,
+      borderBottomStyle: 'solid',
+    },
+    logoRightContent: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    logoRightLogoContainer: {
+      marginLeft: spacing[4],
+      width: 48,
+      height: 48,
+    },
+
+    twoColumnContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingBottom: spacing[4],
+      borderBottomWidth: spacing[0.5],
+      borderBottomColor: c.border,
+      borderBottomStyle: 'solid',
+    },
+    twoColumnLeft: {
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1,
+    },
+    twoColumnRight: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+    },
+    contactInfo: {
+      fontFamily: body.fontFamily,
+      fontSize: t.primitives.typography.xs,
+      color: c.mutedForeground,
+      textAlign: 'right',
+      marginTop: spacing[0.5],
+    },
+  });
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  rightText,
+  rightSubText,
+  variant = 'simple',
+  background,
+  titleColor,
+  marginBottom,
+  logo,
+  address,
+  phone,
+  email,
+  fixed = false,
+  noWrap = true,
+  style,
+}: PageHeaderProps) {
+  const theme = usePdfxTheme();
+  const styles = useSafeMemo(() => createPageHeaderStyles(theme), [theme]);
+  const mb = marginBottom ?? theme.spacing.sectionGap;
+
+  if (variant === 'branded') {
+    const containerStyles: Style[] = [styles.brandedContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title, styles.titleBranded, styles.titleCentered];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        <PDFText style={titleStyles}>{title}</PDFText>
+        {subtitle && (
+          <PDFText style={[styles.subtitle, styles.subtitleBranded]}>{subtitle}</PDFText>
+        )}
+      </View>
+    );
+  }
+
+  if (variant === 'centered') {
+    const containerStyles: Style[] = [styles.centeredContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title, styles.titleCentered];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        <PDFText style={titleStyles}>{title}</PDFText>
+        {subtitle && (
+          <PDFText style={[styles.subtitle, styles.subtitleCentered]}>{subtitle}</PDFText>
+        )}
+      </View>
+    );
+  }
+
+  if (variant === 'logo-right') {
+    const containerStyles: Style[] = [styles.logoRightContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        <View style={styles.logoRightContent}>
+          <PDFText style={titleStyles}>{title}</PDFText>
+          {subtitle && <PDFText style={styles.subtitle}>{subtitle}</PDFText>}
+        </View>
+        {logo && <View style={styles.logoRightLogoContainer}>{logo}</View>}
+      </View>
+    );
+  }
+
+  if (variant === 'logo-left') {
+    const containerStyles: Style[] = [styles.logoLeftContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        {logo && <View style={styles.logoContainer}>{logo}</View>}
+        <View style={styles.logoContent}>
+          <PDFText style={titleStyles}>{title}</PDFText>
+          {subtitle && <PDFText style={styles.subtitle}>{subtitle}</PDFText>}
+        </View>
+        {(rightText || rightSubText) && (
+          <View style={styles.simpleRight}>
+            {rightText && <PDFText style={styles.rightText}>{rightText}</PDFText>}
+            {rightSubText && <PDFText style={styles.rightSubText}>{rightSubText}</PDFText>}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  if (variant === 'two-column') {
+    const containerStyles: Style[] = [styles.twoColumnContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        <View style={styles.twoColumnLeft}>
+          <PDFText style={titleStyles}>{title}</PDFText>
+          {subtitle && <PDFText style={styles.subtitle}>{subtitle}</PDFText>}
+        </View>
+        {(address || phone || email) && (
+          <View style={styles.twoColumnRight}>
+            {address && <PDFText style={styles.contactInfo}>{address}</PDFText>}
+            {phone && <PDFText style={styles.contactInfo}>{phone}</PDFText>}
+            {email && <PDFText style={styles.contactInfo}>{email}</PDFText>}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  if (variant === 'minimal') {
+    const containerStyles: Style[] = [styles.minimalContainer, { marginBottom: mb }];
+    if (background) {
+      containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+    }
+    if (style) containerStyles.push(style);
+
+    const titleStyles: Style[] = [styles.title, styles.titleMinimal];
+    if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+    return (
+      <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+        <View style={styles.minimalLeft}>
+          <PDFText style={titleStyles}>{title}</PDFText>
+          {subtitle && <PDFText style={styles.subtitle}>{subtitle}</PDFText>}
+        </View>
+        {(rightText || rightSubText) && (
+          <View style={styles.minimalRight}>
+            {rightText && <PDFText style={styles.rightText}>{rightText}</PDFText>}
+            {rightSubText && <PDFText style={styles.rightSubText}>{rightSubText}</PDFText>}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  const containerStyles: Style[] = [styles.simpleContainer, { marginBottom: mb }];
+  if (background) {
+    containerStyles.push({ backgroundColor: resolveColor(background, theme.colors) });
+  }
+  if (style) containerStyles.push(style);
+
+  const titleStyles: Style[] = [styles.title];
+  if (titleColor) titleStyles.push({ color: resolveColor(titleColor, theme.colors) });
+
+  return (
+    <View wrap={!noWrap} fixed={fixed} style={containerStyles}>
+      <View style={styles.simpleLeft}>
+        <PDFText style={titleStyles}>{title}</PDFText>
+        {subtitle && <PDFText style={styles.subtitle}>{subtitle}</PDFText>}
+      </View>
+      {(rightText || rightSubText) && (
+        <View style={styles.simpleRight}>
+          {rightText && <PDFText style={styles.rightText}>{rightText}</PDFText>}
+          {rightSubText && <PDFText style={styles.rightSubText}>{rightSubText}</PDFText>}
+        </View>
+      )}
+    </View>
+  );
+}

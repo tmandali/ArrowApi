@@ -4,14 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <SpaRoot>..\sims.client</SpaRoot>
+    <SpaRoot>..\yula.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
-    <SpaProxyServerUrl>https://localhost:56402</SpaProxyServerUrl>
+    <SpaProxyServerUrl>http://localhost:56402</SpaProxyServerUrl>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Arrow.Jobs.AspNetCore\Arrow.Jobs.AspNetCore.csproj" />
-    <ProjectReference Include="..\sims.client\sims.client.esproj">
+    <ProjectReference Include="..\yula.client\yula.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>10.*-*</Version>
     </PackageReference>
+    <!-- StockBalance/StockAnalytics servisleri ve endpoint'leri doğrudan kullanıyor -->
+    <PackageReference Include="Apache.Arrow" Version="23.0.0" />
   </ItemGroup>
 
 </Project>

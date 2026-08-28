@@ -1,8 +1,8 @@
 # ArrowApi
 
-## Sims Client (React frontend)
+## Yula Client (Next.js frontend)
 
-Mimari kararlar ve dizin yapısı kuralları için bak: **`src/Sims/sims.client/AGENTS.md`**
+Mimari kararlar ve dizin yapısı kuralları için bak: **`src/Sims/yula.client/AGENTS.md`**
 (her oturumda mutlaka oku).
 
 Kısa özet:

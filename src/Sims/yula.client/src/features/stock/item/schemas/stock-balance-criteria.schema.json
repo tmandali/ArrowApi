@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stok Bakiye Raporu (Stock Balance)",
+  "description": "Depo ve ambarlardaki mevcut ürünlerin kalan stok adetlerini, parasal değerlerini, hareket tarihlerini ve durumlarını sorgular.",
+  "x-scope": "stock-balance",
+  "x-page-path": "/stock/stock-balance",
+  "x-ai": {
+    "schemaVersion": 1,
+    "columnDescriptions": {
+      "Id": "Kaydın benzersiz teknik tanımlayıcısı; analizlerde anlamsızdır, kullanılmaz.",
+      "ItemCode": "Ürün stok kodu (SKU); ürün kimliği için birincil kolon.",
+      "ItemName": "Ürünün görünen adı.",
+      "Warehouse": "Stok tutulan depo kodu (WH-XX biçiminde).",
+      "Qty": "Stok adedi; sıfıra yakın değerler kritik stok seviyesidir.",
+      "UnitPrice": "Birim satış fiyatı (TRY).",
+      "PostingDate": "Stok hareketinin muhasebeleşme tarihi (YYYY-MM-DD).",
+      "IsActive": "Kaydın aktiflik durumu (true/false).",
+      "BatchNumber": "Üretim parti numarası; boş değer partsız takip edilen stoktur (veri kalitesi riski)."
+    },
+    "aliases": [
+      "stok bakiye",
+      "stok bakiye raporu",
+      "stock balance",
+      "stock balance raporu",
+      "stok bakiyesi",
+      "kalan stok",
+      "mevcut stok",
+      "envanter durumu",
+      "depo bakiye",
+      "bakiye raporu",
+      "stok bakiye kriterleri",
+      "bakiye"
+    ],
+    "directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
+    "quickPrompts": [
+      "Dün itibarıyla hazırla",
+      "Geçen haftanın iptallerini göster",
+      "50.000 TL üzeri stoklar",
+      "Sadece AKTIF kayıtlar"
+    ],
+    "resultsPrompts": [
+      "🚨 Anomali & Risk Analizi",
+      "En Yüksek Bakiyeli 5 Ürün",
+      "Genel Toplam & Stok Metrikleri",
+      "Stokta Olanları Süz",
+      "Filtreleri Temizle"
+    ],
+    "columnAliases": {
+      "Qty": [
+        "miktar",
+        "adet",
+        "stok adedi"
+      ],
+      "UnitPrice": [
+        "fiyat",
+        "birim fiyat"
+      ],
+      "Warehouse": [
+        "depo",
+        "ambar"
+      ],
+      "ItemCode": [
+        "ürün kodu",
+        "stok kodu",
+        "malzeme kodu"
+      ],
+      "PostingDate": [
+        "tarih",
+        "kayıt tarihi"
+      ]
+    }
+  },
+  "x-job-endpoint": "/api/arrow/jobs/stock-balance",
+  "type": "object",
+  "properties": {
+    "kayitTarihi": {
+      "type": "string",
+      "format": "date",
+      "title": "Kayıt / Hareket Tarihi",
+      "description": "Stok hareketinin gerçekleştiği tarih. Tek bir gün (örn: '2026-08-18') veya aralık (örn: '2026-08-01..2026-08-19') formatında girilir.",
+      "x-range-split": "..",
+      "x-ai": {
+        "intent": "movement_date",
+        "priority": 100,
+        "columnHints": [
+          "PostingDate",
+          "posting_date",
+          "date"
+        ],
+        "dateBehavior": "range_string",
+        "directive": "Zorunlu alandır. Kullanıcı komutta tarih vermediyse dünün tarihini koy ve 'geçen hafta', 'bu ay' veya 'bugün' alternatiflerini öner. Format YYYY-MM-DD veya YYYY-MM-DD..YYYY-MM-DD.",
+        "suggestions": [
+          "dün",
+          "geçen hafta",
+          "bugün",
+          "bu ay başından itibaren"
+        ]
+      }
+    },
+    "durum": {
+      "type": "array",
+      "title": "Evrak / Stok Durumu",
+      "description": "Stok kaydının geçerlilik durumu. AKTIF: Depodaki mevcut mallar, IPTAL: İptal edilen kayıtlar, PASIF: Kapatılmış stoklar, BEKLEMEDE: Onay bekleyen hareketler.",
+      "x-selection": "multiple",
+      "x-ai": {
+        "intent": "record_status",
+        "priority": 90,
+        "columnHints": [
+          "IsActive",
+          "status",
+          "is_passive",
+          "durum"
+        ],
+        "directive": "Kullanıcı özel bir durum (iptal, pasif) talep etmediyse boş bırak veya AKTIF seç.",
+        "suggestions": [
+          "AKTIF",
+          "IPTAL",
+          "BEKLEMEDE"
+        ]
+      },
+      "items": {
+        "type": "string",
+        "enum": [
+          "AKTIF",
+          "PASIF",
+          "BEKLEMEDE",
+          "IPTAL"
+        ]
+      }
+    },
+    "tutarMiktar": {
+      "type": "number",
+      "title": "Tutar Eşiği",
+      "description": "Minimum parasal stok değeri eşiği (birim fiyat × miktar toplamı). Örn: '50.000 TL üzeri stoklar' → 50000. Para birimi tutarParaBirimi ile birlikte kullanılır.",
+      "x-ai": {
+        "intent": "minimum_inventory_value",
+        "priority": 80,
+        "columnHints": [
+          "UnitPrice",
+          "total_value",
+          "amount",
+          "tutar"
+        ],
+        "directive": "Kullanıcı 'X tutarından büyük', 'yüksek değerli stoklar' gibi ifadeler kullandığında bu alanı doldur."
+      },
+      "minimum": 0
+    },
+    "tutarParaBirimi": {
+      "type": "string",
+      "title": "Para Birimi",
+      "description": "Tutarın döviz cinsi. Varsayılan TRY.",
+      "enum": [
+        "TRY",
+        "USD",
+        "EUR"
+      ],
+      "x-selection": "single",
+      "default": "TRY",
+      "x-ai": {
+        "intent": "currency",
+        "suggestions": [
+          "TRY",
+          "USD",
+          "EUR"
+        ],
+        "directive": "tutarMiktar doldurulduysa varsayılan TRY ile birlikte gönder; kullanıcı farklı bir döviz belirtmedikçe değiştirme."
+      }
+    },
+    "urun": {
+      "type": "array",
+      "title": "Ürün Bilgileri",
+      "description": "Filtrelenecek ürünlerin kodları ve/veya ticari adları. Kod (ItemCode) ile ad (ItemName) ayrı kolonlardır; kullanıcının verdiği değer hangisine uyuyorsa o kolona yazılır.",
+      "x-selection": "multiple",
+      "x-ai": {
+        "intent": "product_lookup",
+        "priority": 85,
+        "columnHints": [
+          "ItemCode",
+          "ItemName",
+          "sku",
+          "barcode"
+        ],
+        "directive": "Kullanıcı belirli bir ürün adı, kodu veya barkodu söylediğinde veri kaynağındaki eşleşen kodları seç."
+      },
+      "items": {
+        "type": "string"
+      },
+      "properties": {
+        "kod": {
+          "type": "string",
+          "title": "Ürün Kodu"
+        },
+        "ad": {
+          "type": "string",
+          "title": "Ürün Adı"
+        },
+        "barkod": {
+          "type": "string",
+          "title": "Ürün Barkodu",
+          "pattern": "^\\d{13}$"
+        }
+      },
+      "x-datasource": [
+        {
+          "kod": "1",
+          "ad": "Ürün 1",
+          "barkod": "1234567890123"
+        },
+        {
+          "kod": "2",
+          "ad": "Ürün 2",
+          "barkod": "9876543210987"
+        },
+        {
+          "kod": "3",
+          "ad": "Ürün 3",
+          "barkod": "1111111111111"
+        },
+        {
+          "kod": "4",
+          "ad": "Ürün 4",
+          "barkod": "2222222222222"
+        },
+        {
+          "kod": "5",
+          "ad": "Ürün 5",
+          "barkod": "3333333333333"
+        },
+        {
+          "kod": "6",
+          "ad": "Ürün 6",
+          "barkod": "4444444444444"
+        },
+        {
+          "kod": "7",
+          "ad": "Ürün 7",
+          "barkod": "5555555555555"
+        },
+        {
+          "kod": "8",
+          "ad": "Ürün 8",
+          "barkod": "6666666666666"
+        },
+        {
+          "kod": "9",
+          "ad": "Ürün 9",
+          "barkod": "7777777777777"
+        },
+        {
+          "kod": "10",
+          "ad": "Ürün 10",
+          "barkod": "8888888888888"
+        },
+        {
+          "kod": "11",
+          "ad": "Ürün 11",
+          "barkod": "9999999999999"
+        },
+        {
+          "kod": "12",
+          "ad": "Ürün 12",
+          "barkod": "1010101010101"
+        }
+      ]
+    },
+    "sampleRows": {
+      "type": "integer",
+      "title": "Test Satır Sayısı",
+      "description": "Mock veri satır sayısı. Boş bırakılırsa varsayılan (2). Devasa testler için 1000000 yazılabilir.",
+      "minimum": 1,
+      "x-ai": {
+        "intent": "test_only",
+        "directive": "AI bu alanı ASLA doldurmaz ve önermez; yalnızca geliştirici test verisi üretimi içindir."
+      }
+    }
+  },
+  "required": [
+    "kayitTarihi"
+  ]
+}
