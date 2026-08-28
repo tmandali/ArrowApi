@@ -15,7 +15,7 @@ type WorkspaceSearchDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
-/** Fallback modal search when no header search box is mounted. */
+/** Central modal search dialog opened on ⌘K or header search trigger click. */
 export function WorkspaceSearchDialog({
   open,
   onOpenChange,
@@ -31,12 +31,12 @@ export function WorkspaceSearchDialog({
         </DialogDescription>
       </DialogHeader>
       <DialogContent
-        className="top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0"
+        className="top-[15%] translate-y-0 max-w-lg sm:max-w-xl md:max-w-2xl overflow-hidden rounded-xl p-0 border-border/40 shadow-2xl"
         showCloseButton={false}
       >
         <WorkspaceSearchPanel
           onSelect={handleSelect}
-          className="rounded-none"
+          className="rounded-xl border-0"
         />
       </DialogContent>
     </Dialog>

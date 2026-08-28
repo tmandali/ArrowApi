@@ -26,9 +26,10 @@ const e = emptyModulePath
 /** Shared workspace dashboard (menu-boxes landing screen). */
 export const workspaceDashboardPath = "/stock/dashboard"
 
-/** Per-workspace dashboard path — only stock has a real page; others 404. */
+/** Per-workspace dashboard path. */
 export const workspaceDashboardPathByWorkspace: Record<WorkspaceId, string> = {
   system: "/",
+  subcontracting: "/subcontracting/dashboard",
   selling: "/selling/dashboard",
   accounting: "/accounting/dashboard",
   stock: workspaceDashboardPath,
@@ -49,12 +50,12 @@ export type WorkspaceNavItem = {
   items?: WorkspaceNavSubItem[]
 }
 
-export type WorkspaceId = "system" | "selling" | "accounting" | "stock" | "manufacturing"
+export type WorkspaceId = "system" | "subcontracting" | "selling" | "accounting" | "stock" | "manufacturing"
 
 export const subcontractingNav: WorkspaceNavItem[] = [
   {
     title: "Dashboard",
-    url: workspaceDashboardPathByWorkspace.selling,
+    url: workspaceDashboardPathByWorkspace.subcontracting,
     icon: LayoutDashboardIcon,
   },
   {
@@ -333,6 +334,7 @@ export const systemNav: WorkspaceNavItem[] = [
 
 export const workspaceNavById: Record<WorkspaceId, WorkspaceNavItem[]> = {
   system: systemNav,
+  subcontracting: subcontractingNav,
   selling: subcontractingNav,
   accounting: financialReportsNav,
   stock: stockNav,
@@ -364,7 +366,12 @@ export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
   ) {
     return manufacturingNav
   }
-  if (pathname === "/selling" || pathname.startsWith("/selling/")) {
+  if (
+    pathname === "/subcontracting" ||
+    pathname.startsWith("/subcontracting/") ||
+    pathname === "/selling" ||
+    pathname.startsWith("/selling/")
+  ) {
     return subcontractingNav
   }
   return systemNav

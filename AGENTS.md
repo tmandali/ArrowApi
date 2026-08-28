@@ -8,6 +8,7 @@ Mimari kararlar ve dizin yapısı kuralları için bak: **`src/Sims/yula.client/
 Kısa özet:
 - **Shell (host)** = root iskelet: routing, layout, sidebar, Yula, global sayfalar.
 - **Workspace** = bağımsız iş alanı; kendi içeriği `features/<workspace>/` altında, `pages/` sadece ince wrapper.
+- **Workspace Rota Standardı**: Workspace kökü (`/<workspace>`) genel karşılama (landing) ekranıdır; özet pano ve KPI ekranları ise (`/<workspace>/dashboard`) standart alt rotasında yer alır.
 - Her workspace kendini `index.ts` + `routes.ts` ile **register eder**; shell route'ları toplar.
 - Workspace'e özgü ekranlar `features/<workspace>/`, global ekranlar `features/<feature>/`.
 - shadcn `components/ui/*`'a dokunma; `.oxlintrc.json` overrides ile korunur.

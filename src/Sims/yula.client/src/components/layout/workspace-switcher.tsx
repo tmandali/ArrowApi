@@ -64,7 +64,8 @@ export function WorkspaceSwitcher({
   const currentWorkspace = React.useMemo(() => {
     const byId: Record<WorkspaceId, string | undefined> = {
       system: "/",
-      selling: "/selling",
+      subcontracting: "/subcontracting",
+      selling: "/subcontracting",
       accounting: "/accounting",
       stock: "/stock",
       manufacturing: "/manufacturing",

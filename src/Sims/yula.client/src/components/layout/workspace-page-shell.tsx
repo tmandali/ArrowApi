@@ -3,6 +3,8 @@
 import type { ReactNode } from "react"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
+import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { cn } from "@/utils/cn"
 
 type WorkspacePageShellProps = {
@@ -26,18 +28,21 @@ type WorkspacePageShellProps = {
 /**
  * Shared workspace page scaffold: floating header (breadcrumb + actions +
  * search) followed by the Yula-aware AI dock around the page body.
+ * When workspace search is open, main content switches to WorkspaceSearchMainView.
  */
 export function WorkspacePageShell({
   breadcrumb,
   actions,
   startExtra,
   searchPlaceholder,
-  showSearch = false,
+  showSearch = true,
   headerSearch,
   children,
   className,
   contentClassName,
 }: WorkspacePageShellProps) {
+  const { open } = useWorkspaceSearch()
+
   return (
     <div
       className={cn(
@@ -54,7 +59,9 @@ export function WorkspacePageShell({
       >
         {breadcrumb}
       </WorkspacePageHeader>
-      <WorkspaceAiDock className={contentClassName}>{children}</WorkspaceAiDock>
+      <WorkspaceAiDock className={contentClassName}>
+        {open ? <WorkspaceSearchMainView /> : children}
+      </WorkspaceAiDock>
     </div>
   )
 }

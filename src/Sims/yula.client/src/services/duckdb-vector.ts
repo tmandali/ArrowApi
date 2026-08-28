@@ -9,6 +9,7 @@
 import { duckDbClient } from "@/services/duckdb";
 import { getEmbedding, VECTOR_DIMENSION } from "@/lib/yula-embedding";
 import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
+import { STOCK_WORKSPACE_MENU_ITEMS } from "@/features/stock/lib/stock-menu-registry";
 
 export interface RagVectorItem {
   id: string;
@@ -120,8 +121,43 @@ export async function indexReportSchemas(): Promise<number> {
     indexedCount++;
   }
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${indexedCount} vector items indexed into DuckDB WASM.`);
+  // 5) Workspace Menü ve Modül Öğelerinin Vektör İndeksine Eklenmesi
+  const menuCount = await indexWorkspaceMenus();
+  indexedCount += menuCount;
+
+  console.info(`🤖 [DuckDB WASM Vector Indexer] ${indexedCount} total vector items indexed into DuckDB WASM.`);
   return indexedCount;
+}
+
+/** Workspace menü öğelerini (Stock vb.) DuckDB WASM RAG tablosuna vektörleştirip kaydeder. */
+export async function indexWorkspaceMenus(): Promise<number> {
+  await initVectorStore();
+  let count = 0;
+
+  for (const item of STOCK_WORKSPACE_MENU_ITEMS) {
+    const content = `Modül Menü Öğesi: ${item.title} (${item.titleTr}). Kategori: ${item.category}. Workspace: ${item.workspace}. Açıklama: ${item.description}. Anahtar Kelimeler: ${item.keywords.join(", ")}.`;
+    const vec = await getEmbedding(content);
+
+    await insertOrReplaceVector({
+      id: `menu_${item.workspace}_${item.id}`,
+      scope: item.workspace,
+      content,
+      metadata: {
+        type: "menu_item",
+        title: item.title,
+        titleTr: item.titleTr,
+        url: item.url,
+        category: item.category,
+        workspace: item.workspace,
+        keywords: item.keywords,
+      },
+      embedding: vec,
+    });
+    count++;
+  }
+
+  console.info(`🤖 [DuckDB WASM Vector Indexer] ${count} workspace menu items indexed into RAG store.`);
+  return count;
 }
 
 async function insertOrReplaceVector(item: {

@@ -24,8 +24,9 @@ export const emptyWorkspaceHome: Record<string, { label: string; url: string }> 
   {
     system: { label: "System", url: "/" },
     stock: { label: "Stock", url: "/stock" },
-    selling: { label: "Subcontracting", url: "/selling" },
-    accounting: { label: "Financial Reports", url: "/accounting" },
+    subcontracting: { label: "Subcontracting", url: "/subcontracting" },
+    selling: { label: "Subcontracting", url: "/subcontracting" },
+    accounting: { label: "Accounting", url: "/accounting" },
     manufacturing: { label: "Manufacturing", url: "/manufacturing" },
   }
 
@@ -40,8 +41,8 @@ export function workspaceLabelFromPath(pathname: string): string {
     return "System"
   }
   if (pathname.startsWith("/stock")) return "Stock"
-  if (pathname.startsWith("/selling")) return "Subcontracting"
-  if (pathname.startsWith("/accounting")) return "Financial Reports"
+  if (pathname.startsWith("/subcontracting") || pathname.startsWith("/selling")) return "Subcontracting"
+  if (pathname.startsWith("/accounting") || pathname.startsWith("/financial-reports")) return "Accounting"
   if (pathname.startsWith("/manufacturing")) return "Manufacturing"
   return "System"
 }
@@ -57,28 +58,16 @@ export function workspaceIdFromPath(pathname: string): string {
     return "system"
   }
   if (pathname.startsWith("/stock")) return "stock"
-  if (pathname.startsWith("/selling")) return "selling"
+  if (pathname.startsWith("/subcontracting")) return "subcontracting"
+  if (pathname.startsWith("/selling")) return "subcontracting"
   if (pathname.startsWith("/accounting")) return "accounting"
   if (pathname.startsWith("/manufacturing")) return "manufacturing"
   return "system"
 }
 
-const workspaceHomePaths = [
-  "/",
-  "/my",
-  "/my/settings",
-  "/system",
-  "/system/users",
-  "/selling",
-  "/accounting",
-  "/stock",
-  "/manufacturing",
-  "/user-settings",
-]
-
-/** True for the empty workspace landing pages where Yula auto-opens. */
+/** True for the main home page (/) where Yula runs in full-screen main mode. */
 export function isWorkspaceHomePath(pathname: string): boolean {
-  return workspaceHomePaths.includes(pathname)
+  return pathname === "/"
 }
 
 /** Check if a conversation's pathname matches the active screen/page. */

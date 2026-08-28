@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PackageIcon } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landing";
@@ -12,22 +12,28 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-export default function StockHomePage() {
+export default function SubcontractingDashboardPage() {
   return (
     <AppLayout>
       <div className="flex h-full min-h-0 flex-1 flex-col">
         <WorkspacePageShell
           showSearch={true}
-          searchPlaceholder="Stok modüllerinde ara (ör: Stock Ledger, Seri Takibi)..."
+          searchPlaceholder="Subcontracting modüllerinde ara..."
           breadcrumb={
             <Breadcrumb>
               <BreadcrumbList className="text-xs">
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link href="/stock">Stock</Link>
+                    <Link href="/subcontracting">Subcontracting</Link>
                   </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -35,9 +41,9 @@ export default function StockHomePage() {
           actions={<AIChatAssistant />}
         >
           <BlankWorkspaceLanding
-            title="Stock Workspace"
-            description="Stok hareketleri, depo bakiyeleri, analitik ve stok yönetimi modüllerine erişebilirsiniz."
-            icon={PackageIcon}
+            title="Subcontracting Dashboard"
+            description="Fason üretim emirleri, dış tedarik ve fason teslimat rotalama özet panosu."
+            icon={RefreshCwIcon}
           />
         </WorkspacePageShell>
       </div>

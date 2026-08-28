@@ -37,10 +37,12 @@ export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
     return "manufacturing"
   }
   if (
+    pathname === "/subcontracting" ||
+    pathname.startsWith("/subcontracting/") ||
     pathname === "/selling" ||
     pathname.startsWith("/selling/")
   ) {
-    return "selling"
+    return "subcontracting"
   }
   return null
 }

@@ -19,6 +19,7 @@ import { YulaChartCard } from "@/components/layout/yula-chart-card"
 import { ToolExecPanel } from "@/components/layout/tool-exec-panel"
 import { stripMarkdownTables } from "@/lib/markdown-table-strip"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
+import { WorkspaceHomeCards } from "@/components/layout/workspace-home-cards"
 import { YULA } from "@/components/layout/yula-brand-data"
 import {
   getAllYulaCommands,
@@ -952,7 +953,7 @@ export function AIChatPanel({
                 {inputArea}
               </div>
 
-              <WelcomeShortcutCards onYulaClick={() => textareaRef.current?.focus()} />
+              <WorkspaceHomeCards />
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-4">

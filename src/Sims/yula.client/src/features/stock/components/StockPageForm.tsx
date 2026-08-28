@@ -1,9 +1,11 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { MoreHorizontal, RefreshCw } from "lucide-react";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
+import { indexWorkspaceMenus } from "@/services/duckdb-vector";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,9 +23,15 @@ import {
 import { StockDashboard } from "./StockDashboard";
 
 export function StockPageForm() {
+  React.useEffect(() => {
+    // Arka planda Stock workspace menülerini DuckDB WASM RAG vektör store'a indeksle
+    void indexWorkspaceMenus();
+  }, []);
+
   return (
     <WorkspacePageShell
-      searchPlaceholder="Search Stock & Traceability..."
+      showSearch={true}
+      searchPlaceholder="Modül veya menü ara (ör: Stock Ledger, Seri Takibi)..."
       breadcrumb={
         <Breadcrumb>
           <BreadcrumbList className="text-xs">

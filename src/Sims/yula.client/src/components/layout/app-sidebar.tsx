@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useRouter, usePathname } from "next/navigation"
 
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
@@ -49,11 +50,11 @@ const data = {
       name: "Subcontracting",
       logo: <RefreshCwIcon className="size-4" />,
       plan: "LCWaikiki ERP",
-      url: "/selling",
+      url: "/subcontracting",
     },
     {
-      id: "financial-reports",
-      name: "Financial Reports",
+      id: "accounting",
+      name: "Accounting",
       logo: <BarChart2Icon className="size-4" />,
       plan: "LCWaikiki ERP",
       url: "/accounting",
@@ -69,10 +70,20 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter()
+  const pathname = usePathname()
   const { setOpen } = useWorkspaceSearch()
   const activeWorkspaceId = useActiveWorkspaceId()
 
   const currentNav = workspaceNavById[activeWorkspaceId]
+
+  const handleSearchClick = () => {
+    setOpen(true)
+    const targetPath = activeWorkspaceId === "system" ? "/stock" : `/${activeWorkspaceId}`
+    if (!pathname.startsWith(targetPath)) {
+      router.push(targetPath)
+    }
+  }
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -86,7 +97,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuButton
                 tooltip="Search"
                 className="text-sidebar-foreground/70"
-                onClick={() => setOpen(true)}
+                onClick={handleSearchClick}
               >
                 <SearchIcon className="size-4" />
                 <span>Search</span>

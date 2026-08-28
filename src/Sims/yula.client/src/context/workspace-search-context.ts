@@ -5,6 +5,8 @@ export type WorkspaceSearchContextValue = {
   setOpen: (open: boolean) => void
   toggle: () => void
   registerTrigger: (active: boolean) => void
+  query: string
+  setQuery: (query: string) => void
 }
 
 export const WorkspaceSearchContext =

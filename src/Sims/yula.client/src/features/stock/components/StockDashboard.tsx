@@ -19,6 +19,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { WorkspacePinnedItemsGrid } from "@/components/layout/workspace-pinned-items-grid"
 import {
   Card,
   CardAction,
@@ -455,6 +456,8 @@ function FeaturePanel({ section }: { section: FeatureSection }) {
 export function StockDashboard() {
   return (
     <div className="flex flex-1 flex-col gap-3 p-3">
+      <WorkspacePinnedItemsGrid workspace="stock" className="max-w-full px-0 pt-0" />
+
       <div className="grid gap-2 md:grid-cols-3">
         {kpiCards.map((kpi) => {
           const tone = kpiToneClassName[kpi.tone]

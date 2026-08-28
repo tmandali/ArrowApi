@@ -2,7 +2,6 @@
 
 import * as React from "react"
 
-import { WorkspaceSearchDialog } from "@/components/layout/workspace-search-dialog"
 import {
   WorkspaceSearchContext,
   type WorkspaceSearchContextValue,
@@ -14,6 +13,7 @@ export function WorkspaceSearchProvider({
   children: React.ReactNode
 }) {
   const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState("")
   const [triggerCount, setTriggerCount] = React.useState(0)
 
   React.useEffect(() => {
@@ -37,18 +37,15 @@ export function WorkspaceSearchProvider({
       setOpen,
       toggle: () => setOpen((current) => !current),
       registerTrigger,
+      query,
+      setQuery,
     }),
-    [open, registerTrigger]
+    [open, query, registerTrigger]
   )
-
-  const hasHeaderTrigger = triggerCount > 0
 
   return (
     <WorkspaceSearchContext.Provider value={value}>
       {children}
-      {!hasHeaderTrigger ? (
-        <WorkspaceSearchDialog open={open} onOpenChange={setOpen} />
-      ) : null}
     </WorkspaceSearchContext.Provider>
   )
 }

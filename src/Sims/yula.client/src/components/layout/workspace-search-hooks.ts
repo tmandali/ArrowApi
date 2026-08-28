@@ -4,22 +4,26 @@ export function useWorkspaceSearchMeta() {
   const pathname = usePathname()
 
   const workspace =
-    pathname.startsWith("/accounting")
+    pathname.startsWith("/accounting") || pathname.startsWith("/financial-reports")
       ? "accounting"
       : pathname.startsWith("/stock") || pathname === "/landed-cost-voucher"
         ? "stock"
         : pathname.startsWith("/manufacturing")
           ? "manufacturing"
-          : "selling"
+          : pathname.startsWith("/subcontracting") || pathname.startsWith("/selling")
+            ? "subcontracting"
+            : "all"
 
   const placeholder =
     workspace === "accounting"
-      ? "Search Financial Reports..."
+      ? "Accounting & Finans modüllerinde ara..."
       : workspace === "stock"
-        ? "Search Stock & Traceability..."
+        ? "Stock & İzlenebilirlik modüllerinde ara..."
         : workspace === "manufacturing"
-          ? "Search Manufacturing & BOM..."
-          : "Search Subcontracting & Orders..."
+          ? "Manufacturing & BOM modüllerinde ara..."
+          : workspace === "subcontracting"
+            ? "Subcontracting & Fason modüllerinde ara..."
+            : "Tüm modül ve raporlarda ara..."
 
   return { workspace, placeholder }
 }
