@@ -934,7 +934,7 @@ export function AIChatPanel({
     <div className="flex h-full min-h-0 flex-col">
       <div className="relative min-h-0 flex-1">
         {showCenteredIntro ? (
-          isMainMode ? (
+          isHomePath ? (
             <div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-6 py-8 px-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300">
               <div className="flex flex-col items-center gap-4 text-center">
                 <YulaMarkIcon className="size-14" />
