@@ -58,7 +58,24 @@ export const useYulaGridStore = create<GridState>((set) => ({
   customQueryTitle: null,
   runtimeApi: null,
   setRuntimeApi: (runtimeApi) => set({ runtimeApi }),
-  register: (spec) => set({ spec }),
+  register: (spec) =>
+    set((s) => {
+      if (
+        s.spec &&
+        s.spec.tableName === spec.tableName &&
+        s.spec.title === spec.title &&
+        s.spec.rowCount === spec.rowCount &&
+        s.spec.reportScope === spec.reportScope &&
+        JSON.stringify(s.spec.columns) === JSON.stringify(spec.columns) &&
+        JSON.stringify(s.spec.columnTypes) === JSON.stringify(spec.columnTypes) &&
+        JSON.stringify(s.spec.sampleRows) === JSON.stringify(spec.sampleRows) &&
+        JSON.stringify(s.spec.columnValues) === JSON.stringify(spec.columnValues) &&
+        JSON.stringify(s.spec.columnDescriptions) === JSON.stringify(spec.columnDescriptions)
+      ) {
+        return s;
+      }
+      return { spec };
+    }),
   unregister: () =>
     set({
       spec: null,

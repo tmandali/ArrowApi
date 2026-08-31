@@ -14,6 +14,8 @@ import {
   isConversationOnScreen,
   workspaceIdFromPath,
   workspaceLabelFromPath,
+  isReportResultPath,
+  extractJobIdFromPath,
 } from "@/lib/workspace-paths";
 import {
   useChatsStore,
@@ -37,12 +39,7 @@ const YulaChatContext = React.createContext<YulaChatContextValue | null>(
 
 /** Job sonuç görünümü deseni: /<workspace>/<rapor>/<jobId> */
 function pathnameMatchJobDetail(pathname: string): boolean {
-  const known = [
-    "/stock/stock-balance/",
-    "/stock/stock-analytics/",
-    "/stock/analytics/",
-  ];
-  return known.some((p) => pathname.startsWith(p) && pathname.length > p.length);
+  return isReportResultPath(pathname);
 }
 
 /** Statik (`tool-<ad>`) ve dinamik parçaları tek forma indirger */
@@ -349,7 +346,7 @@ function ChatInstance({
 
           // Öz-düzeltme: grid veriyi gösteriyor ama kayıt boş/eksikse
           // DuckDB şemasından anında tamamla (hangi sıra bozulursa bozulsun).
-          const jobIdSeg = jobDetail ? pathname.split("/").pop() ?? "" : "";
+          const jobIdSeg = extractJobIdFromPath(pathname) ?? "";
           const expectedTable = jobIdSeg
             ? `report_${jobIdSeg.replace(/[^a-zA-Z0-9_]/g, "_")}`
             : "";
@@ -459,8 +456,8 @@ function ChatInstance({
     transport,
     // Streaming render seyreltme — memoized markdown bloklarıyla akıcı güncelleme
     throttle: 60,
-    onError: (err) => {
-      console.warn("🤖 [Yula Chat Error]", err);
+    onError(err) {
+      console.error("🤖 [Yula Chat Client Error Details]:", err);
       userStoppedRef.current = true;
       setStopped(true);
     },

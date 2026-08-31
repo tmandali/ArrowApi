@@ -22,3 +22,18 @@ Kısa özet:
 - **2 Kademeli Hibrit AI Yönlendirici (Fast Intent Router + Gemma 4 LLM)**: Yüksek güvenilirlikli rapor ve öneri istekleri yerel şema eşleştiriciyle anında (**~12 ms**), serbest dilli karmaşık talepler **Gemma 4 LLM** ile işlenir. DevTools konsolunda renkli AI telemetrisi (`🤖 [Yula AI Telemetry]`) basılır.
 - **Tak-Çalıştır Workspace Rapor Kaydı**: Workspace'ler raporlarını `YulaReportCardConfig` ve JSON Schema'nın yapılandırılmış `x-ai` bloğu (`aliases`, `quickPrompts`, `columnAliases`) ile tanımlar; AI iç kodlarına dokunmadan hem Fast Router'a hem de LLM'e otomatik kaydolur.
 - **Native Auto-Updater**: Güncelleme kontrolleri web UI'ı kirletmeden sadece macOS/Windows native menüsü (`Check for Updates...`) ve Rust diyalogları üzerinden yürütülür.
+
+### 📋 Yeni Bir Rapor Eklenirken Yapılması Gerekenler (Adım Adım Checklist)
+Projeye yeni bir rapor eklendiğinde (örn. `StockLedger`, `SalesInvoice` vb.) aşağıdaki 5 adım eksiksiz uygulanmalıdır:
+
+1. **JSON Schema Tanımı (`schemas/<report>-criteria.schema.json`):**
+   - `x-scope`, `x-page-path`, `x-job-endpoint` ve `x-ai` (`aliases`, `quickPrompts`, `resultsPrompts`, `columnHints`) alanları içeren kriter şemasını tanımla.
+2. **Rapor Kaydı (`src/features/reports/report-registry.ts`):**
+   - Oluşturulan JSON şemasını `REGISTERED_REPORTS` dizisine `scope`, `workspace`, `title`, `pagePath`, `aliases` ve `fullSchema` ile ekle.
+3. **Next.js Rota Sayfaları (`src/app/`):**
+   - Kriter / Karşılama Sayfası: `src/app/<workspace>/<report>/page.tsx`
+   - GUID Sonuç Ekranı: `src/app/<workspace>/<report>/[jobId]/page.tsx`
+4. **Sonuç Ekranı Bileşeni (`<Report>JobView.tsx`):**
+   - Rapor sonuç bileşenini standart OPFS + DuckDB WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur.
+5. **Yol & Başlık Biçimlendirme (`src/lib/workspace-paths.ts`):**
+   - `formatPathnameLabel(pathname)` fonksiyonuna raporun Türkçe etiketini ekle (`if (pathname.includes("/<workspace>/<report>")) return "<Rapor Adı>"`).

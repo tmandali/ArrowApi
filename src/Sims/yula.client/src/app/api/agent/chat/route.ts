@@ -139,6 +139,9 @@ export async function POST(req: Request) {
     system: buildSystemPrompt(context),
     messages: await convertToModelMessages(messages),
     tools,
+    onError({ error }) {
+      console.error("🤖 [Yula AI Engine Error Details]:", error);
+    },
     // Cookbook deseni: en fazla N adımlı araç döngüsü — ekran güncelleyen
     // araçlardan (set_grid_query, filter_current_grid) sonra 2-4sn gereksiz
     // LLM özet turu beklenmez; akış anında tamamlanır.
@@ -155,5 +158,10 @@ export async function POST(req: Request) {
 
   // Cookbook'un createUIMessageStreamResponse+toUIMessageStream zincirinin
   // resmi kısayolu — birebir aynı UI-message wire formatını üretir.
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    onError(error) {
+      console.error("🤖 [Yula Stream Serialization Error Details]:", error);
+      return error instanceof Error ? error.message : "AI Stream Error";
+    },
+  });
 }

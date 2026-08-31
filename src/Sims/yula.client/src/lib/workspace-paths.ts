@@ -113,3 +113,40 @@ export function formatPathnameLabel(pathname?: string): string | null {
   return last
 }
 
+export const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** True if the string is a valid 36-char GUID (jobId). */
+export function isGuidString(value?: string | null): boolean {
+  if (!value) return false
+  return GUID_REGEX.test(value.trim())
+}
+
+/** Extracts the trailing jobId (GUID) from a pathname if present. */
+export function extractJobIdFromPath(pathname?: string | null): string | null {
+  if (!pathname) return null
+  const clean = pathname.split("?")[0].replace(/\/+$/, "")
+  const lastSeg = clean.split("/").pop() ?? ""
+  return isGuidString(lastSeg) ? lastSeg : null
+}
+
+/** True if the current URL path is a GUID-backed report result page (e.g. /<workspace>/<report>/<jobId>). */
+export function isReportResultPath(pathname?: string | null): boolean {
+  return extractJobIdFromPath(pathname) !== null
+}
+
+/**
+ * Single source of truth for Result View Mode (GUID URL path or active DuckDB report grid).
+ */
+export function isReportResultView(
+  pathname?: string | null,
+  spec?: { tableName?: string; columns?: unknown[]; rowCount?: number | null } | null
+): boolean {
+  if (isReportResultPath(pathname)) return true
+  if (!spec) return false
+  return Boolean(
+    (spec.tableName && spec.tableName.startsWith("report_")) ||
+      spec.rowCount != null ||
+      (spec.columns && spec.columns.length > 0)
+  )
+}
+

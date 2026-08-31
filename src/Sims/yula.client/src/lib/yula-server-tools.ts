@@ -43,7 +43,24 @@ const reportSchemaTool = tool({
   outputSchema: z.object({
     status: z.string(),
     report: z
-      .object({ scope: z.string(), title: z.string(), pagePath: z.string().optional() })
+      .object({
+        scope: z.string(),
+        title: z.string(),
+        pagePath: z.string().optional(),
+        mode: z.string().optional(),
+        isViewingResults: z.boolean().optional(),
+      })
+      .optional(),
+    activeGrid: z
+      .object({
+        tableName: z.string().optional(),
+        title: z.string().optional(),
+        columns: z.array(z.string()).optional(),
+        rowCount: z.number().nullable().optional(),
+        columnTypes: z.record(z.string(), z.string()).optional(),
+        sampleRows: z.array(z.record(z.string(), z.unknown())).optional(),
+        columnValues: z.record(z.string(), z.array(z.string())).optional(),
+      })
       .optional(),
     criteria: z
       .array(
@@ -60,6 +77,7 @@ const reportSchemaTool = tool({
       .optional(),
     columnDescriptions: z.record(z.string(), z.string()).optional(),
     aliases: z.array(z.string()).optional(),
+    directive: z.string().optional(),
     error: z.string().optional(),
     hint: z.string().optional(),
   }),

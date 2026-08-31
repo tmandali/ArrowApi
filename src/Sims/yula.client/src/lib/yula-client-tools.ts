@@ -2,6 +2,7 @@ import { useYulaGridStore } from "@/lib/stores/grid"
 import { findReport, REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
 import { guardReadOnlySelect } from "@/lib/sql-guard";
+import { isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
 
 /**
  * İstemci tarafı araç yürütücüleri — kullanıcının etkileşimiyle ya da
@@ -432,6 +433,10 @@ async function getReportSchema(): Promise<unknown> {
     }
   }
 
+  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  const isGuidPath = isReportResultPath(pathname) || Boolean(spec?.tableName && spec.tableName.startsWith("report_"))
+  const isViewingResults = isReportResultView(pathname, spec)
+
   const meta = readReportAiMetadata(report.fullSchema)
   const required = new Set(report.fullSchema.required ?? [])
   const criteria = Object.entries(report.fullSchema.properties ?? {}).map(
@@ -454,11 +459,30 @@ async function getReportSchema(): Promise<unknown> {
 
   return {
     status: "ok",
-    report: { scope: report.scope, title: report.title, pagePath: report.pagePath },
+    report: {
+      scope: report.scope,
+      title: report.title,
+      pagePath: report.pagePath,
+      mode: isGuidPath ? "view" : "criteria",
+      isViewingResults,
+    },
+    activeGrid: isViewingResults && spec
+      ? {
+          tableName: spec.tableName,
+          title: spec.title,
+          columns: spec.columns,
+          rowCount: spec.rowCount,
+          columnTypes: spec.columnTypes,
+          sampleRows: spec.sampleRows,
+          columnValues: spec.columnValues,
+        }
+      : undefined,
     criteria,
     columnDescriptions: meta.columnDescriptions,
     aliases: meta.aliases,
-    note: "Şemayı kullanıcıya markdown tablo ile özetle; kriter alan adlarını run_report criteria'sında aynen kullan.",
+    directive: isGuidPath
+      ? "Kullanıcı GUID sonuç ekranındadır (View Modu). 'Bu rapor hakkında bilgi ver' veya benzeri sorular sorulduğunda öncelikle aktif sonuç tablosunun kolonlarını, satır sayısını ve veri içeriğini açıkla; kriter listesini yalnızca kullanıcı yeni rapor çalıştırmak isterse ikincil olarak sun."
+      : "Kullanıcı rapor kriter ekranındadır (Criteria Modu). Raporun amacını ve çalıştırılabilir kriter alanlarını markdown tablo ile özetle.",
   }
 }
 

@@ -174,9 +174,7 @@ export function VirtualSpreadsheet<T>({
   }, [resetKey, reset])
 
   const onNeedMoreRef = React.useRef(onNeedMore)
-  React.useEffect(() => {
-    onNeedMoreRef.current = onNeedMore
-  })
+  onNeedMoreRef.current = onNeedMore
 
   const handleScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {

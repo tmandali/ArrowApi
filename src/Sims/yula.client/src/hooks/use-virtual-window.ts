@@ -19,14 +19,14 @@ export function useVirtualWindow<T>(
     if (!el) return
     const update = () => {
       if (el.clientHeight > 0) {
-        setViewportHeight(el.clientHeight)
+        setViewportHeight((prev) => (prev !== el.clientHeight ? el.clientHeight : prev))
       }
     }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(el)
     return () => observer.disconnect()
-  })
+  }, [])
 
   const reset = React.useCallback(() => {
     setScrollTop(0)
@@ -37,10 +37,11 @@ export function useVirtualWindow<T>(
   const totalHeight = totalRows * rowHeight
 
   React.useEffect(() => {
-    if (scrollTop > 0 && totalHeight > 0 && scrollTop >= totalHeight) {
-      reset()
+    if (scrollTop > 0 && totalHeight >= 0 && scrollTop >= totalHeight) {
+      setScrollTop(0)
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
     }
-  }, [totalHeight, scrollTop, reset])
+  }, [totalHeight, scrollTop])
   const effectiveViewportHeight = viewportHeight > 0 ? viewportHeight : 600
   const viewportRows = Math.ceil(effectiveViewportHeight / rowHeight)
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan)
@@ -50,7 +51,8 @@ export function useVirtualWindow<T>(
   )
 
   const onScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(event.currentTarget.scrollTop)
+    const newTop = event.currentTarget.scrollTop
+    setScrollTop((prev) => (prev !== newTop ? newTop : prev))
   }, [])
 
   return {
