@@ -361,13 +361,24 @@ export function YulaWorkedAccordion({
     setTimeout(() => setCopiedAnswer(false), 2000);
   };
 
-  // Canlı akış zamanlayıcısı (Live streaming ticker)
+  // Canlı akış zamanlayıcısı (Live streaming ticker) — Tur boyunca (tüm araçlar/turlar bitene kadar) kesintisiz sayar
+  const startTimeRef = React.useRef<number | null>(null);
+
   React.useEffect(() => {
-    if (!isLive) return;
-    const start = Date.now();
-    const interval = setInterval(() => {
+    if (!isLive) {
+      startTimeRef.current = null;
+      setLiveTimer(0);
+      return;
+    }
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now();
+    }
+    const start = startTimeRef.current;
+    const updateTimer = () => {
       setLiveTimer(Math.max(1, Math.floor((Date.now() - start) / 1000)));
-    }, 1000);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [isLive]);
 

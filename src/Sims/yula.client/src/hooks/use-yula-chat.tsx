@@ -255,6 +255,8 @@ interface YulaChatContextValue
   setModel: (model: string) => void;
   isThinkingEnabled: boolean;
   setThinkingEnabled: (enabled: boolean) => void;
+  /** Yanıt süreci (LLM + Araçlar) tüm turlar tamamlanana kadar aktif mi? */
+  isTurnActive: boolean;
   /** Asistan mesaj id -> yanıt süresi (saniye) */
   responseDurations: Record<string, number>;
   /** Asistan mesaj id -> LLM tur/çağrı sayısı */
@@ -581,9 +583,9 @@ function ChatInstance({
   // asistan turu bittiğinde bekleyen YÜRÜTÜLEBİLİR araç varsa otomatik koştur.
   // Kriter kartı katmanı kaldırıldı; rapor çalıştırma yalnız run_report ile.
   const handledToolsRef = React.useRef<Set<string>>(new Set());
+  const [isExecutingTools, setIsExecutingTools] = React.useState(false);
 
   React.useEffect(() => {
-
     // TÜM asistan mesajlarındaki bekleyen araçları topla — yalnız son mesajı değil.
     // Kesintiye uğrayan eski turlar (hata/reload) sonradan gelen mesajlarla
     // kendini onaramazdı; burada geriye dönük self-heal yapılır.
@@ -603,19 +605,24 @@ function ChatInstance({
     pending.forEach((info) => handledToolsRef.current.add(info.toolCallId));
 
     void (async () => {
-      for (const info of pending) {
-        // Kullanıcı bu sırada durdurduysa kalan araçları koşturma
-        if (userStoppedRef.current) break;
-        // Manual agent loop telemetrisi (cookbook: "custom logging")
-        console.info(
-          `[Yula Agent Loop] adım ${toolStepCountSinceLastUser(chat.messages) + 1}/${MAX_AUTO_STEPS} → ${info.toolName}`,
-        );
-        await runPendingTool({
-          toolCallId: info.toolCallId,
-          toolName: info.toolName,
-          input: info.input,
-          state: info.state,
-        });
+      setIsExecutingTools(true);
+      try {
+        for (const info of pending) {
+          // Kullanıcı bu sırada durdurduysa kalan araçları koşturma
+          if (userStoppedRef.current) break;
+          // Manual agent loop telemetrisi (cookbook: "custom logging")
+          console.info(
+            `[Yula Agent Loop] adım ${toolStepCountSinceLastUser(chat.messages) + 1}/${MAX_AUTO_STEPS} → ${info.toolName}`,
+          );
+          await runPendingTool({
+            toolCallId: info.toolCallId,
+            toolName: info.toolName,
+            input: info.input,
+            state: info.state,
+          });
+        }
+      } finally {
+        setIsExecutingTools(false);
       }
     })();
   }, [status, chat.messages, runPendingTool]);
@@ -674,28 +681,51 @@ function ChatInstance({
     }
   }, [chat]);
 
-  // Kullanıcı mesajı gönderdiği an bekleme süresi başlar (Gerçek kullanıcı bekleme süresi)
+  // TÜM YANIT SÜRECİ AKTİF Mİ? (LLM akışı + Araç yürütmeleri + Otomatik devam turları)
+  const hasPendingTools = React.useMemo(() => {
+    return chat.messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        m.parts.some(
+          (p) => yulaToolPartInfo(p)?.state === "input-available",
+        ),
+    );
+  }, [chat.messages]);
+
+  const willAutoContinue = React.useMemo(() => {
+    return shouldContinueAfterToolOutputs(chat.messages);
+  }, [chat.messages]);
+
+  const isTurnActive =
+    (status === "submitted" ||
+      status === "streaming" ||
+      isExecutingTools ||
+      hasPendingTools ||
+      willAutoContinue) &&
+    !stopped;
+
+  // Kullanıcı mesajı gönderdiği an veya tur aktifleştiği an bekleme süresi başlar (KesintisizSayaç)
   React.useEffect(() => {
-    if (status === "submitted" && requestStartMsRef.current === null) {
+    if (isTurnActive && requestStartMsRef.current === null) {
       requestStartMsRef.current = performance.now();
     }
-  }, [status]);
+  }, [isTurnActive]);
 
-  // Akış tamamen bittiğinde (ready) kullanıcının GERÇEK bekleme süresini kaydet
+  // TÜM Yanıt Süreci tamamen bittiğinde (!isTurnActive) GERÇEK KÜMÜLATİF bekleme süresini kaydet
   React.useEffect(() => {
-    if (status === "ready" && requestStartMsRef.current !== null) {
+    if (!isTurnActive && requestStartMsRef.current !== null) {
       const durationSec = Number(
         ((performance.now() - requestStartMsRef.current) / 1000).toFixed(1),
       );
       const assistantMsgs = chat.messages.filter((m) => m.role === "assistant");
       const lastAssis = assistantMsgs[assistantMsgs.length - 1];
-      if (lastAssis?.id && !responseDurations[lastAssis.id]) {
+      if (lastAssis?.id) {
         const finalDuration = durationSec > 0 ? durationSec : 0.1;
         setResponseDurations((prev) => ({ ...prev, [lastAssis.id]: finalDuration }));
       }
       requestStartMsRef.current = null;
     }
-  }, [status, chat.messages, responseDurations]);
+  }, [isTurnActive, chat.messages]);
 
   const [llmStepCounts, setLlmStepCounts] = React.useState<Record<string, number>>({});
 
@@ -753,11 +783,12 @@ function ChatInstance({
     status: chat.status,
     stop: stopResponse,
     error: chat.error,
-    busy: status === "submitted" || status === "streaming",
+    busy: isTurnActive,
     stopped,
     retryResponse,
     undoToUserMessage,
     addToolOutput: chat.addToolOutput,
+    isTurnActive,
     responseDurations,
     llmStepCounts,
     sendMessageText: (

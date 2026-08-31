@@ -1043,7 +1043,7 @@ export function AIChatPanel({
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
                 {turns.map((turn, idx) => {
                   const isLiveTurn =
-                    isLoading &&
+                    (isLoading || yula.isTurnActive) &&
                     idx === turns.length - 1 &&
                     (!turn.assistantMessage ||
                       turn.assistantMessage.id === lastAssistant?.id)
