@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import * as React from "react"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { isWorkspaceHomePath } from "@/lib/workspace-paths"
+import { useYulaDockStore } from "@/lib/stores/dock"
 import {
   WorkspaceAiChatContext,
   YULA_SIDE_DOCK_MIN_WIDTH,
@@ -18,62 +19,54 @@ export function WorkspaceAiChatProvider({
   const sideDockAllowed = !useMediaQuery(
     `(max-width: ${YULA_SIDE_DOCK_MIN_WIDTH - 1}px)`
   )
-  const [open, setOpenState] = React.useState(false)
-  const [expanded, setExpandedState] = React.useState(false)
 
-  // Never carry the home page's auto-opened Yula onto a real/404 page.
+  const open = useYulaDockStore((s) => s.open)
+  const setOpenStore = useYulaDockStore((s) => s.setOpen)
+  const expanded = useYulaDockStore((s) => s.expanded)
+  const setExpandedStore = useYulaDockStore((s) => s.setExpanded)
+
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname)
   const prevIsHomePageRef = React.useRef(isHomePage)
 
   React.useEffect(() => {
-    if (prevIsHomePageRef.current && !isHomePage) {
-      setOpenState(true)
-      setExpandedState(false)
-    } else if (!prevIsHomePageRef.current && isHomePage) {
-      setOpenState(false)
-      setExpandedState(false)
+    if (!prevIsHomePageRef.current && isHomePage) {
+      setOpenStore(false)
+      setExpandedStore(false)
     }
     prevIsHomePageRef.current = isHomePage
-  }, [isHomePage])
+  }, [isHomePage, setOpenStore, setExpandedStore])
 
   React.useEffect(() => {
     if (!sideDockAllowed && open) {
-      setExpandedState(true)
+      setExpandedStore(true)
     }
-  }, [sideDockAllowed, open])
+  }, [sideDockAllowed, open, setExpandedStore])
 
   const setOpen = React.useCallback(
     (next: boolean) => {
-      setOpenState(next)
+      setOpenStore(next)
       if (!next) {
-        setExpandedState(false)
+        setExpandedStore(false)
         return
       }
       if (!sideDockAllowed) {
-        setExpandedState(true)
+        setExpandedStore(true)
       }
     },
-    [sideDockAllowed]
+    [sideDockAllowed, setOpenStore, setExpandedStore]
   )
 
   const setExpanded = React.useCallback(
     (next: boolean) => {
-      setExpandedState((current) => {
-        if (!sideDockAllowed && !next) return current
-        return next
-      })
+      setExpandedStore(next)
     },
-    [sideDockAllowed]
+    [setExpandedStore]
   )
 
   const toggleExpanded = React.useCallback(() => {
-    setExpandedState((current) => {
-      const next = !current
-      if (!sideDockAllowed && !next) return current
-      return next
-    })
-  }, [sideDockAllowed])
+    setExpandedStore(!expanded)
+  }, [expanded, setExpandedStore])
 
   const value = React.useMemo<WorkspaceAiChatContextValue>(
     () => ({

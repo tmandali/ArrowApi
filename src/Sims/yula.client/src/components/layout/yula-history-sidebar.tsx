@@ -200,7 +200,9 @@ export function YulaHistorySidebar({
                       onClick={() => {
                         if (!isEditing) {
                           selectConversation(session.id);
-                          if (session.pathname && typeof window !== "undefined" && window.location.pathname !== session.pathname) {
+                          const currPath = typeof window !== "undefined" ? window.location.pathname.replace(/\/+$/, "") || "/" : "";
+                          const targetPath = (session.pathname || "").replace(/\/+$/, "") || "/";
+                          if (session.pathname && currPath !== targetPath) {
                             router.push(session.pathname);
                           }
                           setOpen(true);
@@ -376,7 +378,9 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
 
   const handleSelect = (id: string, targetPathname?: string) => {
     selectConversation(id);
-    if (targetPathname && typeof window !== "undefined" && window.location.pathname !== targetPathname) {
+    const currPath = typeof window !== "undefined" ? window.location.pathname.replace(/\/+$/, "") || "/" : "";
+    const targetPath = (targetPathname || "").replace(/\/+$/, "") || "/";
+    if (targetPathname && currPath !== targetPath) {
       router.push(targetPathname);
     }
     setOpen(true);
