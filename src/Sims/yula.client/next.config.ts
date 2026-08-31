@@ -8,6 +8,19 @@ const nextConfig: NextConfig = {
   // grafiği bu proje dizinine sabitliyoruz.
   turbopack: {
     root: path.resolve(__dirname),
+    rules: {
+      "*.yaml": {
+        loaders: [require.resolve("raw-loader")],
+        as: "*.js",
+      },
+    },
+  },
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.yaml$/,
+      type: "asset/source",
+    });
+    return config;
   },
   async rewrites() {
     return [

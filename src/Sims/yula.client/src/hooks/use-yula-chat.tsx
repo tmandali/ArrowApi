@@ -23,6 +23,7 @@ import {
 } from "@/lib/stores/chats";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { slimMessagesForTransport } from "@/lib/context-slim";
+import { extractWorkedSteps } from "@/components/layout/yula-worked-accordion";
 
 /**
  * Yula v2 — referans repo deseninin standart Next karşılığı.
@@ -193,31 +194,22 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   );
   if (hasSuccessfulTerminalScreenTool) return false;
 
-  // Anti-loop: son araçtan SONRA anlamlı metin varsa model çıktıyı
-  // yanıtlamış demektir — devam isteği yoktur.
+  // Anti-loop: son araçtan SONRA model detaylı nihai cevabını yazdıysa dur.
+  // Giriş cümleleri (örn. "Tarih trendlerini analiz edelim." veya "SQL sorgusu çalıştırıyorum.")
+  // kısa intro metinleridir; modelin sonuçları değerlendirmesi için 2. tur devam etmelidir.
   const lastToolIndex = lastStep.reduce(
     (idx, part, index) => (yulaToolPartInfo(part) !== null ? index : idx),
     -1,
   );
-  const answeredAfterTools = lastStep
+  const textAfterTool = lastStep
     .slice(lastToolIndex + 1)
-    .some(
-      (p) =>
-        p.type === "text" &&
-        ((p as { text?: string }).text ?? "").trim().length > 0,
-    );
-  if (answeredAfterTools) return false;
+    .map((p) => (p.type === "text" ? (p as { text?: string }).text ?? "" : ""))
+    .join("\n")
+    .trim();
 
-  // Mesajda zaten yanıt metni varsa ve araçlar başarıyla tamamlandıysa,
-  // 2. LLM turuna gerek yoktur (model cevabını metin + araçla birlikte verdi).
-  const hasAnswerText = lastStep.some(
-    (p) =>
-      p.type === "text" &&
-      ((p as { text?: string }).text ?? "").trim().length > 0,
-  );
-  if (hasAnswerText) {
-    return false;
-  }
+  // Yalnızca 80 karakterden uzun veya birden fazla satırlı / detaylı açıklama metni varsa nihai cevaptır
+  const isSubstantialAnswer = textAfterTool.length > 80 || textAfterTool.includes("\n");
+  if (isSubstantialAnswer) return false;
 
   // Bütçe tükendi: model sonuçlarla devam edemez; kullanıcı yeni mesajla sürdürür.
   return toolStepCountSinceLastUser(messages) < MAX_AUTO_STEPS;
@@ -237,7 +229,12 @@ interface YulaChatContextValue
     "messages" | "status" | "stop" | "error" | "addToolOutput"
   > {
   busy: boolean;
-  sendMessageText: (text: string) => void;
+  sendMessageText: (
+    text: string,
+    attachments?: Array<{ name: string; type: string; dataUrl?: string }>,
+  ) => void;
+  /** Kullanıcı mesajını ve sonrasını geçmişten ve LLM bağlamından siler, soru metnini döner */
+  undoToUserMessage: (messageId: string) => string | undefined;
   /** Kullanıcı yanıtı durdurdu mu (retry butonu görünürlüğü için) */
   stopped: boolean;
   /** Durdurulan/hatalı yanıtı yeniden dene (SDK regenerate/sendMessage seçimi) */
@@ -256,6 +253,8 @@ interface YulaChatContextValue
   newConversation: () => void;
   model: string;
   setModel: (model: string) => void;
+  isThinkingEnabled: boolean;
+  setThinkingEnabled: (enabled: boolean) => void;
   /** Asistan mesaj id -> yanıt süresi (saniye) */
   responseDurations: Record<string, number>;
   /** Asistan mesaj id -> LLM tur/çağrı sayısı */
@@ -307,7 +306,7 @@ function ChatInstance({
     YulaChatContextValue,
     | "conversations" | "activeId" | "selectConversation"
     | "deleteConversation" | "newConversation"
-    | "model" | "setModel"
+    | "model" | "setModel" | "isThinkingEnabled" | "setThinkingEnabled"
   >) => void;
 }) {
   const router = useRouter();
@@ -415,6 +414,7 @@ function ChatInstance({
             body: {
               messages: slimMessagesForTransport(messages),
               model: useChatsStore.getState().model,
+              thinkingEnabled: useChatsStore.getState().isThinkingEnabled,
               context: {
                 pathname,
                 mode,
@@ -699,25 +699,54 @@ function ChatInstance({
 
   const [llmStepCounts, setLlmStepCounts] = React.useState<Record<string, number>>({});
 
-  // Asistan mesajlarındaki LLM tur sayısını (step-start veya tur parçaları) hesapla
+  // Asistan mesajlarındaki ekranda görünen Worked adımlarının sayısını hesapla
   React.useEffect(() => {
     const assistantMsgs = chat.messages.filter((m) => m.role === "assistant");
     const counts: Record<string, number> = {};
     for (const msg of assistantMsgs) {
-      const stepStarts = msg.parts.filter((p) => p.type === "step-start").length;
-      if (stepStarts > 0) {
-        counts[msg.id] = stepStarts;
+      const steps = extractWorkedSteps(msg, false);
+      if (steps.length > 0) {
+        counts[msg.id] = steps.length;
       } else {
-        const toolCalls = msg.parts.filter((p) => yulaToolPartInfo(p) !== null).length;
-        const hasText = msg.parts.some(
-          (p) => p.type === "text" && (p.text ?? "").trim().length > 0,
-        );
-        const total = toolCalls + (hasText && toolCalls > 0 ? 1 : 0);
-        counts[msg.id] = total > 0 ? total : 1;
+        const stepStarts = msg.parts.filter((p) => p.type === "step-start").length;
+        counts[msg.id] = stepStarts > 0 ? stepStarts : 1;
       }
     }
     setLlmStepCounts(counts);
   }, [chat.messages]);
+
+  /**
+   * "Mesajı Geri Al" (Undo) — seçilen kullanıcı mesajını ve altındaki tüm sonraki
+   * turları geçmişten ve LLM bağlamından (messages) siler, soru metnini döndürür.
+   */
+  const undoToUserMessage = React.useCallback(
+    (messageId: string): string | undefined => {
+      const idx = chat.messages.findIndex((m) => m.id === messageId);
+      if (idx === -1) return undefined;
+
+      const targetMsg = chat.messages[idx];
+      const textPart = targetMsg.parts.find((p) => p.type === "text") as
+        | { text?: string }
+        | undefined;
+      const userText = textPart?.text ?? "";
+
+      const remainingMessages = chat.messages.slice(0, idx);
+      chat.setMessages(remainingMessages);
+
+      const currentPath =
+        typeof window !== "undefined"
+          ? window.location.pathname
+          : undefined;
+      saveMessages(conversationId, remainingMessages, currentPath);
+
+      userStoppedRef.current = false;
+      setStopped(false);
+      executedCallsRef.current.clear();
+
+      return userText;
+    },
+    [chat, conversationId, saveMessages],
+  );
 
   const value = React.useMemo(() => ({
     messages: chat.messages,
@@ -727,18 +756,64 @@ function ChatInstance({
     busy: status === "submitted" || status === "streaming",
     stopped,
     retryResponse,
+    undoToUserMessage,
     addToolOutput: chat.addToolOutput,
     responseDurations,
     llmStepCounts,
-    sendMessageText: (text: string) => {
+    sendMessageText: (
+      text: string,
+      attachmentsList?: Array<{ name: string; type: string; dataUrl?: string }>,
+    ) => {
       // Yeni kullanıcı mesajı → durdurma kilidini kaldır, tur sıfırdan başlar
       userStoppedRef.current = false;
       setStopped(false);
       executedCallsRef.current.clear();
-      void chat.sendMessage({ text });
+
+      // Koruma: Bekleyen (yanıtlanmamış) tüm araç çağrılarını kapat ki SDK missing tool result hatası atmasın
+      for (const m of chat.messages) {
+        if (m.role === "assistant") {
+          for (const p of m.parts) {
+            const info = yulaToolPartInfo(p);
+            if (info?.state === "input-available") {
+              chat.addToolOutput({
+                tool: info.toolName as keyof YulaTools,
+                toolCallId: info.toolCallId,
+                state: "output-error",
+                errorText: "Kullanıcı yeni mesaj gönderdiği için atlandı.",
+              });
+            }
+          }
+        }
+      }
+
+      const imageFiles = (attachmentsList ?? []).filter(
+        (f) => f.dataUrl && f.type.startsWith("image/"),
+      );
+      const nonImageFiles = (attachmentsList ?? []).filter(
+        (f) => !f.type.startsWith("image/"),
+      );
+
+      const attachmentNote =
+        nonImageFiles.length > 0
+          ? `\n\n[Ekler: ${nonImageFiles.map((file) => file.name).join(", ")}]`
+          : "";
+
+      const finalText = `${text}${attachmentNote}`.trim();
+
+      if (imageFiles.length > 0) {
+        const files = imageFiles.map((f) => ({
+          type: "file" as const,
+          filename: f.name,
+          mediaType: f.type,
+          url: f.dataUrl!,
+        }));
+        void chat.sendMessage({ text: finalText, files });
+      } else {
+        void chat.sendMessage({ text: finalText });
+      }
     },
     runPendingTool,
-  }), [chat, status, runPendingTool, stopResponse, retryResponse, stopped, responseDurations, llmStepCounts]);
+  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts]);
 
   // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
   React.useEffect(() => {
@@ -832,20 +907,29 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
     YulaChatContextValue,
     | "conversations" | "activeId" | "selectConversation"
     | "deleteConversation" | "newConversation" | "model" | "setModel"
+    | "isThinkingEnabled" | "setThinkingEnabled"
   > | null>(null);
   const [, bump] = React.useReducer((x) => x + 1, 0);
   const lastSigRef = React.useRef("");
 
   const setLiveHelpersStable = React.useCallback((h: NonNullable<typeof helpersRef.current>) => {
     helpersRef.current = h;
-    // Sadece anlamlı değişimde (durum / mesaj sayısı / hata) yeniden yayınla;
-    // akış delta'ları children'ın kendi hook'u üzerinden zaten akar.
-    const sig = `${h.status}:${h.messages.length}:${Boolean(h.error)}:${h.busy}`;
+    // Canlı akış parçaları (metin token'ları / araç çağrıları) geldikçe imza değişsin ve UI anında güncellensin
+    const lastMsg = h.messages[h.messages.length - 1];
+    const partsCount = lastMsg?.parts?.length ?? 0;
+    const textLen = (lastMsg?.parts ?? []).reduce(
+      (acc, p) => acc + (typeof (p as { text?: string }).text === "string" ? (p as { text?: string }).text!.length : 1),
+      0
+    );
+    const sig = `${h.status}:${h.messages.length}:${partsCount}:${textLen}:${Boolean(h.error)}:${h.busy}`;
     if (sig !== lastSigRef.current) {
       lastSigRef.current = sig;
       bump();
     }
   }, []);
+
+  const isThinkingEnabled = useChatsStore((s) => s.isThinkingEnabled);
+  const setThinkingEnabled = useChatsStore((s) => s.setThinkingEnabled);
 
   const value = React.useMemo<YulaChatContextValue | null>(() => {
     if (!activeId || !helpersRef.current) return null;
@@ -858,10 +942,10 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       newConversation,
       model,
       setModel,
+      isThinkingEnabled,
+      setThinkingEnabled,
     };
-    // helpersRef.current render sırasında okunur — ref güncel olduğu sürece
-    // context değeri taze kalır; imza-eşikli bump yeniden hesaplamayı tetikler.
-  }, [helpersRef.current?.status, helpersRef.current?.messages.length, activeId, conversations, model, setModel, selectConversation, deleteConversation, newConversation]);
+  }, [lastSigRef.current, activeId, conversations, model, setModel, isThinkingEnabled, setThinkingEnabled, selectConversation, deleteConversation, newConversation]);
 
   return (
     <>

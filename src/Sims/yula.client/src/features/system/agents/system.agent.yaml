@@ -1,0 +1,16 @@
+commands:
+  - id: "new"
+    slash: "yeni"
+    label: "Yeni sohbet"
+    description: "Mevcut konuşmayı ve sohbet geçmişini sıfırla"
+    prompt: "/new"
+    icon: "SquarePen"
+    phase: "system"
+
+  - id: "attach"
+    slash: "dosya"
+    label: "Dosya ekle"
+    description: "Sohbete belge veya dosya ekle"
+    prompt: "/dosya"
+    icon: "Paperclip"
+    phase: "system"

@@ -276,7 +276,7 @@ function TextPart({
   if (role === "user") {
     return (
       <div className="ml-auto flex items-center max-w-[88%]">
-        <div className="rounded-xl bg-muted px-2.5 py-2 text-[12px] leading-relaxed text-foreground">
+        <div className="rounded-xl border border-primary/15 dark:border-primary/20 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10 px-3 py-2 text-[12px] leading-relaxed text-foreground shadow-xs">
           {text}
         </div>
       </div>

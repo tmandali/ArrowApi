@@ -4,9 +4,11 @@ import * as React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marked } from "marked";
-import { Check, Copy, FileSpreadsheet } from "lucide-react";
+import { Check, Copy, FileSpreadsheet, ChevronDown, Table } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
+import { useYulaGridStore } from "@/lib/stores/grid";
 import {
   KNOWN_SYSTEM_ACTIONS,
   isPromptSentenceLike,
@@ -222,7 +224,7 @@ function renderBulletedItem(
 ): React.ReactNode {
   const bulletMatch = line
     .trim()
-    .match(/^([-*•]|\d+\.)\s+(\*\*)?([A-Za-zÇĞİÖŞÜçğıöşü0-9\s&/()_-]{3,50}?)(\*\*)?\s*:\s*(.+)$/i)
+    .match(/^([-*•●]|\d+\.)\s+(\*\*)?([A-Za-zÇĞİÖŞÜçğıöşü0-9\s&/()_'"-]{3,60}?)(\*\*)?\s*:\s*(.+)$/i)
   if (!bulletMatch) return null
 
   const itemTitle = bulletMatch[3].trim()
@@ -241,8 +243,8 @@ function renderBulletedItem(
     : `Bu gözlemi doğrula ve uygula: ${itemTitle}: ${itemDesc}`
 
   return (
-    <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1">
-      <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
+    <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
+      <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
       <div className="flex-1 leading-relaxed text-[12px]">
         <button
           type="button"
@@ -273,7 +275,7 @@ function renderBulletedItem(
                 : `${itemTitle} ${cb.isExecutionConfirmation ? "sonuçlarını açmak" : "işlemini başlatmak"} için tıklayın`
           }
           className={cn(
-            "mr-1 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 hover:underline cursor-pointer",
+            "mr-1 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer transition-colors",
             findingPrompt && "text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300",
           )}
         >
@@ -285,27 +287,81 @@ function renderBulletedItem(
   )
 }
 
-/** 3c — kolonsuz standart madde */
+/** 3c — kolonsuz veya düz öneri maddesi */
 function renderPlainBullet(
   line: string,
   lIdx: string,
+  cb?: ChatMarkdownCallbacks,
 ): React.ReactNode {
-  const cleanBulletText = line.trim().replace(/^([-*•]|\d+\.)\s+/, "")
+  const cleanBulletText = line.trim().replace(/^([-*•●]|\d+\.)\s+/, "").trim()
+  if (!cleanBulletText) return null
+
   const boldParts = cleanBulletText.split(/(\*\*[^*]+\*\*)/g)
+  const hasBold = boldParts.some((bp) => bp.startsWith("**") && bp.endsWith("**"))
+
+  if (hasBold) {
+    return (
+      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
+        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
+        <p className="flex-1 leading-relaxed text-[12px] text-foreground/90">
+          {boldParts.map((bp, bIdx) => {
+            if (bp.startsWith("**") && bp.endsWith("**")) {
+              const boldText = bp.slice(2, -2).trim()
+              if (cb?.onPrompt && boldText.length > 1) {
+                return (
+                  <button
+                    key={bIdx}
+                    type="button"
+                    onClick={() => cb.onPrompt(boldText)}
+                    title={`"${boldText}" komutunu çalıştırmak için tıklayın`}
+                    className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline"
+                  >
+                    {boldText}
+                  </button>
+                )
+              }
+              return (
+                <strong key={bIdx} className="font-semibold text-foreground">
+                  {boldText}
+                </strong>
+              )
+            }
+            return bp
+          })}
+        </p>
+      </div>
+    )
+  }
+
+  // Bold yoksa: parantez öncesi başlığı tıklanabilir yap (örn: "En çok satılan ürün (ItemName bazlı Qty)")
+  const parenMatch = cleanBulletText.match(/^([^()\n]{2,60})\s*(\(.+\))$/)
+  if (parenMatch && cb?.onPrompt) {
+    const titleText = parenMatch[1].trim()
+    const descText = parenMatch[2].trim()
+    return (
+      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
+        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
+        <div className="flex-1 leading-relaxed text-[12px]">
+          <button
+            type="button"
+            onClick={() => cb.onPrompt(titleText)}
+            title={`"${titleText}" komutunu çalıştırmak için tıklayın`}
+            className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline mr-1"
+          >
+            {titleText}
+          </button>
+          <span className="text-foreground/90">{descText}</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Standart düz madde
   return (
-    <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1">
+    <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
       <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
-      <p className="flex-1 leading-relaxed text-[12px]">
-        {boldParts.map((bp, bIdx) => {
-          if (bp.startsWith("**") && bp.endsWith("**")) {
-            return (
-              <strong key={bIdx} className="font-semibold text-foreground">
-                {bp.slice(2, -2)}
-              </strong>
-            )
-          }
-          return bp
-        })}
+      <p className="flex-1 leading-relaxed text-[12px] text-foreground/90">
+        {cleanBulletText}
       </p>
     </div>
   )
@@ -399,42 +455,102 @@ function extractCodeDetails(children: React.ReactNode): { text: string; language
 
 function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
   const [copied, setCopied] = React.useState(false)
+  const [open, setOpen] = React.useState(true)
   const { text, language } = React.useMemo(() => extractCodeDetails(children), [children])
 
-  const handleCopy = React.useCallback(() => {
-    if (!text) return
-    void navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [text])
+  const lineCount = React.useMemo(() => (text ? text.split("\n").length : 1), [text])
+
+  const handleCopy = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!text) return
+      void navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    },
+    [text],
+  )
+
+  const isSql = language === "sql" || language === "sqlite" || /select\s+.*from\s+/i.test(text)
+
+  const handleShowInGrid = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!text) return
+      useYulaGridStore.getState().setCustomQuerySql(text)
+    },
+    [text]
+  )
+
+  const langTitle = (language ?? "code").toUpperCase()
 
   return (
-    <div className="group relative my-1.5 overflow-hidden rounded-md border border-border/60 bg-muted/30">
-      <div className="flex items-center justify-between border-b border-border/40 bg-muted/50 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-        <span className="font-mono uppercase tracking-wider text-muted-foreground/80">
-          {language ?? "code"}
-        </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          title={copied ? "Kopyalandı" : "Kodu kopyala"}
-          className="rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100 cursor-pointer"
-        >
-          {copied ? (
-            <Check className="size-3.5 text-emerald-500" />
-          ) : (
-            <Copy className="size-3.5" />
-          )}
-        </button>
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="group relative my-1 overflow-hidden rounded-lg border border-border/40 bg-muted/20 dark:bg-muted/20"
+    >
+      <div
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex cursor-pointer items-center justify-between border-b border-border/30 bg-muted/40 px-2.5 py-1 text-[10.5px] font-medium text-muted-foreground hover:bg-muted/60 transition-colors select-none"
+      >
+        <div className="flex items-center gap-1.5">
+          <ChevronDown
+            className={cn(
+              "size-3 text-muted-foreground/70 transition-transform duration-200",
+              !open && "-rotate-90"
+            )}
+          />
+          <span className="font-mono font-semibold tracking-wider text-foreground/80">
+            {langTitle}
+          </span>
+          <span className="text-[10px] text-muted-foreground/60 font-mono">
+            ({lineCount} satır)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {isSql ? (
+            <button
+              type="button"
+              onClick={handleShowInGrid}
+              title="Grid'de Göster (Tabloda Çalıştır)"
+              className="rounded-md p-0.5 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 transition-colors cursor-pointer select-none"
+            >
+              <Table className="size-3.5 shrink-0" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleCopy}
+            title={copied ? "Kopyalandı" : "Kodu kopyala"}
+            className="rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+          >
+            {copied ? (
+              <Check className="size-3.5 text-emerald-500" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+          </button>
+        </div>
       </div>
-      {language ? (
-        <CodeBlock value={text} language={language} className="max-h-72 border-0 shadow-none rounded-none" />
-      ) : (
-        <pre className="max-h-72 overflow-auto p-2.5 font-mono text-[12px] leading-relaxed">
-          {children}
-        </pre>
-      )}
-    </div>
+
+      <CollapsibleContent>
+        {language ? (
+          <CodeBlock
+            value={text}
+            language={language}
+            showCopyButton={false}
+            className="max-h-64 border-0 p-2 text-[11px] shadow-none rounded-none"
+          />
+        ) : (
+          <pre className="max-h-64 overflow-auto p-2 font-mono text-[11px] leading-snug text-foreground/90">
+            {children}
+          </pre>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -580,16 +696,19 @@ function renderBlock(
   const confirmation = renderConfirmationLine(trimmed, key, cb)
   if (confirmation) return confirmation
 
-  // 3b — bulgu/rapor maddeleri (list bloğu → satır satır eski davranış)
-  if (block.type === "list") {
+  // Paragraf veya liste satırlarında bullet kontrolü:
+  if (block.type === "list" || /^([-*•●]|\d+\.)\s+/.test(trimmed)) {
     const lines = block.raw.split("\n").filter((l) => l.trim())
     return (
       <React.Fragment key={`list-${key}`}>
         {lines.map((line, li) => {
-          const bullet = renderBulletedItem(line, `${key}-${li}`, cb)
-          if (bullet) return bullet
-          const plain = renderPlainBullet(line, `${key}-${li}`)
-          if (plain) return plain
+          const trimmedLine = line.trim()
+          if (/^([-*•●]|\d+\.)\s+/.test(trimmedLine)) {
+            const bullet = renderBulletedItem(trimmedLine, `${key}-${li}`, cb)
+            if (bullet) return bullet
+            const plain = renderPlainBullet(trimmedLine, `${key}-${li}`, cb)
+            if (plain) return plain
+          }
           return (
             <MarkdownBlock key={`ml-${key}-${li}`} content={line} />
           )

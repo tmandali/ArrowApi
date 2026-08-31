@@ -517,8 +517,6 @@ async function runExpertSql(
     const display = input.display === "silent" ? "silent" : "card"
     return {
       status: "ok",
-      sql: guard.sql,
-      display,
       rowCount: rows.length,
       note: guard.limited
         ? `LIMIT 200 otomatik eklendi; çıktı ilk ${MAX_OUTPUT_ROWS} satırla döndürüldü.`

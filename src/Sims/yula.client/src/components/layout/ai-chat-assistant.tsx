@@ -13,6 +13,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
+import { YulaChatTurn } from "@/components/layout/yula-chat-turn"
 import { AiChatMessage } from "@/components/layout/ai-chat-message"
 import { ToolResultTable } from "@/components/layout/tool-result-table"
 import { YulaChartCard } from "@/components/layout/yula-chart-card"
@@ -21,6 +22,7 @@ import { stripMarkdownTables } from "@/lib/markdown-table-strip"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { WorkspaceHomeCards } from "@/components/layout/workspace-home-cards"
 import { YULA } from "@/components/layout/yula-brand-data"
+import { YulaModelSelector } from "@/components/layout/yula-model-selector"
 import {
   getAllYulaCommands,
   matchYulaCommands,
@@ -36,7 +38,7 @@ import {
   type YulaToolPartInfo,
 } from "@/hooks/use-yula-chat"
 import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route"
-import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath } from "@/lib/workspace-paths"
+import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, isReportResultView } from "@/lib/workspace-paths"
 import { cn } from "@/utils/cn"
 import {
   ArrowDown,
@@ -68,6 +70,8 @@ type AttachedFile = {
   id: string
   name: string
   size: number
+  type: string
+  dataUrl?: string
 }
 
 /** Toolbar control — opens the workspace docked AI panel. */
@@ -263,23 +267,17 @@ function ToolExecLine({
   actionLabel?: string
   isError?: boolean
 }) {
-  // Biten araç: insan mesajı kutu DIŞINDA normal cümle olarak yazılır;
-  // teknik detay "Araç Çalıştırma" katlanabilir bloğunda kalır.
-  // Hata durumunda satır kırmızı renklendirilir.
   if (state === "output-available" || state === "output-error") {
-    if (!summary) return null
-    return (
-      <p
-        className={cn(
-          "whitespace-pre-wrap break-words text-[13px] leading-relaxed",
-          isError
-            ? "text-red-600 dark:text-red-400"
-            : "text-foreground/90",
-        )}
-      >
-        {summary}
-      </p>
-    )
+    // Sadece gerçek yürütüm hatası varsa kullanıcıya mesaj gösterilir.
+    // Başarılı araçların teknik mesajı "Araç Çalıştırma" katlanabilir akordeon bloğunda kalır.
+    if (isError && summary) {
+      return (
+        <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-red-600 dark:text-red-400 font-medium py-0.5">
+          {summary}
+        </p>
+      )
+    }
+    return null
   }
 
   return (
@@ -450,7 +448,6 @@ export function AIChatPanel({
   const status = yula.status
   const isProcessing = yula.busy
   const sendPrompt = yula.sendMessageText
-  const runPendingTool = yula.runPendingTool
   const { messages } = yula
 
   // SDK geçişlerinde (stream + persist rehydrate) aynı id'li mesaj dizide
@@ -462,6 +459,42 @@ export function AIChatPanel({
     if (lastById.size === messages.length) return messages
     return messages.filter((m, i) => lastById.get(m.id) === i)
   }, [messages])
+
+  // Sohbet mesajlarını Soru-Cevap turlarına (YulaChatTurn) grupla
+  const turns = React.useMemo(() => {
+    const list: Array<{
+      id: string
+      userMessage?: YulaMessage
+      assistantMessage?: YulaMessage
+    }> = []
+
+    let currentTurn: {
+      id: string
+      userMessage?: YulaMessage
+      assistantMessage?: YulaMessage
+    } | null = null
+
+    for (const m of dedupedMessages) {
+      if (m.role === "user") {
+        if (currentTurn) {
+          list.push(currentTurn)
+        }
+        currentTurn = { id: m.id, userMessage: m }
+      } else if (m.role === "assistant") {
+        if (currentTurn) {
+          currentTurn.assistantMessage = m
+          list.push(currentTurn)
+          currentTurn = null
+        } else {
+          list.push({ id: m.id, assistantMessage: m })
+        }
+      }
+    }
+    if (currentTurn) {
+      list.push(currentTurn)
+    }
+    return list
+  }, [dedupedMessages])
 
   // Canlı akış görünümü: en son asistan mesajının parçalarından türetilir
   const lastAssistant = messages.length > 0 ? [...messages].reverse().find((m) => m.role === "assistant") : undefined
@@ -488,6 +521,13 @@ export function AIChatPanel({
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
+  const handleUndo = React.useCallback((text: string) => {
+    setInput(text)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+    })
+  }, [])
+
   const pathname = usePathname()
   const isHomePath = isWorkspaceHomePath(pathname)
   const isMainMode = mode ? mode === "main" : isHomePath
@@ -502,22 +542,13 @@ export function AIChatPanel({
   const introDescription = `${workspaceLabel} çalışma alanınızda — ${YULA.emptyDescription}`
 
   const isLoading = isProcessing
-  // Yeniden dene: durdurulan akış, araç hatası veya sohbet hatası sonrası aktif
-  const retryable =
-    !isLoading &&
-    (yula.stopped ||
-      Boolean(yula.error) ||
-      (lastAssistant?.parts.some(
-        (p) => yulaToolPartInfo(p)?.state === "output-error",
-      ) ??
-        false))
   const spec = useYulaGridStore((s) => s.spec)
-  const hasGrid = !!spec && spec.columns.length > 0
-  const allCommands = React.useMemo(() => getAllYulaCommands(hasGrid), [hasGrid])
+  const isViewingResults = isReportResultView(pathname, spec)
+  const allCommands = React.useMemo(() => getAllYulaCommands(isViewingResults, pathname), [isViewingResults, pathname])
   const commandMatches = matchYulaCommands(input, allCommands)
   const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0
   const hasUserMessages = messages.some((message) => message.role === "user")
-  const showCenteredIntro = (centeredIntro || isMainMode) && !hasUserMessages
+  const showCenteredIntro = (centeredIntro || (isMainMode && isHomePath)) && !hasUserMessages
 
   React.useEffect(() => {
     setSelectedIndex(0)
@@ -604,12 +635,8 @@ export function AIChatPanel({
       finalPrompt = `${finalPrompt}${pastedBlock}`.trim()
     }
 
-    const attachmentNote =
-      attachments.length > 0
-        ? `\n\n[Ekler: ${attachments.map((file) => file.name).join(", ")}]`
-        : ""
-
-    void sendPrompt(`${finalPrompt}${attachmentNote}`.trim())
+    const currentAttachments = [...attachments]
+    yula.sendMessageText(`${finalPrompt}`.trim(), currentAttachments)
     setInput("")
     setSelectedCommand(null)
     setPastedChip(null)
@@ -643,12 +670,29 @@ export function AIChatPanel({
 
   const onFilesSelected = (files: FileList | null) => {
     if (!files?.length) return
-    const next = Array.from(files).map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      name: file.name,
-      size: file.size,
-    }))
-    setAttachments((current) => [...current, ...next].slice(0, 5))
+    const fileArray = Array.from(files)
+
+    fileArray.forEach((file) => {
+      const id = `${file.name}-${file.size}-${file.lastModified}`
+      const isImage = file.type.startsWith("image/")
+
+      if (isImage) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string
+          setAttachments((current) => {
+            if (current.some((f) => f.id === id)) return current
+            return [...current, { id, name: file.name, size: file.size, type: file.type, dataUrl }].slice(0, 5)
+          })
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setAttachments((current) => {
+          if (current.some((f) => f.id === id)) return current
+          return [...current, { id, name: file.name, size: file.size, type: file.type }].slice(0, 5)
+        })
+      }
+    })
   }
 
   const canSubmit =
@@ -790,6 +834,22 @@ export function AIChatPanel({
               }
             }}
             onPaste={(event) => {
+              const items = event.clipboardData?.items
+              if (items) {
+                const imageFiles: File[] = []
+                for (let i = 0; i < items.length; i++) {
+                  if (items[i].type.startsWith("image/")) {
+                    const file = items[i].getAsFile()
+                    if (file) imageFiles.push(file)
+                  }
+                }
+                if (imageFiles.length > 0) {
+                  const dt = new DataTransfer()
+                  imageFiles.forEach((f) => dt.items.add(f))
+                  onFilesSelected(dt.files)
+                }
+              }
+
               const pastedText = event.clipboardData.getData("text")
               if (!pastedText) return
 
@@ -859,6 +919,10 @@ export function AIChatPanel({
             >
               <Paperclip className="size-3.5" />
             </Button>
+
+            <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0 self-center" aria-hidden="true" />
+
+            <YulaModelSelector />
           </div>
 
           {isLoading ? (
@@ -977,124 +1041,33 @@ export function AIChatPanel({
               className="h-full overflow-y-auto overscroll-contain"
             >
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
-                {dedupedMessages.map((message, idx) => {
-                  const isLiveAssistant =
-                    message.role === "assistant" &&
-                    idx === dedupedMessages.length - 1
+                {turns.map((turn, idx) => {
+                  const isLiveTurn =
+                    isLoading &&
+                    idx === turns.length - 1 &&
+                    (!turn.assistantMessage ||
+                      turn.assistantMessage.id === lastAssistant?.id)
 
-                  const toolParts =
-                    message.role === "assistant"
-                      ? message.parts
-                          .map((p) => yulaToolPartInfo(p))
-                          .filter(
-                            (info): info is NonNullable<typeof info> =>
-                              info !== null &&
-                              info.toolName !== "prepare_report_criteria",
-                          )
-                      : []
-
-                  const hasSqlCard = toolParts.some(
-                    (i) =>
-                      i.toolName === "run_expert_sql" &&
-                      !isFailedToolInfo(i) &&
-                      i.state === "output-available",
-                  )
-                    ? message.parts.some(
-                        (p) => p.type === "text" && p.text.includes("|"),
-                      )
-                    : false
-                  const displayMessage: typeof message = hasSqlCard
-                    ? {
-                        ...message,
-                        parts: message.parts.map((p) =>
-                          p.type === "text"
-                            ? { ...p, text: stripMarkdownTables(p.text) }
-                            : p,
-                        ),
-                      }
-                    : message
+                  const durationSec = turn.assistantMessage?.id
+                    ? yula.responseDurations[turn.assistantMessage.id]
+                    : undefined
+                  const llmStepCount = turn.assistantMessage?.id
+                    ? yula.llmStepCounts[turn.assistantMessage.id]
+                    : undefined
 
                   return (
-                    <React.Fragment key={message.id}>
-                      <AiChatMessage
-                        message={displayMessage}
-                        isLive={isLiveAssistant}
-                      />
-                      {toolParts.map((info) => {
-                        const isError = isFailedToolInfo(info)
-                        if (isError && recoveredToolCallIds.has(info.toolCallId)) {
-                          return null
-                        }
-                        return (
-                          <React.Fragment key={info.toolCallId}>
-                            <ToolExecLine
-                              state={info.state}
-                              summary={toolRunSummary(info)}
-                              actionLabel={toolActionLabel(info)}
-                              isError={isError}
-                            />
-                            {info.toolName === "request_user_confirmation" ? (
-                               <YulaConfirmationCard info={info} />
-                             ) : null}
-                            {info.toolName === "run_expert_sql" &&
-                            !isError &&
-                            info.state === "output-available" &&
-                            (info.output as { display?: string } | null)
-                              ?.display !== "silent" ? (
-                              <ToolResultTable output={info.output} />
-                            ) : null}
-                            {info.toolName === "visualize_grid_data" &&
-                            !isError &&
-                            info.state === "output-available" ? (
-                              <YulaChartCard output={info.output} />
-                            ) : null}
-                            {(info.state === "output-available" ||
-                              info.state === "output-error") ? (
-                              <ToolExecPanel
-                                toolName={info.toolName}
-                                input={info.input}
-                                output={info.output}
-                                errorText={info.errorText}
-                                isError={isError}
-                              />
-                            ) : null}
-                          </React.Fragment>
-                        )
-                      })}
-                      {message.role === "assistant" && yula.responseDurations[message.id] ? (
-                        <div className="flex items-center justify-start text-[10px] font-mono text-muted-foreground/40 select-none pt-0.5 pl-0.5">
-                          ({yula.llmStepCounts[message.id] && yula.llmStepCounts[message.id] > 1 ? `${yula.llmStepCounts[message.id]} tur · ` : ""}{yula.responseDurations[message.id]}s)
-                        </div>
-                      ) : null}
-                    </React.Fragment>
+                    <YulaChatTurn
+                      key={turn.id}
+                      userMessage={turn.userMessage}
+                      assistantMessage={turn.assistantMessage}
+                      isLive={isLiveTurn}
+                      durationSec={durationSec}
+                      llmStepCount={llmStepCount}
+                      recoveredToolCallIds={recoveredToolCallIds}
+                      onUndo={handleUndo}
+                    />
                   )
                 })}
-                {isLoading && streamingThinking ? (
-                  <Marker role="status" className="py-1">
-                    <MarkerContent className="w-full items-start gap-2">
-                      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-medium text-muted-foreground">
-                        <Brain className="size-3.5 shrink-0 animate-pulse text-orange-500/80 dark:text-orange-400/80" />
-                        Düşünme Süreci
-                      </span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words border-l-2 border-orange-500/30 pl-3 text-left text-[11px] leading-relaxed text-muted-foreground dark:border-orange-400/30">
-                        {streamingThinking}
-                      </span>
-                    </MarkerContent>
-                  </Marker>
-                ) : null}
-
-                {isLoading && messages[messages.length - 1]?.role === "user" ? (
-                  <Marker role="status" className="py-1 px-1 text-xs text-muted-foreground animate-in fade-in duration-200">
-                    <MarkerContent className="flex items-center gap-1.5 font-medium text-foreground/80">
-                      <span>Yula yanıt hazırlıyor</span>
-                      <span className="inline-flex gap-0.5 items-center">
-                        <span className="size-1 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.3s]" />
-                        <span className="size-1 rounded-full bg-orange-500 animate-bounce [animation-delay:-0.15s]" />
-                        <span className="size-1 rounded-full bg-orange-500 animate-bounce" />
-                      </span>
-                    </MarkerContent>
-                  </Marker>
-                ) : null}
               </div>
             </div>
 

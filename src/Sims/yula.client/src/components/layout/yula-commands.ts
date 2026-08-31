@@ -1,3 +1,4 @@
+import { load } from "js-yaml";
 import {
   SquarePen,
   Paperclip,
@@ -7,9 +8,12 @@ import {
   RotateCcw,
   Package,
   ShieldAlert,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
-import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
+import systemCommandsYaml from "@/features/system/agents/system.agent.yaml";
+import gridCommandsYaml from "@/features/reports/agents/grid.agent.yaml";
+import reportCommandsYaml from "@/features/stock/agents/report.agent.yaml";
 
 export type YulaCommand = {
   id: string;
@@ -22,90 +26,80 @@ export type YulaCommand = {
   icon: LucideIcon;
 };
 
-export const SYSTEM_COMMANDS: YulaCommand[] = [
-  {
-    id: "new",
-    slash: "yeni",
-    label: "Yeni sohbet",
-    description: "Mevcut konuşmayı ve sohbet geçmişini sıfırla",
-    prompt: "/new",
-    icon: SquarePen,
-  },
-  {
-    id: "attach",
-    slash: "dosya",
-    label: "Dosya ekle",
-    description: "Sohbete belge veya dosya ekle",
-    prompt: "/dosya",
-    icon: Paperclip,
-  },
-];
+export type YulaCommandYamlItem = {
+  id: string;
+  slash: string;
+  label: string;
+  description: string;
+  prompt: string;
+  icon: string;
+  phase?: "system" | "grid" | "report";
+};
 
-export function getAllYulaCommands(hasGrid = false): YulaCommand[] {
-  const commands: YulaCommand[] = [...SYSTEM_COMMANDS];
+export type YulaCommandYamlManifest = {
+  commands: YulaCommandYamlItem[];
+};
 
-  if (hasGrid) {
-    // Grid (Tablo) evresi komutları — çakışan /sql ve /anomali birleştirildi
-    commands.push(
-      {
-        id: "grid-analiz",
-        slash: "analiz",
-        label: "Tablo Analizi & Anomali",
-        description: "Tablo profili çıkar, anomali/riskleri tespit et ve önerileri paylaş",
-        prompt:
-          "Tabloyu derinlemesine analiz et: profili çıkar, anomali ve risk taşıyan kayıtları tespit et, önerilerini ve doğrulama sorgularını paylaş.",
-        icon: Database,
-      },
-      {
-        id: "grid-top5",
-        slash: "top5",
-        label: "En Yüksek 5 Grafik",
-        description: "En yüksek ilk 5 kaydı grafikle özetle",
-        prompt: "En yüksek ilk 5 kaydı grafikle özetle",
-        icon: BarChart2,
-      },
-      {
-        id: "grid-kolonlar",
-        slash: "kolonlar",
-        label: "Kolon Açıklamaları",
-        description: "Bu raporun kolonlarını ve şema detaylarını açıkla",
-        prompt: "Bu raporun kolonlarını ve şema detaylarını açıkla",
-        icon: FileText,
-      },
-      {
-        id: "grid-temizle",
-        slash: "temizle",
-        label: "Filtreleri Sıfırla",
-        description: "Aktif filtreleri temizle ve tabloyu sıfırla",
-        prompt: "Aktif filtreleri temizle ve tabloyu sıfırla",
-        icon: RotateCcw,
-      },
-    );
-  } else {
-    // Workspace evresi komutları — rapora bağımsız dinamik komutlar
-    DEMO_REPORTS.forEach((r) => {
-      commands.push({
-        id: `report-${r.scope}`,
-        slash: r.scope,
-        label: r.title,
-        description: `${r.workspace ? `[${r.workspace.toUpperCase()}] ` : ""}${r.title} hazırlama komutu`,
-        prompt: `${r.title} hazırla`,
-        icon: Package,
-      });
-    });
+/** İkon metin isimlerini Lucide React bileşenlerine dönüştüren dinamik harita */
+const ICON_MAP: Record<string, LucideIcon> = {
+  SquarePen,
+  Paperclip,
+  FileText,
+  BarChart2,
+  Database,
+  RotateCcw,
+  Package,
+  ShieldAlert,
+};
 
-    commands.push({
-      id: "workspace-anomali",
-      slash: "anomali",
-      label: "Anomali & Risk Analizi",
-      description: "Aktif raporda anomali ve risk analizi başlat",
-      prompt:
-        "Aktif raporda anomali ve risk taşıyan kritik kayıtlar var mı? Önce raporu çalıştır.",
-      icon: ShieldAlert,
-    });
+function resolveIcon(iconName: string): LucideIcon {
+  return ICON_MAP[iconName] ?? HelpCircle;
+}
+
+function parseYamlCommands(yamlSource: string): YulaCommand[] {
+  try {
+    const doc = (load(yamlSource) || {}) as YulaCommandYamlManifest;
+    if (!doc || !Array.isArray(doc.commands)) return [];
+    return doc.commands.map((cmd) => ({
+      id: cmd.id,
+      slash: cmd.slash,
+      label: cmd.label,
+      description: cmd.description,
+      prompt: cmd.prompt,
+      icon: resolveIcon(cmd.icon),
+    }));
+  } catch (error) {
+    console.error("YAML Command Parse Error:", error);
+    return [];
   }
+}
 
-  return commands;
+/** Sistem Evresi Komutları (src/features/system/agents/system.agent.yaml) */
+export const SYSTEM_COMMANDS: YulaCommand[] = parseYamlCommands(systemCommandsYaml);
+
+/** Sonuç Evresi Komutları (src/features/reports/agents/grid.agent.yaml) */
+export const GRID_COMMANDS: YulaCommand[] = parseYamlCommands(gridCommandsYaml);
+
+/** Kriter Evresi Komutları (src/features/stock/agents/report.agent.yaml) */
+export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(reportCommandsYaml);
+
+/**
+ * Ekran evresine ve çalışma alanına (pathname) göre komut listesi:
+ * - isViewingResults = true  (GUID URL / DuckDB Sonuç Ekranı) → Veri Analiz Komutları (/analiz, /top5, /kolonlar, /temizle)
+ * - pathname === "/" (Ana Sayfa) → Yalnızca Sistem Komutları (/yeni, /dosya)
+ * - Diğer Workspace Yolları (/stock vb.) → Workspace Ajan Komutları (/stok-bakiye, /stok-analiz, /anomali)
+ */
+export function getAllYulaCommands(
+  isViewingResults = false,
+  pathname = "/"
+): YulaCommand[] {
+  if (isViewingResults) {
+    return [...SYSTEM_COMMANDS, ...GRID_COMMANDS];
+  }
+  if (pathname === "/" || pathname === "") {
+    return [...SYSTEM_COMMANDS];
+  }
+  return [...SYSTEM_COMMANDS, ...REPORT_COMMANDS];
 }
 
 export function matchYulaCommands(

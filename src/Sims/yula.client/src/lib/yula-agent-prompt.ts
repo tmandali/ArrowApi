@@ -201,6 +201,15 @@ function formatColumnDescriptions(descs: Record<string, string>): string {
     .join(" · ");
 }
 
+const SMART_SQL_QUERY_RULES = [
+  "SMART SQL & /SORGU COMMAND RULE:",
+  "  • When user uses '/sorgu ...' or inputs pseudo-SQL / natural SQL (e.g. 'select * from rapor tarih=bugun', 'select * from depo where miktar>100'):",
+  "  • 1. TABLE NAME CORRECTION: Replace pseudo-table names ('rapor', 'table', 'tablo', 'stok_bakiye', etc.) with the ACTUAL active DuckDB table name from system state (e.g. report_e53c80ce_...).",
+  "  • 2. COLUMN NAME CORRECTION: Auto-correct misspelled or Turkish alias column names ('tarih' -> 'TransDate', 'miktar' -> 'Qty', 'depo' -> 'Warehouse', 'fiyat' -> 'UnitPrice', 'stok_kodu' -> 'ItemCode', etc.) to the exact column names in the active grid table schema.",
+  "  • 3. RELATIVE DATE EXPANSION: Expand relative date terms into exact ISO date strings (e.g., 'bugun' -> '2026-09-01', 'dun' -> '2026-08-31', 'bu ay' -> date range '2026-09-01' to '2026-09-30').",
+  "  • 4. QUERY EXECUTION: Call set_grid_query({ sql: \"...\" }) with the corrected, valid DuckDB SQL query so the screen grid table updates automatically, accompanied by a 1-sentence Turkish explanation of the corrections made.",
+].join("\n");
+
 export function buildSystemPrompt(context?: YulaScreenContext): string {
   const lines: string[] = [BASE_PROMPT];
 
@@ -210,10 +219,12 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   const wsId = context?.workspaceId ?? workspaceIdFromPath(pathname);
   const wsLabel = context?.workspaceLabel ?? workspaceLabelFromPath(pathname);
   const phase = context?.phase ?? "workspace";
+  const todayStr = new Date().toISOString().split("T")[0];
 
   lines.push(
     "",
     "=== LEVEL 1: GLOBAL APPLICATION SCOPE ===",
+    `• Current Local Date: ${todayStr} (Use for expanding relative date terms like bugün, dün, bu ay)`,
     `• Execution Mode: ${mode === "main" ? "MAIN SCREEN MODE (Full-Screen AI Workspace)" : "SIDE DOCK MODE (Page Copilot Panel)"}`,
     `• Main Mode Rule: In MAIN SCREEN MODE, Yula AI is the primary full-screen workspace interface. When the user asks for a report or workflow, ALWAYS execute or navigate immediately without conversational date/criteria pushback.`,
     `• Language Rule: Generate all conversational text strictly in natural TURKISH.`,
@@ -236,6 +247,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   if (context?.grid) {
     lines.push(GRID_PRESENT_RULES);
     lines.push(SQL_EXPERT_RULES);
+    lines.push(SMART_SQL_QUERY_RULES);
     lines.push(DUCKDB_RULES);
     const isCustomActive = Boolean(context.grid.customQuerySql);
     const viewModeNotice = isCustomActive

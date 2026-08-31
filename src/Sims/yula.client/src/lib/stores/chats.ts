@@ -31,6 +31,8 @@ interface ChatsState {
   renameFromFirstMessage: (id: string, text: string) => void;
   clearAllConversations: () => void;
   saveMessages: (id: string, messages: YulaMessage[], pathname?: string) => void;
+  isThinkingEnabled: boolean;
+  setThinkingEnabled: (enabled: boolean) => void;
   setModel: (model: string) => void;
 }
 
@@ -45,6 +47,8 @@ export const useChatsStore = create<ChatsState>()(
       activeId: null,
       messagesById: {},
       model: process.env.NEXT_PUBLIC_YULA_MODEL ?? "gemma4:12b-mlx",
+      isThinkingEnabled: true,
+      setThinkingEnabled: (isThinkingEnabled) => set({ isThinkingEnabled }),
       isHistoryOpen: false,
       searchQuery: "",
       isSearchingHistory: false,
@@ -182,6 +186,7 @@ export const useChatsStore = create<ChatsState>()(
         activeId: state.activeId,
         messagesById: state.messagesById,
         model: state.model,
+        isThinkingEnabled: state.isThinkingEnabled,
       }),
     },
   ),

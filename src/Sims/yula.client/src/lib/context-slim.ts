@@ -75,14 +75,24 @@ export function slimMessagesForTransport<
   });
 
   return windowedMessages.map((message, i) => {
-    // Güncel tur (son asistan mesajı) ve kullanıcı mesajları olduğu gibi korunur
-    if (i === lastAssistant || message.role !== "assistant") return message;
-    if (!Array.isArray(message.parts)) return message;
+    if (message.role !== "assistant" || !Array.isArray(message.parts)) return message;
 
     let changed = false;
+    const isLatest = i === lastAssistant;
     const parts = message.parts.map((part) => {
       if (!isToolPart(part)) return part;
-      if (part.state !== "output-available") return part;
+      // SDK koruması: Herhangi bir araç çağrısı "input-available" durumunda kaldıysa
+      // (ör. yanıtlanmamış onay kartı veya yarıda kesilmiş araç), transport kopyasında
+      // state'i output-error'a çek ki AI SDK "Tool result is missing for tool call" hatası vermesin.
+      if (part.state === "input-available" || !part.state) {
+        changed = true;
+        return {
+          ...part,
+          state: "output-error",
+          errorText: "İşlem yanıtlanmadı veya kesintiye uğradı.",
+        };
+      }
+      if (isLatest || part.state !== "output-available") return part;
       const slimmed = slimOutput(part.output);
       if (slimmed === part.output) return part;
       changed = true;
