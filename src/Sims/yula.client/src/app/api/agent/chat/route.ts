@@ -262,6 +262,12 @@ export async function POST(req: Request) {
           "filter_current_grid",
           "visualize_grid_data",
           "run_report",
+          "profile_grid_table",
+          "analyze_grid_data",
+          "run_expert_sql",
+          "get_report_schema",
+          "prepare_report_criteria",
+          "request_user_confirmation",
         ),
       ],
     });

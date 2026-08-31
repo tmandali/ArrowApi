@@ -406,7 +406,7 @@ async function profileGrid(): Promise<unknown> {
       rowCount: Number(agg.__row_count ?? 0),
       filtersApplied: filterSummary,
       columns,
-      note: "Profili SQL uzmanı gibi yorumla; bulguları gerekçelendir ve run_expert_sql ile doğrula.",
+      note: "Tablo profil sonuçları yukarıdadır. Lütfen veriyi detaylıca inceleyip kullanıcıya doğrudan Türkçe markdown ile açıklayıcı ve net analiz sun. Başka bir araç çağırma.",
     }
   } catch (err) {
     return {
