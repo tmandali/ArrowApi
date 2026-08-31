@@ -202,7 +202,9 @@ export async function POST(req: Request) {
 
     const isThinking = thinkingEnabled !== false;
     let systemPrompt = buildSystemPrompt(context);
-    if (!isThinking) {
+    if (isThinking) {
+      systemPrompt += "\n\n[DÜŞÜNME MODU (THINKING) AÇIK: Yanıt vermeden önce içsel akıl yürütme ve planlama adımlarını `<think>...</think>` etiketleri arasına yaz. Ardından kullanıcıya nihai Türkçe yanıtını sun.]";
+    } else {
       systemPrompt += "\n\n[DÜŞÜNME MODU (THINKING) KAPALI: Düşünme adımlarını (thinking/reasoning) atla. Doğrudan net yanıtı sun.]";
     }
 

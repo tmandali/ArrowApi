@@ -30,8 +30,17 @@ const SKIP_TOKENS = [
   "<start|>",
 ] as const;
 
+const DIRECT_REASONING_TAGS = ["<think>", "<thinking>", "<thought>", "<reasoning>", "<analysis>"] as const;
+const DIRECT_TEXT_TAGS = ["</think>", "</thinking>", "</thought>", "</reasoning>", "</analysis>"] as const;
+
 const MARKERS: HarmonyMarker[] = (() => {
   const markers: HarmonyMarker[] = [];
+  for (const tag of DIRECT_REASONING_TAGS) {
+    markers.push({ kind: "reasoning", token: tag });
+  }
+  for (const tag of DIRECT_TEXT_TAGS) {
+    markers.push({ kind: "text", token: tag });
+  }
   for (const cs of CHANNEL_STARTS) {
     for (const name of REASONING_CHANNELS) {
       for (const ms of MESSAGE_STARTS) {
