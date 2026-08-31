@@ -718,11 +718,16 @@ function ChatInstance({
         ((performance.now() - requestStartMsRef.current) / 1000).toFixed(1),
       );
       const assistantMsgs = chat.messages.filter((m) => m.role === "assistant");
-      const lastAssis = assistantMsgs[assistantMsgs.length - 1];
-      if (lastAssis?.id) {
-        const finalDuration = durationSec > 0 ? durationSec : 0.1;
-        setResponseDurations((prev) => ({ ...prev, [lastAssis.id]: finalDuration }));
-      }
+      const finalDuration = durationSec > 0 ? durationSec : 0.1;
+      setResponseDurations((prev) => {
+        const next = { ...prev };
+        for (const m of assistantMsgs) {
+          if (!next[m.id]) {
+            next[m.id] = finalDuration;
+          }
+        }
+        return next;
+      });
       requestStartMsRef.current = null;
     }
   }, [isTurnActive, chat.messages]);

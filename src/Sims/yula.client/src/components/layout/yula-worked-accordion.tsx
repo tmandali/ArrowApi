@@ -89,6 +89,15 @@ export function extractWorkedSteps(
   }
 
   if (!message) {
+    if (isLiveStreaming && steps.length === 0) {
+      steps.push({
+        id: "live-initial-planning",
+        kind: "explored",
+        label: "Generative AI reasoning & stream",
+        subLabel: "Düşünülüyor ve yanıt hazırlanıyor...",
+        isLive: true,
+      });
+    }
     return steps;
   }
 
@@ -401,10 +410,20 @@ export function YulaWorkedAccordion({
     [message, isLive, userMessage]
   );
 
+  const lastLiveTimerRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    if (liveTimer > 0) {
+      lastLiveTimerRef.current = liveTimer;
+    }
+  }, [liveTimer]);
+
   const totalTime =
     durationSec ??
     (isLive
       ? liveTimer
+      : lastLiveTimerRef.current > 0
+      ? lastLiveTimerRef.current
       : steps.length > 0
       ? Math.max(1, steps.reduce((acc, s) => acc + (s.durationSec || 1), 0))
       : 1);
