@@ -12,13 +12,19 @@ import {
   Wrench,
   Loader2,
   Pin,
+  Pencil,
+  Check,
+  Trash2,
   X,
+  MessagesSquare,
 } from "lucide-react";
 import { useWorkspaceSearch } from "@/context/workspace-search-context";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
 import { useWorkspaceRagSearch } from "@/hooks/use-workspace-rag-search";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { WORKSPACE_SEARCH_CONFIGS } from "@/features/stock/lib/stock-menu-registry";
+import { useChatsStore } from "@/lib/stores/chats";
+import { useYulaDockStore } from "@/lib/stores/dock";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 
@@ -27,6 +33,8 @@ function getCategoryIcon(category: string, isRag = false) {
     return <Sparkles className="size-3.5 shrink-0 text-amber-500/90 group-hover:text-amber-600 dark:text-amber-400" />;
   }
   switch (category) {
+    case "Sohbet Geçmişi":
+      return <MessagesSquare className="size-3.5 shrink-0 text-sky-500/80 group-hover:text-sky-600 dark:text-sky-400" />;
     case "Katalog":
       return <Package className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground transition-colors" />;
     case "İşlemler":
@@ -58,6 +66,23 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
 
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const activeItemRef = React.useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = React.useState("");
+
+  const handleStartRename = (e: React.MouseEvent, id: string, currentTitle: string) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleSaveRename = (e: React.FormEvent | React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (editingTitle.trim()) {
+      useChatsStore.getState().renameConversation(id, editingTitle);
+    }
+    setEditingId(null);
+  };
 
   // Arama sonuçları geliştikçe seçili indeksi başa sıfırla
   React.useEffect(() => {
@@ -69,9 +94,21 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
     activeItemRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedIndex]);
 
-  const handleSelect = (url: string) => {
+  const handleSelect = (url: string, conversationId?: string) => {
     setOpen(false);
     setQuery("");
+    // Sohbet sonucuysa dock'ta o konuşmayı aktif et, sonra ekranına git
+    if (conversationId) {
+      const msgs = useChatsStore.getState().messagesById[conversationId] ?? [];
+      console.info(
+        `🤖 [Yula History Select] sohbet=${conversationId} · ${msgs.length} mesaj · hedef=${url}`,
+      );
+      useChatsStore.getState().selectConversation(conversationId);
+      // Geçmiş/arama modunda kalmasın; hedef sayfada sohbet görünür olsun
+      useChatsStore.setState({ isHistoryOpen: false, isSearchingHistory: false });
+      // Hedef sayfada Yula paneli kapalıysa açılsın
+      useYulaDockStore.getState().setOpen(true);
+    }
     if (url && url !== "#") {
       router.push(url);
     }
@@ -80,6 +117,9 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
   // Klavye yön tuşları (Yukarı, Aşağı), Enter ve Escape dinleyicisi
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Yeniden adlandırma düzenlemesi sırasında liste kısayolları kapalı
+      if (editingId) return;
+
       if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
@@ -99,14 +139,14 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
         e.preventDefault();
         const selected = flatItems[selectedIndex];
         if (selected) {
-          handleSelect(selected.url);
+          handleSelect(selected.url, selected.conversationId);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [flatItems, selectedIndex]);
+  }, [flatItems, selectedIndex, editingId]);
 
   return (
     <div
@@ -123,7 +163,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
             {query.trim() ? (
               <span>"{query}" Sonuçları ({flatItems.length})</span>
             ) : (
-              <span>Tüm Modüller ({flatItems.length})</span>
+              <span>Son Yazışmalar ({flatItems.length})</span>
             )}
           </span>
 
@@ -155,17 +195,21 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
               <Sparkles className="size-8 text-primary/40" />
               {query.trim() ? (
                 <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
-                  <span className="font-semibold text-foreground">"{query}"</span> için uygun bir modül bulunamadı.
+                  <span className="font-semibold text-foreground">"{query}"</span> için uygun bir modül veya yazışma bulunamadı.
                 </p>
-              ) : null}
+              ) : (
+                <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
+                  Henüz bir yazışma bulunmuyor. Yula ile sohbet başlattığınızda yazışmalarınız burada listelenir.
+                </p>
+              )}
               <p className="max-w-[360px] text-[11.5px] text-muted-foreground/75 leading-relaxed text-center">
-                {config.nameTr} alanında arama yapmak için modül adını veya tam hatırlamıyorsanız yapmak istediğiniz işin tarifini (ör:{" "}
+                Yazdığınızda modül, rapor ve sohbet geçmişinde arama yapılır; tam hatırlamıyorsanız yapmak istediğiniz işi tarif edin (ör:{" "}
                 {config.examples.map((ex, i) => (
                   <React.Fragment key={ex}>
                     {i > 0 ? ", " : ""}
                     <span className="text-primary font-medium">"{ex}"</span>
                   </React.Fragment>
-                ))}) yazabilirsiniz, sizin için hemen listeleyebilirim.
+                ))}). Sohbet eşleşmeleri <span className="text-sky-500 font-medium">Sohbet Geçmişi</span> grubunda listelenir.
               </p>
             </div>
           ) : (
@@ -179,23 +223,67 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                     const itemIndex = flatItems.findIndex((f) => f.id === item.id);
                     const isSelected = itemIndex === selectedIndex;
                     const itemIsPinned = isPinned(item.id);
+                    const isEditingConv =
+                      item.source === "conversation" &&
+                      !!item.conversationId &&
+                      item.conversationId === editingId;
 
                     return (
                       <div
                         key={item.id}
                         ref={isSelected ? activeItemRef : null}
-                        onClick={() => handleSelect(item.url)}
+                        onClick={() => {
+                          if (!isEditingConv) handleSelect(item.url, item.conversationId);
+                        }}
                         onMouseEnter={() => setSelectedIndex(itemIndex)}
                         className={cn(
-                          "group relative flex items-center justify-between rounded-lg px-2.5 py-2 text-xs transition-all cursor-pointer border-0",
+                          "group relative flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-all cursor-pointer border-0",
                           isSelected
                             ? "bg-primary/10 text-primary font-medium dark:bg-primary/15 ring-1 ring-primary/30"
                             : "text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
                         )}
                       >
+                        {isEditingConv ? (
+                          <form
+                            onSubmit={(e) => handleSaveRename(e, item.conversationId!)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex flex-1 items-center gap-1 min-w-0"
+                          >
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingId(null);
+                              }}
+                              className="flex-1 rounded border border-primary/40 bg-background px-2 py-0.5 text-xs outline-none text-foreground"
+                            />
+                            <button
+                              type="submit"
+                              onClick={(e) => handleSaveRename(e, item.conversationId!)}
+                              className="p-1 rounded text-primary hover:bg-muted transition-colors"
+                              title="Kaydet"
+                            >
+                              <Check className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingId(null);
+                              }}
+                              className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
+                              title="İptal"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </form>
+                        ) : (
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           {getCategoryIcon(item.category, !item.isExactMatch)}
-                          <span className="truncate text-[11.5px] leading-tight font-normal text-foreground/90 group-hover:text-foreground">
+                          <span className="truncate text-xs leading-tight font-normal text-foreground/90 group-hover:text-foreground">
                             {item.title}
                           </span>
                           {item.titleTr && item.titleTr !== item.title ? (
@@ -204,44 +292,77 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                             </span>
                           ) : null}
                         </div>
+                        )}
 
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          {item.isExactMatch ? (
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          {item.source === "conversation" && item.conversationId ? (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                              <button
+                                type="button"
+                                title="Yeniden Adlandır"
+                                aria-label="Yeniden Adlandır"
+                                onClick={(e) =>
+                                  handleStartRename(e, item.conversationId!, item.title)
+                                }
+                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
+                              >
+                                <Pencil className="size-3" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Yazışmayı Sil"
+                                aria-label="Yazışmayı Sil"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (item.conversationId) {
+                                    useChatsStore.getState().deleteConversation(item.conversationId);
+                                  }
+                                }}
+                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {query.trim() && item.isExactMatch ? (
                             <span className="text-[10px] text-muted-foreground/50 bg-muted/30 px-2 py-0.5 rounded font-normal">
                               {item.category}
                             </span>
-                          ) : (
+                          ) : query.trim() && !item.isExactMatch ? (
                             <Badge
                               variant="outline"
                               className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1"
                             >
                               <Sparkles className="size-2.5" /> %{item.score} Eşleşme
                             </Badge>
-                          )}
+                          ) : null}
 
-                          <button
-                            type="button"
-                            title={itemIsPinned ? "İğneyi Kaldır" : "Ana Ekrana İğnele"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePin({
-                                id: item.id,
-                                title: item.title,
-                                titleTr: item.titleTr,
-                                url: item.url,
-                                category: item.category,
-                                workspace: item.workspace,
-                              });
-                            }}
-                            className={cn(
-                              "flex size-6 items-center justify-center bg-transparent border-0 outline-none transition-all cursor-pointer",
-                              itemIsPinned
-                                ? "text-amber-500 opacity-100 hover:text-amber-600"
-                                : "opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-amber-500"
-                            )}
-                          >
-                            <Pin className={cn("size-3.5", itemIsPinned && "fill-amber-500/40 text-amber-500")} />
-                          </button>
+                          {item.source === "conversation" ? null : (
+                            <button
+                              type="button"
+                              title={itemIsPinned ? "İğneyi Kaldır" : "Ana Ekrana İğnele"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePin({
+                                  id: item.id,
+                                  title: item.title,
+                                  titleTr: item.titleTr,
+                                  url: item.url,
+                                  category: item.category,
+                                  workspace: item.workspace,
+                                });
+                              }}
+                              className={cn(
+                                "rounded p-1 bg-transparent border-0 outline-none transition-all cursor-pointer",
+                                itemIsPinned
+                                  ? "text-amber-500 opacity-100 hover:text-amber-600"
+                                  : "opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-amber-500"
+                              )}
+                            >
+                              <Pin className={cn("size-3", itemIsPinned && "fill-amber-500/40 text-amber-500")} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

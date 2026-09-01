@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { YulaChatTurn } from "@/components/layout/yula-chat-turn"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
-import { WorkspaceHomeCards } from "@/components/layout/workspace-home-cards"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaModelSelector } from "@/components/layout/yula-model-selector"
 import {
@@ -202,18 +201,29 @@ type AIChatPanelProps = {
   centeredIntro?: boolean
   /** View mode: "main" (Ana Ekran full-width) or "dock" (Right side panel). Auto-detected if omitted. */
   mode?: "main" | "dock"
+  /** Intro ekranında text box'ın altında gösterilen ek içerik (pinler / çalışma alanı kutuları). */
+  belowInput?: React.ReactNode
 }
 
 /** Docked or main screen panel body — avatar-free chat box with attach + slash commands. */
 export function AIChatPanel({
   centeredIntro = false,
   mode,
+  belowInput,
 }: AIChatPanelProps = {}) {
   const isSearchingHistory = useChatsStore((s) => s.isSearchingHistory)
+  const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const yula = useYulaChat()
   const status = yula.status
   const isProcessing = yula.busy
   const { messages } = yula
+
+  // Panel teşhisi: sohbet geçişi sonrası panelin gördüğü durum
+  React.useEffect(() => {
+    console.info(
+      `🤖 [Yula Panel] activeId=${yula.activeId} · mesaj=${messages.length} · history=${isHistoryOpen || isSearchingHistory} · path=${window.location.pathname}`,
+    )
+  }, [messages.length, yula.activeId, isHistoryOpen, isSearchingHistory])
 
   const [queuedPrompt, setQueuedPrompt] = React.useState(peekQueuedYulaPrompt)
   React.useEffect(() => subscribeQueuedYulaPrompt(() => setQueuedPrompt(peekQueuedYulaPrompt())), [])
@@ -312,7 +322,6 @@ export function AIChatPanel({
   const pathname = usePathname()
   const isHomePath = isWorkspaceHomePath(pathname)
   const isMainMode = mode ? mode === "main" : isHomePath
-  const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
 
   const mounted = useMounted()
   const now = React.useMemo(() => new Date(), [])
@@ -793,7 +802,7 @@ export function AIChatPanel({
                 <div className="space-y-1.5">
                   <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
                   <p className="text-sm text-muted-foreground">
-                    Yula, yerel Ollama üzerinde akan yapay zekâ asistanın.
+                    Yula, eski Türkçede yol gösteren ışık demektir. Size yardımcı olmak için burada.
                   </p>
                   {dateLabel ? (
                     <p className="text-xs text-muted-foreground/70">{dateLabel}</p>
@@ -805,7 +814,7 @@ export function AIChatPanel({
                 {inputArea}
               </div>
 
-              <WorkspaceHomeCards />
+              {belowInput}
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-4">

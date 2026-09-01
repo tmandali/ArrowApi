@@ -1,5 +1,3 @@
-"use client";
+import HomePage from "@/app/page";
 
-import AccountingHomePage from "@/app/accounting/page";
-
-export default AccountingHomePage;
+export default HomePage;

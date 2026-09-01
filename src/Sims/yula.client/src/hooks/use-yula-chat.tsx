@@ -8,6 +8,7 @@ import { DefaultChatTransport } from "ai";
 import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route";
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { CircleAlert, RotateCw } from "lucide-react";
 import { executeClientTool, resetGridCustomView } from "@/lib/yula-client-tools";
 import {
   isWorkspaceHomePath,
@@ -22,11 +23,12 @@ import {
   useChatsStore,
   type YulaConversation,
 } from "@/lib/stores/chats";
-import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
+import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
 import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
 import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
 import { isYulaGridSlashPrompt } from "@/components/layout/yula-commands";
 import { useYulaGridStore } from "@/lib/stores/grid";
+import { useYulaDockStore } from "@/lib/stores/dock";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-accordion";
 import { readYulaClientAiConfig, yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
@@ -729,6 +731,8 @@ function ChatInstance({
         (execOut?.status === "executed" || execOut?.status === "navigated") &&
         typeof execOut.navigateTo === "string"
       ) {
+        useChatsStore.getState().beginConversationFollow(conversationIdRef.current);
+        useYulaDockStore.getState().setOpen(true);
         void router.push(execOut.navigateTo);
       }
       // sendAutomaticallyWhen=true → resubmission SDK tarafında otomatik
@@ -1089,6 +1093,8 @@ function ChatInstance({
           output: { reason: "grid slash; DuckDB tablosu henüz yok" },
         });
         if (to) {
+          useChatsStore.getState().beginConversationFollow(conversationId);
+          useYulaDockStore.getState().setOpen(true);
           router.push(to);
         }
         return;
@@ -1155,6 +1161,15 @@ function ChatInstance({
   return null;
 }
 
+/** Sohbetin ilk kullanıcı mesajının metnini döner (geçmiş indeksleme bağlamı için). */
+function firstUserMessageText(messages?: YulaMessage[]): string {
+  const firstUser = messages?.find((m) => m.role === "user");
+  const textPart = firstUser?.parts.find(
+    (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
+  );
+  return textPart && textPart.type === "text" ? (textPart.text ?? "") : "";
+}
+
 export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
@@ -1166,6 +1181,12 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // Dock açıldığında aktif konuşmanın varlığını garanti et
   React.useEffect(() => {
     useChatsStore.getState().ensureActiveConversation();
+  }, []);
+
+  // Eski kayıt self-heal: ana sayfaya bağlı kalmış sohbetleri mesajlarındaki
+  // son navigasyon hedefine bağla (açılışta bir kez).
+  React.useEffect(() => {
+    healConversationRecords();
   }, []);
 
   // Ekran bazlı aktif sohbet yönetimi:
@@ -1180,6 +1201,19 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 
     const store = useChatsStore.getState();
     const currentActiveId = store.activeId;
+
+    // Sohbet KENDİ navigasyonuyla sayfa değiştirdiyse: hedefe VARILDIĞINDA
+    // kaydı yeni sayfaya bağla (son açılan sayfa kazanır) ve aktif sohbeti koru.
+    // Push'tan ÖNCE bağlamak çalışmaz — persist efekti eski sayfada kaydedip ezer.
+    const follow = store.followNav;
+    if (follow) {
+      useChatsStore.setState({ followNav: null });
+      if (follow.id === currentActiveId && Date.now() - follow.at < 15_000) {
+        store.followArrivedConversation(follow.id);
+        return;
+      }
+    }
+
     const conversations = store.conversations;
     const activeConv = conversations.find((c) => c.id === currentActiveId);
     const activeMsgs = currentActiveId ? store.messagesById[currentActiveId] ?? [] : [];
@@ -1210,6 +1244,29 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       // Isıtma best-effort
     });
   }, []);
+
+  // Sohbet geçmişini RAG vektör store'a indeksle (ilk yükleme + her yeni
+  // sohbet/kayıtta artımlı). Ana sayfa araması menülerle birlikte geçmişi de
+  // semantik arayabilsin diye. duckdb-vector'ü tembel yükle (DuckDB WASM).
+  React.useEffect(() => {
+    if (conversations.length === 0) return;
+    const store = useChatsStore.getState();
+    const items = conversations
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        pathname: c.pathname,
+        jobId: c.jobId,
+        snippet: firstUserMessageText(store.messagesById[c.id]).slice(0, 400),
+      }))
+      .filter((i) => i.snippet.trim().length > 0);
+    if (items.length === 0) return;
+    void import("@/services/duckdb-vector").then(({ indexConversationHistory }) => {
+      void indexConversationHistory(items).catch(() => {
+        // Geçmiş indeksleme best-effort
+      });
+    });
+  }, [conversations]);
 
   const router = useRouter();
   const selectConversation = React.useCallback(
@@ -1259,7 +1316,9 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       (acc, p) => acc + (typeof (p as { text?: string }).text === "string" ? (p as { text?: string }).text!.length : 1),
       0
     );
-    const sig = `${h.status}:${h.messages.length}:${partsCount}:${textLen}:${Boolean(h.error)}:${h.busy}`;
+    // Sohbet kimliği imzada: iki sohbet aynı görünümlü durumda olsa bile
+    // geçişte panel mutlaka tazelensin (geçmişten açılan sohbetin görünmemesi)
+    const sig = `${useChatsStore.getState().activeId}:${h.status}:${h.messages.length}:${partsCount}:${textLen}:${Boolean(h.error)}:${h.busy}`;
     if (sig !== lastSigRef.current) {
       lastSigRef.current = sig;
       bump();
@@ -1296,6 +1355,19 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 	newConversation
 ]);
 
+  // Placeholder iki kademeli: kısa süren normal bekleme ("hazırlanıyor") ve
+  // context ~4 sn içinde hazır olmazsa hydration/oturum hatası ihtimaline
+  // karşı "yüklenemedi" durumu (muhtemel neden + yenileme aksiyonu).
+  const [isLoadStuck, setIsLoadStuck] = React.useState(false);
+  React.useEffect(() => {
+    if (value) {
+      setIsLoadStuck(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsLoadStuck(true), 4000);
+    return () => clearTimeout(timer);
+  }, [value]);
+
   return (
     <>
       {activeId ? (
@@ -1309,6 +1381,27 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
         <YulaChatContext.Provider value={value}>
           {children}
         </YulaChatContext.Provider>
+      ) : isLoadStuck ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm">
+          <div className="flex items-center gap-2 font-medium text-destructive">
+            <CircleAlert className="size-4" aria-hidden />
+            <span>Uygulama yüklenemedi</span>
+          </div>
+          <p className="max-w-md text-center text-xs opacity-70">
+            Sohbet oturumu başlatılamadı; bu genellikle sunucu yeniden
+            başlatıldıktan sonra eski sekmenin bağlantısının kopmasından
+            (hydration hatası) kaynaklanır. Ayrıntılar için tarayıcı
+            konsoluna bakabilirsiniz.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-accent"
+          >
+            <RotateCw className="size-3.5" aria-hidden />
+            Sayfayı yenile
+          </button>
+        </div>
       ) : (
         <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
           Sohbet hazırlanıyor…
@@ -1320,3 +1413,5 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 
 // Not: context örneği null iken çocuklar render edilmez; dock açılışı
 // ensureActiveConversation garanti ettiği için pratikte anlık olur.
+// ~4 sn içinde hazır olmazsa "Uygulama yüklenemedi" durumuna düşer
+// (hydration/oturum hatası ihtimali); kullanıcıya yenileme aksiyonu sunulur.

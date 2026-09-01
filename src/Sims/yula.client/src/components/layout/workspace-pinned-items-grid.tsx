@@ -10,9 +10,11 @@ import {
   Settings,
   Scale,
   Wrench,
+  ChevronRight,
 } from "lucide-react";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
+import { WORKSPACE_CARDS } from "@/components/layout/workspace-home-cards";
 import { cn } from "@/utils/cn";
 
 function getCategoryIcon(category: string) {
@@ -37,15 +39,54 @@ function getCategoryIcon(category: string) {
 interface WorkspacePinnedItemsGridProps {
   workspace?: string;
   className?: string;
+  /** "workspaces": pin yerine çalışma alanı kutuları (aynı kutu biçimi). */
+  mode?: "pins" | "workspaces";
 }
 
 export function WorkspacePinnedItemsGrid({
   workspace: propWorkspace,
   className,
+  mode = "pins",
 }: WorkspacePinnedItemsGridProps) {
   const { workspace: metaWorkspace } = useWorkspaceSearchMeta();
   const workspace = propWorkspace || metaWorkspace;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(workspace);
+
+  // Yula root gibi "tüm pinler" yerine çalışma alanı kutuları istenirse:
+  // pin kutusu biçimi korunarak WORKSPACE_CARDS listelenir.
+  if (mode === "workspaces") {
+    return (
+      <div className={cn("w-full max-w-3xl px-3 pt-2 animate-in fade-in-50 duration-200", className)}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+          {WORKSPACE_CARDS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.id}
+                href={item.url}
+                className="group relative flex items-center justify-between rounded-xl border border-border/60 bg-background/60 hover:bg-accent/40 p-2.5 transition-all duration-200 hover:border-primary/40 hover:shadow-sm"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-primary group-hover:bg-primary/10 transition-colors">
+                    <Icon className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[12px] font-medium tracking-tight text-foreground truncate group-hover:text-primary transition-colors">
+                      {item.titleLead}&nbsp;{item.titleTrail}
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground/60 truncate leading-tight">
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   if (pinnedItems.length === 0) {
     return null;

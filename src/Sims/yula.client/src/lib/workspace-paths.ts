@@ -65,9 +65,19 @@ export function workspaceIdFromPath(pathname: string): string {
   return "system"
 }
 
-/** True for the main home page (/) where Yula runs in full-screen main mode. */
+/** Workspace roots that render the same Yula home screen as "/" (workspace switcher only). */
+const WORKSPACE_ROOT_PATHS = new Set([
+  "/stock",
+  "/subcontracting",
+  "/selling",
+  "/accounting",
+  "/financial-reports",
+  "/manufacturing",
+])
+
+/** True for the main home screen (/ and workspace roots) where Yula runs in full-screen main mode. */
 export function isWorkspaceHomePath(pathname: string): boolean {
-  return pathname === "/"
+  return pathname === "/" || WORKSPACE_ROOT_PATHS.has(pathname)
 }
 
 /** Normalize path for conversation/screen matching. */
@@ -123,7 +133,7 @@ function reportScreenLabel(pathname: string): string | null {
 }
 
 export function formatPathnameLabel(pathname?: string): string | null {
-  if (!pathname || pathname === "/") return null
+  if (!pathname || isWorkspaceHomePath(pathname.split("?")[0] || "/")) return null
   const jobId = extractJobIdFromHref(pathname)
   const named = reportScreenLabel(pathname)
   if (named) {

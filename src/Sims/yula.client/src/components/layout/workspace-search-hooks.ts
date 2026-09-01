@@ -16,14 +16,14 @@ export function useWorkspaceSearchMeta() {
 
   const placeholder =
     workspace === "accounting"
-      ? "Accounting & Finans modüllerinde ara..."
+      ? "Muhasebe & Finans modülleri ve sohbet geçmişinde ara..."
       : workspace === "stock"
-        ? "Stock & İzlenebilirlik modüllerinde ara..."
+        ? "Stock modülleri ve sohbet geçmişinde ara..."
         : workspace === "manufacturing"
-          ? "Manufacturing & BOM modüllerinde ara..."
+          ? "Manufacturing & BOM modülleri ve sohbet geçmişinde ara..."
           : workspace === "subcontracting"
-            ? "Subcontracting & Fason modüllerinde ara..."
-            : "Tüm modül ve raporlarda ara..."
+            ? "Fason & Satış modülleri ve sohbet geçmişinde ara..."
+            : "Modül, rapor ve sohbet geçmişinde ara..."
 
   return { workspace, placeholder }
 }

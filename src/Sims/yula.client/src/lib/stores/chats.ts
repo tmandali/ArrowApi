@@ -16,6 +16,8 @@ interface ChatsState {
   conversations: YulaConversation[];
   activeId: string | null;
   messagesById: Record<string, YulaMessage[]>;
+  /** Sohbet kendi navigasyonuyla sayfa değiştirirken hedefe varışta kaydı bağlamak için (transient). */
+  followNav: { id: string; at: number } | null;
   model: string;
   isHistoryOpen: boolean;
   searchQuery: string;
@@ -34,6 +36,8 @@ interface ChatsState {
   renameFromFirstMessage: (id: string, text: string) => void;
   clearAllConversations: () => void;
   saveMessages: (id: string, messages: YulaMessage[], pathname?: string) => void;
+  beginConversationFollow: (id: string) => void;
+  followArrivedConversation: (id: string, href?: string) => void;
   isThinkingEnabled: boolean;
   setThinkingEnabled: (enabled: boolean) => void;
   setModel: (model: string) => void;
@@ -54,6 +58,7 @@ export const useChatsStore = create<ChatsState>()(
       conversations: [],
       activeId: null,
       messagesById: {},
+      followNav: null,
       model: process.env.NEXT_PUBLIC_YULA_MODEL ?? "gpt-5.4",
       isThinkingEnabled: true,
       setThinkingEnabled: (isThinkingEnabled) => set({ isThinkingEnabled }),
@@ -191,21 +196,63 @@ export const useChatsStore = create<ChatsState>()(
                 ...conversations,
               ];
             } else {
+              // İçerik değişmediyse (sohbet geçişi/restor kaydı — navigasyon
+              // boşluğunda eski sayfada tetiklenen persist) sayfa bağını
+              // KAYDIRMA; pathname yalnız gerçekten yeni mesaj gelince güncellenir.
+              const prev = s.messagesById[id];
+              const hasNewContent = !prev || prev.length !== messages.length;
               conversations = conversations.map((c) => {
                 if (c.id !== id) return c;
                 const updatedTitle = c.title === "Yeni Sohbet" ? derivedTitle : c.title;
-                const updatedPath = resolveConversationPathname(c.pathname, currentPath);
+                const updatedPath = hasNewContent
+                  ? resolveConversationPathname(c.pathname, currentPath)
+                  : c.pathname;
                 return {
                   ...c,
                   title: updatedTitle,
                   pathname: updatedPath,
-                  jobId: extractJobIdFromHref(updatedPath) ?? c.jobId,
+                  jobId: hasNewContent
+                    ? extractJobIdFromHref(updatedPath) ?? c.jobId
+                    : c.jobId,
                 };
               });
             }
           }
 
           return { messagesById, conversations };
+        }),
+
+      beginConversationFollow: (id) =>
+        set({ followNav: { id, at: Date.now() } }),
+
+      followArrivedConversation: (id, href) =>
+        set((s) => {
+          const resolved = href ?? currentLocationHref();
+          if (!resolved) return { followNav: null };
+          const pathname = resolveConversationPathname(undefined, resolved) ?? resolved;
+          const jobId = extractJobIdFromHref(pathname) ?? undefined;
+          const existingIndex = s.conversations.findIndex((c) => c.id === id);
+          if (existingIndex === -1) {
+            return {
+              followNav: null,
+              conversations: [
+                {
+                  id,
+                  title: "Yeni Sohbet",
+                  createdAt: Date.now(),
+                  pathname,
+                  jobId,
+                },
+                ...s.conversations,
+              ],
+            };
+          }
+          return {
+            followNav: null,
+            conversations: s.conversations.map((c) =>
+              c.id === id ? { ...c, pathname, jobId: jobId ?? c.jobId } : c,
+            ),
+          };
         }),
 
       setModel: (model) => set({ model }),

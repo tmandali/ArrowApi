@@ -1,10 +1,11 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route"
-import type { YulaConversation } from "@/lib/stores/chats"
+import { useChatsStore, type YulaConversation } from "@/lib/stores/chats"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { focusReportExecution } from "@/lib/report-run-bus"
 import {
   extractJobIdFromHref,
   isGuidString,
+  isWorkspaceHomePath,
   reportExecutionHref,
   reportExecutionPath,
   reportScopeFromPath,
@@ -99,4 +100,50 @@ export function navigateToConversationScreen(
       : "/"
   const dest = href.replace(/\/+$/, "") || "/"
   if (here !== dest) push(href)
+}
+
+const NAV_TOOL_NAMES = new Set(["navigate_to_page", "run_report", "run_job"])
+
+/** Mesajlardaki SON navigasyon aracının hedef sayfası (yoksa null). */
+function lastNavigateTargetFromMessages(messages?: YulaMessage[]): string | null {
+  if (!messages?.length) return null
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role !== "assistant") continue
+    for (const part of message.parts ?? []) {
+      const row = part as {
+        type?: string
+        toolName?: string
+        state?: string
+        output?: { navigateTo?: unknown }
+      }
+      const toolName =
+        row.toolName ??
+        (typeof row.type === "string" && row.type.startsWith("tool-")
+          ? row.type.slice("tool-".length)
+          : "")
+      if (!NAV_TOOL_NAMES.has(toolName)) continue
+      const output = row.output
+      if (output && typeof output === "object" && typeof output.navigateTo === "string") {
+        return output.navigateTo
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Eski kayıt self-heal: "son açılan sayfa" kuralından önce oluşmuş, ana sayfaya
+ * bağlı kalmış sohbetleri mesajlarındaki son navigasyon hedefine bağlar.
+ * Uygulama açılışında bir kez çalışır.
+ */
+export function healConversationRecords(): void {
+  const store = useChatsStore.getState()
+  for (const conv of store.conversations) {
+    const current = (conv.pathname ?? "/").split("?")[0] || "/"
+    if (!isWorkspaceHomePath(current)) continue
+    const target = lastNavigateTargetFromMessages(store.messagesById[conv.id])
+    if (!target) continue
+    useChatsStore.getState().followArrivedConversation(conv.id, target)
+  }
 }

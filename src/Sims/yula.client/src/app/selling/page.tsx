@@ -1,5 +1,3 @@
-"use client";
+import HomePage from "@/app/page";
 
-import SubcontractingHomePage from "@/app/subcontracting/page";
-
-export default SubcontractingHomePage;
+export default HomePage;

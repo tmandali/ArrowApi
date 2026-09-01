@@ -208,6 +208,64 @@ async function doIndexWorkspaceMenus(): Promise<number> {
   return pending.length;
 }
 
+/** RAG vektör store'a yazılacak sohbet özeti. */
+export interface ConversationIndexItem {
+  id: string;
+  title: string;
+  pathname?: string;
+  jobId?: string;
+  /** Sohbetin ilk kullanıcı mesajı (bağlam için, kırpılmış). */
+  snippet: string;
+}
+
+const conversationIndexedIds = new Set<string>();
+let conversationIndexInFlight: Promise<number> | null = null;
+
+/**
+ * Sohbet geçmişini RAG vektör store'a indeksler (artımlı + in-flight dedup'lı).
+ * Daha önce indekslenmiş konuşmalar atlanır; sürerken gelen çağrılar iş bitiminde
+ * zincirlenir. Böylece ana sayfa araması menülerle birlikte geçmişi de semantik bulur.
+ */
+export function indexConversationHistory(items: ConversationIndexItem[]): Promise<number> {
+  const pending = items.filter(
+    (i) => i.id && i.snippet.trim() && !conversationIndexedIds.has(i.id),
+  );
+  if (pending.length === 0) return Promise.resolve(0);
+  if (conversationIndexInFlight) {
+    return conversationIndexInFlight.then(() => indexConversationHistory(items));
+  }
+
+  conversationIndexInFlight = (async () => {
+    try {
+      await initVectorStore();
+      const texts = pending.map((p) => `Sohbet: ${p.title}. ${p.snippet}`.trim());
+      const vectors = await getEmbeddings(texts);
+      for (let i = 0; i < pending.length; i++) {
+        const it = pending[i];
+        await insertOrReplaceVector({
+          id: `conv_${it.id}`,
+          scope: "chats",
+          content: texts[i],
+          metadata: {
+            type: "conversation",
+            title: it.title,
+            pathname: it.pathname,
+            jobId: it.jobId,
+            conversationId: it.id,
+          },
+          embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0),
+        });
+        conversationIndexedIds.add(it.id);
+      }
+      console.info(`🤖 [DuckDB WASM Vector Indexer] ${pending.length} conversations indexed into RAG store.`);
+      return pending.length;
+    } finally {
+      conversationIndexInFlight = null;
+    }
+  })();
+  return conversationIndexInFlight;
+}
+
 async function insertOrReplaceVector(item: {
   id: string;
   scope: string;

@@ -345,7 +345,6 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const conversations = useChatsStore((s) => s.conversations);
   const activeId = useChatsStore((s) => s.activeId);
   const searchQuery = useChatsStore((s) => s.searchQuery);
-  const setSearchQuery = useChatsStore((s) => s.setSearchQuery);
   const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory);
   const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen);
   const selectConversation = useChatsStore((s) => s.selectConversation);
@@ -379,6 +378,9 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
     const session =
       target ?? useChatsStore.getState().conversations.find((c) => c.id === id);
     if (session) {
+      console.info(
+        `🤖 [Yula History Select] sohbet=${session.id} · ${(useChatsStore.getState().messagesById[session.id] ?? []).length} mesaj · hedef=${session.pathname}`,
+      );
       navigateToConversationScreen(
         session,
         (href) => {
@@ -416,14 +418,6 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
     deleteConversation(id);
   };
 
-  const searchInputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-    });
-  }, []);
-
   return (
     <div
       className={cn(
@@ -432,33 +426,12 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
       )}
     >
       <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col">
-        {/* Header Bar */}
+        {/* Header Bar — arama girişi header'daki YulaHeaderSearch'te (aynı searchQuery store'u) */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 pb-3 mb-2">
           <div className="flex items-center gap-2 shrink-0">
             <History className="size-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">Sohbet Geçmişi</h2>
             <span className="text-xs font-medium text-muted-foreground/60">({filteredSessions.length})</span>
-          </div>
-
-          <div className="relative flex-1 max-w-xs mx-2">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/50" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Sohbetlerde ara..."
-              className="w-full rounded-lg border-0 bg-muted/40 py-1.5 pl-8 pr-2.5 text-xs outline-none placeholder:text-muted-foreground/50 focus:bg-muted/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-              >
-                <X className="size-3" />
-              </button>
-            ) : null}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
