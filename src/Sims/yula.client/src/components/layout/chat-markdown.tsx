@@ -356,7 +356,28 @@ function renderPlainBullet(
     )
   }
 
-  // Standart düz madde
+  // Standart düz madde: Eğer öneri/aksiyon cümlesiyse tıklanabilir aksiyon düğmesi yap
+  const isActionLike =
+    isPromptSentenceLike(cleanBulletText) ||
+    /(?:filtrele|özetle|çıkar|analiz|grafik|hesapla|göster|listele|hazırla|yap|incele|sorgula)/i.test(cleanBulletText)
+
+  if (isActionLike && cb?.onPrompt) {
+    return (
+      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
+        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
+        <button
+          type="button"
+          onClick={() => cb.onPrompt(cleanBulletText)}
+          title={`"${cleanBulletText}" komutunu çalıştırmak için tıklayın`}
+          className="flex-1 leading-relaxed text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors"
+        >
+          {cleanBulletText}
+        </button>
+      </div>
+    )
+  }
+
+  // Düz bilgilendirme maddesi
   return (
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
       <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
