@@ -2,15 +2,17 @@ import {
   getAvailableProviderModels,
   getYulaProviderInfo,
 } from "@/lib/yula-provider";
-import { DEFAULT_OLLAMA_URL } from "@/lib/yula-config";
+import {
+  DEFAULT_OLLAMA_URL,
+  PROVIDER_LABELS,
+  listConfiguredProviders,
+  resolveProvider,
+} from "@/lib/yula-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Soğuk başlangıç ısıtması (Yalnızca Ollama için):
- */
-function warmupModel(base: string, defaultModel: string) {
+function warmupLocalModel(base: string, defaultModel: string) {
   void fetch(`${base}/api/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -20,27 +22,41 @@ function warmupModel(base: string, defaultModel: string) {
     }),
     cache: "no-store",
   }).catch(() => {
-    // Isıtma best-effort: Ollama kapalıysa sessizce yut
+    // Isıtma best-effort
   });
 }
 
-/** Model seçici için sağlayıcı köprüsü — aktif sağlayıcının modellerini ve yeteneklerini döndürür. */
-export async function GET() {
+/** Model seçici: env’de tanımlı sağlayıcılar + aktif listenin modelleri. */
+export async function GET(req: Request) {
   try {
-    const providerInfo = getYulaProviderInfo();
+    const url = new URL(req.url);
+    const provider = resolveProvider(url.searchParams.get("provider"));
+    const endpoint = url.searchParams.get("endpoint") || undefined;
+    const providerInfo = getYulaProviderInfo(provider);
+    const availableProviders = listConfiguredProviders().map((id) => ({
+      id,
+      label: PROVIDER_LABELS[id],
+    }));
 
-    if (providerInfo.provider === "ollama") {
-      const base = process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL;
-      warmupModel(base, providerInfo.defaultModel);
+    if (provider === "ollama") {
+      const base = (endpoint || process.env.OLLAMA_URL || DEFAULT_OLLAMA_URL).replace(
+        /\/+$/,
+        "",
+      );
+      warmupLocalModel(base, providerInfo.defaultModel);
     }
 
-    const models = await getAvailableProviderModels();
+    const models = await getAvailableProviderModels({
+      provider,
+      baseUrl: endpoint,
+    });
 
     return Response.json({
       provider: providerInfo.provider,
       defaultModel: providerInfo.defaultModel,
       isCloud: providerInfo.isCloud,
       vectorDimension: providerInfo.vectorDimension,
+      availableProviders,
       models,
     });
   } catch (error) {
@@ -50,4 +66,3 @@ export async function GET() {
     );
   }
 }
-

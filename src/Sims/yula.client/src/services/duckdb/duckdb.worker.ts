@@ -54,6 +54,48 @@ async function getDuckDb(): Promise<{
   return { db: db!, conn: conn! }
 }
 
+function normalizeArrowValue(val: unknown): unknown {
+  if (val === null || val === undefined) return null
+
+  // 1. Date / Timestamp nesneleri
+  if (val instanceof Date) {
+    return !isNaN(val.getTime()) ? val.toISOString().slice(0, 10) : ""
+  }
+
+  // 2. BigInt (JS Number'a çevir — Web Worker transfer & JSON serialize için)
+  if (typeof val === "bigint") {
+    const num = Number(val)
+    return Number.isSafeInteger(num) ? num : val.toString()
+  }
+
+  // 3. Uint8Array / Buffer / Binary (Hex veya Base64 stringe çevir)
+  if (val instanceof Uint8Array || (typeof Buffer !== "undefined" && Buffer.isBuffer?.(val))) {
+    try {
+      const u8 = val instanceof Uint8Array ? val : new Uint8Array(val as ArrayBuffer)
+      if (u8.length === 16) {
+        // Guid / UUID (16 byte)
+        const hex = Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("")
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+      }
+      return Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("")
+    } catch {
+      return ""
+    }
+  }
+
+  // 4. Custom Arrow Struct / Object / Map (Proxy ya da Arrow Row ise düz JS objesine çevir)
+  if (typeof val === "object" && val !== null) {
+    if (typeof (val as any).toJSON === "function") {
+      return (val as any).toJSON()
+    }
+    if (Array.isArray(val)) {
+      return val.map(normalizeArrowValue)
+    }
+  }
+
+  return val
+}
+
 function arrowTableToObjects(table: any): Record<string, unknown>[] {
   const rows: Record<string, unknown>[] = []
   const schema = table?.schema
@@ -71,7 +113,7 @@ function arrowTableToObjects(table: any): Record<string, unknown>[] {
     const row: Record<string, unknown> = {}
     for (let j = 0; j < fields.length; j++) {
       const val = columns[j]?.get(i)
-      row[fields[j]] = typeof val === "bigint" ? Number(val) : val
+      row[fields[j]] = normalizeArrowValue(val)
     }
     rows.push(row)
   }
@@ -94,6 +136,71 @@ async function resetDuckDb(): Promise<{
   return getDuckDb()
 }
 
+type CatalogObjectType = "TABLE" | "VIEW"
+
+function escapeIdentLiteral(name: string): string {
+  return name.replace(/'/g, "''")
+}
+
+async function getCatalogType(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableName: string,
+): Promise<CatalogObjectType | null> {
+  const escaped = escapeIdentLiteral(tableName)
+  try {
+    const res = await conn.query(
+      `SELECT table_type FROM information_schema.tables WHERE table_name = '${escaped}' LIMIT 1`,
+    )
+    const rows = arrowTableToObjects(res)
+    if (rows.length === 0) return null
+    const type = String(rows[0]?.table_type ?? "").toUpperCase()
+    return type.includes("VIEW") ? "VIEW" : "TABLE"
+  } catch {
+    return null
+  }
+}
+
+/**
+ * DuckDB `DROP VIEW IF EXISTS` / `DROP TABLE IF EXISTS` yanlış türde nesnede
+ * Catalog Error fırlatır ("Existing object is of type Table, trying to drop type View").
+ * Türü information_schema'dan okuyup yalnız doğru DROP'u çalıştır.
+ */
+async function safeDropObject(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableName: string,
+): Promise<void> {
+  const quoted = `"${tableName.replace(/"/g, '""')}"`
+  const type = await getCatalogType(conn, tableName)
+  if (type === "VIEW") {
+    await conn.query(`DROP VIEW ${quoted}`).catch(() => {})
+    return
+  }
+  if (type === "TABLE") {
+    await conn.query(`DROP TABLE ${quoted}`).catch(() => {})
+    return
+  }
+}
+
+/**
+ * Parquet'i view olarak bağla. Aynı isimde TABLO varsa CREATE OR REPLACE VIEW
+ * içeride DROP VIEW dener ve catalog hatasıyla takılır — tabloyu ezme.
+ */
+async function attachParquetView(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableName: string,
+  parquetFileName: string,
+): Promise<void> {
+  const quoted = `"${tableName.replace(/"/g, '""')}"`
+  const existing = await getCatalogType(conn, tableName)
+  if (existing === "TABLE") return
+  const sql = `SELECT * FROM read_parquet('${escapeIdentLiteral(parquetFileName)}')`
+  if (existing === "VIEW") {
+    await conn.query(`CREATE OR REPLACE VIEW ${quoted} AS ${sql}`)
+  } else {
+    await conn.query(`CREATE VIEW ${quoted} AS ${sql}`)
+  }
+}
+
 self.onmessage = async (e: MessageEvent) => {
   const { id, type, payload } = e.data
 
@@ -114,8 +221,7 @@ self.onmessage = async (e: MessageEvent) => {
             buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
 
           if (!append) {
-            await conn.query(`DROP VIEW IF EXISTS "${tableName}"`).catch(() => {})
-            await conn.query(`DROP TABLE IF EXISTS "${tableName}"`).catch(() => {})
+            await safeDropObject(conn, tableName)
             tableRowCounts.set(tableName, 0)
           }
 
@@ -167,7 +273,7 @@ self.onmessage = async (e: MessageEvent) => {
           const uint8 =
             buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer as ArrayBuffer)
           await db!.registerFileBuffer(parquetFile, uint8)
-          await conn.query(`CREATE OR REPLACE VIEW "${tableName}" AS SELECT * FROM read_parquet('${parquetFile}')`)
+          await attachParquetView(conn, tableName, parquetFile)
           const countRes = await conn.query(`SELECT COUNT(*) as count FROM "${tableName}"`)
           const countRows = arrowTableToObjects(countRes)
           const rowCount = Number(countRows[0]?.count ?? 0)
@@ -252,17 +358,13 @@ self.onmessage = async (e: MessageEvent) => {
           const { tableName, jobId } = payload as { tableName: string; jobId?: string }
           const parquetFileName = `${jobId || tableName}.parquet`
 
-          // 1. Önce bellekteki mevcut tablo veya view kontrolü (information_schema ile güvenli kontrol — hata fırlatmaz)
+          const quoted = `"${tableName.replace(/"/g, '""')}"`
+
+          // 1. Bellekte tablo/view varsa view ile ezme — CREATE OR REPLACE VIEW tablo üstünde Catalog Error üretir.
           try {
-            const escapedName = tableName.replace(/'/g, "''")
-            const checkRes = await conn.query(
-              `SELECT table_name FROM information_schema.tables WHERE table_name = '${escapedName}'`
-            )
-            const checkRows = arrowTableToObjects(checkRes)
-            if (checkRows && checkRows.length > 0) {
-              const res = await conn.query(
-                `SELECT COUNT(*) as count FROM "${tableName}"`
-              )
+            const existing = await getCatalogType(conn, tableName)
+            if (existing) {
+              const res = await conn.query(`SELECT COUNT(*) as count FROM ${quoted}`)
               const countRows = arrowTableToObjects(res)
               const rowCount = Number(countRows[0]?.count ?? 0)
               if (rowCount > 0) {
@@ -274,9 +376,14 @@ self.onmessage = async (e: MessageEvent) => {
             // Tablo veya view henüz bellekte yok
           }
 
-          // 2. OPFS diskinde {jobId}.parquet var mı? (Varsa 0ms'de CREATE OR REPLACE VIEW!)
+          // 2. OPFS parquet → yalnız nesne yoksa veya boşsa VIEW bağla
           try {
             if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
+              const catalogType = await getCatalogType(conn, tableName)
+              if (catalogType === "TABLE") {
+                self.postMessage({ id, success: true, exists: false, rowCount: 0 })
+                break
+              }
               const root = await navigator.storage.getDirectory()
               const dir = await root.getDirectoryHandle("sims_arrow_reports", { create: true })
               const fileHandle = await dir.getFileHandle(parquetFileName, { create: false })
@@ -284,10 +391,8 @@ self.onmessage = async (e: MessageEvent) => {
               if (file.size > 0) {
                 const arrayBuffer = await file.arrayBuffer()
                 await db!.registerFileBuffer(parquetFileName, new Uint8Array(arrayBuffer))
-                await conn.query(
-                  `CREATE OR REPLACE VIEW "${tableName}" AS SELECT * FROM read_parquet('${parquetFileName}')`
-                )
-                const countRes = await conn.query(`SELECT COUNT(*) as count FROM "${tableName}"`)
+                await attachParquetView(conn, tableName, parquetFileName)
+                const countRes = await conn.query(`SELECT COUNT(*) as count FROM ${quoted}`)
                 const countRows = arrowTableToObjects(countRes)
                 const rowCount = Number(countRows[0]?.count ?? 0)
                 if (rowCount > 0) {
@@ -306,9 +411,8 @@ self.onmessage = async (e: MessageEvent) => {
 
         case "DROP_TABLE": {
           const { tableName } = payload
-          await conn.query(`DROP VIEW IF EXISTS "${tableName}"`).catch(() => {})
-          await conn.query(`DROP TABLE IF EXISTS "${tableName}"`).catch(() => {})
-          await conn.query(`DROP TABLE IF EXISTS "${tableName}_raw"`).catch(() => {})
+          await safeDropObject(conn, tableName)
+          await safeDropObject(conn, `${tableName}_raw`)
           await db!.dropFile(`${tableName}.parquet`).catch(() => {})
           tableRowCounts.delete(tableName)
           self.postMessage({ id, success: true })

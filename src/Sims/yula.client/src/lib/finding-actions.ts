@@ -116,5 +116,30 @@ export function extractFindingFilterPrompt(
     return `${column} = 0 olan kayıtları filtrele`;
   }
 
-  return `${column} ile ilgili kayıtları filtrele`;
+  return null;
+}
+
+/**
+ * "Başlık: açıklama" / "**Başlık:** açıklama" satırını ayırır.
+ * Başlık tıklanınca sohbete yalnızca kısa başlık gider (dar panelde uzun kullanıcı balonu olmasın).
+ */
+export function parseColonTitleLine(line: string): { title: string; desc: string } | null {
+  const cleaned = line
+    .trim()
+    .replace(/^([-*•●]|\d+\.)\s+/, "")
+    .replace(/\*\*/g, "")
+    .trim();
+  const colon = cleaned.indexOf(":");
+  if (colon < 3 || colon > 80) return null;
+  const title = cleaned.slice(0, colon).trim();
+  const desc = cleaned.slice(colon + 1).trim();
+  if (title.length < 3 || desc.length < 2) return null;
+  if (/^https?:\/\//i.test(title) || /^\d{1,2}$/.test(title)) return null;
+  if (title.includes("\n") || desc.length > 800) return null;
+  return { title, desc };
+}
+
+/** Tıklanınca sohbete yazılacak kısa komut — yalnız başlık. */
+export function findingItemPrompt(title: string, _desc?: string): string {
+  return title.replace(/:+\s*$/, "").trim();
 }

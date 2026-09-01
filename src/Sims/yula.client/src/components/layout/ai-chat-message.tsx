@@ -8,6 +8,7 @@ import { useActiveJobsStore } from "@/store/slices/active-jobs-store";
 import { cn } from "@/utils/cn";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { ChatMarkdown, FileOpenChip } from "./chat-markdown";
+import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 
 type AiChatMessageProps = {
   message: YulaMessage;
@@ -163,19 +164,22 @@ function TextPart({
   message?: YulaMessage
 }) {
   if (!text) return null
+  const displayText =
+    role === "user" ? text : sanitizeAssistantText(text)
+  if (role !== "user" && !displayText) return null
 
   // Skill çıktısı dosya token'ı: [[file:<mutlak yol>|<etiket>]] → tıkla & varsayılan uygulamada aç
   const FILE_TOKEN = /\[\[file:(.+?)\|(.+?)\]\]/g
-  if (role !== "user" && FILE_TOKEN.test(text)) {
+  if (role !== "user" && FILE_TOKEN.test(displayText)) {
     FILE_TOKEN.lastIndex = 0
     const segments: Array<{ type: "text" | "file"; value: string; path?: string }> = []
     let last = 0
-    for (const m of text.matchAll(FILE_TOKEN)) {
-      if (m.index! > last) segments.push({ type: "text", value: text.slice(last, m.index) })
+    for (const m of displayText.matchAll(FILE_TOKEN)) {
+      if (m.index! > last) segments.push({ type: "text", value: displayText.slice(last, m.index) })
       segments.push({ type: "file", value: m[2], path: m[1] })
       last = m.index! + m[0].length
     }
-    if (last < text.length) segments.push({ type: "text", value: text.slice(last) })
+    if (last < displayText.length) segments.push({ type: "text", value: displayText.slice(last) })
 
     return (
       <div className="text-[12px] leading-relaxed">
@@ -200,7 +204,7 @@ function TextPart({
     )
   }
 
-  return <FormattedAssistantText text={text} message={message} />
+  return <FormattedAssistantText text={displayText} message={message} />
 }
 
 /** Avatar-free message row — user bubble right, assistant text left (reasoning is in Worked for Xs). */

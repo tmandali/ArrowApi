@@ -118,6 +118,50 @@ export const STATIC_TOOLS = {
         z.object({ status: z.literal("error"), error: z.string() }),
       ]),
     }),
+    apply_criteria: tool({
+      description: [
+        "Önerilen kriterleri (ör. kayitTarihi, durum, tutarMiktar) aktif ekrandaki kriter formuna doldurur.",
+        "Kullanıcı '1. öneriyi uygula', 'dünü seç', 'forma yaz' dediğinde bu aracı criteria objesi ile ÇAĞIR.",
+        "Form doldurulur, ekranda vurgulanır ve kullanıcı ekrandaki 'Run' butonuna basarak işi kendisi çalıştırabilir.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+        criteria: z.record(z.string(), z.unknown()).describe("Forma doldurulacak kriterler"),
+        presetTitle: z.string().optional().describe("Uygulanan öneri başlığı"),
+      }),
+      outputSchema: z.object({
+        status: z.string(),
+        updatedKeys: z.array(z.string()),
+        message: z.string(),
+      }),
+    }),
+    run_job: tool({
+      description: [
+        "Stok Bakiye veya aktif rapor için backend job başlatır ve sonuç ekranına (/guid) yönlendirir.",
+        "Kullanıcı önerilen bir seçeneği doğrudan çalıştırmak istediğinde veya 'run et' dediğinde zorunlu alanları (kayitTarihi) ve kriterleri belirterek BU ARACI ÇAĞIR.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+        criteria: z.record(z.string(), z.unknown()).default({}).describe("Rapor kriterleri (örn. kayitTarihi, durum)"),
+        presetTitle: z.string().optional().describe("Çalıştırılan öneri / preset başlığı"),
+      }),
+      outputSchema: z.discriminatedUnion("status", [
+        z.object({
+          status: z.literal("executed"),
+          jobId: z.string(),
+          jobStatus: z.string(),
+          navigateTo: z.string(),
+          presetTitle: z.string().optional(),
+          message: z.string().optional(),
+        }),
+        z.object({
+          status: z.literal("validation-error"),
+          errors: z.array(z.string()),
+          hint: z.string().optional(),
+        }),
+        z.object({ status: z.literal("error"), error: z.string() }),
+      ]),
+    }),
     request_user_confirmation: tool({
       description: [
         "Kritik, yüksek maliyetli veya veri değiştiren işlemler öncesinde kullanıcıdan İNSAN ONAYI (Human-in-the-Loop) ister.",
@@ -134,6 +178,23 @@ export const STATIC_TOOLS = {
         confirmed: z.boolean(),
         message: z.string(),
         userNote: z.string().optional(),
+      }),
+    }),
+    navigate_to_page: tool({
+      description: [
+        "Uygulama içinde belirtilen bir sayfaya, çalışma alanına (workspace) veya rapora yönlendirir (In-App Client Navigation).",
+        "Kullanıcı '... ekranını aç', '... sayfasına git', 'beni ... raporuna götür' dediğinde veya aktif ekranda bulunmayan bir rapor/sayfa istendiğinde BU ARACI ÇAĞIR.",
+        "Kullanılabilir standart rotalar: '/stock/stock-balance' (Stok Bakiye Raporu), '/stock/stock-analytics' (Stok Analiz Raporu), '/stock' (Stok Modülü), '/accounting' (Muhasebe), '/selling' (Satış), '/manufacturing' (Üretim).",
+      ].join(" "),
+      inputSchema: z.object({
+        path: z.string().describe("Hedef sayfa yolu (örn: '/stock/stock-balance', '/stock', '/accounting')"),
+        title: z.string().optional().describe("Hedef sayfa veya rapor adı"),
+        reason: z.string().optional().describe("Yönlendirme nedeni"),
+      }),
+      outputSchema: z.object({
+        status: z.enum(["navigated", "already_on_page", "error"]),
+        navigateTo: z.string().optional(),
+        message: z.string(),
       }),
     }),
   } satisfies ToolSet;

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marked } from "marked";
@@ -17,7 +18,7 @@ import {
 } from "@/lib/yula-actions";
 
 export type { KnownSystemAction };
-import { extractFindingFilterPrompt } from "@/lib/finding-actions";
+import { findingItemPrompt, parseColonTitleLine } from "@/lib/finding-actions";
 
 /**
  * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
@@ -181,7 +182,12 @@ function renderConfirmationLine(
   )
   if (
     !confirmationMatch ||
-    !(confirmationMatch[1] || cb.isExecutionConfirmation || trimmed.includes("Report Started"))
+    !(
+      confirmationMatch[1] ||
+      trimmed.includes("Report Started") ||
+      trimmed.includes("Raporu Başlatıldı") ||
+      trimmed.includes("Raporu Hazırlandı")
+    )
   ) {
     return null
   }
@@ -217,31 +223,18 @@ function renderConfirmationLine(
   )
 }
 
-/** 3b — bulgu/rapor maddesi: "● Başlık: açıklama" */
+/** 3b — öneri/bulgu: tıklanan başlık maddeyi prompt olarak yeniden sorar */
 function renderBulletedItem(
   line: string,
   lIdx: string,
   cb: ChatMarkdownCallbacks,
 ): React.ReactNode {
-  const bulletMatch = line
-    .trim()
-    .match(/^([-*•●]|\d+\.)\s+(\*\*)?([A-Za-zÇĞİÖŞÜçğıöşü0-9\s&/()_'"-]{3,60}?)(\*\*)?\s*:\s*(.+)$/i)
-  if (!bulletMatch) return null
+  const parsed = parseColonTitleLine(line)
+  if (!parsed) return null
 
-  const itemTitle = bulletMatch[3].trim()
-  const itemDesc = bulletMatch[5].trim()
-
-  // Madde sınıflandırması kelime listesiyle DEĞİL: başlık bilinen rapor
-  // desenine uyuyorsa "rapor başlat" yolu; UYMUYORSA gözlem/bulgudur →
-  // açık doğrulama prompt'u. Filtre şekli çıkarılabilirse hızlı yol.
+  const { title: itemTitle, desc: itemDesc } = parsed
   const knownAction = KNOWN_SYSTEM_ACTIONS.find((a) => a.pattern.test(itemTitle))
-  const findingPrompt = extractFindingFilterPrompt({
-    text: `${itemTitle} ${itemDesc}`,
-    columns: cb.columns,
-  })
-  const findingOpenPrompt = knownAction
-    ? null
-    : `Bu gözlemi doğrula ve uygula: ${itemTitle}: ${itemDesc}`
+  const reQueryPrompt = findingItemPrompt(itemTitle, itemDesc)
 
   return (
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
@@ -250,14 +243,6 @@ function renderBulletedItem(
         <button
           type="button"
           onClick={() => {
-            if (findingPrompt) {
-              cb.onPrompt(findingPrompt)
-              return
-            }
-            if (!knownAction && findingOpenPrompt) {
-              cb.onPrompt(findingOpenPrompt)
-              return
-            }
             if (knownAction) {
               if (cb.isExecutionConfirmation) {
                 const navigated = cb.onNavigateReport(knownAction.label)
@@ -266,22 +251,16 @@ function renderBulletedItem(
               cb.onPrompt(knownAction.prompt)
               return
             }
-            cb.onPrompt(`${itemTitle} hazırla`)
+            cb.onPrompt(reQueryPrompt)
           }}
-          title={
-            findingPrompt
-              ? `"${findingPrompt}" filtresini uygulamak için tıklayın`
-              : !knownAction && findingOpenPrompt
-                ? "Bu gözlemi Yula ile doğrulamak/uygulamak için tıklayın"
-                : `${itemTitle} ${cb.isExecutionConfirmation ? "sonuçlarını açmak" : "işlemini başlatmak"} için tıklayın`
-          }
+          title={`"${reQueryPrompt}" olarak sormak için tıklayın`}
           className={cn(
             "mr-1.5 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors",
           )}
         >
           {itemTitle}:
         </button>
-        <span className="text-foreground/90">{itemDesc}</span>
+        <span className="text-foreground/90 line-clamp-2 break-words">{itemDesc}</span>
       </div>
     </div>
   )
@@ -293,6 +272,10 @@ function renderPlainBullet(
   lIdx: string,
   cb?: ChatMarkdownCallbacks,
 ): React.ReactNode {
+  if (cb) {
+    const titled = renderBulletedItem(line, lIdx, cb)
+    if (titled) return titled
+  }
   const cleanBulletText = line.trim().replace(/^([-*•●]|\d+\.)\s+/, "").trim()
   if (!cleanBulletText) return null
 
@@ -369,7 +352,7 @@ function renderPlainBullet(
           type="button"
           onClick={() => cb.onPrompt(cleanBulletText)}
           title={`"${cleanBulletText}" komutunu çalıştırmak için tıklayın`}
-          className="flex-1 leading-relaxed text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors"
+          className="flex-1 leading-snug text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors line-clamp-2"
         >
           {cleanBulletText}
         </button>
@@ -643,6 +626,48 @@ function ChatMarkdownLink({
     return <FileOpenChip path={path} label={label || path} />
   }
 
+  if (href.startsWith("yula-criteria:")) {
+    const raw = href.slice("yula-criteria:".length)
+    let scope = "stock-balance"
+    const criteria: Record<string, unknown> = {}
+
+    try {
+      if (raw.startsWith("{")) {
+        const parsed = JSON.parse(decodeURIComponent(raw))
+        scope = parsed.scope || "stock-balance"
+        Object.assign(criteria, parsed.criteria || {})
+      } else {
+        const [scopePart, queryPart] = raw.split("?")
+        scope = decodeURIComponent(scopePart || "stock-balance")
+        if (queryPart) {
+          const params = new URLSearchParams(queryPart)
+          params.forEach((v, k) => {
+            criteria[k] = v
+          })
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse yula-criteria URL:", e)
+    }
+
+    return (
+      <CriteriaApplyChip scope={scope} criteria={criteria}>
+        {children}
+      </CriteriaApplyChip>
+    )
+  }
+
+  if (href.startsWith("/")) {
+    return (
+      <Link
+        href={href}
+        className="text-orange-600 font-semibold hover:underline dark:text-orange-400"
+      >
+        {children}
+      </Link>
+    )
+  }
+
   return (
     <a href={href} className="text-orange-600 hover:underline dark:text-orange-400">
       {children}
@@ -678,6 +703,54 @@ export function FileOpenChip({ path, label }: { path: string; label: string }) {
     >
       <FileSpreadsheet className="size-3 shrink-0" />
       <span className="truncate">{label}</span>
+    </button>
+  )
+}
+export function CriteriaApplyChip({
+  scope,
+  criteria,
+  children,
+}: {
+  scope: string
+  criteria: Record<string, unknown>
+  children?: React.ReactNode
+}) {
+  const [applied, setApplied] = React.useState(false)
+
+  const handleApply = async () => {
+    try {
+      const { applyCriteriaToDraft } = await import(
+        "@/features/report-criteria/lib/apply-criteria-to-draft"
+      )
+      applyCriteriaToDraft(scope, criteria)
+      setApplied(true)
+      setTimeout(() => setApplied(false), 3000)
+    } catch (err) {
+      console.warn("[CriteriaApplyChip] Kriter uygulanamadı:", err)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleApply}
+      title="Bu önerilen kriterleri ekrandaki kriter tablosuna uygula"
+      className={cn(
+        "inline-flex items-center gap-1.5 my-1 mx-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium border transition-all cursor-pointer select-none align-middle shadow-xs hover:scale-[1.02] active:scale-[0.98]",
+        applied
+          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+          : "bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20"
+      )}
+    >
+      {applied ? (
+        <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      ) : (
+        <Sparkles className="size-3.5 shrink-0 text-orange-500" />
+      )}
+      <span className="font-semibold">{children}</span>
+      <span className="text-[10px] opacity-85 underline ml-0.5 font-normal">
+        {applied ? "(Kriterlere Uygulandı ✓)" : "(Kriterlere Uygula)"}
+      </span>
     </button>
   )
 }
@@ -719,6 +792,11 @@ function renderBlock(
   // 3a — onay satırı (paragraf bloğu, tek satır)
   const confirmation = renderConfirmationLine(trimmed, key, cb)
   if (confirmation) return confirmation
+
+  const titleDesc = parseColonTitleLine(trimmed)
+  if (titleDesc && (block.type === "paragraph" || block.type === "heading")) {
+    return renderBulletedItem(trimmed, String(key), cb)
+  }
 
   // Paragraf veya liste satırlarında bullet kontrolü:
   if (block.type === "list" || /^([-*•●]|\d+\.)\s+/.test(trimmed)) {

@@ -7,6 +7,14 @@ commands:
     icon: "Package"
     phase: "report"
 
+  - id: "report-stock-balance-run"
+    slash: "run-job"
+    label: "Stok Bakiye Öner & Çalıştır"
+    description: "Şemayı yorumlayarak öneriler sunar, seçime göre kriterleri forma doldurur"
+    prompt: "Stok Bakiye Raporu şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
+    icon: "Package"
+    phase: "report"
+
   - id: "report-stock-analytics"
     slash: "stok-analiz"
     label: "Stok Analiz Raporu"

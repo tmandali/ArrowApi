@@ -50,6 +50,18 @@ export function StockBalanceForm() {
     [setComposing, handleSelectJob]
   )
 
+  React.useEffect(() => {
+    const handleOpenCompose = (e: Event) => {
+      const detail = (e as CustomEvent<{ scope?: string }>).detail
+      if (!detail?.scope || detail.scope === "stock-balance") {
+        setComposing(true)
+        handleSelectJob(null)
+      }
+    }
+    window.addEventListener("yula:open-compose", handleOpenCompose)
+    return () => window.removeEventListener("yula:open-compose", handleOpenCompose)
+  }, [setComposing, handleSelectJob])
+
   return (
     <StockModuleShell
       mode="stock-balance"

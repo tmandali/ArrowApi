@@ -11,6 +11,8 @@
  * Son asistan mesajı (güncel tur) olduğu gibi korunur; UI etkilenmez.
  */
 
+import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+
 const SLIM_CHAR_LIMIT = 800;
 const MAX_TRANSPORT_MESSAGES = 16;
 
@@ -80,6 +82,23 @@ export function slimMessagesForTransport<
     let changed = false;
     const isLatest = i === lastAssistant;
     const parts = message.parts.map((part) => {
+      const p = part as { type?: string; text?: string; state?: string; output?: unknown };
+      if (p.type === "text" && typeof p.text === "string") {
+        const clean = sanitizeAssistantText(p.text);
+        if (clean !== p.text) {
+          changed = true;
+          return { ...p, text: clean };
+        }
+        return part;
+      }
+      if (p.type === "reasoning" && typeof p.text === "string") {
+        const clean = sanitizeAssistantText(p.text);
+        if (clean !== p.text) {
+          changed = true;
+          return { ...p, text: clean };
+        }
+        return part;
+      }
       if (!isToolPart(part)) return part;
       // SDK koruması: Herhangi bir araç çağrısı "input-available" durumunda kaldıysa
       // (ör. yanıtlanmamış onay kartı veya yarıda kesilmiş araç), transport kopyasında

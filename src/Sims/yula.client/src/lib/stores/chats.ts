@@ -46,7 +46,7 @@ export const useChatsStore = create<ChatsState>()(
       conversations: [],
       activeId: null,
       messagesById: {},
-      model: process.env.NEXT_PUBLIC_YULA_MODEL ?? "gemma4:12b-mlx",
+      model: process.env.NEXT_PUBLIC_YULA_MODEL ?? "gpt-5.4",
       isThinkingEnabled: true,
       setThinkingEnabled: (isThinkingEnabled) => set({ isThinkingEnabled }),
       isHistoryOpen: false,

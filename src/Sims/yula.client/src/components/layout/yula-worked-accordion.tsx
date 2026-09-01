@@ -34,6 +34,7 @@ import {
   type YulaToolPartInfo,
 } from "@/hooks/use-yula-chat";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 
 export interface WorkedStepItem {
   id: string;
@@ -106,7 +107,7 @@ export function extractWorkedSteps(
   message.parts.forEach((part, index) => {
     // 1. Gerçek Düşünme Parçaları (Reasoning / Thinking)
     if (part.type === "reasoning") {
-      const text = part.text ?? "";
+      const text = sanitizeAssistantText(part.text ?? "");
       if (!text.trim() && !isLiveStreaming) return;
       const meta = (part as { meta?: string }).meta;
       const isThinking = !meta || meta === "thinking";
@@ -289,13 +290,41 @@ export function extractWorkedSteps(
         });
         break;
       }
-      case "run_report": {
-        const report = typeof inputObj.report === "string" ? inputObj.report : "";
+      case "run_report":
+      case "run_job": {
+        const report = typeof inputObj.report === "string" ? inputObj.report : "Stock Balance";
+        const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
         steps.push({
           id: info.toolCallId,
           kind: "ran",
-          label: `Ran Report: ${report || "Job execution"}`,
+          label: preset ? `Ran Job: ${preset}` : `Ran Job: ${report}`,
           subLabel: isPending ? "Executing background report job..." : "Report execution",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "apply_criteria": {
+        const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
+        steps.push({
+          id: info.toolCallId,
+          kind: "edited",
+          label: preset ? `Applied: ${preset}` : "Applied criteria to form",
+          subLabel: isPending ? "Updating criteria grid..." : "Criteria updated",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "navigate_to_page": {
+        const title = typeof inputObj.title === "string" ? inputObj.title : (typeof inputObj.path === "string" ? inputObj.path : "Page navigation");
+        steps.push({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Navigated: ${title}`,
+          subLabel: isPending ? "Opening page..." : "Page opened",
           isLive: isPending,
           isError,
           info,

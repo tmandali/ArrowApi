@@ -50,10 +50,48 @@ export function useScreenAgentContext(input: {
   }, [summary?.isViewingResults, summary?.tableName, input.screenId, hasColumns]);
 
   React.useEffect(() => {
+    const screenId = input.screenId || (input.activeReportScope as string) || "screen";
+    const screenTitle = input.screenTitle || "";
+    const workspaceId = (input.workspaceId as string) || "stock";
+    const reportScope = (input.activeReportScope as string) || (input.screenId as string);
+    const isViewingResults = Boolean(summary?.isViewingResults);
+    const quickPrompts = (input.quickPrompts as string[]) || [];
+    const criteriaDigest = (input.criteriaDigest as Array<Record<string, unknown>>) || [];
+    const tools = (input.tools as Array<{ name: string; description?: string }>) || [
+      {
+        name: "apply_criteria",
+        description: "Rapor şemasına göre zorunlu alanları gözeterek önerilen kriterleri ekrandaki kriter formuna doldurur.",
+      },
+      {
+        name: "run_job",
+        description: "Rapor şemasına göre zorunlu alanları gözeterek rapor job'ını başlatır ve sonuç ekranına yönlendirir.",
+      },
+    ];
+
+    useYulaGridStore.getState().registerScreen({
+      screenId,
+      screenTitle,
+      workspaceId,
+      reportScope,
+      isViewingResults,
+      registeredTools: tools,
+      quickPrompts,
+      criteriaDigest,
+      jobId: summary?.jobId as string | undefined,
+    });
+
     return () => {
+      useYulaGridStore.getState().unregisterScreen();
       useYulaGridStore.getState().unregister();
     };
-  }, []);
+  }, [
+    input.screenId,
+    input.screenTitle,
+    input.workspaceId,
+    input.activeReportScope,
+    summary?.isViewingResults,
+    summary?.jobId,
+  ]);
 
   // Şema grounding zenginleştirmesi: columnTypes/sampleRows (Arrow/DuckDB
   // şeması + ilk satırlar) store'a aynalanır ki sistem promptu modeli gerçek

@@ -91,13 +91,10 @@ export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(reportCommandsYa
  */
 export function getAllYulaCommands(
   isViewingResults = false,
-  pathname = "/"
+  _pathname = "/"
 ): YulaCommand[] {
   if (isViewingResults) {
     return [...SYSTEM_COMMANDS, ...GRID_COMMANDS];
-  }
-  if (pathname === "/" || pathname === "") {
-    return [...SYSTEM_COMMANDS];
   }
   return [...SYSTEM_COMMANDS, ...REPORT_COMMANDS];
 }

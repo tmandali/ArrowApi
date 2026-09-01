@@ -140,6 +140,26 @@ async function ensureGridSpec(): Promise<
   return store.spec;
 }
 
+async function gridStillStreaming(tableName: string): Promise<boolean> {
+  try {
+    const { duckStreamManager } = await import(
+      "@/features/jobs/services/duck-stream-manager"
+    )
+    const jobId = tableName.startsWith("report_")
+      ? tableName
+          .slice("report_".length)
+          .replace(
+            /([0-9a-f]{8})_([0-9a-f]{4})_([0-9a-f]{4})_([0-9a-f]{4})_([0-9a-f]{12})/i,
+            "$1-$2-$3-$4-$5",
+          )
+      : tableName
+    const state = duckStreamManager.getState(jobId)
+    return Boolean(state?.isStreaming || state?.isSavingDisk)
+  } catch {
+    return false
+  }
+}
+
 async function analyzeGrid(
   input: Record<string, unknown>,
 ): Promise<unknown> {
@@ -160,6 +180,14 @@ async function analyzeGrid(
   const topN = Number(input.topN ?? 5);
 
   try {
+    if (await gridStillStreaming(ds.tableName)) {
+      return {
+        status: "error",
+        error: "Rapor hâlâ DuckDB'ye yükleniyor.",
+        hint: "Yükleme bitince 'analiz et'i tekrar gönder.",
+      };
+    }
+
     const { duckDbClient } = await import("@/services/duckdb");
     const tableLabel = ds.isCustom ? "(aktif özel görünüm)" : ds.tableName;
 
@@ -307,6 +335,14 @@ async function profileGrid(): Promise<unknown> {
   }
 
   try {
+    if (await gridStillStreaming(ds.tableName)) {
+      return {
+        status: "error",
+        error: "Rapor hâlâ DuckDB'ye yükleniyor.",
+        hint: "Yükleme bitince 'analiz et'i tekrar gönder; aksi halde profil sorgusu kuyrukta bekler.",
+      }
+    }
+
     const { duckDbClient } = await import("@/services/duckdb")
     const { buildCombinedWhereClause } = await import(
       "@/services/duckdb/filter-parser"
@@ -328,7 +364,8 @@ async function profileGrid(): Promise<unknown> {
       const a = sqlAlias(col)
       const kind = kindOf(col)
       aggParts.push(`SUM(CASE WHEN ${q} IS NULL THEN 1 ELSE 0 END) AS ${a}_nulls`)
-      aggParts.push(`COUNT(DISTINCT ${q}) AS ${a}_distinct`)
+      // COUNT(DISTINCT) WASM'de geniş tablolarda dakikalar sürebilir; HyperLogLog yeter.
+      aggParts.push(`approx_count_distinct(${q}) AS ${a}_distinct`)
       if (kind === "numeric") {
         aggParts.push(
           `MIN(${q}) AS ${a}_min, MAX(${q}) AS ${a}_max, ROUND(AVG(${q}), 4) AS ${a}_avg, ROUND(SUM(${q}), 4) AS ${a}_sum, SUM(CASE WHEN ${q} < 0 THEN 1 ELSE 0 END) AS ${a}_negative`
@@ -345,17 +382,17 @@ async function profileGrid(): Promise<unknown> {
     )
     const agg = aggRows[0] ?? {}
 
-    // Top değerler — metin kolonlarında en sık 3 değer (maliyeti sınırlamak için en fazla 6 kolon)
+    // Top değerler — örneklem üzerinden (tam tarama yerine); en fazla 4 metin kolon
     const textCols = ds.columns
       .filter((col) => kindOf(col) === "text")
-      .slice(0, 6)
+      .slice(0, 4)
     const topValuesByColumn: Record<string, { value: string; count: number }[]> =
       {}
     for (const col of textCols) {
       const q = sqlSafeId(col)
       try {
         const rows = await duckDbClient.executeCustomSql(
-          `SELECT CAST(${q} AS VARCHAR) AS value, COUNT(*) AS cnt FROM ${ds.from} ${where} GROUP BY 1 ORDER BY cnt DESC LIMIT 3`
+          `SELECT CAST(${q} AS VARCHAR) AS value, COUNT(*) AS cnt FROM (SELECT * FROM (SELECT * FROM ${ds.from} ${where}) AS __yula_profile_filtered USING SAMPLE 10% (bernoulli)) AS __yula_profile_sample GROUP BY 1 ORDER BY cnt DESC LIMIT 3`,
         )
         topValuesByColumn[col] = rows.map((r) => ({
           value: String(r.value ?? ""),
@@ -406,7 +443,7 @@ async function profileGrid(): Promise<unknown> {
       rowCount: Number(agg.__row_count ?? 0),
       filtersApplied: filterSummary,
       columns,
-      note: "Tablo profil sonuçları yukarıdadır. Lütfen veriyi detaylıca inceleyip kullanıcıya doğrudan Türkçe markdown ile açıklayıcı ve net analiz sun. Başka bir araç çağırma.",
+      note: "Tablo profil sonuçları yukarıdadır (kardinalite yaklaşık; top-değerler örneklemdendir). Lütfen veriyi detaylıca inceleyip kullanıcıya doğrudan Türkçe markdown ile açıklayıcı ve net analiz sun. Başka bir araç çağırma.",
     }
   } catch (err) {
     return {
@@ -422,18 +459,23 @@ async function profileGrid(): Promise<unknown> {
  * olarak özetler; kriter alan adları run_report criteria'sında aynen kullanılır.
  */
 async function getReportSchema(): Promise<unknown> {
-  const spec = useYulaGridStore.getState().spec
-  const scope = spec?.reportScope
+  const storeState = useYulaGridStore.getState()
+  const spec = storeState.spec
+  const screen = storeState.screen
+  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  const scope =
+    spec?.reportScope ||
+    screen?.reportScope ||
+    (pathname.includes("/stock/stock-balance") ? "stock-balance" : undefined)
   const report = scope ? findReport(scope) : undefined
   if (!report) {
     return {
       status: "error",
       error: "Aktif rapor şeması bulunamadı.",
-      hint: "Bir rapor sonuç ekranı açıkken tekrar deneyin.",
+      hint: "Bir rapor sonuç ekranı veya kriter ekranı açıkken tekrar deneyin.",
     }
   }
 
-  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
   const isGuidPath = isReportResultPath(pathname) || Boolean(spec?.tableName && spec.tableName.startsWith("report_"))
   const isViewingResults = isReportResultView(pathname, spec)
 
@@ -926,8 +968,9 @@ export async function executeClientTool(
       // Kart katmanı kaldırıldı — eski konuşmalardaki bekleyen çağrılar
       // sessizce kapatılır.
       return { status: "skipped", message: "Kriter kartı akışı kaldırıldı." };
-    case "run_report": {
-      const scope = String(args.report ?? "");
+    case "run_report":
+    case "run_job": {
+      const scope = String(args.report ?? "stock-balance");
       const meta =
         (
           await import("@/features/reports/report-registry")
@@ -936,35 +979,39 @@ export async function executeClientTool(
         return { status: "error", error: `Bilinmeyen rapor: ${scope}` };
       }
       try {
-        const { validateCriteria } = await import(
-          "@/features/report-criteria"
-        );
+        const { applyCriteriaToDraft, resolveRelativeDateString } =
+          await import("@/features/report-criteria/lib/apply-criteria-to-draft");
+        const { validateCriteria } =
+          await import("@/features/report-criteria/lib/validate-criteria");
         const criteriaObj = { ...((args.criteria ?? {}) as Record<string, unknown>) };
 
         // Relative date synthesizer & default fallback for date criteria
+        const resolveDate =
+          typeof resolveRelativeDateString === "function"
+            ? resolveRelativeDateString
+            : (val: string) => {
+                const v = val.toLowerCase().trim();
+                const today = new Date();
+                const todayIso = today.toISOString().slice(0, 10);
+                if (v === "dün" || v === "dun" || v === "yesterday") {
+                  const d = new Date(today);
+                  d.setDate(d.getDate() - 1);
+                  return d.toISOString().slice(0, 10);
+                }
+                if (v === "bugün" || v === "bugun" || v === "today") return todayIso;
+                return val;
+              };
+
         if (!criteriaObj.kayitTarihi) {
-          const today = new Date().toISOString().slice(0, 10);
-          criteriaObj.kayitTarihi = today;
+          const dun = new Date();
+          dun.setDate(dun.getDate() - 1);
+          criteriaObj.kayitTarihi = dun.toISOString().slice(0, 10);
         } else if (typeof criteriaObj.kayitTarihi === "string") {
-          const val = criteriaObj.kayitTarihi.toLowerCase().trim();
-          if (val.includes("hafta")) {
-            const end = new Date();
-            const start = new Date();
-            start.setDate(end.getDate() - 7);
-            criteriaObj.kayitTarihi = `${start.toISOString().slice(0, 10)}..${end.toISOString().slice(0, 10)}`;
-          } else if (val.includes("dün") || val.includes("dun")) {
-            const dun = new Date();
-            dun.setDate(dun.getDate() - 1);
-            criteriaObj.kayitTarihi = dun.toISOString().slice(0, 10);
-          } else if (val.includes("bugün") || val.includes("bugun")) {
-            criteriaObj.kayitTarihi = new Date().toISOString().slice(0, 10);
-          } else if (val.includes("ay")) {
-            const end = new Date();
-            const start = new Date();
-            start.setDate(1);
-            criteriaObj.kayitTarihi = `${start.toISOString().slice(0, 10)}..${end.toISOString().slice(0, 10)}`;
-          }
+          criteriaObj.kayitTarihi = resolveDate(criteriaObj.kayitTarihi);
         }
+
+        // Form taslağına da uygula (ekrandaki kriter tablosu eşzamanlı güncellensin)
+        applyCriteriaToDraft(scope, criteriaObj, meta.fullSchema);
 
         const result = validateCriteria(
           meta.fullSchema,
@@ -984,12 +1031,34 @@ export async function executeClientTool(
           "@/features/jobs/arrow-job-client"
         );
         const job = await createArrowJob(result.jobEndpoint, result.instance);
+
+        const { useActiveJobsStore } = await import(
+          "@/store/slices/active-jobs-store"
+        );
+        useActiveJobsStore.getState().addJob({
+          id: job.id,
+          name: scope,
+          title: meta.title,
+          href: `${meta.pagePath}/${job.id}`,
+          status: job.status,
+          eventsUrl: job.eventsUrl,
+          jobUrl: job.jobUrl,
+          createdAt: new Date().toISOString(),
+          notificationType: "report",
+          workspace: "/stock",
+          payload: result.instance,
+        });
+
+        const preset = typeof args.presetTitle === "string" ? args.presetTitle : undefined;
         return {
           status: "executed",
           jobId: job.id,
           jobStatus: job.status,
           navigateTo: `${meta.pagePath}/${job.id}`,
-          message: `Job başlatıldı (${job.id}). Sonuç ekranı açılıyor.`,
+          presetTitle: preset,
+          message: preset
+            ? `"${preset}" job'ı başlatıldı (${job.id}). Sonuç ekranı açılıyor.`
+            : `Job başlatıldı (${job.id}). Sonuç ekranı açılıyor.`,
         };
       } catch (err) {
         return {
@@ -997,6 +1066,54 @@ export async function executeClientTool(
           error: err instanceof Error ? err.message : String(err),
         };
       }
+    }
+    case "apply_criteria": {
+      const scope = String(args.report ?? "stock-balance");
+      const criteriaObj = (args.criteria ?? {}) as Record<string, unknown>;
+      try {
+        const { applyCriteriaToDraft } = await import(
+          "@/features/report-criteria/lib/apply-criteria-to-draft"
+        );
+        const res = applyCriteriaToDraft(scope, criteriaObj);
+        const preset = typeof args.presetTitle === "string" ? args.presetTitle : "";
+        return {
+          status: "ok",
+          updatedKeys: res.updatedKeys,
+          message: preset
+            ? `"${preset}" kriterleri ekrandaki tabloya dolduruldu ve vurgulandı. Ekrandaki 'Run' butonuna basarak raporu başlatabilirsiniz.`
+            : "Önerilen kriterler ekrandaki tabloya dolduruldu ve vurgulandı. Ekrandaki 'Run' butonuna basarak raporu başlatabilirsiniz.",
+        };
+      } catch (err) {
+        return {
+          status: "error",
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
+    case "navigate_to_page": {
+      const targetPath = String(args.path ?? "").trim();
+      if (!targetPath) {
+        return {
+          status: "error",
+          message: "Yönlendirilecek sayfa yolu belirtilmedi.",
+        };
+      }
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      if (currentPath === targetPath) {
+        return {
+          status: "already_on_page",
+          navigateTo: targetPath,
+          message: `Zaten ${targetPath} sayfasındasınız.`,
+        };
+      }
+      const title =
+        typeof args.title === "string" ? args.title : targetPath;
+      return {
+        status: "navigated",
+        navigateTo: targetPath,
+        message: `"${title}" sayfasına yönlendiriliyorsunuz.`,
+      };
     }
     case "analyze_grid_data":
       return analyzeGrid(args);

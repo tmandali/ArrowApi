@@ -32,3 +32,14 @@ Projeye yeni bir rapor veya ajan yeteneği eklendiğinde aşağıdaki adımlar e
    - Rapor sonuç bileşenini standart OPFS + DuckDB WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur.
 6. **Yol & Başlık Biçimlendirme (`src/lib/workspace-paths.ts`):**
    - `formatPathnameLabel(pathname)` fonksiyonuna raporun Türkçe etiketini ekle (`if (pathname.includes("/<workspace>/<report>")) return "<Rapor Adı>"`).
+
+## Yula AI (sohbet SDK & sağlayıcı)
+
+- **Sohbet yolu sağlayıcı-agnostiktir.** `/api/agent/chat` yalnız `getYulaLanguageModel(...)` + `streamText({ model, tools })` kullanır. Araç çağrısı prompt metnine yazılmaz; `streamText({ tools })` + `extractReasoningMiddleware({ tagName: "think" })`.
+- **Sağlayıcı SDK’sı yalnızca adaptörde:** `src/lib/yula-provider.ts`. Chat/UI koduna `createOllama` / `createAzure` / `createOpenAI` veya `ollama:` `providerOptions` gömülmez.
+  - Microsoft Foundry → `@ai-sdk/azure` `createAzure({ baseURL, apiKey })` (Foundry `/openai/v1` ucu). Foundry için `createOpenAI` kullanılmaz.
+  - OpenAI → `@ai-sdk/openai` `createOpenAI`.
+  - Yerel → `ollama-ai-provider-v2` `createOllama` (keep_alive / num_ctx bu katmanın `fetch` sarmalayıcısında).
+- **Aktif sağlayıcı:** `AI_PROVIDER` / `NEXT_PUBLIC_AI_PROVIDER` (`foundry` ≡ `azure`). Env’de Azure kimliği varsa varsayılan Microsoft Foundry’dir. Kullanıcı seçimi `yula_ai_config` (localStorage) + model popover’daki sağlayıcı listesi (`listConfiguredProviders`). Kayıt yoksa istek gövdesine `provider` yazılmaz; sunucu env’e güvenir.
+- **Asistan metni:** `sanitize-assistant-text` sızıntı/yazı sistemi çöpünü temizler; akışta kelime yutmamak için metni `trim` etmez.
+- **Öneri / bulgu maddeleri:** `Başlık: kısa açıklama`. Başlık tıklanınca sohbete **yalnızca başlık** gider (`findingItemPrompt`) — uzun açıklama kullanıcı balonuna yazılmaz. Model yanıtları dar dock’ta kısa tutulur (1–3 cümle + en fazla 4 madde). Kolon adı geçti diye otomatik filtre komutuna sapılmaz. Bilinen rapor adları (`KNOWN_SYSTEM_ACTIONS`) ayrı yoldur.

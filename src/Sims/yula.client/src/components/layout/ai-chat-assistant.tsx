@@ -247,9 +247,19 @@ function toolActionLabel(info: {
       const title = typeof input.title === "string" ? input.title.trim() : ""
       return title ? `Grafik hazırlanıyor: ${title}` : "Grafik görselleştiriliyor"
     }
-    case "run_report": {
-      const report = typeof input.report === "string" ? input.report : ""
-      return report ? `Rapor çalıştırılıyor: ${report}` : "Rapor çalıştırılıyor"
+    case "run_report":
+    case "run_job": {
+      const preset = typeof input.presetTitle === "string" ? input.presetTitle : ""
+      const report = typeof input.report === "string" ? input.report : "Stok Bakiye"
+      return preset ? `Job başlatılıyor: ${preset}` : report ? `Rapor çalıştırılıyor: ${report}` : "Rapor çalıştırılıyor"
+    }
+    case "apply_criteria": {
+      const preset = typeof input.presetTitle === "string" ? input.presetTitle : ""
+      return preset ? `Kriterler dolduruluyor: ${preset}` : "Kriterler forma dolduruluyor"
+    }
+    case "navigate_to_page": {
+      const title = typeof input.title === "string" ? input.title : (typeof input.path === "string" ? input.path : "")
+      return title ? `Sayfaya yönlendiriliyor: ${title}` : "Sayfaya yönlendiriliyor"
     }
     default:
       return "Çalışıyor"
@@ -757,6 +767,11 @@ export function AIChatPanel({
         </div>
       ) : null}
 
+      {isLoading ? (
+        <p className="px-1 text-[11px] text-muted-foreground">
+          Yula hâlâ yanıtlıyor. Bitene kadar yeni mesaj gönderilemez; gerekirse Durdur.
+        </p>
+      ) : null}
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -884,7 +899,9 @@ export function AIChatPanel({
               }
             }}
             placeholder={
-              selectedCommand || pastedChip
+              isLoading
+                ? "Yanıt bekleniyor — lütfen bitmesini bekleyin…"
+                : selectedCommand || pastedChip
                 ? "Ek mesaj veya parametre yazın..."
                 : YULA.placeholder
             }

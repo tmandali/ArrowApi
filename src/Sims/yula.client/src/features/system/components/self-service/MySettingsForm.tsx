@@ -91,9 +91,9 @@ const CONFIG_STORAGE_KEY = "yula_ai_config"
 
 function loadStoredAiConfig(): AiProviderConfig {
   const defaults: AiProviderConfig = {
-    provider: "ollama",
-    model: "gemma4:12b-mlx",
-    endpoint: "http://127.0.0.1:11434",
+    provider: "azure",
+    model: "gpt-5.4",
+    endpoint: "",
     apiKey: "",
     thinkingLevel: "low",
   }
@@ -102,6 +102,7 @@ function loadStoredAiConfig(): AiProviderConfig {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY)
     if (raw) {
       const parsed = { ...defaults, ...JSON.parse(raw) } as AiProviderConfig
+      if (String(parsed.provider) === "foundry") parsed.provider = "azure"
       return { ...parsed, apiKey: "" }
     }
   } catch {
@@ -554,10 +555,10 @@ export function MySettingsForm() {
                                 <SelectValue placeholder="Select Provider" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="azure">Microsoft Foundry (Azure OpenAI)</SelectItem>
                                 <SelectItem value="ollama">Yerel Ollama (Gemma 4 / Llama 3 / Offline)</SelectItem>
-                                <SelectItem value="google">Google AI SDK (Gemini 2.5 Flash / Pro)</SelectItem>
-                                <SelectItem value="azure">Microsoft AI Foundry (Azure OpenAI / Phi-4)</SelectItem>
                                 <SelectItem value="openai">OpenAI / Custom OpenAI-Compatible</SelectItem>
+                                <SelectItem value="google">Google AI SDK (Gemini 2.5 Flash / Pro)</SelectItem>
                               </SelectContent>
                             </Select>
                           </Field>

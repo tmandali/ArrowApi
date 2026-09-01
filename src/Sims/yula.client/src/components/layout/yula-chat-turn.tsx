@@ -7,12 +7,82 @@ import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { ToolResultTable } from "@/components/layout/tool-result-table";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { yulaToolPartInfo, isFailedToolInfo, useYulaChat } from "@/hooks/use-yula-chat";
+import type { YulaToolPartInfo } from "@/hooks/use-yula-chat";
 import { stripMarkdownTables } from "@/lib/markdown-table-strip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
-import { Copy, Check, Undo2, Sparkles, Loader2 } from "lucide-react";
+import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 
 import { copyToClipboard } from "@/lib/clipboard";
+import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+
+const SCREEN_TOOLS = new Set([
+  "filter_current_grid",
+  "set_grid_query",
+  "run_report",
+  "run_job",
+  "apply_criteria",
+  "navigate_to_page",
+  "visualize_grid_data",
+]);
+
+function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
+  const pending = toolParts.find(
+    (i) => i.state === "input-available" || i.state === "input-streaming",
+  );
+  switch (pending?.toolName) {
+    case "profile_grid_table":
+      return "Tablo analiz ediliyor — lütfen bekleyin…";
+    case "analyze_grid_data":
+      return "Tablo özeti hesaplanıyor…";
+    case "run_expert_sql":
+      return "SQL sorgusu çalışıyor…";
+    case "visualize_grid_data":
+      return "Grafik hazırlanıyor…";
+    case "filter_current_grid":
+      return "Filtre uygulanıyor…";
+    case "set_grid_query":
+      return "Tablo görünümü güncelleniyor…";
+    default:
+      return pending
+        ? "İstek işleniyor — lütfen bekleyin…"
+        : "Yula yanıt hazırlıyor — lütfen bekleyin…";
+  }
+}
+
+function SilentTurnFallback({
+  toolParts,
+  onRetry,
+}: {
+  toolParts: YulaToolPartInfo[];
+  onRetry: () => void;
+}) {
+  const failed = toolParts.filter((i) => isFailedToolInfo(i));
+  const hasScreenOk = toolParts.some(
+    (i) => SCREEN_TOOLS.has(i.toolName) && !isFailedToolInfo(i) && i.state === "output-available",
+  );
+  if (hasScreenOk && failed.length === 0) return null;
+
+  const hint =
+    failed.length > 0
+      ? `Analiz tamamlanamadı: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "araç hatası")}.`
+      : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).";
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-2.5 text-[12px] leading-relaxed text-amber-950 dark:text-amber-100">
+      <p>{hint} Yeni bir mesaj yazmadan önce yeniden deneyin.</p>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 w-fit text-[11px]"
+        onClick={onRetry}
+      >
+        Yanıtı yeniden dene
+      </Button>
+    </div>
+  );
+}
 
 export interface YulaChatTurnProps {
   userMessage?: YulaMessage;
@@ -35,6 +105,7 @@ export function YulaChatTurn({
 }: YulaChatTurnProps) {
   const yula = useYulaChat();
   const [copied, setCopied] = React.useState(false);
+  const [userPromptOpen, setUserPromptOpen] = React.useState(false);
 
   // Kullanıcı mesajının metni
   const userText = React.useMemo(() => {
@@ -48,10 +119,12 @@ export function YulaChatTurn({
   // Asistan mesajının metni
   const assistantText = React.useMemo(() => {
     if (!assistantMessage) return "";
-    return assistantMessage.parts
-      .filter((p) => p.type === "text")
-      .map((p) => (p as { text: string }).text)
-      .join("\n");
+    return sanitizeAssistantText(
+      assistantMessage.parts
+        .filter((p) => p.type === "text")
+        .map((p) => (p as { text: string }).text)
+        .join("\n"),
+    );
   }, [assistantMessage]);
 
   const handleCopyUserText = async () => {
@@ -98,26 +171,44 @@ export function YulaChatTurn({
 
   const displayAssistantMessage: YulaMessage | undefined = React.useMemo(() => {
     if (!assistantMessage) return undefined;
-    if (!hasSqlCard) return assistantMessage;
-    return {
-      ...assistantMessage,
-      parts: assistantMessage.parts.map((p) =>
-        p.type === "text"
-          ? { ...p, text: stripMarkdownTables((p as { text: string }).text) }
-          : p
-      ),
-    };
+    const cleanedParts = assistantMessage.parts.map((p) => {
+      if (p.type === "text") {
+        const raw = hasSqlCard
+          ? stripMarkdownTables((p as { text: string }).text)
+          : (p as { text: string }).text;
+        return { ...p, text: sanitizeAssistantText(raw) };
+      }
+      if (p.type === "reasoning" && "text" in p) {
+        return { ...p, text: sanitizeAssistantText(String((p as { text?: string }).text ?? "")) };
+      }
+      return p;
+    });
+    return { ...assistantMessage, parts: cleanedParts };
   }, [assistantMessage, hasSqlCard]);
 
   return (
     <div className="group/turn relative flex flex-col gap-2.5 py-2">
       {/* 1. Yapışkan Soru Kartı (Kullanıcı Mesajı + Kopyala & Geri Al Simge Butonları) */}
       {userMessage && userText ? (
-        <div className="sticky top-0 z-10 py-1 bg-transparent font-sans">
-          <div className="group/prompt relative flex items-center justify-between gap-3 rounded-xl border border-primary/15 dark:border-primary/20 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10 backdrop-blur-md px-3.5 py-2.5 shadow-xs transition-all">
-            <p className="flex-1 text-[13px] font-sans text-foreground/95 leading-relaxed whitespace-pre-wrap break-words">
-              {userText}
-            </p>
+        <div className={cn("py-1 font-sans", isLive && "sticky top-0 z-10")}>
+          <div className="group/prompt relative flex min-h-8 min-w-0 items-center justify-between gap-2 rounded-xl border border-primary/15 dark:border-primary/20 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10 backdrop-blur-md px-3 py-1.5 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setUserPromptOpen((v) => !v)}
+              title={userPromptOpen ? "Kısalt" : userText}
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left"
+            >
+              <p
+                className={cn(
+                  "text-[13px] font-sans text-foreground/95 leading-snug break-words",
+                  userPromptOpen
+                    ? "whitespace-pre-wrap"
+                    : "overflow-hidden text-ellipsis whitespace-nowrap",
+                )}
+              >
+                {userPromptOpen ? userText : userText.replace(/\s+/g, " ").trim()}
+              </p>
+            </button>
 
             {!isLive ? (
               <div className="flex items-center gap-0.5 opacity-0 group-hover/prompt:opacity-100 transition-opacity">
@@ -182,17 +273,24 @@ export function YulaChatTurn({
           );
         })}
 
-        {/* Nihai Akan Markdown Cevap */}
-        {displayAssistantMessage ? (
+        {/* Nihai Akan Markdown Cevap — boş metinde sessiz kalma: canlı durum veya fallback */}
+        {assistantText.trim() && displayAssistantMessage ? (
           <AiChatMessage
             message={displayAssistantMessage}
             isLive={isLive}
           />
-        ) : isLive ? (
-          <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground animate-pulse">
-            <Sparkles className="size-3.5 text-primary animate-spin" />
-            <span>Yula yanıt hazırlıyor...</span>
+        ) : null}
+
+        {isLive ? (
+          <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground">
+            <Loader2 className="size-3.5 shrink-0 text-primary animate-spin" />
+            <span>{liveStatusLabel(toolParts)}</span>
           </div>
+        ) : !assistantText.trim() ? (
+          <SilentTurnFallback
+            toolParts={toolParts}
+            onRetry={() => void yula.retryResponse()}
+          />
         ) : null}
 
         {/* Cevap Altı Telemetri Çubuğu */}

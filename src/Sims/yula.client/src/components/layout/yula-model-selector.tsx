@@ -9,6 +9,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useYulaChat } from "@/hooks/use-yula-chat";
+import {
+  readYulaClientAiConfig,
+  writeYulaClientAiConfig,
+  yulaModelsApiUrl,
+} from "@/lib/yula-ai-client-config";
+import type { AIProviderType } from "@/lib/yula-config";
 import { cn } from "@/utils/cn";
 
 export interface ModelOption {
@@ -176,17 +182,26 @@ export function YulaModelSelector({ className }: { className?: string }) {
   const [open, setOpen] = React.useState(false);
   const [installedModels, setInstalledModels] = React.useState<ModelOption[]>([]);
   const [isLoaded, setIsLoaded] = React.useState(false);
+  const [provider, setProvider] = React.useState<AIProviderType | undefined>(() =>
+    typeof window === "undefined" ? undefined : readYulaClientAiConfig().provider,
+  );
+  const [availableProviders, setAvailableProviders] = React.useState<
+    Array<{ id: AIProviderType; label: string }>
+  >([]);
 
-  // Aktif AI sağlayıcısı üzerindeki modelleri canlı çek
   React.useEffect(() => {
     let active = true;
     async function fetchModels() {
       try {
-        const res = await fetch("/api/agent/models");
+        const stored = readYulaClientAiConfig();
+        const res = await fetch(
+          yulaModelsApiUrl({ ...stored, ...(provider ? { provider } : {}) }),
+        );
         if (!res.ok) return;
         const data = (await res.json()) as {
-          provider?: string;
+          provider?: AIProviderType;
           defaultModel?: string;
+          availableProviders?: Array<{ id: AIProviderType; label: string }>;
           models?: Array<{
             name: string;
             capabilities?: {
@@ -200,6 +215,13 @@ export function YulaModelSelector({ className }: { className?: string }) {
           }>;
         };
         if (!active || !Array.isArray(data.models)) return;
+
+        if (Array.isArray(data.availableProviders)) {
+          setAvailableProviders(data.availableProviders);
+        }
+        if (!stored.provider && data.provider) {
+          setProvider(data.provider);
+        }
 
         const list = data.models.map((m) => {
           const opt = formatModelOption(m.name);
@@ -226,7 +248,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
     return () => {
       active = false;
     };
-  }, [model, setModel]);
+  }, [model, setModel, provider]);
 
   // Yalnızca sistemde gerçekten yüklü olan modeller listelenir
   const allModels = React.useMemo(() => {
@@ -236,7 +258,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
       }
       return installedModels;
     }
-    return [formatModelOption(model || "gemma4:12b-mlx")];
+    return [formatModelOption(model || "gpt-5.4")];
   }, [installedModels, model]);
 
   // Düşünme modu anahtarı (Switch) AÇIK iken YALNIZCA düşünme destekli modeller listelenir
@@ -254,7 +276,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
     if (found) return found;
     return {
       id: model,
-      name: model || "Gemma 4 (12B)",
+      name: model || "GPT-5.4",
       tag: "Active",
     };
   }, [allModels, model]);
@@ -285,6 +307,35 @@ export function YulaModelSelector({ className }: { className?: string }) {
         sideOffset={8}
         className="w-64 p-1.5 shadow-xl border border-border/80 bg-popover/95 backdrop-blur-md rounded-xl z-50 animate-in fade-in-0 zoom-in-95"
       >
+        <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+          Sağlayıcı
+        </div>
+        {availableProviders.length > 0 ? (
+          <div className="space-y-0.5 pb-1.5 mb-1 border-b border-border/60">
+            {availableProviders.map((p) => {
+              const isSelected = p.id === provider;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    writeYulaClientAiConfig({ provider: p.id });
+                    setProvider(p.id);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left text-[12px] transition-colors cursor-pointer",
+                    isSelected
+                      ? "bg-accent text-accent-foreground font-semibold"
+                      : "hover:bg-accent/60 text-foreground/80 font-normal",
+                  )}
+                >
+                  <span className="truncate">{p.label}</span>
+                  {isSelected ? <Check className="size-3.5 text-primary shrink-0" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           Model
         </div>

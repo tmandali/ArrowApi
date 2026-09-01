@@ -414,7 +414,7 @@ export function ArrowReportGrid({
                     col.align === "right" && "justify-end"
                   )}
                 >
-                  {formatGridCellValue(values[col.name], col.align)}
+                  {formatGridCellValue(values[col.name], col.align, columnTypes[col.name])}
                 </div>
               </td>
             ))}

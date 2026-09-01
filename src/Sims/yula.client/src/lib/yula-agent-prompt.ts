@@ -45,11 +45,15 @@ export interface YulaScreenContext {
   workspaceLabel?: string;
   phase?: YulaScreenPhase;
   grid?: YulaGridContext | null;
+  screen?: import("@/lib/stores/grid").YulaScreenRegistration | null;
   /** DuckDB WASM + All-MiniLM RAG Vektör arama sonuçları */
   ragContext?: YulaRagContextItem[];
 }
 
-import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
+import {
+  REGISTERED_REPORTS as DEMO_REPORTS,
+  findReport,
+} from "@/features/reports/report-registry";
 import {
   isWorkspaceHomePath,
   workspaceIdFromPath,
@@ -63,27 +67,23 @@ const BASE_PROMPT = [
   "",
   "LANGUAGE DIRECTIVE:",
   "• You MUST write all user-facing conversational answers, findings, and explanations strictly in natural, professional TURKISH (Türkçe).",
-  "• Internal reasoning inside <think>...</think> can be in English or Turkish.",
-  "",
-  "THINKING & REASONING PROTOCOL:",
-  "• When thinking mode is enabled, ALWAYS begin your response with step-by-step internal reasoning enclosed in <think>...</think> tags.",
-  "• In your thinking, analyze user intent, inspect active screen context, table schema, and plan the necessary tool calls or calculations.",
-  "• Immediately after the closing </think> tag, execute the planned tool call(s) and/or provide the final user-facing Turkish response. Never get stuck in thoughts without triggering the planned tool.",
+  "• CHAT BUBBLE BUDGET (narrow dock): Keep user-visible replies SHORT. Prefer 1–3 short sentences, then at most 4 titled bullets. Do not write essays, first-person plans ('hesaplarım', 'analiz ederim', 'görselleştiririm'), or restating the user's request.",
   "",
   "TOOL EXECUTION PRINCIPLES:",
+  "• Tools are invoked only through the structured tools API. Never write tool calls as chat text (no XML, no 【 】, no to=functions, no fake JSON wrappers).",
   "• The tools provided in each turn represent your complete capabilities for the active screen. Use them whenever an action or data query is requested.",
-  "• Do NOT announce tool execution in conversational text (e.g. avoid 'Starting query now...'). Execute the tool directly.",
+  "• Do NOT announce tool execution in conversational text (e.g. avoid 'Starting query now...'). Call the tool; after results, answer in Turkish.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
   "",
   "RECOMMENDATIONS & NEXT STEPS FORMATTING PROTOCOL:",
   "• When suggesting next steps or recommendations (e.g. 'İsterseniz şunları yapabilirim:'), NEVER output plain sentence fragments, orphaned sub-bullets, or multi-level indented lists without titles.",
-  "• ALWAYS format EVERY suggestion as a single-level bold-titled bullet with a colon: '• **<Aksiyon Başlığı>**: <Kısa açıklama>'.",
+  "• ALWAYS format EVERY suggestion as a single-level bold-titled bullet: '• **<Kısa Başlık>**: <en fazla ~8 kelime>'.",
+  "• Title: max ~40 characters, imperative or noun phrase (e.g. 'Depo dağılımı', 'Grafik ile göster'). Description: one short clause, third person / impersonal — NOT '…çıkarırım / hesaplarım'.",
   "• Examples:",
-  "  - '• **Problemli Kayıtları Filtrele**: Boş parti numaralı satırları ekranda listeler.'",
-  "  - '• **Depo Bazında Dağılım**: Depo stok toplamlarını gride yansıtır.'",
-  "  - '• **Toplam Tutar Analizi**: Qty * UnitPrice hesaplanmış kolonunu tabloya ekler.'",
-  "  - '• **Grafik ile Özetle**: Depo ve ürün bazında görsel dağılım kartı oluşturur.'",
+  "  - '• **Boş partileri listele**: Parti numarası boş satırlar.'",
+  "  - '• **Depo dağılımı**: Depo bazında Qty toplamı.'",
+  "  - '• **Grafik**: Depo çubuk grafik.'",
   "",
   "HUMAN-IN-THE-LOOP (HITL) CONFIRMATION:",
   "• For destructive, bulk-modifying, or critical operations, use 'request_user_confirmation' before proceeding.",
@@ -138,7 +138,7 @@ const DATA_QUALITY_ANALYSIS_RULES = [
   "  1. Call profile_grid_table FIRST to inspect null counts, distinct values, min/max metrics, and anomalies across all columns.",
   "  2. Provide a structured, clean Turkish summary with 2 main sections:",
   "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı değerlendirmesi.",
-  "     - ⚠️ **Tespit Edilen Veri Problemleri & Bulgular**: Her tespit edilen problemi '• **Başlık (KolonAdı Koşul)**: Açıklama' biçiminde maddeler halinde listele. Kullanıcı arayüzü bu başlıkları otomatik olarak tıklanabilir aksiyona dönüştürür (basit filtreler için filter_current_grid, gruplu/hesaplanmış/mükerrer büyük sorgular için set_grid_query çalışır).",
+  "     - ⚠️ **Tespit Edilen Veri Problemleri**: En fazla 4 madde; her madde '• **Kısa Başlık**: kısa sonuç' (ör. '• **Negatif Qty**: 4 satır.').",
   "  3. Standard bulleted finding formats (simple filters & complex SQL-level anomalies):",
   "     - '• **Negatif Stok Miktarları (Quantity < 0)**: Tabloda 4 satırda negatif miktar tespit edildi.'",
   "     - '• **Boş Ambar Kodları (Warehouse boş)**: 12 satırda ambar tanımı eksik (NULL).'",
@@ -214,7 +214,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     `• Current Local Date: ${todayStr} (Use for expanding relative date terms like bugün, dün, bu ay)`,
     `• Execution Mode: ${mode === "main" ? "MAIN SCREEN MODE (Full-Screen AI Workspace)" : "SIDE DOCK MODE (Page Copilot Panel)"}`,
     `• Main Mode Rule: In MAIN SCREEN MODE, Yula AI is the primary full-screen workspace interface. When the user asks for a report or workflow, ALWAYS execute or navigate immediately without conversational date/criteria pushback.`,
-    `• Language Rule: Generate all conversational text strictly in natural TURKISH.`,
+    `• Language Rule: Generate all conversational text strictly in natural TURKISH. Keep it short so the chat transcript stays readable in the dock.`,
     "",
     "=== LEVEL 2: WORKSPACE SCOPE ===",
     `• Active Workspace: ${wsLabel} (ID: ${wsId})`,
@@ -223,11 +223,57 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     "=== LEVEL 3: PAGE / SCREEN SCOPE ===",
     `• Current Page Path: ${pathname}`,
     `• Screen Phase: ${phase.toUpperCase()} (${phase === "results" ? "Active Job Data Table Open" : phase === "results-loading" ? "Table Loading" : "Criteria / Form / Home Workspace"})`,
+    "• APPLICATION IN-APP NAVIGATION (navigate_to_page):",
+    "  - Uygulama içi istemci yönlendirmesi için 'navigate_to_page' aracına sahipsin.",
+    "  - Standart Rotalar:",
+    "    • Stok Bakiye Raporu: '/stock/stock-balance'",
+    "    • Stok Analiz Raporu: '/stock/stock-analytics'",
+    "    • Stok Ana Sayfa / Modülü: '/stock'",
+    "    • Muhasebe Modülü: '/accounting'",
+    "    • Satış Modülü: '/selling'",
+    "    • Üretim Modülü: '/manufacturing'",
+    "  - KULLANICI BAŞKA BİR EKRANDAYKEN (Current Page Path hedef rota ile eşleşmiyorsa):",
+    "    • Kullanıcı 'stok bakiye', 'stok raporu', 'analiz', 'muhasebeye git' istediğinde veya '/stok-bakiye' komutu verildiğinde:",
+    "      1. DERHAL 'navigate_to_page' aracını ilgili path ve title ile çağır (örn: path: '/stock/stock-balance', title: 'Stok Bakiye Raporu').",
+    "      2. Yanıtında kullanıcıya sayfaya yönlendirildiğini, açılan ekranda kriterleri belirleyip 'Run' ile çalıştırabileceğini belirt.",
+    "      3. Yanıtında [Stok Bakiye Raporu](/stock/stock-balance) linkini de sun.",
   );
 
   if (phase === "results-loading") {
     lines.push(
       "• SCREEN PHASE NOTICE: Table data is not ready yet; filter/analysis tools are temporarily unavailable. Inform user to try again once table finishes loading.",
+    );
+  }
+
+  const activeReportMeta =
+    DEMO_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
+    (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
+
+  if (activeReportMeta && phase !== "results") {
+    const reportTitle = activeReportMeta.title;
+    const scope = activeReportMeta.scope;
+    const reqList = activeReportMeta.fullSchema?.required ?? [];
+    const reqText = reqList.length > 0 ? reqList.join(", ") : "Yok";
+
+    lines.push(
+      "",
+      `=== REPORT CRITERIA & EXECUTION SCREEN: ${reportTitle.toUpperCase()} (${activeReportMeta.pagePath}) ===`,
+      `• Bu ekran ${reportTitle} ana çalıştırma ve kriter ekranıdır (önceki çalıştırmalar ve kriter formu listelenir).`,
+      `• Aktif Rapor Scope: '${scope}'`,
+      "• Ekranda Kayıtlı Araçlar: 'apply_criteria', 'run_job', 'get_report_schema'.",
+      "• KULLANICI ETKİLEŞİMİ, ÖNERİ SUNMA & ÇALIŞTIRMA PROTOKOLÜ:",
+      "  1. KULLANICI BELİRLİ BİR KRİTERLE ÇALIŞTIRMA TALEP ETTİĞİNDE (ör. 'bugün için hazırla', 'dün için çalıştır', 'aktif kayıtları hazırla', 'çalıştır'):",
+      "     - Kullanıcı zaten ne istediğini net olarak belirtmiştir; gereksizce 'istersen ben doldurayım' gibi mükerrer soru sorma veya sohbet döngüsüne girme!",
+      `     - DERHAL 'run_job' aracını ilgili criteria ile ÇAĞIR (ör. report: '${scope}', criteria: { kayitTarihi: 'bugün' }).`,
+      "     - İşi başlat ve kullanıcıya sonucun açıldığını bildir.",
+      "  2. KULLANICI GENEL ÖNERİ VEYA SEÇENEK İSTEDİĞİNDE (ör. 'ne önerirsin', 'nasıl çalıştırabilirim', 'seçenekleri sun', '/run-job'):",
+      "     - Rapor şemasını ve zorunlu alanlarını yorumlayarak kullanıcıya 1-2 somut öneri / hazır paket sun.",
+      `     - Her öneriyi kullanıcının bastığında kriter gridini anında güncelleyecek 'yula-criteria:${scope}?...' formatında link / aksiyon butonu olarak yaz:`,
+      `       • [Öneri 1: Dün İtibarıyla Aktif Kayıtlar](yula-criteria:${scope}?kayitTarihi=dun&durum=AKTIF)`,
+      `       • [Öneri 2: Son 7 Günün Yüksek Değerli Stokları](yula-criteria:${scope}?kayitTarihi=gecen_hafta&tutarMiktar=50000)`,
+      "     - Kullanıcıya öneri butonuna tıkladığında ekrandaki kriter tablosunun otomatik doldurulacağını ve ekrandaki 'Run' (Çalıştır) butonuna kendisinin basarak işi başlatabileceğini açıkça belirt.",
+      "  3. KULLANICI SOHBETTE '1. öneriyi uygula', 'forma doldur' DEDİĞİNDE:",
+      `     - 'apply_criteria' aracını report: '${scope}' ve seçilen criteria objesi ile ÇAĞIR. Kriter tablosu anında güncellenecektir.`,
     );
   }
 

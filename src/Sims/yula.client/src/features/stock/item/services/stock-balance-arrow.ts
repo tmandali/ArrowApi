@@ -24,6 +24,10 @@ function humanizeField(name: string): string {
 
 function cellToDisplay(value: unknown): string {
   if (value == null) return ""
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return ""
+    return value.toISOString().slice(0, 10)
+  }
   if (typeof value === "string") return value
   if (typeof value === "number") {
     return Number.isFinite(value) ? String(value) : ""

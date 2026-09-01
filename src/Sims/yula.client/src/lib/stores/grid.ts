@@ -21,8 +21,21 @@ export interface YulaGridSpec {
   reportScope?: string;
 }
 
+export interface YulaScreenRegistration {
+  screenId: string;
+  screenTitle: string;
+  workspaceId: string;
+  reportScope?: string;
+  isViewingResults: boolean;
+  registeredTools?: Array<{ name: string; description?: string }>;
+  quickPrompts?: string[];
+  criteriaDigest?: Array<Record<string, unknown>>;
+  jobId?: string;
+}
+
 interface GridState {
   spec: YulaGridSpec | null;
+  screen: YulaScreenRegistration | null;
   filters: Record<string, string>;
   /**
    * Modelin yazdığı salt-okunur SELECT (guard'dan geçmiş). Setliyken grid
@@ -36,6 +49,8 @@ interface GridState {
   setRuntimeApi: (api: YulaGridRuntimeApi | null) => void;
   register: (spec: YulaGridSpec) => void;
   unregister: () => void;
+  registerScreen: (screen: YulaScreenRegistration) => void;
+  unregisterScreen: () => void;
   setFilters: (
     filters:
       | Record<string, string>
@@ -53,11 +68,27 @@ export interface YulaGridRuntimeApi {
 
 export const useYulaGridStore = create<GridState>((set) => ({
   spec: null,
+  screen: null,
   filters: {},
   customQuerySql: null,
   customQueryTitle: null,
   runtimeApi: null,
   setRuntimeApi: (runtimeApi) => set({ runtimeApi }),
+  registerScreen: (screen) =>
+    set((s) => {
+      if (
+        s.screen &&
+        s.screen.screenId === screen.screenId &&
+        s.screen.reportScope === screen.reportScope &&
+        s.screen.isViewingResults === screen.isViewingResults &&
+        s.screen.jobId === screen.jobId &&
+        JSON.stringify(s.screen.registeredTools) === JSON.stringify(screen.registeredTools)
+      ) {
+        return s;
+      }
+      return { screen };
+    }),
+  unregisterScreen: () => set({ screen: null }),
   register: (spec) =>
     set((s) => {
       if (

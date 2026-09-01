@@ -230,9 +230,25 @@ export function validateCriteria(
 ): CriteriaValidationResult {
   const resolvedFields = fields ?? parseCriteriaSchema(schema).fields
 
-  const instance = Array.isArray(rowsOrInstance)
-    ? rowsToCriteriaInstance(rowsOrInstance, resolvedFields)
-    : { ...rowsOrInstance }
+  let instance: Record<string, unknown>
+  if (Array.isArray(rowsOrInstance)) {
+    instance = rowsToCriteriaInstance(rowsOrInstance, resolvedFields)
+  } else {
+    // Nesne olarak gönderilen kriterleri (run_job / run_report criteria objesi)
+    // rowsToCriteriaInstance ile rangeSplit (from_/to_) ve array tiplerine dönüştür
+    const syntheticRows: CriteriaFilterRow[] = Object.entries(rowsOrInstance).map(
+      ([name, value], idx) => ({
+        id: `synthetic-${idx}`,
+        selected: false,
+        name,
+        value: Array.isArray(value) ? value.map(String).join(",") : String(value ?? ""),
+      })
+    )
+    instance = {
+      ...rowsOrInstance,
+      ...rowsToCriteriaInstance(syntheticRows, resolvedFields),
+    }
+  }
 
   const validate = getValidator(schema)
   const ajvValid = validate(instance) as boolean

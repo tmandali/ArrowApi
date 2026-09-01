@@ -24,6 +24,7 @@ import {
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-accordion";
+import { readYulaClientAiConfig, yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
 
 /**
  * Yula v2 — referans repo deseninin standart Next karşılığı.
@@ -189,8 +190,15 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   // kendini düzeltmesi için (Self-Correction Turn) otomatik olarak 2. tur tetiklenir!
   const hasSuccessfulTerminalScreenTool = toolInfos.some(
     (i) =>
-      ["filter_current_grid", "set_grid_query", "run_report", "visualize_grid_data"].includes(i.toolName) &&
-      !isFailedToolInfo(i),
+      [
+        "filter_current_grid",
+        "set_grid_query",
+        "run_report",
+        "run_job",
+        "apply_criteria",
+        "navigate_to_page",
+        "visualize_grid_data",
+      ].includes(i.toolName) && !isFailedToolInfo(i),
   );
   if (hasSuccessfulTerminalScreenTool) return false;
 
@@ -411,11 +419,14 @@ function ChatInstance({
           const workspaceId = workspaceIdFromPath(pathname);
           const workspaceLabel = workspaceLabelFromPath(pathname);
           const mode: "main" | "dock" = isHome ? "main" : "dock";
+          const aiConfig = readYulaClientAiConfig();
 
           return {
             body: {
               messages: slimMessagesForTransport(messages),
-              model: useChatsStore.getState().model,
+              model: useChatsStore.getState().model || aiConfig.model,
+              ...(aiConfig.provider ? { provider: aiConfig.provider } : {}),
+              ...(aiConfig.endpoint ? { endpoint: aiConfig.endpoint } : {}),
               thinkingEnabled: useChatsStore.getState().isThinkingEnabled,
               context: {
                 pathname,
@@ -432,6 +443,7 @@ function ChatInstance({
                         customQueryTitle: useYulaGridStore.getState().customQueryTitle,
                       }
                     : null,
+                screen: useYulaGridStore.getState().screen,
                 ragContext,
               },
             },
@@ -528,7 +540,23 @@ function ChatInstance({
       let output: unknown;
       let errorText: string | undefined;
       try {
-        output = await executeClientTool(part.toolName, part.input);
+        const timeoutMs =
+          part.toolName === "profile_grid_table" ||
+          part.toolName === "run_expert_sql"
+            ? 45_000
+            : 25_000;
+        output = await Promise.race([
+          executeClientTool(part.toolName, part.input),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(() => {
+              reject(
+                new Error(
+                  `${part.toolName} ${Math.round(timeoutMs / 1000)} sn içinde bitmedi. Tablo yükleniyor veya DuckDB meşgul olabilir — Durdur'a basıp birkaç saniye sonra tekrar deneyin.`,
+                ),
+              );
+            }, timeoutMs);
+          }),
+        ]);
       } catch (err) {
         console.warn("[Yula exec] araç yürütme hatası:", part.toolName, err);
         output = undefined;
@@ -536,13 +564,27 @@ function ChatInstance({
       }
       executedCallsRef.current.set(callSignature, "");
 
-      if (part.toolName === "run_report") {
+      if (part.toolName === "run_report" || part.toolName === "run_job") {
         // Statik araç → outputSchema tipiyle birebir (cast yok)
         chat.addToolOutput({
-          tool: "run_report",
+          tool: part.toolName as keyof YulaTools,
           toolCallId: part.toolCallId,
           state: "output-available",
           output: output as YulaTools["run_report"]["output"],
+        });
+      } else if (part.toolName === "apply_criteria") {
+        chat.addToolOutput({
+          tool: "apply_criteria",
+          toolCallId: part.toolCallId,
+          state: "output-available",
+          output: output as YulaTools["apply_criteria"]["output"],
+        });
+      } else if (part.toolName === "navigate_to_page") {
+        chat.addToolOutput({
+          tool: "navigate_to_page",
+          toolCallId: part.toolCallId,
+          state: "output-available",
+          output: output as YulaTools["navigate_to_page"]["output"],
         });
       } else if (errorText !== undefined) {
         // SDK ToolUIPart sözleşmesi: hata → state:"output-error" + errorText
@@ -567,9 +609,9 @@ function ChatInstance({
           ? (output as Record<string, unknown>)
           : undefined;
 
-      // Gerçek job açıldıysa sonucu görüntüleme evresine geç
+      // Gerçek job açıldıysa veya sayfa yönlendirmesi istendiyse rotaya geç
       if (
-        execOut?.status === "executed" &&
+        (execOut?.status === "executed" || execOut?.status === "navigated") &&
         typeof execOut.navigateTo === "string"
       ) {
         void router.push(execOut.navigateTo);
@@ -704,6 +746,22 @@ function ChatInstance({
       willAutoContinue) &&
     !stopped;
 
+  // Gönder → SDK `submitted` arası boşlukta busy false kalmasın (peş peşe mesaj).
+  const [sendGate, setSendGate] = React.useState(false);
+  const busy = isTurnActive || sendGate;
+  const busyRef = React.useRef(busy);
+  busyRef.current = busy;
+
+  React.useEffect(() => {
+    if (!sendGate) return;
+    if (isTurnActive) {
+      setSendGate(false);
+      return;
+    }
+    const t = window.setTimeout(() => setSendGate(false), 8_000);
+    return () => window.clearTimeout(t);
+  }, [sendGate, isTurnActive]);
+
   // Kullanıcı mesajı gönderdiği an veya tur aktifleştiği an bekleme süresi başlar (KesintisizSayaç)
   React.useEffect(() => {
     if (isTurnActive && requestStartMsRef.current === null) {
@@ -788,18 +846,20 @@ function ChatInstance({
     status: chat.status,
     stop: stopResponse,
     error: chat.error,
-    busy: isTurnActive,
+    busy,
     stopped,
     retryResponse,
     undoToUserMessage,
     addToolOutput: chat.addToolOutput,
-    isTurnActive,
+    isTurnActive: busy,
     responseDurations,
     llmStepCounts,
     sendMessageText: (
       text: string,
       attachmentsList?: Array<{ name: string; type: string; dataUrl?: string }>,
     ) => {
+      if (busyRef.current) return;
+      setSendGate(true);
       // Yeni kullanıcı mesajı → durdurma kilidini kaldır, tur sıfırdan başlar
       userStoppedRef.current = false;
       setStopped(false);
@@ -849,7 +909,7 @@ function ChatInstance({
       }
     },
     runPendingTool,
-  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts]);
+  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, busy, isTurnActive]);
 
   // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
   React.useEffect(() => {
@@ -905,7 +965,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // Soğuk başlangıç ısıtması: dock açılır açılmaz Ollama modeli belleğe
   // yüklenir (models route'u boş-prompt warmup tetikler) → ilk mesaj hızlı.
   React.useEffect(() => {
-    void fetch("/api/agent/models").catch(() => {
+    void fetch(yulaModelsApiUrl()).catch(() => {
       // Isıtma best-effort
     });
   }, []);

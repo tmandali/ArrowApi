@@ -1,6 +1,6 @@
+import { createAzure } from "@ai-sdk/azure";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama } from "ollama-ai-provider-v2";
-import type { LanguageModel, EmbeddingModel } from "ai";
 import {
   getActiveProvider,
   getDefaultModel,
@@ -29,22 +29,40 @@ export interface ProviderModelCapability {
   hasThinking?: boolean;
 }
 
-let ollamaInstance: ReturnType<typeof createOllama> | null = null;
-let openaiInstance: ReturnType<typeof createOpenAI> | null = null;
+export type YulaModelRequestOptions = {
+  provider?: AIProviderType;
+  baseUrl?: string;
+};
 
-function getOllamaProvider() {
-  if (!ollamaInstance) {
-    const keepAlive = process.env.OLLAMA_KEEP_ALIVE ?? "30m";
-    const baseUrl = process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL;
-    ollamaInstance = createOllama({
-      baseURL: `${baseUrl.replace(/\/+$/, "")}/api`,
+let localChatInstance: ReturnType<typeof createOllama> | null = null;
+let localChatBoundBase = "";
+let cloudInstance: ReturnType<typeof createAzure> | ReturnType<typeof createOpenAI> | null =
+  null;
+let cloudBoundKey = "";
+
+function getOllamaProvider(baseUrl?: string) {
+  const keepAlive = process.env.OLLAMA_KEEP_ALIVE ?? "30m";
+  const numCtx = Number(process.env.YULA_NUM_CTX ?? 8192);
+  const resolved = (baseUrl || process.env.OLLAMA_URL || DEFAULT_OLLAMA_URL).replace(
+    /\/+$/,
+    "",
+  );
+  if (!localChatInstance || localChatBoundBase !== resolved) {
+    localChatBoundBase = resolved;
+    localChatInstance = createOllama({
+      baseURL: `${resolved}/api`,
       fetch: async (input, init) => {
-        let bodyObj: Record<string, unknown> | null = null;
         try {
           if (typeof init?.body === "string") {
-            bodyObj = JSON.parse(init.body) as Record<string, unknown>;
-            if (bodyObj.model && bodyObj.keep_alive === undefined) {
-              bodyObj.keep_alive = keepAlive;
+            const bodyObj = JSON.parse(init.body) as Record<string, unknown>;
+            if (bodyObj.model) {
+              if (bodyObj.keep_alive === undefined) bodyObj.keep_alive = keepAlive;
+              const opts =
+                bodyObj.options && typeof bodyObj.options === "object"
+                  ? { ...(bodyObj.options as Record<string, unknown>) }
+                  : {};
+              if (opts.num_ctx === undefined) opts.num_ctx = numCtx;
+              bodyObj.options = opts;
               init = { ...init, body: JSON.stringify(bodyObj) };
             }
           }
@@ -54,94 +72,116 @@ function getOllamaProvider() {
         const res = await fetch(input, init);
         if (!res.ok) {
           const errText = await res.clone().text();
-          console.error(`🤖 [Ollama API Error ${res.status}]:`, errText);
+          console.error(`🤖 [Local LLM API Error ${res.status}]:`, errText);
         }
         return res;
       },
     });
   }
-  return ollamaInstance;
+  return localChatInstance;
 }
 
-function getAzureOrOpenAIProvider() {
-  if (!openaiInstance) {
-    const provider = getActiveProvider();
+function getCloudProvider(
+  provider: AIProviderType,
+  baseUrl?: string,
+): ReturnType<typeof createAzure> | ReturnType<typeof createOpenAI> {
+  const key = `${provider}:${baseUrl ?? ""}`;
+  if (!cloudInstance || cloudBoundKey !== key) {
+    cloudBoundKey = key;
     if (provider === "azure") {
-      const endpoint =
-        process.env.AZURE_OPENAI_ENDPOINT ??
-        "https://tmandali-resource.openai.azure.com/openai/v1";
-      const apiKey = process.env.AZURE_OPENAI_API_KEY ?? "";
-      openaiInstance = createOpenAI({
-        baseURL: endpoint.replace(/\/+$/, ""),
-        apiKey,
+      const endpoint = (
+        baseUrl ||
+        process.env.AZURE_OPENAI_ENDPOINT ||
+        "https://tmandali-resource.openai.azure.com/openai/v1"
+      ).replace(/\/+$/, "");
+      cloudInstance = createAzure({
+        baseURL: endpoint,
+        apiKey: process.env.AZURE_OPENAI_API_KEY ?? process.env.AZURE_API_KEY ?? "",
       });
     } else {
       const apiKey = process.env.OPENAI_API_KEY ?? "";
-      const baseURL = process.env.OPENAI_BASE_URL;
-      openaiInstance = createOpenAI({
+      const resolved = (baseUrl || process.env.OPENAI_BASE_URL || "").replace(/\/+$/, "");
+      cloudInstance = createOpenAI({
         apiKey,
-        ...(baseURL ? { baseURL: baseURL.replace(/\/+$/, "") } : {}),
+        ...(resolved ? { baseURL: resolved } : {}),
       });
     }
   }
-  return openaiInstance;
+  return cloudInstance;
 }
 
-/** Aktif sağlayıcıya göre Dil Modelini (LLM) döndürür */
-export function getYulaLanguageModel(requestedModel?: string) {
-  const provider = getActiveProvider();
-  const defaultModel = getDefaultModel();
-  const activeModel = requestedModel && requestedModel.trim().length > 0 ? requestedModel : defaultModel;
+/** Dil modeli — sohbet rotası yalnızca LanguageModel alır. */
+export function getYulaLanguageModel(
+  requestedModel?: string,
+  options?: YulaModelRequestOptions,
+) {
+  const provider = options?.provider ?? getActiveProvider();
+  const defaultModel = getDefaultModel(provider);
+  const activeModel =
+    requestedModel && requestedModel.length > 0 ? requestedModel : defaultModel;
 
-  if (provider === "azure" || provider === "openai") {
-    const openai = getAzureOrOpenAIProvider();
-    return openai(activeModel);
+  switch (provider) {
+    case "azure":
+    case "openai":
+      return getCloudProvider(provider, options?.baseUrl)(activeModel);
+    case "ollama":
+      return getOllamaProvider(options?.baseUrl)(activeModel);
+    default: {
+      const _never: never = provider;
+      return _never;
+    }
   }
-
-  const ollama = getOllamaProvider();
-  return ollama(activeModel);
 }
 
-/** Aktif sağlayıcıya göre Embedding Modelini döndürür */
-export function getYulaEmbeddingModel(requestedModel?: string) {
-  const provider = getActiveProvider();
-  const defaultEmbedModel = getDefaultEmbeddingModel();
-  const activeModel = requestedModel && requestedModel.trim().length > 0 ? requestedModel : defaultEmbedModel;
+/** Embedding modeli */
+export function getYulaEmbeddingModel(
+  requestedModel?: string,
+  options?: YulaModelRequestOptions,
+) {
+  const provider = options?.provider ?? getActiveProvider();
+  const defaultEmbedModel = getDefaultEmbeddingModel(provider);
+  const activeModel =
+    requestedModel && requestedModel.length > 0 ? requestedModel : defaultEmbedModel;
 
-  if (provider === "azure" || provider === "openai") {
-    const openai = getAzureOrOpenAIProvider();
-    return openai.textEmbeddingModel(activeModel);
+  switch (provider) {
+    case "azure":
+    case "openai":
+      return getCloudProvider(provider, options?.baseUrl).textEmbeddingModel(activeModel);
+    case "ollama":
+      return getOllamaProvider(options?.baseUrl).embedding(activeModel);
+    default: {
+      const _never: never = provider;
+      return _never;
+    }
   }
-
-  const ollama = getOllamaProvider();
-  return ollama.embedding(activeModel);
 }
 
 /** Aktif sağlayıcı bilgilerini döndürür */
-export function getYulaProviderInfo() {
-  const provider = getActiveProvider();
+export function getYulaProviderInfo(provider: AIProviderType = getActiveProvider()) {
   return {
     provider,
-    defaultModel: getDefaultModel(),
-    defaultEmbeddingModel: getDefaultEmbeddingModel(),
-    vectorDimension: getVectorDimension(),
+    defaultModel: getDefaultModel(provider),
+    defaultEmbeddingModel: getDefaultEmbeddingModel(provider),
+    vectorDimension: getVectorDimension(provider),
     isCloud: provider === "azure" || provider === "openai",
   };
 }
 
-let tagsCache: { names: string[]; at: number } | null = null;
+let tagsCache: { base: string; names: string[]; at: number } | null = null;
 
 /** Yerel Ollama üzerindeki modelleri listeler */
-async function fetchOllamaModels(): Promise<string[]> {
-  if (tagsCache && Date.now() - tagsCache.at < 60_000) return tagsCache.names;
+async function fetchOllamaModels(baseUrl?: string): Promise<string[]> {
+  const resolved = (baseUrl || process.env.OLLAMA_URL || DEFAULT_OLLAMA_URL).replace(/\/+$/, "");
+  if (tagsCache && tagsCache.base === resolved && Date.now() - tagsCache.at < 60_000) {
+    return tagsCache.names;
+  }
   try {
-    const baseUrl = process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL;
-    const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/tags`, {
+    const res = await fetch(`${resolved}/api/tags`, {
       cache: "no-store",
     });
     const data = (await res.json()) as { models?: { name: string }[] };
     const names = (data.models ?? []).map((m) => m.name);
-    tagsCache = { names, at: Date.now() };
+    tagsCache = { base: resolved, names, at: Date.now() };
     return names;
   } catch {
     return [];
@@ -149,8 +189,11 @@ async function fetchOllamaModels(): Promise<string[]> {
 }
 
 /** Aktif sağlayıcıya göre kullanılabilir model listesini ve yeteneklerini döndürür */
-export async function getAvailableProviderModels(): Promise<ProviderModelCapability[]> {
-  const provider = getActiveProvider();
+export async function getAvailableProviderModels(options?: {
+  provider?: AIProviderType;
+  baseUrl?: string;
+}): Promise<ProviderModelCapability[]> {
+  const provider = options?.provider ?? getActiveProvider();
 
   if (provider === "azure") {
     const primaryModel = process.env.AZURE_OPENAI_MODEL ?? "gpt-5.4";
@@ -271,8 +314,8 @@ export async function getAvailableProviderModels(): Promise<ProviderModelCapabil
   }
 
   // Ollama
-  const names = await fetchOllamaModels();
-  const defaultMod = getDefaultModel();
+  const names = await fetchOllamaModels(options?.baseUrl);
+  const defaultMod = getDefaultModel(provider);
   const effectiveNames = names.length > 0 ? names : [defaultMod];
 
   return effectiveNames.map((name) => {

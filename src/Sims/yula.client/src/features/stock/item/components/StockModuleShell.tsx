@@ -253,6 +253,18 @@ export function StockModuleShell({
       ? readReportAiMetadata(currentSchema).quickPrompts || []
       : [],
     criteriaDigest: activeCriteriaDigest,
+    tools: isReportShell
+      ? [
+          {
+            name: "apply_criteria",
+            description: "Şemayı ve zorunlu alanları gözeterek önerilen kriterleri ekrandaki forma doldurur.",
+          },
+          {
+            name: "run_job",
+            description: "Stok Bakiye Raporu için şemayı ve zorunlu alanları gözeterek job başlatır ve sonuç ekranına yönlendirir.",
+          },
+        ]
+      : [],
   })
 
   const initialTab =

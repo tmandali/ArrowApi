@@ -1,5 +1,6 @@
 import {
   convertToModelMessages,
+  extractReasoningMiddleware,
   hasToolCall,
   isStepCount,
   type InferUITools,
@@ -10,7 +11,6 @@ import {
 } from "ai";
 import { type YulaStaticTools } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
-import { harmonyReasoningMiddleware } from "@/lib/harmony-reasoning-middleware";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { buildServerTools } from "@/lib/yula-server-tools";
 import { slimMessagesForTransport } from "@/lib/context-slim";
@@ -19,7 +19,7 @@ import {
   getYulaProviderInfo,
   getAvailableProviderModels,
 } from "@/lib/yula-provider";
-import { getDefaultModel } from "@/lib/yula-config";
+import { getDefaultModel, resolveProvider } from "@/lib/yula-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,16 +34,17 @@ export type YulaMessage = UIMessage<never, UIDataTypes, YulaTools>;
 
 export const DEFAULT_MODEL = getDefaultModel();
 
-/** Ollama bağlam penceresi — varsayılan 8k */
-const YULA_NUM_CTX = Number(process.env.YULA_NUM_CTX ?? 8192);
-
-async function resolveModel(requested?: string): Promise<string> {
-  const models = await getAvailableProviderModels();
+async function resolveModel(
+  requested: string | undefined,
+  provider: ReturnType<typeof resolveProvider>,
+  baseUrl?: string,
+): Promise<string> {
+  const models = await getAvailableProviderModels({ provider, baseUrl });
   const names = models.map((m) => m.name);
   if (requested && (names.includes(requested) || names.some((n) => n.toLowerCase() === requested.toLowerCase()))) {
     return requested;
   }
-  const defaultModel = getDefaultModel();
+  const defaultModel = getDefaultModel(provider);
   if (names.includes(defaultModel)) return defaultModel;
   if (names.length > 0) {
     return names[0];
@@ -51,10 +52,12 @@ async function resolveModel(requested?: string): Promise<string> {
   return defaultModel;
 }
 
-function isModelVisionCapable(modelName: string): boolean {
+function isModelVisionCapable(
+  modelName: string,
+  provider: ReturnType<typeof resolveProvider>,
+): boolean {
   const lower = modelName.toLowerCase();
-  const providerInfo = getYulaProviderInfo();
-  if (providerInfo.provider === "azure" || providerInfo.provider === "openai") {
+  if (provider === "azure" || provider === "openai") {
     return !lower.includes("o1-mini") && !lower.includes("o3-mini");
   }
   return (
@@ -69,8 +72,12 @@ function isModelVisionCapable(modelName: string): boolean {
   );
 }
 
-async function prepareModelMessages(rawMessages: YulaMessage[], activeModel: string) {
-  const supportsVision = isModelVisionCapable(activeModel);
+async function prepareModelMessages(
+  rawMessages: YulaMessage[],
+  activeModel: string,
+  provider: ReturnType<typeof resolveProvider>,
+) {
+  const supportsVision = isModelVisionCapable(activeModel, provider);
   const modelMessages = await convertToModelMessages(
     slimMessagesForTransport(rawMessages),
   );
@@ -140,12 +147,18 @@ export async function POST(req: Request) {
       return Response.json({ error: "invalid json" }, { status: 400 });
     }
 
-    const { messages, model, thinkingEnabled, context } = (body ?? {}) as {
-      messages?: YulaMessage[];
-      model?: string;
-      thinkingEnabled?: boolean;
-      context?: YulaScreenContext;
-    };
+    const { messages, model, thinkingEnabled, context, provider: requestedProvider, endpoint } =
+      (body ?? {}) as {
+        messages?: YulaMessage[];
+        model?: string;
+        thinkingEnabled?: boolean;
+        context?: YulaScreenContext;
+        provider?: string;
+        endpoint?: string;
+      };
+    const provider = resolveProvider(requestedProvider);
+    const baseUrl =
+      typeof endpoint === "string" && endpoint.length > 0 ? endpoint : undefined;
 
     if (!Array.isArray(messages)) {
       return Response.json({ error: "messages required" }, { status: 400 });
@@ -167,31 +180,28 @@ export async function POST(req: Request) {
     }
 
     const isThinking = thinkingEnabled !== false;
-    let systemPrompt = buildSystemPrompt(context);
-    if (isThinking) {
-      systemPrompt =
-        `[MANDATORY THINKING DIRECTIVE:
-1. Always begin your response by writing your step-by-step internal reasoning and planning inside <think>...</think> tags.
-2. Immediately after closing </think>, execute the planned tool call(s) (e.g. set_grid_query, filter_current_grid, visualize_grid_data, run_report, profile_grid_table) and/or provide the final user response in Turkish. Do not stay idle in thoughts.]\n\n` + systemPrompt;
-    } else {
-      systemPrompt =
-        `[THINKING DIRECTIVE: Thinking mode is disabled. Skip internal reasoning and provide direct tool calls or Turkish responses.]\n\n` + systemPrompt;
-    }
+    // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
+    // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
+    const systemPrompt = buildSystemPrompt(context);
 
-    const activeModel = await resolveModel(model);
-    const providerInfo = getYulaProviderInfo();
-    const languageModel = getYulaLanguageModel(activeModel);
+    const activeModel = await resolveModel(model, provider, baseUrl);
+    const providerInfo = getYulaProviderInfo(provider);
+    const languageModel = getYulaLanguageModel(activeModel, {
+      provider,
+      baseUrl,
+    });
 
     // Token bütçesi ve sağlayıcı telemetrisi
     console.info(
       `[Yula AI] provider: ${providerInfo.provider} · model: ${activeModel} · system: ${systemPrompt.length} chars (≈${Math.round(systemPrompt.length / 3.4)} tok) · tools: ${Object.keys(tools).length} · phase: ${phase} · thinking: ${isThinking}`,
     );
 
-    const middleware = isThinking
-      ? [harmonyReasoningMiddleware(), yulaCachingMiddleware()]
-      : [yulaCachingMiddleware()];
+    const middleware = [
+      extractReasoningMiddleware({ tagName: "think" }),
+      yulaCachingMiddleware(),
+    ];
 
-    const modelMessages = await prepareModelMessages(messages, activeModel);
+    const modelMessages = await prepareModelMessages(messages, activeModel, provider);
 
     const hasImageInMessages = modelMessages.some(
       (m) => Array.isArray(m.content) && m.content.some((p) => p.type === "image"),
@@ -199,23 +209,14 @@ export async function POST(req: Request) {
 
     const activeTools = hasImageInMessages ? {} : tools;
 
-    const providerOptions = (
-      providerInfo.provider === "ollama"
-        ? {
-            ollama: { options: { num_ctx: YULA_NUM_CTX } },
-            anthropic: { cacheControl: { type: "ephemeral" } },
-          }
-        : {
-            anthropic: { cacheControl: { type: "ephemeral" } },
-          }
-    ) as Parameters<typeof streamText>[0]["providerOptions"];
-
     const result = streamText({
       model: wrapLanguageModel({
         model: languageModel,
         middleware,
       }),
-      providerOptions,
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
       system: systemPrompt,
       messages: modelMessages,
       tools: activeTools,
@@ -244,6 +245,9 @@ export async function POST(req: Request) {
           "filter_current_grid",
           "visualize_grid_data",
           "run_report",
+          "run_job",
+          "apply_criteria",
+          "navigate_to_page",
           "profile_grid_table",
           "analyze_grid_data",
           "run_expert_sql",

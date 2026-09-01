@@ -9,8 +9,9 @@
  * Tolerans: boru atlanmış varyantlar (`<channel|>`, `<message|>`) da yakalanır.
  */
 import type { LanguageModelMiddleware } from "ai";
+import { stripLeakedControlTokens } from "@/lib/sanitize-assistant-text";
 
-type MarkerKind = "reasoning" | "text" | "skip";
+type MarkerKind = "reasoning" | "text" | "skip" | "drop";
 
 interface HarmonyMarker {
   kind: MarkerKind;
@@ -20,7 +21,8 @@ interface HarmonyMarker {
 const CHANNEL_STARTS = ["<|channel|>", "<channel|>"] as const;
 const MESSAGE_STARTS = ["<|message|>", "<message|>"] as const;
 const REASONING_CHANNELS = ["analysis", "thinking", "thought"] as const;
-const TEXT_CHANNELS = ["final", "answer", "commentary"] as const;
+const TEXT_CHANNELS = ["final", "answer"] as const;
+const DROP_CHANNELS = ["commentary"] as const;
 const SKIP_TOKENS = [
   "<|end|>",
   "<end|>",
@@ -50,6 +52,11 @@ const MARKERS: HarmonyMarker[] = (() => {
     for (const name of TEXT_CHANNELS) {
       for (const ms of MESSAGE_STARTS) {
         markers.push({ kind: "text", token: `${cs}${name}${ms}` });
+      }
+    }
+    for (const name of DROP_CHANNELS) {
+      for (const ms of MESSAGE_STARTS) {
+        markers.push({ kind: "drop", token: `${cs}${name}${ms}` });
       }
     }
   }
@@ -108,7 +115,7 @@ export interface HarmonySegment {
  * chunk sınırında bölünen marker'ı tamponlar; flush() kalanını boşaltır.
  */
 export class HarmonyStreamParser {
-  private mode: HarmonySegmentKind = "text";
+  private mode: HarmonySegmentKind | "drop" = "text";
   private buffer = "";
 
   push(delta: string): HarmonySegment[] {
@@ -117,23 +124,29 @@ export class HarmonyStreamParser {
     for (;;) {
       const hit = findEarliestMarker(this.buffer);
       if (!hit) break;
-      if (hit.index > 0) {
+      if (hit.index > 0 && this.mode !== "drop") {
         out.push({ kind: this.mode, text: this.buffer.slice(0, hit.index) });
       }
       this.buffer = this.buffer.slice(hit.index + hit.marker.token.length);
-      if (hit.marker.kind !== "skip") this.mode = hit.marker.kind;
+      if (hit.marker.kind === "drop") this.mode = "drop";
+      else if (hit.marker.kind !== "skip") this.mode = hit.marker.kind;
     }
     const keep = partialPrefixLen(this.buffer);
     const flushLen = this.buffer.length - keep;
     if (flushLen > 0) {
-      out.push({ kind: this.mode, text: this.buffer.slice(0, flushLen) });
+      if (this.mode !== "drop") {
+        out.push({ kind: this.mode, text: this.buffer.slice(0, flushLen) });
+      }
       this.buffer = this.buffer.slice(flushLen);
     }
     return out;
   }
 
   flush(): HarmonySegment[] {
-    if (this.buffer.length === 0) return [];
+    if (this.buffer.length === 0 || this.mode === "drop") {
+      this.buffer = "";
+      return [];
+    }
     const out = [{ kind: this.mode, text: this.buffer } as HarmonySegment];
     this.buffer = "";
     return out;
@@ -152,18 +165,8 @@ interface ParserEntry {
   reasoningStarted: boolean;
 }
 
-/**
- * OpenAI / Azure OpenAI internal function calling / bracket token sızıntılarını ve
- * token sapması sonucu oluşan çöp metinleri temizler.
- */
 export function sanitizeLeakedTokens(text: string): string {
-  if (!text) return "";
-  return text
-    .replace(/【analysis[^\n]*/gi, "")
-    .replace(/【[^】]*】/g, "")
-    .replace(/to=functions\.[\w_]+[^\n]*/gi, "")
-    .replace(/ADDITIONAL_ARGS_DO_NOT_PARSE[^\n]*/gi, "")
-    .replace(/\n{3,}/g, "\n\n");
+  return stripLeakedControlTokens(text);
 }
 
 export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
