@@ -25,6 +25,30 @@ export interface ModelOption {
 
 /** Bilinen modeller için görünüm ve etiket sözlüğü (yalnızca sistemde yüklü ise kullanılır) */
 const MODEL_METADATA_MAP: Record<string, { name: string; tag?: string; description?: string; hasThinking?: boolean }> = {
+  "gpt-5.4": {
+    name: "GPT-5.4",
+    tag: "Azure Foundry",
+    description: "Microsoft Foundation yüksek kapasiteli akıl yürütme modeli",
+    hasThinking: true,
+  },
+  "gpt-4o": {
+    name: "GPT-4o",
+    tag: "Azure / OpenAI",
+    description: "Yüksek hızlı ve çok modlu (multimodal) model",
+    hasThinking: false,
+  },
+  "gpt-4o-mini": {
+    name: "GPT-4o Mini",
+    tag: "Fast",
+    description: "Hızlı ve verimli hafif model",
+    hasThinking: false,
+  },
+  "o3-mini": {
+    name: "o3-mini",
+    tag: "Thinking",
+    description: "Derin düşünce adımları ve mantık yürütme",
+    hasThinking: true,
+  },
   "gemma4:12b-mlx": {
     name: "Gemma 4 12B MLX",
     tag: "Fast MLX",
@@ -153,14 +177,16 @@ export function YulaModelSelector({ className }: { className?: string }) {
   const [installedModels, setInstalledModels] = React.useState<ModelOption[]>([]);
   const [isLoaded, setIsLoaded] = React.useState(false);
 
-  // Yerel Ollama üzerindeki YÜKLÜ modelleri canlı çek (yalnız yüklü olanları göster)
+  // Aktif AI sağlayıcısı üzerindeki modelleri canlı çek
   React.useEffect(() => {
     let active = true;
-    async function fetchOllamaModels() {
+    async function fetchModels() {
       try {
         const res = await fetch("/api/agent/models");
         if (!res.ok) return;
         const data = (await res.json()) as {
+          provider?: string;
+          defaultModel?: string;
           models?: Array<{
             name: string;
             capabilities?: {
@@ -188,15 +214,19 @@ export function YulaModelSelector({ className }: { className?: string }) {
         });
         setInstalledModels(list);
         setIsLoaded(true);
+
+        if (data.defaultModel && (!model || !data.models.some((m) => m.name === model))) {
+          setModel(data.defaultModel);
+        }
       } catch (err) {
-        console.warn("[Yula Model Selector] Ollama model listesi alınamadı:", err);
+        console.warn("[Yula Model Selector] Model listesi alınamadı:", err);
       }
     }
-    void fetchOllamaModels();
+    void fetchModels();
     return () => {
       active = false;
     };
-  }, []);
+  }, [model, setModel]);
 
   // Yalnızca sistemde gerçekten yüklü olan modeller listelenir
   const allModels = React.useMemo(() => {

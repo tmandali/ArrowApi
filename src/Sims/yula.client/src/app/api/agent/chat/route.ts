@@ -9,12 +9,17 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { type YulaStaticTools } from "@/lib/yula-server-tools";
-import { createOllama } from "ollama-ai-provider-v2";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
 import { harmonyReasoningMiddleware } from "@/lib/harmony-reasoning-middleware";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { buildServerTools } from "@/lib/yula-server-tools";
 import { slimMessagesForTransport } from "@/lib/context-slim";
+import {
+  getYulaLanguageModel,
+  getYulaProviderInfo,
+  getAvailableProviderModels,
+} from "@/lib/yula-provider";
+import { getDefaultModel } from "@/lib/yula-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,73 +32,34 @@ export const dynamic = "force-dynamic";
 export type YulaTools = InferUITools<YulaStaticTools>;
 export type YulaMessage = UIMessage<never, UIDataTypes, YulaTools>;
 
-const DEFAULT_OLLAMA_URL = "http://localhost:11434";
-export const DEFAULT_MODEL = process.env.YULA_MODEL ?? "gemma4:12b-mlx";
+export const DEFAULT_MODEL = getDefaultModel();
 
-/** Ollama bağlam penceresi — varsayılan 4k'da uzun sohbet sessizce kesilir */
+/** Ollama bağlam penceresi — varsayılan 8k */
 const YULA_NUM_CTX = Number(process.env.YULA_NUM_CTX ?? 8192);
 
-/** Provider singleton — base URL sabit; model adı çağrı başına seçilir. */
-const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? "30m";
-
-const ollama = createOllama({
-  baseURL: `${process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL}/api`,
-  fetch: async (input, init) => {
-    let bodyObj: Record<string, unknown> | null = null;
-    try {
-      if (typeof init?.body === "string") {
-        bodyObj = JSON.parse(init.body) as Record<string, unknown>;
-        if (bodyObj.model && bodyObj.keep_alive === undefined) {
-          bodyObj.keep_alive = OLLAMA_KEEP_ALIVE;
-          init = { ...init, body: JSON.stringify(bodyObj) };
-        }
-      }
-    } catch {
-      // Gövde JSON değilse olduğu gibi geçir
-    }
-    const res = await fetch(input, init);
-    if (!res.ok) {
-      const errText = await res.clone().text();
-      console.error(`🤖 [Ollama API Error ${res.status}]:`, errText);
-    }
-    return res;
-  },
-});
-
-let tagsCache: { names: string[]; at: number } | null = null;
-
-async function availableModels(): Promise<string[]> {
-  if (tagsCache && Date.now() - tagsCache.at < 60_000) return tagsCache.names;
-  try {
-    const res = await fetch(
-      `${process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL}/api/tags`,
-      { cache: "no-store" },
-    );
-    const data = (await res.json()) as { models?: { name: string }[] };
-    const names = (data.models ?? []).map((m) => m.name);
-    tagsCache = { names, at: Date.now() };
-    return names;
-  } catch {
-    return [];
-  }
-}
-
 async function resolveModel(requested?: string): Promise<string> {
-  const names = await availableModels();
-  if (requested && names.includes(requested)) return requested;
-  if (names.includes(DEFAULT_MODEL)) return DEFAULT_MODEL;
+  const models = await getAvailableProviderModels();
+  const names = models.map((m) => m.name);
+  if (requested && (names.includes(requested) || names.some((n) => n.toLowerCase() === requested.toLowerCase()))) {
+    return requested;
+  }
+  const defaultModel = getDefaultModel();
+  if (names.includes(defaultModel)) return defaultModel;
   if (names.length > 0) {
-    console.info(
-      `🤖 [Yula Model Fallback]: "${requested ?? DEFAULT_MODEL}" Ollama'da bulunamadı, aktif varsayılan seçildi: "${names[0]}"`,
-    );
     return names[0];
   }
-  return DEFAULT_MODEL;
+  return defaultModel;
 }
 
 function isModelVisionCapable(modelName: string): boolean {
   const lower = modelName.toLowerCase();
+  const providerInfo = getYulaProviderInfo();
+  if (providerInfo.provider === "azure" || providerInfo.provider === "openai") {
+    return !lower.includes("o1-mini") && !lower.includes("o3-mini");
+  }
   return (
+    lower.includes("gpt-4") ||
+    lower.includes("gpt-5") ||
     lower.includes("vision") ||
     lower.includes("llava") ||
     lower.includes("bakllava") ||
@@ -203,17 +169,23 @@ export async function POST(req: Request) {
     const isThinking = thinkingEnabled !== false;
     let systemPrompt = buildSystemPrompt(context);
     if (isThinking) {
-      systemPrompt += "\n\n[DÜŞÜNME MODU (THINKING) AÇIK: Yanıt vermeden önce içsel akıl yürütme ve planlama adımlarını `<think>...</think>` etiketleri arasına yaz. Ardından kullanıcıya nihai Türkçe yanıtını sun.]";
+      systemPrompt =
+        `[ÖNEMLİ KURAL - DÜŞÜNME VE AKIL YÜRÜTME (THINKING) MODU AÇIK:
+Kullanıcıya vereceğin yanıttan önce MUTLAKA içsel akıl yürütme, planlama, veri kontrolü ve karar aşamalarını <think>...</think> etiketleri arasına detaylıca yazarak başla.
+Etiket kapandıktan sonra kullanıcıya nihai Türkçe yanıtını sun.]\n\n` + systemPrompt;
     } else {
-      systemPrompt += "\n\n[DÜŞÜNME MODU (THINKING) KAPALI: Düşünme adımlarını (thinking/reasoning) atla. Doğrudan net yanıtı sun.]";
+      systemPrompt =
+        `[DÜŞÜNME MODU KAPALI: Düşünme adımlarını atla ve doğrudan kullanıcıya nihai net yanıtı sun.]\n\n` + systemPrompt;
     }
 
-    // Token bütçesi telemetrisi — prompt şişmesini izlenebilir kılar
-    console.info(
-      `[Yula AI] system: ${systemPrompt.length} chars (≈${Math.round(systemPrompt.length / 3.4)} tok) · tools: ${Object.keys(tools).length} · phase: ${phase} · thinking: ${isThinking}`,
-    );
-
     const activeModel = await resolveModel(model);
+    const providerInfo = getYulaProviderInfo();
+    const languageModel = getYulaLanguageModel(activeModel);
+
+    // Token bütçesi ve sağlayıcı telemetrisi
+    console.info(
+      `[Yula AI] provider: ${providerInfo.provider} · model: ${activeModel} · system: ${systemPrompt.length} chars (≈${Math.round(systemPrompt.length / 3.4)} tok) · tools: ${Object.keys(tools).length} · phase: ${phase} · thinking: ${isThinking}`,
+    );
 
     const middleware = isThinking
       ? [harmonyReasoningMiddleware(), yulaCachingMiddleware()]
@@ -227,15 +199,23 @@ export async function POST(req: Request) {
 
     const activeTools = hasImageInMessages ? {} : tools;
 
+    const providerOptions = (
+      providerInfo.provider === "ollama"
+        ? {
+            ollama: { options: { num_ctx: YULA_NUM_CTX } },
+            anthropic: { cacheControl: { type: "ephemeral" } },
+          }
+        : {
+            anthropic: { cacheControl: { type: "ephemeral" } },
+          }
+    ) as Parameters<typeof streamText>[0]["providerOptions"];
+
     const result = streamText({
       model: wrapLanguageModel({
-        model: ollama(activeModel),
+        model: languageModel,
         middleware,
       }),
-      providerOptions: {
-        ollama: { options: { num_ctx: YULA_NUM_CTX } },
-        anthropic: { cacheControl: { type: "ephemeral" } },
-      },
+      providerOptions,
       system: systemPrompt,
       messages: modelMessages,
       tools: activeTools,

@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react"
 import { createHighlighter, type Highlighter } from "shiki"
 import { useTheme } from "@/context/theme-provider"
 import { cn } from "@/utils/cn"
+import { copyToClipboard } from "@/lib/clipboard"
 
 type CodeBlockProps = {
   value: string
@@ -38,12 +39,14 @@ export function CodeBlock({
   const [copied, setCopied] = React.useState(false)
 
   const handleCopy = React.useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       e.stopPropagation()
       if (!value) return
-      void navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      const success = await copyToClipboard(value)
+      if (success) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     },
     [value]
   )

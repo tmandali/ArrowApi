@@ -1,102 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import * as React from "react"
-import type { YulaMessage } from "@/app/api/agent/chat/route"
-import { Brain, ChevronDown, Wrench, Zap } from "lucide-react"
-
-import { useYulaChat } from "@/hooks/use-yula-chat"
-import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { cn } from "@/utils/cn"
-import { useYulaGridStore } from "@/lib/stores/grid"
-import { ChatMarkdown, FileOpenChip } from "./chat-markdown"
-
+import * as React from "react";
+import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { useYulaChat } from "@/hooks/use-yula-chat";
+import { useActiveJobsStore } from "@/store/slices/active-jobs-store";
+import { cn } from "@/utils/cn";
+import { useYulaGridStore } from "@/lib/stores/grid";
+import { ChatMarkdown, FileOpenChip } from "./chat-markdown";
 
 type AiChatMessageProps = {
-  message: YulaMessage
-  /** Sohbetin en sonki asistan mesajı — düşünme bloğu canlı davranış (açık başlar, cevap bitince katlanır). */
-  isLive?: boolean
-  className?: string
-}
-
-const REASONING_META: Record<string, { label: string; icon: typeof Brain; iconColor: string; borderColor: string }> = {
-  "tool-args": {
-    label: "Araç Parametreleri",
-    icon: Wrench,
-    iconColor: "text-sky-500/80 dark:text-sky-400/80",
-    borderColor: "border-sky-500/30 dark:border-sky-400/30",
-  },
-  "tool-exec": {
-    label: "Araç Çalıştırma",
-    icon: Wrench,
-    iconColor: "text-sky-500/80 dark:text-sky-400/80",
-    borderColor: "border-sky-500/30 dark:border-sky-400/30",
-  },
-  "tool-exec-error": {
-    label: "Araç Çalıştırma (Hata)",
-    icon: Wrench,
-    iconColor: "text-red-500/80 dark:text-red-400/80",
-    borderColor: "border-red-500/40 dark:border-red-400/40",
-  },
-  "tool-result": {
-    label: "Araç Sonucu",
-    icon: Zap,
-    iconColor: "text-emerald-500/80 dark:text-emerald-400/80",
-    borderColor: "border-emerald-500/30 dark:border-emerald-400/30",
-  },
-  thinking: {
-    label: "Düşünme Süreci",
-    icon: Brain,
-    iconColor: "text-orange-500/80 dark:text-orange-400/80",
-    borderColor: "border-orange-500/30 dark:border-orange-400/30",
-  },
-}
-
-function ReasoningPart({ text, isLive, meta }: { text: string; isLive?: boolean; meta?: string }) {
-  const { busy: isProcessing } = useYulaChat()
-  const [open, setOpen] = React.useState(Boolean(isLive))
-  const [userToggled, setUserToggled] = React.useState(false)
-
-  // Güncel mesajda düşünme hemen görünür; cevaplama tamamlanınca otomatik katlanır
-  React.useEffect(() => {
-    if (!isLive || isProcessing || userToggled) return
-    const timer = setTimeout(() => setOpen(false), 1500)
-    return () => clearTimeout(timer)
-  }, [isLive, isProcessing, userToggled])
-
-  if (!text.trim()) return null
-
-  const cfg = REASONING_META[meta || "thinking"] || REASONING_META.thinking
-  const Icon = cfg.icon
-
-  return (
-    <Collapsible
-      open={open}
-      onOpenChange={(value) => {
-        setUserToggled(true)
-        setOpen(value)
-      }}
-      className="space-y-1.5"
-    >
-      <CollapsibleTrigger className="group/reasoning flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
-        <Icon className={cn("size-3.5 shrink-0", cfg.iconColor)} />
-        {cfg.label}
-        <ChevronDown className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/reasoning:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div
-          className={cn(
-            "border-l-2 pl-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words text-muted-foreground",
-            cfg.borderColor
-          )}
-        >
-          {text}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
+  message: YulaMessage;
+  isLive?: boolean;
+  className?: string;
+};
 
 function FormattedAssistantText({
   text,
@@ -286,10 +203,9 @@ function TextPart({
   return <FormattedAssistantText text={text} message={message} />
 }
 
-/** Avatar-free message row — user bubble right, assistant text + reasoning left. */
+/** Avatar-free message row — user bubble right, assistant text left (reasoning is in Worked for Xs). */
 export function AiChatMessage({
   message,
-  isLive,
   className,
 }: AiChatMessageProps) {
   const isUser = message.role === "user"
@@ -303,17 +219,6 @@ export function AiChatMessage({
       )}
     >
       {message.parts?.map((part, index) => {
-        if (part.type === "reasoning") {
-          const meta = (part as { meta?: string }).meta
-          return (
-            <ReasoningPart
-              key={`${message.id}-r-${index}`}
-              text={part.text}
-              isLive={isLive}
-              meta={meta}
-            />
-          )
-        }
         if (part.type === "text") {
           return (
             <TextPart

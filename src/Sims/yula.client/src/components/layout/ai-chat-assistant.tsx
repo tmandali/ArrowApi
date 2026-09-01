@@ -460,38 +460,51 @@ export function AIChatPanel({
     return messages.filter((m, i) => lastById.get(m.id) === i)
   }, [messages])
 
-  // Sohbet mesajlarını Soru-Cevap turlarına (YulaChatTurn) grupla
+  // Sohbet mesajlarını Soru-Cevap turlarına (YulaChatTurn) grupla (Çok adımlı araç çağrılarını birleştirir)
   const turns = React.useMemo(() => {
     const list: Array<{
       id: string
       userMessage?: YulaMessage
       assistantMessage?: YulaMessage
+      assistantMessages: YulaMessage[]
     }> = []
 
     let currentTurn: {
       id: string
       userMessage?: YulaMessage
-      assistantMessage?: YulaMessage
+      assistantMessages: YulaMessage[]
     } | null = null
 
     for (const m of dedupedMessages) {
       if (m.role === "user") {
         if (currentTurn) {
-          list.push(currentTurn)
+          const combinedParts = currentTurn.assistantMessages.flatMap((a) => a.parts)
+          const lastAssistant = currentTurn.assistantMessages[currentTurn.assistantMessages.length - 1]
+          list.push({
+            id: currentTurn.id,
+            userMessage: currentTurn.userMessage,
+            assistantMessage: lastAssistant ? { ...lastAssistant, parts: combinedParts } : undefined,
+            assistantMessages: currentTurn.assistantMessages,
+          })
         }
-        currentTurn = { id: m.id, userMessage: m }
+        currentTurn = { id: m.id, userMessage: m, assistantMessages: [] }
       } else if (m.role === "assistant") {
         if (currentTurn) {
-          currentTurn.assistantMessage = m
-          list.push(currentTurn)
-          currentTurn = null
+          currentTurn.assistantMessages.push(m)
         } else {
-          list.push({ id: m.id, assistantMessage: m })
+          list.push({ id: m.id, assistantMessage: m, assistantMessages: [m] })
         }
       }
     }
     if (currentTurn) {
-      list.push(currentTurn)
+      const combinedParts = currentTurn.assistantMessages.flatMap((a) => a.parts)
+      const lastAssistant = currentTurn.assistantMessages[currentTurn.assistantMessages.length - 1]
+      list.push({
+        id: currentTurn.id,
+        userMessage: currentTurn.userMessage,
+        assistantMessage: lastAssistant ? { ...lastAssistant, parts: combinedParts } : undefined,
+        assistantMessages: currentTurn.assistantMessages,
+      })
     }
     return list
   }, [dedupedMessages])
@@ -1043,10 +1056,7 @@ export function AIChatPanel({
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
                 {turns.map((turn, idx) => {
                   const isLiveTurn =
-                    (isLoading || yula.isTurnActive) &&
-                    idx === turns.length - 1 &&
-                    (!turn.assistantMessage ||
-                      turn.assistantMessage.id === lastAssistant?.id)
+                    (isLoading || yula.isTurnActive) && idx === turns.length - 1;
 
                   const durationSec = turn.assistantMessage?.id
                     ? yula.responseDurations[turn.assistantMessage.id]

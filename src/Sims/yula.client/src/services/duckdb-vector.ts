@@ -19,26 +19,48 @@ export interface RagVectorItem {
   distance?: number;
 }
 
-let isStoreInitialized = false;
+let activeStoreDimension: number | null = null;
 
-/** DuckDB WASM üzerinde vektör RAG tablosunu hazırlar. */
-export async function initVectorStore(): Promise<void> {
-  if (isStoreInitialized) return;
+/** DuckDB WASM üzerinde vektör RAG tablosunu istenen boyuta göre (örn: 384 veya 1536) hazırlar. */
+export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<void> {
+  if (activeStoreDimension === dimension) return;
   try {
+    // Eğer mevcut tablo farklı boyuttaysa düşürüp yeni boyutla kur
+    if (activeStoreDimension !== null && activeStoreDimension !== dimension) {
+      await duckDbClient.executeCustomSql("DROP TABLE IF EXISTS yula_rag_embeddings;");
+    }
+
     const sql = `
       CREATE TABLE IF NOT EXISTS yula_rag_embeddings (
         id VARCHAR PRIMARY KEY,
         scope VARCHAR,
         content VARCHAR,
         metadata JSON,
-        embedding FLOAT[${VECTOR_DIMENSION}]
+        embedding FLOAT[${dimension}]
       );
     `;
     await duckDbClient.executeCustomSql(sql);
-    isStoreInitialized = true;
-    console.info("🤖 [DuckDB WASM Vector Store] yula_rag_embeddings table ready (FLOAT[384]).");
+    activeStoreDimension = dimension;
+    console.info(`🤖 [DuckDB WASM Vector Store] yula_rag_embeddings table ready (FLOAT[${dimension}]).`);
   } catch (err) {
-    console.warn("[DuckDB Vector Store] init error:", err);
+    // Tablo şema uyuşmazlığı varsa (örn: eski 384 vs 1536) tabloyu sıfırla
+    try {
+      await duckDbClient.executeCustomSql("DROP TABLE IF EXISTS yula_rag_embeddings;");
+      const fallbackSql = `
+        CREATE TABLE yula_rag_embeddings (
+          id VARCHAR PRIMARY KEY,
+          scope VARCHAR,
+          content VARCHAR,
+          metadata JSON,
+          embedding FLOAT[${dimension}]
+        );
+      `;
+      await duckDbClient.executeCustomSql(fallbackSql);
+      activeStoreDimension = dimension;
+      console.info(`🤖 [DuckDB WASM Vector Store] Recreated yula_rag_embeddings (FLOAT[${dimension}]).`);
+    } catch (recreateErr) {
+      console.warn("[DuckDB Vector Store] init error:", recreateErr);
+    }
   }
 }
 
@@ -167,7 +189,9 @@ async function insertOrReplaceVector(item: {
   metadata: Record<string, unknown>;
   embedding: number[];
 }): Promise<void> {
-  const vecLiteral = `[${item.embedding.join(",")}]::FLOAT[${VECTOR_DIMENSION}]`;
+  const dim = item.embedding.length || VECTOR_DIMENSION;
+  await initVectorStore(dim);
+  const vecLiteral = `[${item.embedding.join(",")}]::FLOAT[${dim}]`;
   const cleanContent = item.content.replace(/'/g, "''");
   const cleanMeta = JSON.stringify(item.metadata).replace(/'/g, "''");
 
@@ -185,14 +209,15 @@ export async function searchVectorContext(
   queryText: string,
   limit = 3,
 ): Promise<RagVectorItem[]> {
-  await initVectorStore();
   const trimmed = queryText.trim();
   if (!trimmed) return [];
 
   const startMs = performance.now();
   try {
     const queryVec = await getEmbedding(trimmed);
-    const vecLiteral = `[${queryVec.join(",")}]::FLOAT[${VECTOR_DIMENSION}]`;
+    const dim = queryVec.length || VECTOR_DIMENSION;
+    await initVectorStore(dim);
+    const vecLiteral = `[${queryVec.join(",")}]::FLOAT[${dim}]`;
 
     const sql = `
       SELECT 

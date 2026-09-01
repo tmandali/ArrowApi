@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { Copy, Check, Undo2, Sparkles, Loader2 } from "lucide-react";
 
+import { copyToClipboard } from "@/lib/clipboard";
+
 export interface YulaChatTurnProps {
   userMessage?: YulaMessage;
   assistantMessage?: YulaMessage;
@@ -54,12 +56,10 @@ export function YulaChatTurn({
 
   const handleCopyUserText = async () => {
     if (!userText) return;
-    try {
-      await navigator.clipboard.writeText(userText);
+    const success = await copyToClipboard(userText);
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // kopyalama hatası
     }
   };
 

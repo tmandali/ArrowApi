@@ -1,0 +1,1 @@
+import{D as e,M as t,m as n}from"./separator-ZnBNwOJ5.js";import{i as r}from"./item-BaKwiwFu.js";var i=t(e(),1),a=n();function o(){let[e,t]=i.useState(!0);return(0,a.jsx)(r,{filtersOpen:e,onFiltersOpenChange:t})}export{o as default};

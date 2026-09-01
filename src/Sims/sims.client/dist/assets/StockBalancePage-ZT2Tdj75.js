@@ -1,0 +1,1 @@
+import{m as e,w as t}from"./separator-ZnBNwOJ5.js";import{n,t as r}from"./item-BaKwiwFu.js";var i=e();function a(){let{jobId:e}=t();return e?(0,i.jsx)(r,{jobId:e}):(0,i.jsx)(n,{})}export{a as default};

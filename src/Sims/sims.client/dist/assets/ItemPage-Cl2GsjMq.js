@@ -1,0 +1,1 @@
+import{m as e}from"./separator-ZnBNwOJ5.js";import{a as t}from"./item-BaKwiwFu.js";var n=e();function r(){return(0,n.jsx)(t,{})}export{r as default};

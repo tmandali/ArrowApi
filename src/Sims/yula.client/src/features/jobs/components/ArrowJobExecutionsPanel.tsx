@@ -77,6 +77,7 @@ import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 import { ApiError } from "@/services"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
+import { copyToClipboard } from "@/lib/clipboard"
 
 function formatWhen(value?: string | null): string {
   if (!value) return "—"
@@ -635,7 +636,7 @@ export function ArrowJobExecutionsPanel({
         mode === "url" && openJobHref
           ? `${window.location.origin}${openJobHref(value)}`
           : value
-      void navigator.clipboard.writeText(text)
+      void copyToClipboard(text)
     },
     [openJobHref]
   )

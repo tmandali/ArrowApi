@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 56402",
+    "dev": "next dev -H 0.0.0.0 -p 56402",
     "build": "next build",
     "start": "next start -p 56402",
     "lint": "oxlint",
@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^4.0.56",
+    "@ai-sdk/openai": "^4.0.53",
     "@ai-sdk/react": "^4.0.86",
     "@base-ui/react": "^1.7.0",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 import {
   Brain,
   ChevronDown,
@@ -92,9 +93,10 @@ export function extractWorkedSteps(
     if (isLiveStreaming && steps.length === 0) {
       steps.push({
         id: "live-initial-planning",
-        kind: "explored",
-        label: "Generative AI reasoning & stream",
-        subLabel: "Düşünülüyor ve yanıt hazırlanıyor...",
+        kind: "thought",
+        label: "Thinking & reasoning...",
+        subLabel: "Planlama yapılıyor...",
+        detailText: "Kullanıcı talebi ve ekran durumu inceleniyor, uygun işlem ve analiz adımları belirleniyor...",
         isLive: true,
       });
     }
@@ -105,7 +107,7 @@ export function extractWorkedSteps(
     // 1. Gerçek Düşünme Parçaları (Reasoning / Thinking)
     if (part.type === "reasoning") {
       const text = part.text ?? "";
-      if (!text.trim()) return;
+      if (!text.trim() && !isLiveStreaming) return;
       const meta = (part as { meta?: string }).meta;
       const isThinking = !meta || meta === "thinking";
       
@@ -114,10 +116,14 @@ export function extractWorkedSteps(
       steps.push({
         id: `${message.id}-reasoning-${index}`,
         kind: "thought",
-        label: isThinking ? `Thought for ${approxDuration}s` : `Reasoning (${meta})`,
+        label: isThinking
+          ? isLiveStreaming
+            ? "Thinking & reasoning..."
+            : `Thought for ${approxDuration}s`
+          : `Reasoning (${meta})`,
         subLabel: `${approxDuration}s`,
         durationSec: approxDuration,
-        detailText: text,
+        detailText: text || "Düşünce adımları çözümleniyor...",
         isLive: isLiveStreaming,
       });
       return;
@@ -326,9 +332,10 @@ export function extractWorkedSteps(
   if (isLiveStreaming && steps.length === 0) {
     steps.push({
       id: `${message?.id ?? "live"}-initial-planning`,
-      kind: "explored",
-      label: "Reasoning & planning next action",
-      subLabel: "Analyzing prompt & selecting tools...",
+      kind: "thought",
+      label: "Thinking & reasoning...",
+      subLabel: "Planlama yapılıyor...",
+      detailText: "Kullanıcı talebi ve ekran durumu inceleniyor, uygun işlem ve analiz adımları belirleniyor...",
       isLive: true,
     });
   }
@@ -350,7 +357,7 @@ export function YulaWorkedAccordion({
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
   const [copiedAnswer, setCopiedAnswer] = React.useState(false);
 
-  const handleCopyAnswer = (e: React.MouseEvent) => {
+  const handleCopyAnswer = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!message) return;
     const fullText = message.parts
@@ -365,9 +372,11 @@ export function YulaWorkedAccordion({
       .join("\n\n");
 
     if (!fullText.trim()) return;
-    void navigator.clipboard.writeText(fullText);
-    setCopiedAnswer(true);
-    setTimeout(() => setCopiedAnswer(false), 2000);
+    const success = await copyToClipboard(fullText);
+    if (success) {
+      setCopiedAnswer(true);
+      setTimeout(() => setCopiedAnswer(false), 2000);
+    }
   };
 
   // Canlı akış zamanlayıcısı (Live streaming ticker) — Tur boyunca (tüm araçlar/turlar bitene kadar) kesintisiz sayar
@@ -391,7 +400,7 @@ export function YulaWorkedAccordion({
     return () => clearInterval(interval);
   }, [isLive]);
 
-  // Nihai cevap metni yazılmaya başlandığı anda (text token'ları geldiğinde) akordeon otomatik katlanır
+  // Nihai cevap metni tamamlandığında (akış bittiğinde) akordeon otomatik katlanır
   const hasTextContent = React.useMemo(() => {
     if (!message) return false;
     return message.parts.some(
@@ -400,10 +409,12 @@ export function YulaWorkedAccordion({
   }, [message]);
 
   React.useEffect(() => {
-    if (hasTextContent && !userToggled) {
+    if (!isLive && hasTextContent && !userToggled) {
       setOpen(false);
+    } else if (isLive && !userToggled) {
+      setOpen(true);
     }
-  }, [hasTextContent, userToggled]);
+  }, [isLive, hasTextContent, userToggled]);
 
   const steps = React.useMemo(
     () => extractWorkedSteps(message, isLive, userMessage),
@@ -477,35 +488,37 @@ export function YulaWorkedAccordion({
         ) : null}
       </div>
 
-      {/* Gemini Stili Şeffaf Adım Detayları */}
+      {/* Gemini Stili Adım Adım Çalıştırma ve Düşünme Çizelgesi */}
       {hasExpandableContent ? (
-        <CollapsibleContent className="mt-1 space-y-1 pl-0.5">
-          <div className="flex flex-col gap-1 text-[11.5px] font-sans text-muted-foreground/90">
+        <CollapsibleContent className="mt-1.5 space-y-1.5 pl-1">
+          <div className="flex flex-col gap-1.5 text-[12.5px] font-sans text-muted-foreground/90">
             {steps.map((step) => {
-              const isExpanded = expandedStepId === step.id;
+              // Düşünme adımları varsayılan olarak açık başlar (Gemini stili)
+              const isThought = step.kind === "thought";
+              const isManuallyToggled = expandedStepId === step.id;
+              const isExpanded = isThought
+                ? expandedStepId === null || expandedStepId === step.id
+                : isManuallyToggled;
+
               const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
               const inputObj = (step.info?.input as Record<string, unknown> | null) ?? {};
-              const sqlStr = typeof inputObj.sql === "string" ? inputObj.sql.trim() : null;
               const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
 
               return (
                 <div key={step.id} className="flex flex-col gap-1">
+                  {/* Adım Başlığı Satırı */}
                   <div
                     onClick={() => {
                       if (hasDetails) {
-                        setExpandedStepId(isExpanded ? null : step.id);
+                        setExpandedStepId(isExpanded ? `closed-${step.id}` : step.id);
                       }
                     }}
                     className={cn(
-                      "flex items-center gap-2 hover:text-foreground transition-colors py-0.5 select-none",
-                      hasDetails ? "cursor-pointer" : "cursor-default"
+                      "group/step flex items-center gap-1.5 py-0.5 text-foreground/90 transition-colors select-none",
+                      hasDetails ? "cursor-pointer hover:text-foreground" : "cursor-default"
                     )}
                   >
-                    {step.kind === "edited" ? (
-                      <FileCode className="size-3.5 text-sky-400 shrink-0" />
-                    ) : null}
-
-                    <span className="font-mono text-foreground/90 font-medium">
+                    <span className="font-sans font-normal text-[12.5px] text-foreground/85">
                       {step.label}
                     </span>
 
@@ -520,58 +533,62 @@ export function YulaWorkedAccordion({
                       </span>
                     ) : null}
 
-
-
                     {step.isLive ? (
-                      <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-orange-500 animate-pulse">
+                      <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-orange-500 animate-pulse">
                         <Loader2 className="size-3 animate-spin" />
                       </span>
                     ) : hasDetails ? (
                       <ChevronRight
                         className={cn(
-                          "ml-1 size-3 text-muted-foreground/40 shrink-0 transition-transform duration-200",
+                          "size-3.5 text-muted-foreground/50 transition-transform duration-200 group-hover/step:text-foreground/70",
                           isExpanded && "rotate-90 text-foreground/70"
                         )}
                       />
                     ) : null}
                   </div>
 
-                  {/* Adım Tıklandığında Açılan Şık Detay Kutusu */}
+                  {/* Gemini Stili Doğrudan İçe Girintili Düşünme / Detay Metni */}
                   {isExpanded && hasDetails ? (
-                    <div className="ml-4 mt-1 overflow-hidden rounded-lg border border-border/30 bg-muted/20 p-1.5 space-y-1.5 font-mono text-[11px] backdrop-blur-xs select-none">
-                      {step.detailText ? (
-                        <div className="text-muted-foreground leading-snug px-0.5">{step.detailText}</div>
-                      ) : null}
+                    isThought && step.detailText ? (
+                      <div className="pl-4 py-0.5 text-[12px] leading-relaxed text-muted-foreground/80 font-sans whitespace-pre-wrap select-text">
+                        {step.detailText}
+                      </div>
+                    ) : (
+                      <div className="ml-4 mt-1 overflow-hidden rounded-lg border border-border/30 bg-muted/20 p-2 space-y-1.5 font-mono text-[11px] backdrop-blur-xs select-none">
+                        {step.detailText ? (
+                          <div className="text-muted-foreground leading-snug px-0.5">{step.detailText}</div>
+                        ) : null}
 
-                      {/* Araç Adı, Giden Parametreler (Input) ve Gelen Çıktı (Output) ile Tek Renkli JSON Bloğu */}
-                      {step.info ? (
-                        <CodeBlock
-                          value={JSON.stringify(
-                            {
-                              tool: step.info.toolName,
-                              input: step.info.input,
-                              output: (() => {
-                                if (!step.info.output || typeof step.info.output !== "object") return step.info.output ?? null;
-                                const out = { ...(step.info.output as Record<string, unknown>) };
-                                if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-                                  delete out.sql;
-                                  delete out.display;
-                                }
-                                return out;
-                              })(),
-                            },
-                            null,
-                            2
-                          )}
-                          language="json"
-                          className="max-h-52 border border-border/20 rounded-md p-1.5 text-[10.5px] font-mono leading-tight shadow-none"
-                        />
-                      ) : outputObj.error ? (
-                        <div className="text-[10.5px] text-red-500 font-medium px-0.5">
-                          Hata: {String(outputObj.error)}
-                        </div>
-                      ) : null}
-                    </div>
+                        {/* Araç Adı, Giden Parametreler (Input) ve Gelen Çıktı (Output) ile Tek Renkli JSON Bloğu */}
+                        {step.info ? (
+                          <CodeBlock
+                            value={JSON.stringify(
+                              {
+                                tool: step.info.toolName,
+                                input: step.info.input,
+                                output: (() => {
+                                  if (!step.info.output || typeof step.info.output !== "object") return step.info.output ?? null;
+                                  const out = { ...(step.info.output as Record<string, unknown>) };
+                                  if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
+                                    delete out.sql;
+                                    delete out.display;
+                                  }
+                                  return out;
+                                })(),
+                              },
+                              null,
+                              2
+                            )}
+                            language="json"
+                            className="max-h-52 border border-border/20 rounded-md p-1.5 text-[10.5px] font-mono leading-tight shadow-none"
+                          />
+                        ) : outputObj.error ? (
+                          <div className="text-[10.5px] text-red-500 font-medium px-0.5">
+                            Hata: {String(outputObj.error)}
+                          </div>
+                        ) : null}
+                      </div>
+                    )
                   ) : null}
                 </div>
               );

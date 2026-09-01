@@ -11,7 +11,7 @@ builder.Services.AddArrowApi(arrow =>
     // Sonuçlar RAM'de tutulmaz; batch'ler diskteki Arrow IPC dosyasına stream edilir
     // (büyük raporlarda bellek sabit kalır). Global singleton kayıt: bir kez yeterlidir.
     arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", c => c.UseFileStore("arrow-jobs"));
-    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance");
+    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseFileStore("arrow-jobs"));
 });
 builder.Services.AddCors(options =>
 {

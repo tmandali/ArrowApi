@@ -8,6 +8,7 @@ import { Check, Copy, FileSpreadsheet, ChevronDown, Table } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
+import { copyToClipboard } from "@/lib/clipboard";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import {
   KNOWN_SYSTEM_ACTIONS,
@@ -461,12 +462,14 @@ function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
   const lineCount = React.useMemo(() => (text ? text.split("\n").length : 1), [text])
 
   const handleCopy = React.useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       e.stopPropagation()
       if (!text) return
-      void navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      const success = await copyToClipboard(text)
+      if (success) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     },
     [text],
   )
