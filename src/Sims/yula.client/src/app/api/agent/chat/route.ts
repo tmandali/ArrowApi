@@ -170,12 +170,12 @@ export async function POST(req: Request) {
     let systemPrompt = buildSystemPrompt(context);
     if (isThinking) {
       systemPrompt =
-        `[ÖNEMLİ KURAL - DÜŞÜNME VE AKIL YÜRÜTME (THINKING) MODU AÇIK:
-1. Kullanıcıya yanıt vermeden veya ARAÇ ÇAĞIRMADAN önce MUTLAKA içsel akıl yürütme, planlama ve stratejini <think>...</think> etiketleri arasına yaz.
-2. Düşünme etiketini (</think>) kapattıktan hemen sonra planladığın aracı (örn. set_grid_query, filter_current_grid, visualize_grid_data, run_report, profile_grid_table) DERHAL ÇAĞIR ve kısa Türkçe teyidini ilet. Düşünce aşamasında kalıp aracı çağırmayı ASLA atlama.]\n\n` + systemPrompt;
+        `[MANDATORY THINKING DIRECTIVE:
+1. Always begin your response by writing your step-by-step internal reasoning and planning inside <think>...</think> tags.
+2. Immediately after closing </think>, execute the planned tool call(s) (e.g. set_grid_query, filter_current_grid, visualize_grid_data, run_report, profile_grid_table) and/or provide the final user response in Turkish. Do not stay idle in thoughts.]\n\n` + systemPrompt;
     } else {
       systemPrompt =
-        `[DÜŞÜNME MODU KAPALI: Düşünme adımlarını atla ve doğrudan kullanıcıya nihai net yanıtı sun veya aracı çağır.]\n\n` + systemPrompt;
+        `[THINKING DIRECTIVE: Thinking mode is disabled. Skip internal reasoning and provide direct tool calls or Turkish responses.]\n\n` + systemPrompt;
     }
 
     const activeModel = await resolveModel(model);
