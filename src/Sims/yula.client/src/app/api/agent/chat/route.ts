@@ -171,11 +171,11 @@ export async function POST(req: Request) {
     if (isThinking) {
       systemPrompt =
         `[ÖNEMLİ KURAL - DÜŞÜNME VE AKIL YÜRÜTME (THINKING) MODU AÇIK:
-Kullanıcıya vereceğin yanıttan önce MUTLAKA içsel akıl yürütme, planlama, veri kontrolü ve karar aşamalarını <think>...</think> etiketleri arasına detaylıca yazarak başla.
-Etiket kapandıktan sonra kullanıcıya nihai Türkçe yanıtını sun.]\n\n` + systemPrompt;
+1. Kullanıcıya yanıt vermeden veya ARAÇ ÇAĞIRMADAN önce MUTLAKA içsel akıl yürütme, planlama ve stratejini <think>...</think> etiketleri arasına yaz.
+2. Düşünme etiketini (</think>) kapattıktan hemen sonra planladığın aracı (örn. set_grid_query, filter_current_grid, visualize_grid_data, run_report, profile_grid_table) DERHAL ÇAĞIR ve kısa Türkçe teyidini ilet. Düşünce aşamasında kalıp aracı çağırmayı ASLA atlama.]\n\n` + systemPrompt;
     } else {
       systemPrompt =
-        `[DÜŞÜNME MODU KAPALI: Düşünme adımlarını atla ve doğrudan kullanıcıya nihai net yanıtı sun.]\n\n` + systemPrompt;
+        `[DÜŞÜNME MODU KAPALI: Düşünme adımlarını atla ve doğrudan kullanıcıya nihai net yanıtı sun veya aracı çağır.]\n\n` + systemPrompt;
     }
 
     const activeModel = await resolveModel(model);

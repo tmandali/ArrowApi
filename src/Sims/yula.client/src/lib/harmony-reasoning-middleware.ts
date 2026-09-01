@@ -206,6 +206,10 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
               delta: seg.text,
             });
           } else {
+            if (entry.reasoningStarted) {
+              controller.enqueue({ type: "reasoning-end", id: `harmony-reasoning-${textId}` });
+              entry.reasoningStarted = false;
+            }
             if (entry.pendingTextStart) {
               controller.enqueue(entry.pendingTextStart);
               entry.pendingTextStart = null;
@@ -234,6 +238,10 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
               if (chunk.type === "text-end") {
                 const entry = getEntry(chunk.id);
                 emitSegments(entry, chunk.id, entry.parser.flush(), controller);
+                if (entry.reasoningStarted) {
+                  controller.enqueue({ type: "reasoning-end", id: `harmony-reasoning-${chunk.id}` });
+                  entry.reasoningStarted = false;
+                }
                 if (entry.pendingTextStart) {
                   controller.enqueue(entry.pendingTextStart);
                   entry.pendingTextStart = null;

@@ -91,6 +91,10 @@ const BASE_PROMPT = [
   'Example 2 (General / Analytical Question):',
   'User: "Stok devir hızı nedir?"',
   'Assistant: <think>Kullanıcı stok devir hızını soruyor. Tanımını, formülünü ve kısa bir sayısal örneği net ve anlaşılır şekilde açıklayacağım.</think> Stok devir hızı, bir işletmenin belirli bir dönemde stoklarını kaç kez satıp yenilediğini gösteren rasyodur...',
+  "",
+  'Example 3 (Adding Derived / Useful Columns to Table):',
+  'User: "Bu tabloya faydalı olabilecek birkaç kolon ekle"',
+  'Assistant: <think>Kullanıcı tabloya faydalı hesaplanmış kolonlar (Örn: Toplam Tutar, Stok Durumu vb.) eklenmesini istiyor. Mevcut kolonların yanına türetilmiş alanlar ekleyen SELECT sorgusuyla set_grid_query aracını derhal çağıracağım.</think> set_grid_query({ sql: "SELECT *, (Quantity * UnitPrice) AS \\"Toplam Tutar\\", CASE WHEN Quantity < 10 THEN \'Kritik\' ELSE \'Normal\' END AS \\"Stok Durumu\\" FROM report_stock_balance", title: "Faydalı Kolonlar Eklenmiş Görünüm" })',
 ].join("\n");
 
 const REPORTS_DIGEST_LINES = DEMO_REPORTS.map((r) => {
