@@ -152,6 +152,20 @@ interface ParserEntry {
   reasoningStarted: boolean;
 }
 
+/**
+ * OpenAI / Azure OpenAI internal function calling / bracket token sızıntılarını ve
+ * token sapması sonucu oluşan çöp metinleri temizler.
+ */
+export function sanitizeLeakedTokens(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/【analysis[^\n]*/gi, "")
+    .replace(/【[^】]*】/g, "")
+    .replace(/to=functions\.[\w_]+[^\n]*/gi, "")
+    .replace(/ADDITIONAL_ARGS_DO_NOT_PARSE[^\n]*/gi, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
   return {
     specificationVersion: "v4",
@@ -164,11 +178,12 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
           continue;
         }
         for (const seg of splitHarmonySegments(part.text)) {
-          if (seg.text.length === 0) continue;
+          const clean = sanitizeLeakedTokens(seg.text);
+          if (clean.length === 0) continue;
           transformed.push(
             seg.kind === "reasoning"
-              ? { type: "reasoning", text: seg.text }
-              : { type: "text", text: seg.text },
+              ? { type: "reasoning", text: clean }
+              : { type: "text", text: clean },
           );
         }
       }
@@ -194,7 +209,8 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
         controller: TransformStreamDefaultController<unknown>,
       ) => {
         for (const seg of segments) {
-          if (seg.text.length === 0) continue;
+          const clean = sanitizeLeakedTokens(seg.text);
+          if (clean.length === 0) continue;
           if (seg.kind === "reasoning") {
             if (!entry.reasoningStarted) {
               entry.reasoningStarted = true;
@@ -203,7 +219,7 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
             controller.enqueue({
               type: "reasoning-delta",
               id: `harmony-reasoning-${textId}`,
-              delta: seg.text,
+              delta: clean,
             });
           } else {
             if (entry.reasoningStarted) {
@@ -214,7 +230,7 @@ export function harmonyReasoningMiddleware(): LanguageModelMiddleware {
               controller.enqueue(entry.pendingTextStart);
               entry.pendingTextStart = null;
             }
-            controller.enqueue({ type: "text-delta", id: textId, delta: seg.text });
+            controller.enqueue({ type: "text-delta", id: textId, delta: clean });
           }
         }
       };

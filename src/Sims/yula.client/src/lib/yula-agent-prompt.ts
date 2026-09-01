@@ -194,7 +194,7 @@ const SMART_SQL_QUERY_RULES = [
   "  • 1. TABLE NAME CORRECTION: Replace pseudo-table names ('rapor', 'table', 'tablo', 'stok_bakiye', etc.) with the ACTUAL active DuckDB table name from system state (e.g. report_e53c80ce_...).",
   "  • 2. COLUMN NAME CORRECTION: Auto-correct misspelled or Turkish alias column names ('tarih' -> 'TransDate', 'miktar' -> 'Qty', 'depo' -> 'Warehouse', 'fiyat' -> 'UnitPrice', 'stok_kodu' -> 'ItemCode', etc.) to the exact column names in the active grid table schema.",
   "  • 3. RELATIVE DATE EXPANSION: Expand relative date terms into exact ISO date strings (e.g., 'bugun' -> '2026-09-01', 'dun' -> '2026-08-31', 'bu ay' -> date range '2026-09-01' to '2026-09-30').",
-  "  • 4. QUERY EXECUTION: Call set_grid_query({ sql: \"...\" }) with the corrected, valid DuckDB SQL query so the screen grid table updates automatically, accompanied by a 1-sentence Turkish explanation of the corrections made.",
+  "  • 4. QUERY EXECUTION: Call set_grid_query({ sql: \"...\" }) with the corrected, valid DuckDB SQL query so the screen grid table updates automatically.",
 ].join("\n");
 
 export function buildSystemPrompt(context?: YulaScreenContext): string {
