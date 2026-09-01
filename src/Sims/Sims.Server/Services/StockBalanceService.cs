@@ -23,7 +23,7 @@ public sealed class StockBalanceService : IStockBalanceService
         new Field("Warehouse", StringType.Default, nullable: true),
         new Field("Qty", DoubleType.Default, nullable: true),
         new Field("UnitPrice", DoubleType.Default, nullable: true),
-        new Field("PostingDate", StringType.Default, nullable: true),
+        new Field("PostingDate", Date32Type.Default, nullable: true),
         new Field("IsActive", BooleanType.Default, nullable: true),
         new Field("BatchNumber", StringType.Default, nullable: true),
     ];
@@ -45,7 +45,7 @@ public sealed class StockBalanceService : IStockBalanceService
         var warehouse = new StringArray.Builder();
         var qty = new DoubleArray.Builder();
         var unitPrice = new DoubleArray.Builder();
-        var postingDate = new StringArray.Builder();
+        var postingDate = new Date32Array.Builder();
         var isActive = new BooleanArray.Builder();
         var batchNumber = new StringArray.Builder();
         int count = 0;
@@ -64,7 +64,7 @@ public sealed class StockBalanceService : IStockBalanceService
             warehouse.Append($"WH-{i % 50:D2}");
             qty.Append(i % 1000 + 0.5d);
             unitPrice.Append(Math.Round(10.50d + (i % 500) * 1.25d, 2));
-            postingDate.Append(baseDate.AddDays(-(i % 365)).ToString("yyyy-MM-dd"));
+            postingDate.Append(baseDate.AddDays(-(i % 365)));
             isActive.Append(i % 3 != 0);
 
             if (i % 4 == 0)
@@ -86,7 +86,7 @@ public sealed class StockBalanceService : IStockBalanceService
             warehouse = new StringArray.Builder();
             qty = new DoubleArray.Builder();
             unitPrice = new DoubleArray.Builder();
-            postingDate = new StringArray.Builder();
+            postingDate = new Date32Array.Builder();
             isActive = new BooleanArray.Builder();
             batchNumber = new StringArray.Builder();
             count = 0;
@@ -107,7 +107,7 @@ public sealed class StockBalanceService : IStockBalanceService
         StringArray.Builder warehouse,
         DoubleArray.Builder qty,
         DoubleArray.Builder unitPrice,
-        StringArray.Builder postingDate,
+        Date32Array.Builder postingDate,
         BooleanArray.Builder isActive,
         StringArray.Builder batchNumber) =>
         new(
