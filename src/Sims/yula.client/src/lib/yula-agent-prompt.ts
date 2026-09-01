@@ -129,12 +129,14 @@ const DATA_QUALITY_ANALYSIS_RULES = [
   "  1. Call profile_grid_table FIRST to inspect null counts, distinct values, min/max metrics, and anomalies across all columns.",
   "  2. Provide a structured, clean Turkish summary with 2 main sections:",
   "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı değerlendirmesi.",
-  "     - ⚠️ **Tespit Edilen Veri Problemleri & Bulgular**: Her tespit edilen problemi '• **Başlık (KolonAdı Koşul)**: Açıklama' biçiminde maddeler halinde listele. Kullanıcı arayüzü bu başlıkları otomatik olarak tıklanabilir aksiyon düğmesine dönüştürür.",
-  "  3. Standard bulleted finding format (with column name and condition in bold title):",
-  "     - '• **Negatif Stok Miktarları (Quantity < 0)**: Tabloda 4 satırda negatif miktar tespit edildi. İncelemek için başlığa tıklayın.'",
+  "     - ⚠️ **Tespit Edilen Veri Problemleri & Bulgular**: Her tespit edilen problemi '• **Başlık (KolonAdı Koşul)**: Açıklama' biçiminde maddeler halinde listele. Kullanıcı arayüzü bu başlıkları otomatik olarak tıklanabilir aksiyona dönüştürür (basit filtreler için filter_current_grid, gruplu/hesaplanmış/mükerrer büyük sorgular için set_grid_query çalışır).",
+  "  3. Standard bulleted finding formats (simple filters & complex SQL-level anomalies):",
+  "     - '• **Negatif Stok Miktarları (Quantity < 0)**: Tabloda 4 satırda negatif miktar tespit edildi.'",
   "     - '• **Boş Ambar Kodları (Warehouse boş)**: 12 satırda ambar tanımı eksik (NULL).'",
   "     - '• **Sıfır Birim Fiyatlı Kayıtlar (UnitPrice = 0)**: 5 satırda birim fiyat girilmemiş.'",
-  "     - '• **Kritik Düşük Stoklar (Quantity 1..10)**: 8 ürün kritik stok eşiğinin altında.'",
+  "     - '• **Mükerrer Ürün Kayıtları (ItemCode tekrar edenler)**: Birden fazla ambarda aynı kodla mükerrer açılmış kayıtlar mevcut.'",
+  "     - '• **Yüksek Değerli Stok Anomalileri (Quantity * UnitPrice > 100.000)**: Aşırı yüksek bakiye tutarına sahip uç kayıtlar.'",
+  "     - '• **Depo Bazında Negatif Dağılım (Warehouse gruplu)**: Toplam miktarı eksiye düşen ambarlar tespit edildi.'",
 ].join("\n");
 
 /** Hücre değerini prompt-uyumlu kısaltır (uzun metinler bağlamı şişirmesin). */

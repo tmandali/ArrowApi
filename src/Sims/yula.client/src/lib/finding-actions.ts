@@ -37,20 +37,42 @@ export function extractFindingFilterPrompt(
   input: FindingFilterInput,
 ): string | null {
   const text = input.text.replace(/\*\*/g, " ").replace(/\s+/g, " ");
+
+  // 1. Açıklamada veya başlıkta doğrudan geçerli bir SQL sorgusu varsa (SELECT ... FROM ...)
+  const sqlMatch = text.match(/select\s+[\s\S]+?\s+from\s+[\w.]+/i);
+  if (sqlMatch) {
+    return `/sorgu ${sqlMatch[0].trim()}`;
+  }
+
   const column = matchColumn(text, input.columns);
+
+  // 2. Mükerrer / Çift / Duplicate Kayıtlar (Büyük sorgu: GROUP BY ... HAVING COUNT(*) > 1)
+  if (/(?:mükerrer|mukerrer|tekrar\s*eden|duplicate|çift\s*kayıt)/i.test(text)) {
+    const colName = column || input.columns[0] || "anahtar";
+    return `${colName} kolonuna göre mükerrer kayıtları gruplayarak grid tablosunda göster`;
+  }
+
+  // 3. Gruplama & Özet Dağılım Sorguları (Büyük sorgu: GROUP BY ... SUM / AVG)
+  if (/(?:grupla|bazında|dağılım|ozet|özet|toplam\s*tutar|segment)/i.test(text)) {
+    const colName = column || input.columns[0];
+    return colName
+      ? `${colName} bazında gruplayarak özet sonuçları grid tablosunda göster`
+      : `Veri analizi sonuçlarını gruplayarak grid tablosunda göster`;
+  }
+
   if (!column) return null;
 
-  // 1. Boş / Eksik / NULL değerler
+  // 4. Boş / Eksik / NULL değerler
   if (/(?:boş|bos|null|tanımsız|tanimsiz|eksik)/i.test(text)) {
     return `${column} kolonunda boş olanları filtrele`;
   }
 
-  // 2. Negatif değerler
+  // 5. Negatif değerler
   if (/(?:negatif|eksi)/i.test(text)) {
     return `${column} kolonunu <0 olacak şekilde filtrele`;
   }
 
-  // 3. Karşılaştırma Operatörleri: < 0, <= 10, > 50, = 0
+  // 6. Karşılaştırma Operatörleri: < 0, <= 10, > 50, = 0
   const opMatch = text.match(/([<>]=?|=)\s*(\d+(?:[.,]\d+)?)/);
   if (opMatch) {
     const op = opMatch[1];
@@ -58,7 +80,7 @@ export function extractFindingFilterPrompt(
     return `${column} ${op} ${n} olan kayıtları filtrele`;
   }
 
-  // 4. Aralık: "0.5 - 40.5 arası" · "1..100" · "10 ile 20"
+  // 7. Aralık: "0.5 - 40.5 arası" · "1..100" · "10 ile 20"
   const range = text.match(
     /(\d+(?:[.,]\d+)?)\s*(?:-|–|—|\.\.|\sile\s)\s*(\d+(?:[.,]\d+)?)/,
   );
@@ -71,7 +93,7 @@ export function extractFindingFilterPrompt(
     }
   }
 
-  // 5. Eşik-az: "1'den küçük", "0 altında", "5'ten az"
+  // 8. Eşik-az: "1'den küçük", "0 altında", "5'ten az"
   const less = text.match(
     /(\d+(?:[.,]\d+)?)\s*'?(?:den|dan|ten|tan)?\s*(?:küçük|kucuk|az|düşük|dusuk|altında|altinda)/i,
   );
@@ -80,7 +102,7 @@ export function extractFindingFilterPrompt(
     return `${column} kolonunu ${n}'den küçük olacak şekilde filtrele`;
   }
 
-  // 6. Eşik-çok: "500 üzeri", "1000 üstü"
+  // 9. Eşik-çok: "500 üzeri", "1000 üstü"
   const more = text.match(
     /(\d+(?:[.,]\d+)?)\s*'?\s*(?:üzeri|uzeri|üstü|ustu|üstünde|ustunde)/i,
   );
@@ -89,7 +111,7 @@ export function extractFindingFilterPrompt(
     return `${column} kolonunu ${n} üzeri olacak şekilde filtrele`;
   }
 
-  // 7. Sıfır / 0 olanlar
+  // 10. Sıfır / 0 olanlar
   if (/(?:sıfır|sifir|0\s*olan)/i.test(text)) {
     return `${column} = 0 olan kayıtları filtrele`;
   }
