@@ -37,8 +37,9 @@ app.MapStaticAssets();
 
 app.UseArrowApi("/api/arrow/jobs", jobs =>
 {
-    jobs.MapJob("stock-analytics").PreventDuplicates(TimeSpan.FromMinutes(30));
-    jobs.MapJob("stock-balance").PreventDuplicates(TimeSpan.FromMinutes(30));
+    // Her Çalıştır yeni GUID üretir; tamamlanmış iş 409 ile yeniden açılmaz.
+    jobs.MapJob("stock-analytics");
+    jobs.MapJob("stock-balance");
 });
 
 app.MapStockAnalyticsEndpoints();

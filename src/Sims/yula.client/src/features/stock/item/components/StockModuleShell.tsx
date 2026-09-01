@@ -261,7 +261,7 @@ export function StockModuleShell({
           },
           {
             name: "run_job",
-            description: "Stok Bakiye Raporu için şemayı ve zorunlu alanları gözeterek job başlatır ve sonuç ekranına yönlendirir.",
+            description: "Stok Bakiye Raporu için şemayı ve zorunlu alanları gözeterek job başlatır ve execution listesinde yeni işi seçili/çalışır gösterir.",
           },
         ]
       : [],

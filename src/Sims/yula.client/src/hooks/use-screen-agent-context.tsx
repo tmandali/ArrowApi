@@ -64,7 +64,7 @@ export function useScreenAgentContext(input: {
       },
       {
         name: "run_job",
-        description: "Rapor şemasına göre zorunlu alanları gözeterek rapor job'ını başlatır ve sonuç ekranına yönlendirir.",
+        description: "Rapor şemasına göre zorunlu alanları gözeterek rapor job'ını başlatır ve execution ekranında yeni işi seçili/çalışır gösterir.",
       },
     ];
 

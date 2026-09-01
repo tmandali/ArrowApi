@@ -1,12 +1,15 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { extractJobIdFromHref, resolveConversationPathname } from "@/lib/workspace-paths";
 
 export interface YulaConversation {
   id: string;
   title: string;
   createdAt: number;
   pathname?: string;
+  /** Sonuç analizi sohbeti ise job GUID (pathname ile uyumlu). */
+  jobId?: string;
 }
 
 interface ChatsState {
@@ -38,6 +41,11 @@ interface ChatsState {
 
 function makeId() {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function currentLocationHref(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export const useChatsStore = create<ChatsState>()(
@@ -115,11 +123,17 @@ export const useChatsStore = create<ChatsState>()(
         set((s) => {
           const existingIndex = s.conversations.findIndex((c) => c.id === id);
           const title = text.slice(0, 40) || "Yeni Sohbet";
-          const currentPath = typeof window !== "undefined" ? window.location.pathname : undefined;
+          const currentPath = currentLocationHref();
           if (existingIndex === -1) {
             return {
               conversations: [
-                { id, title, createdAt: Date.now(), pathname: currentPath },
+                {
+                  id,
+                  title,
+                  createdAt: Date.now(),
+                  pathname: currentPath,
+                  jobId: extractJobIdFromHref(currentPath) ?? undefined,
+                },
                 ...s.conversations,
               ],
             };
@@ -127,7 +141,15 @@ export const useChatsStore = create<ChatsState>()(
           return {
             conversations: s.conversations.map((c) =>
               c.id === id && c.title === "Yeni Sohbet"
-                ? { ...c, title, pathname: c.pathname || currentPath }
+                ? {
+                    ...c,
+                    title,
+                    pathname: resolveConversationPathname(c.pathname, currentPath),
+                    jobId:
+                      extractJobIdFromHref(
+                        resolveConversationPathname(c.pathname, currentPath),
+                      ) ?? c.jobId,
+                  }
                 : c
             ),
           };
@@ -149,9 +171,7 @@ export const useChatsStore = create<ChatsState>()(
           const userMsgs = messages.filter((m) => m.role === "user");
           let conversations = s.conversations;
 
-          const currentPath =
-            pathname ||
-            (typeof window !== "undefined" ? window.location.pathname : undefined);
+          const currentPath = pathname || currentLocationHref();
 
           if (userMsgs.length > 0) {
             const existingIndex = conversations.findIndex((c) => c.id === id);
@@ -161,15 +181,26 @@ export const useChatsStore = create<ChatsState>()(
 
             if (existingIndex === -1) {
               conversations = [
-                { id, title: derivedTitle, createdAt: Date.now(), pathname: currentPath },
+                {
+                  id,
+                  title: derivedTitle,
+                  createdAt: Date.now(),
+                  pathname: resolveConversationPathname(undefined, currentPath),
+                  jobId: extractJobIdFromHref(currentPath) ?? undefined,
+                },
                 ...conversations,
               ];
             } else {
               conversations = conversations.map((c) => {
                 if (c.id !== id) return c;
                 const updatedTitle = c.title === "Yeni Sohbet" ? derivedTitle : c.title;
-                const updatedPath = c.pathname || currentPath;
-                return { ...c, title: updatedTitle, pathname: updatedPath };
+                const updatedPath = resolveConversationPathname(c.pathname, currentPath);
+                return {
+                  ...c,
+                  title: updatedTitle,
+                  pathname: updatedPath,
+                  jobId: extractJobIdFromHref(updatedPath) ?? c.jobId,
+                };
               });
             }
           }

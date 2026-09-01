@@ -70,17 +70,31 @@ export function isWorkspaceHomePath(pathname: string): boolean {
   return pathname === "/"
 }
 
+/** Normalize path for conversation/screen matching. */
+function normalizePath(path: string): string {
+  return path.split("?")[0].replace(/\/+$/, "") || "/"
+}
+
 /** Check if a conversation's pathname matches the active screen/page. */
 export function isConversationOnScreen(
   cPath?: string,
   currentPath?: string
 ): boolean {
   if (!cPath || !currentPath) return false
-  const c = cPath.split("?")[0].replace(/\/+$/, "")
-  const curr = currentPath.split("?")[0].replace(/\/+$/, "")
+  const c = normalizePath(cPath)
+  const curr = normalizePath(currentPath)
   if (c === curr) return true
 
-  // Both are landing/home paths
+  const cExec = reportExecutionPath(cPath)
+  const currExec = reportExecutionPath(currentPath)
+  if (cExec && currExec && cExec === currExec) return true
+
+  const cJob = extractJobIdFromHref(cPath)
+  const currJob = extractJobIdFromHref(currentPath)
+  if (cJob && currJob) {
+    return cJob.toLowerCase() === currJob.toLowerCase()
+  }
+
   if (isWorkspaceHomePath(c || "/") && isWorkspaceHomePath(curr || "/")) {
     return true
   }
@@ -99,18 +113,46 @@ export function isConversationOnScreen(
   return cBase !== "/" && !isWorkspaceHomePath(c) && cBase === currBase
 }
 
-export function formatPathnameLabel(pathname?: string): string | null {
-  if (!pathname || pathname === "/") return null
+function reportScreenLabel(pathname: string): string | null {
   if (pathname.includes("/stock/stock-balance")) return "Stok Bakiye"
   if (pathname.includes("/stock/stock-analytics")) return "Stok Analiz"
   if (pathname.includes("/stock/stock-ledger")) return "Stok Ekstre"
   if (pathname.includes("/stock/item")) return "Stok Kartı"
   if (pathname.includes("/system/users")) return "Kullanıcılar"
+  return null
+}
+
+export function formatPathnameLabel(pathname?: string): string | null {
+  if (!pathname || pathname === "/") return null
+  const jobId = extractJobIdFromHref(pathname)
+  const named = reportScreenLabel(pathname)
+  if (named) {
+    return jobId ? `${named} · ${jobId.slice(0, 8)}` : named
+  }
   const parts = pathname.split("/").filter(Boolean)
   if (parts.length === 0) return null
   const last = parts[parts.length - 1]
+  if (jobId) {
+    const reportSeg = parts.length >= 2 ? parts[parts.length - 2] : parts[0]
+    return `${reportSeg} · ${jobId.slice(0, 8)}`
+  }
   if (last.length > 20) return parts[parts.length - 2] || parts[0]
   return last
+}
+
+/**
+ * Sohbet kaydı: execution ekranı + job query (GUID sonuç path'i değil).
+ */
+export function resolveConversationPathname(
+  existing?: string | null,
+  current?: string | null,
+): string | undefined {
+  const job =
+    extractJobIdFromHref(current) ?? extractJobIdFromHref(existing) ?? undefined
+  const exec =
+    reportExecutionPath(current) ?? reportExecutionPath(existing) ?? undefined
+  if (job && exec) return reportExecutionHref(exec, job)
+  return exec || (current ? normalizePath(current) : undefined) || (existing ? normalizePath(existing) : undefined)
 }
 
 export const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -127,6 +169,42 @@ export function extractJobIdFromPath(pathname?: string | null): string | null {
   const clean = pathname.split("?")[0].replace(/\/+$/, "")
   const lastSeg = clean.split("/").pop() ?? ""
   return isGuidString(lastSeg) ? lastSeg : null
+}
+
+/** Path GUID veya `?job=` query. */
+export function extractJobIdFromHref(href?: string | null): string | null {
+  if (!href) return null
+  const fromPath = extractJobIdFromPath(href)
+  if (fromPath) return fromPath
+  const q = href.split("?")[1]
+  if (!q) return null
+  const job = new URLSearchParams(q).get("job")
+  return isGuidString(job) ? job!.trim() : null
+}
+
+/** `/stock/stock-balance/{guid}` → `/stock/stock-balance` (query yok). */
+export function reportExecutionPath(href?: string | null): string | null {
+  if (!href) return null
+  const path = normalizePath(href)
+  if (extractJobIdFromPath(path)) {
+    const parts = path.split("/").filter(Boolean)
+    parts.pop()
+    return parts.length ? `/${parts.join("/")}` : "/"
+  }
+  return path
+}
+
+export function reportExecutionHref(pagePath: string, jobId: string): string {
+  const base = reportExecutionPath(pagePath) ?? (pagePath.replace(/\/+$/, "") || "/")
+  return `${base}?job=${encodeURIComponent(jobId)}`
+}
+
+/** `/stock/stock-balance` → `stock-balance` */
+export function reportScopeFromPath(href?: string | null): string | null {
+  const exec = reportExecutionPath(href)
+  if (!exec) return null
+  const parts = exec.split("/").filter(Boolean)
+  return parts.length >= 2 ? parts[1] : null
 }
 
 /** True if the current URL path is a GUID-backed report result page (e.g. /<workspace>/<report>/<jobId>). */

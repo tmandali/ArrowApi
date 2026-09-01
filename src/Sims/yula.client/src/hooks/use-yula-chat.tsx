@@ -15,12 +15,17 @@ import {
   workspaceIdFromPath,
   workspaceLabelFromPath,
   isReportResultPath,
-  extractJobIdFromPath,
+  extractJobIdFromHref,
+  reportExecutionPath,
 } from "@/lib/workspace-paths";
 import {
   useChatsStore,
   type YulaConversation,
 } from "@/lib/stores/chats";
+import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
+import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
+import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
+import { isYulaGridSlashPrompt } from "@/components/layout/yula-commands";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-accordion";
@@ -38,11 +43,6 @@ import { readYulaClientAiConfig, yulaModelsApiUrl } from "@/lib/yula-ai-client-c
 const YulaChatContext = React.createContext<YulaChatContextValue | null>(
   null,
 );
-
-/** Job sonuç görünümü deseni: /<workspace>/<rapor>/<jobId> */
-function pathnameMatchJobDetail(pathname: string): boolean {
-  return isReportResultPath(pathname);
-}
 
 /** Statik (`tool-<ad>`) ve dinamik parçaları tek forma indirger */
 export interface YulaToolPartInfo {
@@ -332,6 +332,8 @@ function ChatInstance({
 
   const requestStartMsRef = React.useRef<number | null>(null);
   const [responseDurations, setResponseDurations] = React.useState<Record<string, number>>({});
+  const conversationIdRef = React.useRef(conversationId);
+  conversationIdRef.current = conversationId;
 
   const transport = React.useMemo(
     () =>
@@ -342,28 +344,24 @@ function ChatInstance({
           if (requestStartMsRef.current === null) {
             requestStartMsRef.current = performance.now();
           }
-          const pathname =
-            typeof window !== "undefined" ? window.location.pathname : "/";
+          const href =
+            typeof window !== "undefined"
+              ? `${window.location.pathname}${window.location.search}`
+              : "/";
+          const pathname = href;
           const store = useYulaGridStore.getState();
           let spec = store.spec;
 
-          // EVRE TÜRETİMİ — Yula hangi ekranda olduğunu buradan bilir:
-          //   job detay + grid hazır             → "results"
-          //   job detay + tablo henüz yükleniyor → "results-loading"
-          //   diğer (form/ana ekran)             → "workspace"
-          const jobDetail = pathnameMatchJobDetail(pathname);
-
-          // Öz-düzeltme: grid veriyi gösteriyor ama kayıt boş/eksikse
-          // DuckDB şemasından anında tamamla (hangi sıra bozulursa bozulsun).
-          const jobIdSeg = extractJobIdFromPath(pathname) ?? "";
+          const jobIdSeg = extractJobIdFromHref(href) ?? "";
+          const jobDetail = Boolean(jobIdSeg);
           const expectedTable = jobIdSeg
             ? `report_${jobIdSeg.replace(/[^a-zA-Z0-9_]/g, "_")}`
             : "";
 
           if (
             jobDetail &&
-            (!spec || spec.columns.length === 0) &&
-            expectedTable
+            expectedTable &&
+            (!spec || spec.columns.length === 0 || spec.tableName !== expectedTable)
           ) {
             try {
               const { duckDbClient } = await import("@/services/duckdb");
@@ -392,12 +390,24 @@ function ChatInstance({
                 "[Yula transport] self-heal describeTable başarısız:",
                 err,
               );
+              upsertTurnTrace(conversationIdRef.current, {
+                id: "describe",
+                toolName: "worker",
+                label: "DuckDB describeTable başarısız",
+                isError: true,
+                detailText: err instanceof Error ? err.message : String(err),
+                input: { expectedTable },
+              });
             }
           }
 
+          const specMatchesJob =
+            Boolean(spec && spec.columns.length > 0) &&
+            (!expectedTable || spec?.tableName === expectedTable);
+
           const phase: "results" | "results-loading" | "workspace" =
             jobDetail
-              ? spec && spec.columns.length > 0
+              ? specMatchesJob
                 ? "results"
                 : "results-loading"
               : "workspace";
@@ -415,11 +425,87 @@ function ChatInstance({
             }
           }
 
-          const isHome = isWorkspaceHomePath(pathname);
-          const workspaceId = workspaceIdFromPath(pathname);
-          const workspaceLabel = workspaceLabelFromPath(pathname);
+          const pathOnly = href.split("?")[0] || "/";
+          const isHome = isWorkspaceHomePath(pathOnly);
+          const workspaceId = workspaceIdFromPath(pathOnly);
+          const workspaceLabel = workspaceLabelFromPath(pathOnly);
           const mode: "main" | "dock" = isHome ? "main" : "dock";
           const aiConfig = readYulaClientAiConfig();
+
+          const jobId = extractJobIdFromHref(pathname);
+          const lastText = lastTextPart?.text ?? "";
+          const gridPrompt = isYulaGridSlashPrompt(lastText);
+          const phaseBreak = gridPrompt && phase !== "results";
+          const specCols = spec?.columns?.length ?? 0;
+
+          if (specMatchesJob && expectedTable) {
+            upsertTurnTrace(conversationIdRef.current, {
+              id: "describe",
+              toolName: "worker",
+              label: "DuckDB tablo hazır",
+              subLabel: expectedTable,
+              input: { expectedTable, specCols },
+            });
+          }
+
+          upsertTurnTrace(conversationIdRef.current, {
+            id: "phase",
+            toolName: "worker",
+            label: `Phase: ${phase}`,
+            subLabel: jobId ? jobId.slice(0, 8) : "job yok",
+            isError: phaseBreak,
+            detailText: phaseBreak
+              ? "Grid komutu results fazı olmadan gitti — sunucu tablo araçlarını bağlamaz."
+              : undefined,
+            input: {
+              href,
+              jobId,
+              expectedTable,
+              specTable: spec?.tableName ?? null,
+              specCols,
+              specMatchesJob,
+              phase,
+              gridPrompt,
+            },
+            output: {
+              gridAttached: phase === "results",
+              toolSet:
+                phase === "results"
+                  ? "grid"
+                  : phase === "results-loading"
+                    ? "none"
+                    : "workspace",
+            },
+          });
+
+          upsertTurnTrace(conversationIdRef.current, {
+            id: "rag",
+            toolName: "worker",
+            label: `RAG: ${ragContext.length} kayıt`,
+            input: { query: lastText.slice(0, 200) },
+            output: { count: ragContext.length, scopes: ragContext.map((r) => r.scope) },
+          });
+
+          upsertTurnTrace(conversationIdRef.current, {
+            id: "tools",
+            toolName: "worker",
+            label:
+              phase === "results"
+                ? "Araç seti: grid"
+                : phase === "results-loading"
+                  ? "Araç seti: yok (tablo yükleniyor)"
+                  : "Araç seti: workspace",
+            isError: phaseBreak,
+            input: { phase, gridPrompt },
+          });
+
+          upsertTurnTrace(conversationIdRef.current, {
+            id: "flush-prompt",
+            toolName: "worker",
+            label: "HTTP /api/agent/chat",
+            isLive: true,
+            input: { phase, model: useChatsStore.getState().model },
+          });
 
           return {
             body: {
@@ -434,8 +520,9 @@ function ChatInstance({
                 workspaceId,
                 workspaceLabel,
                 phase,
+                jobId: jobId ?? undefined,
                 grid:
-                  spec && spec.columns.length > 0
+                  phase === "results" && spec && spec.columns.length > 0
                     ? {
                         ...spec,
                         filters: useYulaGridStore.getState().filters,
@@ -474,6 +561,13 @@ function ChatInstance({
       console.error("🤖 [Yula Chat Client Error Details]:", err);
       userStoppedRef.current = true;
       setStopped(true);
+      upsertTurnTrace(conversationIdRef.current, {
+        id: "client-error",
+        toolName: "worker",
+        label: "İstemci hatası",
+        isError: true,
+        detailText: err instanceof Error ? err.message : String(err),
+      });
     },
     // Cookbook/Client-Tools deseni: araç çıktısı eklendiğinde akış kendiliğinden
     // devam etsin (manuel sendMessage yerine SDK köprüsü).
@@ -498,7 +592,10 @@ function ChatInstance({
   // Konuşma kalıcılığı (localStorage / zustand persist)
   React.useEffect(() => {
     if (!conversationId || status !== "ready") return;
-    const currentPath = typeof window !== "undefined" ? window.location.pathname : undefined;
+    const currentPath =
+      typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : undefined;
     saveMessages(conversationId, chat.messages, currentPath);
     const firstUser = chat.messages.find((m) => m.role === "user");
     const textPart = firstUser?.parts.find(
@@ -752,6 +849,40 @@ function ChatInstance({
   const busyRef = React.useRef(busy);
   busyRef.current = busy;
 
+  const pagePathname = usePathname();
+  const liveGridSpec = useYulaGridStore((s) => s.spec);
+
+  React.useEffect(() => {
+    if (!isReportResultPath(pagePathname)) return;
+    if (!liveGridSpec?.columns.length) return;
+    if (status !== "ready") return;
+    if (busyRef.current) return;
+    const queued = takeQueuedYulaPrompt();
+    if (!queued) return;
+    userStoppedRef.current = false;
+    setStopped(false);
+    setSendGate(true);
+    upsertTurnTrace(conversationId, {
+      id: "open-results",
+      toolName: "worker",
+      label: "Sonuç tablosu açıldı",
+      isLive: false,
+      input: { pathname: pagePathname },
+      output: {
+        table: liveGridSpec.tableName,
+        cols: liveGridSpec.columns.length,
+      },
+    });
+    upsertTurnTrace(conversationId, {
+      id: "flush-prompt",
+      toolName: "worker",
+      label: "Kuyruktaki komut gönderiliyor",
+      isLive: true,
+      input: { queued },
+    });
+    void chat.sendMessage({ text: queued });
+  }, [pagePathname, liveGridSpec, status, chat, conversationId]);
+
   React.useEffect(() => {
     if (!sendGate) return;
     if (isTurnActive) {
@@ -789,6 +920,19 @@ function ChatInstance({
       requestStartMsRef.current = null;
     }
   }, [isTurnActive, chat.messages]);
+
+  React.useEffect(() => {
+    if (isTurnActive) return;
+    const liveHttp = getTurnTrace(conversationId).find(
+      (s) => s.id === "flush-prompt" && s.isLive,
+    );
+    if (!liveHttp) return;
+    upsertTurnTrace(conversationId, {
+      ...liveHttp,
+      isLive: false,
+      label: "HTTP /api/agent/chat bitti",
+    });
+  }, [isTurnActive, conversationId]);
 
   const [llmStepCounts, setLlmStepCounts] = React.useState<Record<string, number>>({});
 
@@ -828,7 +972,7 @@ function ChatInstance({
 
       const currentPath =
         typeof window !== "undefined"
-          ? window.location.pathname
+          ? `${window.location.pathname}${window.location.search}`
           : undefined;
       saveMessages(conversationId, remainingMessages, currentPath);
 
@@ -858,7 +1002,79 @@ function ChatInstance({
       text: string,
       attachmentsList?: Array<{ name: string; type: string; dataUrl?: string }>,
     ) => {
-      if (busyRef.current) return;
+      void (async () => {
+      clearTurnTrace(conversationId);
+      if (busyRef.current) {
+        userStoppedRef.current = true;
+        upsertTurnTrace(conversationId, {
+          id: "busy-interrupt",
+          toolName: "worker",
+          label: "Önceki tur kesildi",
+          detailText: "Yeni mesaj için bekleyen akış durduruldu.",
+        });
+        try {
+          await chat.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const href =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "";
+      const pathOnly = href.split("?")[0] || "/";
+      const selectedJobId = extractJobIdFromHref(href);
+      const expectedTable = selectedJobId
+        ? `report_${selectedJobId.replace(/[^a-zA-Z0-9_]/g, "_")}`
+        : "";
+      const spec = useYulaGridStore.getState().spec;
+      const tableReadyOnScreen =
+        Boolean(expectedTable) &&
+        spec?.tableName === expectedTable &&
+        (        spec.columns?.length ?? 0) > 0;
+
+      upsertTurnTrace(conversationId, {
+        id: "user-send",
+        toolName: "worker",
+        label: "İstek alındı",
+        subLabel: text.slice(0, 80),
+        input: {
+          text,
+          href,
+          selectedJobId,
+          expectedTable,
+          specTable: spec?.tableName ?? null,
+          specCols: spec?.columns?.length ?? 0,
+          tableReadyOnScreen,
+          resultPath: isReportResultPath(pathOnly),
+        },
+      });
+
+      if (
+        isYulaGridSlashPrompt(text) &&
+        !isReportResultPath(pathOnly) &&
+        selectedJobId &&
+        !tableReadyOnScreen
+      ) {
+        queueYulaPrompt(text);
+        const exec = reportExecutionPath(pathOnly);
+        const to = exec ? `${exec}/${selectedJobId}` : null;
+        upsertTurnTrace(conversationId, {
+          id: "open-results",
+          toolName: "worker",
+          label: "Sonuç tablosu açılıyor",
+          subLabel: selectedJobId.slice(0, 8),
+          isLive: true,
+          input: { from: href, to },
+          output: { reason: "grid slash; DuckDB tablosu henüz yok" },
+        });
+        if (to) {
+          router.push(to);
+        }
+        return;
+      }
+
       setSendGate(true);
       // Yeni kullanıcı mesajı → durdurma kilidini kaldır, tur sıfırdan başlar
       userStoppedRef.current = false;
@@ -907,9 +1123,10 @@ function ChatInstance({
       } else {
         void chat.sendMessage({ text: finalText });
       }
+      })();
     },
     runPendingTool,
-  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, busy, isTurnActive]);
+  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, busy, isTurnActive, router, conversationId]);
 
   // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
   React.useEffect(() => {
@@ -953,7 +1170,12 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       : activeMsgs.length === 0;
 
     if (!isValidForScreen) {
-      const screenConv = conversations.find((c) => isConversationOnScreen(c.pathname, pathname));
+      const jobId = extractJobIdFromHref(pathname);
+      const screenConv = jobId
+        ? conversations.find(
+            (c) => (c.jobId ?? extractJobIdFromHref(c.pathname))?.toLowerCase() === jobId.toLowerCase(),
+          )
+        : conversations.find((c) => isConversationOnScreen(c.pathname, pathname));
       if (screenConv) {
         store.selectConversation(screenConv.id);
       } else {
@@ -976,13 +1198,14 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       const store = useChatsStore.getState();
       store.selectConversation(id);
       const target = store.conversations.find((c) => c.id === id);
-      if (
-        target?.pathname &&
-        typeof window !== "undefined" &&
-        window.location.pathname !== target.pathname
-      ) {
-        router.push(target.pathname);
-      }
+      if (!target) return;
+      navigateToConversationScreen(
+        target,
+        (href) => {
+          router.push(href);
+        },
+        store.messagesById[id],
+      );
     },
     [router],
   );

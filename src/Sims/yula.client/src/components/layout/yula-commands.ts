@@ -24,6 +24,8 @@ export type YulaCommand = {
   /** İstemciye eklenen veya gönderilen prompt metni */
   prompt: string;
   icon: LucideIcon;
+  /** Bu raporu zaten açıkken slash paletinden gizlenir (kriter evresi). */
+  pagePath?: string;
 };
 
 export type YulaCommandYamlItem = {
@@ -34,6 +36,7 @@ export type YulaCommandYamlItem = {
   prompt: string;
   icon: string;
   phase?: "system" | "grid" | "report";
+  pagePath?: string;
 };
 
 export type YulaCommandYamlManifest = {
@@ -67,6 +70,7 @@ function parseYamlCommands(yamlSource: string): YulaCommand[] {
       description: cmd.description,
       prompt: cmd.prompt,
       icon: resolveIcon(cmd.icon),
+      pagePath: cmd.pagePath,
     }));
   } catch (error) {
     console.error("YAML Command Parse Error:", error);
@@ -84,19 +88,55 @@ export const GRID_COMMANDS: YulaCommand[] = parseYamlCommands(gridCommandsYaml);
 export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(reportCommandsYaml);
 
 /**
- * Ekran evresine ve çalışma alanına (pathname) göre komut listesi:
- * - isViewingResults = true  (GUID URL / DuckDB Sonuç Ekranı) → Veri Analiz Komutları (/analiz, /top5, /kolonlar, /temizle)
- * - pathname === "/" (Ana Sayfa) → Yalnızca Sistem Komutları (/yeni, /dosya)
- * - Diğer Workspace Yolları (/stock vb.) → Workspace Ajan Komutları (/stok-bakiye, /stok-analiz, /anomali)
+ * Slash paleti yalnızca eylem komutlarıdır (rapor adı değil).
+ * - Sonuç (GUID / grid) → /analiz, /top5, /sorgu, /kolonlar, /temizle
+ * - Kriter / workspace → /run-job ve sistem komutları
  */
 export function getAllYulaCommands(
   isViewingResults = false,
-  _pathname = "/"
+  pathname = "/",
 ): YulaCommand[] {
   if (isViewingResults) {
     return [...SYSTEM_COMMANDS, ...GRID_COMMANDS];
   }
-  return [...SYSTEM_COMMANDS, ...REPORT_COMMANDS];
+  const path = pathname.split("?")[0] || "/";
+  const reportCommands = REPORT_COMMANDS.filter((cmd) => {
+    if (!cmd.pagePath) return true;
+    return path !== cmd.pagePath && !path.startsWith(`${cmd.pagePath}/`);
+  });
+  return [...SYSTEM_COMMANDS, ...reportCommands];
+}
+
+/** Manifestteki tüm slash komutları (evre karışık; tam eşleşme için). */
+export function getRegisteredYulaCommands(): YulaCommand[] {
+  const seen = new Set<string>();
+  const out: YulaCommand[] = [];
+  for (const cmd of [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...REPORT_COMMANDS]) {
+    const key = cmd.slash.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(cmd);
+  }
+  return out;
+}
+
+/** `/analiz foo` → kayıtlı komut; `/4` veya bilinmeyen slash → null. */
+export function resolveYulaSlashCommand(
+  input: string,
+  commands: YulaCommand[] = getRegisteredYulaCommands(),
+): YulaCommand | null {
+  if (!input.startsWith("/")) return null;
+  const token = input.slice(1).trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (!token) return null;
+  return commands.find((c) => c.slash.toLowerCase() === token) ?? null;
+}
+
+export function isYulaGridSlashPrompt(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (resolveYulaSlashCommand(trimmed, GRID_COMMANDS)) return true;
+  const lower = trimmed.toLowerCase();
+  return GRID_COMMANDS.some((cmd) => cmd.prompt.trim().toLowerCase() === lower);
 }
 
 export function matchYulaCommands(

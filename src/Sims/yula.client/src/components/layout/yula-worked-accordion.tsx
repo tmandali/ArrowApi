@@ -35,6 +35,9 @@ import {
 } from "@/hooks/use-yula-chat";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+import { resolveYulaSlashCommand } from "@/components/layout/yula-commands";
+import { getTurnTrace, subscribeTurnTrace } from "@/lib/yula-turn-trace";
+import type { TurnTraceStep } from "@/lib/yula-turn-trace";
 
 export interface WorkedStepItem {
   id: string;
@@ -55,16 +58,49 @@ interface YulaWorkedAccordionProps {
   isLive?: boolean;
   durationSec?: number;
   llmStepCount?: number;
+  conversationId?: string;
   className?: string;
 }
 
-/** Statik ve dinamik parçalardan YALNIZCA GERÇEK işlem ve düşünme adımlarını çıkartır */
+function traceToWorkedStep(step: TurnTraceStep): WorkedStepItem {
+  const pending = Boolean(step.isLive);
+  return {
+    id: step.id,
+    kind: step.isError ? "ran" : "explored",
+    label: step.label,
+    subLabel: step.subLabel,
+    detailText: step.detailText,
+    isLive: pending,
+    isError: step.isError,
+    info: {
+      toolCallId: step.id,
+      toolName: step.toolName ?? "worker",
+      state: pending
+        ? "input-available"
+        : step.isError
+          ? "output-error"
+          : "output-available",
+      input: step.input,
+      output: step.output,
+      errorText: step.isError ? step.detailText : undefined,
+    },
+  };
+}
+
+/** Statik ve dinamik parçalardan işlem, düşünme ve gizlenen worker adımlarını çıkarır */
 export function extractWorkedSteps(
   message?: YulaMessage,
   isLiveStreaming?: boolean,
   userMessage?: YulaMessage,
+  conversationId?: string,
 ): WorkedStepItem[] {
   const steps: WorkedStepItem[] = [];
+
+  if (conversationId) {
+    for (const trace of getTurnTrace(conversationId)) {
+      steps.push(traceToWorkedStep(trace));
+    }
+  }
 
   const userText = userMessage?.parts
     ?.filter((p) => p.type === "text")
@@ -72,8 +108,9 @@ export function extractWorkedSteps(
     ?.join("\n")
     ?.trim();
 
-  if (userText?.startsWith("/")) {
-    const cmdName = userText.split(/\s+/)[0];
+  const matchedCmd = userText ? resolveYulaSlashCommand(userText) : null;
+  if (matchedCmd) {
+    const cmdName = `/${matchedCmd.slash}`;
     steps.push({
       id: `${message?.id ?? "cmd"}-command-execution`,
       kind: "explored",
@@ -85,7 +122,7 @@ export function extractWorkedSteps(
         toolName: "slash_command",
         state: "output-available",
         input: { command: cmdName, prompt: userText },
-        output: { status: "ok", message: `${cmdName} özel sistem komutu tetiklendi.` },
+        output: { status: "ok", message: `${cmdName} (${matchedCmd.label}) çalıştırıldı.` },
       },
     });
   }
@@ -105,14 +142,12 @@ export function extractWorkedSteps(
   }
 
   message.parts.forEach((part, index) => {
-    // 1. Gerçek Düşünme Parçaları (Reasoning / Thinking)
     if (part.type === "reasoning") {
-      const text = sanitizeAssistantText(part.text ?? "");
-      if (!text.trim() && !isLiveStreaming) return;
+      const raw = part.text ?? "";
+      const text = sanitizeAssistantText(raw);
       const meta = (part as { meta?: string }).meta;
       const isThinking = !meta || meta === "thinking";
-      
-      const approxDuration = Math.max(1, Math.round(text.length / 60));
+      const approxDuration = Math.max(1, Math.round((text || raw).length / 60));
 
       steps.push({
         id: `${message.id}-reasoning-${index}`,
@@ -120,19 +155,78 @@ export function extractWorkedSteps(
         label: isThinking
           ? isLiveStreaming
             ? "Thinking & reasoning..."
-            : `Thought for ${approxDuration}s`
+            : text.trim()
+              ? `Thought for ${approxDuration}s`
+              : "Thought (boş / gizlendi)"
           : `Reasoning (${meta})`,
         subLabel: `${approxDuration}s`,
         durationSec: approxDuration,
-        detailText: text || "Düşünce adımları çözümleniyor...",
+        detailText: text || raw || "Düşünce metni yok veya sanitizer sildi.",
         isLive: isLiveStreaming,
+        isError: !text.trim() && Boolean(raw.trim()),
       });
       return;
     }
 
-    // 2. Gerçek Araç Parçaları (Tools)
+    if (part.type === "text") {
+      const raw = (part as { text?: string }).text ?? "";
+      const text = sanitizeAssistantText(raw);
+      if (text.trim()) return;
+      steps.push({
+        id: `${message.id}-text-hidden-${index}`,
+        kind: "thought",
+        label: raw.trim() ? "Model text gizlendi (sanitizer)" : "Model text boş",
+        subLabel: isLiveStreaming ? "Streaming..." : "no visible bubble",
+        detailText: raw.slice(0, 2000) || "(part.text boş)",
+        isLive: isLiveStreaming,
+        isError: Boolean(raw.trim()),
+        info: {
+          toolCallId: `${message.id}-text-hidden-${index}`,
+          toolName: "model_text",
+          state: "output-available",
+          input: { chars: raw.length },
+          output: { sanitizedEmpty: true, preview: raw.slice(0, 400) },
+        },
+      });
+      return;
+    }
+
+    if (part.type === "step-start") {
+      steps.push({
+        id: `${message.id}-step-start-${index}`,
+        kind: "explored",
+        label: "LLM step-start",
+        subLabel: isLiveStreaming ? "Yeni tur başladı..." : "step",
+        isLive: isLiveStreaming,
+        info: {
+          toolCallId: `${message.id}-step-start-${index}`,
+          toolName: "step-start",
+          state: "output-available",
+          input: part,
+          output: { index },
+        },
+      });
+      return;
+    }
+
     const info = yulaToolPartInfo(part);
-    if (!info) return;
+    if (!info) {
+      steps.push({
+        id: `${message.id}-part-${index}`,
+        kind: "explored",
+        label: `Part: ${part.type ?? "unknown"}`,
+        subLabel: isLiveStreaming ? "Incoming part..." : "unparsed",
+        isLive: isLiveStreaming,
+        info: {
+          toolCallId: `${message.id}-part-${index}`,
+          toolName: String(part.type ?? "unknown_part"),
+          state: "output-available",
+          input: part,
+          output: null,
+        },
+      });
+      return;
+    }
 
     const isError = isFailedToolInfo(info);
     const isPending = info.state !== "output-available" && info.state !== "output-error";
@@ -378,6 +472,7 @@ export function YulaWorkedAccordion({
   isLive = false,
   durationSec,
   llmStepCount,
+  conversationId,
   className,
 }: YulaWorkedAccordionProps) {
   const [open, setOpen] = React.useState(isLive);
@@ -437,18 +532,23 @@ export function YulaWorkedAccordion({
     );
   }, [message]);
 
-  React.useEffect(() => {
-    if (!isLive && hasTextContent && !userToggled) {
-      setOpen(false);
-    } else if (isLive && !userToggled) {
-      setOpen(true);
-    }
-  }, [isLive, hasTextContent, userToggled]);
+  const [traceRev, bumpTrace] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => subscribeTurnTrace(() => bumpTrace()), []);
 
   const steps = React.useMemo(
-    () => extractWorkedSteps(message, isLive, userMessage),
-    [message, isLive, userMessage]
+    () => extractWorkedSteps(message, isLive, userMessage, conversationId),
+    [message, isLive, userMessage, conversationId, traceRev],
   );
+
+  React.useEffect(() => {
+    if (userToggled) return;
+    const keepOpen =
+      isLive ||
+      !hasTextContent ||
+      steps.some((s) => s.isError) ||
+      steps.some((s) => s.info?.toolName === "worker");
+    setOpen(keepOpen);
+  }, [isLive, hasTextContent, userToggled, steps]);
 
   const lastLiveTimerRef = React.useRef<number>(0);
 
@@ -470,8 +570,8 @@ export function YulaWorkedAccordion({
 
   const timeLabel = typeof totalTime === "number" ? Math.max(1, Math.round(totalTime)) : totalTime;
 
-  // Mesaj, süre veya canlı akış varsa HER ZAMAN Worked for Xs başlığını ekranda kalıcı tut (asla kaybolmaz)
-  if (!message && !isLive && !durationSec) return null;
+  // Worker her zaman: asistan, canlı akış, süre veya görünür adım varsa
+  if (!message && !isLive && !durationSec && steps.length === 0) return null;
 
   const hasExpandableContent = steps.length > 0;
 
@@ -524,8 +624,9 @@ export function YulaWorkedAccordion({
             {steps.map((step) => {
               // Düşünme adımları varsayılan olarak açık başlar (Gemini stili)
               const isThought = step.kind === "thought";
+              const autoOpen = isThought || Boolean(step.isError);
               const isManuallyToggled = expandedStepId === step.id;
-              const isExpanded = isThought
+              const isExpanded = autoOpen
                 ? expandedStepId === null || expandedStepId === step.id
                 : isManuallyToggled;
 
@@ -547,9 +648,21 @@ export function YulaWorkedAccordion({
                       hasDetails ? "cursor-pointer hover:text-foreground" : "cursor-default"
                     )}
                   >
-                    <span className="font-sans font-normal text-[12.5px] text-foreground/85">
+                    <span
+                      className={cn(
+                        "font-sans font-normal text-[12.5px]",
+                        step.isError
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-foreground/85",
+                      )}
+                    >
                       {step.label}
                     </span>
+                    {step.subLabel ? (
+                      <span className="truncate font-mono text-[10.5px] text-muted-foreground/70">
+                        {step.subLabel}
+                      </span>
+                    ) : null}
 
                     {step.diffBadge ? (
                       <span className="inline-flex items-center gap-1 font-mono text-[10.5px]">

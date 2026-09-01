@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { isConversationOnScreen, formatPathnameLabel } from "@/lib/workspace-paths";
+import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import {
@@ -200,11 +201,13 @@ export function YulaHistorySidebar({
                       onClick={() => {
                         if (!isEditing) {
                           selectConversation(session.id);
-                          const currPath = typeof window !== "undefined" ? window.location.pathname.replace(/\/+$/, "") || "/" : "";
-                          const targetPath = (session.pathname || "").replace(/\/+$/, "") || "/";
-                          if (session.pathname && currPath !== targetPath) {
-                            router.push(session.pathname);
-                          }
+                          navigateToConversationScreen(
+                            session,
+                            (href) => {
+                              router.push(href);
+                            },
+                            useChatsStore.getState().messagesById[session.id],
+                          );
                           setOpen(true);
                           setHistoryOpen(false);
                           onSelectConversation?.();
@@ -261,6 +264,14 @@ export function YulaHistorySidebar({
                             <span className="truncate text-[11.5px] leading-tight font-normal flex-1">
                               {session.title}
                             </span>
+                            {pathLabel ? (
+                              <span
+                                className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70"
+                                title={session.pathname}
+                              >
+                                {pathLabel}
+                              </span>
+                            ) : null}
                           </div>
 
                           <div className="flex items-center gap-0.5 ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -376,12 +387,18 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
     [filteredSessions]
   );
 
-  const handleSelect = (id: string, targetPathname?: string) => {
+  const handleSelect = (id: string, target?: YulaConversation) => {
     selectConversation(id);
-    const currPath = typeof window !== "undefined" ? window.location.pathname.replace(/\/+$/, "") || "/" : "";
-    const targetPath = (targetPathname || "").replace(/\/+$/, "") || "/";
-    if (targetPathname && currPath !== targetPath) {
-      router.push(targetPathname);
+    const session =
+      target ?? useChatsStore.getState().conversations.find((c) => c.id === id);
+    if (session) {
+      navigateToConversationScreen(
+        session,
+        (href) => {
+          router.push(href);
+        },
+        useChatsStore.getState().messagesById[id],
+      );
     }
     setOpen(true);
     setSearchingHistory(false);
@@ -501,7 +518,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                       <div
                         key={session.id}
                         onClick={() => {
-                          if (!isEditing) handleSelect(session.id, session.pathname);
+                          if (!isEditing) handleSelect(session.id, session);
                         }}
                         className={cn(
                           "group relative flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-colors cursor-pointer border-0",
@@ -558,7 +575,10 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                                 {session.title}
                               </span>
                               {pathLabel ? (
-                                <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70 transition-colors">
+                                <span
+                                  className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70"
+                                  title={session.pathname}
+                                >
                                   {pathLabel}
                                 </span>
                               ) : null}

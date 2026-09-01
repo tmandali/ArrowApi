@@ -88,7 +88,7 @@ export const STATIC_TOOLS = {
     get_report_schema: reportSchemaTool,
     run_report: tool({
       description: [
-        "Bir raporu GERÇEKLEŞTİRİR (backend job başlatır) ve sonuç/execution ekranını açar.",
+        "Bir raporu GERÇEKLEŞTİRİR (backend job başlatır) ve execution ekranında yeni job'ı seçili/çalışır gösterir.",
         `Kullanılabilir raporlar: ${DEMO_REPORTS.map((r) => r.scope).join(", ")}.`,
         'Kullanıcı herhangi bir rapor istediğinde (örn: "stok bakiye raporu", "raporu hazırla", "stok bakiyesi göster", "geçen hafta itibarıyla hazırla"), kriterler tam verilsin veya verilmesin BU ARACI DERHAL ÇAĞIR.',
         "Kullanıcıya sohbet üzerinden tarih formatı veya kriter sorusu SORMA — aracı criteria:{} ile çağır; sistem varsayılan tarih ve kriterleri otomatik uygulayacaktır.",
@@ -137,7 +137,7 @@ export const STATIC_TOOLS = {
     }),
     run_job: tool({
       description: [
-        "Stok Bakiye veya aktif rapor için backend job başlatır ve sonuç ekranına (/guid) yönlendirir.",
+        "Stok Bakiye veya aktif rapor için backend job başlatır ve execution ekranında yeni job'ı seçer (GUID sonuç sayfasına atlama).",
         "Kullanıcı önerilen bir seçeneği doğrudan çalıştırmak istediğinde veya 'run et' dediğinde zorunlu alanları (kayitTarihi) ve kriterleri belirterek BU ARACI ÇAĞIR.",
       ].join(" "),
       inputSchema: z.object({

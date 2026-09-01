@@ -44,6 +44,8 @@ export interface YulaScreenContext {
   workspaceId?: string;
   workspaceLabel?: string;
   phase?: YulaScreenPhase;
+  /** Sonuç ekranındaki job GUID — geçmiş ve analiz bağlamı */
+  jobId?: string;
   grid?: YulaGridContext | null;
   screen?: import("@/lib/stores/grid").YulaScreenRegistration | null;
   /** DuckDB WASM + All-MiniLM RAG Vektör arama sonuçları */
@@ -58,6 +60,7 @@ import {
   isWorkspaceHomePath,
   workspaceIdFromPath,
   workspaceLabelFromPath,
+  extractJobIdFromHref,
 } from "@/lib/workspace-paths";
 
 const BASE_PROMPT = [
@@ -70,7 +73,7 @@ const BASE_PROMPT = [
   "• CHAT BUBBLE BUDGET (narrow dock): Keep user-visible replies SHORT. Prefer 1–3 short sentences, then at most 4 titled bullets. Do not write essays, first-person plans ('hesaplarım', 'analiz ederim', 'görselleştiririm'), or restating the user's request.",
   "",
   "TOOL EXECUTION PRINCIPLES:",
-  "• Tools are invoked only through the structured tools API. Never write tool calls as chat text (no XML, no 【 】, no to=functions, no fake JSON wrappers).",
+  "• Greeting, thanks, or small talk (e.g. merhaba, selam, nasılsın): reply in Turkish immediately. Do not call any tool.",
   "• The tools provided in each turn represent your complete capabilities for the active screen. Use them whenever an action or data query is requested.",
   "• Do NOT announce tool execution in conversational text (e.g. avoid 'Starting query now...'). Call the tool; after results, answer in Turkish.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
@@ -114,6 +117,7 @@ const GRID_PRESENT_RULES = [
 const GRID_ABSENT_RULES = [
   "REPORT CATALOG & EXECUTION:",
   "• When user requests a report (e.g. 'Stok Bakiye Raporu', 'hazırla', 'çalıştır'), immediately call run_report with the appropriate scope and criteria.",
+  "• After run_report/run_job the client opens the report EXECUTION screen and selects the new running job — do not tell the user a GUID results table opened.",
   "• Do not push back asking for dates or formats; relative dates (e.g. 'bugün', 'geçen hafta') are automatically resolved.",
   "• Available reports in catalog:",
   REPORTS_DIGEST_LINES,
@@ -200,12 +204,14 @@ const SMART_SQL_QUERY_RULES = [
 export function buildSystemPrompt(context?: YulaScreenContext): string {
   const lines: string[] = [BASE_PROMPT];
 
-  const pathname = context?.pathname ?? "/";
+  const href = context?.pathname ?? "/";
+  const pathname = href.split("?")[0] || "/";
   const isMainHome = isWorkspaceHomePath(pathname);
   const mode = context?.mode ?? (isMainHome ? "main" : "dock");
   const wsId = context?.workspaceId ?? workspaceIdFromPath(pathname);
   const wsLabel = context?.workspaceLabel ?? workspaceLabelFromPath(pathname);
   const phase = context?.phase ?? "workspace";
+  const jobId = context?.jobId ?? extractJobIdFromHref(href);
   const todayStr = new Date().toISOString().split("T")[0];
 
   lines.push(
@@ -223,17 +229,22 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     "=== LEVEL 3: PAGE / SCREEN SCOPE ===",
     `• Current Page Path: ${pathname}`,
     `• Screen Phase: ${phase.toUpperCase()} (${phase === "results" ? "Active Job Data Table Open" : phase === "results-loading" ? "Table Loading" : "Criteria / Form / Home Workspace"})`,
+    jobId ? `• Active Job Id (GUID): ${jobId}` : "• Active Job Id: none (criteria / catalog screen)",
+    "• PHASE WALL (do not mix these jobs):",
+    "  - RESULTS (URL has a job GUID or ?job= and the table is loaded): Analyze ONLY the open table. Never call run_job, run_report, apply_criteria, or prepare_report_criteria. Never offer to start a new report job.",
+    "  - WORKSPACE / CRITERIA (no selected job): User is filling criteria to CREATE a job. Never filter/analyze a grid as if results were open. Use apply_criteria / run_job / get_report_schema only.",
+    "  - RESULTS-LOADING: Table not ready. Do not call grid or run_job tools; tell the user to wait.",
     "• APPLICATION IN-APP NAVIGATION (navigate_to_page):",
     "  - Uygulama içi istemci yönlendirmesi için 'navigate_to_page' aracına sahipsin.",
     "  - Standart Rotalar:",
-    "    • Stok Bakiye Raporu: '/stock/stock-balance'",
-    "    • Stok Analiz Raporu: '/stock/stock-analytics'",
+    "    • Stok Bakiye Raporu (execution): '/stock/stock-balance'",
+    "    • Stok Analiz Raporu (execution): '/stock/stock-analytics'",
     "    • Stok Ana Sayfa / Modülü: '/stock'",
     "    • Muhasebe Modülü: '/accounting'",
     "    • Satış Modülü: '/selling'",
     "    • Üretim Modülü: '/manufacturing'",
     "  - KULLANICI BAŞKA BİR EKRANDAYKEN (Current Page Path hedef rota ile eşleşmiyorsa):",
-    "    • Kullanıcı 'stok bakiye', 'stok raporu', 'analiz', 'muhasebeye git' istediğinde veya '/stok-bakiye' komutu verildiğinde:",
+    "    • Kullanıcı 'stok bakiye', 'stok raporu', 'stok analiz', 'muhasebeye git' gibi bir rapor veya modül istediğinde:",
     "      1. DERHAL 'navigate_to_page' aracını ilgili path ve title ile çağır (örn: path: '/stock/stock-balance', title: 'Stok Bakiye Raporu').",
     "      2. Yanıtında kullanıcıya sayfaya yönlendirildiğini, açılan ekranda kriterleri belirleyip 'Run' ile çalıştırabileceğini belirt.",
     "      3. Yanıtında [Stok Bakiye Raporu](/stock/stock-balance) linkini de sun.",
@@ -249,7 +260,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     DEMO_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
     (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
 
-  if (activeReportMeta && phase !== "results") {
+  if (activeReportMeta && phase === "workspace") {
     const reportTitle = activeReportMeta.title;
     const scope = activeReportMeta.scope;
     const reqList = activeReportMeta.fullSchema?.required ?? [];
@@ -277,7 +288,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     );
   }
 
-  if (context?.grid) {
+  if (phase === "results" && context?.grid) {
     lines.push(GRID_PRESENT_RULES);
     lines.push(SQL_EXPERT_RULES);
     lines.push(DATA_QUALITY_ANALYSIS_RULES);
@@ -339,10 +350,10 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     }
 
     gridLines.push(
-      "DO NOT answer analysis/filter requests without calling the appropriate tool first.",
+      "DO NOT answer analysis/filter requests without calling the appropriate tool first. Greetings and small talk are answers, not tools.",
     );
     lines.push(gridLines.join(" "));
-  } else {
+  } else if (phase !== "results" && phase !== "results-loading") {
     lines.push(GRID_ABSENT_RULES);
   }
 

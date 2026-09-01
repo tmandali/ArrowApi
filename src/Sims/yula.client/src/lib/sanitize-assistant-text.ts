@@ -39,7 +39,7 @@ export function sanitizeAssistantText(text: string): string {
     .replace(/\n{3,}/g, "\n\n")
 
   if (!s) return ""
-  if (leaked && (isDebugSoup(s) || letterCount(s) < 24)) return ""
+  if (leaked && isDebugSoup(s)) return ""
   if (isMostlyJunk(s) || isDebugSoup(s)) return ""
   return s
 }
@@ -56,10 +56,6 @@ function isDebugSoup(s: string): boolean {
   return /malformed|no such tool|not possible\.|valid tool call|json content|by mistake\?/i.test(
     s,
   )
-}
-
-function letterCount(s: string): number {
-  return (s.match(/[A-Za-zÀ-ɏ\u011E\u011F\u0130\u0131\u015E\u015F]/g) ?? []).length
 }
 
 function isMostlyJunk(s: string): boolean {

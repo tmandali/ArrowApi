@@ -92,6 +92,8 @@ export interface YulaChatTurnProps {
   llmStepCount?: number;
   recoveredToolCallIds?: Set<string>;
   onUndo?: (text: string) => void;
+  /** Worker izleri yalnız aktif turda */
+  conversationId?: string;
 }
 
 export function YulaChatTurn({
@@ -102,6 +104,7 @@ export function YulaChatTurn({
   llmStepCount,
   recoveredToolCallIds = new Set(),
   onUndo,
+  conversationId,
 }: YulaChatTurnProps) {
   const yula = useYulaChat();
   const [copied, setCopied] = React.useState(false);
@@ -254,6 +257,7 @@ export function YulaChatTurn({
           isLive={isLive}
           durationSec={durationSec}
           llmStepCount={llmStepCount}
+          conversationId={conversationId}
         />
 
         {/* Özel Görsel Kartlar (Grafik Kartı) */}

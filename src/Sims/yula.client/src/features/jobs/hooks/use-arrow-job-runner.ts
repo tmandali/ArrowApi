@@ -19,6 +19,10 @@ import type {
   ArrowJobStatus,
 } from "@/features/jobs/types"
 import type { WorkspaceKey } from "@/lib/workspace"
+import {
+  subscribeExecutionFocus,
+  takePendingExecutionFocus,
+} from "@/lib/report-run-bus"
 
 export type ArrowJobRunnerOptions = {
   jobName: string
@@ -360,7 +364,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     },
     [followJob]
   )
-
   const handleSelectJob = React.useCallback(
     (jobOrId: ArrowJobStatus | string | null) => {
       if (!jobOrId) {
@@ -409,6 +412,48 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     },
     [followJob, patchLive, publishFocused]
   )
+
+  const applyExecutionFocus = React.useCallback(
+    (job: ArrowJobStatus, request?: Record<string, unknown>) => {
+      if (isInFlightStatus(job.status)) {
+        handleSubmitted(job, request ?? {})
+        return
+      }
+      preferCriteriaRef.current = false
+      setComposing(false)
+      handleSelectJob(job)
+    },
+    [handleSelectJob, handleSubmitted],
+  )
+
+  const applyExecutionFocusRef = React.useRef(applyExecutionFocus)
+  applyExecutionFocusRef.current = applyExecutionFocus
+
+  React.useEffect(() => {
+    const pending = takePendingExecutionFocus(jobName)
+    if (pending) {
+      applyExecutionFocusRef.current(pending.job, pending.request)
+    } else if (typeof window !== "undefined") {
+      const jobId = new URLSearchParams(window.location.search).get("job")
+      if (jobId) {
+        const tracked = useActiveJobsStore.getState().jobs[jobId]
+        applyExecutionFocusRef.current(
+          {
+            id: jobId,
+            status: tracked?.status || "Completed",
+            eventsUrl: tracked?.eventsUrl ?? "",
+            jobUrl: tracked?.jobUrl ?? "",
+            createdAt: tracked?.createdAt,
+            name: tracked?.name,
+          },
+          tracked?.payload,
+        )
+      }
+    }
+    return subscribeExecutionFocus(jobName, (focus) => {
+      applyExecutionFocusRef.current(focus.job, focus.request)
+    })
+  }, [jobName])
 
   const handleJobCancelled = React.useCallback(
     (jobId: string) => {

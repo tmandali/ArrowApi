@@ -2,7 +2,8 @@ import { useYulaGridStore } from "@/lib/stores/grid"
 import { findReport, REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
 import { guardReadOnlySelect } from "@/lib/sql-guard";
-import { isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
+import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
+import { focusReportExecution, reportExecutionHref } from "@/lib/report-run-bus";
 
 /**
  * İstemci tarafı araç yürütücüleri — kullanıcının etkileşimiyle ya da
@@ -84,33 +85,27 @@ async function resolveActiveDataset(): Promise<ActiveDataset | null> {
   return { from, columns: spec.columns, numeric, isCustom: true, tableName: spec.tableName };
 }
 
-/**
- * Öz-düzeltme: sonuç ekranındaysak ama mağazadaki spec boş/eksikse
- * (navigasyon/refresh race'i) DuckDB şemasından anında tamamla.
- */
-const JOB_DETAIL_PREFIXES = [
-  "/stock/stock-balance/",
-  "/stock/stock-analytics/",
-  "/stock/analytics/",
-];
-
 async function ensureGridSpec(): Promise<
   ReturnType<typeof useYulaGridStore.getState>["spec"]
 > {
   const store = useYulaGridStore.getState();
-  if (store.spec && store.spec.columns.length > 0) return store.spec;
-
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "";
-  const isJobDetail = JOB_DETAIL_PREFIXES.some(
-    (p) => pathname.startsWith(p) && pathname.length > p.length,
-  );
-  if (!isJobDetail) return store.spec;
-
-  const jobIdSeg = pathname.split("/").pop() ?? "";
+  const href =
+    typeof window !== "undefined"
+      ? `${window.location.pathname}${window.location.search}`
+      : "";
+  const jobIdSeg = extractJobIdFromHref(href) ?? "";
   const tableName = jobIdSeg
     ? `report_${jobIdSeg.replace(/[^a-zA-Z0-9_]/g, "_")}`
     : "";
+
+  if (
+    store.spec &&
+    store.spec.columns.length > 0 &&
+    (!tableName || store.spec.tableName === tableName)
+  ) {
+    return store.spec;
+  }
+
   if (!tableName) return store.spec;
 
   // Ingest penceresi yarışı: tablo worker'a birkaç yüz ms sonra düşebilir;
@@ -1049,16 +1044,22 @@ export async function executeClientTool(
           payload: result.instance,
         });
 
+        focusReportExecution({
+          scope,
+          job,
+          request: result.instance,
+        });
+
         const preset = typeof args.presetTitle === "string" ? args.presetTitle : undefined;
         return {
           status: "executed",
           jobId: job.id,
           jobStatus: job.status,
-          navigateTo: `${meta.pagePath}/${job.id}`,
+          navigateTo: reportExecutionHref(meta.pagePath, job.id),
           presetTitle: preset,
           message: preset
-            ? `"${preset}" job'ı başlatıldı (${job.id}). Sonuç ekranı açılıyor.`
-            : `Job başlatıldı (${job.id}). Sonuç ekranı açılıyor.`,
+            ? `"${preset}" job'ı başlatıldı (${job.id}). Execution ekranında seçildi.`
+            : `Job başlatıldı (${job.id}). Execution ekranında çalışıyor olarak seçildi.`,
         };
       } catch (err) {
         return {

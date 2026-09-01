@@ -28,7 +28,6 @@ import {
   matchYulaCommands,
   type YulaCommand,
 } from "@/components/layout/yula-commands"
-import { useYulaGridStore } from "@/lib/stores/grid"
 import { useChatsStore } from "@/lib/stores/chats"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
@@ -38,7 +37,8 @@ import {
   type YulaToolPartInfo,
 } from "@/hooks/use-yula-chat"
 import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route"
-import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, isReportResultView } from "@/lib/workspace-paths"
+import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
+import { peekQueuedYulaPrompt, subscribeQueuedYulaPrompt } from "@/lib/yula-pending-prompt"
 import { cn } from "@/utils/cn"
 import {
   ArrowDown,
@@ -460,6 +460,9 @@ export function AIChatPanel({
   const sendPrompt = yula.sendMessageText
   const { messages } = yula
 
+  const [queuedPrompt, setQueuedPrompt] = React.useState(peekQueuedYulaPrompt)
+  React.useEffect(() => subscribeQueuedYulaPrompt(() => setQueuedPrompt(peekQueuedYulaPrompt())), [])
+
   // SDK geçişlerinde (stream + persist rehydrate) aynı id'li mesaj dizide
   // iki kez bulunabilir → React key çakışması ve çift balon render'ı.
   // Render öncesi id'ye göre tekilleştir (SON kopya en taze durumudur).
@@ -565,8 +568,12 @@ export function AIChatPanel({
   const introDescription = `${workspaceLabel} çalışma alanınızda — ${YULA.emptyDescription}`
 
   const isLoading = isProcessing
-  const spec = useYulaGridStore((s) => s.spec)
-  const isViewingResults = isReportResultView(pathname, spec)
+  const selectedJobId =
+    typeof window !== "undefined"
+      ? extractJobIdFromHref(`${pathname}${window.location.search}`)
+      : extractJobIdFromPath(pathname)
+  const isViewingResults =
+    isReportResultPath(pathname) || Boolean(selectedJobId)
   const allCommands = React.useMemo(() => getAllYulaCommands(isViewingResults, pathname), [isViewingResults, pathname])
   const commandMatches = matchYulaCommands(input, allCommands)
   const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0
@@ -667,7 +674,6 @@ export function AIChatPanel({
   }
 
   const handleSend = () => {
-    if (isLoading) return
     sendText(input)
   }
 
@@ -719,11 +725,10 @@ export function AIChatPanel({
   }
 
   const canSubmit =
-    !isLoading &&
-    (Boolean(input.trim()) ||
-      Boolean(selectedCommand) ||
-      Boolean(pastedChip) ||
-      attachments.length > 0)
+    Boolean(input.trim()) ||
+    Boolean(selectedCommand) ||
+    Boolean(pastedChip) ||
+    attachments.length > 0
 
   const inputArea = (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
@@ -899,9 +904,7 @@ export function AIChatPanel({
               }
             }}
             placeholder={
-              isLoading
-                ? "Yanıt bekleniyor — lütfen bitmesini bekleyin…"
-                : selectedCommand || pastedChip
+              selectedCommand || pastedChip
                 ? "Ek mesaj veya parametre yazın..."
                 : YULA.placeholder
             }
@@ -955,7 +958,7 @@ export function AIChatPanel({
             <YulaModelSelector />
           </div>
 
-          {isLoading ? (
+          {isLoading && !canSubmit ? (
             <Button
               type="button"
               size="icon"
@@ -1072,8 +1075,11 @@ export function AIChatPanel({
             >
               <div className="mx-auto w-full max-w-3xl space-y-2.5 px-3 py-2">
                 {turns.map((turn, idx) => {
+                  const isLast = idx === turns.length - 1
                   const isLiveTurn =
-                    (isLoading || yula.isTurnActive) && idx === turns.length - 1;
+                    !queuedPrompt &&
+                    (isLoading || yula.isTurnActive) &&
+                    isLast;
 
                   const durationSec = turn.assistantMessage?.id
                     ? yula.responseDurations[turn.assistantMessage.id]
@@ -1092,9 +1098,27 @@ export function AIChatPanel({
                       llmStepCount={llmStepCount}
                       recoveredToolCallIds={recoveredToolCallIds}
                       onUndo={handleUndo}
+                      conversationId={
+                        queuedPrompt || !isLast ? undefined : yula.activeId
+                      }
                     />
                   )
                 })}
+                {queuedPrompt ? (
+                  <YulaChatTurn
+                    key="yula-pending-prompt"
+                    userMessage={
+                      {
+                        id: "yula-pending-user",
+                        role: "user",
+                        parts: [{ type: "text", text: queuedPrompt }],
+                      } as YulaMessage
+                    }
+                    isLive
+                    conversationId={yula.activeId}
+                    recoveredToolCallIds={recoveredToolCallIds}
+                  />
+                ) : null}
               </div>
             </div>
 
