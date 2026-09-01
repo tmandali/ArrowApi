@@ -1247,7 +1247,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
     | "deleteConversation" | "newConversation" | "model" | "setModel"
     | "isThinkingEnabled" | "setThinkingEnabled"
   > | null>(null);
-  const [, bump] = React.useReducer((x) => x + 1, 0);
+  const [helpersVersion, bump] = React.useReducer((x) => x + 1, 0);
   const lastSigRef = React.useRef("");
 
   const setLiveHelpersStable = React.useCallback((h: NonNullable<typeof helpersRef.current>) => {
@@ -1284,6 +1284,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       setThinkingEnabled,
     };
   }, [
+	helpersVersion,
 	activeId,
 	conversations,
 	model,

@@ -7,7 +7,7 @@
  */
 
 import { duckDbClient } from "@/services/duckdb";
-import { getEmbedding, VECTOR_DIMENSION } from "@/lib/yula-embedding";
+import { getEmbedding, getEmbeddings, VECTOR_DIMENSION } from "@/lib/yula-embedding";
 import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
 import { STOCK_WORKSPACE_MENU_ITEMS } from "@/features/stock/lib/stock-menu-registry";
 
@@ -20,6 +20,28 @@ export interface RagVectorItem {
 }
 
 let activeStoreDimension: number | null = null;
+
+/**
+ * Oturum düzeyinde indeksleme dedup'ı: DuckDB WASM tablosu sayfa ömrü boyunca
+ * yaşadığı için şema/menü indeksi bir kez kurulur. StrictMode çift-effect ve
+ * eşzamanlı mount'larda (ChatInstance + StockPageForm) aynı anda ikinci bir
+ * indeksleme turu başlamasın diye devam eden promise paylaşılır (in-flight
+ * dedup); tamamlanınca bayrak set edilir, hata olursa retry'a izin verilir.
+ */
+/** Devam eden aynı indeksleme işini paylaşır; bitince bayrağı set eder, hata halinde retry'a açar. */
+function dedupeSessionIndex(
+  flagRef: { promise: Promise<number> | null },
+  run: () => Promise<number>,
+): Promise<number> {
+  if (!flagRef.promise) {
+    flagRef.promise = run()
+      .catch((err) => {
+        flagRef.promise = null;
+        throw err;
+      });
+  }
+  return flagRef.promise;
+}
 
 /** DuckDB WASM üzerinde vektör RAG tablosunu istenen boyuta göre (örn: 384 veya 1536) hazırlar. */
 export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<void> {
@@ -64,10 +86,24 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
   }
 }
 
-/** Sistemdeki tüm rapor şemalarını ve kolon tanımlarını vektörleştirip indeksler. */
-export async function indexReportSchemas(): Promise<number> {
+const reportSchemaIndexRef: { promise: Promise<number> | null } = { promise: null };
+const workspaceMenuIndexRef: { promise: Promise<number> | null } = { promise: null };
+
+/** Sistemdeki tüm rapor şemalarını ve kolon tanımlarını vektörleştirip indeksler (oturum başına bir kez, toplu istekle). */
+export function indexReportSchemas(): Promise<number> {
+  return dedupeSessionIndex(reportSchemaIndexRef, doIndexReportSchemas);
+}
+
+async function doIndexReportSchemas(): Promise<number> {
   await initVectorStore();
-  let indexedCount = 0;
+
+  type PendingVector = {
+    id: string;
+    scope: string;
+    content: string;
+    metadata: Record<string, unknown>;
+  };
+  const pending: PendingVector[] = [];
 
   for (const report of DEMO_REPORTS) {
     const scope = report.scope;
@@ -75,15 +111,12 @@ export async function indexReportSchemas(): Promise<number> {
 
     // 1) Rapor üst seviye özeti
     const summaryText = `Rapor: ${title} (${scope}, workspace: ${report.workspace}). Kapsam ve tanım: Stok bakiyeleri, miktar, tutar ve depo detayları.`;
-    const summaryVec = await getEmbedding(summaryText);
-    await insertOrReplaceVector({
+    pending.push({
       id: `report_${scope}_summary`,
       scope,
       content: summaryText,
       metadata: { type: "report_summary", title, scope, workspace: report.workspace },
-      embedding: summaryVec,
     });
-    indexedCount++;
 
     // 2) Kriter alanları özeti
     const criteriaEntries = Object.entries(report.criteriaSchema.properties);
@@ -91,35 +124,29 @@ export async function indexReportSchemas(): Promise<number> {
       const fieldTitle = prop.title ?? key;
       const optionsStr = prop.enum ? `, seçenekler: ${prop.enum.join(" | ")}` : "";
       const text = `Rapor Kriter Alanı: ${key} (${fieldTitle}). Rapor: ${title} (${scope}, workspace: ${report.workspace})${optionsStr}.`;
-      const vec = await getEmbedding(text);
-      await insertOrReplaceVector({
+      pending.push({
         id: `report_${scope}_criteria_${key}`,
         scope,
         content: text,
         metadata: { type: "criteria_field", key, title: fieldTitle, scope, workspace: report.workspace },
-        embedding: vec,
       });
-      indexedCount++;
     }
 
     // 3) Kolon açıklamaları (x-ai.columnDescriptions)
     const colDescs = (report.fullSchema as unknown as { "x-ai"?: { columnDescriptions?: Record<string, string> } })?.["x-ai"]?.columnDescriptions ?? {};
     for (const [col, desc] of Object.entries(colDescs)) {
       const text = `Kolon Tanımı: ${col} - ${desc}. Rapor: ${title} (${scope}, workspace: ${report.workspace}).`;
-      const vec = await getEmbedding(text);
-      await insertOrReplaceVector({
+      pending.push({
         id: `report_${scope}_col_${col}`,
         scope,
         content: text,
         metadata: { type: "column_description", column: col, scope, workspace: report.workspace },
-        embedding: vec,
       });
-      indexedCount++;
     }
   }
 
   // 4) Sistem ve Kişisel Rotaların RAG İndeksine Eklenmesi (/my ve /system)
-  const systemKnowledge = [
+  pending.push(
     {
       id: "system_my_settings",
       scope: "my",
@@ -132,54 +159,53 @@ export async function indexReportSchemas(): Promise<number> {
       content: "Sistem Kullanıcı Dizin Kataloğu (/system/users): Şirket genelindeki tüm kayıtlı kullanıcılar, rolleri, erişim yetkileri ve aktif oturum durumları bu ekranda yönetilir.",
       metadata: { type: "system_route", path: "/system/users" },
     },
-  ];
+  );
 
-  for (const item of systemKnowledge) {
-    const vec = await getEmbedding(item.content);
-    await insertOrReplaceVector({
-      ...item,
-      embedding: vec,
-    });
-    indexedCount++;
+  // Tek toplu embedding isteği (öğe başına ayrı POST fırtınası yerine)
+  const vectors = await getEmbeddings(pending.map((p) => p.content));
+  for (let i = 0; i < pending.length; i++) {
+    await insertOrReplaceVector({ ...pending[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
   }
+  const indexedCount = pending.length;
 
   // 5) Workspace Menü ve Modül Öğelerinin Vektör İndeksine Eklenmesi
   const menuCount = await indexWorkspaceMenus();
-  indexedCount += menuCount;
+  const total = indexedCount + menuCount;
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${indexedCount} total vector items indexed into DuckDB WASM.`);
-  return indexedCount;
+  console.info(`🤖 [DuckDB WASM Vector Indexer] ${total} total vector items indexed into DuckDB WASM.`);
+  return total;
 }
 
-/** Workspace menü öğelerini (Stock vb.) DuckDB WASM RAG tablosuna vektörleştirip kaydeder. */
-export async function indexWorkspaceMenus(): Promise<number> {
+/** Workspace menü öğelerini (Stock vb.) DuckDB WASM RAG tablosuna vektörleştirip kaydeder (oturum başına bir kez, toplu istekle). */
+export function indexWorkspaceMenus(): Promise<number> {
+  return dedupeSessionIndex(workspaceMenuIndexRef, doIndexWorkspaceMenus);
+}
+
+async function doIndexWorkspaceMenus(): Promise<number> {
   await initVectorStore();
-  let count = 0;
 
-  for (const item of STOCK_WORKSPACE_MENU_ITEMS) {
-    const content = `Modül Menü Öğesi: ${item.title} (${item.titleTr}). Kategori: ${item.category}. Workspace: ${item.workspace}. Açıklama: ${item.description}. Anahtar Kelimeler: ${item.keywords.join(", ")}.`;
-    const vec = await getEmbedding(content);
+  const pending = STOCK_WORKSPACE_MENU_ITEMS.map((item) => ({
+    id: `menu_${item.workspace}_${item.id}`,
+    scope: item.workspace,
+    content: `Modül Menü Öğesi: ${item.title} (${item.titleTr}). Kategori: ${item.category}. Workspace: ${item.workspace}. Açıklama: ${item.description}. Anahtar Kelimeler: ${item.keywords.join(", ")}.`,
+    metadata: {
+      type: "menu_item",
+      title: item.title,
+      titleTr: item.titleTr,
+      url: item.url,
+      category: item.category,
+      workspace: item.workspace,
+      keywords: item.keywords,
+    },
+  }));
 
-    await insertOrReplaceVector({
-      id: `menu_${item.workspace}_${item.id}`,
-      scope: item.workspace,
-      content,
-      metadata: {
-        type: "menu_item",
-        title: item.title,
-        titleTr: item.titleTr,
-        url: item.url,
-        category: item.category,
-        workspace: item.workspace,
-        keywords: item.keywords,
-      },
-      embedding: vec,
-    });
-    count++;
+  const vectors = await getEmbeddings(pending.map((p) => p.content));
+  for (let i = 0; i < pending.length; i++) {
+    await insertOrReplaceVector({ ...pending[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
   }
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${count} workspace menu items indexed into RAG store.`);
-  return count;
+  console.info(`🤖 [DuckDB WASM Vector Indexer] ${pending.length} workspace menu items indexed into RAG store.`);
+  return pending.length;
 }
 
 async function insertOrReplaceVector(item: {
