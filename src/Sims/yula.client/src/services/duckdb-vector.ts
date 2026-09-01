@@ -42,7 +42,7 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
     await duckDbClient.executeCustomSql(sql);
     activeStoreDimension = dimension;
     console.info(`🤖 [DuckDB WASM Vector Store] yula_rag_embeddings table ready (FLOAT[${dimension}]).`);
-  } catch (err) {
+  } catch {
     // Tablo şema uyuşmazlığı varsa (örn: eski 384 vs 1536) tabloyu sıfırla
     try {
       await duckDbClient.executeCustomSql("DROP TABLE IF EXISTS yula_rag_embeddings;");
@@ -203,11 +203,39 @@ async function insertOrReplaceVector(item: {
 }
 
 /**
+ * Mesafe eşikleri — dilsel kelime listesi YOK, yalnızca yapısal kural:
+ * 1-2 kelimelik kısa sorgularda (örn. tek sözcüklik selamlaşma) en iyi eşleşme
+ * bile zayıfsa kayıtlar bağlama eklenmez; uzun/doğal dil sorularında daha
+ * hoşgörülü eşik uygulanır. Değerler env ile override edilebilir.
+ */
+const SHORT_QUERY_MAX_DISTANCE = Number(
+  process.env.NEXT_PUBLIC_RAG_SHORT_MAX_DISTANCE ?? "0.35",
+);
+const DEFAULT_QUERY_MAX_DISTANCE = Number(
+  process.env.NEXT_PUBLIC_RAG_MAX_DISTANCE ?? "0.75",
+);
+
+/** Sorguya uygulanacak mesafe eşiği (kosinüs mesafesi; küçük = güçlü eşleşme). */
+function distanceCutoffFor(queryText: string): number {
+  const words = queryText.trim().split(/\s+/).filter(Boolean).length;
+  const fallback = words <= 2 ? SHORT_QUERY_MAX_DISTANCE : DEFAULT_QUERY_MAX_DISTANCE;
+  const n = Number(fallback);
+  return Number.isFinite(n) && n > 0 ? n : 0.75;
+}
+
+/**
  * Kullanıcı sorusuna en yakın top-K semantik bağlamı DuckDB WASM `array_cosine_distance` ile arar.
+ *
+ * Mesafe eşiği dilsel değildir: sorgu 1-2 kelimelikse zayıf eşleşmeler
+ * (kısa sorgu eşiği), uzun sorularda daha geniş eşik uygulanır; eşik
+ * `NEXT_PUBLIC_RAG_SHORT_MAX_DISTANCE` / `NEXT_PUBLIC_RAG_MAX_DISTANCE`
+ * env'leriyle override edilebilir. İsteğe bağlı `maxDistance` parametresi
+ * verildiğinde türetim yerine doğrudan o değer kullanılır.
  */
 export async function searchVectorContext(
   queryText: string,
   limit = 3,
+  maxDistance?: number,
 ): Promise<RagVectorItem[]> {
   const trimmed = queryText.trim();
   if (!trimmed) return [];
@@ -242,20 +270,29 @@ export async function searchVectorContext(
       distance: typeof r.distance === "number" ? r.distance : Number(r.distance),
     }));
 
+    // Zayıf (ilişkisiz) eşleşmeleri düşür — dilsel kalıp yok, yalnız mesafe
+    const cutoff = maxDistance ?? distanceCutoffFor(trimmed);
+    const filtered = results.filter(
+      (r) =>
+        typeof r.distance !== "number" ||
+        !Number.isFinite(r.distance) ||
+        r.distance <= cutoff,
+    );
+
     if (results.length > 0) {
       console.info(
-        `%c🤖 [Yula RAG Telemetry]%c query: "%c${trimmed}%c" · %c${results.length} vector context items retrieved%c (${Math.round(performance.now() - startMs)} ms)`,
+        `%c🤖 [Yula RAG Telemetry]%c query: "%c${trimmed}%c" · %c${filtered.length}/${results.length} vector context items (cutoff ${cutoff.toFixed(2)})%c (${Math.round(performance.now() - startMs)} ms)`,
         "color: #f59e0b; font-weight: bold;",
         "color: inherit;",
         "color: #3b82f6; font-style: italic;",
         "color: inherit;",
         "color: #10b981; font-weight: bold;",
         "color: #6b7280;",
-        results,
+        filtered,
       );
     }
 
-    return results;
+    return filtered;
   } catch (err) {
     console.warn("[DuckDB Vector Store] search error:", err);
     return [];

@@ -11,14 +11,8 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Separator } from "@/components/ui/separator"
-import { Marker, MarkerContent } from "@/components/ui/marker"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { YulaChatTurn } from "@/components/layout/yula-chat-turn"
-import { AiChatMessage } from "@/components/layout/ai-chat-message"
-import { ToolResultTable } from "@/components/layout/tool-result-table"
-import { YulaChartCard } from "@/components/layout/yula-chart-card"
-import { ToolExecPanel } from "@/components/layout/tool-exec-panel"
-import { stripMarkdownTables } from "@/lib/markdown-table-strip"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { WorkspaceHomeCards } from "@/components/layout/workspace-home-cards"
 import { YULA } from "@/components/layout/yula-brand-data"
@@ -31,32 +25,20 @@ import {
 import { useChatsStore } from "@/lib/stores/chats"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
-import {
-  useYulaChat,
-  yulaToolPartInfo,
-  type YulaToolPartInfo,
-} from "@/hooks/use-yula-chat"
-import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route"
+import { useYulaChat, yulaToolPartInfo } from "@/hooks/use-yula-chat"
+import type { YulaMessage } from "@/app/api/agent/chat/route"
 import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
 import { peekQueuedYulaPrompt, subscribeQueuedYulaPrompt } from "@/lib/yula-pending-prompt"
 import { cn } from "@/utils/cn"
 import {
   ArrowDown,
   ArrowUp,
-  Brain,
-  ChevronDown,
   FileCode,
   FileText,
   Paperclip,
   Plus,
-  Puzzle,
-  RotateCcw,
   Square,
-  SquarePen,
   X,
-  ShieldAlert,
-  CheckCircle2,
-  Zap,
 } from "lucide-react"
 
 type AIChatAssistantProps = {
@@ -157,30 +139,6 @@ export function AIChatAssistant({
 }
 
 
-function toolRunSummary(info: {
-  toolName: string
-  state: string
-  input?: unknown
-  output?: unknown
-  errorText?: string
-}): string | undefined {
-  // SDK kanonik hata parçası: state:"output-error" → errorText taşıyıcısıdır
-  if (info.state === "output-error" && info.errorText) {
-    return info.errorText
-  }
-  const out =
-    typeof info.output === "object" && info.output !== null
-      ? (info.output as Record<string, unknown>)
-      : undefined
-  if (out?.message) return String(out.message)
-  if (out?.error) return String(out.error)
-  if (out?.hint) return String(out.hint)
-  if (Array.isArray(out?.errors) && out.errors.length > 0) {
-    return out.errors.map(String).join(" · ")
-  }
-  return undefined
-}
-
 /**
  * Hata taşıyan araç parçası mı? İki biçim vardır:
  *  - SDK kanonik: state:"output-error" (+errorText)
@@ -204,213 +162,11 @@ function isFailedToolInfo(info: {
   )
 }
 
-/**
- * Bekleyen araç çağrısı için insan-okur aksiyon etiketi — "Çalışıyor" yerine
- * ne yapıldığını yazar (örn. "Tablo profili çıkarılıyor…").
- */
-function toolActionLabel(info: {
-  toolName: string
-  input?: unknown
-}): string {
-  const input =
-    typeof info.input === "object" && info.input !== null
-      ? (info.input as Record<string, unknown>)
-      : {}
-  switch (info.toolName) {
-    case "profile_grid_table":
-      return "Tablo profili çıkarılıyor"
-    case "run_expert_sql": {
-      const sql =
-        typeof input.sql === "string" ? input.sql.replace(/\s+/g, " ").trim() : ""
-      const short = sql.length > 70 ? `${sql.slice(0, 70)}…` : sql
-      return short ? `SQL çalıştırılıyor: ${short}` : "SQL sorgusu çalıştırılıyor"
-    }
-    case "filter_current_grid": {
-      const field = typeof input.field === "string" ? input.field : ""
-      const value = typeof input.value === "string" ? input.value.trim() : ""
-      if (field === "*") return "Filtreler temizleniyor"
-      return field
-        ? value
-          ? `Filtre uygulanıyor: ${field} = ${value}`
-          : `Filtre uygulanıyor: ${field}`
-        : "Filtre uygulanıyor"
-    }
-    case "analyze_grid_data": {
-      const op = typeof input.operation === "string" ? input.operation : ""
-      return op ? `Tablo analizi: ${op}` : "Tablo analizi yürütülüyor"
-    }
-    case "set_grid_query": {
-      const title = typeof input.title === "string" ? input.title.trim() : ""
-      return title ? `Grid yenileniyor: ${title}` : "Grid görünümü yenileniyor"
-    }
-    case "visualize_grid_data": {
-      const title = typeof input.title === "string" ? input.title.trim() : ""
-      return title ? `Grafik hazırlanıyor: ${title}` : "Grafik görselleştiriliyor"
-    }
-    case "run_report":
-    case "run_job": {
-      const preset = typeof input.presetTitle === "string" ? input.presetTitle : ""
-      const report = typeof input.report === "string" ? input.report : "Stok Bakiye"
-      return preset ? `Job başlatılıyor: ${preset}` : report ? `Rapor çalıştırılıyor: ${report}` : "Rapor çalıştırılıyor"
-    }
-    case "apply_criteria": {
-      const preset = typeof input.presetTitle === "string" ? input.presetTitle : ""
-      return preset ? `Kriterler dolduruluyor: ${preset}` : "Kriterler forma dolduruluyor"
-    }
-    case "navigate_to_page": {
-      const title = typeof input.title === "string" ? input.title : (typeof input.path === "string" ? input.path : "")
-      return title ? `Sayfaya yönlendiriliyor: ${title}` : "Sayfaya yönlendiriliyor"
-    }
-    default:
-      return "Çalışıyor"
-  }
-}
-
-function ToolExecLine({
-  state,
-  summary,
-  actionLabel,
-  isError,
-}: {
-  state: string
-  summary?: string
-  actionLabel?: string
-  isError?: boolean
-}) {
-  if (state === "output-available" || state === "output-error") {
-    // Sadece gerçek yürütüm hatası varsa kullanıcıya mesaj gösterilir.
-    // Başarılı araçların teknik mesajı "Araç Çalıştırma" katlanabilir akordeon bloğunda kalır.
-    if (isError && summary) {
-      return (
-        <p className="whitespace-pre-wrap break-words text-[12px] leading-relaxed text-red-600 dark:text-red-400 font-medium py-0.5">
-          {summary}
-        </p>
-      )
-    }
-    return null
-  }
-
-  return (
-    <Marker role="status" className="py-0.5">
-      <MarkerContent className="items-start gap-1.5">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-          <span className="size-1 rounded-full bg-orange-500 animate-bounce" />
-          {actionLabel ?? "Çalışıyor"}…
-        </span>
-      </MarkerContent>
-    </Marker>
-  )
-}
-
-
-function YulaConfirmationCard({ info }: { info: YulaToolPartInfo }) {
-  const yula = useYulaChat()
-  const input = (info.input as {
-    title?: string
-    message?: string
-    actionType?: string
-    details?: Record<string, unknown>
-  } | null) ?? {}
-
-  const output = (info.output as {
-    confirmed?: boolean
-    message?: string
-  } | null) ?? null
-
-  const isPending = info.state === "input-available"
-
-  const handleConfirm = () => {
-    yula.addToolOutput({
-      tool: "request_user_confirmation" as keyof YulaTools,
-      toolCallId: info.toolCallId,
-      state: "output-available",
-      output: {
-        confirmed: true,
-        message: "İşlem kullanıcı tarafından onaylandı.",
-      },
-    })
-  }
-
-  const handleCancel = () => {
-    yula.addToolOutput({
-      tool: "request_user_confirmation" as keyof YulaTools,
-      toolCallId: info.toolCallId,
-      state: "output-available",
-      output: {
-        confirmed: false,
-        message: "İşlem kullanıcı tarafından iptal edildi.",
-      },
-    })
-  }
-
-  return (
-    <div className="my-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 space-y-2.5 backdrop-blur-md shadow-sm">
-      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
-        <ShieldAlert className="size-4 shrink-0 text-amber-500 animate-pulse" />
-        <span>{input.title || "İşlem Onayı Gerekiyor"}</span>
-      </div>
-
-      <p className="text-xs text-foreground/90 leading-relaxed">
-        {input.message || "Bu işlem için kullanıcı onayı gerekmektedir."}
-      </p>
-
-      {input.details && Object.keys(input.details).length > 0 && (
-        <div className="rounded-lg border border-border/50 bg-background/70 p-2 text-[11px] space-y-1 font-mono">
-          {Object.entries(input.details).map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-2">
-              <span className="text-muted-foreground">{k}:</span>
-              <span className="font-semibold text-foreground">{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isPending ? (
-        <div className="flex items-center gap-2 pt-1">
-          <Button
-            size="sm"
-            className="h-8 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs px-3.5 shadow-sm"
-            onClick={handleConfirm}
-          >
-            <CheckCircle2 className="size-3.5" />
-            İşlemi Onayla
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1 text-xs border-border/70 hover:bg-accent"
-            onClick={handleCancel}
-          >
-            <X className="size-3.5" />
-            İptal Et
-          </Button>
-        </div>
-      ) : (
-        <div className="pt-1 flex items-center gap-1.5 text-xs font-medium">
-          {output?.confirmed ? (
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="size-3.5" />
-              İşlem Onaylandı
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
-              <X className="size-3.5" />
-              İşlem Kullanıcı Tarafından İptal Edildi
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 import {
   greetingFor,
   formatDate,
   useMounted,
-  WelcomeShortcutCards,
 } from "@/components/app/welcome-screen"
-import { YulaQuickActionChips } from "@/components/layout/yula-quick-chips"
 
 export function AIChatPanelTitle() {
   const activeId = useChatsStore((s) => s.activeId)
@@ -457,7 +213,6 @@ export function AIChatPanel({
   const yula = useYulaChat()
   const status = yula.status
   const isProcessing = yula.busy
-  const sendPrompt = yula.sendMessageText
   const { messages } = yula
 
   const [queuedPrompt, setQueuedPrompt] = React.useState(peekQueuedYulaPrompt)

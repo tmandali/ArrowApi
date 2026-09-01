@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/sidebar"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
-import { isTauriEnv } from "@/lib/api-url"
 import { cn } from "@/utils/cn"
 import {
   Building2,

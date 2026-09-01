@@ -14,7 +14,6 @@ import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar"
 import {
   formatNotificationTime,
   useWorkspaceNotifications,
-  type WorkspaceNotification,
   type WorkspaceNotificationType,
 } from "@/context/workspace-notifications-context"
 import {

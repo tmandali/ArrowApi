@@ -28,5 +28,5 @@ export const useAgentCriteriaStore = create<AgentCriteriaState>((set) => ({
       },
     })),
   clearAiFilledCriteria: () =>
-    set((s) => ({ aiFilledCriteria: {} })),
+    set(() => ({ aiFilledCriteria: {} })),
 }));

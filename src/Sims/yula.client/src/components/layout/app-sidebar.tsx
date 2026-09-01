@@ -25,7 +25,6 @@ import {
   SearchIcon,
   PackageIcon,
   FactoryIcon,
-  SettingsIcon,
 } from "lucide-react"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"

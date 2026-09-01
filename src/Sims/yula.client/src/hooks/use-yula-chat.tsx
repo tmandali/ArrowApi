@@ -1283,7 +1283,17 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       isThinkingEnabled,
       setThinkingEnabled,
     };
-  }, [lastSigRef.current, activeId, conversations, model, setModel, isThinkingEnabled, setThinkingEnabled, selectConversation, deleteConversation, newConversation]);
+  }, [
+	activeId,
+	conversations,
+	model,
+	setModel,
+	isThinkingEnabled,
+	setThinkingEnabled,
+	selectConversation,
+	deleteConversation,
+	newConversation
+]);
 
   return (
     <>

@@ -1,22 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import {
-  ChevronRightIcon,
-  DatabaseIcon,
-  PackageIcon,
-  SparklesIcon,
-} from "lucide-react";
 import { YulaMarkIcon } from "@/components/layout/yula-brand";
-import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export function greetingFor(date: Date) {
   const h = date.getHours();
@@ -47,11 +32,11 @@ export function useMounted() {
 
 
 
-export function WelcomeShortcutCards({
-  onYulaClick,
-}: {
-  onYulaClick?: () => void;
-}) {
+export function WelcomeShortcutCards(
+  _props: {
+    onYulaClick?: () => void;
+  },
+) {
   return null;
 }
 

@@ -17,7 +17,6 @@ import {
   panelShellClass,
 } from "@/components/layout/panel-chrome"
 import { cn } from "@/utils/cn"
-import { ChevronRight } from "lucide-react"
 
 /** Shared dock width — Query Criteria and workspace AI use the same proportion. */
 export const WORKSPACE_SIDE_PANEL_PERCENT = 20

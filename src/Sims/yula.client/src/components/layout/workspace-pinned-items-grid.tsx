@@ -11,7 +11,7 @@ import {
   Scale,
   Wrench,
 } from "lucide-react";
-import { usePinnedWorkspaceItems, type PinnedMenuItem } from "@/hooks/use-pinned-workspace-items";
+import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
 import { cn } from "@/utils/cn";
 

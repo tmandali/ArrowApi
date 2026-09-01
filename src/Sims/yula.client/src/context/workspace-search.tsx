@@ -14,7 +14,7 @@ export function WorkspaceSearchProvider({
 }) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
-  const [triggerCount, setTriggerCount] = React.useState(0)
+  const [, setTriggerCount] = React.useState(0)
 
   React.useEffect(() => {
     const down = (event: KeyboardEvent) => {

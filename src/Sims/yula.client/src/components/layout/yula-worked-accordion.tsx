@@ -3,22 +3,10 @@
 import * as React from "react";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
-  Brain,
-  ChevronDown,
-  ChevronUp,
   ChevronRight,
-  Search,
-  FileCode,
   Loader2,
-  Terminal,
-  Sliders,
-  Sparkles,
-  Database,
-  Code,
-  CheckCircle2,
   Copy,
   Check,
-  Table,
 } from "lucide-react";
 import {
   Collapsible,
@@ -26,7 +14,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
-import { useYulaGridStore } from "@/lib/stores/grid";
 import { cn } from "@/utils/cn";
 import {
   yulaToolPartInfo,
@@ -471,7 +458,6 @@ export function YulaWorkedAccordion({
   message,
   isLive = false,
   durationSec,
-  llmStepCount,
   conversationId,
   className,
 }: YulaWorkedAccordionProps) {
@@ -481,20 +467,62 @@ export function YulaWorkedAccordion({
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
   const [copiedAnswer, setCopiedAnswer] = React.useState(false);
 
+  /** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
+  const stepPayload = (step: WorkedStepItem): string | null => {
+    if (!step.info) return null;
+    return JSON.stringify(
+      {
+        tool: step.info.toolName,
+        input: step.info.input,
+        output: (() => {
+          if (!step.info.output || typeof step.info.output !== "object") return step.info.output ?? null;
+          const out = { ...(step.info.output as Record<string, unknown>) };
+          if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
+            delete out.sql;
+            delete out.display;
+          }
+          return out;
+        })(),
+      },
+      null,
+      2,
+    );
+  };
+
+  /** "Worked for" başlığı + tüm adım detayları + nihai cevap metni */
+  const buildFullCopyText = (): string => {
+    const sections: string[] = [];
+    sections.push(`Worked for ${timeLabel}s`);
+
+    steps.forEach((step, index) => {
+      const lines = [`${index + 1}. ${step.label}${step.subLabel ? ` (${step.subLabel})` : ""}`];
+      if (step.detailText) lines.push(`   ${step.detailText}`);
+      const payload = stepPayload(step);
+      if (payload) lines.push(payload);
+      sections.push(lines.join("\n"));
+    });
+
+    if (message) {
+      const fullText = message.parts
+        .map((p) => {
+          if (p.type === "text") return (p as { text: string }).text;
+          if (p.type === "reasoning" && (p as { text?: string }).text) {
+            return `[Düşünme / Reasoning]\n${(p as { text: string }).text}`;
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n\n");
+      if (fullText.trim()) sections.push(`———\n${fullText}`);
+    }
+
+    return sections.join("\n\n");
+  };
+
   const handleCopyAnswer = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!message) return;
-    const fullText = message.parts
-      .map((p) => {
-        if (p.type === "text") return (p as { text: string }).text;
-        if (p.type === "reasoning" && (p as { text?: string }).text) {
-          return `[Düşünme / Reasoning]\n${(p as { text: string }).text}`;
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join("\n\n");
-
+    const fullText = buildFullCopyText();
     if (!fullText.trim()) return;
     const success = await copyToClipboard(fullText);
     if (success) {
@@ -542,11 +570,14 @@ export function YulaWorkedAccordion({
 
   React.useEffect(() => {
     if (userToggled) return;
+    // Yanıt bitince (canlı akış yok, cevap metni var, hata yok) akordeon
+    // kendini kapatır. Worker adımları yalnızca HÂLÂ çalışıyorsa açık tutar;
+    // tamamlanmış worker/trace adımları akordeonu kilitlamaz.
     const keepOpen =
       isLive ||
       !hasTextContent ||
       steps.some((s) => s.isError) ||
-      steps.some((s) => s.info?.toolName === "worker");
+      steps.some((s) => s.info?.toolName === "worker" && s.isLive);
     setOpen(keepOpen);
   }, [isLive, hasTextContent, userToggled, steps]);
 
@@ -631,7 +662,6 @@ export function YulaWorkedAccordion({
                 : isManuallyToggled;
 
               const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
-              const inputObj = (step.info?.input as Record<string, unknown> | null) ?? {};
               const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
 
               return (

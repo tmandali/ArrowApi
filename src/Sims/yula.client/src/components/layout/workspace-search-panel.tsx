@@ -13,26 +13,20 @@ import {
 } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import {
-  ArrowRight,
   FileText,
   Package,
-  Factory,
   BarChart2,
-  BookOpen,
   DollarSign,
   TrendingUp,
   Receipt,
   Truck,
   Scale,
-  Send,
-  UserCheck,
   Wrench,
   Settings,
   CornerDownLeft,
   Sparkles,
   Loader2,
   MessageSquare,
-  Search,
 } from "lucide-react"
 import { emptyModulePath } from "@/lib/workspace-paths"
 import { workspaceDashboardPath } from "@/lib/workspace-nav"

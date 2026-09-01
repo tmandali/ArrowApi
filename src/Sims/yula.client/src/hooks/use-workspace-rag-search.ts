@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/features/stock/lib/stock-menu-registry";
-import { searchVectorContext, type RagVectorItem } from "@/services/duckdb-vector";
+import { searchVectorContext } from "@/services/duckdb-vector";
 
 export interface WorkspaceSearchResultItem {
   id: string;

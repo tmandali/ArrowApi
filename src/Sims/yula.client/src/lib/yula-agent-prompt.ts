@@ -263,9 +263,6 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   if (activeReportMeta && phase === "workspace") {
     const reportTitle = activeReportMeta.title;
     const scope = activeReportMeta.scope;
-    const reqList = activeReportMeta.fullSchema?.required ?? [];
-    const reqText = reqList.length > 0 ? reqList.join(", ") : "Yok";
-
     lines.push(
       "",
       `=== REPORT CRITERIA & EXECUTION SCREEN: ${reportTitle.toUpperCase()} (${activeReportMeta.pagePath}) ===`,

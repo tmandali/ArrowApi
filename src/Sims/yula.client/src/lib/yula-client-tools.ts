@@ -1,5 +1,5 @@
 import { useYulaGridStore } from "@/lib/stores/grid"
-import { findReport, REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry"
+import { findReport } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
 import { guardReadOnlySelect } from "@/lib/sql-guard";
 import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
@@ -551,7 +551,6 @@ async function runExpertSql(
     const MAX_OUTPUT_ROWS = 50
     // silent = keşif/doğrulama sorgusu: ekrana tablo kartı basılmaz,
     // çıktı yine de MODELE tam döner.
-    const display = input.display === "silent" ? "silent" : "card"
     return {
       status: "ok",
       rowCount: rows.length,

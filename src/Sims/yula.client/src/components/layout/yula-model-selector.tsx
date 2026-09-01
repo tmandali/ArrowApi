@@ -181,7 +181,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
   const { model, setModel, isThinkingEnabled, setThinkingEnabled } = useYulaChat();
   const [open, setOpen] = React.useState(false);
   const [installedModels, setInstalledModels] = React.useState<ModelOption[]>([]);
-  const [isLoaded, setIsLoaded] = React.useState(false);
+  const [, setIsLoaded] = React.useState(false);
   const [provider, setProvider] = React.useState<AIProviderType | undefined>(() =>
     typeof window === "undefined" ? undefined : readYulaClientAiConfig().provider,
   );

@@ -6,7 +6,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marked } from "marked";
 import { Check, Copy, FileSpreadsheet, ChevronDown, Table, Sparkles } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
 import { copyToClipboard } from "@/lib/clipboard";

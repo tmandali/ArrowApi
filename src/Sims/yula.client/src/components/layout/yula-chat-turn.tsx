@@ -4,7 +4,6 @@ import * as React from "react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
-import { ToolResultTable } from "@/components/layout/tool-result-table";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { yulaToolPartInfo, isFailedToolInfo, useYulaChat } from "@/hooks/use-yula-chat";
 import type { YulaToolPartInfo } from "@/hooks/use-yula-chat";

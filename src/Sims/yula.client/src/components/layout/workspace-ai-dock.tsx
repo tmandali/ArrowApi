@@ -15,12 +15,11 @@ import {
   panelHeaderClass,
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
-import { YulaHistorySidebar } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { cn } from "@/utils/cn"
-import { ChevronRight, History, Maximize2, Minimize2, SquarePen } from "lucide-react"
+import { History, Maximize2, Minimize2, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -163,7 +162,6 @@ export function WorkspaceAiDock({
 }: WorkspaceAiDockProps) {
   const { open, setOpen, expanded, setExpanded, sideDockAllowed } =
     useWorkspaceAiChat()
-  const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname)
 

@@ -17,7 +17,6 @@ import {
   Pencil,
   Sparkles,
   History,
-  LayoutGrid,
 } from "lucide-react";
 
 export interface YulaHistorySidebarProps {
@@ -71,13 +70,10 @@ export function YulaHistorySidebar({
   const { setOpen } = useWorkspaceAiChat();
   const conversations = useChatsStore((s) => s.conversations);
   const activeId = useChatsStore((s) => s.activeId);
-  const historyFilter = useChatsStore((s) => s.historyFilter);
-  const setHistoryFilter = useChatsStore((s) => s.setHistoryFilter);
   const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen);
   const selectConversation = useChatsStore((s) => s.selectConversation);
   const deleteConversation = useChatsStore((s) => s.deleteConversation);
   const renameConversation = useChatsStore((s) => s.renameConversation);
-  const newConversation = useChatsStore((s) => s.newConversation);
   const clearAllConversations = useChatsStore((s) => s.clearAllConversations);
 
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -86,9 +82,6 @@ export function YulaHistorySidebar({
   const [confirmClear, setConfirmClear] = React.useState(false);
 
   const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
-  const screenCount = React.useMemo(() => {
-    return conversations.filter((c) => isConversationOnScreen(c.pathname, currentPathname)).length;
-  }, [conversations, currentPathname]);
 
   const filteredSessions = React.useMemo(() => {
     let list = conversations.filter((c) => isConversationOnScreen(c.pathname, currentPathname));
@@ -354,13 +347,10 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const searchQuery = useChatsStore((s) => s.searchQuery);
   const setSearchQuery = useChatsStore((s) => s.setSearchQuery);
   const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory);
-  const historyFilter = useChatsStore((s) => s.historyFilter);
-  const setHistoryFilter = useChatsStore((s) => s.setHistoryFilter);
   const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen);
   const selectConversation = useChatsStore((s) => s.selectConversation);
   const deleteConversation = useChatsStore((s) => s.deleteConversation);
   const renameConversation = useChatsStore((s) => s.renameConversation);
-  const newConversation = useChatsStore((s) => s.newConversation);
   const clearAllConversations = useChatsStore((s) => s.clearAllConversations);
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -368,9 +358,6 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const [confirmClear, setConfirmClear] = React.useState(false);
 
   const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
-  const screenCount = React.useMemo(() => {
-    return conversations.filter((c) => isConversationOnScreen(c.pathname, currentPathname)).length;
-  }, [conversations, currentPathname]);
 
   // Main modda TÜM sohbet geçmişi listelenir
   const filteredSessions = React.useMemo(() => {
