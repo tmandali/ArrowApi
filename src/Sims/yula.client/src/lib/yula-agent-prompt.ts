@@ -127,15 +127,14 @@ const DATA_QUALITY_ANALYSIS_RULES = [
   "DATA QUALITY, ANOMALY DETECTION & /ANALIZ PROTOCOL:",
   "• When the user triggers '/analiz', asks to inspect data problems, or requests table anomaly analysis:",
   "  1. Call profile_grid_table FIRST to inspect null counts, distinct values, min/max metrics, and anomalies across all columns.",
-  "  2. Provide a structured, clean Turkish summary with 3 sections:",
-  "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı.",
-  "     - ⚠️ **Tespit Edilen Veri Problemleri & Anomaliler**: Kritik alanlardaki boşluklar (null/empty), negatif miktarlar, sıfır/aşırı birim fiyatlar, uç değerler veya tutarsızlıklar.",
-  "     - 🎯 **Önerilen Aksiyonlar (Tıklanabilir Linkler)**: Tespit edilen HER problem için kullanıcının tek tıkla çalıştırabileceği Markdown linkleri formatında sun: '[Aksiyon Adı](yula-prompt:Çalıştırılacak net prompt)'.",
-  "  3. Format example for clickable action links in response:",
-  "     - '• **Negatif Stoklar (4 satır):** [Negatif Miktarları Filtrele](yula-prompt:Quantity < 0 olanları filtrele)'",
-  "     - '• **Boş Ambar Kodları (12 satır):** [Boş Ambarları Filtrele](yula-prompt:Warehouse boş olanları filtrele)'",
-  "     - '• **Sıfır Fiyatlı Ürünler (5 satır):** [Sıfır Fiyatlıları Filtrele](yula-prompt:UnitPrice 0 olanları filtrele)'",
-  "     - '• **Kritik Stok Seviyeleri:** [Kritik Stokları Grafikle](yula-prompt:Kritik stokları grafikle özetle)'",
+  "  2. Provide a structured, clean Turkish summary with 2 main sections:",
+  "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı değerlendirmesi.",
+  "     - ⚠️ **Tespit Edilen Veri Problemleri & Bulgular**: Her tespit edilen problemi '• **Başlık (KolonAdı Koşul)**: Açıklama' biçiminde maddeler halinde listele. Kullanıcı arayüzü bu başlıkları otomatik olarak tıklanabilir aksiyon düğmesine dönüştürür.",
+  "  3. Standard bulleted finding format (with column name and condition in bold title):",
+  "     - '• **Negatif Stok Miktarları (Quantity < 0)**: Tabloda 4 satırda negatif miktar tespit edildi. İncelemek için başlığa tıklayın.'",
+  "     - '• **Boş Ambar Kodları (Warehouse boş)**: 12 satırda ambar tanımı eksik (NULL).'",
+  "     - '• **Sıfır Birim Fiyatlı Kayıtlar (UnitPrice = 0)**: 5 satırda birim fiyat girilmemiş.'",
+  "     - '• **Kritik Düşük Stoklar (Quantity 1..10)**: 8 ürün kritik stok eşiğinin altında.'",
 ].join("\n");
 
 /** Hücre değerini prompt-uyumlu kısaltır (uzun metinler bağlamı şişirmesin). */

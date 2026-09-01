@@ -276,8 +276,7 @@ function renderBulletedItem(
                 : `${itemTitle} ${cb.isExecutionConfirmation ? "sonuçlarını açmak" : "işlemini başlatmak"} için tıklayın`
           }
           className={cn(
-            "mr-1 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer transition-colors",
-            findingPrompt && "text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300",
+            "mr-1.5 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors",
           )}
         >
           {itemTitle}:
