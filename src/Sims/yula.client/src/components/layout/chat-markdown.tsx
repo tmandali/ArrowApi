@@ -4,7 +4,7 @@ import * as React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marked } from "marked";
-import { Check, Copy, FileSpreadsheet, ChevronDown, Table } from "lucide-react";
+import { Check, Copy, FileSpreadsheet, ChevronDown, Table, Sparkles } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
@@ -586,9 +586,10 @@ function ChatMarkdownLink({
         type="button"
         onClick={() => onPrompt(prompt)}
         title={`"${prompt}" komutunu çalıştırmak için tıklayın`}
-        className="font-medium text-foreground/90 underline decoration-dotted underline-offset-2 hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer"
+        className="inline-flex items-center gap-1.5 my-0.5 mx-1 px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 font-medium text-[11.5px] border border-orange-500/25 transition-all cursor-pointer select-none align-middle hover:scale-[1.02] active:scale-[0.98]"
       >
-        {children}
+        <Sparkles className="size-3 shrink-0 text-orange-500" />
+        <span>{children}</span>
       </button>
     )
   }

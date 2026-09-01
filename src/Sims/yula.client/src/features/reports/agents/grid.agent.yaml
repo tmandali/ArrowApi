@@ -1,10 +1,10 @@
 commands:
   - id: "grid-analiz"
     slash: "analiz"
-    label: "Tablo Analizi & Anomali"
-    description: "Tablo profili çıkar, anomali/riskleri tespit et ve önerileri paylaş"
-    prompt: "Tabloyu derinlemesine analiz et: profili çıkar, anomali ve risk taşıyan kayıtları tespit et, önerilerini ve doğrulama sorgularını paylaş."
-    icon: "Database"
+    label: "Tablo Analizi & Veri Kalitesi"
+    description: "Veri kalitesi ve anomali analizi yaparak problemleri tıklanabilir aksiyon linkleriyle listeler"
+    prompt: "/analiz"
+    icon: "ShieldAlert"
     phase: "grid"
 
   - id: "grid-top5"

@@ -123,6 +123,21 @@ const DUCKDB_RULES = [
   "• Quote alias identifiers with double quotes when they contain spaces or Turkish characters: AS \"Toplam Tutar\".",
 ].join("\n");
 
+const DATA_QUALITY_ANALYSIS_RULES = [
+  "DATA QUALITY, ANOMALY DETECTION & /ANALIZ PROTOCOL:",
+  "• When the user triggers '/analiz', asks to inspect data problems, or requests table anomaly analysis:",
+  "  1. Call profile_grid_table FIRST to inspect null counts, distinct values, min/max metrics, and anomalies across all columns.",
+  "  2. Provide a structured, clean Turkish summary with 3 sections:",
+  "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı.",
+  "     - ⚠️ **Tespit Edilen Veri Problemleri & Anomaliler**: Kritik alanlardaki boşluklar (null/empty), negatif miktarlar, sıfır/aşırı birim fiyatlar, uç değerler veya tutarsızlıklar.",
+  "     - 🎯 **Önerilen Aksiyonlar (Tıklanabilir Linkler)**: Tespit edilen HER problem için kullanıcının tek tıkla çalıştırabileceği Markdown linkleri formatında sun: '[Aksiyon Adı](yula-prompt:Çalıştırılacak net prompt)'.",
+  "  3. Format example for clickable action links in response:",
+  "     - '• **Negatif Stoklar (4 satır):** [Negatif Miktarları Filtrele](yula-prompt:Quantity < 0 olanları filtrele)'",
+  "     - '• **Boş Ambar Kodları (12 satır):** [Boş Ambarları Filtrele](yula-prompt:Warehouse boş olanları filtrele)'",
+  "     - '• **Sıfır Fiyatlı Ürünler (5 satır):** [Sıfır Fiyatlıları Filtrele](yula-prompt:UnitPrice 0 olanları filtrele)'",
+  "     - '• **Kritik Stok Seviyeleri:** [Kritik Stokları Grafikle](yula-prompt:Kritik stokları grafikle özetle)'",
+].join("\n");
+
 /** Hücre değerini prompt-uyumlu kısaltır (uzun metinler bağlamı şişirmesin). */
 function sampleCell(value: unknown): unknown {
   if (typeof value === "string" && value.length > 40) {
@@ -209,6 +224,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   if (context?.grid) {
     lines.push(GRID_PRESENT_RULES);
     lines.push(SQL_EXPERT_RULES);
+    lines.push(DATA_QUALITY_ANALYSIS_RULES);
     lines.push(SMART_SQL_QUERY_RULES);
     lines.push(DUCKDB_RULES);
     const isCustomActive = Boolean(context.grid.customQuerySql);
