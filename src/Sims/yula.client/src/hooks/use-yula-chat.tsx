@@ -267,6 +267,8 @@ interface YulaChatContextValue
   isTurnActive: boolean;
   /** Asistan mesaj id -> yanıt süresi (saniye) */
   responseDurations: Record<string, number>;
+  /** Asistan mesaj id -> akış hatası ham metni (sağlayıcı 401, kota, ağ vb.) */
+  streamErrorTexts: Record<string, string>;
   /** Asistan mesaj id -> LLM tur/çağrı sayısı */
   llmStepCounts: Record<string, number>;
 }
@@ -545,6 +547,11 @@ function ChatInstance({
   const userStoppedRef = React.useRef(false);
   // UI-reaktif kopya (durdurulan kısmi metin akışlarında retry butonu için)
   const [stopped, setStopped] = React.useState(false);
+  // Akış hatası (sağlayıcı 401/kota/ağ vb.) — asistan mesaj id'sine kaydedilir;
+  // SilentTurnFallback genel "sessiz tur" yerine anlamlı hata gösterir.
+  const [streamErrorTexts, setStreamErrorTexts] = React.useState<
+    Record<string, string>
+  >({});
   // Tur içinde çalıştırılan araç çağrıları (araç:girdi imzası). Aynı imza
   // tekrar gelirse yeniden KOŞULMAZ; modele "zaten çalıştı" hatası döner.
   // Küçük modellerin (gemma) [metin + aynı araç çağrısı] turlarını sonsuza
@@ -561,13 +568,24 @@ function ChatInstance({
       console.error("🤖 [Yula Chat Client Error Details]:", err);
       userStoppedRef.current = true;
       setStopped(true);
+      const raw = err instanceof Error ? err.message : String(err);
       upsertTurnTrace(conversationIdRef.current, {
         id: "client-error",
         toolName: "worker",
         label: "İstemci hatası",
         isError: true,
-        detailText: err instanceof Error ? err.message : String(err),
+        detailText: raw,
       });
+      // Akış hatasını son asistan mesajına işle — SilentTurnFallback genel
+      // "sessiz tur" yerine anlamlı hata mesajı göstersin.
+      const lastAssistant = [...chat.messages]
+        .reverse()
+        .find((m) => m.role === "assistant");
+      if (lastAssistant && raw) {
+        setStreamErrorTexts((prev) =>
+          prev[lastAssistant.id] === raw ? prev : { ...prev, [lastAssistant.id]: raw },
+        );
+      }
     },
     // Cookbook/Client-Tools deseni: araç çıktısı eklendiğinde akış kendiliğinden
     // devam etsin (manuel sendMessage yerine SDK köprüsü).
@@ -998,6 +1016,7 @@ function ChatInstance({
     isTurnActive: busy,
     responseDurations,
     llmStepCounts,
+    streamErrorTexts,
     sendMessageText: (
       text: string,
       attachmentsList?: Array<{ name: string; type: string; dataUrl?: string }>,
@@ -1126,7 +1145,7 @@ function ChatInstance({
       })();
     },
     runPendingTool,
-  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, busy, isTurnActive, router, conversationId]);
+  }), [chat, status, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, streamErrorTexts, busy, isTurnActive, router, conversationId]);
 
   // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
   React.useEffect(() => {

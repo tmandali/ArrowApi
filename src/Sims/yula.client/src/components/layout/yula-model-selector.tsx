@@ -238,7 +238,17 @@ export function YulaModelSelector({ className }: { className?: string }) {
         setIsLoaded(true);
 
         if (data.defaultModel && (!model || !data.models.some((m) => m.name === model))) {
-          setModel(data.defaultModel);
+          // Düşünme modu açıksa yalnızca thinking destekli modeller arasından
+          // sıfırlama yapılır; anahtar kapatılana kadar listede görünmeyen
+          // bir model seçilmiş olmasın.
+          const pool =
+            isThinkingEnabled && data.models.some((m) => m.capabilities?.hasThinking)
+              ? data.models.filter((m) => m.capabilities?.hasThinking)
+              : data.models;
+          const fallback = pool.some((m) => m.name === data.defaultModel)
+            ? data.defaultModel
+            : pool[0]?.name;
+          if (fallback) setModel(fallback);
         }
       } catch (err) {
         console.warn("[Yula Model Selector] Model listesi alınamadı:", err);
@@ -248,14 +258,12 @@ export function YulaModelSelector({ className }: { className?: string }) {
     return () => {
       active = false;
     };
-  }, [model, setModel, provider]);
+  }, [model, setModel, provider, isThinkingEnabled]);
 
-  // Yalnızca sistemde gerçekten yüklü olan modeller listelenir
+  // Yalnızca aktif sağlayıcının gerçek model listesi gösterilir; eski/uyumsuz
+  // model listeye eklenmez (activeModelInfo fallback'i tetikte adını gösterir).
   const allModels = React.useMemo(() => {
     if (installedModels.length > 0) {
-      if (model && !installedModels.some((m) => m.id === model)) {
-        return [formatModelOption(model), ...installedModels];
-      }
       return installedModels;
     }
     return [formatModelOption(model || "gpt-5.4")];
@@ -318,10 +326,13 @@ export function YulaModelSelector({ className }: { className?: string }) {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => {
-                    writeYulaClientAiConfig({ provider: p.id });
-                    setProvider(p.id);
-                  }}
+                onClick={() => {
+                  // Sağlayıcı değişti → model seçimi sıfırlanır; liste gelince
+                  // yeni sağlayıcının varsayılan modeli otomatik seçilir.
+                  writeYulaClientAiConfig({ provider: p.id, model: "" });
+                  setProvider(p.id);
+                  setModel("");
+                }}
                   className={cn(
                     "w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left text-[12px] transition-colors cursor-pointer",
                     isSelected

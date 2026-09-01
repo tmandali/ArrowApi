@@ -54,7 +54,10 @@ export async function POST(req: Request) {
 
     return Response.json({ error: "text or texts parameter is required" }, { status: 400 });
   } catch (error) {
-    console.error("🤖 [Yula Embed API Error]:", error);
+    console.error(
+      "🤖 [Yula Embed API Error]:",
+      error instanceof Error ? error.message : String(error),
+    );
     return Response.json(
       {
         error: error instanceof Error ? error.message : "Embedding generation failed",

@@ -9,6 +9,26 @@ import { getVectorDimension } from "./yula-config";
 
 export const VECTOR_DIMENSION = getVectorDimension();
 
+/**
+ * Devre kesici (circuit breaker): sağlayıcı kimlik (401/403) veya kota hatası
+ * bir kez alındığında embedding uç noktası oturum boyunca devre dışı kalır;
+ * sonraki tüm çağrılar yerel deterministik fallback vektörle karşılanır.
+ * Böylece 401 döngüsü (her menü öğesi için tekrar eden istekler) kesilir.
+ */
+let embedEndpointDisabled = false;
+
+function isAuthOrQuotaStatus(status: number): boolean {
+  return status === 401 || status === 403 || status === 429;
+}
+
+function disableEmbedEndpoint(status: number): void {
+  if (embedEndpointDisabled) return;
+  embedEndpointDisabled = true;
+  console.warn(
+    `[Yula Embedding] Sağlayıcı istekleri reddetti (HTTP ${status}) — bu oturumda embedding uç noktası devre dışı; yerel fallback vektör kullanılacak. Lütfen API anahtarını/sağlayıcı env ayarlarını kontrol edin (örn. OpenRouter anahtarı OpenAI uç noktasına gönderiliyor olabilir).`,
+  );
+}
+
 /** Metni FNV-1a 32-bit ile deterministik sezgisel sayı dizisine çevirir (offline fallback). */
 function fallbackVector(text: string, dimension = VECTOR_DIMENSION): number[] {
   const vec: number[] = new Array(dimension).fill(0);
@@ -28,6 +48,10 @@ export async function getEmbedding(text: string): Promise<number[]> {
   const trimmed = text.trim();
   if (!trimmed) return new Array(VECTOR_DIMENSION).fill(0);
 
+  // Devre kesici: kimlik/kota hatası bir kez tespit edildiyse bu oturumda
+  // tekrar ağa çıkma — 401 fırtınası ve konsol spam'i oluşmasın.
+  if (embedEndpointDisabled) return fallbackVector(trimmed);
+
   try {
     const res = await fetch("/api/agent/embed", {
       method: "POST",
@@ -40,6 +64,8 @@ export async function getEmbedding(text: string): Promise<number[]> {
       if (Array.isArray(data.embedding) && data.embedding.length > 0) {
         return data.embedding;
       }
+    } else if (isAuthOrQuotaStatus(res.status)) {
+      disableEmbedEndpoint(res.status);
     }
   } catch (err) {
     console.warn(
@@ -55,6 +81,10 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
   const validTexts = texts.map((t) => t.trim());
   if (validTexts.length === 0) return [];
 
+  if (embedEndpointDisabled) {
+    return validTexts.map((t) => fallbackVector(t));
+  }
+
   try {
     const res = await fetch("/api/agent/embed", {
       method: "POST",
@@ -67,6 +97,9 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
       if (Array.isArray(data.embeddings) && data.embeddings.length === validTexts.length) {
         return data.embeddings;
       }
+    } else if (isAuthOrQuotaStatus(res.status)) {
+      disableEmbedEndpoint(res.status);
+      return validTexts.map((t) => fallbackVector(t));
     }
   } catch (err) {
     console.warn(
@@ -75,6 +108,8 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
     );
   }
 
-  return Promise.all(validTexts.map((t) => (t ? getEmbedding(t) : new Array(VECTOR_DIMENSION).fill(0))));
+  // Not: toplu istek başarısızsa öğe başına ağa ÇIKILMAZ (hata fırtınası);
+  // doğrudan yerel deterministik fallback vektörler üretilir.
+  return validTexts.map((t) => (t ? fallbackVector(t) : new Array(VECTOR_DIMENSION).fill(0)));
 }
 

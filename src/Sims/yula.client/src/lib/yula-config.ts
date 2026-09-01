@@ -59,23 +59,15 @@ export function getActiveProvider(): AIProviderType {
   return "azure";
 }
 
-/** Varsayılan model adı (sağlayıcıya göre env üzerinden çözülür). */
+/** Varsayılan model adı (sağlayıcıya göre env üzerinden çözülür).
+ *  Bulut sağlayıcılarda genel YULA_MODEL sızması engellenir — o yalnızca
+ *  yerel Ollama varsayılanıdır; bulutta sağlayıcıya özgü env kullanılır. */
 export function getDefaultModel(provider: AIProviderType = getActiveProvider()): string {
   if (provider === "azure") {
-    return (
-      process.env.AZURE_OPENAI_MODEL ??
-      process.env.NEXT_PUBLIC_YULA_MODEL ??
-      process.env.YULA_MODEL ??
-      "gpt-5.4"
-    );
+    return process.env.AZURE_OPENAI_MODEL ?? "gpt-5.4";
   }
   if (provider === "openai") {
-    return (
-      process.env.OPENAI_MODEL ??
-      process.env.NEXT_PUBLIC_YULA_MODEL ??
-      process.env.YULA_MODEL ??
-      "gpt-4o"
-    );
+    return process.env.OPENAI_MODEL ?? "gpt-4o";
   }
   return (
     process.env.OLLAMA_MODEL ??

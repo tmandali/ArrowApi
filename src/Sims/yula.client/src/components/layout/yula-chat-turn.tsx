@@ -15,6 +15,7 @@ import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 
 import { copyToClipboard } from "@/lib/clipboard";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+import { describeYulaStreamError } from "@/lib/yula-stream-error";
 
 const SCREEN_TOOLS = new Set([
   "filter_current_grid",
@@ -52,21 +53,26 @@ function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
 
 function SilentTurnFallback({
   toolParts,
+  streamErrorText,
   onRetry,
 }: {
   toolParts: YulaToolPartInfo[];
+  streamErrorText?: string;
   onRetry: () => void;
 }) {
   const failed = toolParts.filter((i) => isFailedToolInfo(i));
   const hasScreenOk = toolParts.some(
     (i) => SCREEN_TOOLS.has(i.toolName) && !isFailedToolInfo(i) && i.state === "output-available",
   );
-  if (hasScreenOk && failed.length === 0) return null;
+  if (hasScreenOk && failed.length === 0 && !streamErrorText) return null;
 
+  const friendlyStreamError = describeYulaStreamError(streamErrorText);
   const hint =
-    failed.length > 0
-      ? `Analiz tamamlanamadı: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "araç hatası")}.`
-      : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).";
+    friendlyStreamError
+      ? `AI sağlayıcısı hata döndürdü: ${friendlyStreamError}`
+      : failed.length > 0
+        ? `Analiz tamamlanamadı: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "araç hatası")}.`
+        : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).";
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-2.5 text-[12px] leading-relaxed text-amber-950 dark:text-amber-100">
@@ -293,6 +299,9 @@ export function YulaChatTurn({
         ) : !assistantText.trim() ? (
           <SilentTurnFallback
             toolParts={toolParts}
+            streamErrorText={
+              assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined
+            }
             onRetry={() => void yula.retryResponse()}
           />
         ) : null}
