@@ -248,6 +248,7 @@ export async function POST(req: Request) {
           "run_job",
           "apply_criteria",
           "navigate_to_page",
+          "open_last_report",
           "profile_grid_table",
           "analyze_grid_data",
           "run_expert_sql",

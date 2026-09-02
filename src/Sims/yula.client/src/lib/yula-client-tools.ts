@@ -1115,6 +1115,79 @@ export async function executeClientTool(
         message: `"${title}" sayfasına yönlendiriliyorsunuz.`,
       };
     }
+    case "open_last_report": {
+      try {
+        const { REGISTERED_REPORTS } = await import(
+          "@/features/reports/report-registry"
+        );
+        const scope = typeof args.report === "string" ? args.report.trim().toLowerCase() : "";
+        const matched = scope
+          ? REGISTERED_REPORTS.filter(
+              (r) =>
+                r.scope === scope ||
+                r.aliases.some((a) => scope.includes(a) || a.includes(scope)),
+            )
+          : [];
+        const targets = matched.length > 0 ? matched : REGISTERED_REPORTS;
+
+        const { listArrowJobs } = await import("@/features/jobs/arrow-job-client");
+        type Candidate = { jobId: string; status: string; createdAt: string; title: string; href: string };
+        const candidates: Candidate[] = [];
+
+        for (const report of targets) {
+          const endpoint = (report.fullSchema as Record<string, unknown>)["x-job-endpoint"];
+          if (typeof endpoint !== "string" || !endpoint) continue;
+          try {
+            const { items } = await listArrowJobs(endpoint, { take: 10 });
+            for (const j of items) {
+              candidates.push({
+                jobId: j.id,
+                status: j.status,
+                createdAt: j.createdAt ?? "",
+                title: report.title,
+                href: `${report.pagePath}/${j.id}`,
+              });
+            }
+          } catch {
+            // Tek raporun listesi başarısız olsa da diğerlerine bak
+          }
+        }
+
+        // Liste API'sine henüz düşmemiş in-flight job'ları da dahil et
+        const { useActiveJobsStore } = await import(
+          "@/store/slices/active-jobs-store"
+        );
+        for (const job of Object.values(useActiveJobsStore.getState().jobs)) {
+          if (scope && (job.name ?? "").toLowerCase() !== scope) continue;
+          if (candidates.some((c) => c.jobId === job.id)) continue;
+          candidates.push({
+            jobId: job.id,
+            status: job.status,
+            createdAt: job.createdAt ?? "",
+            title: job.title || job.name,
+            href: job.href ?? `${"/stock/stock-balance"}/${job.id}`,
+          });
+        }
+
+        candidates.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const lastJob = candidates[0];
+        if (!lastJob) {
+          return {
+            status: "not_found",
+            message:
+              "Kayıtlı rapor job'ı bulunamadı. Kullanıcıya run_report ile yeni bir rapor çalıştırmayı önerebilirsin.",
+          };
+        }
+        return {
+          status: "navigated",
+          jobId: lastJob.jobId,
+          navigateTo: lastJob.href,
+          message: `Son çalışan rapor açıldı: ${lastJob.title} (job ${lastJob.jobId.slice(0, 8)}, ${lastJob.status}).`,
+        };
+      } catch (err) {
+        return { status: "error", error: err instanceof Error ? err.message : String(err) };
+      }
+    }
     case "analyze_grid_data":
       return analyzeGrid(args);
     case "profile_grid_table":

@@ -409,6 +409,18 @@ export function extractWorkedSteps(
         });
         break;
       }
+      case "open_last_report": {
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: "Opened last report job",
+          subLabel: isPending ? "Finding last report job..." : "Last report opened",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
       case "request_user_confirmation": {
         const title = typeof inputObj.title === "string" ? inputObj.title : "User approval";
         pushStep({

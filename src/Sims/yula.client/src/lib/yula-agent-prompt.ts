@@ -236,6 +236,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     "  - RESULTS-LOADING: Table not ready. Do not call grid or run_job tools; tell the user to wait.",
     "• APPLICATION IN-APP NAVIGATION (navigate_to_page):",
     "  - Uygulama içi istemci yönlendirmesi için 'navigate_to_page' aracına sahipsin.",
+    "  - MEVCUT RAPOR JOB'I GÖRÜNTÜLEME ('son çalışan raporu aç', 'son sonuçlar', 'en son job', 'önceki raporu göster'): YENİ JOB BAŞLATMA — 'open_last_report' aracını çağır. 'run_report'/'run_job' yalnız YENİ ÇALIŞTIRMA niyeti içindir.",
     "  - Standart Rotalar:",
     "    • Stok Bakiye Raporu (execution): '/stock/stock-balance'",
     "    • Stok Analiz Raporu (execution): '/stock/stock-analytics'",

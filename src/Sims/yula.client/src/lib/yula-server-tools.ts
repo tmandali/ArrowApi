@@ -90,7 +90,8 @@ export const STATIC_TOOLS = {
       description: [
         "Bir raporu GERÇEKLEŞTİRİR (backend job başlatır) ve execution ekranında yeni job'ı seçili/çalışır gösterir.",
         `Kullanılabilir raporlar: ${DEMO_REPORTS.map((r) => r.scope).join(", ")}.`,
-        'Kullanıcı herhangi bir rapor istediğinde (örn: "stok bakiye raporu", "raporu hazırla", "stok bakiyesi göster", "geçen hafta itibarıyla hazırla"), kriterler tam verilsin veya verilmesin BU ARACI DERHAL ÇAĞIR.',
+        "YALNIZ YENİ ÇALIŞTIRMA niyeti varsa çağır (örn: 'raporu çalıştır', 'raporu hazırla', 'geçen hafta itibarıyla hazırla', 'bugünün stok bakiyesini getir'). Kriterler tam verilsin veya verilmesin; varsayılan tarih/kriterler otomatik uygulanır.",
+        "MEVCUT bir job'ı/sonuçları GÖRME isteklerinde (örn: 'son çalışan raporu aç', 'son sonuçlar', 'en son job') BU ARACI ÇAĞIRMA — 'open_last_report' aracını kullan.",
         "Kullanıcıya sohbet üzerinden tarih formatı veya kriter sorusu SORMA — aracı criteria:{} ile çağır; sistem varsayılan tarih ve kriterleri otomatik uygulayacaktır.",
         "YALNIZ yeni rapor çalıştırma isteğinde kullan; açık tabloyu süzme istekleri için DEĞİL.",
       ].join(" "),
@@ -196,6 +197,29 @@ export const STATIC_TOOLS = {
         navigateTo: z.string().optional(),
         message: z.string(),
       }),
+    }),
+    open_last_report: tool({
+      description: [
+        "Kullanıcının EN SON çalıştırdığı rapor job'ını YENİDEN ÇALIŞTIRMADAN açar: kayıtlı job bulunur ve sonuç tablosuna yönlendirilir.",
+        "Kullanıcı 'son çalışan raporu aç', 'son raporu göster', 'son sonuçlar', 'en son job', 'önceki rapor' gibi isteklerde BU ARACI ÇAĞIR.",
+        "Bu araç YENİ JOB BAŞLATMAZ — mevcut job'ın sonuç ekranına gider. Yeni çalıştırma isteniyorsa run_report kullanılır.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().optional().describe("Rapor scope'u (örn: stock-balance); verilmezse en son job seçilir"),
+      }),
+      outputSchema: z.discriminatedUnion("status", [
+        z.object({
+          status: z.literal("navigated"),
+          jobId: z.string(),
+          navigateTo: z.string(),
+          message: z.string(),
+        }),
+        z.object({
+          status: z.literal("not_found"),
+          message: z.string(),
+        }),
+        z.object({ status: z.literal("error"), error: z.string() }),
+      ]),
     }),
   } satisfies ToolSet;
 

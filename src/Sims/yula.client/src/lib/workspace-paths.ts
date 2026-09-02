@@ -80,8 +80,8 @@ export function isWorkspaceHomePath(pathname: string): boolean {
   return pathname === "/" || WORKSPACE_ROOT_PATHS.has(pathname)
 }
 
-/** Normalize path for conversation/screen matching. */
-function normalizePath(path: string): string {
+/** Normalize path for conversation/screen matching (query düşer, trailing slash temizlenir). */
+export function normalizePath(path: string): string {
   return path.split("?")[0].replace(/\/+$/, "") || "/"
 }
 

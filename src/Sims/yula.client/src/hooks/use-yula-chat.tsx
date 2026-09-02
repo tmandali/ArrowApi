@@ -12,7 +12,7 @@ import { CircleAlert, RotateCw } from "lucide-react";
 import { executeClientTool, resetGridCustomView } from "@/lib/yula-client-tools";
 import {
   isWorkspaceHomePath,
-  isConversationOnScreen,
+  normalizePath,
   workspaceIdFromPath,
   workspaceLabelFromPath,
   isReportResultPath,
@@ -199,6 +199,7 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
         "run_job",
         "apply_criteria",
         "navigate_to_page",
+        "open_last_report",
         "visualize_grid_data",
       ].includes(i.toolName) && !isFailedToolInfo(i),
   );
@@ -1214,26 +1215,17 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const conversations = store.conversations;
-    const activeConv = conversations.find((c) => c.id === currentActiveId);
+    // Her sayfa değişimi = taze sohbet: aktif sohbet yalnız bu sayfaya BİREBİR
+    // bağlıysa korunur (history tıklaması da bu eşleşmeyle korunur); aksi halde
+    // yeni sohbet açılır. Gevşek eşleşme (aynı rapor/baz-rota) kaldırıldı.
+    const activeConv = store.conversations.find((c) => c.id === currentActiveId);
     const activeMsgs = currentActiveId ? store.messagesById[currentActiveId] ?? [] : [];
-
-    const isValidForScreen = activeConv
-      ? isConversationOnScreen(activeConv.pathname, pathname)
+    const isSamePage = activeConv
+      ? normalizePath(activeConv.pathname ?? "/") === normalizePath(pathname)
       : activeMsgs.length === 0;
 
-    if (!isValidForScreen) {
-      const jobId = extractJobIdFromHref(pathname);
-      const screenConv = jobId
-        ? conversations.find(
-            (c) => (c.jobId ?? extractJobIdFromHref(c.pathname))?.toLowerCase() === jobId.toLowerCase(),
-          )
-        : conversations.find((c) => isConversationOnScreen(c.pathname, pathname));
-      if (screenConv) {
-        store.selectConversation(screenConv.id);
-      } else {
-        store.newConversation();
-      }
+    if (!isSamePage) {
+      store.newConversation();
     }
   }, [pathname]);
 

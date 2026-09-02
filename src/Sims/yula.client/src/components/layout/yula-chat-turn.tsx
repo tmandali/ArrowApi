@@ -23,6 +23,7 @@ const SCREEN_TOOLS = new Set([
   "run_job",
   "apply_criteria",
   "navigate_to_page",
+  "open_last_report",
   "visualize_grid_data",
 ]);
 
