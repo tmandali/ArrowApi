@@ -37,6 +37,8 @@ export interface WorkedStepItem {
   isError?: boolean;
   detailText?: string;
   info?: YulaToolPartInfo;
+  /** Ait olduğu LLM adımının sırası (step-start sayacı) — Worked görünümünde girinti */
+  stepIndex?: number;
 }
 
 interface YulaWorkedAccordionProps {
@@ -84,6 +86,7 @@ export function extractWorkedSteps(
   const steps: WorkedStepItem[] = [];
 
   if (conversationId) {
+    // Tüm aşama izleri görünür: İstek alındı, Phase, RAG, Araç seti, HTTP, hatalar
     for (const trace of getTurnTrace(conversationId)) {
       steps.push(traceToWorkedStep(trace));
     }
@@ -128,6 +131,11 @@ export function extractWorkedSteps(
     return steps;
   }
 
+  // step-start işaretine göre güncel LLM adımı; parçalar bu adıma bağlanır
+  let currentStep = -1;
+  const pushStep = (s: WorkedStepItem) =>
+    steps.push({ ...s, stepIndex: currentStep < 0 ? 0 : currentStep });
+
   message.parts.forEach((part, index) => {
     if (part.type === "reasoning") {
       const raw = part.text ?? "";
@@ -136,7 +144,7 @@ export function extractWorkedSteps(
       const isThinking = !meta || meta === "thinking";
       const approxDuration = Math.max(1, Math.round((text || raw).length / 60));
 
-      steps.push({
+      pushStep({
         id: `${message.id}-reasoning-${index}`,
         kind: "thought",
         label: isThinking
@@ -159,7 +167,7 @@ export function extractWorkedSteps(
       const raw = (part as { text?: string }).text ?? "";
       const text = sanitizeAssistantText(raw);
       if (text.trim()) return;
-      steps.push({
+      pushStep({
         id: `${message.id}-text-hidden-${index}`,
         kind: "thought",
         label: raw.trim() ? "Model text gizlendi (sanitizer)" : "Model text boş",
@@ -179,26 +187,15 @@ export function extractWorkedSteps(
     }
 
     if (part.type === "step-start") {
-      steps.push({
-        id: `${message.id}-step-start-${index}`,
-        kind: "explored",
-        label: "LLM step-start",
-        subLabel: isLiveStreaming ? "Yeni tur başladı..." : "step",
-        isLive: isLiveStreaming,
-        info: {
-          toolCallId: `${message.id}-step-start-${index}`,
-          toolName: "step-start",
-          state: "output-available",
-          input: part,
-          output: { index },
-        },
-      });
+      // step-start bir satır değil, adım sınırıdır: sonraki parçalar
+      // yeni adıma girintili bağlanır
+      currentStep += 1;
       return;
     }
 
     const info = yulaToolPartInfo(part);
     if (!info) {
-      steps.push({
+      pushStep({
         id: `${message.id}-part-${index}`,
         kind: "explored",
         label: `Part: ${part.type ?? "unknown"}`,
@@ -226,7 +223,7 @@ export function extractWorkedSteps(
     switch (info.toolName) {
       case "prepare_report_criteria":
       case "get_report_schema": {
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "explored",
           label: "Explored report criteria & JSON schema",
@@ -239,7 +236,7 @@ export function extractWorkedSteps(
       }
       case "profile_grid_table":
       case "analyze_grid_data": {
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "explored",
           label: "Explored 1 table, RAG schema",
@@ -257,7 +254,7 @@ export function extractWorkedSteps(
       case "run_expert_sql": {
         const sql = typeof inputObj.sql === "string" ? inputObj.sql.replace(/\s+/g, " ").trim() : "";
         const shortSql = sql.length > 40 ? `${sql.slice(0, 40)}…` : sql;
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "ran",
           label: `Ran SQL: ${shortSql || "DuckDB query"}`,
@@ -295,7 +292,7 @@ export function extractWorkedSteps(
           }
         }
 
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "edited",
           label: isReset ? "Cleared grid filters" : `Filtered ${displayExpr}`,
@@ -318,7 +315,7 @@ export function extractWorkedSteps(
 
         if (hasSql) {
           // LLM Tarafında SQL Otomatik Düzeltme & Şema Eşleme Adımı (Canlı yükleme spinner'ı destekli)
-          steps.push({
+          pushStep({
             id: `${info.toolCallId}-autocorrect`,
             kind: "explored",
             label: "Auto-corrected SQL query & grounded schema",
@@ -343,7 +340,7 @@ export function extractWorkedSteps(
           });
         }
 
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "edited",
           label: isReset ? "Reset grid view" : `Updated grid view query${title ? ` (${title})` : ""}`,
@@ -360,7 +357,7 @@ export function extractWorkedSteps(
       }
       case "visualize_grid_data": {
         const title = typeof inputObj.title === "string" ? inputObj.title.trim() : "";
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "ran",
           label: `Ran Chart: ${title || "Visualization"}`,
@@ -375,7 +372,7 @@ export function extractWorkedSteps(
       case "run_job": {
         const report = typeof inputObj.report === "string" ? inputObj.report : "Stock Balance";
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "ran",
           label: preset ? `Ran Job: ${preset}` : `Ran Job: ${report}`,
@@ -388,7 +385,7 @@ export function extractWorkedSteps(
       }
       case "apply_criteria": {
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "edited",
           label: preset ? `Applied: ${preset}` : "Applied criteria to form",
@@ -401,7 +398,7 @@ export function extractWorkedSteps(
       }
       case "navigate_to_page": {
         const title = typeof inputObj.title === "string" ? inputObj.title : (typeof inputObj.path === "string" ? inputObj.path : "Page navigation");
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "explored",
           label: `Navigated: ${title}`,
@@ -414,7 +411,7 @@ export function extractWorkedSteps(
       }
       case "request_user_confirmation": {
         const title = typeof inputObj.title === "string" ? inputObj.title : "User approval";
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "confirmation",
           label: `Confirmation: ${title}`,
@@ -426,7 +423,7 @@ export function extractWorkedSteps(
         break;
       }
       default: {
-        steps.push({
+        pushStep({
           id: info.toolCallId,
           kind: "ran",
           label: `Ran tool: ${info.toolName}`,
@@ -450,6 +447,22 @@ export function extractWorkedSteps(
     });
   }
 
+  // step-start artık satır üretmediği için yalnız metinden oluşan yanıtlarda
+  // (thinking kapalıyken tipik durum) adım listesi boş kalır: tek satırlık özet ekle
+  if (!isLiveStreaming && steps.length === 0 && message) {
+    const hasText = message.parts.some(
+      (p) => p.type === "text" && ((p as { text?: string }).text ?? "").trim().length > 0,
+    );
+    if (hasText) {
+      steps.push({
+        id: `${message.id}-direct-answer`,
+        kind: "ran",
+        label: "Composed answer",
+        subLabel: "Direct response",
+      });
+    }
+  }
+
   return steps;
 }
 
@@ -470,23 +483,19 @@ export function YulaWorkedAccordion({
   /** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
   const stepPayload = (step: WorkedStepItem): string | null => {
     if (!step.info) return null;
-    return JSON.stringify(
-      {
-        tool: step.info.toolName,
-        input: step.info.input,
-        output: (() => {
-          if (!step.info.output || typeof step.info.output !== "object") return step.info.output ?? null;
-          const out = { ...(step.info.output as Record<string, unknown>) };
-          if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-            delete out.sql;
-            delete out.display;
-          }
-          return out;
-        })(),
-      },
-      null,
-      2,
-    );
+    const out = (() => {
+      if (!step.info?.output || typeof step.info.output !== "object") return step.info?.output ?? null;
+      const cleaned = { ...(step.info.output as Record<string, unknown>) };
+      if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
+        delete cleaned.sql;
+        delete cleaned.display;
+      }
+      return cleaned;
+    })();
+    const body: Record<string, unknown> = { tool: step.info.toolName, input: step.info.input };
+    // Sınır işaretlerinde output hiç üretilmez: null alanı basmak yerine atla
+    if (out !== null && out !== undefined) body.output = out;
+    return JSON.stringify(body, null, 2);
   };
 
   /** "Worked for" başlığı + tüm adım detayları + nihai cevap metni */
@@ -571,13 +580,8 @@ export function YulaWorkedAccordion({
   React.useEffect(() => {
     if (userToggled) return;
     // Yanıt bitince (canlı akış yok, cevap metni var, hata yok) akordeon
-    // kendini kapatır. Worker adımları yalnızca HÂLÂ çalışıyorsa açık tutar;
-    // tamamlanmış worker/trace adımları akordeonu kilitlamaz.
-    const keepOpen =
-      isLive ||
-      !hasTextContent ||
-      steps.some((s) => s.isError) ||
-      steps.some((s) => s.info?.toolName === "worker" && s.isLive);
+    // kendini kapatır; isLive tüm tur (araç yürütmeleri dahil) süresince açık tutar.
+    const keepOpen = isLive || !hasTextContent || steps.some((s) => s.isError);
     setOpen(keepOpen);
   }, [isLive, hasTextContent, userToggled, steps]);
 
@@ -663,9 +667,15 @@ export function YulaWorkedAccordion({
 
               const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
               const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
+              // step-start sonrası parçalar kendi adım seviyesinde girintili görünür
+              const indent = step.stepIndex == null ? 0 : 16;
 
               return (
-                <div key={step.id} className="flex flex-col gap-1">
+                <div
+                  key={step.id}
+                  style={indent ? { marginLeft: indent } : undefined}
+                  className="flex flex-col gap-1"
+                >
                   {/* Adım Başlığı Satırı */}
                   <div
                     onClick={() => {
@@ -734,23 +744,23 @@ export function YulaWorkedAccordion({
                         {/* Araç Adı, Giden Parametreler (Input) ve Gelen Çıktı (Output) ile Tek Renkli JSON Bloğu */}
                         {step.info ? (
                           <CodeBlock
-                            value={JSON.stringify(
-                              {
+                            value={(() => {
+                              const out = (() => {
+                                if (!step.info?.output || typeof step.info.output !== "object") return step.info?.output ?? null;
+                                const cleaned = { ...(step.info.output as Record<string, unknown>) };
+                                if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
+                                  delete cleaned.sql;
+                                  delete cleaned.display;
+                                }
+                                return cleaned;
+                              })();
+                              const body: Record<string, unknown> = {
                                 tool: step.info.toolName,
                                 input: step.info.input,
-                                output: (() => {
-                                  if (!step.info.output || typeof step.info.output !== "object") return step.info.output ?? null;
-                                  const out = { ...(step.info.output as Record<string, unknown>) };
-                                  if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-                                    delete out.sql;
-                                    delete out.display;
-                                  }
-                                  return out;
-                                })(),
-                              },
-                              null,
-                              2
-                            )}
+                              };
+                              if (out !== null && out !== undefined) body.output = out;
+                              return JSON.stringify(body, null, 2);
+                            })()}
                             language="json"
                             className="max-h-52 border border-border/20 rounded-md p-1.5 text-[10.5px] font-mono leading-tight shadow-none"
                           />

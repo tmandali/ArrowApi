@@ -194,6 +194,32 @@ export function YulaChatTurn({
     return { ...assistantMessage, parts: cleanedParts };
   }, [assistantMessage, hasSqlCard]);
 
+  // Metin yazılmayan turlarda son başarılı araç çıktısının "message" alanı
+  // görünür yanıt olarak kullanılır (LLM, terminal ekran araçlarından sonra yazmaz)
+  const streamErrorText = assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined;
+  const hasFailedTools = toolParts.some((i) => isFailedToolInfo(i));
+  let fallbackToolText = "";
+  if (!assistantText.trim() && !hasFailedTools && !streamErrorText) {
+    for (let i = toolParts.length - 1; i >= 0; i--) {
+      const info = toolParts[i];
+      if (info.state !== "output-available" || isFailedToolInfo(info)) continue;
+      const out = info.output as { message?: unknown } | undefined;
+      if (typeof out?.message === "string" && out.message.trim()) {
+        fallbackToolText = out.message.trim();
+        break;
+      }
+    }
+  }
+
+  const fallbackMessage: YulaMessage | undefined =
+    fallbackToolText && assistantMessage
+      ? ({
+          id: `${assistantMessage.id}-tool-reply`,
+          role: "assistant",
+          parts: [{ type: "text", text: fallbackToolText }],
+        } as unknown as YulaMessage)
+      : undefined;
+
   return (
     <div className="group/turn relative flex flex-col gap-2.5 py-2">
       {/* 1. Yapışkan Soru Kartı (Kullanıcı Mesajı + Kopyala & Geri Al Simge Butonları) */}
@@ -288,6 +314,8 @@ export function YulaChatTurn({
             message={displayAssistantMessage}
             isLive={isLive}
           />
+        ) : fallbackMessage ? (
+          <AiChatMessage message={fallbackMessage} />
         ) : null}
 
         {isLive ? (
@@ -295,12 +323,10 @@ export function YulaChatTurn({
             <Loader2 className="size-3.5 shrink-0 text-primary animate-spin" />
             <span>{liveStatusLabel(toolParts)}</span>
           </div>
-        ) : !assistantText.trim() ? (
+        ) : !assistantText.trim() && !fallbackMessage ? (
           <SilentTurnFallback
             toolParts={toolParts}
-            streamErrorText={
-              assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined
-            }
+            streamErrorText={streamErrorText}
             onRetry={() => void yula.retryResponse()}
           />
         ) : null}

@@ -6,7 +6,6 @@ import {
   extractJobIdFromHref,
   isGuidString,
   isWorkspaceHomePath,
-  reportExecutionHref,
   reportExecutionPath,
   reportScopeFromPath,
 } from "@/lib/workspace-paths"
@@ -60,7 +59,11 @@ export function hrefForConversation(
 ): string | undefined {
   const jobId = resolveConversationJobId(conversation, messages)
   const exec = reportExecutionPath(conversation.pathname)
-  if (jobId && exec) return reportExecutionHref(exec, jobId)
+  // Kayıt job'ı zaten taşıyorsa (GUID path / ?job=) kayıtlı gerçek form korunur
+  if (jobId && extractJobIdFromHref(conversation.pathname)) {
+    return conversation.pathname
+  }
+  if (jobId && exec) return `${exec}/${jobId}`
   return conversation.pathname
 }
 

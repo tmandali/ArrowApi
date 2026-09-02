@@ -152,16 +152,26 @@ export function formatPathnameLabel(pathname?: string): string | null {
 
 /**
  * Sohbet kaydı: execution ekranı + job query (GUID sonuç path'i değil).
+ * Job'lı sayfalar iki URL formunda açılabilir (GUID path / ?job= query);
+ * kayıt kullanıcının gerçekte kaldığı formu KORUR, zorla ?job= biçimine çevirmez.
  */
 export function resolveConversationPathname(
   existing?: string | null,
   current?: string | null,
 ): string | undefined {
+  const keepForm = (href: string) => href.replace(/\/+$/, "") || "/"
   const job =
     extractJobIdFromHref(current) ?? extractJobIdFromHref(existing) ?? undefined
   const exec =
     reportExecutionPath(current) ?? reportExecutionPath(existing) ?? undefined
-  if (job && exec) return reportExecutionHref(exec, job)
+  if (job && exec) {
+    // Gerçek sayfa formu korunur: current formu önce, sonra existing, en sonda GUID path üretilir
+    if (current && extractJobIdFromPath(current)) return normalizePath(current)
+    if (current && extractJobIdFromHref(current)) return keepForm(current)
+    if (existing && extractJobIdFromPath(existing)) return normalizePath(existing)
+    if (existing && extractJobIdFromHref(existing)) return keepForm(existing)
+    return `${exec}/${job}`
+  }
   return exec || (current ? normalizePath(current) : undefined) || (existing ? normalizePath(existing) : undefined)
 }
 
