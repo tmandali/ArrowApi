@@ -8,7 +8,7 @@ export type ReportColumnMeta = {
   label?: string
   align?: "left" | "right"
   isNumeric?: boolean
-  /** Ham DuckDB tipi (DATE, TIMESTAMP, VARCHAR, DECIMAL...) — AI şema grounding'i için. */
+  /** Ham tipi (DATE, TIMESTAMP, VARCHAR, DECIMAL...) — AI şema grounding'i için. */
   duckType?: string
 }
 
@@ -137,7 +137,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           )
         }
       } catch (err) {
-        console.error("DuckDB Query error:", err)
+        console.error("Query error:", err)
       } finally {
         if (seq === querySeqRef.current) setIsLoadingQuery(false)
       }
@@ -378,7 +378,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         // Özel görünüm hataları banner'a düşürülmez: model akışı zaten
         // düzeltir; kullanıcıyı kırmızı banner ile endişelendirmeye gerek yok.
         if (!cancelled) {
-          console.warn("DuckDB custom query error:", err)
+          console.warn("custom query error:", err)
         }
       } finally {
         if (!cancelled && seq === querySeqRef.current) setIsLoadingQuery(false)

@@ -257,8 +257,8 @@ export function extractWorkedSteps(
         pushStep({
           id: info.toolCallId,
           kind: "ran",
-          label: `Ran SQL: ${shortSql || "DuckDB query"}`,
-          subLabel: isPending ? "Executing DuckDB SQL query..." : "DuckDB query",
+          label: `Ran SQL: ${shortSql || "query"}`,
+          subLabel: isPending ? "Executing SQL query..." : "query",
           isLive: isPending,
           isError,
           info,

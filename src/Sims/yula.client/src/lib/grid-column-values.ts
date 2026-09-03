@@ -4,7 +4,7 @@
  * Natural Language Postgres rehberindeki "industries listesi" tekniği:
  * model kategorik değerleri uydurmasın; metin/bool kolonların gerçekte
  * var olan değerlerini DuckDB'den alıp prompt'aGrounding olarak ver.
- * Yalnız saf fonksiyonlar burada; DuckDB erişimi computeColumnValuesDigest'te.
+ * Yalnız saf fonksiyonlar burada; erişimi computeColumnValuesDigest'te.
  */
 
 /** Bu eşiği aşan tablolarda tam tarama riskine girme (OPFS/WASM bütçesi). */

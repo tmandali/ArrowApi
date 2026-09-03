@@ -41,7 +41,7 @@ export type ArrowReportGridProps = {
 }
 
 /**
- * Uygulama genelinde tüm Arrow raporları için ortak, DuckDB Wasm + OPFS destekli
+ * Uygulama genelinde tüm Arrow raporları için ortak, Wasm + OPFS destekli
  * yüksek performanslı sanal spreadsheet bileşeni.
  *
  * Herhangi bir workspace'teki (Stok, Satış, Muhasebe, Üretim vb.) rapor için
@@ -49,7 +49,7 @@ export type ArrowReportGridProps = {
  */
 
 /**
- * columnTypes haritası Arrow/DuckDB şemasından türetilir (column-type-utils).
+ * columnTypes haritası Arrow/şemasından türetilir (column-type-utils).
  * Yula'ya şema grounding olarak verilir; filtre değerlerinin kolon tipiyle
  * uyumu hem modele öğretilir hem execution anında jenerik doğrulanır.
  */
@@ -80,7 +80,7 @@ export function ArrowReportGrid({
     [columns]
   )
 
-  // DuckDB tablo adı — şema (DESCRIBE), kolon değerleri ve Yula bağlamı için
+  // tablo adı — şema (DESCRIBE), kolon değerleri ve Yula bağlamı için
   const duckTableName = jobId
     ? `report_${jobId.replace(/[^a-zA-Z0-9_]/g, "_")}`
     : "current_report"
@@ -131,12 +131,12 @@ export function ArrowReportGrid({
   }, [customQuerySql, columns, discoveredCols])
 
   /**
-   * Arrow/DuckDB şemasından türetilmiş kolon tip haritası.
+   * Arrow/şemasından türetilmiş kolon tip haritası.
    * Yula'ya (LLM) şema grounding olarak verilir; filtre değerlerinin
    * kolon tipiyle (tarih/sayı/metin) uyumlu olmasını hem modele öğretir hem
    * execution anında jenerik olarak doğrular.
    */
-  // DuckDB DESCRIBE — TİPLERİN YETKİLİ KAYNAĞI. columns prop'u hizalama
+  // DESCRIBE — TİPLERİN YETKİLİ KAYNAĞI. columns prop'u hizalama
   // (align) sezgisiyle gelir ve duckType taşımaz; "Qty (text)" gibi yanlış
   // grounding modelin araç çağırmayı reddetmesine yol açıyordu.
   const [describedCols, setDescribedCols] = React.useState<
@@ -164,7 +164,7 @@ export function ArrowReportGrid({
     const map: Record<string, string> = {}
     for (const c of metaColumns) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric)
     for (const c of discoveredCols) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric)
-    // Öncelik: DuckDB DESCRIBE > keşif > align sezgisi
+    // Öncelik: DESCRIBE > keşif > align sezgisi
     if (describedCols) {
       for (const c of describedCols) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric)
     }
@@ -196,7 +196,7 @@ export function ArrowReportGrid({
    */
 
   // Kardinalite sözlüğü: düşük kardinaliteli metin/bool kolonların GERÇEK
-  // değerleri (DuckDB DISTINCT) — Yula kategori değerlerini uydurmasın.
+  // değerleri (DISTINCT) — Yula kategori değerlerini uydurmasın.
   // Tablo başına (tipler hazır olunca) bir kez hesaplanır; filtre değişimi
   // yeniden tetiklemez.
   const [columnValuesDigest, setColumnValuesDigest] = React.useState<

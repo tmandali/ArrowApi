@@ -24,7 +24,7 @@ type ActiveDataset = {
   numeric: Set<string>;
   isCustom: boolean;
   tableName: string;
-  /** Yalnız temel tablo: DuckDB şema metası (duckType/tarih tespiti için) */
+  /** Yalnız temel tablo: şema metası (duckType/tarih tespiti için) */
   described?: Awaited<
     ReturnType<typeof import("@/services/duckdb")["duckDbClient"]["describeTable"]>
   >;
@@ -207,7 +207,7 @@ async function analyzeGrid(
         hint: "availableColumns içinden bir kolon seç; toplama/ortalama için numericColumns gerekir.",
       };
     }
-    // Sayısal olmayan kolona toplama uygulamak DuckDB Binder Error üretir
+    // Sayısal olmayan kolona toplama uygulamak Binder Error üretir
     // (örn. sum(VARCHAR)) — sessiz fallback YOK; model düzeltmeli kolonla tekrar çağırır.
     if (!ds.numeric.has(column)) {
       return {
@@ -345,7 +345,7 @@ async function profileGrid(): Promise<unknown> {
     const filters = useYulaGridStore.getState().filters
     const where = buildCombinedWhereClause(filters, ds.numeric)
 
-    // Kolon tipleri: temel tabloda DuckDB şemasından (tarih/bool dahil),
+    // Kolon tipleri: temel tabloda şemasından (tarih/bool dahil),
     // özel görünümde örnek satır tipinden (numeric/text) türetilir.
     const kindOf = (name: string): ProfileColumnKind => {
       const meta = ds.described?.find((c) => c.name === name)
@@ -698,7 +698,7 @@ async function setGridQuery(
 
 /**
  * visualize_grid_data — modelin ürettiği grafik KONFİGÜRASYONUNU deterministik
- * DuckDB aggregasyonuyla veriye çevirir. Model satır verisi taşımaz; kart
+ * aggregasyonuyla veriye çevirir. Model satır verisi taşımaz; kart
  * dönen gerçek satırlardan çizilir (transkripsiyon hatası imkânsızlaşır).
  */
 async function visualizeGrid(

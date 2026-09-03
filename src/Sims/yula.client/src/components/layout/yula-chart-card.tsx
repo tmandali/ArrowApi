@@ -110,7 +110,7 @@ function parseChartOutput(output: unknown): ParsedChart | null {
 /**
  * visualize_grid_data kartı — tek jenerik render yolu.
  * Kontrat: model yalnız { chartType, dimensionX, dimensionY, aggregation }
- * bildirir; satırlar DuckDB aggregasyonundan gelir (model transkripsiyonu yok).
+ * bildirir; satırlar aggregasyonundan gelir (model transkripsiyonu yok).
  * Renkler doğrudan paletten (tema token'ları) — seriler ve pie dilimleri.
  */
 export function YulaChartCard({

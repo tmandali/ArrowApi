@@ -4,7 +4,7 @@ import { getVectorDimension } from "./yula-config";
  * Yula Embedding Servisi — Çoklu Sağlayıcı Destekli (Azure / OpenAI / Ollama).
  *
  * /api/agent/embed rotası üzerinden aktif sağlayıcı modeliyle (örn: text-embedding-3-small,
- * all-minilm) vektör üretir. DuckDB WASM vector store ile tam uyumludur.
+ * all-minilm) vektör üretir. WASM vector store ile tam uyumludur.
  */
 
 export const VECTOR_DIMENSION = getVectorDimension();

@@ -20,7 +20,7 @@ export interface SqlGuardError {
 
 export type SqlGuardResult = SqlGuardOk | SqlGuardError
 
-/** Statement-level yasaklıklar (DuckDB yazma/şema/dosya işlemleri). */
+/** Statement-level yasaklıklar (yazma/şema/dosya işlemleri). */
 const FORBIDDEN_KEYWORDS = [
   "insert",
   "update",
@@ -46,7 +46,7 @@ const FORBIDDEN_KEYWORDS = [
   "analyze",
 ] as const
 
-/** DuckDB okuma fonksiyonları — diğer rapor dosyalarına sızmayı engeller. */
+/** okuma fonksiyonları — diğer rapor dosyalarına sızmayı engeller. */
 const FORBIDDEN_FUNCTION_PATTERNS: RegExp[] = [
   /\bread_(?:parquet|csv|json|arrow)\s*\(/i,
   /\bglob\s*\(/i,

@@ -2,8 +2,8 @@
  * Yula Storage Buckets Manager — Chrome 122+ / Storage Buckets API.
  *
  * Yula yerel verilerini 3 bağımsız izole deponun altına ayırır:
- *   1) `yula-reports-opfs`: DuckDB WASM Parquet dosyaları (persisted: true)
- *   2) `yula-rag-vectors`: DuckDB WASM RAG Vektör veritabanı (persisted: true)
+ *   1) `yula-reports-opfs`: WASM Parquet dosyaları (persisted: true)
+ *   2) `yula-rag-vectors`: WASM RAG Vektör veritabanı (persisted: true)
  *   3) `yula-ai-cache`: AI yanıt ve akış önbellekleri (7 günlük otomatik TTL)
  *
  * Feature detection (Progressive Enhancement) ile yazılmıştır; desteği olmayan

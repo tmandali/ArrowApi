@@ -209,7 +209,7 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   if (!toolInfos.every((info) => isFinalToolState(info.state))) return false;
 
   // Ekran güncelleyen/görselleştiren nihai araçlar YALNIZCA BAŞARILI OLDUĞUNDA durur:
-  // Araç hata aldıysa (örn: DuckDB Binder Error), modelin hata mesajını ve hint'i okuyup
+  // Araç hata aldıysa (örn: Binder Error), modelin hata mesajını ve hint'i okuyup
   // kendini düzeltmesi için (Self-Correction Turn) otomatik olarak 2. tur tetiklenir!
   const hasSuccessfulTerminalScreenTool = toolInfos.some(
     (i) =>
@@ -419,7 +419,7 @@ function ChatInstance({
               upsertTurnTrace(conversationIdRef.current, {
                 id: "describe",
                 toolName: "worker",
-                label: "DuckDB describeTable başarısız",
+                label: "describeTable başarısız",
                 isError: true,
                 detailText: err instanceof Error ? err.message : String(err),
                 input: { expectedTable },
@@ -438,7 +438,7 @@ function ChatInstance({
                 : "results-loading"
               : "workspace";
 
-          // DuckDB WASM Vector RAG araması (all-minilm + array_cosine_distance)
+          // WASM Vector RAG araması (all-minilm + array_cosine_distance)
           let ragContext: Array<{ scope: string; content: string; metadata?: Record<string, unknown>; distance?: number }> = [];
           const lastUserMsg = messages.filter((m) => m.role === "user").pop();
           const lastTextPart = lastUserMsg?.parts.find((p) => p.type === "text") as { text?: string } | undefined;
@@ -468,7 +468,7 @@ function ChatInstance({
             upsertTurnTrace(conversationIdRef.current, {
               id: "describe",
               toolName: "worker",
-              label: "DuckDB tablo hazır",
+              label: "Tablo hazır",
               subLabel: expectedTable,
               input: { expectedTable, specCols },
             });
@@ -619,7 +619,7 @@ function ChatInstance({
 
   const status = chat.status;
 
-  // Storage Buckets & DuckDB WASM Vector RAG şema indeksleyicisi
+  // Storage Buckets & WASM Vector RAG şema indeksleyicisi
   React.useEffect(() => {
     void import("@/lib/yula-storage-buckets").then(({ initYulaStorageBuckets }) => {
       void initYulaStorageBuckets().catch(() => {});
@@ -705,7 +705,7 @@ function ChatInstance({
               window.setTimeout(() => {
                 reject(
                   new Error(
-                    `${part.toolName} ${Math.round(timeoutMs / 1000)} sn içinde bitmedi. Tablo yükleniyor veya DuckDB meşgul olabilir — Durdur'a basıp birkaç saniye sonra tekrar deneyin.`,
+                    `${part.toolName} ${Math.round(timeoutMs / 1000)} sn içinde bitmedi. Tablo yükleniyor veya meşgul olabilir — Durdur'a basıp birkaç saniye sonra tekrar deneyin.`,
                   ),
                 );
               }, timeoutMs);
@@ -1128,7 +1128,7 @@ function ChatInstance({
           subLabel: selectedJobId.slice(0, 8),
           isLive: true,
           input: { from: href, to },
-          output: { reason: "grid slash; DuckDB tablosu henüz yok" },
+          output: { reason: "grid slash; tablo henüz oluşmamış" },
         });
         if (to) {
           useChatsStore.getState().beginConversationFollow(conversationId);
@@ -1276,7 +1276,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 
   // Sohbet geçmişini RAG vektör store'a indeksle (ilk yükleme + her yeni
   // sohbet/kayıtta artımlı). Ana sayfa araması menülerle birlikte geçmişi de
-  // semantik arayabilsin diye. duckdb-vector'ü tembel yükle (DuckDB WASM).
+  // semantik arayabilsin diye. duckdb-vector'ü tembel yükle (WASM).
   React.useEffect(() => {
     if (conversations.length === 0) return;
     const store = useChatsStore.getState();

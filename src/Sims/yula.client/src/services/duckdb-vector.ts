@@ -63,7 +63,7 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
     `;
     await duckDbClient.executeCustomSql(sql);
     activeStoreDimension = dimension;
-    console.info(`🤖 [DuckDB WASM Vector Store] yula_rag_embeddings table ready (FLOAT[${dimension}]).`);
+    console.info(`🤖 [WASM Vector Store] yula_rag_embeddings table ready (FLOAT[${dimension}]).`);
   } catch {
     // Tablo şema uyuşmazlığı varsa (örn: eski 384 vs 1536) tabloyu sıfırla
     try {
@@ -79,9 +79,9 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
       `;
       await duckDbClient.executeCustomSql(fallbackSql);
       activeStoreDimension = dimension;
-      console.info(`🤖 [DuckDB WASM Vector Store] Recreated yula_rag_embeddings (FLOAT[${dimension}]).`);
+      console.info(`🤖 [WASM Vector Store] Recreated yula_rag_embeddings (FLOAT[${dimension}]).`);
     } catch (recreateErr) {
-      console.warn("[DuckDB Vector Store] init error:", recreateErr);
+      console.warn("[Vector Store] init error:", recreateErr);
     }
   }
 }
@@ -204,7 +204,7 @@ async function doIndexWorkspaceMenus(): Promise<number> {
     await insertOrReplaceVector({ ...pending[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
   }
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${pending.length} workspace menu items indexed into RAG store.`);
+  console.info(`🤖 [WASM Vector Indexer] ${pending.length} workspace menu items indexed into RAG store.`);
   return pending.length;
 }
 
@@ -257,7 +257,7 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
         });
         conversationIndexedIds.add(it.id);
       }
-      console.info(`🤖 [DuckDB WASM Vector Indexer] ${pending.length} conversations indexed into RAG store.`);
+      console.info(`🤖 [WASM Vector Indexer] ${pending.length} conversations indexed into RAG store.`);
       return pending.length;
     } finally {
       conversationIndexInFlight = null;
@@ -378,7 +378,7 @@ export async function searchVectorContext(
 
     return filtered;
   } catch (err) {
-    console.warn("[DuckDB Vector Store] search error:", err);
+    console.warn("[Vector Store] search error:", err);
     return [];
   }
 }

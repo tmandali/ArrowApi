@@ -6,7 +6,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 type Step = { ok: boolean; label: string; detail?: string };
 
 /**
- * Faz 1a spike — DuckDB WASM × Turbopack kanıtı.
+ * Faz 1a spike — WASM × Turbopack kanıtı.
  * getJsDelivrBundles CDN'den bundle çözer; build bu importları toplarsa ve
  * runtime'da instantiate + query dönerse faz geçer sayılır.
  */
@@ -22,9 +22,9 @@ export default function DuckDbSpikePage() {
     async function run() {
       try {
         push({ ok: true, label: "dynamic import('@duckdb/duckdb-wasm')" });
-        const duckdb = await import("@duckdb/duckdb-wasm");
+        const = await import("@duckdb/duckdb-wasm");
 
-        push({ ok: true, label: "selectBundle(/public/duckdb self-hosted)" });
+        push({ ok: true, label: "selectBundle(/public/self-hosted)" });
         const bundle = await duckdb.selectBundle({
           mvp: {
             mainModule: "/duckdb/duckdb-mvp.wasm",
@@ -92,7 +92,7 @@ export default function DuckDbSpikePage() {
   return (
     <AppLayout>
     <main className="p-8 font-mono text-sm">
-      <h1 className="mb-4 text-lg font-bold">DuckDB WASM × Turbopack Spike</h1>
+      <h1 className="mb-4 text-lg font-bold">WASM × Turbopack Spike</h1>
       <ul className="space-y-1">
         {steps.map((step, i) => (
           <li key={i} className={step.ok ? "" : "font-bold text-red-600"}>

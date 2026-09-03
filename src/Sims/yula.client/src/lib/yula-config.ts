@@ -92,7 +92,7 @@ export function getDefaultEmbeddingModel(provider: AIProviderType = getActivePro
   );
 }
 
-/** Varsayılan embedding vektör boyutu (DuckDB WASM & RAG için). */
+/** Varsayılan embedding vektör boyutu (WASM & RAG için). */
 export function getVectorDimension(provider: AIProviderType = getActiveProvider()): number {
   const rawDim =
     process.env.VECTOR_DIMENSION || process.env.NEXT_PUBLIC_VECTOR_DIMENSION;

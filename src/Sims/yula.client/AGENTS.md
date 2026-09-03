@@ -29,7 +29,7 @@ Projeye yeni bir rapor veya ajan yeteneği eklendiğinde aşağıdaki adımlar e
    - Kriter / Karşılama Sayfası: `src/app/<workspace>/<report>/page.tsx`
    - GUID Sonuç Ekranı: `src/app/<workspace>/<report>/[jobId]/page.tsx`
 5. **Sonuç Ekranı Bileşeni (`<Report>JobView.tsx`):**
-   - Rapor sonuç bileşenini standart OPFS + DuckDB WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur.
+   - Rapor sonuç bileşenini standart OPFS + WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur.
 6. **Yol & Başlık Biçimlendirme (`src/lib/workspace-paths.ts`):**
    - `formatPathnameLabel(pathname)` fonksiyonuna raporun Türkçe etiketini ekle (`if (pathname.includes("/<workspace>/<report>")) return "<Rapor Adı>"`).
 

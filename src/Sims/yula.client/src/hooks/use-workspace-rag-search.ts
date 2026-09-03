@@ -165,7 +165,7 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
       setGroupedResults(groupItems(exactAll));
     });
 
-    // 2) Asenkron DuckDB WASM Vektör Semantik Arama (3-5 ms)
+    // 2) Asenkron WASM Vektör Semantik Arama (3-5 ms)
     let isCancelled = false;
     setIsSearchingRag(true);
 

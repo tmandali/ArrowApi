@@ -24,7 +24,7 @@ export type StreamSessionState = {
 type StreamSessionInternal = StreamSessionState & {
   abortController: AbortController
   listeners: Set<(state: StreamSessionState) => void>
-  /** Terminal durumda, dinleyici kalmayınca 60sn sonra DuckDB session'ını temizler. */
+  /** Terminal durumda, dinleyici kalmayınca 60sn sonra session'ını temizler. */
   cleanupTimer?: ReturnType<typeof setTimeout> | null
 }
 
@@ -94,7 +94,7 @@ class DuckStreamManager {
   }
 
   /**
-   * Akışı iptal eder ve DuckDB tablosunu siler (kullanıcı açıkça iptal/silme istediğinde).
+   * Akışı iptal eder ve tablosunu siler (kullanıcı açıkça iptal/silme istediğinde).
    */
   cancel(jobId: string): void {
     const session = this.sessions.get(jobId)
@@ -192,7 +192,7 @@ class DuckStreamManager {
 
   /**
    * Akış terminal durumda (tamamlandı/hata) ve dinleyici kalmadıysa, bir süre sonra
-   * DuckDB tablosunu/parquet'ini silip session'ı bellekten düşürür.
+   * tablosunu/parquet'ini silip session'ı bellekten düşürür.
    * Ana-OPFS önbelleği (yeniden açılış faydası) korunur.
    */
   private scheduleCleanup(session: StreamSessionInternal): void {
@@ -241,7 +241,7 @@ class DuckStreamManager {
       session.isStreaming = true
       this.notify(session)
 
-      // 2. DuckDB RAM'de yoksa yerel OPFS diskindeki Arrow akışını kontrol et (0 internet)
+      // 2. RAM'de yoksa yerel OPFS diskindeki Arrow akışını kontrol et (0 internet)
       let stream: ReadableStream<Uint8Array> | null = null
 
       const opfsStream = await opfsReportCache.getStream(jobId)
@@ -368,7 +368,7 @@ class DuckStreamManager {
           // Bellek sınırına veya akış sonu kesintisine ulaşıldı, ancak şimdiye kadar inen satırları koru
           console.warn(
             isOom
-              ? "DuckDB WASM bellek tavanına ulaşıldı. Mevcut satırlarla devam ediliyor:"
+              ? "WASM bellek tavanına ulaşıldı. Mevcut satırlarla devam ediliyor:"
               : "Akış kesildi ancak inen satırlarla devam ediliyor:",
             session.streamedRows
           )

@@ -62,7 +62,7 @@ type StockAnalyticsJobViewProps = {
 
 /**
  * Dedicated Stock Analytics result page (`/stock/stock-analytics/{guid}`).
- * Standard DuckDB OPFS report grid — Criteria lives on the entry page.
+ * Standard OPFS report grid — Criteria lives on the entry page.
  */
 export function StockAnalyticsJobView({ jobId }: StockAnalyticsJobViewProps) {
   React.useEffect(() => {

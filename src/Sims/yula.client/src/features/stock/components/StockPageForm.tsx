@@ -24,7 +24,7 @@ import { StockDashboard } from "./StockDashboard";
 
 export function StockPageForm() {
   React.useEffect(() => {
-    // Arka planda Stock workspace menülerini DuckDB WASM RAG vektör store'a indeksle
+    // Arka planda Stock workspace menülerini WASM RAG vektör store'a indeksle
     void indexWorkspaceMenus();
   }, []);
 

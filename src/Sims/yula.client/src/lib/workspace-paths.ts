@@ -234,7 +234,7 @@ export function isReportResultPath(pathname?: string | null): boolean {
 }
 
 /**
- * Single source of truth for Result View Mode (GUID URL path or active DuckDB report grid).
+ * Single source of truth for Result View Mode (GUID URL path or active report grid).
  */
 export function isReportResultView(
   pathname?: string | null,

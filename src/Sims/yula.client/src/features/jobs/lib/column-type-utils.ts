@@ -1,12 +1,12 @@
 /**
- * Arrow/DuckDB şema tiplerinden türetilen jenerik filtre-değeri doğrulaması.
+ * Arrow/şema tiplerinden türetilen jenerik filtre-değeri doğrulaması.
  * Kelime listesi YOKTUR — kontrol tamamen kolonun fiziksel tipinden gelir,
  * böylece yeni rapor/kolon eklendiğinde yeni kural yazmak gerekmez.
  */
 
 export type ColumnKind = "date" | "number" | "bool" | "text"
 
-/** Ham DuckDB tipini (DATE, TIMESTAMP, VARCHAR, DECIMAL...) kaba tipe çevirir. */
+/** Ham tipini (DATE, TIMESTAMP, VARCHAR, DECIMAL...) kaba tipe çevirir. */
 export function deriveColumnKind(duckType?: string, isNumeric?: boolean): ColumnKind {
   const t = (duckType || "").toUpperCase()
   if (!t) return isNumeric ? "number" : "text"

@@ -13,11 +13,11 @@ export interface YulaGridContext {
   customQuerySql?: string | null;
   /** Özel SQL görünümünün kullanıcı dostu ad etiketi */
   customQueryTitle?: string | null;
-  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/DuckDB şemasından (şema grounding) */
+  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/şemasından (şema grounding) */
   columnTypes?: Record<string, string>;
   /** İlk örnek satırlar — model değerleri gerçek veri dokusuyla eşlesin (few-shot grounding) */
   sampleRows?: Array<Record<string, unknown>>;
-  /** Düşük kardinaliteli kolonların gerçek değerleri (DuckDB DISTINCT) — değer uydurma savunması */
+  /** Düşük kardinaliteli kolonların gerçek değerleri (DISTINCT) — değer uydurma savunması */
   columnValues?: Record<string, string[]>;
   /** Kolon → yetkili semantik tanım (rapor şeması x-ai.columnDescriptions) */
   columnDescriptions?: Record<string, string>;
@@ -48,7 +48,7 @@ export interface YulaScreenContext {
   jobId?: string;
   grid?: YulaGridContext | null;
   screen?: import("@/lib/stores/grid").YulaScreenRegistration | null;
-  /** DuckDB WASM + All-MiniLM RAG Vektör arama sonuçları */
+  /** WASM + All-MiniLM RAG Vektör arama sonuçları */
   ragContext?: YulaRagContextItem[];
 }
 
@@ -104,7 +104,7 @@ const REPORTS_DIGEST_LINES = DEMO_REPORTS.map((r) => {
 
 const GRID_PRESENT_RULES = [
   "ACTIVE TABLE & GRID OPERATIONS:",
-  "• set_grid_query: Use when user asks for custom views, calculations, derived columns (e.g. Total = Qty * UnitPrice), grouping, aggregations, or column renaming/aliasing. Write valid DuckDB SELECT queries referencing the active table name. Use { reset: true } to restore the default table view.",
+  "• set_grid_query: Use when user asks for custom views, calculations, derived columns (e.g. Total = Qty * UnitPrice), grouping, aggregations, or column renaming/aliasing. Write valid SELECT queries referencing the active table name. Use { reset: true } to restore the default table view.",
   "• filter_current_grid: Use for row-level filtering by column values, thresholds, ranges, or empty/non-empty states. Pass D365 filter expressions as-is (e.g. '>50', '100..500', 'SKU*'). Use field: '*' to clear all filters.",
   "• visualize_grid_data: Use when user requests charts (bar, line, pie), visual trends, or distributions. Provide dimension and metric columns; do not write raw data in text.",
   "• analyze_grid_data: Use for fast KPI aggregates (sum, avg, min, max, count, topN) on numeric columns.",
@@ -132,8 +132,8 @@ const SQL_EXPERT_RULES = [
 ].join("\n");
 
 const DUCKDB_RULES = [
-  "DUCKDB SYNTAX RULES:",
-  "• Use standard DuckDB SQL functions: CAST(col AS DATE), date_trunc('month', col), COALESCE, CASE WHEN ... THEN ... ELSE ... END.",
+  "SYNTAX RULES:",
+  "• Use standard SQL functions: CAST(col AS DATE), date_trunc('month', col), COALESCE, CASE WHEN ... THEN ... ELSE ... END.",
   "• Quote alias identifiers with double quotes when they contain spaces or Turkish characters: AS \"Toplam Tutar\".",
 ].join("\n");
 
@@ -196,10 +196,10 @@ function formatColumnDescriptions(descs: Record<string, string>): string {
 const SMART_SQL_QUERY_RULES = [
   "SMART SQL & /SORGU COMMAND RULE:",
   "  • When user uses '/sorgu ...' or inputs pseudo-SQL / natural SQL (e.g. 'select * from rapor tarih=bugun', 'select * from depo where miktar>100'):",
-  "  • 1. TABLE NAME CORRECTION: Replace pseudo-table names ('rapor', 'table', 'tablo', 'stok_bakiye', etc.) with the ACTUAL active DuckDB table name from system state (e.g. report_e53c80ce_...).",
+  "  • 1. TABLE NAME CORRECTION: Replace pseudo-table names ('rapor', 'table', 'tablo', 'stok_bakiye', etc.) with the ACTUAL active table name from system state (e.g. report_e53c80ce_...).",
   "  • 2. COLUMN NAME CORRECTION: Auto-correct misspelled or Turkish alias column names ('tarih' -> 'TransDate', 'miktar' -> 'Qty', 'depo' -> 'Warehouse', 'fiyat' -> 'UnitPrice', 'stok_kodu' -> 'ItemCode', etc.) to the exact column names in the active grid table schema.",
   "  • 3. RELATIVE DATE EXPANSION: Expand relative date terms into exact ISO date strings (e.g., 'bugun' -> '2026-09-01', 'dun' -> '2026-08-31', 'bu ay' -> date range '2026-09-01' to '2026-09-30').",
-  "  • 4. QUERY EXECUTION: Call set_grid_query({ sql: \"...\" }) with the corrected, valid DuckDB SQL query so the screen grid table updates automatically.",
+  "  • 4. QUERY EXECUTION: Call set_grid_query({ sql: \"...\" }) with the corrected, valid SQL query so the screen grid table updates automatically.",
 ].join("\n");
 
 export function buildSystemPrompt(context?: YulaScreenContext): string {
@@ -359,7 +359,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
 
   if (context?.ragContext && context.ragContext.length > 0) {
     lines.push(
-      "\nRELEVANT VECTOR RAG CONTEXT (Retrieved via DuckDB WASM + All-MiniLM Vector Search):",
+      "\nRELEVANT VECTOR RAG CONTEXT (Retrieved via WASM + All-MiniLM Vector Search):",
       ...context.ragContext.map(
         (item) =>
           ` • ${item.content}${item.distance != null ? ` (distance: ${item.distance.toFixed(3)})` : ""}`,

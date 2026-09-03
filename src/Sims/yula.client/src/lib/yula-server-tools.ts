@@ -12,7 +12,7 @@ export interface YulaGridToolContext {
   tableName: string;
   columns: string[];
   rowCount?: number | null;
-  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/DuckDB şemasından; LLM şema grounding'i */
+  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/şemasından; LLM şema grounding'i */
   columnTypes?: Record<string, string>;
   /** Düşük kardinaliteli kolon değerleri — benzersiz kimlik kolonlarını ayıklamak için */
   columnValues?: Record<string, string[]>;
@@ -268,7 +268,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
     get_report_schema: reportSchemaTool,
     analyze_grid_data: dynamicTool({
       description: [
-        "Açık veri kümesinde DuckDB analizi çalıştırır (KPI/toplam/grup).",
+        "Açık veri kümesinde analizi çalıştırır (KPI/toplam/grup).",
         "Sayı/sayaç/toplam sorularında ÇAĞIR. top için byColumn (kategori kolonu) ver; verilmezse sistem en uygun kategori kolonunu seçer (benzersiz kimlikler hariç).",
         "Kolon listesi ve tipleri sistem bağlamındadır.",
       ].join(" "),

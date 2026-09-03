@@ -9,11 +9,11 @@ export interface YulaGridSpec {
   title: string;
   columns: string[];
   rowCount: number | null;
-  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/DuckDB şemasından; LLM şema grounding'i */
+  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/şemasından; LLM şema grounding'i */
   columnTypes?: Record<string, string>;
   /** İlk örnek satırlar — modelin veri dokusunu görmesi için; LLM şema grounding'i */
   sampleRows?: Array<Record<string, unknown>>;
-  /** Düşük kardinaliteli kolonların gerçek değerleri (DuckDB DISTINCT) — model değeri uydurmasın */
+  /** Düşük kardinaliteli kolonların gerçek değerleri (DISTINCT) — model değeri uydurmasın */
   columnValues?: Record<string, string[]>;
   /** Kolon → yetkili semantik tanım (rapor şeması x-ai.columnDescriptions) */
   columnDescriptions?: Record<string, string>;
