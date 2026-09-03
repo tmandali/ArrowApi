@@ -3,6 +3,7 @@ export {
   selectPendingJobs,
   selectPendingStockAnalyticsJob,
   selectPendingStockBalanceJob,
+  selectPendingRetailSalesJob,
   isTerminalJobStatus,
   TERMINAL_JOB_STATUSES,
   type TrackedJob,

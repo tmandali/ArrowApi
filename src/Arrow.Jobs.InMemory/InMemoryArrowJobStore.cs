@@ -110,7 +110,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     public Task MarkRunningAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = GetRequired(id);
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.CompletedTask;
         if (job.State == ArrowJobState.Cancelled)
             return Task.CompletedTask;
 
@@ -120,7 +121,12 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     public Task ReportProgressAsync(Guid id, int batchCount, long totalRows, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = GetRequired(id);
+        // Job iptal+silme yarışında kaybolabilir; progress yazımı pipeline'ı düşürmemeli.
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.CompletedTask;
+        if (job.State == ArrowJobState.Cancelled)
+            return Task.CompletedTask;
+
         job.BatchCount = batchCount;
         job.TotalRows = totalRows;
         return Task.CompletedTask;
@@ -129,7 +135,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
     public Task MarkCompletedAsync(Guid id, string resultPath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resultPath);
-        ArrowJob<TRequest> job = GetRequired(id);
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.CompletedTask;
         if (job.State == ArrowJobState.Cancelled)
             return Task.CompletedTask;
 
@@ -141,7 +148,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
     public Task MarkFailedAsync(Guid id, string error, CancellationToken cancellationToken = default)
     {
-        ArrowJob<TRequest> job = GetRequired(id);
+        if (!_jobs.TryGetValue(id, out ArrowJob<TRequest>? job))
+            return Task.CompletedTask;
         if (job.State == ArrowJobState.Cancelled)
             return Task.CompletedTask;
 
@@ -223,9 +231,4 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
         return Task.FromResult<object?>(job.Request);
     }
-
-    private ArrowJob<TRequest> GetRequired(Guid id) =>
-        _jobs.TryGetValue(id, out ArrowJob<TRequest>? job)
-            ? job
-            : throw new KeyNotFoundException($"Job bulunamadı: {id}");
 }

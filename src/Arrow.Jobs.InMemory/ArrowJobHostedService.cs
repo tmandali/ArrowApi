@@ -65,11 +65,16 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 ArrowJob<TRequest>? cancelled = await _store.GetAsync(jobId, cancellationToken);
-                if (cancelled?.State == ArrowJobState.Cancelled)
+                if (cancelled is null || cancelled.State == ArrowJobState.Cancelled)
                 {
                     activity?.SetStatus(ActivityStatusCode.Ok);
-                    await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
-                    _logger.LogInformation("Job iptal edildi: {JobId}", jobId);
+                    if (cancelled is not null)
+                        await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
+                    _logger.LogInformation(
+                        cancelled is null
+                            ? "Job silindi (işlem durduruldu): {JobId}"
+                            : "Job iptal edildi: {JobId}",
+                        jobId);
                     return;
                 }
 
@@ -78,10 +83,11 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 ArrowJob<TRequest>? current = await _store.GetAsync(jobId, cancellationToken);
-                if (current?.State == ArrowJobState.Cancelled)
+                if (current is null || current.State == ArrowJobState.Cancelled)
                 {
                     activity?.SetStatus(ActivityStatusCode.Ok);
-                    await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
+                    if (current is not null)
+                        await PublishAsync(jobId, ArrowJobEventNames.Cancelled, cancellationToken);
                     return;
                 }
 
@@ -194,10 +200,16 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         await foreach (RecordBatch batch in batches.WithCancellation(cancellationToken))
         {
             ArrowJob<TRequest>? current = await _store.GetAsync(jobId, cancellationToken);
-            if (current?.State == ArrowJobState.Cancelled)
+            // Silinmiş job da iptal gibi davranır (Cancel→Delete yarışı).
+            if (current is null || current.State == ArrowJobState.Cancelled)
                 throw new OperationCanceledException();
 
             yield return batch;
+
+            // Disk yazımı (yield sonrası) sırasında job silinmiş olabilir.
+            current = await _store.GetAsync(jobId, cancellationToken);
+            if (current is null || current.State == ArrowJobState.Cancelled)
+                throw new OperationCanceledException();
 
             batchCount++;
             totalRows += batch.Length;

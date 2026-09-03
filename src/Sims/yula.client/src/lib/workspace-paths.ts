@@ -126,6 +126,7 @@ export function isConversationOnScreen(
 function reportScreenLabel(pathname: string): string | null {
   if (pathname.includes("/stock/stock-balance")) return "Stok Bakiye"
   if (pathname.includes("/stock/stock-analytics")) return "Stok Analiz"
+  if (pathname.includes("/stock/retail-sales-report")) return "Perakende Satış"
   if (pathname.includes("/stock/stock-ledger")) return "Stok Ekstre"
   if (pathname.includes("/stock/item")) return "Stok Kartı"
   if (pathname.includes("/system/users")) return "Kullanıcılar"

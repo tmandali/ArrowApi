@@ -399,10 +399,12 @@ public static class ArrowJobEndpoints
         if (string.Equals(status.Status, nameof(ArrowJobState.Running), StringComparison.OrdinalIgnoreCase))
             return Results.Conflict();
 
+        // Sonuç yolunu silmeden önce al — TryDelete sonrası GetResultPath null döner.
+        string? resultPath = await store.GetResultPathAsync(id, cancellationToken);
+
         if (!await store.TryDeleteJobAsync(id, cancellationToken))
             return Results.Conflict();
 
-        string? resultPath = await store.GetResultPathAsync(id, cancellationToken);
         await resultStorage.DeleteResultAsync(resultPath, cancellationToken);
         return Results.NoContent();
     }

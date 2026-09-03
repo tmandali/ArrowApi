@@ -195,6 +195,7 @@ const featureSections: FeatureSection[] = [
     links: [
       { title: "Stock Ledger", url: "/stock/stock-ledger" },
       { title: "Stock Balance", url: "/stock/stock-balance" },
+      { title: "Retail Sales", url: "/stock/retail-sales-report" },
       { title: "Stock Projected Qty", url: e("stock", "Stock Projected Qty") },
       { title: "Stock Summary", url: e("stock", "Stock Summary") },
       { title: "Stock Ageing", url: e("stock", "Stock Ageing") },

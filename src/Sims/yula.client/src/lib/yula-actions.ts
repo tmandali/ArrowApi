@@ -19,6 +19,12 @@ export const KNOWN_SYSTEM_ACTIONS: KnownSystemAction[] = [
     scope: "stock-balance",
   },
   {
+    pattern: /perakende satış(?:\s+raporu|\s+raporları|\s+raporunu)?|retail sales(?:\s+report)?/i,
+    prompt: "Perakende Satış Raporu hazırla",
+    label: "Perakende Satış",
+    scope: "retail-sales-report",
+  },
+  {
     pattern: /stok analiti(?:k|ği|ğini|kleri|klerinin)?(?:\s+raporu|\s+raporları|\s+raporunu)?|stock analytics(?:\s+report)?/i,
     prompt: "Stok Analitik Raporu hazırla",
     label: "Stok Analitik Raporu",

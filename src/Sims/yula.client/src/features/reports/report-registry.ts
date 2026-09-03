@@ -1,6 +1,7 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
 import stockBalanceSchema from "@/features/stock/item/schemas/stock-balance-criteria.schema.json";
 import stockAnalyticsSchema from "@/features/stock/item/schemas/stock-analytics-criteria.schema.json";
+import retailSalesSchema from "@/features/stock/item/schemas/retail-sales-criteria.schema.json";
 
 export interface YulaReportMeta {
   scope: string;
@@ -38,6 +39,15 @@ export const REGISTERED_REPORTS: YulaReportMeta[] = [
     aliases: ["stok analiz", "analiz", "stok istatistik", "stok hareket analiz", "stock analytics"],
     criteriaSchema: (stockAnalyticsSchema as unknown as JsonSchemaObject) as YulaReportMeta["criteriaSchema"],
     fullSchema: stockAnalyticsSchema as unknown as JsonSchemaObject,
+  },
+  {
+    scope: "retail-sales-report",
+    workspace: "stock",
+    title: "Perakende Satış Raporu",
+    pagePath: "/stock/retail-sales-report",
+    aliases: ["perakende satış", "retail sales", "satış raporu", "mağaza satış"],
+    criteriaSchema: (retailSalesSchema as unknown as JsonSchemaObject) as YulaReportMeta["criteriaSchema"],
+    fullSchema: retailSalesSchema as unknown as JsonSchemaObject,
   },
 ];
 

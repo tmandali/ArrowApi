@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Perakende Satış Raporu (Retail Sales)",
+  "description": "Perakende satış başlıklarını (tb_SatisBaslik) hareket başlangıç tarih aralığına göre sorgular. Her satır bir satış fişidir.",
+  "x-scope": "retail-sales-report",
+  "x-page-path": "/stock/retail-sales-report",
+  "x-ai": {
+    "schemaVersion": 1,
+    "columnDescriptions": {
+      "Depo": "Mağaza / depo kodu (örn: TJ01); satışın yapıldığı lokasyon.",
+      "SatisID": "Satış fişinin benzersiz teknik kimliği; satır eşleştirme için kullanılır, tutar analizi için birincil metrik değildir.",
+      "KasaTip": "Kasa tipi kodu (sayısal); satış kanalı / kasa türünü ayırt eder.",
+      "HareketBaslamaTarih": "Satış hareketinin başladığı tarih-saat; raporun birincil zaman kolonudur ve kriter filtresi (basTarih/bitTarih) bu kolona uygulanır.",
+      "HareketBitisTarih": "Satış hareketinin bittiği tarih-saat; fiş süresi (başlangıç–bitiş farkı) için kullanılır.",
+      "BelgeNo": "Satış belge / fiş numarası; kullanıcıya görünen işlem numarası.",
+      "Statu": "Satış kaydı durum kodu (sayısal; örn: 1 = tamamlanmış).",
+      "ToplamTutar": "Satışın toplam tutarı (KDV dahil net satış tutarı); tutar ve ciro analizlerinde birincil kolon.",
+      "ToplamKdvTutar": "Satıştaki toplam KDV tutarı.",
+      "GenelIskontoTutar": "Fiş geneline uygulanan iskonto tutarı; 0 ise iskonto yok.",
+      "Islem": "İşlem tipi kodu (sayısal); satış hareketinin işlem sınıfı.",
+      "SonDuzenleme": "Kaydın son düzenlenme tarih-saati.",
+      "KasaID": "Kasanın teknik kimliği; 0 değeri varsayılan / atanmamış kasa olabilir.",
+      "ParaBirimi": "Satış para birimi kodu (örn: TJS, TRY, USD).",
+      "Kasiyer": "Satışı yapan kasiyerin personel / kullanıcı numarası.",
+      "MusteriNo": "Müşteri numarası; 0 veya boş ise anonim / tanımsız müşteri."
+    },
+    "aliases": [
+      "perakende satış",
+      "perakende satış raporu",
+      "retail sales",
+      "retail sales report",
+      "satış raporu",
+      "mağaza satış",
+      "satış fişi",
+      "kasa satış",
+      "retail sales kriterleri"
+    ],
+    "directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap (basTarih = 30 gün önce, bitTarih = yarın) ve 'son 7 gün' veya 'bu ay' seçeneklerini öner. bitTarih, basTarih'ten büyük olmalıdır (üst sınır hariç: HareketBaslamaTarih < bitTarih). Tutar sorularında ToplamTutar; lokasyon için Depo; personel için Kasiyer kolonunu kullan.",
+    "quickPrompts": [
+      "Son 30 günü öner",
+      "Son 7 günü öner",
+      "Bu ayı öner",
+      "Raporu çalıştır"
+    ],
+    "resultsPrompts": [
+      "Genel ciro & KDV özeti (ToplamTutar, ToplamKdvTutar)",
+      "En yüksek tutarlı 5 satış",
+      "Depo bazlı satış dağılımı",
+      "Kasiyer performans özeti",
+      "Filtreleri Temizle"
+    ],
+    "columnAliases": {
+      "Depo": [
+        "depo",
+        "mağaza",
+        "şube",
+        "lokasyon",
+        "warehouse"
+      ],
+      "SatisID": [
+        "satış id",
+        "satış no",
+        "fiş id",
+        "sales id"
+      ],
+      "KasaTip": [
+        "kasa tipi",
+        "kasa türü"
+      ],
+      "HareketBaslamaTarih": [
+        "tarih",
+        "başlangıç tarihi",
+        "hareket tarihi",
+        "satış tarihi",
+        "fiş başlangıç"
+      ],
+      "HareketBitisTarih": [
+        "bitiş tarihi",
+        "fiş bitiş",
+        "bitiş saati"
+      ],
+      "BelgeNo": [
+        "belge no",
+        "fiş no",
+        "evrak no",
+        "document number"
+      ],
+      "Statu": [
+        "statü",
+        "durum",
+        "status"
+      ],
+      "ToplamTutar": [
+        "tutar",
+        "toplam",
+        "ciro",
+        "satış tutarı",
+        "amount"
+      ],
+      "ToplamKdvTutar": [
+        "kdv",
+        "kdv tutarı",
+        "vergi",
+        "vat"
+      ],
+      "GenelIskontoTutar": [
+        "iskonto",
+        "indirim",
+        "genel iskonto",
+        "discount"
+      ],
+      "Islem": [
+        "işlem",
+        "işlem tipi",
+        "transaction"
+      ],
+      "SonDuzenleme": [
+        "son düzenleme",
+        "güncelleme tarihi",
+        "modified"
+      ],
+      "KasaID": [
+        "kasa",
+        "kasa id",
+        "register"
+      ],
+      "ParaBirimi": [
+        "para birimi",
+        "döviz",
+        "currency"
+      ],
+      "Kasiyer": [
+        "kasiyer",
+        "personel",
+        "satış elemanı",
+        "cashier"
+      ],
+      "MusteriNo": [
+        "müşteri",
+        "müşteri no",
+        "customer",
+        "cari"
+      ]
+    }
+  },
+  "x-job-endpoint": "/api/arrow/jobs/retail-sales-report",
+  "type": "object",
+  "properties": {
+    "basTarih": {
+      "type": "string",
+      "format": "date",
+      "title": "Başlangıç Tarihi",
+      "description": "Satış hareketi başlangıç tarihi (dahil). YYYY-MM-DD formatında, örn: '2025-01-01'.",
+      "x-ai": {
+        "intent": "sales_start_date",
+        "priority": 100,
+        "columnHints": [
+          "HareketBaslamaTarih",
+          "date",
+          "basTarih"
+        ],
+        "dateBehavior": "range_start",
+        "suggestions": [
+          "son 30 gün",
+          "son 7 gün",
+          "bu ay başı",
+          "bu yıl başı"
+        ],
+        "directive": "Zorunlu alandır. Kullanıcı tek gün verdiyse basTarih o gün, bitTarih ertesi gün olsun. Aralık verdiyse basTarih aralığın başı."
+      }
+    },
+    "bitTarih": {
+      "type": "string",
+      "format": "date",
+      "title": "Bitiş Tarihi",
+      "description": "Satış hareketi bitiş tarihi (hariç üst sınır). YYYY-MM-DD formatında, örn: '2025-02-01'. basTarih'ten büyük olmalıdır.",
+      "x-ai": {
+        "intent": "sales_end_date",
+        "priority": 100,
+        "columnHints": [
+          "HareketBaslamaTarih",
+          "date",
+          "bitTarih"
+        ],
+        "dateBehavior": "range_end",
+        "suggestions": [
+          "bugün",
+          "yarın",
+          "ay sonu"
+        ],
+        "directive": "Zorunlu alandır. Backend sorgusu HareketBaslamaTarih < bitTarih kullandığı için bitTarih üst sınırdır (hariç). Kullanıcı '31 Ocak dahil' derse bitTarih = 1 Şubat yaz."
+      }
+    }
+  },
+  "required": [
+    "basTarih",
+    "bitTarih"
+  ]
+}

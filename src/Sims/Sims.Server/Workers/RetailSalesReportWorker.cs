@@ -24,13 +24,15 @@ public sealed class RetailSalesReportWorker(
         await cnn.OpenAsync(cancellationToken);
 
         var command = new CommandDefinition(
-            commandText: "SELECT * FROM tb_SatisBaslik WHERE HareketBaslamaTarih >= @BasTarih AND HareketBaslamaTarih < @BitTarih",
+            commandText: "SELECT Depo, SatisID, KasaTip, HareketBaslamaTarih, HareketBitisTarih, BelgeNo, Statu, ToplamTutar, ToplamKdvTutar, GenelIskontoTutar, Islem, SonDuzenleme, KasaID, ParaBirimi, Kasiyer, MusteriNo\n" +
+                         "FROM tb_SatisBaslik (nolock)\n" +
+                         "WHERE HareketBaslamaTarih >= @BasTarih AND HareketBaslamaTarih < @BitTarih",
             parameters: request,
             cancellationToken: cancellationToken
         );
 
         await using var reader = await cnn.ExecuteReaderAsync(command);
-        await using var arrowReader = reader.OpenArrowReader(new ArrowConversionOptions { BatchSize = 100_000 });
+        await using var arrowReader = reader.OpenArrowReader(new ArrowConversionOptions { BatchSize = 10_000 });
 
         await foreach (RecordBatch batch in arrowReader.WithCancellation(cancellationToken))
         {

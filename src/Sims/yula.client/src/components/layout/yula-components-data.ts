@@ -10,6 +10,7 @@ export interface YulaReportCardConfig {
 }
 import stockBalanceCriteriaSchema from "@/features/stock/item/schemas/stock-balance-criteria.schema.json"
 import stockAnalyticsCriteriaSchema from "@/features/stock/item/schemas/stock-analytics-criteria.schema.json"
+import retailSalesCriteriaSchema from "@/features/stock/item/schemas/retail-sales-criteria.schema.json"
 
 
 /**
@@ -19,12 +20,14 @@ import stockAnalyticsCriteriaSchema from "@/features/stock/item/schemas/stock-an
 export const yulaCustomKinds = {
   stockBalance: "yula.report.stock-balance",
   stockAnalytics: "yula.report.stock-analytics",
+  retailSales: "yula.report.retail-sales-report",
 } as const
 
 export type YulaCustomKind = (typeof yulaCustomKinds)[keyof typeof yulaCustomKinds]
 
 const stockBalanceSchema = stockBalanceCriteriaSchema as JsonSchemaObject
 const stockAnalyticsSchema = stockAnalyticsCriteriaSchema as JsonSchemaObject
+const retailSalesSchema = retailSalesCriteriaSchema as JsonSchemaObject
 
 /**
  * Report cards Yula can embed. Register any report here to get a shared
@@ -48,5 +51,14 @@ export const yulaReportCardConfigs: YulaReportCardConfig[] = [
     description: "Stok analitik rapor kriterlerini doldurun",
     pagePath: "/stock/stock-analytics",
     schema: stockAnalyticsSchema,
+  },
+  {
+    kind: yulaCustomKinds.retailSales,
+    scope: "retail-sales-report",
+    workspace: "stock",
+    title: "Retail Sales",
+    description: "Perakende satış rapor kriterlerini doldurun",
+    pagePath: "/stock/retail-sales-report",
+    schema: retailSalesSchema,
   },
 ]

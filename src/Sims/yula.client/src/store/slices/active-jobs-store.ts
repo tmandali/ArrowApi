@@ -226,6 +226,13 @@ export function selectPendingStockBalanceJob(
   return selectPendingJobByName(jobs, "stock-balance", "/stock")
 }
 
+/** En son başlatılan pending Retail Sales job (href / name ile). */
+export function selectPendingRetailSalesJob(
+  jobs: Record<string, TrackedJob>
+): TrackedJob | null {
+  return selectPendingJobByName(jobs, "retail-sales-report", "/stock")
+}
+
 /** En son başlatılan pending job — name veya href prefix ile. */
 export function selectPendingJobByName(
   jobs: Record<string, TrackedJob>,

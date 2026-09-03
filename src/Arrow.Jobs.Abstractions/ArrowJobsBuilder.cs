@@ -18,6 +18,6 @@ public sealed class ArrowJobsBuilder<TRequest>
     {
         Services.RemoveAll<IArrowJobStore<TRequest>>();
         Services.RemoveAll<IArrowJobQueue<TRequest>>();
-        Services.RemoveAll<IArrowJobEventHub>();
+        // IArrowJobEventHub paylaşımlıdır; her AddJob'da silinmemeli.
     }
 }

@@ -70,6 +70,10 @@ import {
   type StockAnalyticsJobSession,
 } from "./StockAnalyticsFilter"
 import {
+  RetailSalesFilter,
+  type RetailSalesJobSession,
+} from "./RetailSalesFilter"
+import {
   ReportModuleFilter,
   type ReportModuleJobSession,
 } from "@/features/reports/components/ReportModuleFilter"
@@ -91,6 +95,7 @@ import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criter
 import { registerReportRunner } from "@/lib/report-run-bus"
 import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
 import stockAnalyticsCriteriaSchema from "../schemas/stock-analytics-criteria.schema.json"
+import retailSalesCriteriaSchema from "../schemas/retail-sales-criteria.schema.json"
 
 export type StockModuleTab =
   | "details"
@@ -139,6 +144,7 @@ type StockModuleShellProps = {
     | "stock-analytics"
     | "stock-ledger"
     | "stock-balance"
+    | "retail-sales-report"
     | "report-module"
   onStartNewReport?: () => void
   /** Stock Balance: stay on page and track the new job in Executions. */
@@ -153,6 +159,12 @@ type StockModuleShellProps = {
     request: Record<string, unknown>
   ) => void
   stockAnalyticsJobSession?: StockAnalyticsJobSession
+  /** Retail Sales: stay on page and track the new job in Executions. */
+  onRetailSalesJobCreated?: (
+    job: ArrowJobStatus,
+    request: Record<string, unknown>
+  ) => void
+  retailSalesJobSession?: RetailSalesJobSession
   /** Generic nav report module (Criteria + Executions shell). */
   reportModule?: {
     title: string
@@ -179,6 +191,8 @@ export function StockModuleShell({
   stockBalanceJobSession,
   onStockAnalyticsJobCreated,
   stockAnalyticsJobSession,
+  onRetailSalesJobCreated,
+  retailSalesJobSession,
   reportModule,
   onReportJobCreated,
   reportJobSession,
@@ -187,9 +201,10 @@ export function StockModuleShell({
   const isStockAnalytics = mode === "stock-analytics"
   const isStockLedger = mode === "stock-ledger"
   const isStockBalance = mode === "stock-balance"
+  const isRetailSales = mode === "retail-sales-report"
   const isReportModule = mode === "report-module"
   const isJobCriteriaShell =
-    isStockBalance || isReportModule || isStockAnalytics
+    isStockBalance || isRetailSales || isReportModule || isStockAnalytics
   const isLedgerLikeShell = isStockLedger || isJobCriteriaShell
   const isReportShell = isLedgerLikeShell
   const workspaceHome =
@@ -199,21 +214,26 @@ export function StockModuleShell({
     ? (reportModule?.title ?? "Report")
     : isStockBalance
       ? "Stock Balance"
-      : isStockAnalytics
-        ? "Stock Analytics"
-        : isStockLedger
-          ? "Stock Ledger"
-          : "Report"
+      : isRetailSales
+        ? "Retail Sales"
+        : isStockAnalytics
+          ? "Stock Analytics"
+          : isStockLedger
+            ? "Stock Ledger"
+            : "Report"
   const criteriaFilterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
 
   const currentSchema = isStockBalance
     ? (stockBalanceCriteriaSchema as JsonSchemaObject)
-    : isStockAnalytics
-      ? (stockAnalyticsCriteriaSchema as JsonSchemaObject)
-      : reportModule?.schema
+    : isRetailSales
+      ? (retailSalesCriteriaSchema as JsonSchemaObject)
+      : isStockAnalytics
+        ? (stockAnalyticsCriteriaSchema as JsonSchemaObject)
+        : reportModule?.schema
 
   const activeJobId =
     stockBalanceJobSession?.activeJobId ||
+    retailSalesJobSession?.activeJobId ||
     stockAnalyticsJobSession?.activeJobId ||
     reportJobSession?.activeJobId
 
@@ -344,6 +364,7 @@ export function StockModuleShell({
       }
       onStockBalanceJobCreated?.(existingJobStatus, result.instance)
       onStockAnalyticsJobCreated?.(existingJobStatus, result.instance)
+      onRetailSalesJobCreated?.(existingJobStatus, result.instance)
       onReportJobCreated?.(existingJobStatus, result.instance)
       setCriteriaBanner(null)
       return
@@ -355,6 +376,7 @@ export function StockModuleShell({
       const job = await createArrowJob(endpoint, result.instance)
       onStockBalanceJobCreated?.(job, result.instance)
       onStockAnalyticsJobCreated?.(job, result.instance)
+      onRetailSalesJobCreated?.(job, result.instance)
       onReportJobCreated?.(job, result.instance)
       setCriteriaBanner(null)
     } catch (error) {
@@ -370,8 +392,10 @@ export function StockModuleShell({
     }
   }, [
     formatValidationBanner,
+    mode,
     onStockBalanceJobCreated,
     onStockAnalyticsJobCreated,
+    onRetailSalesJobCreated,
     onReportJobCreated,
   ])
 
@@ -586,6 +610,17 @@ export function StockModuleShell({
           className="min-h-0 min-w-0 w-full flex-1"
           jobSession={{
             ...stockBalanceJobSession,
+            onListError: handleListError,
+          }}
+          onRun={() => void handleCriteriaSubmit()}
+          runDisabled={submittingCriteria}
+        />
+      ) : isRetailSales ? (
+        <RetailSalesFilter
+          ref={criteriaFilterRef}
+          className="min-h-0 min-w-0 w-full flex-1"
+          jobSession={{
+            ...retailSalesJobSession,
             onListError: handleListError,
           }}
           onRun={() => void handleCriteriaSubmit()}

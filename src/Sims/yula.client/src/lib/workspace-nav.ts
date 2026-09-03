@@ -209,6 +209,7 @@ export const stockNav: WorkspaceNavItem[] = [
     items: [
       { title: "Stock Analytics", url: "/stock/stock-analytics" },
       { title: "Stock Balance", url: "/stock/stock-balance" },
+      { title: "Retail Sales", url: "/stock/retail-sales-report" },
       { title: "Stock Ledger", url: "/stock/stock-ledger" },
       {
         title: "Serial No and Batch Traceability",
