@@ -329,7 +329,11 @@ export async function readJobSseEvents(
   onEvent: (eventName: string, payload: ArrowJobEvent) => void
 ): Promise<ArrowJobEvent> {
   const response = await fetch(resolveApiUrl(eventsUrl), {
-    headers: { Accept: "text/event-stream", ...getCompanyHeaders() },
+    headers: {
+      Accept: "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      ...getCompanyHeaders(),
+    },
     signal,
   })
 

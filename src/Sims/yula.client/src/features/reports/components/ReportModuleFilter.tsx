@@ -10,6 +10,7 @@ import {
 } from "@/features/report-criteria"
 import {
   ArrowJobExecutionsPanel,
+  ArrowJobResultPanel,
   type ArrowJobExecutionsPanelProps,
 } from "@/features/jobs"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,27 @@ export const ReportModuleFilter = React.forwardRef<
   const composing = Boolean(jobSession?.composing)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
   const { rows, setRows } = useSharedCriteriaDraft(draftStorageKey, schema)
+
+  const reportTitle = React.useMemo(
+    () =>
+      jobName
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" "),
+    [jobName]
+  )
+
+  const renderResult = React.useCallback(
+    (jobId: string) => (
+      <ArrowJobResultPanel
+        jobId={jobId}
+        title={reportTitle}
+        className="min-h-0 flex-1"
+      />
+    ),
+    [reportTitle]
+  )
 
   React.useImperativeHandle(
     ref,
@@ -154,6 +176,8 @@ export const ReportModuleFilter = React.forwardRef<
           </>
         }
         criteriaActive={composing}
+        criteriaSchema={schema}
+        renderResult={renderResult}
         className="min-h-0 flex-1"
       />
     </div>

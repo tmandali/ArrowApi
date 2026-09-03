@@ -465,15 +465,48 @@ export function DuckDbPersistBench() {
 
   const resetOpfs = React.useCallback(async () => {
     await teardown()
-    try {
-      const root = await navigator.storage.getDirectory()
-      await root.removeEntry(DB_FILE)
-      log("info", "[reset] bench_reports.duckdb silindi")
-    } catch {
-      log("warn", "[reset] bench_reports.duckdb bulunamadı")
+    // bench db'si + eski üretim denemesinin bıraktığı 0-byte kalıntılar
+    const legacy = [
+      DB_FILE,
+      "sims_reports.duckdb",
+      "sims_reports.duckdb.wal",
+    ]
+    for (const name of legacy) {
+      try {
+        const root = await navigator.storage.getDirectory()
+        await root.removeEntry(name)
+        log("info", `[reset] ${name} silindi`)
+      } catch {
+        log("warn", `[reset] ${name} bulunamadı`)
+      }
     }
     void refreshOpfs()
   }, [log, refreshOpfs, teardown])
+
+  const cleanCacheExt = React.useCallback(
+    async (ext: ".arrow" | ".parquet") => {
+      let removed = 0
+      try {
+        const root = await navigator.storage.getDirectory()
+        const dir = await root.getDirectoryHandle("sims_arrow_reports", {
+          create: true,
+        })
+        const names: string[] = []
+        for await (const [name, handle] of dir.entries()) {
+          if (handle.kind === "file" && name.endsWith(ext)) names.push(name)
+        }
+        for (const name of names) {
+          await dir.removeEntry(name).catch(() => {})
+          removed += 1
+        }
+        log("info", `[cache] ${ext} → ${removed} dosya silindi`)
+      } catch (err) {
+        log("warn", `[cache] ${ext} temizlenemedi: ${(err as Error)?.message ?? ""}`)
+      }
+      void refreshOpfs()
+    },
+    [log, refreshOpfs]
+  )
 
   const storageDelta =
     storageBefore != null && storageAfter != null ? storageAfter - storageBefore : null
@@ -587,9 +620,27 @@ export function DuckDbPersistBench() {
           size="sm"
           variant="outline"
           disabled={state.running}
+          onClick={() => void cleanCacheExt(".arrow")}
+        >
+          Arrow cache temizle
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={state.running}
+          onClick={() => void cleanCacheExt(".parquet")}
+        >
+          Parquet cache temizle
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={state.running}
           onClick={() => void resetOpfs()}
         >
-          OPFS db dosyasını sil
+          OPFS bench db + kalıntıları sil
         </Button>
       </div>
 

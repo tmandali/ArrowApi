@@ -184,26 +184,6 @@ async function safeDropObject(
   }
 }
 
-/**
- * Parquet'i view olarak bağla. Aynı isimde TABLO varsa CREATE OR REPLACE VIEW
- * içeride DROP VIEW dener ve catalog hatasıyla takılır — tabloyu ezme.
- */
-async function attachParquetView(
-  conn: duckdb.AsyncDuckDBConnection,
-  tableName: string,
-  parquetFileName: string,
-): Promise<void> {
-  const quoted = `"${tableName.replace(/"/g, '""')}"`
-  const existing = await getCatalogType(conn, tableName)
-  if (existing === "TABLE") return
-  const sql = `SELECT * FROM read_parquet('${escapeIdentLiteral(parquetFileName)}')`
-  if (existing === "VIEW") {
-    await conn.query(`CREATE OR REPLACE VIEW ${quoted} AS ${sql}`)
-  } else {
-    await conn.query(`CREATE VIEW ${quoted} AS ${sql}`)
-  }
-}
-
 self.onmessage = async (e: MessageEvent) => {
   const { id, type, payload } = e.data
 
@@ -240,47 +220,6 @@ self.onmessage = async (e: MessageEvent) => {
           tableRowCounts.set(tableName, count)
 
           self.postMessage({ id, success: true, rowCount: count })
-          break
-        }
-
-        case "FINALIZE_PARQUET_VIEW": {
-          const { tableName, jobId } = payload as { tableName: string; jobId?: string }
-          const parquetFileName = `${jobId || tableName}.parquet`
-          try {
-            // 1. DuckDB içinde yüksek hızlı Parquet oluştur
-            await conn.query(`COPY "${tableName}" TO '${parquetFileName}' (FORMAT PARQUET)`)
-
-            // 2. Parquet buffer'ını W3C OPFS kalıcı SSD diskine kaydet (~25-50 MB)
-            if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
-              const buffer = await db!.copyFileToBuffer(parquetFileName)
-              if (buffer && buffer.length > 0) {
-                const root = await navigator.storage.getDirectory()
-                const dir = await root.getDirectoryHandle("sims_arrow_reports", { create: true })
-                const fileHandle = await dir.getFileHandle(parquetFileName, { create: true })
-                const writable = await fileHandle.createWritable()
-                await writable.write(buffer as Uint8Array<ArrayBuffer>)
-                await writable.close()
-              }
-            }
-            self.postMessage({ id, success: true })
-          } catch (err) {
-            console.warn("OPFS Parquet yazma hatası, tablo korunuyor:", err)
-            self.postMessage({ id, success: true })
-          }
-          break
-        }
-
-        case "REGISTER_PARQUET_BUFFER": {
-          const { tableName, buffer } = payload
-          const parquetFile = `${tableName}.parquet`
-          const uint8 =
-            buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer as ArrayBuffer)
-          await db!.registerFileBuffer(parquetFile, uint8)
-          await attachParquetView(conn, tableName, parquetFile)
-          const countRes = await conn.query(`SELECT COUNT(*) as count FROM "${tableName}"`)
-          const countRows = arrowTableToObjects(countRes)
-          const rowCount = Number(countRows[0]?.count ?? 0)
-          self.postMessage({ id, success: true, rowCount })
           break
         }
 
@@ -358,12 +297,10 @@ self.onmessage = async (e: MessageEvent) => {
         }
 
         case "CHECK_TABLE_EXISTS": {
-          const { tableName, jobId } = payload as { tableName: string; jobId?: string }
-          const parquetFileName = `${jobId || tableName}.parquet`
+          const { tableName } = payload as { tableName: string }
 
           const quoted = `"${tableName.replace(/"/g, '""')}"`
 
-          // 1. Bellekte tablo/view varsa view ile ezme — CREATE OR REPLACE VIEW tablo üstünde Catalog Error üretir.
           try {
             const existing = await getCatalogType(conn, tableName)
             if (existing) {
@@ -379,35 +316,6 @@ self.onmessage = async (e: MessageEvent) => {
             // Tablo veya view henüz bellekte yok
           }
 
-          // 2. OPFS parquet → yalnız nesne yoksa veya boşsa VIEW bağla
-          try {
-            if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
-              const catalogType = await getCatalogType(conn, tableName)
-              if (catalogType === "TABLE") {
-                self.postMessage({ id, success: true, exists: false, rowCount: 0 })
-                break
-              }
-              const root = await navigator.storage.getDirectory()
-              const dir = await root.getDirectoryHandle("sims_arrow_reports", { create: true })
-              const fileHandle = await dir.getFileHandle(parquetFileName, { create: false })
-              const file = await fileHandle.getFile()
-              if (file.size > 0) {
-                const arrayBuffer = await file.arrayBuffer()
-                await db!.registerFileBuffer(parquetFileName, new Uint8Array(arrayBuffer))
-                await attachParquetView(conn, tableName, parquetFileName)
-                const countRes = await conn.query(`SELECT COUNT(*) as count FROM ${quoted}`)
-                const countRows = arrowTableToObjects(countRes)
-                const rowCount = Number(countRows[0]?.count ?? 0)
-                if (rowCount > 0) {
-                  self.postMessage({ id, success: true, exists: true, rowCount })
-                  break
-                }
-              }
-            }
-          } catch {
-            // Parquet dosyası diskte yok
-          }
-
           self.postMessage({ id, success: true, exists: false, rowCount: 0 })
           break
         }
@@ -416,7 +324,6 @@ self.onmessage = async (e: MessageEvent) => {
           const { tableName } = payload
           await safeDropObject(conn, tableName)
           await safeDropObject(conn, `${tableName}_raw`)
-          await db!.dropFile(`${tableName}.parquet`).catch(() => {})
           tableRowCounts.delete(tableName)
           self.postMessage({ id, success: true })
           break

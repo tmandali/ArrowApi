@@ -99,34 +99,6 @@ class DuckDbClient {
   }
 
   /**
-   * İndirilen tabloyu yerel Parquet dosyasına aktarıp RAM'i boşaltır ve View oluşturur.
-   */
-  async finalizeParquetView(tableName: string, jobId?: string): Promise<void> {
-    await this.postMessage("FINALIZE_PARQUET_VIEW", { tableName, jobId })
-  }
-
-  /**
-   * OPFS yedeğindeki Parquet buffer'ını DuckDB'ye View olarak bağlar.
-   * DİKKAT: buffer DuckDB WASM belleğine kopyalanır — dosya boyutu kadar RAM tutar.
-   * Gerçek 0-RAM yol DuckDB'nin kendi OPFS'inden `read_parquet`'tır (`CHECK_TABLE_EXISTS`).
-   */
-  async registerParquetBuffer(
-    tableName: string,
-    buffer: Uint8Array
-  ): Promise<number> {
-    const res = await this.postMessage<{
-      id: number
-      success: boolean
-      rowCount?: number
-    }>(
-      "REGISTER_PARQUET_BUFFER",
-      { tableName, buffer },
-      [buffer.buffer]
-    )
-    return res.rowCount ?? 0
-  }
-
-  /**
    * Rapor tablosunda filtreleme, sıralama ve sayfalama ile SQL sorgusu çalıştırır.
    */
   async queryReportRows(options: {
@@ -222,16 +194,13 @@ class DuckDbClient {
   /**
    * Tablonun DuckDB içinde zaten mevcut olup olmadığını kontrol eder.
    */
-  async checkTableExists(
-    tableName: string,
-    jobId?: string
-  ): Promise<{ exists: boolean; rowCount: number }> {
+  async checkTableExists(tableName: string): Promise<{ exists: boolean; rowCount: number }> {
     const res = await this.postMessage<{
       id: number
       success: boolean
       exists?: boolean
       rowCount?: number
-    }>("CHECK_TABLE_EXISTS", { tableName, jobId })
+    }>("CHECK_TABLE_EXISTS", { tableName })
     return { exists: Boolean(res?.exists), rowCount: res?.rowCount ?? 0 }
   }
 

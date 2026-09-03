@@ -11,6 +11,7 @@ import {
 } from "@/features/report-criteria"
 import {
   ArrowJobExecutionsPanel,
+  ArrowJobResultPanel,
   type ArrowJobExecutionsPanelProps,
 } from "@/features/jobs"
 import { Button } from "@/components/ui/button"
@@ -36,6 +37,8 @@ export type StockAnalyticsJobSession = Pick<
 > & {
   /** New / empty list → show criteria grid in the Detail column. */
   composing?: boolean
+  /** Aktif job çalışıyor → kriter gridi + Run/Clear kilitli. */
+  criteriaLocked?: boolean
   onExitCompose?: () => void
   onJobCancelled?: (jobId: string) => void
   onJobDeleted?: (jobId: string) => void
@@ -55,6 +58,7 @@ export const StockAnalyticsFilter = React.forwardRef<
   ref
 ) {
   const composing = Boolean(jobSession?.composing)
+  const criteriaLocked = Boolean(jobSession?.criteriaLocked)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
   const aiFilled = useAgentCriteriaStore(
     (state) => state.aiFilledCriteria["stock-analytics"]
@@ -67,6 +71,17 @@ export const StockAnalyticsFilter = React.forwardRef<
   const { rows, setRows } = useSharedCriteriaDraft(
     "stock-analytics",
     stockAnalyticsSchema
+  )
+
+  const renderResult = React.useCallback(
+    (jobId: string) => (
+      <ArrowJobResultPanel
+        jobId={jobId}
+        title="Stock Analytics"
+        className="min-h-0 flex-1"
+      />
+    ),
+    []
   )
 
 
@@ -138,6 +153,7 @@ export const StockAnalyticsFilter = React.forwardRef<
               variant="outline"
               size="sm"
               className="h-7 shrink-0 gap-1 px-2.5 text-xs"
+              disabled={criteriaLocked}
               onClick={() => filterRef.current?.clear()}
             >
               <RotateCcw className="size-3.5" />
@@ -147,7 +163,7 @@ export const StockAnalyticsFilter = React.forwardRef<
               type="button"
               size="sm"
               className="h-7 shrink-0 px-3 text-xs"
-              disabled={runDisabled}
+              disabled={runDisabled || criteriaLocked}
               onClick={() => onRun?.()}
             >
               Run
@@ -155,6 +171,8 @@ export const StockAnalyticsFilter = React.forwardRef<
           </>
         }
         criteriaActive={composing}
+        criteriaSchema={stockAnalyticsSchema}
+        renderResult={renderResult}
         className="min-h-0 flex-1"
       />
     </div>

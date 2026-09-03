@@ -230,8 +230,8 @@ class DuckStreamManager {
     const { jobId, jobUrl, tableName, abortController } = session
 
     try {
-      // 1. Tablo DuckDB'de veya OPFS Parquet dosyasında zaten mevcut mu kontrol et (0ms)
-      const check = await duckDbClient.checkTableExists(tableName, jobId)
+      // 1. Tablo DuckDB'de zaten mevcut mu kontrol et (0ms)
+      const check = await duckDbClient.checkTableExists(tableName)
       if (check.exists && check.rowCount > 0) {
         session.streamedRows = check.rowCount
         session.isStreaming = false
@@ -328,13 +328,12 @@ class DuckStreamManager {
         session.streamedRows = totalCount
       }
 
-      // İndirme tamamlandı: Sunucu akışı bitti, yerel OPFS disk yedeği alınıyor
+      // İndirme/ingest tamamlandı. Kalıcılık: ham Arrow IPC cache
+      // (sims_arrow_reports/<jobId>.arrow) — indirme sırasında tee ile zaten
+      // OPFS'e yazıldı; F5 sonrası getStream ile yeniden ingest edilir (0 internet).
+      // Parquet dönüşümü kaldırıldı: COPY + copyFileToBuffer, WASM heap'inde
+      // tablo boyutunda spike üretiyordu ve büyük raporlarda sessizce OOM'luyordu.
       session.isStreaming = false
-      session.isSavingDisk = true
-      this.notify(session)
-
-      await duckDbClient.finalizeParquetView(tableName, jobId).catch(() => null)
-
       session.isSavingDisk = false
       session.isComplete = true
       this.notify(session)

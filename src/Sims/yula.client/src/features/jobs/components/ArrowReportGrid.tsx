@@ -103,6 +103,7 @@ export function ArrowReportGrid({
     isStreaming,
     isSavingDisk,
     isPartial,
+    isFromCache,
     isLoadingQuery,
     refresh,
   } = useDuckReport({
@@ -302,7 +303,8 @@ export function ArrowReportGrid({
     </span>
   ) : isStreaming && displayRows.length > 0 ? (
     <span className="text-[11px] text-muted-foreground tabular-nums">
-      Streaming: {formatCount(streamedRows)}
+      {isFromCache ? "Streaming (local cache)" : "Streaming"}:{" "}
+      {formatCount(streamedRows)}
       {expectedTotalRows ? ` / ${formatCount(expectedTotalRows)}` : ""} rows…
       {progressPercent != null ? ` (${progressPercent}%)` : ""}
     </span>

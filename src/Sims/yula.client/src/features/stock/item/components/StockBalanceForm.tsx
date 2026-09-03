@@ -50,6 +50,9 @@ export function StockBalanceForm() {
     [setComposing, handleSelectJob]
   )
 
+  /** Aktif job in-flight iken kriter gridi + Run/Clear kilitlenir. */
+  const criteriaLocked = Boolean(activeJobId) && activeRunPhase === "running"
+
   React.useEffect(() => {
     const handleOpenCompose = (e: Event) => {
       const detail = (e as CustomEvent<{ scope?: string }>).detail
@@ -78,6 +81,7 @@ export function StockBalanceForm() {
         activeRunEvents,
         activeRunPhase,
         composing,
+        criteriaLocked,
         pendingJobs,
         listRefreshToken,
         onExitCompose: () => setComposing(false),

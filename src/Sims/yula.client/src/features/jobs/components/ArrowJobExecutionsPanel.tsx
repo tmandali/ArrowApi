@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   Ban,
-  Check,
   CircleCheck,
   CircleX,
   Copy,
@@ -14,7 +13,6 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
-  X,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -40,7 +38,6 @@ import {
 import {
   Marker,
   MarkerContent,
-  MarkerIcon,
 } from "@/components/ui/marker"
 import {
   ResizableHandle,
@@ -48,7 +45,6 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Spinner } from "@/components/ui/spinner"
 import {
   panelCardClass,
   panelHeaderActionClass,
@@ -65,12 +61,14 @@ import {
   fetchJobRequest,
   listArrowJobs,
 } from "@/features/jobs/arrow-job-client"
+import { ArrowJobLivePanel } from "./ArrowJobLivePanel"
+import { RunProgressSteps } from "./RunProgressSteps"
 import {
   buildRunEventsFromLog,
-  elapsedSinceStart,
   formatTotalDuration,
   type RunEventItem,
 } from "@/features/jobs/run-events"
+import type { JsonSchemaObject } from "@/features/report-criteria"
 import type { ArrowJobStatus } from "../types"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { cn } from "@/utils/cn"
@@ -87,23 +85,6 @@ function formatWhen(value?: string | null): string {
     dateStyle: "short",
     timeStyle: "medium",
   }).format(date)
-}
-
-function statusTone(
-  status: string
-): "default" | "secondary" | "destructive" | "outline" {
-  switch (status) {
-    case "Completed":
-      return "default"
-    case "Failed":
-    case "Cancelled":
-      return "destructive"
-    case "Running":
-    case "Queued":
-      return "secondary"
-    default:
-      return "outline"
-  }
 }
 
 function ExecutionStatusMark({
@@ -276,6 +257,16 @@ export type ArrowJobExecutionsPanelProps = {
    * criteria slot takes over the Detail column. Ignored without detailSlot.
    */
   criteriaActive?: boolean
+  /**
+   * Criteria JSON schema of the report — powers the read-only criteria grid
+   * inside the Live panel (falls back to raw request JSON without it).
+   */
+  criteriaSchema?: JsonSchemaObject
+  /**
+   * Renders the embedded result panel for a completed job id. When provided,
+   * completed jobs open the result grid in place instead of the Detail view.
+   */
+  renderResult?: (jobId: string) => React.ReactNode
 }
 
 /**
@@ -304,6 +295,8 @@ export function ArrowJobExecutionsPanel({
   detailSlotTitle = "Criteria",
   detailSlotActions,
   criteriaActive = false,
+  criteriaSchema,
+  renderResult,
 }: ArrowJobExecutionsPanelProps) {
   const showCriteriaSlot = detailSlot != null
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
@@ -603,32 +596,25 @@ export function ArrowJobExecutionsPanel({
     displayStatusFor(selectedJob, activeJobId, undefined)
   const canOpenSelected =
     selectedDisplayStatus === "Completed" && Boolean(onOpenJob)
-  /** While the selected run is in flight, Detail shows progress only. */
-  const showRunningProgressOnly =
-    Boolean(selectedId) &&
-    selectedDisplayStatus !== "Completed" &&
-    selectedDisplayStatus !== "Failed" &&
-    selectedDisplayStatus !== "Cancelled" &&
-    (selectedDisplayStatus === "Running" ||
-      selectedDisplayStatus === "Queued" ||
-      (isActiveSelected &&
-        activeRunPhase === "running" &&
-        !progressEvents.some(
-          (e) =>
-            e.eventName === "completed" ||
-            e.eventName === "failed" ||
-            e.eventName === "cancelled"
-        )))
-  const criteriaVisible = showCriteriaSlot && !selectedId
-  const isRunningOrQueued =
+  /**
+   * 3-panel run flow: selected run in flight → Live panel (read-only criteria
+   * + SSE stream); completed (+ renderResult) → embedded result panel;
+   * otherwise the classic Detail view.
+   */
+  const selectedInFlight =
     selectedDisplayStatus === "Running" ||
     selectedDisplayStatus === "Queued" ||
-    showRunningProgressOnly ||
     (isActiveSelected && activeRunPhase === "running")
+  const liveMode = Boolean(selectedId) && selectedInFlight
+  const resultMode =
+    Boolean(selectedId) &&
+    selectedDisplayStatus === "Completed" &&
+    renderResult != null
+  const criteriaVisible = showCriteriaSlot && !selectedId
   const canCancelSelected =
-    Boolean(selectedId) && !criteriaVisible && isRunningOrQueued
+    Boolean(selectedId) && !criteriaVisible && !liveMode && selectedInFlight
   const canDeleteSelected =
-    Boolean(selectedId) && !criteriaVisible && !showRunningProgressOnly
+    Boolean(selectedId) && !criteriaVisible && !liveMode
 
   const handleCopy = React.useCallback(
     (value: string, mode: "id" | "url") => {
@@ -872,7 +858,26 @@ export function ArrowJobExecutionsPanel({
       />
 
       <ResizablePanel defaultSize="62%" minSize="30%" className="min-h-0 min-w-0">
-        {criteriaVisible ? (
+        {liveMode ? (
+          <ArrowJobLivePanel
+            className="h-full"
+            schema={criteriaSchema}
+            requestJson={
+              isActiveSelected && activeRequestJson ? activeRequestJson : inputJson
+            }
+            events={progressEvents}
+            phase={progressPhase}
+            running={running}
+            loading={historyLoading && progressEvents.length === 0}
+            liveStatus={selectedDisplayStatus}
+            cancelling={cancelling}
+            onCancel={
+              selectedId ? () => void handleCancelSelected() : undefined
+            }
+          />
+        ) : resultMode && selectedId ? (
+          renderResult(selectedId)
+        ) : criteriaVisible ? (
           <section className={cn(panelCardClass, "h-full min-w-0")}>
             <div className={panelHeaderClass}>
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -907,13 +912,11 @@ export function ArrowJobExecutionsPanel({
                     )}
                     title={selectedId ?? undefined}
                   >
-                    {showRunningProgressOnly
-                      ? "Live progress"
-                      : detailLoading
-                        ? "Loading request…"
-                        : selectedId
-                          ? selectedId
-                          : "Status, meta and request payload"}
+                    {detailLoading
+                      ? "Loading request…"
+                      : selectedId
+                        ? selectedId
+                        : "Status, meta and request payload"}
                   </span>
                   {selectedId ? (
                     <button
@@ -980,181 +983,69 @@ export function ArrowJobExecutionsPanel({
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <ScrollArea className="h-0 min-h-0 w-full flex-1">
                 <div className="px-4 py-3">
-                  {!showRunningProgressOnly ? (
-                    <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
-                      {detailLines.map((line) => (
-                        <div
-                          key={line.label}
-                          className="group grid min-w-0 gap-0.5"
+                  <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+                    {detailLines.map((line) => (
+                      <div
+                        key={line.label}
+                        className="group grid min-w-0 gap-0.5"
+                      >
+                        <dt className="text-[11px] text-muted-foreground">
+                          {line.label}
+                        </dt>
+                        <dd
+                          className={cn(
+                            "text-foreground",
+                            line.label === "Error" &&
+                              "whitespace-normal break-all"
+                          )}
+                          title={line.value}
                         >
-                          <dt className="text-[11px] text-muted-foreground">
-                            {line.label}
-                          </dt>
-                          <dd
-                            className={cn(
-                              "text-foreground",
-                              line.label === "Error" &&
-                                "whitespace-normal break-all"
-                            )}
-                            title={line.value}
-                          >
-                            {line.label === "Error" ? (
-                              <span className="flex min-w-0 items-center gap-1.5">
-                                <span className="min-w-0 truncate">
-                                  {line.value}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCopy(line.value, "id")
-                                  }
-                                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                                  aria-label="Copy error"
-                                  title="Copy to clipboard"
-                                >
-                                  <Copy className="size-3" />
-                                </button>
+                          {line.label === "Error" ? (
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="min-w-0 truncate">
+                                {line.value}
                               </span>
-                            ) : (
-                              line.value
-                            )}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : null}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopy(line.value, "id")
+                                }
+                                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                                aria-label="Copy error"
+                                title="Copy to clipboard"
+                              >
+                                <Copy className="size-3" />
+                              </button>
+                            </span>
+                          ) : (
+                            line.value
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
                   {showProgress ? (
-                    <div
-                      className={cn(
-                        "space-y-3",
-                        !showRunningProgressOnly && "mt-3"
-                      )}
-                    >
-                      {!showRunningProgressOnly ? (
-                        <Marker variant="separator">
-                          <MarkerContent className="text-[11px] text-muted-foreground">
-                            Progress
-                          </MarkerContent>
-                        </Marker>
-                      ) : null}
-                      {historyLoading && progressEvents.length === 0 ? (
-                        <Marker role="status">
-                          <MarkerIcon>
-                            <Spinner className="size-3.5" />
-                          </MarkerIcon>
-                          <MarkerContent>Loading progress…</MarkerContent>
-                        </Marker>
-                      ) : progressEvents.length === 0 ? (
-                        <Marker>
-                          <MarkerContent>
-                            {showRunningProgressOnly
-                              ? "Waiting for SSE events…"
-                              : "No progress log for this run."}
-                          </MarkerContent>
-                        </Marker>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          {progressEvents.map((step, index) => {
-                            const isCurrent =
-                              index === progressEvents.length - 1
-                            const isComplete =
-                              progressPhase === "done" ||
-                              (running && !isCurrent) ||
-                              (progressPhase === "cancelled" && !isCurrent)
-                            const isCancelledHere =
-                              progressPhase === "cancelled" && isCurrent
-                            const isFailedHere =
-                              step.tone === "danger" && isCurrent
-                            const isLiveCurrent =
-                              (running || showRunningProgressOnly) && isCurrent
-
-                            const contentClass = cn(
-                              isCancelledHere || isFailedHere
-                                ? "text-amber-500"
-                                : isComplete ||
-                                    (isCurrent && step.tone === "success")
-                                  ? "text-emerald-600"
-                                  : isCurrent
-                                    ? "text-foreground"
-                                    : "text-muted-foreground/70",
-                              isLiveCurrent && "animate-pulse"
-                            )
-
-                            const iconClass = cn(
-                              isCancelledHere || isFailedHere
-                                ? "text-amber-500"
-                                : isComplete ||
-                                    (isCurrent && step.tone === "success")
-                                  ? "text-emerald-600"
-                                  : "text-muted-foreground"
-                            )
-
-                            const label =
-                              step.eventName === "progress"
-                                ? `${step.title} · ${step.detail}`
-                                : step.detail
-                                  ? `${step.title} — ${step.detail}`
-                                  : step.title
-                            const elapsed = elapsedSinceStart(
-                              progressEvents,
-                              step
-                            )
-
-                            return (
-                              <Marker
-                                key={step.id}
-                                role={isLiveCurrent ? "status" : undefined}
-                                className="items-start"
-                              >
-                                <MarkerIcon className={cn("mt-0.5", iconClass)}>
-                                  {isLiveCurrent ? (
-                                    <Spinner className="size-3.5" />
-                                  ) : isComplete &&
-                                    !isCancelledHere &&
-                                    !isFailedHere ? (
-                                    <Check className="size-3.5" />
-                                  ) : isCancelledHere || isFailedHere ? (
-                                    <X className="size-3.5" />
-                                  ) : (
-                                    <span className="mx-auto mt-1 size-1.5 rounded-full bg-muted-foreground/35" />
-                                  )}
-                                </MarkerIcon>
-                                <MarkerContent
-                                  className={cn(
-                                    "flex min-w-0 flex-1 items-baseline justify-between gap-3",
-                                    contentClass
-                                  )}
-                                >
-                                  <span className="min-w-0">{label}</span>
-                                  {elapsed ? (
-                                    <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">
-                                      {elapsed}
-                                    </span>
-                                  ) : null}
-                                </MarkerContent>
-                              </Marker>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <RunProgressSteps
+                      events={progressEvents}
+                      phase={progressPhase}
+                      running={running}
+                      loading={historyLoading && progressEvents.length === 0}
+                    />
                   ) : null}
 
-                  {!showRunningProgressOnly ? (
-                    <div className="mt-3 flex min-h-0 flex-col space-y-3">
-                      <Marker variant="separator">
-                        <MarkerContent className="text-[11px] text-muted-foreground">
-                          Request Input
-                        </MarkerContent>
-                      </Marker>
-                      <CodeBlock
-                        value={inputJson}
-                        language="json"
-                        className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
-                      />
-                    </div>
-                  ) : null}
+                  <div className="mt-3 flex min-h-0 flex-col space-y-3">
+                    <Marker variant="separator">
+                      <MarkerContent className="text-[11px] text-muted-foreground">
+                        Request Input
+                      </MarkerContent>
+                    </Marker>
+                    <CodeBlock
+                      value={inputJson}
+                      language="json"
+                      className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
+                    />
+                  </div>
                 </div>
               </ScrollArea>
             </div>
