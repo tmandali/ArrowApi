@@ -48,6 +48,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [isStreaming, setIsStreaming] = React.useState(false)
   const [isSavingDisk, setIsSavingDisk] = React.useState(false)
   const [isFromCache, setIsFromCache] = React.useState(false)
+  const [isPartial, setIsPartial] = React.useState(false)
   const [isLoadingQuery, setIsLoadingQuery] = React.useState(false)
   const [sortBy, setSortBy] = React.useState<string | null>(null)
   const [sortDesc, setSortDesc] = React.useState<boolean>(false)
@@ -137,7 +138,18 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           )
         }
       } catch (err) {
-        console.error("Query error:", err)
+        // Bellek tavanı (kontrollü OOM) beklenen/yönetilen durum: warn bas,
+        // dev overlay'e sahte Console Error düşürme.
+        const msg = String(err)
+        if (
+          msg.includes("Out of Memory") ||
+          msg.includes("could not allocate block") ||
+          msg.includes("Allocation failure")
+        ) {
+          console.warn("Query hit WASM memory limit (partial data):", err)
+        } else {
+          console.error("Query error:", err)
+        }
       } finally {
         if (seq === querySeqRef.current) setIsLoadingQuery(false)
       }
@@ -195,6 +207,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setTotalRows(0)
       setTotalFiltered(0)
       setStreamedRows(0)
+      setIsPartial(false)
       return
     }
 
@@ -211,6 +224,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         setIsStreaming(state.isStreaming)
         setIsSavingDisk(state.isSavingDisk)
         setIsFromCache(state.isFromCache)
+        setIsPartial(state.isPartial)
 
         if (state.streamedRows > 0 || state.isComplete) {
           if (state.streamedRows > 0) baseTotalRowsRef.current = state.streamedRows
@@ -247,6 +261,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setIsStreaming(true)
       setIsSavingDisk(false)
       setIsFromCache(false)
+      setIsPartial(false)
       tableReadyRef.current = false
       setRows([])
       setTotalRows(0)
@@ -415,6 +430,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     isStreaming,
     isSavingDisk,
     isFromCache,
+    isPartial,
     isLoadingQuery,
     sortBy,
     sortDesc,

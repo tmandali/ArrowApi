@@ -31,22 +31,25 @@ async function getDuckDb(): Promise<{
       const newDb = new duckdb.AsyncDuckDB(logger, worker)
       await newDb.instantiate(bundle.mainModule, bundle.pthreadWorker)
 
-      // OPFS (Origin Private File System) ile yerel SSD kalıcı depolama
-      try {
-        await newDb.open({
-          path: "sims_reports.duckdb",
-          accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
-          opfs: { fileHandling: "auto" },
-        })
-      } catch (opfsErr) {
-        console.warn("DuckDB OPFS kullanılamadı, in-memory moduna geçiliyor:", opfsErr)
-        await newDb.open({}).catch(() => {})
-      }
+      // Bilinçli olarak IN-MEMORY db: kalıcı db dosyası (opfs:// dahil) WAL +
+      // checkpoint'i WASM heap'inde tutup "Allocation failure" FATAL'ı üretiyor.
+      // Kalıcılığı zaten OPFS Parquet cache'i (sims_arrow_reports) sağlıyor —
+      // F5 sonrası tablo parquet view olarak yeniden bağlanır. memory_limit,
+      // tavana değince DuckDB'nin KONTROLLÜ "Out of Memory" hatasını üretir;
+      // akış yöneticisi bu hatada inen satırlarla devam eder.
+      await newDb.open({})
 
       const newConn = await newDb.connect()
       await newConn.query("SET preserve_insertion_order=false;").catch(() => {})
+      // eh.wasm build'i 4 GiB WASM heap'i ile geliyor (maximum: 65536 page).
+      // 3 GB (≈2.79 GiB) buffer pool + IPC chunk/parquet tamponları için ~1 GB
+      // marj güvenli: malloc abortu (FATAL) yerine kontrollü OOM üretilir.
+      await newConn.query("SET memory_limit='3GB';").catch(() => {})
       db = newDb
       conn = newConn
+      console.log(
+        "[DuckDB Worker] init v4 — in-memory db, memory_limit=3GB (WAL/checkpoint yok)"
+      )
     })()
   }
 
@@ -424,7 +427,11 @@ self.onmessage = async (e: MessageEvent) => {
       }
     } catch (innerErr) {
       const msg = innerErr instanceof Error ? innerErr.message : String(innerErr)
-      if (msg.includes("invalidated") || msg.includes("Out of Memory")) {
+      if (
+        msg.includes("invalidated") ||
+        msg.includes("Out of Memory") ||
+        msg.includes("Allocation failure")
+      ) {
         // Fatal bellek hatasında DuckDB'yi sıfırla ki sonraki sorgular kilitlenmesin
         await resetDuckDb().catch(() => {})
       }

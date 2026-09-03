@@ -18,6 +18,8 @@ export type StreamSessionState = {
   isSavingDisk: boolean
   isFromCache: boolean
   isComplete: boolean
+  /** WASM bellek tavanı / akış kesintisi: yalnızca inen satırlar mevcut. */
+  isPartial: boolean
   error: string | null
 }
 
@@ -70,6 +72,7 @@ class DuckStreamManager {
         isSavingDisk: false,
         isFromCache: false,
         isComplete: false,
+        isPartial: false,
         error: null,
         abortController,
         listeners: new Set(),
@@ -139,6 +142,7 @@ class DuckStreamManager {
         isSavingDisk: false,
         isFromCache: false,
         isComplete: false,
+        isPartial: false,
         error: null,
         abortController,
         listeners: new Set(),
@@ -156,6 +160,7 @@ class DuckStreamManager {
       session.isSavingDisk = false
       session.isFromCache = false
       session.isComplete = false
+      session.isPartial = false
       session.error = null
       session.cleanupTimer = null
     }
@@ -175,6 +180,7 @@ class DuckStreamManager {
       isSavingDisk: session.isSavingDisk,
       isFromCache: session.isFromCache,
       isComplete: session.isComplete,
+      isPartial: session.isPartial,
       error: session.error,
     }
   }
@@ -342,7 +348,6 @@ class DuckStreamManager {
         String(err).includes("The user aborted a request")
 
       if (!isAborted) {
-        console.error("DuckStreamManager stream error:", err)
         const rawMsg = (err as Error)?.message || String(err)
         let parsedMessage = rawMsg
         if (rawMsg.startsWith("{")) {
@@ -357,15 +362,19 @@ class DuckStreamManager {
         const isOom =
           rawMsg.includes("Out of Memory") ||
           rawMsg.includes("could not allocate block") ||
+          rawMsg.includes("Allocation failure") ||
           parsedMessage.includes("Out of Memory") ||
-          parsedMessage.includes("could not allocate block")
+          parsedMessage.includes("could not allocate block") ||
+          parsedMessage.includes("Allocation failure")
 
         const isTruncated =
           rawMsg.includes("Expected to read") ||
           parsedMessage.includes("Expected to read")
 
         if ((isOom || isTruncated) && session.streamedRows > 0) {
-          // Bellek sınırına veya akış sonu kesintisine ulaşıldı, ancak şimdiye kadar inen satırları koru
+          // Bellek sınırına veya akış sonu kesintisine ulaşıldı, ancak şimdiye
+          // kadar inen satırları koru. Beklenen/yönetilen durum: warn yeterli,
+          // console.error Next dev overlay'de sahte Console Error üretir.
           console.warn(
             isOom
               ? "WASM bellek tavanına ulaşıldı. Mevcut satırlarla devam ediliyor:"
@@ -375,12 +384,14 @@ class DuckStreamManager {
           session.isStreaming = false
           session.isSavingDisk = false
           session.isComplete = true
+          session.isPartial = true
           session.error = null
           this.notify(session)
           this.scheduleCleanup(session)
         } else {
+          console.error("DuckStreamManager stream error:", err)
           const userFriendlyMsg = isOom
-            ? "Rapor boyutu tarayıcının 32-bit WebAssembly bellek tavanını (3.1 GB) aştı."
+            ? "Rapor boyutu tarayıcı WebAssembly bellek sınırını (~3 GB) aştı."
             : `Rapor yüklenirken hata oluştu: ${parsedMessage}`
 
           session.error = userFriendlyMsg

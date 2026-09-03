@@ -2,7 +2,7 @@
 
 import { useYulaGridStore } from "@/lib/stores/grid";
 import * as React from "react"
-import { RotateCw, X, DatabaseIcon } from "lucide-react"
+import { RotateCw, X, DatabaseIcon, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -102,6 +102,7 @@ export function ArrowReportGrid({
     hasMore,
     isStreaming,
     isSavingDisk,
+    isPartial,
     isLoadingQuery,
     refresh,
   } = useDuckReport({
@@ -307,8 +308,21 @@ export function ArrowReportGrid({
     </span>
   ) : null
 
+  const partialSubtitle =
+    !isStreaming && !isSavingDisk && isPartial ? (
+      <span
+        className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 tabular-nums dark:text-amber-400"
+        title="Tarayıcı WebAssembly bellek sınırı doldu — raporun yalnızca sunucudan inen kısmı gösteriliyor. Yenile butonu tekrar dener."
+      >
+        <TriangleAlert className="size-3 shrink-0" />
+        Partial: {formatCount(totalRows)}
+        {expectedTotalRows ? ` / ${formatCount(expectedTotalRows)}` : ""} rows
+      </span>
+    ) : null
+
   const subtitle =
     streamingSubtitle ??
+    partialSubtitle ??
     (isStreaming || isSavingDisk || effectiveColumns.length === 0 ? null : countDisplay)
 
   return (
