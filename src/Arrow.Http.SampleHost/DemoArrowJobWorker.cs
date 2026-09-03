@@ -27,7 +27,7 @@ public sealed class DemoArrowJobWorker : IArrowJobWorker<ArrowQueryRequest>
         ArrowConversionOptions? options = ArrowSamples.CreateConversionOptions(request.BatchSize);
         await using ArrowBatchReader arrowReader = ArrowData.OpenArrowReader(reader, options);
 
-        await foreach (RecordBatch batch in arrowReader.ReadBatchesAsync(cancellationToken))
+        await foreach (RecordBatch batch in arrowReader.WithCancellation(cancellationToken))
         {
             yield return batch;
         }

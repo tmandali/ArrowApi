@@ -90,9 +90,9 @@ export const STATIC_TOOLS = {
       description: [
         "Bir raporu GERÇEKLEŞTİRİR (backend job başlatır) ve execution ekranında yeni job'ı seçili/çalışır gösterir.",
         `Kullanılabilir raporlar: ${DEMO_REPORTS.map((r) => r.scope).join(", ")}.`,
-        "YALNIZ YENİ ÇALIŞTIRMA niyeti varsa çağır (örn: 'raporu çalıştır', 'raporu hazırla', 'geçen hafta itibarıyla hazırla', 'bugünün stok bakiyesini getir'). Kriterler tam verilsin veya verilmesin; varsayılan tarih/kriterler otomatik uygulanır.",
+        "YALNIZ açık çalıştırma fiili varsa çağır: 'raporu çalıştır', 'çalıştır', 'calistir', 'run', 'execute', 'job başlat' (örn: 'geçen hafta için çalıştır').",
+        "'hazırla', 'göster', 'getir', yalnız 'geçen hafta' / 'dün' gibi slot ifadeleri YETERLİ DEĞİLDİR — bu aracı ÇAĞIRMA; öneri sun veya apply_criteria için onay bekle.",
         "MEVCUT bir job'ı/sonuçları GÖRME isteklerinde (örn: 'son çalışan raporu aç', 'son sonuçlar', 'en son job') BU ARACI ÇAĞIRMA — 'open_last_report' aracını kullan.",
-        "Kullanıcıya sohbet üzerinden tarih formatı veya kriter sorusu SORMA — aracı criteria:{} ile çağır; sistem varsayılan tarih ve kriterleri otomatik uygulayacaktır.",
         "YALNIZ yeni rapor çalıştırma isteğinde kullan; açık tabloyu süzme istekleri için DEĞİL.",
       ].join(" "),
       inputSchema: z.object({
@@ -116,13 +116,20 @@ export const STATIC_TOOLS = {
           errors: z.array(z.string()),
           hint: z.string().optional(),
         }),
+        z.object({
+          status: z.literal("blocked"),
+          reason: z.literal("incomplete-intent"),
+          hint: z.string(),
+          message: z.string().optional(),
+        }),
         z.object({ status: z.literal("error"), error: z.string() }),
       ]),
     }),
     apply_criteria: tool({
       description: [
-        "Önerilen kriterleri (ör. kayitTarihi, durum, tutarMiktar) aktif ekrandaki kriter formuna doldurur.",
-        "Kullanıcı '1. öneriyi uygula', 'dünü seç', 'forma yaz' dediğinde bu aracı criteria objesi ile ÇAĞIR.",
+        "Önerilen kriterleri (ör. kayitTarihi, durum, tutarMiktar) aktif ekrandaki kriter formuna doldurur; job BAŞLATMAZ.",
+        "YALNIZ açık doldurma/onay niyeti varsa çağır: '1. öneriyi uygula', 'forma doldur', 'forma yaz', 'dünü seç', 'uygula'.",
+        "Yalnız 'geçen hafta', 'dün', 'AKTIF' gibi eksik ifadelerde BU ARACI ÇAĞIRMA — önce 1-2 yula-criteria öneri chip'i sun.",
         "Form doldurulur, ekranda vurgulanır ve kullanıcı ekrandaki 'Run' butonuna basarak işi kendisi çalıştırabilir.",
       ].join(" "),
       inputSchema: z.object({
@@ -132,14 +139,17 @@ export const STATIC_TOOLS = {
       }),
       outputSchema: z.object({
         status: z.string(),
-        updatedKeys: z.array(z.string()),
-        message: z.string(),
+        updatedKeys: z.array(z.string()).optional(),
+        message: z.string().optional(),
+        reason: z.string().optional(),
+        hint: z.string().optional(),
       }),
     }),
     run_job: tool({
       description: [
-        "Stok Bakiye veya aktif rapor için backend job başlatır ve execution ekranında yeni job'ı seçer (GUID sonuç sayfasına atlama).",
-        "Kullanıcı önerilen bir seçeneği doğrudan çalıştırmak istediğinde veya 'run et' dediğinde zorunlu alanları (kayitTarihi) ve kriterleri belirterek BU ARACI ÇAĞIR.",
+        "Aktif rapor için backend job başlatır ve execution ekranında yeni job'ı seçer (GUID sonuç sayfasına atlama).",
+        "YALNIZ açık çalıştırma fiili varsa çağır: 'raporu çalıştır', 'çalıştır', 'calistir', 'run', 'execute', 'job başlat'.",
+        "'hazırla' / 'göster' / 'getir' veya yalnız tarih/durum slotu (örn: 'geçen hafta') YETERLİ DEĞİLDİR — job başlatma; öneri sun.",
       ].join(" "),
       inputSchema: z.object({
         report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
@@ -159,6 +169,12 @@ export const STATIC_TOOLS = {
           status: z.literal("validation-error"),
           errors: z.array(z.string()),
           hint: z.string().optional(),
+        }),
+        z.object({
+          status: z.literal("blocked"),
+          reason: z.literal("incomplete-intent"),
+          hint: z.string(),
+          message: z.string().optional(),
         }),
         z.object({ status: z.literal("error"), error: z.string() }),
       ]),

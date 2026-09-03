@@ -372,6 +372,22 @@ export function extractWorkedSteps(
       case "run_job": {
         const report = typeof inputObj.report === "string" ? inputObj.report : "Stock Balance";
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
+        const outStatus =
+          info.output && typeof info.output === "object"
+            ? (info.output as { status?: string }).status
+            : undefined;
+        if (outStatus === "blocked") {
+          pushStep({
+            id: info.toolCallId,
+            kind: "explored",
+            label: "Skipped job: incomplete intent",
+            subLabel: "Waiting for explicit run or criteria confirmation",
+            isLive: isPending,
+            isError,
+            info,
+          });
+          break;
+        }
         pushStep({
           id: info.toolCallId,
           kind: "ran",
@@ -385,6 +401,22 @@ export function extractWorkedSteps(
       }
       case "apply_criteria": {
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
+        const outStatus =
+          info.output && typeof info.output === "object"
+            ? (info.output as { status?: string }).status
+            : undefined;
+        if (outStatus === "blocked") {
+          pushStep({
+            id: info.toolCallId,
+            kind: "explored",
+            label: "Skipped criteria apply: incomplete intent",
+            subLabel: "Waiting for confirmation (forma doldur / uygula)",
+            isLive: isPending,
+            isError,
+            info,
+          });
+          break;
+        }
         pushStep({
           id: info.toolCallId,
           kind: "edited",

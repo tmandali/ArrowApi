@@ -157,6 +157,7 @@ function isFailedToolInfo(info: {
   return (
     out?.status === "error" ||
     out?.status === "validation-error" ||
+    out?.status === "blocked" ||
     Boolean(out?.error)
   )
 }
@@ -802,7 +803,7 @@ export function AIChatPanel({
                 <div className="space-y-1.5">
                   <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
                   <p className="text-sm text-muted-foreground">
-                    Yula, eski Türkçede yol gösteren ışık demektir. Size yardımcı olmak için burada.
+                    Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada
                   </p>
                   {dateLabel ? (
                     <p className="text-xs text-muted-foreground/70">{dateLabel}</p>

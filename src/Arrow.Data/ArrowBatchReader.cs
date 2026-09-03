@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 namespace Arrow.Data;
 
 /// <summary>Columnar batch kaynağı — Arrow IPC stream veya <see cref="DbDataReader"/>.</summary>
-public sealed class ArrowBatchReader : IAsyncDisposable
+public sealed class ArrowBatchReader : IAsyncEnumerable<RecordBatch>, IAsyncDisposable
 {
     private readonly ArrowDataReader? _arrowReader;
     private readonly DbDataReader? _dbReader;
@@ -82,6 +82,10 @@ public sealed class ArrowBatchReader : IAsyncDisposable
         CancellationToken cancellationToken = default,
         ILogger? logger = null) =>
         ReadBatchesCore(cancellationToken, logger);
+
+    /// <summary>Akış için asenkron numaralandırıcı döner. <c>await foreach (var batch in arrowReader)</c> kullanımını destekler.</summary>
+    public IAsyncEnumerator<RecordBatch> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
+        ReadBatchesAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
 
     /// <summary>
     /// Sonraki <see cref="RecordBatch"/>'i döndürür.

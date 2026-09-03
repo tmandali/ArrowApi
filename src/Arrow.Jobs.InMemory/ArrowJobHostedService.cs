@@ -244,13 +244,13 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
         {
             using var reader = dataTable.CreateDataReader();
             await using var arrowReader = ArrowData.OpenArrowReader(reader);
-            await foreach (RecordBatch b in arrowReader.ReadBatchesAsync(cancellationToken))
+            await foreach (RecordBatch b in arrowReader.WithCancellation(cancellationToken))
                 yield return b;
         }
         else if (response is System.Data.Common.DbDataReader dbReader)
         {
             await using var arrowReader = ArrowData.OpenArrowReader(dbReader);
-            await foreach (RecordBatch b in arrowReader.ReadBatchesAsync(cancellationToken))
+            await foreach (RecordBatch b in arrowReader.WithCancellation(cancellationToken))
                 yield return b;
         }
         else if (response is not null)

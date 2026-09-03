@@ -242,6 +242,16 @@ export const STOCK_WORKSPACE_MENU_ITEMS: WorkspaceMenuItem[] = [
     keywords: ["analiz", "stok analizi", "trend", "grafik", "stok devir hızı"],
   },
   {
+    id: "stock_retail_sales_report",
+    title: "Retail Sales Report",
+    titleTr: "Perakende Satış Raporu",
+    url: "/stock/retail-sales-report",
+    category: "Raporlar",
+    workspace: "stock",
+    description: "Perakende satışların tarih, mağaza, ürün ve tutar bazlı analizini yapar. Günlük, haftalık veya aylık satış trendlerini gösterir.",
+    keywords: ["perakende satış", "satış raporu", "mağaza satış", "retail sales"],
+  },
+  {
     id: "stock_projected_qty",
     title: "Stock Projected Qty",
     titleTr: "Gelecek / Tahmini Stok Miktarı",

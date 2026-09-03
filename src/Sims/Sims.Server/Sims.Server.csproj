@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Arrow.Jobs.Abstractions\Arrow.Jobs.Abstractions.csproj" />
     <ProjectReference Include="..\..\Arrow.Jobs.AspNetCore\Arrow.Jobs.AspNetCore.csproj" />
     <ProjectReference Include="..\yula.client\yula.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
@@ -17,11 +18,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.79" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>10.*-*</Version>
     </PackageReference>
     <!-- StockBalance/StockAnalytics servisleri ve endpoint'leri doğrudan kullanıyor -->
     <PackageReference Include="Apache.Arrow" Version="23.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
   </ItemGroup>
 
 </Project>

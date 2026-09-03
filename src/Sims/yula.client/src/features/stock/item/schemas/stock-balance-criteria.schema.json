@@ -33,10 +33,10 @@
     ],
     "directive": "Kullanıcı tarih belirtmediğinde dünün tarihini varsayılan yap ve kullanıcıya 'geçen hafta' veya 'bugün' seçeneklerini önererek bilgilendir.",
     "quickPrompts": [
-      "Dün itibarıyla hazırla",
-      "Geçen haftanın iptallerini göster",
-      "50.000 TL üzeri stoklar",
-      "Sadece AKTIF kayıtlar"
+      "Dünün tarihini öner",
+      "Geçen haftayı öner",
+      "Sadece AKTIF kayıtlar",
+      "Raporu çalıştır"
     ],
     "resultsPrompts": [
       "🚨 Anomali & Risk Analizi",

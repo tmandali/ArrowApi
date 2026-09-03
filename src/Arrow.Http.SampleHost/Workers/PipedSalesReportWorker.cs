@@ -33,7 +33,7 @@ public sealed class PipedSalesReportWorker : IArrowJobWorker<PipedSalesReportReq
         await using DbDataReader dbReader = table.CreateDataReader();
         await using ArrowBatchReader arrowReader = dbReader.OpenArrowReader();
 
-        IAsyncEnumerable<RecordBatch> sourceStream = arrowReader.ReadBatchesAsync(cancellationToken);
+        IAsyncEnumerable<RecordBatch> sourceStream = arrowReader;
 
         // 2. Paket akışını Pipe (boru hattı) ile 'export-report' alt worker'ına aktar (Aynı Scope & DbContext):
         await foreach (RecordBatch reportBatch in _context.PipeToAsync("export-report", new ExportReportRequest(request.Region), sourceStream, cancellationToken))

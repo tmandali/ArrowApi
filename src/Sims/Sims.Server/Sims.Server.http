@@ -1,6 +1,18 @@
 @Sims.Server_HostAddress = http://localhost:5168
 @ArrowMediaType = application/vnd.apache.arrow.stream
 
+
+### 1. Create Retail Sales Report job
+# @name createRetailSalesReport 
+POST {{Sims.Server_HostAddress}}/api/arrow/jobs/retail-sales-report
+Content-Type: application/json
+
+{
+  "basTarih": "2025-01-01",
+  "bitTarih": "2025-02-01"
+}
+
+
 ### 1. Create Stock Analytics job
 # @name createStockAnalytics
 POST {{Sims.Server_HostAddress}}/api/arrow/jobs/stock-analytics

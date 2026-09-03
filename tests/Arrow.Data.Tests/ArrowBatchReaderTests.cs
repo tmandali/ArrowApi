@@ -9,6 +9,32 @@ namespace Arrow.Data.Tests;
 public class ArrowBatchReaderTests
 {
     [Fact]
+    public async Task ArrowBatchReader_supports_await_foreach_enumeration()
+    {
+        using DataTable table = new();
+        table.Columns.Add("Id", typeof(int));
+        table.Rows.Add(1);
+        table.Rows.Add(2);
+        table.Rows.Add(3);
+        await using DbDataReader dbReader = table.CreateDataReader();
+
+        await using ArrowBatchReader reader = ArrowData.OpenArrowReader(
+            dbReader,
+            new ArrowConversionOptions { BatchSize = 2 });
+
+        int totalBatches = 0;
+        int totalRows = 0;
+
+        await foreach (RecordBatch batch in reader)
+        {
+            totalBatches++;
+            totalRows += batch.Length;
+        }
+
+        Assert.Equal(2, totalBatches);
+        Assert.Equal(3, totalRows);
+    }
+    [Fact]
     public async Task ReadNextBatchAsync_reads_ipc_stream_batch_by_batch()
     {
         Schema schema = new([new Field("n", Int32Type.Default, nullable: false)], []);

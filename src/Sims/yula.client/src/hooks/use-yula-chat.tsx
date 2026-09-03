@@ -11,6 +11,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { CircleAlert, RotateCw } from "lucide-react";
 import { executeClientTool, resetGridCustomView } from "@/lib/yula-client-tools";
 import {
+  blockedIncompleteIntent,
+  hasExplicitCriteriaApplyIntent,
+  hasExplicitReportRunIntent,
+} from "@/lib/report-run-intent";
+import {
   isWorkspaceHomePath,
   normalizePath,
   workspaceIdFromPath,
@@ -145,9 +150,25 @@ export function isFailedToolInfo(info: YulaToolPartInfo): boolean {
   if (info.state === "output-error") return true;
   if (info.state === "output-available" && info.output && typeof info.output === "object") {
     const status = (info.output as { status?: string }).status;
-    if (status === "error" || status === "validation-error") return true;
+    if (
+      status === "error" ||
+      status === "validation-error" ||
+      status === "blocked"
+    ) {
+      return true;
+    }
   }
   return false;
+}
+
+/** Son kullanıcı mesajının birleşik metin içeriği (niyet kapısı için). */
+function lastUserTextFromMessages(messages: YulaMessage[]): string {
+  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  if (!lastUser) return "";
+  return lastUser.parts
+    .map((p) => (p.type === "text" ? ((p as { text?: string }).text ?? "") : ""))
+    .join("\n")
+    .trim();
 }
 
 function isFinalToolState(state: string): boolean {
@@ -658,23 +679,39 @@ function ChatInstance({
       let output: unknown;
       let errorText: string | undefined;
       try {
-        const timeoutMs =
-          part.toolName === "profile_grid_table" ||
-          part.toolName === "run_expert_sql"
-            ? 45_000
-            : 25_000;
-        output = await Promise.race([
-          executeClientTool(part.toolName, part.input),
-          new Promise<never>((_, reject) => {
-            window.setTimeout(() => {
-              reject(
-                new Error(
-                  `${part.toolName} ${Math.round(timeoutMs / 1000)} sn içinde bitmedi. Tablo yükleniyor veya DuckDB meşgul olabilir — Durdur'a basıp birkaç saniye sonra tekrar deneyin.`,
-                ),
-              );
-            }, timeoutMs);
-          }),
-        ]);
+        const userText = lastUserTextFromMessages(chat.messages);
+        const gatedRun =
+          (part.toolName === "run_job" || part.toolName === "run_report") &&
+          !hasExplicitReportRunIntent(userText);
+        const gatedApply =
+          part.toolName === "apply_criteria" &&
+          !hasExplicitCriteriaApplyIntent(userText);
+
+        if (gatedRun) {
+          output = blockedIncompleteIntent(
+            part.toolName === "run_report" ? "run_report" : "run_job",
+          );
+        } else if (gatedApply) {
+          output = blockedIncompleteIntent("apply_criteria");
+        } else {
+          const timeoutMs =
+            part.toolName === "profile_grid_table" ||
+            part.toolName === "run_expert_sql"
+              ? 45_000
+              : 25_000;
+          output = await Promise.race([
+            executeClientTool(part.toolName, part.input),
+            new Promise<never>((_, reject) => {
+              window.setTimeout(() => {
+                reject(
+                  new Error(
+                    `${part.toolName} ${Math.round(timeoutMs / 1000)} sn içinde bitmedi. Tablo yükleniyor veya DuckDB meşgul olabilir — Durdur'a basıp birkaç saniye sonra tekrar deneyin.`,
+                  ),
+                );
+              }, timeoutMs);
+            }),
+          ]);
+        }
       } catch (err) {
         console.warn("[Yula exec] araç yürütme hatası:", part.toolName, err);
         output = undefined;

@@ -12,6 +12,7 @@ builder.Services.AddArrowApi(arrow =>
     // (büyük raporlarda bellek sabit kalır). Global singleton kayıt: bir kez yeterlidir.
     arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", c => c.UseFileStore("arrow-jobs"));
     arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseFileStore("arrow-jobs"));
+    arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", c => c.UseFileStore("arrow-jobs"));
 });
 builder.Services.AddCors(options =>
 {
@@ -40,6 +41,7 @@ app.UseArrowApi("/api/arrow/jobs", jobs =>
     // Her Çalıştır yeni GUID üretir; tamamlanmış iş 409 ile yeniden açılmaz.
     jobs.MapJob("stock-analytics");
     jobs.MapJob("stock-balance");
+    jobs.MapJob("retail-sales-report");
 });
 
 app.MapStockAnalyticsEndpoints();
