@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
+import { useWorkspaceLastPageStore } from "@/lib/stores/workspace-last-page"
 import type { WorkspaceId } from "@/lib/workspace-nav"
 import { cn } from "@/utils/cn"
 
@@ -36,6 +37,7 @@ const railWorkspaces: RailWorkspace[] = [
 export function WorkspaceIconRail({ className }: { className?: string }) {
   const router = useRouter()
   const activeWorkspaceId = useActiveWorkspaceId()
+  const lastPathById = useWorkspaceLastPageStore((s) => s.lastPathById)
 
   return (
     <TooltipProvider>
@@ -72,7 +74,9 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => {
                     if (!isActive && workspace.url) {
-                      router.push(workspace.url)
+                      // Workspace'te son işlem yapılan sayfa; kayıt yoksa kök
+                      const last = lastPathById[workspace.id]
+                      router.push(last ?? workspace.url)
                     }
                   }}
                   className={cn(

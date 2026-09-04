@@ -5,6 +5,7 @@ import { FilePlus2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
+import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { ArrowJobResultPanel } from "@/features/jobs/components/ArrowJobResultPanel"
@@ -50,13 +51,15 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
       </WorkspacePageHeader>
 
       <WorkspaceAiDock className="overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pb-2 pt-0">
-          <ArrowJobResultPanel
-            jobId={jobId}
-            title={DEFAULT_REPORT_TITLE}
-            className="min-h-0 flex-1"
-          />
-        </div>
+        <ModuleNavPane>
+          <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
+            <ArrowJobResultPanel
+              jobId={jobId}
+              title={DEFAULT_REPORT_TITLE}
+              className="min-h-0 flex-1"
+            />
+          </div>
+        </ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

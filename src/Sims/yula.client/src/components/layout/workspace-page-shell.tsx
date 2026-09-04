@@ -1,10 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react"
+import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
-import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view"
-import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { cn } from "@/utils/cn"
 
 type WorkspacePageShellProps = {
@@ -30,7 +29,8 @@ type WorkspacePageShellProps = {
 /**
  * Shared workspace page scaffold: floating header (page title + actions +
  * search) followed by the Yula-aware AI dock around the page body.
- * When workspace search is open, main content switches to WorkspaceSearchMainView.
+ * Workspace search'in ana görünüme dönüşmesi WorkspaceAiDock içinde merkezden
+ * yürütülür — bu shell'i kullanmayan ekranlarda da search çalışır.
  */
 export function WorkspacePageShell({
   title,
@@ -44,8 +44,6 @@ export function WorkspacePageShell({
   className,
   contentClassName,
 }: WorkspacePageShellProps) {
-  const { open } = useWorkspaceSearch()
-
   return (
     <div
       className={cn(
@@ -65,7 +63,7 @@ export function WorkspacePageShell({
         </WorkspacePageHeader>
       )}
       <WorkspaceAiDock className={contentClassName}>
-        {open ? <WorkspaceSearchMainView /> : children}
+        <ModuleNavPane>{children}</ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

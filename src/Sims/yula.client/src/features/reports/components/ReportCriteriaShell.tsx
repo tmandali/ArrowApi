@@ -11,7 +11,9 @@ import {
   pageHeaderShellClass,
 } from "@/components/layout/panel-chrome"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
+import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import type { ArrowJobStatus } from "@/features/jobs"
 import {
   assertSafeApiJobEndpoint,
@@ -123,6 +125,9 @@ export function ReportCriteriaShell({
   const [listErrorBanner, setListErrorBanner] = React.useState<string | null>(
     null
   )
+  // Workspace search açıkken floating header gizlenir — arama görünümü
+  // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
+  const { open: searchOpen } = useWorkspaceSearch()
   const handleListError = React.useCallback((message: string | null) => {
     setListErrorBanner(message)
   }, [])
@@ -207,40 +212,42 @@ export function ReportCriteriaShell({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className={pageHeaderShellClass}>
-      <header
-        className={cn(
-          pageHeaderCardClass,
-          "justify-between gap-1.5 sm:gap-2"
-        )}
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
-          <PagePanelTrigger
-            className="-ml-1 shrink-0"
-            separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
-          />
-          <PageHeaderTitle>{title}</PageHeaderTitle>
-        </div>
+      {searchOpen ? null : (
+        <div className={pageHeaderShellClass}>
+        <header
+          className={cn(
+            pageHeaderCardClass,
+            "justify-between gap-1.5 sm:gap-2"
+          )}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
+            <PagePanelTrigger
+              className="-ml-1 shrink-0"
+              separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
+            />
+            <PageHeaderTitle>{title}</PageHeaderTitle>
+          </div>
 
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 px-2.5 text-xs"
-            onClick={() => onStartNewReport?.()}
-            title="New report"
-            aria-label="New report"
-          >
-            <FilePlus2 className="size-3.5" />
-            New
-          </Button>
-          <AIChatAssistant />
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={() => onStartNewReport?.()}
+              title="New report"
+              aria-label="New report"
+            >
+              <FilePlus2 className="size-3.5" />
+              New
+            </Button>
+            <AIChatAssistant />
+          </div>
+        </header>
         </div>
-      </header>
-      </div>
+      )}
 
-      {listErrorBanner ? (
+      {!searchOpen && listErrorBanner ? (
         <WorkspaceBanner
           tone="error"
           onDismiss={() => setListErrorBanner(null)}
@@ -249,7 +256,7 @@ export function ReportCriteriaShell({
         </WorkspaceBanner>
       ) : null}
 
-      {criteriaBanner ? (
+      {!searchOpen && criteriaBanner ? (
         <WorkspaceBanner
           tone={criteriaBanner.tone === "error" ? "error" : "success"}
           href={criteriaBanner.href}
@@ -262,11 +269,13 @@ export function ReportCriteriaShell({
       <WorkspaceAiDock
         className={cn("overflow-hidden", "max-md:overflow-y-auto")}
       >
-        {renderFilter(setCriteriaHandle, {
-          onRun: () => void handleCriteriaSubmit(),
-          runDisabled: submittingCriteria,
-          onListError: handleListError,
-        })}
+        <ModuleNavPane>
+          {renderFilter(setCriteriaHandle, {
+            onRun: () => void handleCriteriaSubmit(),
+            runDisabled: submittingCriteria,
+            onListError: handleListError,
+          })}
+        </ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

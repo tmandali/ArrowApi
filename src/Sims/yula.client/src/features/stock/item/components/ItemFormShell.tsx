@@ -41,14 +41,11 @@ import {
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
-import {
-  pageContentGutterClass,
-  pageHeaderCardClass,
-  pageHeaderShellClass,
-  panelCardClass,
-} from "@/components/layout/panel-chrome"
+import { pageHeaderCardClass, pageHeaderShellClass, panelCardClass } from "@/components/layout/panel-chrome";
+import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
 import { printStockItemReport } from "../services/print-stock-report"
@@ -142,9 +139,13 @@ export function ItemFormShell({
     { id: "2", name: "lcw-seyahat-cantasi-spec.pdf" },
   ])
   const attachmentInputRef = React.useRef<HTMLInputElement>(null)
+  // Workspace search açıkken floating header gizlenir — arama görünümü
+  // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
+  const { open: searchOpen } = useWorkspaceSearch()
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      {searchOpen ? null : (
       <div className={pageHeaderShellClass}>
       <header
         className={cn(
@@ -259,8 +260,9 @@ export function ItemFormShell({
         </div>
       </header>
       </div>
+      )}
 
-      {showBanner && !isLedgerVariant ? (
+      {!searchOpen && showBanner && !isLedgerVariant ? (
         <WorkspaceBanner tone="info" onDismiss={() => setShowBanner(false)}>
           This Item is a Variant of{" "}
           <span className="font-semibold underline underline-offset-2">
@@ -276,9 +278,9 @@ export function ItemFormShell({
           isLedgerVariant && "max-md:overflow-y-auto"
         )}
       >
+        <ModuleNavPane>
         <div
           className={cn(
-            pageContentGutterClass,
             "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           )}
         >
@@ -633,6 +635,7 @@ export function ItemFormShell({
         </Tabs>
         </div>
         </div>
+        </ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

@@ -108,7 +108,7 @@ export const StockAnalyticsFilter = React.forwardRef<
   return (
     <div
       className={cn(
-        "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden px-2 pb-2 pt-0",
+        "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden",
         className
       )}
     >

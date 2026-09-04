@@ -3,9 +3,10 @@
 import * as React from "react"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
+import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
-import { panelCardClass, pageContentGutterClass } from "@/components/layout/panel-chrome"
+import { panelCardClass } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -276,9 +277,9 @@ export function MySettingsForm() {
       </WorkspacePageHeader>
 
       <WorkspaceAiDock>
+        <ModuleNavPane>
         <div
           className={cn(
-            pageContentGutterClass,
             "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           )}
         >
@@ -981,6 +982,7 @@ export function MySettingsForm() {
             </Tabs>
           </div>
         </div>
+        </ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

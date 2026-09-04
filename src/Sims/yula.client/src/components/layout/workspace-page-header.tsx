@@ -8,6 +8,7 @@ import {
 } from "@/components/layout/panel-chrome"
 import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { cn } from "@/utils/cn"
 
 type WorkspacePageHeaderProps = {
@@ -38,6 +39,11 @@ export function WorkspacePageHeader({
   searchPlaceholder,
   headerSearch,
 }: WorkspacePageHeaderProps) {
+  // Workspace search açıkken floating header gizlenir — arama görünümü
+  // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
+  const { open: searchOpen } = useWorkspaceSearch()
+  if (searchOpen) return null
+
   return (
     <div className={cn(pageHeaderShellClass, shellClassName)}>
       <header className={cn(pageHeaderCardClass, className)}>

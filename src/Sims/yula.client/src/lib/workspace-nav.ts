@@ -342,6 +342,16 @@ export const workspaceNavById: Record<WorkspaceId, WorkspaceNavItem[]> = {
   manufacturing: manufacturingNav,
 }
 
+/** Modül adları — AppHeader marka satırı ve benzeri yerler için. */
+export const workspaceNameById: Record<WorkspaceId, string> = {
+  system: "System",
+  subcontracting: "Subcontracting",
+  selling: "Selling",
+  accounting: "Accounting",
+  stock: "Stock",
+  manufacturing: "Manufacturing",
+}
+
 export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
   if (
     pathname === "/" ||
