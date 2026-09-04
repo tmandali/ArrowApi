@@ -24,6 +24,11 @@ type WorkspacePageHeaderProps = {
   searchPlaceholder?: string
   /** Custom header search node (e.g. YulaHeaderSearch). */
   headerSearch?: ReactNode
+  /**
+   * Çerçevesiz/transparan header — kart görünümü, başlık, search ve actions
+   * atlanır; yalnızca menü aç/kapa (PagePanelTrigger) render edilir.
+   */
+  frameless?: boolean
 }
 
 /**
@@ -38,11 +43,22 @@ export function WorkspacePageHeader({
   showSearch = true,
   searchPlaceholder,
   headerSearch,
+  frameless = false,
 }: WorkspacePageHeaderProps) {
   // Workspace search açıkken floating header gizlenir — arama görünümü
   // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
   const { open: searchOpen } = useWorkspaceSearch()
   if (searchOpen) return null
+
+  if (frameless) {
+    return (
+      <div className={cn(pageHeaderShellClass, shellClassName)}>
+        <header className={cn("flex w-full min-w-0 items-center", className)}>
+          <PagePanelTrigger className="-ml-1" />
+        </header>
+      </div>
+    )
+  }
 
   return (
     <div className={cn(pageHeaderShellClass, shellClassName)}>
