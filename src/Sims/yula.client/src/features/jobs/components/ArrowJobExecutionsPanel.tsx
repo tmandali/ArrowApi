@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { usePersistedPanelLayout } from "@/lib/use-persisted-panel-layout"
 import {
   Ban,
   CircleCheck,
@@ -44,7 +45,6 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { usePagePanel } from "@/hooks/use-page-panel"
 import {
   panelCardClass,
   panelHeaderActionClass,
@@ -298,11 +298,10 @@ export function ArrowJobExecutionsPanel({
   const showCriteriaSlot = detailSlot != null
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
   // Header butonunun (PagePanelTrigger) hedefi — Executions kolonu açık/kapalı.
-  const { open: executionsOpen } = usePagePanel({
-    id: "executions",
-    title: "Executions",
-    defaultOpen: true,
-  })
+  // Resize düzenini oturumlar arası koru (localStorage) — criteria/detail oranları.
+  const { groupRef, onLayoutChanged } = usePersistedPanelLayout(
+    "arrow-jobs-executions"
+  )
   const [loading, setLoading] = React.useState(true)
   const [detailLoading, setDetailLoading] = React.useState(false)
   const [cancelling, setCancelling] = React.useState(false)
@@ -849,12 +848,17 @@ export function ArrowJobExecutionsPanel({
       </WorkspaceBanner>
     ) : null}
     <ResizablePanelGroup
-      key={executionsOpen ? "split" : "full"}
       orientation="horizontal"
+      groupRef={groupRef}
+      onLayoutChanged={onLayoutChanged}
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
-      {executionsOpen ? (
-        <ResizablePanel defaultSize="38%" minSize="18%" className="min-h-0 min-w-0">
+      <ResizablePanel
+        id="executions-criteria"
+        defaultSize="38%"
+        minSize="18%"
+        className="min-h-0 min-w-0"
+      >
         <section className={cn(panelCardClass, "h-full")}>
             <div className={panelHeaderClass}>
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -994,16 +998,11 @@ export function ArrowJobExecutionsPanel({
           </ScrollArea>
         </section>
       </ResizablePanel>
-      ) : null}
-      {executionsOpen ? (
-        <ResizableHandle
-          withHandle
-          className={panelResizeHandleClass}
-        />
-      ) : null}
+      <ResizableHandle withHandle className={panelResizeHandleClass} />
 
       <ResizablePanel
-        defaultSize={executionsOpen ? "62%" : "100%"}
+        id="executions-detail"
+        defaultSize="62%"
         minSize="30%"
         className="min-h-0 min-w-0"
       >

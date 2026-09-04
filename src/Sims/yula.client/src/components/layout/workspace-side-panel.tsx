@@ -16,6 +16,7 @@ import {
   panelResizeHandleClass,
   panelShellClass,
 } from "@/components/layout/panel-chrome"
+import { usePersistedPanelLayout } from "@/lib/use-persisted-panel-layout"
 import { cn } from "@/utils/cn"
 
 /** Shared dock width — Query Criteria and workspace AI use the same proportion. */
@@ -54,6 +55,12 @@ type WorkspaceSidePanelLayoutProps = {
   sideDockAllowed?: boolean
   /** Allow dragging below min size to snap-collapse the panel. Defaults to false. */
   collapsible?: boolean
+  /**
+   * Persisted-layout group id: kullanıcının sürüklediği panel genişlikleri
+   * bu kimlikle localStorage'a kaydedilir ve sonraki açılışta geri yüklenir.
+   * Split (panel açık) ve full (panel kapalı) yapıları ayrı anahtar tutulur.
+   */
+  layoutId?: string
 }
 
 function SidePanelHeader({
@@ -111,9 +118,17 @@ export function WorkspaceSidePanelLayout({
   headerClassName,
   sideDockAllowed = true,
   collapsible = false,
+  layoutId,
 }: WorkspaceSidePanelLayoutProps) {
   const mainDefault = 100 - defaultSizePercent
   const panelMinSize = minSizePercent ?? defaultSizePercent
+
+  // Resize düzenlerini oturumlar arası koru (localStorage). Split/full
+  // yapıları ayrı anahtarda tutulur ki panel kapalıyken oluşan 100% düzeni
+  // kullanıcının kaydettiği split oranını ezmesin.
+  const { groupRef, onLayoutChanged } = usePersistedPanelLayout(
+    `${layoutId ?? "workspace-side-panel"}:${open ? "split" : "full"}`
+  )
   const resolvedCollapseLabel =
     collapseLabel ??
     (typeof title === "string" ? `Collapse ${title}` : "Collapse panel")
@@ -156,9 +171,12 @@ export function WorkspaceSidePanelLayout({
     <ResizablePanelGroup
       key={open ? "split" : "full"}
       orientation="horizontal"
+      groupRef={groupRef}
+      onLayoutChanged={onLayoutChanged}
       className={cn("h-full min-h-0 w-full", className)}
     >
       <ResizablePanel
+        id="side-main"
         defaultSize={open ? String(mainDefault) : "100"}
         minSize={String(mainMinSizePercent)}
         className="min-h-0"
@@ -179,6 +197,7 @@ export function WorkspaceSidePanelLayout({
       ) : null}
       {open ? (
         <ResizablePanel
+          id="side-panel"
           defaultSize={String(defaultSizePercent)}
           minSize={String(panelMinSize)}
           maxSize={String(maxSizePercent)}

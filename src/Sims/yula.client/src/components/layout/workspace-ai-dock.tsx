@@ -15,7 +15,9 @@ import {
   panelHeaderClass,
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
+import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
+import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useYulaChatOrNull } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { cn } from "@/utils/cn"
@@ -164,8 +166,13 @@ export function WorkspaceAiDock({
 }: WorkspaceAiDockProps) {
   const { open, setOpen, expanded, setExpanded, sideDockAllowed } =
     useWorkspaceAiChat()
+  const { open: searchOpen } = useWorkspaceSearch()
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname)
+
+  // Workspace search açıkken dock içeriği ana arama görünümüne döner —
+  // hangi ekran AiDock kullanıyorsa search her ekranda çalışır.
+  const content = searchOpen ? <WorkspaceSearchMainView /> : children
 
   const mountedRef = React.useRef(false)
   React.useEffect(() => {
@@ -180,7 +187,9 @@ export function WorkspaceAiDock({
     }
   }, [defaultOpen, startExpanded, setOpen, setExpanded])
 
-  if (isHomePage || !open) {
+  // Search açıkken Yula paneli de gizlenir — arama görünümü tüm alanı kaplar
+  // (ana ekran davranışı); panel search kapanınca yeniden belirir.
+  if (isHomePage || !open || searchOpen) {
     return (
       <div
         className={cn(
@@ -188,7 +197,7 @@ export function WorkspaceAiDock({
           className
         )}
       >
-        {children}
+        {content}
       </div>
     )
   }
@@ -253,13 +262,14 @@ export function WorkspaceAiDock({
       }
       panel={<AIChatPanel centeredIntro={centeredIntro} />}
       defaultSizePercent={32}
-      minSizePercent={32}
-      maxSizePercent={50}
+      minSizePercent={20}
+      maxSizePercent={60}
       mainMinSizePercent={40}
+      layoutId="yula-dock"
       mainClassName="overflow-y-auto overscroll-contain"
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
-      {children}
+      {content}
     </WorkspaceSidePanelLayout>
   )
 }
