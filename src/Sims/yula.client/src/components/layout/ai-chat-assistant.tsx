@@ -34,7 +34,6 @@ import {
   ArrowUp,
   FileCode,
   FileText,
-  Paperclip,
   Plus,
   Square,
   X,
@@ -706,18 +705,6 @@ export function AIChatPanel({
             >
               <Plus className="size-3.5" />
             </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="size-7 rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Dosya ekle"
-              title="Dosya ekle"
-            >
-              <Paperclip className="size-3.5" />
-            </Button>
-
             <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0 self-center" aria-hidden="true" />
 
             <YulaModelSelector />
