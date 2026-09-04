@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockLedgerForm } from "@/features/stock/item";
+import { StockLedgerForm } from "@/features/stock/stock-ledger";
 
 export default function StockLedgerPage() {
   return (

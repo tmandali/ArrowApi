@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockBalanceJobView } from "@/features/stock/item";
+import { StockBalanceJobView } from "@/features/stock/stock-balance";
 
 export default async function StockBalanceJobPage({
   params,

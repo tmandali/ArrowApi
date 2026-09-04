@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockBalanceForm } from "@/features/stock/item";
+import { StockBalanceForm } from "@/features/stock/stock-balance";
 
 export default function StockBalancePage() {
   return (

@@ -1,11 +1,11 @@
 "use client";
 
-import { StockModuleShell } from "./StockModuleShell"
+import { ItemFormShell } from "@/features/stock/item"
 
 export function StockLedgerForm() {
   return (
-    <StockModuleShell
-      mode="stock-ledger"
+    <ItemFormShell
+      variant="ledger"
       tabs={["tax"]}
       defaultTab="tax"
       tabLabels={{

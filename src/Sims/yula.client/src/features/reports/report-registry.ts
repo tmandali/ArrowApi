@@ -1,7 +1,7 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
-import stockBalanceSchema from "@/features/stock/item/schemas/stock-balance-criteria.schema.json";
-import stockAnalyticsSchema from "@/features/stock/item/schemas/stock-analytics-criteria.schema.json";
-import retailSalesSchema from "@/features/stock/item/schemas/retail-sales-criteria.schema.json";
+import stockBalanceSchema from "@/features/stock/stock-balance/schemas/stock-balance-criteria.schema.json";
+import stockAnalyticsSchema from "@/features/stock/stock-analytics/schemas/stock-analytics-criteria.schema.json";
+import retailSalesSchema from "@/features/stock/retail-sales-report/schemas/retail-sales-criteria.schema.json";
 
 export interface YulaReportMeta {
   scope: string;

@@ -13,7 +13,7 @@ import {
   VirtualSpreadsheet,
   cellInputClass,
   cellClass,
-} from "./VirtualSpreadsheet"
+} from "@/features/jobs/components/VirtualSpreadsheet"
 import type {
   RetailSalesColumn,
   RetailSalesGridRow,

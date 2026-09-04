@@ -9,6 +9,8 @@ import type {
   ArrowJobStatusList,
   ReportColumn,
   ReportGridRow,
+} from "@/features/jobs"
+import type {
   StockAnalyticsArrowReport,
   StockAnalyticsRequest,
 } from "../types/stock-analytics"

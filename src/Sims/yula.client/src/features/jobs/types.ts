@@ -36,3 +36,21 @@ export type ArrowJobHubMessage = {
   eventName: string
   payload: ArrowJobEvent
 }
+
+export type ReportColumn = {
+  name: string
+  label: string
+  type: string
+  kind: "account" | "money" | "meta"
+  align: "left" | "right"
+}
+
+export type ReportGridRow = {
+  id: string
+  parentId: string | null
+  name: string
+  level: number
+  isGroup: boolean
+  values: Record<string, string>
+  children?: ReportGridRow[]
+}

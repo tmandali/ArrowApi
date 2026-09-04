@@ -18,7 +18,7 @@ import {
   cellInputClass,
   cellClass,
   type SpreadsheetColumn,
-} from "@/features/stock/item/components/VirtualSpreadsheet"
+} from "./VirtualSpreadsheet"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 

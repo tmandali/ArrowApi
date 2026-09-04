@@ -1,34 +1,5 @@
-export { StockModuleShell } from "./components/StockModuleShell"
-export type { StockModuleTab } from "./components/StockModuleShell"
+export { ItemFormShell } from "./components/ItemFormShell"
+export type { ItemFormTab } from "./components/ItemFormShell"
 export { ItemImageUpload } from "./components/ItemImageUpload"
 export { ItemTaxTab } from "./components/ItemTaxTab"
-export { StockAnalyticsForm } from "./components/StockAnalyticsForm"
-export { StockAnalyticsFilter } from "./components/StockAnalyticsFilter"
-export type { StockAnalyticsJobSession } from "./components/StockAnalyticsFilter"
-export { StockAnalyticsJobView } from "./components/StockAnalyticsJobView"
-export { StockAnalyticsResultGrid } from "./components/StockAnalyticsResultGrid"
-export type { StockAnalyticsResultGridHandle } from "./components/StockAnalyticsResultGrid"
-export { StockLedgerForm } from "./components/StockLedgerForm"
-export { StockBalanceForm } from "./components/StockBalanceForm"
-export { StockBalanceFilter } from "./components/StockBalanceFilter"
-export type { StockBalanceJobSession } from "./components/StockBalanceFilter"
-export { StockBalanceJobView } from "./components/StockBalanceJobView"
-export { StockBalanceResultGrid } from "./components/StockBalanceResultGrid"
-export { RetailSalesForm } from "./components/RetailSalesForm"
-export { RetailSalesFilter } from "./components/RetailSalesFilter"
-export type { RetailSalesJobSession } from "./components/RetailSalesFilter"
-export { RetailSalesJobView } from "./components/RetailSalesJobView"
-export { RetailSalesResultGrid } from "./components/RetailSalesResultGrid"
-export { stockAnalyticsService } from "./services/stock-analytics-service"
-export type {
-  ArrowJobEvent,
-  ArrowJobStatus,
-  ReportColumn,
-  ReportGridRow,
-  StockAnalyticsArrowReport,
-  StockAnalyticsRequest,
-} from "./types/stock-analytics"
-export { default as stockBalanceCriteriaSchema } from "./schemas/stock-balance-criteria.schema.json"
-export { default as stockAnalyticsCriteriaSchema } from "./schemas/stock-analytics-criteria.schema.json"
-export { default as retailSalesCriteriaSchema } from "./schemas/retail-sales-criteria.schema.json"
 export { printStockItemReport } from "./services/print-stock-report"

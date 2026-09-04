@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { RetailSalesJobView } from "@/features/stock/item";
+import { RetailSalesJobView } from "@/features/stock/retail-sales-report";
 
 export default async function RetailSalesJobPage({
   params,

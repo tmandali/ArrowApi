@@ -1,5 +1,5 @@
 /**
- * Rapor çalıştırma otobüsü: kriter ekranı sahibi (örn. StockModuleShell) aktif raporun
+ * Rapor çalıştırma otobüsü: kriter ekranı sahibi (örn. ReportCriteriaShell) aktif raporun
  * "Çalıştır" akışını buraya kaydeder; jenerik run_report aracı bunu tetikler.
  * Böylece rapor başına araç yazmak yerine TEK jenerik araç yeterlidir.
  */

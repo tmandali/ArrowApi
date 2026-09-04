@@ -4,7 +4,10 @@ import * as React from "react"
 import { useArrowJobRunner } from "@/features/jobs"
 import { selectPendingStockBalanceJob } from "@/store/slices/active-jobs-store"
 import type { ArrowJobStatus } from "@/features/jobs"
-import { StockModuleShell } from "./StockModuleShell"
+import { ReportCriteriaShell } from "@/features/reports/components/ReportCriteriaShell"
+import type { JsonSchemaObject } from "@/features/report-criteria"
+import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
+import { StockBalanceFilter } from "./StockBalanceFilter"
 
 const STOCK_BALANCE_PATH = "/stock/stock-balance"
 const STOCK_BALANCE_JOBS = "/api/arrow/jobs/stock-balance"
@@ -66,34 +69,45 @@ export function StockBalanceForm() {
   }, [setComposing, handleSelectJob])
 
   return (
-    <StockModuleShell
+    <ReportCriteriaShell
       mode="stock-balance"
-      tabs={[]}
+      title="Stock Balance"
+      workspaceId="stock"
+      schema={stockBalanceCriteriaSchema as JsonSchemaObject}
+      activeJobId={activeJobId}
+      onJobCreated={handleJobCreated}
       onStartNewReport={() => {
         setComposing(true)
         handleSelectJob(null)
       }}
-      onStockBalanceJobCreated={handleJobCreated}
-      stockBalanceJobSession={{
-        activeJobId,
-        activeLiveStatus,
-        activeRequestJson,
-        activeRunEvents,
-        activeRunPhase,
-        composing,
-        criteriaLocked,
-        pendingJobs,
-        listRefreshToken,
-        onExitCompose: () => setComposing(false),
-        onJobSelect: handleJobSelect,
-        onJobCancelled: handleJobCancelled,
-        onOpenJob: handleNavigateToJob,
-        openJobHref: jobHref,
-        onJobDeleted: handleJobDeleted,
-        onListLoaded: (count) => {
-          if (count === 0) setComposing(true)
-        },
-      }}
+      renderFilter={(filterRef, { onRun, runDisabled, onListError }) => (
+        <StockBalanceFilter
+          ref={filterRef}
+          jobSession={{
+            activeJobId,
+            activeLiveStatus,
+            activeRequestJson,
+            activeRunEvents,
+            activeRunPhase,
+            composing,
+            criteriaLocked,
+            pendingJobs,
+            listRefreshToken,
+            onExitCompose: () => setComposing(false),
+            onJobSelect: handleJobSelect,
+            onJobCancelled: handleJobCancelled,
+            onOpenJob: handleNavigateToJob,
+            openJobHref: jobHref,
+            onJobDeleted: handleJobDeleted,
+            onListLoaded: (count) => {
+              if (count === 0) setComposing(true)
+            },
+            onListError,
+          }}
+          onRun={onRun}
+          runDisabled={runDisabled}
+        />
+      )}
     />
   )
 }

@@ -1,12 +1,19 @@
 import * as React from "react"
-import {
-  streamStockBalanceRows,
-  type StockBalanceArrowReport,
-} from "../services/stock-balance-arrow"
 
-export type UseLazyBatchRowsOptions = {
+export type LazyBatchChunk<Columns, Row> = {
+  columns: Columns[]
+  rows: Row[]
+  totalRows: number | null
+}
+
+export type UseLazyBatchRowsOptions<Columns, Row> = {
   /** Tamamlanmış job'ın Arrow URL'si; `null` iken akış başlatılmaz. */
   jobUrl: string | null
+  /** Raporun Arrow akışını üreten jeneratör (ör. `streamStockBalanceRows`). */
+  streamRows: (
+    jobUrl: string,
+    signal: AbortSignal
+  ) => AsyncGenerator<LazyBatchChunk<Columns, Row>, void, void>
   signal?: AbortSignal
   /** İlk yüklemede çekilecek chunk (batch) sayısı. */
   initialChunks?: number
@@ -17,25 +24,27 @@ export type UseLazyBatchRowsOptions = {
  * Tamamlanmış job'ın Arrow akışını C#'taki `async foreach` gibi **lazy** tüketir:
  * yalnızca `loadMore()` çağrıldıkça (grid scroll'a yaklaştıkça) sonraki batch çekilir.
  * Server değişmez; tek GET canlı kalır, tüketilen satırlar state'te birikir.
+ * Rapor-agnostiktir: akış fonksiyonu `streamRows` ile enjekte edilir.
  */
-export function useLazyBatchRows({
+export function useLazyBatchRows<Columns, Row>({
   jobUrl,
+  streamRows,
   signal,
   initialChunks = 1,
   onError,
-}: UseLazyBatchRowsOptions) {
-  const [columns, setColumns] = React.useState<
-    StockBalanceArrowReport["columns"]
-  >([])
-  const [rows, setRows] = React.useState<StockBalanceArrowReport["rows"]>([])
+}: UseLazyBatchRowsOptions<Columns, Row>) {
+  const [columns, setColumns] = React.useState<Columns[]>([])
+  const [rows, setRows] = React.useState<Row[]>([])
   const [totalRows, setTotalRows] = React.useState<number | null>(null)
   const [loadingMore, setLoadingMore] = React.useState(false)
   const [hasMore, setHasMore] = React.useState(false)
   const [started, setStarted] = React.useState(false)
 
-  const iteratorRef = React.useRef<
-    AsyncGenerator<StockBalanceArrowReport, void, void> | null
-  >(null)
+  const iteratorRef = React.useRef<AsyncGenerator<
+    LazyBatchChunk<Columns, Row>,
+    void,
+    void
+  > | null>(null)
   const busyRef = React.useRef(false)
   const doneRef = React.useRef(true)
   const tokenRef = React.useRef<{ cancelled: boolean }>({ cancelled: true })
@@ -95,10 +104,7 @@ export function useLazyBatchRows({
     if (!jobUrl) return
 
     const fallbackAbort = new AbortController()
-    const iterator = streamStockBalanceRows(
-      jobUrl,
-      signal ?? fallbackAbort.signal
-    )
+    const iterator = streamRows(jobUrl, signal ?? fallbackAbort.signal)
     iteratorRef.current = iterator
     doneRef.current = false
     token.cancelled = false
@@ -115,7 +121,7 @@ export function useLazyBatchRows({
       token.cancelled = true
       if (!signal) fallbackAbort.abort()
     }
-  }, [jobUrl, signal, initialChunks, consume])
+  }, [jobUrl, signal, initialChunks, consume, streamRows])
 
   const loadMore = React.useCallback(async () => {
     const token = tokenRef.current

@@ -1,5 +1,5 @@
 import * as React from "react"
-import type { ArrowJobEvent } from "@/features/stock/item/types/stock-analytics"
+import type { ArrowJobEvent } from "@/features/jobs"
 import type { TrackedJob } from "@/store/slices/active-jobs-store"
 
 export type JobSyncListener = {

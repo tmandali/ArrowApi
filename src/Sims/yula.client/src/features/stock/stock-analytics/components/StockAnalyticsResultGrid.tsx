@@ -17,8 +17,8 @@ import {
   VirtualSpreadsheet,
   cellInputClass,
   cellClass,
-} from "./VirtualSpreadsheet"
-import type { ReportColumn, ReportGridRow } from "../types/stock-analytics"
+} from "@/features/jobs/components/VirtualSpreadsheet"
+import type { ReportColumn, ReportGridRow } from "@/features/jobs"
 
 /** Match the header action buttons (h-7, text-xs, no shadow) in the grid header. */
 const levelToggleItemClass =
