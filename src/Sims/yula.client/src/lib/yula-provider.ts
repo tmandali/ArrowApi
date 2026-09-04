@@ -5,6 +5,7 @@ import {
   getActiveProvider,
   getDefaultModel,
   getDefaultEmbeddingModel,
+  getAzureDeployments,
   getVectorDimension,
   DEFAULT_OLLAMA_URL,
   type AIProviderType,
@@ -196,51 +197,27 @@ export async function getAvailableProviderModels(options?: {
   const provider = options?.provider ?? getActiveProvider();
 
   if (provider === "azure") {
-    const primaryModel = process.env.AZURE_OPENAI_MODEL ?? "gpt-5.4";
-    const models: ProviderModelCapability[] = [
-      {
-        name: primaryModel,
-        model: primaryModel,
-        description: `Azure Microsoft Foundry (${primaryModel})`,
+    const isReasoningModel = (name: string) => /gpt-5|o[13](-mini|-preview)?$/i.test(name);
+    const models: ProviderModelCapability[] = getAzureDeployments().map((name, index) => {
+      const hasThinking = isReasoningModel(name);
+      return {
+        name,
+        model: name,
+        description:
+          index === 0
+            ? `Azure Microsoft Foundry (${name})`
+            : `Azure OpenAI (${name})`,
         provider: "azure",
-        tag: "Azure",
+        tag: index === 0 ? "Azure" : hasThinking ? "Azure Thinking" : "Azure Pro",
         capabilities: {
-          hasThinking: true,
+          hasThinking,
           hasVision: true,
           hasTools: true,
           isCloud: true,
         },
-        hasThinking: true,
-      },
-      {
-        name: "gpt-4o",
-        model: "gpt-4o",
-        description: "Azure OpenAI GPT-4o Omnimodal",
-        provider: "azure",
-        tag: "Azure Pro",
-        capabilities: {
-          hasThinking: false,
-          hasVision: true,
-          hasTools: true,
-          isCloud: true,
-        },
-        hasThinking: false,
-      },
-      {
-        name: "gpt-4o-mini",
-        model: "gpt-4o-mini",
-        description: "Azure OpenAI Hızlı & Ekonomik",
-        provider: "azure",
-        tag: "Azure Fast",
-        capabilities: {
-          hasThinking: false,
-          hasVision: true,
-          hasTools: true,
-          isCloud: true,
-        },
-        hasThinking: false,
-      },
-    ];
+        hasThinking,
+      };
+    });
 
     // Tekrar edenleri temizle
     const uniqueMap = new Map<string, ProviderModelCapability>();

@@ -77,6 +77,19 @@ export function getDefaultModel(provider: AIProviderType = getActiveProvider()):
   );
 }
 
+/** Azure/Foundry'de kullanılabilir deployment adları (sıra korunur).
+ *  AZURE_OPENAI_DEPLOYMENTS="gpt-5.4,gpt-4o" gibi virgüllü liste;
+ *  boşsa yalnızca varsayılan model döner. Deployment adı ≠ model adı:
+ *  Azure kaynağında tanımlı deployment adları yazılmalıdır. */
+export function getAzureDeployments(): string[] {
+  const primary = getDefaultModel("azure");
+  const extras = (process.env.AZURE_OPENAI_DEPLOYMENTS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s !== primary);
+  return [primary, ...extras];
+}
+
 /** Varsayılan embedding modeli. */
 export function getDefaultEmbeddingModel(provider: AIProviderType = getActiveProvider()): string {
   if (provider === "azure") {
