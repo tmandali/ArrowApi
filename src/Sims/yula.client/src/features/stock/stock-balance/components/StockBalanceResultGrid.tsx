@@ -49,10 +49,13 @@ export function StockBalanceResultGrid({
   className,
 }: StockBalanceResultGridProps) {
   const [filters, setFilters] = React.useState<Record<string, string>>({})
+  const [syncedColumns, setSyncedColumns] = React.useState(columns)
 
-  React.useEffect(() => {
+  // Sütunlar değişince filtreleri başa al — render sırasında state ayarlama.
+  if (syncedColumns !== columns) {
+    setSyncedColumns(columns)
     setFilters({})
-  }, [columns])
+  }
 
   const handleFilterChange = (colName: string, value: string) => {
     setFilters((prev) => ({

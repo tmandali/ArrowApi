@@ -150,6 +150,22 @@ export function MySettingsForm() {
   const [showApiKey, setShowApiKey] = React.useState(false)
   const [aiSaved, setAiSaved] = React.useState(false)
 
+  // Güvenli depodan API anahtarı yüklendiğinde / config değiştiğinde formu
+  // senkronla — render sırasında state ayarlama (effect'siz türev).
+  const [syncedAiConfig, setSyncedAiConfig] = React.useState<AiProviderConfig | null>(null)
+  const [syncedHydrated, setSyncedHydrated] = React.useState(false)
+  if (syncedAiConfig !== aiConfig || syncedHydrated !== configHydrated) {
+    setSyncedAiConfig(aiConfig)
+    setSyncedHydrated(configHydrated)
+    if (configHydrated) {
+      setAiProvider(aiConfig.provider)
+      setAiModel(aiConfig.model)
+      setAiEndpoint(aiConfig.endpoint || "")
+      setAiApiKey(aiConfig.apiKey || "")
+      setAiThinkingLevel(aiConfig.thinkingLevel || "low")
+    }
+  }
+
   // API anahtarını güvenli depodan oku
   React.useEffect(() => {
     let active = true
@@ -163,16 +179,6 @@ export function MySettingsForm() {
       active = false
     }
   }, [])
-
-  // Güvenli depodan API anahtarı yüklendiğinde formu senkronla
-  React.useEffect(() => {
-    if (!configHydrated) return
-    setAiProvider(aiConfig.provider)
-    setAiModel(aiConfig.model)
-    setAiEndpoint(aiConfig.endpoint || "")
-    setAiApiKey(aiConfig.apiKey || "")
-    setAiThinkingLevel(aiConfig.thinkingLevel || "low")
-  }, [configHydrated, aiConfig])
 
   const handleSaveAiConfig = () => {
     const updated: AiProviderConfig = {

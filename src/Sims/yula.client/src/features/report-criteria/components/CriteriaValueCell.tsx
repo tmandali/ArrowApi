@@ -85,10 +85,11 @@ function ObjectLookupValueCell({
   ]
   const [selectedDisplayFields, setSelectedDisplayFields] =
     React.useState(defaultKeys)
-  const previousFieldKeyRef = React.useRef(field.key)
+  const [syncedFieldKey, setSyncedFieldKey] = React.useState(field.key)
 
-  if (previousFieldKeyRef.current !== field.key) {
-    previousFieldKeyRef.current = field.key
+  // Alan değişince görüntü alanlarını başa al — render sırasında state ayarlama.
+  if (syncedFieldKey !== field.key) {
+    setSyncedFieldKey(field.key)
     setSelectedDisplayFields(defaultKeys)
   }
 

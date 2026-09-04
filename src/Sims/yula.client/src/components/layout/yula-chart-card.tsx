@@ -120,15 +120,7 @@ export function YulaChartCard({
   output: unknown;
   className?: string;
 }) {
-  const outputKey = React.useMemo(() => {
-    try {
-      return JSON.stringify(output);
-    } catch {
-      return String(output);
-    }
-  }, [output]);
-
-  const parsed = React.useMemo(() => parseChartOutput(output), [outputKey]);
+  const parsed = React.useMemo(() => parseChartOutput(output), [output]);
   const uid = React.useId().replace(/:/g, "");
 
   // Legend/tooltip etiket sözleşmesi: bar/line → seri adları; pie → dilim adları

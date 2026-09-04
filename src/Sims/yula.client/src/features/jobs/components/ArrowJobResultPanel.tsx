@@ -74,7 +74,9 @@ export function ArrowJobResultPanel({
   const [reportScope, setReportScope] = React.useState<string | undefined>()
 
   const onErrorRef = React.useRef(onError)
-  onErrorRef.current = onError
+  React.useEffect(() => {
+    onErrorRef.current = onError
+  })
 
   const pushError = React.useCallback((message: string | null) => {
     setError(message)
@@ -113,17 +115,25 @@ export function ArrowJobResultPanel({
     return true
   }, [jobId, pushError])
 
-  React.useEffect(() => {
-    const runId = ++runIdRef.current
-    abortRef.current?.abort()
-    const abort = new AbortController()
-    abortRef.current = abort
+  // job değişince akış durumunu başa al — render sırasında state ayarlama
+  // (effect yalnızca fetch ömrünü yönetir).
+  const jobResetKey = `${jobId ?? ""}|${fallbackTitle ?? ""}`
+  const [syncedJobResetKey, setSyncedJobResetKey] = React.useState(jobResetKey)
+  if (syncedJobResetKey !== jobResetKey) {
+    setSyncedJobResetKey(jobResetKey)
     setReportUrl(null)
     setExpectedTotalRows(null)
     setError(null)
     setReportTitle(fallbackTitle)
     setColumnDescriptions(undefined)
     setReportScope(undefined)
+  }
+
+  React.useEffect(() => {
+    const runId = ++runIdRef.current
+    abortRef.current?.abort()
+    const abort = new AbortController()
+    abortRef.current = abort
 
     const load = async () => {
       try {

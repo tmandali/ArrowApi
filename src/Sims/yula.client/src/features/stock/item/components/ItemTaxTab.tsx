@@ -234,7 +234,9 @@ export function ItemTaxTab() {
   }
 
   const moveRowRef = React.useRef(moveRow)
-  moveRowRef.current = moveRow
+  React.useEffect(() => {
+    moveRowRef.current = moveRow
+  })
 
   const allSelected = rows.length > 0 && rows.every((row) => row.selected)
 

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Check, Copy } from "lucide-react"
 import { createHighlighter, type Highlighter } from "shiki"
-import { useTheme } from "@/context/theme-provider"
+import { useTheme } from "@/context/theme-context"
 import { cn } from "@/utils/cn"
 import { copyToClipboard } from "@/lib/clipboard"
 

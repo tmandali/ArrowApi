@@ -79,9 +79,9 @@ export function StockAnalyticsForm() {
         setComposing(true)
         handleSelectJob(null)
       }}
-      renderFilter={(filterRef, { onRun, runDisabled, onListError }) => (
+      renderFilter={(registerFilter, { onRun, runDisabled, onListError }) => (
         <StockAnalyticsFilter
-          ref={filterRef}
+          ref={registerFilter}
           jobSession={{
             activeJobId,
             activeLiveStatus,

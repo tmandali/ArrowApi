@@ -26,6 +26,36 @@ function getStoredPinnedItems(): PinnedMenuItem[] {
   }
 }
 
+const EMPTY_PINNED_ITEMS: PinnedMenuItem[] = [];
+
+/** getSnapshot'ın referansı sabit kalmalı — aynı raw için önbelleklenir. */
+let storedCache: { raw: string | null; items: PinnedMenuItem[] } | null = null;
+
+function subscribePinnedItems(callback: () => void) {
+  window.addEventListener(CHANGE_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function getStoredPinnedItemsSnapshot(): PinnedMenuItem[] {
+  const raw =
+    typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+  if (storedCache && storedCache.raw === raw) return storedCache.items;
+  let items = EMPTY_PINNED_ITEMS;
+  if (raw) {
+    try {
+      items = JSON.parse(raw) as PinnedMenuItem[];
+    } catch (e) {
+      console.warn("[usePinnedWorkspaceItems] Error reading localStorage:", e);
+    }
+  }
+  storedCache = { raw, items };
+  return items;
+}
+
 function saveStoredPinnedItems(items: PinnedMenuItem[]) {
   if (typeof window === "undefined") return;
   try {
@@ -37,22 +67,13 @@ function saveStoredPinnedItems(items: PinnedMenuItem[]) {
 }
 
 export function usePinnedWorkspaceItems(workspace?: string) {
-  const [allPinnedItems, setAllPinnedItems] = React.useState<PinnedMenuItem[]>([]);
-
-  React.useEffect(() => {
-    setAllPinnedItems(getStoredPinnedItems());
-
-    const handleSync = () => {
-      setAllPinnedItems(getStoredPinnedItems());
-    };
-
-    window.addEventListener(CHANGE_EVENT, handleSync);
-    window.addEventListener("storage", handleSync);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, handleSync);
-      window.removeEventListener("storage", handleSync);
-    };
-  }, []);
+  // localStorage + özel event = dış store; useSyncExternalStore doğru primitiftir
+  // (SSR'da boş, hydration güvenli, event'te otomatik tazelenir).
+  const allPinnedItems = React.useSyncExternalStore(
+    subscribePinnedItems,
+    getStoredPinnedItemsSnapshot,
+    () => EMPTY_PINNED_ITEMS,
+  );
 
   const pinnedItems = React.useMemo(() => {
     if (!workspace || workspace === "all" || workspace === "system") {

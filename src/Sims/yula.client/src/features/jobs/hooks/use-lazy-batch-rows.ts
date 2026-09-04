@@ -40,6 +40,20 @@ export function useLazyBatchRows<Columns, Row>({
   const [hasMore, setHasMore] = React.useState(false)
   const [started, setStarted] = React.useState(false)
 
+  // jobUrl değişince akış durumunu başa al — render sırasında state ayarlama.
+  // (consume/loadMore zaten `await` sonrası setState yapar; effect yalnızca
+  // iterator ömrünü yönetir.)
+  const [syncedJobUrl, setSyncedJobUrl] = React.useState<string | null>(jobUrl)
+  if (syncedJobUrl !== jobUrl) {
+    setSyncedJobUrl(jobUrl)
+    setColumns([])
+    setRows([])
+    setTotalRows(null)
+    setLoadingMore(false)
+    setHasMore(false)
+    setStarted(false)
+  }
+
   const iteratorRef = React.useRef<AsyncGenerator<
     LazyBatchChunk<Columns, Row>,
     void,
@@ -94,12 +108,6 @@ export function useLazyBatchRows<Columns, Row>({
     iteratorRef.current = null
     doneRef.current = true
     busyRef.current = false
-    setColumns([])
-    setRows([])
-    setTotalRows(null)
-    setLoadingMore(false)
-    setHasMore(false)
-    setStarted(false)
 
     if (!jobUrl) return
 

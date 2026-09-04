@@ -5,8 +5,12 @@ import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
-import { yulaToolPartInfo, isFailedToolInfo, useYulaChat } from "@/hooks/use-yula-chat";
-import type { YulaToolPartInfo } from "@/hooks/use-yula-chat";
+import { useYulaChat } from "@/hooks/use-yula-chat";
+import {
+  yulaToolPartInfo,
+  isFailedToolInfo,
+  type YulaToolPartInfo,
+} from "@/lib/yula-tool-info";
 import { stripMarkdownTables } from "@/lib/markdown-table-strip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";

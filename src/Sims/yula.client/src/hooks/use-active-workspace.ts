@@ -56,16 +56,17 @@ const DEFAULT_WORKSPACE: WorkspaceId = "stock"
  */
 export function useActiveWorkspaceId(): WorkspaceId {
   const pathname = usePathname()
-  const lastWorkspaceRef = React.useRef<WorkspaceId>(DEFAULT_WORKSPACE)
+  const [lastWorkspace, setLastWorkspace] =
+    React.useState<WorkspaceId>(DEFAULT_WORKSPACE)
+  const [prevPathname, setPrevPathname] = React.useState(pathname)
 
-  const active = React.useMemo(() => {
-    const id = workspaceIdFromPath(pathname)
-    if (id) {
-      lastWorkspaceRef.current = id
-      return id
-    }
-    return lastWorkspaceRef.current
-  }, [pathname])
+  const id = workspaceIdFromPath(pathname)
+  // Pathname değişince en son ziyaret edilen workspace'i güncelle —
+  // React'ın "render sırasında state ayarlama" kalıbı (ref yerine state).
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname)
+    if (id) setLastWorkspace(id)
+  }
 
-  return active
+  return id ?? lastWorkspace
 }

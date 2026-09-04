@@ -313,7 +313,6 @@ export const SchemaCriteriaFilter = React.forwardRef<
     React.useState<CriteriaValidationResult | null>(null)
   const hasValidatedRef = React.useRef(false)
   const rowsRef = React.useRef(rows)
-  rowsRef.current = rows
   const tableRef = React.useRef<HTMLDivElement>(null)
   const [colWidths, setColWidths] = React.useState<ColWidths>(DEFAULT_COL_WIDTHS)
   const [layout, setLayout] = React.useState<CriteriaGridLayout>("columns")
@@ -321,9 +320,19 @@ export const SchemaCriteriaFilter = React.forwardRef<
   const descriptionColumnVisible = layout === "columns-with-description"
   const stackedLayout = layout === "stacked"
   const layoutRef = React.useRef(layout)
-  layoutRef.current = layout
   const colWidthsRef = React.useRef(colWidths)
-  colWidthsRef.current = colWidths
+  // En-güncel-değer ref'leri: yazım effect'te yapılır (render'da ref erişimi
+  // yok). Bu effect'ler aşağıdaki layout effect'inden ÖNCE deklare edildiği
+  // için aynı commit içinde taze değer garantidir.
+  React.useEffect(() => {
+    rowsRef.current = rows
+  })
+  React.useEffect(() => {
+    layoutRef.current = layout
+  })
+  React.useEffect(() => {
+    colWidthsRef.current = colWidths
+  })
 
   React.useEffect(() => {
     const el = tableRef.current
@@ -654,7 +663,9 @@ export const SchemaCriteriaFilter = React.forwardRef<
   }
 
   const moveRowRef = React.useRef(moveRow)
-  moveRowRef.current = moveRow
+  React.useEffect(() => {
+    moveRowRef.current = moveRow
+  })
 
   React.useEffect(() => {
     if (!dialogOpen) return

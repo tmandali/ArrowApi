@@ -4,6 +4,9 @@ import "./globals.css";
 
 
 
+// Next.js App Router `metadata` exportu bu dosyada ZORUNLUDUR —
+// yalnızca Fast Refresh kuralını susturmak için yönlendirme yapılır.
+// eslint-disable-next-line react/only-export-components
 export const metadata: Metadata = {
   title: "Yula",
   description: "Yula Client — Next.js web uygulaması",

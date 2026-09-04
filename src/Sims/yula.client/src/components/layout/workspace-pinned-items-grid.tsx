@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
-import { WORKSPACE_CARDS } from "@/components/layout/workspace-home-cards";
+import { WORKSPACE_CARDS } from "@/lib/workspace-cards";
 import { cn } from "@/utils/cn";
 
 function getCategoryIcon(category: string) {

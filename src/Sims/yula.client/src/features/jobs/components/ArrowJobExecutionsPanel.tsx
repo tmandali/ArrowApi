@@ -305,8 +305,11 @@ export function ArrowJobExecutionsPanel({
   const [selectedId, setSelectedId] = React.useState<string | null>(
     activeJobId
   )
-  const [selectedJob, setSelectedJob] = React.useState<ArrowJobStatus | null>(
-    null
+  // Seçili job satırlardan türetilir (state değil) — seçim/silme/silinme
+  // otomatik yansır.
+  const selectedJob = React.useMemo(
+    () => items.find((item) => sameJobId(item.id, selectedId)) ?? null,
+    [items, selectedId]
   )
   const [inputJson, setInputJson] = React.useState("{\n  \n}")
   const [historyEvents, setHistoryEvents] = React.useState<RunEventItem[]>([])
@@ -353,13 +356,19 @@ export function ArrowJobExecutionsPanel({
 
   React.useEffect(() => {
     const abort = new AbortController()
-    void loadList(abort.signal)
+    const bootstrap = async () => {
+      await loadList(abort.signal)
+    }
+    void bootstrap()
     return () => abort.abort()
   }, [loadList])
 
   React.useEffect(() => {
     if (!listRefreshToken) return
-    void loadList(undefined, { silent: true })
+    const refresh = async () => {
+      await loadList(undefined, { silent: true })
+    }
+    void refresh()
   }, [listRefreshToken, loadList])
 
   // Poll while any in-flight job exists (focused or queued siblings).
@@ -389,19 +398,25 @@ export function ArrowJobExecutionsPanel({
     }
   }, [activeRunPhase, loadList])
 
-  // Compose mode (New / empty list): drop any highlighted execution so the
-  // criteria slot takes over the Detail column.
-  React.useEffect(() => {
-    if (!showCriteriaSlot) return
-    if (!criteriaActive) return
-    setSelectedId(null)
-  }, [showCriteriaSlot, criteriaActive])
+  // Compose modu (New / boş liste): vurgulu execution'ı bırak — render
+  // sırasında state ayarlama.
+  const composeKey = `${showCriteriaSlot}|${criteriaActive}`
+  const [syncedComposeKey, setSyncedComposeKey] = React.useState(composeKey)
+  if (syncedComposeKey !== composeKey) {
+    setSyncedComposeKey(composeKey)
+    if (showCriteriaSlot && criteriaActive) {
+      setSelectedId(null)
+    }
+  }
 
-  // Keep the active (live) run selected so its progress stays visible.
-  React.useEffect(() => {
-    if (!activeJobId) return
-    setSelectedId(activeJobId)
-  }, [activeJobId])
+  // Aktif (canlı) run seçili kalsın — render sırasında state ayarlama.
+  const [syncedLiveJobId, setSyncedLiveJobId] = React.useState(activeJobId)
+  if (syncedLiveJobId !== activeJobId) {
+    setSyncedLiveJobId(activeJobId)
+    if (activeJobId) {
+      setSelectedId(activeJobId)
+    }
+  }
 
   React.useEffect(() => {
     if (loading || !selectedId) return
@@ -410,9 +425,6 @@ export function ArrowJobExecutionsPanel({
 
   React.useEffect(() => {
     const abort = new AbortController()
-    const job =
-      items.find((item) => sameJobId(item.id, selectedId)) ?? null
-    setSelectedJob(job)
 
     const loadDetail = async () => {
       if (!selectedId) return
@@ -447,20 +459,28 @@ export function ArrowJobExecutionsPanel({
 
     void loadDetail()
     return () => abort.abort()
-  }, [selectedId, items, activeJobId, activeRequestJson])
+  }, [selectedId, activeJobId, activeRequestJson])
 
   // Load persisted progress for the selected run (skip while watching live active job).
-  React.useEffect(() => {
-    if (!selectedId) {
+  // Canlı canlı izleme / boş seçim durumunda geçmişi başa al — render
+  // sırasında state ayarlama.
+  const historyResetKey = `${selectedId ?? ""}|${activeJobId ?? ""}|${activeRunPhase ?? ""}`
+  const [syncedHistoryResetKey, setSyncedHistoryResetKey] =
+    React.useState(historyResetKey)
+  if (syncedHistoryResetKey !== historyResetKey) {
+    setSyncedHistoryResetKey(historyResetKey)
+    const shouldClearHistory =
+      !selectedId ||
+      (sameJobId(selectedId, activeJobId) && activeRunPhase === "running")
+    if (shouldClearHistory) {
       setHistoryEvents([])
-      return
     }
+  }
 
-    const isActive = sameJobId(selectedId, activeJobId)
-    if (isActive && activeRunPhase === "running") {
-      setHistoryEvents([])
-      return
-    }
+  React.useEffect(() => {
+    if (!selectedId) return
+    // Canlı aktif run izlenirken geçmiş yüklenmez (izleme ekranı canlıdır).
+    if (sameJobId(selectedId, activeJobId) && activeRunPhase === "running") return
 
     const abort = new AbortController()
     const loadHistory = async () => {
@@ -656,7 +676,6 @@ export function ArrowJobExecutionsPanel({
         setDeleteTargetId(null)
         if (sameJobId(selectedId, targetId)) {
           setSelectedId(null)
-          setSelectedJob(null)
           setHistoryEvents([])
           setInputJson("{\n  \n}")
         }

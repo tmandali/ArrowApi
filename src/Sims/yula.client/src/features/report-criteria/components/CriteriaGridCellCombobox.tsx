@@ -296,17 +296,27 @@ export function CriteriaGridCellCombobox({
 
   const activeValue = filtered[activeIndex]?.value ?? ""
 
-  React.useEffect(() => {
-    if (!open) return
-    setActiveIndex(0)
-  }, [query, open])
+  // Açılış/sorgu değişiminde seçimi başa al, liste kısalınca kırp —
+  // render sırasında state ayarlama (effect'siz türev).
+  const [syncedOpenQuery, setSyncedOpenQuery] = React.useState<string | null>(null)
+  const openQueryKey = `${open}|${query}`
+  if (syncedOpenQuery !== openQueryKey) {
+    setSyncedOpenQuery(openQueryKey)
+    if (open) {
+      setActiveIndex(0)
+    }
+  }
 
-  React.useEffect(() => {
-    if (!open) return
-    setActiveIndex((prev) =>
-      filtered.length === 0 ? 0 : Math.min(prev, filtered.length - 1)
-    )
-  }, [filtered.length, open])
+  const [syncedLengthOpen, setSyncedLengthOpen] = React.useState<string | null>(null)
+  const lengthOpenKey = `${open}|${filtered.length}`
+  if (syncedLengthOpen !== lengthOpenKey) {
+    setSyncedLengthOpen(lengthOpenKey)
+    if (open) {
+      setActiveIndex((prev) =>
+        filtered.length === 0 ? 0 : Math.min(prev, filtered.length - 1)
+      )
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !activeValue) return

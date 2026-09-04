@@ -76,10 +76,15 @@ export function WorkspaceSwitcher({
   }, [activeWorkspaceId, workspaceByUrl, workspaces])
 
   const [activeWorkspace, setActiveWorkspace] = React.useState(currentWorkspace)
+  const [prevCurrentWorkspace, setPrevCurrentWorkspace] =
+    React.useState(currentWorkspace)
 
-  React.useEffect(() => {
+  // Türetilmiş seçim değişince state'i render sırasında ayarla
+  // (React'ın "render sırasında state ayarlama" kalıbı).
+  if (prevCurrentWorkspace !== currentWorkspace) {
+    setPrevCurrentWorkspace(currentWorkspace)
     setActiveWorkspace(currentWorkspace)
-  }, [currentWorkspace])
+  }
 
   if (!activeWorkspace) {
     return null

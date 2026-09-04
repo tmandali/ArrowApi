@@ -65,6 +65,13 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
   }, [groupedResults]);
 
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [syncedFlatItems, setSyncedFlatItems] = React.useState(flatItems);
+  // Arama sonuçları geliştikçe seçili indeksi başa sıfırla — render
+  // sırasında state ayarlama (effect'siz türev).
+  if (syncedFlatItems !== flatItems) {
+    setSyncedFlatItems(flatItems);
+    setSelectedIndex(0);
+  }
   const activeItemRef = React.useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editingTitle, setEditingTitle] = React.useState("");
@@ -84,17 +91,12 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
     setEditingId(null);
   };
 
-  // Arama sonuçları geliştikçe seçili indeksi başa sıfırla
-  React.useEffect(() => {
-    setSelectedIndex(0);
-  }, [flatItems]);
-
   // Seçili öğeyi ekranda görünür tut
   React.useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedIndex]);
 
-  const handleSelect = (url: string, conversationId?: string) => {
+  const handleSelect = React.useCallback((url: string, conversationId?: string) => {
     setOpen(false);
     setQuery("");
     // Sohbet sonucuysa dock'ta o konuşmayı aktif et, sonra ekranına git
@@ -112,7 +114,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
     if (url && url !== "#") {
       router.push(url);
     }
-  };
+  }, [router, setOpen, setQuery]);
 
   // Klavye yön tuşları (Yukarı, Aşağı), Enter ve Escape dinleyicisi
   React.useEffect(() => {
@@ -146,7 +148,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [flatItems, selectedIndex, editingId]);
+  }, [flatItems, selectedIndex, editingId, setOpen, setQuery, handleSelect]);
 
   return (
     <div

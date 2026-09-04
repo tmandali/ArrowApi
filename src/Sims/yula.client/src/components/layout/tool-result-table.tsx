@@ -29,14 +29,6 @@ export function ToolResultTable({
   output: unknown;
   className?: string;
 }) {
-  const outputKey = React.useMemo(() => {
-    try {
-      return JSON.stringify(output);
-    } catch {
-      return String(output);
-    }
-  }, [output]);
-
   const parsed = React.useMemo(() => {
     const o =
       typeof output === "object" && output !== null
@@ -61,7 +53,7 @@ export function ToolResultTable({
       rowCount: typeof o.rowCount === "number" ? o.rowCount : rows.length,
       querySql: typeof o.sql === "string" ? o.sql : typeof o.querySql === "string" ? o.querySql : null,
     };
-  }, [outputKey]);
+  }, [output]);
 
   if (!parsed) return null;
 

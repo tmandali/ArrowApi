@@ -110,9 +110,18 @@ export function VirtualSpreadsheet<T>({
     name: string
   } | null>(null)
 
-  React.useEffect(() => {
+  // resetKey/başlangıç genişlikleri değişince sütun genişliklerini başa al —
+  // render sırasında state ayarlama (içerik anahtarı ile, inline objelerde döngüsüz).
+  const initialWidthsKey = React.useMemo(
+    () => JSON.stringify(initialColWidths ?? null),
+    [initialColWidths]
+  )
+  const widthsSyncKey = `${String(resetKey)}|${initialWidthsKey}`
+  const [syncedWidthsKey, setSyncedWidthsKey] = React.useState(widthsSyncKey)
+  if (syncedWidthsKey !== widthsSyncKey) {
+    setSyncedWidthsKey(widthsSyncKey)
     setColWidths(initialColWidths ?? {})
-  }, [resetKey, initialColWidths])
+  }
 
   const handleResizeStart = React.useCallback(
     (event: React.PointerEvent, col: SpreadsheetColumn) => {
@@ -174,7 +183,9 @@ export function VirtualSpreadsheet<T>({
   }, [resetKey, reset])
 
   const onNeedMoreRef = React.useRef(onNeedMore)
-  onNeedMoreRef.current = onNeedMore
+  React.useEffect(() => {
+    onNeedMoreRef.current = onNeedMore
+  })
 
   const handleScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {

@@ -133,12 +133,18 @@ export const StockAnalyticsResultGrid = React.forwardRef<
     Record<string, boolean>
   >({})
   const [treeLevel, setTreeLevel] = React.useState("2")
+  const [syncedColumns, setSyncedColumns] = React.useState(columns)
+  const [syncedRows, setSyncedRows] = React.useState(rows)
 
-  React.useEffect(() => {
+  // Sütunlar/satırlar değişince filtreleri + ağaç durumunu başa al —
+  // render sırasında state ayarlama (effect'siz türev).
+  if (syncedColumns !== columns || syncedRows !== rows) {
+    setSyncedColumns(columns)
+    setSyncedRows(rows)
     setInternalFilters({})
     setTreeLevel("2")
     setExpandedNodes(collectExpandableIds(rows, 2))
-  }, [columns, rows])
+  }
 
   const activeFilters = externalFilters ?? internalFilters
 

@@ -55,10 +55,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [page, setPage] = React.useState(0)
 
   React.useEffect(() => {
-    if (isCustomQueryActive()) return
-    if (initialColumns.length > 0) {
-      setColumns(initialColumns)
+    const syncInitialColumns = () => {
+      if (isCustomQueryActive()) return
+      if (initialColumns.length > 0) {
+        setColumns(initialColumns)
+      }
     }
+    syncInitialColumns()
   }, [initialColumns])
 
   const tableName = React.useMemo(() => {
@@ -78,14 +81,29 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
   const queryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableReadyRef = React.useRef(false)
+  // Render için aynalanan tablo-hazır bayrağı (callback'ler taze ref okur)
+  const [tableReady, setTableReady] = React.useState(false)
+  const markTableReady = React.useCallback((v: boolean) => {
+    tableReadyRef.current = v
+    setTableReady(v)
+  }, [])
+  // Akış ilerlemesinin en güncel değerleri — callback'ler ref okur
+  const latestStreamedRef = React.useRef(streamedRows)
+  const latestExpectedRef = React.useRef(expectedTotalRows)
+  React.useEffect(() => {
+    latestStreamedRef.current = streamedRows
+    latestExpectedRef.current = expectedTotalRows
+  })
   const querySeqRef = React.useRef(0)
   const baseTotalRowsRef = React.useRef(0)
   const filtersRef = React.useRef(filters)
-  filtersRef.current = filters
   const sortByRef = React.useRef(sortBy)
-  sortByRef.current = sortBy
   const sortDescRef = React.useRef(sortDesc)
-  sortDescRef.current = sortDesc
+  React.useEffect(() => {
+    filtersRef.current = filters
+    sortByRef.current = sortBy
+    sortDescRef.current = sortDesc
+  })
   // Tablo ingest tamamlandığında özel sorguyu (yeniden) tetiklemek için tık
   const [customQueryTick, setCustomQueryTick] = React.useState(0)
 
@@ -132,8 +150,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           setTotalRows(
             baseTotalRowsRef.current > 0
               ? baseTotalRowsRef.current
-              : streamedRows > 0
-                ? streamedRows
+              : latestStreamedRef.current > 0
+                ? latestStreamedRef.current
                 : result.totalFiltered
           )
         }
@@ -202,12 +220,15 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
   // Arka plan akış yöneticisine abone ol (Kullanıcı sayfa değiştirse dahi akış kesilmez)
   React.useEffect(() => {
-    if (!jobId || !jobUrl) {
+    const resetStreamState = () => {
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)
       setStreamedRows(0)
       setIsPartial(false)
+    }
+    if (!jobId || !jobUrl) {
+      resetStreamState()
       return
     }
 
@@ -233,7 +254,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
           const shouldQuery = !tableReadyRef.current
           if (shouldQuery) {
-            tableReadyRef.current = true
+            markTableReady(true)
             void duckDbClient.describeTable(tableName).then((discovered) => {
               if (discovered.length > 0 && !isCustomQueryActive()) {
                 setColumns(discovered)
@@ -251,7 +272,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       unsubscribe()
       if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
     }
-  }, [jobId, jobUrl, tableName, expectedTotalRows, onError])
+  }, [jobId, jobUrl, tableName, expectedTotalRows, onError, markTableReady])
 
   const refresh = React.useCallback(async () => {
     if (!jobId || !jobUrl || !tableName) return
@@ -262,7 +283,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setIsSavingDisk(false)
       setIsFromCache(false)
       setIsPartial(false)
-      tableReadyRef.current = false
+      markTableReady(false)
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)
@@ -280,7 +301,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setIsStreaming(false)
       setIsSavingDisk(false)
     }
-  }, [jobId, jobUrl, tableName, expectedTotalRows, onError])
+  }, [jobId, jobUrl, tableName, expectedTotalRows, onError, markTableReady])
 
   const progressPercent = React.useMemo(() => {
     if (!expectedTotalRows || expectedTotalRows <= 0) return null
@@ -302,9 +323,9 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         const restoredBase =
           baseTotalRowsRef.current > 0
             ? baseTotalRowsRef.current
-            : streamedRows > 0
-              ? streamedRows
-              : expectedTotalRows ?? 0
+            : latestStreamedRef.current > 0
+              ? latestStreamedRef.current
+              : latestExpectedRef.current ?? 0
         setTotalRows(restoredBase)
         setTotalFiltered(restoredBase)
         void executeQueryRef.current({}, null, false, 0)
@@ -315,13 +336,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     }
 
     const seq = ++querySeqRef.current
-    setIsLoadingQuery(true)
     let cancelled = false
-    void (async () => {
+    const runCustomSql = async () => {
+      setIsLoadingQuery(true)
       try {
         const result = await duckDbClient.executeCustomSql(customSql)
         if (cancelled || seq !== querySeqRef.current) return
-        tableReadyRef.current = true
+        markTableReady(true)
         let resultRows = (result as T[]) ?? []
         const first = resultRows[0] as Record<string, unknown> | undefined
         const viewCols = new Set(first ? Object.keys(first) : [])
@@ -398,13 +419,14 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       } finally {
         if (!cancelled && seq === querySeqRef.current) setIsLoadingQuery(false)
       }
-    })()
+    }
+    void runCustomSql()
     return () => {
       cancelled = true
     }
-  }, [customSql, customQueryTick, tableName, onError])
+  }, [customSql, customQueryTick, tableName, onError, markTableReady])
 
-  const hasMore = tableReadyRef.current && totalFiltered > 0 && rows.length < totalFiltered
+  const hasMore = tableReady && totalFiltered > 0 && rows.length < totalFiltered
   const loadingMoreRef = React.useRef(false)
 
   const loadMore = React.useCallback(() => {

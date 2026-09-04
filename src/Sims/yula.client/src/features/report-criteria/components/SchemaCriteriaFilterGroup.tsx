@@ -57,11 +57,16 @@ export const SchemaCriteriaFilterGroup = React.forwardRef<
   const [activeTab, setActiveTab] = React.useState(tabs[0]?.id ?? "")
   const filterRefs = React.useRef<Array<SchemaCriteriaFilterHandle | null>>([])
 
-  React.useEffect(() => {
+  // Sekme listesi/tür değişince geçersiz türü başa al — render sırasında
+  // state ayarlama (effect'siz türev).
+  const validityKey = `${tabs.map((tab) => tab.id).join("|")}|${activeTab}`
+  const [syncedValidityKey, setSyncedValidityKey] = React.useState(validityKey)
+  if (syncedValidityKey !== validityKey) {
+    setSyncedValidityKey(validityKey)
     if (!tabs.some((tab) => tab.id === activeTab) && tabs[0]) {
       setActiveTab(tabs[0].id)
     }
-  }, [tabs, activeTab])
+  }
 
   React.useImperativeHandle(
     ref,

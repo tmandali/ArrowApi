@@ -19,6 +19,7 @@ import { cn } from "@/utils/cn"
 import stockBalanceCriteriaSchema from "../schemas/stock-balance-criteria.schema.json"
 
 const STOCK_BALANCE_JOBS = "/api/arrow/jobs/stock-balance"
+const EMPTY_AI_NAMES: string[] = []
 const stockBalanceSchema = stockBalanceCriteriaSchema as JsonSchemaObject
 
 export type StockBalanceJobSession = Pick<
@@ -63,10 +64,9 @@ export const StockBalanceFilter = React.forwardRef<
   const aiFilled = useAgentCriteriaStore(
     (state) => state.aiFilledCriteria["stock-balance"]
     );
-  const aiFilledNames = React.useMemo(
-    () => (aiFilled && Date.now() - aiFilled.at < 10 * 60_000 ? aiFilled.names : []),
-    [aiFilled]
-  )
+  // Tazelik (10 dk) köprü store'da otomatik süre dolması ile yönetilir;
+  // render içinde saat hesabı gerekmez.
+  const aiFilledNames = aiFilled?.names ?? EMPTY_AI_NAMES
 
   const { rows, setRows } = useSharedCriteriaDraft(
     "stock-balance",

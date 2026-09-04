@@ -155,10 +155,14 @@ export function DuckDbPersistBench() {
   }, [])
 
   React.useEffect(() => {
-    void refreshOpfs()
-    if (navigator.storage?.estimate) {
-      void navigator.storage.estimate().then((e) => setStorageBefore(e.usage ?? null))
+    const bootstrap = async () => {
+      await refreshOpfs()
+      if (navigator.storage?.estimate) {
+        const estimate = await navigator.storage.estimate()
+        setStorageBefore(estimate.usage ?? null)
+      }
     }
+    void bootstrap()
   }, [refreshOpfs])
 
   const teardown = React.useCallback(async () => {

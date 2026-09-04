@@ -117,8 +117,8 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
       startTransition(() => {
         setResults(recentConversations);
         setGroupedResults(groupItems(recentConversations));
+        setIsSearchingRag(false);
       });
-      setIsSearchingRag(false);
       return;
     }
 
@@ -167,7 +167,9 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
 
     // 2) Asenkron WASM Vektör Semantik Arama (3-5 ms)
     let isCancelled = false;
-    setIsSearchingRag(true);
+    startTransition(() => {
+      setIsSearchingRag(true);
+    });
 
     const timer = setTimeout(async () => {
       try {

@@ -56,17 +56,20 @@ function reportSummary(job: TrackedJob, payload: ArrowJobEvent): string {
 
 export function JobSyncProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const navigate = (
-    to: string | number,
-    _options?: { replace?: boolean; state?: unknown },
-  ) => {
-    if (typeof to === "number") {
-      if (to < 0) router.back();
-      else router.forward();
-    } else {
-      void router.push(to);
-    }
-  };
+  const navigate = React.useCallback(
+    (
+      to: string | number,
+      _options?: { replace?: boolean; state?: unknown },
+    ) => {
+      if (typeof to === "number") {
+        if (to < 0) router.back();
+        else router.forward();
+      } else {
+        void router.push(to);
+      }
+    },
+    [router]
+  );
 
   const { pushNotification } = useWorkspaceNotifications()
   const jobs = useActiveJobsStore((s) => s.jobs)

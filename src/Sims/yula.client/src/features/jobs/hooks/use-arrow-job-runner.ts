@@ -98,7 +98,13 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   } = options
 
   const router = useRouter();
-  const navigate = (to: string | number) => { if (typeof to === "number") router.back(); else void router.push(to); };
+  const navigate = React.useCallback(
+    (to: string | number) => {
+      if (typeof to === "number") router.back();
+      else void router.push(to);
+    },
+    [router]
+  );
   const location = { pathname: typeof window !== "undefined" ? window.location.pathname : "/", state: null as unknown }
   const { trackJob, waitUntilTerminal } = useJobSync()
 
@@ -110,7 +116,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   const [composing, setComposing] = React.useState(
     locationState?.composing ?? true
   )
-  const preferCriteriaRef = React.useRef(locationState?.composing ?? true)
   const [activeJobId, setActiveJobId] = React.useState<string | null>(
     locationState?.focusJobId ?? null
   )
@@ -358,11 +363,10 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   const handleSubmitted = React.useCallback(
     (job: ArrowJobStatus, request: Record<string, unknown>) => {
       allowEntryResumeRef.current = false
-      preferCriteriaRef.current = false
       setComposing(false)
       void followJob(job, request)
     },
-    [followJob]
+    [followJob, setComposing]
   )
   const handleSelectJob = React.useCallback(
     (jobOrId: ArrowJobStatus | string | null) => {
@@ -419,15 +423,16 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         handleSubmitted(job, request ?? {})
         return
       }
-      preferCriteriaRef.current = false
       setComposing(false)
       handleSelectJob(job)
     },
-    [handleSelectJob, handleSubmitted],
+    [handleSelectJob, handleSubmitted, setComposing],
   )
 
   const applyExecutionFocusRef = React.useRef(applyExecutionFocus)
-  applyExecutionFocusRef.current = applyExecutionFocus
+  React.useEffect(() => {
+    applyExecutionFocusRef.current = applyExecutionFocus
+  })
 
   React.useEffect(() => {
     const pending = takePendingExecutionFocus(jobName)
@@ -478,7 +483,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         setComposing(true)
       }
     },
-    [publishFocused]
+    [publishFocused, setComposing]
   )
 
   const handleNavigateToJob = React.useCallback(
@@ -488,13 +493,17 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     [navigate, jobHref]
   )
 
+  // Sayfaya focus-state ile gelinirse in-flight job'ı bağla. Gövdeye bir
+  // düz fonksiyon (connectFocus) sarmalanır; tetiklenmesi dış state'tir.
   React.useEffect(() => {
-    const focusId = locationState?.focusJobId
-    if (focusId) {
-      preferCriteriaRef.current = false
-      setComposing(false)
-      handleSelectJob(focusId)
+    const connectFocus = () => {
+      const focusId = locationState?.focusJobId
+      if (focusId) {
+        setComposing(false)
+        handleSelectJob(focusId)
+      }
     }
+    connectFocus()
   }, [locationState?.focusJobId, handleSelectJob])
 
   // Sayfaya ilk girişte varsa in-flight job'ı otomatik bağla
@@ -541,7 +550,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
         if (!resumeTarget) return
 
-        preferCriteriaRef.current = false
         setComposing(false)
 
         const req = (await fetchJobRequest(resumeTarget.id, abort.signal)) ?? {}

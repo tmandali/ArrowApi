@@ -80,9 +80,9 @@ export function RetailSalesForm() {
         setComposing(true)
         handleSelectJob(null)
       }}
-      renderFilter={(filterRef, { onRun, runDisabled, onListError }) => (
+      renderFilter={(registerFilter, { onRun, runDisabled, onListError }) => (
         <RetailSalesFilter
-          ref={filterRef}
+          ref={registerFilter}
           jobSession={{
             activeJobId,
             activeLiveStatus,

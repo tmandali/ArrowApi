@@ -80,9 +80,9 @@ export function StockBalanceForm() {
         setComposing(true)
         handleSelectJob(null)
       }}
-      renderFilter={(filterRef, { onRun, runDisabled, onListError }) => (
+      renderFilter={(registerFilter, { onRun, runDisabled, onListError }) => (
         <StockBalanceFilter
-          ref={filterRef}
+          ref={registerFilter}
           jobSession={{
             activeJobId,
             activeLiveStatus,

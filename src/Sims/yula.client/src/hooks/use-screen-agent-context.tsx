@@ -26,6 +26,13 @@ export function useScreenAgentContext(input: {
   tools?: unknown[];
 }) {
   const summary = input.activeDataSummary;
+  // Efekt gövdesinde en güncel input okunur (ref render'da yazılmaz,
+  // effect ile tazelenir) — böylece inline quickPrompts/tools dizileri
+  // kayıt efektini her render yeniden tetiklemez.
+  const latestInputRef = React.useRef(input);
+  React.useEffect(() => {
+    latestInputRef.current = input;
+  });
   // Kolon sayısı 0 → non-zero geçişi kayıt efektini yeniden tetiklesin
   // (kolonlar DESCRIBE/discoveredCols ile sonradan gelir; aksi halde spec
   // hiç dolmaz ve Yula workspace çiplerinde kalır).
@@ -50,14 +57,16 @@ export function useScreenAgentContext(input: {
   }, [summary?.isViewingResults, summary?.tableName, input.screenId, hasColumns]);
 
   React.useEffect(() => {
-    const screenId = input.screenId || (input.activeReportScope as string) || "screen";
-    const screenTitle = input.screenTitle || "";
-    const workspaceId = (input.workspaceId as string) || "stock";
-    const reportScope = (input.activeReportScope as string) || (input.screenId as string);
-    const isViewingResults = Boolean(summary?.isViewingResults);
-    const quickPrompts = (input.quickPrompts as string[]) || [];
-    const criteriaDigest = (input.criteriaDigest as Array<Record<string, unknown>>) || [];
-    const tools = (input.tools as Array<{ name: string; description?: string }>) || [
+    const current = latestInputRef.current;
+    const currentSummary = current.activeDataSummary;
+    const screenId = current.screenId || (current.activeReportScope as string) || "screen";
+    const screenTitle = current.screenTitle || "";
+    const workspaceId = (current.workspaceId as string) || "stock";
+    const reportScope = (current.activeReportScope as string) || (current.screenId as string);
+    const isViewingResults = Boolean(currentSummary?.isViewingResults);
+    const quickPrompts = (current.quickPrompts as string[]) || [];
+    const criteriaDigest = (current.criteriaDigest as Array<Record<string, unknown>>) || [];
+    const tools = (current.tools as Array<{ name: string; description?: string }>) || [
       {
         name: "apply_criteria",
         description: "Rapor şemasına göre zorunlu alanları gözeterek önerilen kriterleri ekrandaki kriter formuna doldurur.",
@@ -77,7 +86,7 @@ export function useScreenAgentContext(input: {
       registeredTools: tools,
       quickPrompts,
       criteriaDigest,
-      jobId: summary?.jobId as string | undefined,
+      jobId: currentSummary?.jobId as string | undefined,
     });
 
     return () => {

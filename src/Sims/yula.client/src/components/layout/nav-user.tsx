@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react"
-import { useTheme } from "@/context/theme-provider"
+import { useTheme } from "@/context/theme-context"
 import {
   Avatar,
   AvatarFallback,
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
+import { emptySubscribe } from "@/hooks/use-mounted"
 import { cn } from "@/utils/cn"
 import {
   Building2,
@@ -75,11 +76,12 @@ export function NavUser({
   const { clearJobSession } = useJobSession()
   const { company, companies, beginCompanySwitch, isSwitching } =
     useActiveCompany()
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
+  // Hydration güvenli "mounted" bayrağı: sunucuda false, istemcide true.
+  const mounted = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  )
 
   const initials = user.name
     ? user.name

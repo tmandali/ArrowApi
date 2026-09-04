@@ -57,11 +57,11 @@ export type ReportCriteriaShellProps = {
   onStartNewReport?: () => void
   /**
    * Criteria + Executions filtresini render eder. Shell, kriter gridi handle'ını
-   * ve Run/onListError yardımcılarını bu callback üzerinden enjekte eder.
+   * toplayan callback ref'i ve Run/onListError yardımcılarını bu callback
+   * üzerinden enjekte eder.
    */
   renderFilter: (
-    filterRef: React.Ref<SchemaCriteriaFilterHandle>,
-    helpers: {
+    registerFilter: (handle: SchemaCriteriaFilterHandle | null) => void,    helpers: {
       onRun: () => void
       runDisabled: boolean
       onListError: (message: string | null) => void
@@ -86,7 +86,10 @@ export function ReportCriteriaShell({
 }: ReportCriteriaShellProps) {
   const workspaceHome =
     emptyWorkspaceHome[workspaceId] ?? emptyWorkspaceHome.stock
-  const criteriaFilterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
+  // Kriter gridi handle'ı callback ref olarak toplanır: setter commit fazında
+  // React tarafından çağrılır, render sırasında ref erişimi yapılmaz.
+  const [criteriaHandle, setCriteriaHandle] =
+    React.useState<SchemaCriteriaFilterHandle | null>(null)
 
   // Aktif rapor şemasının alan sindirimi — Yula "bu rapor ne hakkında"
   // sorularını JSON Schema'daki gerçek kriterlerle yanıtlar.
@@ -98,16 +101,6 @@ export function ReportCriteriaShell({
       ? (digest.fields as unknown as Array<Record<string, unknown>>)
       : undefined;
   }, [schema])
-
-  // Run tuşunun aynısını AI'a aç: jenerik run_report aracı bu otobüsü tetikler
-  const runCriteriaRef = React.useRef<() => void>(() => {});
-  runCriteriaRef.current = () => {
-    void handleCriteriaSubmit();
-  };
-
-  React.useEffect(() => {
-    return registerReportRunner(mode, () => runCriteriaRef.current());
-  }, [mode]);
 
   useScreenAgentContext({
     screenId: mode,
@@ -159,7 +152,7 @@ export function ReportCriteriaShell({
   )
 
   const handleCriteriaSubmit = React.useCallback(async () => {
-    const result = criteriaFilterRef.current?.submit()
+    const result = criteriaHandle?.submit()
     if (!result) return
 
     if (!result.valid) {
@@ -212,10 +205,17 @@ export function ReportCriteriaShell({
       setSubmittingCriteria(false)
     }
   }, [
+    criteriaHandle,
     formatValidationBanner,
     mode,
     onJobCreated,
   ])
+
+  // Run tuşunun aynısını AI'a aç: jenerik run_report aracı bu otobüsü tetikler.
+  // En güncel handleCriteriaSubmit'i görmek için her değişimde yeniden kaydolur.
+  React.useEffect(() => {
+    return registerReportRunner(mode, () => void handleCriteriaSubmit());
+  }, [mode, handleCriteriaSubmit]);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -293,7 +293,7 @@ export function ReportCriteriaShell({
       <WorkspaceAiDock
         className={cn("overflow-hidden", "max-md:overflow-y-auto")}
       >
-        {renderFilter(criteriaFilterRef, {
+        {renderFilter(setCriteriaHandle, {
           onRun: () => void handleCriteriaSubmit(),
           runDisabled: submittingCriteria,
           onListError: handleListError,

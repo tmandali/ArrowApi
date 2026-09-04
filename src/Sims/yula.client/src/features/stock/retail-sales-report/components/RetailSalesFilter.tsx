@@ -19,6 +19,7 @@ import { cn } from "@/utils/cn"
 import retailSalesCriteriaSchema from "../schemas/retail-sales-criteria.schema.json"
 
 const RETAIL_SALES_JOBS = "/api/arrow/jobs/retail-sales-report"
+const EMPTY_AI_NAMES: string[] = []
 const retailSalesSchema = retailSalesCriteriaSchema as JsonSchemaObject
 
 export type RetailSalesJobSession = Pick<
@@ -63,10 +64,9 @@ export const RetailSalesFilter = React.forwardRef<
   const aiFilled = useAgentCriteriaStore(
     (state) => state.aiFilledCriteria["retail-sales-report"]
     );
-  const aiFilledNames = React.useMemo(
-    () => (aiFilled && Date.now() - aiFilled.at < 10 * 60_000 ? aiFilled.names : []),
-    [aiFilled]
-  )
+  // Tazelik (10 dk) köprü store'da otomatik süre dolması ile yönetilir;
+  // render içinde saat hesabı gerekmez.
+  const aiFilledNames = aiFilled?.names ?? EMPTY_AI_NAMES
 
   const { rows, setRows } = useSharedCriteriaDraft(
     "retail-sales-report",

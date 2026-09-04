@@ -37,9 +37,12 @@ export function useVirtualWindow<T>(
   const totalHeight = totalRows * rowHeight
 
   React.useEffect(() => {
-    if (scrollTop > 0 && totalHeight >= 0 && scrollTop >= totalHeight) {
+    const resetToTop = () => {
       setScrollTop(0)
       if (scrollRef.current) scrollRef.current.scrollTop = 0
+    }
+    if (scrollTop > 0 && totalHeight >= 0 && scrollTop >= totalHeight) {
+      resetToTop()
     }
   }, [totalHeight, scrollTop])
   const effectiveViewportHeight = viewportHeight > 0 ? viewportHeight : 600

@@ -24,7 +24,8 @@ import {
 import { useChatsStore } from "@/lib/stores/chats"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
-import { useYulaChat, yulaToolPartInfo } from "@/hooks/use-yula-chat"
+import { useYulaChat } from "@/hooks/use-yula-chat"
+import { yulaToolPartInfo } from "@/lib/yula-tool-info"
 import type { YulaMessage } from "@/app/api/agent/chat/route"
 import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
 import { peekQueuedYulaPrompt, subscribeQueuedYulaPrompt } from "@/lib/yula-pending-prompt"
@@ -161,11 +162,8 @@ function isFailedToolInfo(info: {
   )
 }
 
-import {
-  greetingFor,
-  formatDate,
-  useMounted,
-} from "@/components/app/welcome-screen"
+import { useMounted } from "@/hooks/use-mounted"
+import { formatDate, greetingFor } from "@/lib/welcome-format"
 
 export function AIChatPanelTitle() {
   const activeId = useChatsStore((s) => s.activeId)
@@ -306,6 +304,12 @@ export function AIChatPanel({
     preview: string
   } | null>(null)
   const [selectedIndex, setSelectedIndex] = React.useState(0)
+  const [prevCommandInput, setPrevCommandInput] = React.useState("")
+  // Girdi değişince komut seçimini başa al — render sırasında state ayarlama.
+  if (prevCommandInput !== input) {
+    setPrevCommandInput(input)
+    setSelectedIndex(0)
+  }
   const [isAtBottom, setIsAtBottom] = React.useState(true)
 
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -343,10 +347,6 @@ export function AIChatPanel({
   const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0
   const hasUserMessages = messages.some((message) => message.role === "user")
   const showCenteredIntro = (centeredIntro || (isMainMode && isHomePath)) && !hasUserMessages
-
-  React.useEffect(() => {
-    setSelectedIndex(0)
-  }, [input])
 
   // Sohbet değişiminde (New / konuşma seçimi) scroll durumunu sıfırla:
   // boşalan ekranda scroll olayı tetiklenmez, eski "alta kaydır" rozeti asılı kalır.
