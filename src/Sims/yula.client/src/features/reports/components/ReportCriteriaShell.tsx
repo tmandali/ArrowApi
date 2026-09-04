@@ -1,20 +1,11 @@
 "use client";
 
 import * as React from "react"
-import Link from "next/link";
 import { FilePlus2 } from "lucide-react"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
+import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import {
   pageHeaderCardClass,
   pageHeaderShellClass,
@@ -28,7 +19,6 @@ import {
   type JsonSchemaObject,
   type SchemaCriteriaFilterHandle,
 } from "@/features/report-criteria"
-import { emptyWorkspaceHome } from "@/lib/workspace-paths"
 import { createArrowJob } from "@/features/jobs/arrow-job-client"
 import { findActiveJobByPayload } from "@/store/slices/active-jobs-store"
 import { ApiError } from "@/services"
@@ -42,7 +32,7 @@ export type ReportCriteriaShellProps = {
   /** Rapor scope'u — registerReportRunner + AI screen context kimliği (ör. "stock-analytics"). */
   mode: string
   title: string
-  /** Sahip workspace — breadcrumb ana sayfası ve AI screen context. */
+  /** Sahip workspace — AI screen context. */
   workspaceId: string
   /** Raporun JSON kriter şeması — x-job-endpoint + AI criteria digest kaynağı. */
   schema: JsonSchemaObject
@@ -70,9 +60,9 @@ export type ReportCriteriaShellProps = {
 }
 
 /**
- * Workspace-agnostik rapor kriter ekranı kabuğu: "Reports / <title>" breadcrumb'ı,
- * New aksiyonu, banner'lar, job oluşturma (createArrowJob), AI run_report otobüsü
- * ve screen agent context. Filtre bileşeni `renderFilter` ile enjekte edilir.
+ * Workspace-agnostik rapor kriter ekranı kabuğu: New aksiyonu, banner'lar,
+ * job oluşturma (createArrowJob), AI run_report otobüsü ve screen agent
+ * context. Filtre bileşeni `renderFilter` ile enjekte edilir.
  */
 export function ReportCriteriaShell({
   mode,
@@ -84,8 +74,6 @@ export function ReportCriteriaShell({
   onStartNewReport,
   renderFilter,
 }: ReportCriteriaShellProps) {
-  const workspaceHome =
-    emptyWorkspaceHome[workspaceId] ?? emptyWorkspaceHome.stock
   // Kriter gridi handle'ı callback ref olarak toplanır: setter commit fazında
   // React tarafından çağrılır, render sırasında ref erişimi yapılmaz.
   const [criteriaHandle, setCriteriaHandle] =
@@ -227,30 +215,11 @@ export function ReportCriteriaShell({
         )}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
-          <SidebarTrigger className="-ml-1 shrink-0" />
-          <Separator
-            orientation="vertical"
-            className="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
+          <PagePanelTrigger
+            className="-ml-1 shrink-0"
+            separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
           />
-          <Breadcrumb className="min-w-0 overflow-hidden">
-            <BreadcrumbList className="flex-nowrap text-xs">
-              <BreadcrumbItem className="hidden md:inline-flex">
-                <BreadcrumbLink asChild>
-                  <Link href={workspaceHome.url}>{workspaceHome.label}</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="hidden md:inline-flex">
-                <BreadcrumbPage className="text-foreground">Reports</BreadcrumbPage>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="block truncate font-semibold text-foreground">
-                  {title}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <PageHeaderTitle>{title}</PageHeaderTitle>
         </div>
 
         <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">

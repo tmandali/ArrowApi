@@ -1,15 +1,6 @@
 "use client";
 
 import * as React from "react"
-import Link from "next/link";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Separator } from "@/components/ui/separator"
@@ -32,7 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
+import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import {
   ChevronRight,
   ChevronDown,
@@ -60,7 +52,6 @@ import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
 import { printStockItemReport } from "../services/print-stock-report"
-import { emptyWorkspaceHome } from "@/lib/workspace-paths"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
 
@@ -118,7 +109,6 @@ export function ItemFormShell({
 }: ItemFormShellProps) {
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isLedgerVariant = variant === "ledger"
-  const workspaceHome = emptyWorkspaceHome.stock
 
   useScreenAgentContext({
     screenId: "item-form",
@@ -163,32 +153,11 @@ export function ItemFormShell({
         )}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
-          <SidebarTrigger className="-ml-1 shrink-0" />
-          <Separator
-            orientation="vertical"
-            className="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
+          <PagePanelTrigger
+            className="-ml-1 shrink-0"
+            separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
           />
-          <Breadcrumb className="min-w-0 overflow-hidden">
-            <BreadcrumbList className="flex-nowrap text-xs">
-              <BreadcrumbItem className="hidden md:inline-flex">
-                <BreadcrumbLink asChild>
-                  <Link href={workspaceHome.url}>{workspaceHome.label}</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="hidden sm:inline-flex">
-                <BreadcrumbLink asChild>
-                  <Link href="/stock/item">Item</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden sm:block" />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="block truncate font-semibold text-foreground">
-                  W6ED16Z8-HDN
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <PageHeaderTitle>W6ED16Z8-HDN</PageHeaderTitle>
           {!isLedgerVariant ? (
             <Badge className="ml-2 hidden shrink-0 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium sm:inline-flex">
               Variant

@@ -1,15 +1,8 @@
 "use client";
 
 import * as React from "react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock";
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header";
 import { panelCardClass, pageContentGutterClass } from "@/components/layout/panel-chrome";
@@ -86,19 +79,7 @@ export function SystemUsersView() {
           </>
         }
       >
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs">
-            <BreadcrumbItem>
-              <BreadcrumbLink href="#">System Administration</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-semibold text-foreground">
-                Tüm Kullanıcılar & Yetkiler
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageHeaderTitle>Tüm Kullanıcılar & Yetkiler</PageHeaderTitle>
       </WorkspacePageHeader>
 
       <WorkspaceAiDock>

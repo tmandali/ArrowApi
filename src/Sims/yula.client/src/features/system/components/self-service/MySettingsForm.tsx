@@ -1,15 +1,8 @@
 "use client";
 
 import * as React from "react"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { panelCardClass, pageContentGutterClass } from "@/components/layout/panel-chrome"
@@ -279,19 +272,7 @@ export function MySettingsForm() {
           </>
         }
       >
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs">
-            <BreadcrumbItem>
-              <BreadcrumbLink href="#">My Account</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-semibold text-foreground">
-                Profile & Settings
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageHeaderTitle>Profile & Settings</PageHeaderTitle>
       </WorkspacePageHeader>
 
       <WorkspaceAiDock>

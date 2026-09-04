@@ -1,17 +1,11 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { MoreHorizontal, RefreshCw } from "lucide-react";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { indexWorkspaceMenus } from "@/services/duckdb-vector";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,17 +26,7 @@ export function StockPageForm() {
     <WorkspacePageShell
       showSearch={true}
       searchPlaceholder="Modül veya menü ara (ör: Stock Ledger, Seri Takibi)..."
-      breadcrumb={
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs">
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/stock">Stock</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      }
+      title={<PageHeaderTitle>Dashboard</PageHeaderTitle>}
       actions={
         <>
           <Button variant="outline" size="icon" aria-label="Refresh">

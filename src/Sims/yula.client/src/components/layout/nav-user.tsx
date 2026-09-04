@@ -9,6 +9,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,12 +20,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import { emptySubscribe } from "@/hooks/use-mounted"
@@ -32,7 +27,6 @@ import { cn } from "@/utils/cn"
 import {
   Building2,
   Check,
-  ChevronsUpDown,
   User,
   Settings,
   Inbox,
@@ -58,7 +52,6 @@ export function NavUser({
     avatar: string
   }
 }) {
-  const { isMobile } = useSidebar()
   const { theme, setTheme } = useTheme()
   const router = useRouter();
   const navigate = (
@@ -100,32 +93,24 @@ export function NavUser({
   }
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-full">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-xs leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-muted-foreground text-[11px]">
-                  {user.email}
-                </span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground/70" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          aria-label="User menu"
+          className="h-8 rounded-full px-1.5 data-[state=open]:bg-muted"
+        >
+          <Avatar className="size-7 rounded-full">
+            <AvatarImage src={user.avatar} alt={user.name} />
+            <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-64 rounded-xl p-1.5"
-            side={isMobile ? "bottom" : "right"}
+            side="bottom"
             align="end"
             sideOffset={8}
           >
@@ -244,7 +229,5 @@ export function NavUser({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
   )
 }

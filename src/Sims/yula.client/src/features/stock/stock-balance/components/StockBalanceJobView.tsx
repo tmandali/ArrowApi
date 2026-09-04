@@ -1,18 +1,10 @@
 "use client";
 
-import * as React from "react"
 import Link from "next/link";
 import { FilePlus2 } from "lucide-react"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { ArrowJobResultPanel } from "@/features/jobs/components/ArrowJobResultPanel"
@@ -52,31 +44,9 @@ export function StockBalanceJobView({ jobId }: StockBalanceJobViewProps) {
           </div>
         }
       >
-        <Breadcrumb className="min-w-0 overflow-hidden">
-          <BreadcrumbList className="flex-nowrap text-xs">
-            <BreadcrumbItem className="hidden md:inline-flex">
-              <BreadcrumbLink asChild>
-                <Link href="/stock">Stock</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:block" />
-            <BreadcrumbItem className="hidden md:inline-flex">
-              <BreadcrumbPage className="text-foreground">Reports</BreadcrumbPage>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:block" />
-            <BreadcrumbItem className="hidden sm:inline-flex">
-              <BreadcrumbLink asChild>
-                <Link href={STOCK_BALANCE_PATH}>Stock Balance</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden sm:block" />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage className="block truncate font-semibold text-foreground">
-                {shortId}…
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <PageHeaderTitle>
+          {DEFAULT_REPORT_TITLE} · {shortId}…
+        </PageHeaderTitle>
       </WorkspacePageHeader>
 
       <WorkspaceAiDock className="overflow-hidden">

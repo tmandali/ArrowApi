@@ -44,8 +44,12 @@ export const panelResizeHandleClass =
 /** Gap between stacked page cards (vertical). */
 export const pageCardGapClass = "gap-2"
 
-/** Outer padding for the floating page header (all four sides = page gutter). */
-export const pageHeaderShellClass = "relative z-10 shrink-0 p-2"
+/**
+ * Outer padding for the floating page header — left/right/bottom = page
+ * gutter. Top is 0: the card docks flush under AppHeader, so the header's
+ * bottom space + card gutter stack into a single gutter unit (no doubling).
+ */
+export const pageHeaderShellClass = "relative z-10 shrink-0 px-2 pb-2"
 
 /** Inset header bar — same card language as Executions / Yula. */
 export const pageHeaderCardClass =

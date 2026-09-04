@@ -10,7 +10,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar"
 import {
   formatNotificationTime,
   useWorkspaceNotifications,
@@ -65,8 +64,6 @@ export function WorkspaceNotificationPopover() {
   };
 
   const [open, setOpen] = React.useState(false)
-  const { isMobile, state } = useSidebar()
-  const iconCollapsed = !isMobile && state === "collapsed"
   const {
     notifications,
     markAsRead,
@@ -159,33 +156,29 @@ export function WorkspaceNotificationPopover() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <SidebarMenuButton
-          tooltip="Notification"
-          className="relative text-sidebar-foreground/70"
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-lg"
+          title="Notification"
+          aria-label="Notification"
+          className="relative shrink-0 text-muted-foreground hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
         >
           <Bell className="size-4 shrink-0" />
-          <span className={cn("truncate", iconCollapsed && "hidden")}>
-            Notification
-          </span>
           {unreadCount > 0 ? (
             <Badge
               asChild
               variant="destructive"
-              className={cn(
-                "h-4 min-w-4 shrink-0 justify-center rounded-full px-1 text-[10px] tabular-nums",
-                iconCollapsed
-                  ? "absolute top-0 right-0 z-10 ml-0"
-                  : "ml-auto"
-              )}
+              className="absolute -top-1 -right-1 z-10 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] tabular-nums"
             >
               <div>{formatUnreadCount(unreadCount)}</div>
             </Badge>
           ) : null}
-        </SidebarMenuButton>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
-        side="right"
-        align="start"
+        side="bottom"
+        align="end"
         className="flex w-80 flex-col overflow-hidden p-0 shadow-xl"
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">

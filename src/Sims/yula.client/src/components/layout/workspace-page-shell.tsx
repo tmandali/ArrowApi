@@ -8,8 +8,10 @@ import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { cn } from "@/utils/cn"
 
 type WorkspacePageShellProps = {
-  /** Breadcrumb content rendered inside the page header. */
-  breadcrumb: ReactNode
+  /** Page title content rendered in the header's left cluster (shell breadcrumb lives in AppHeader). */
+  title?: ReactNode
+  /** Hide the floating header card entirely (e.g. home screens rely on AppHeader). */
+  hideHeader?: boolean
   /** Toolbar actions (right side of the header). */
   actions?: ReactNode
   /** Extra content in the left cluster after the breadcrumb. */
@@ -26,12 +28,13 @@ type WorkspacePageShellProps = {
 }
 
 /**
- * Shared workspace page scaffold: floating header (breadcrumb + actions +
+ * Shared workspace page scaffold: floating header (page title + actions +
  * search) followed by the Yula-aware AI dock around the page body.
  * When workspace search is open, main content switches to WorkspaceSearchMainView.
  */
 export function WorkspacePageShell({
-  breadcrumb,
+  title,
+  hideHeader = false,
   actions,
   startExtra,
   searchPlaceholder,
@@ -50,15 +53,17 @@ export function WorkspacePageShell({
         className
       )}
     >
-      <WorkspacePageHeader
-        showSearch={showSearch}
-        searchPlaceholder={searchPlaceholder}
-        headerSearch={headerSearch}
-        startExtra={startExtra}
-        actions={actions}
-      >
-        {breadcrumb}
-      </WorkspacePageHeader>
+      {hideHeader ? null : (
+        <WorkspacePageHeader
+          showSearch={showSearch}
+          searchPlaceholder={searchPlaceholder}
+          headerSearch={headerSearch}
+          startExtra={startExtra}
+          actions={actions}
+        >
+          {title}
+        </WorkspacePageHeader>
+      )}
       <WorkspaceAiDock className={contentClassName}>
         {open ? <WorkspaceSearchMainView /> : children}
       </WorkspaceAiDock>

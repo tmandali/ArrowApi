@@ -6,13 +6,12 @@ import {
   pageHeaderCardClass,
   pageHeaderShellClass,
 } from "@/components/layout/panel-chrome"
+import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { cn } from "@/utils/cn"
 
 type WorkspacePageHeaderProps = {
-  children: ReactNode
+  children?: ReactNode
   actions?: ReactNode
   className?: string
   /** Classes for the outer shell (gutters). */
@@ -43,11 +42,7 @@ export function WorkspacePageHeader({
     <div className={cn(pageHeaderShellClass, shellClassName)}>
       <header className={cn(pageHeaderCardClass, className)}>
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-          />
+          <PagePanelTrigger className="-ml-1" />
           {children}
           {startExtra}
         </div>

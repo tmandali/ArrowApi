@@ -109,14 +109,31 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
     };
 
     if (!trimmed) {
-      // Boş sorgu (default): yalnız yazışmalar listelenir; menülere yazınca aranılır.
+      // Boş sorgu (default): solda workspace menüleri (kategori sırasıyla),
+      // sağda son yazışmalar — iki kolon da anında dolu gelir.
+      const allMenuItems: WorkspaceSearchResultItem[] = ALL_WORKSPACE_MENU_ITEMS
+        .filter(isItemInWorkspace)
+        .map((item) => ({
+          id: item.id,
+          title: item.title,
+          titleTr: item.titleTr,
+          url: item.url,
+          category: item.category,
+          workspace: item.workspace,
+          score: 100,
+          isExactMatch: true,
+          source: "menu" as const,
+        }));
+
       const recentConversations = readChatConversations()
         .sort((a, b) => b.conv.createdAt - a.conv.createdAt)
         .map((entry) => conversationResultItem(entry.conv, entry.snippet, 100, true));
 
+      const idleResults = [...allMenuItems, ...recentConversations];
+
       startTransition(() => {
-        setResults(recentConversations);
-        setGroupedResults(groupItems(recentConversations));
+        setResults(idleResults);
+        setGroupedResults(groupItems(idleResults));
         setIsSearchingRag(false);
       });
       return;

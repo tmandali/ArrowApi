@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { WorkspaceSidePanelTrigger } from "@/components/layout/workspace-side-panel"
 import { YulaChatTurn } from "@/components/layout/yula-chat-turn"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
+import { workspaceIconFor } from "@/components/layout/workspace-brand"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaModelSelector } from "@/components/layout/yula-model-selector"
 import {
@@ -27,7 +28,7 @@ import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useYulaChat, useYulaChatOrNull } from "@/hooks/use-yula-chat"
 import { yulaToolPartInfo } from "@/lib/yula-tool-info"
 import type { YulaMessage } from "@/app/api/agent/chat/route"
-import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
+import { formatPathnameLabel, isWorkspaceHomePath, workspaceIdFromPath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
 import { peekQueuedYulaPrompt, subscribeQueuedYulaPrompt } from "@/lib/yula-pending-prompt"
 import { cn } from "@/utils/cn"
 import {
@@ -388,6 +389,16 @@ function AIChatPanelSession({
   const dateLabel = mounted ? formatDate(now) : null
 
   const workspaceLabel = workspaceLabelFromPath(pathname)
+  // Karşılama ekranı workspace kökünde (ör. /stock) workspace'in kendi ikonunu
+  // ve etiketini gösterir; Yula kökü (/) marka ikonuyla kalır — farkındalık için.
+  const isYulaRoot = pathname === "/"
+  const workspaceRootIcon = React.useMemo(() => {
+    if (isYulaRoot) return null
+    const icon = workspaceIconFor(workspaceIdFromPath(pathname))
+    return icon
+      ? React.createElement(icon, { className: "size-16 text-yula-accent" })
+      : null
+  }, [isYulaRoot, pathname])
   const introDescription = `${workspaceLabel} çalışma alanınızda — ${YULA.emptyDescription}`
 
   const isLoading = isProcessing
@@ -839,13 +850,22 @@ function AIChatPanelSession({
       <div className="relative min-h-0 flex-1">
         {showCenteredIntro ? (
           isHomePath ? (
-            <div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-6 py-8 px-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300">
+            <div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center gap-6 px-4 pt-16 pb-8 md:pt-20 overflow-y-auto no-scrollbar">
               <div className="flex flex-col items-center gap-4 text-center">
-                <YulaMarkIcon className="size-14" />
+                {workspaceRootIcon ?? <YulaMarkIcon className="size-16" />}
                 <div className="space-y-1.5">
-                  <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
+                  <h1
+                    className={cn(
+                      "text-3xl font-bold tracking-tight",
+                      workspaceRootIcon && "text-primary"
+                    )}
+                  >
+                    {workspaceRootIcon ? workspaceLabel : greeting}
+                  </h1>
                   <p className="text-sm text-muted-foreground">
-                    Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada
+                    {workspaceRootIcon
+                      ? YULA.emptyDescription
+                      : "Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada"}
                   </p>
                   {dateLabel ? (
                     <p className="text-xs text-muted-foreground/70">{dateLabel}</p>

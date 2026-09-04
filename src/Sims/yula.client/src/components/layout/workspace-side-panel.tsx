@@ -175,33 +175,33 @@ export function WorkspaceSidePanelLayout({
       </ResizablePanel>
 
       {open ? (
-        <>
-          <ResizableHandle withHandle className={resolvedHandleClass} />
-          <ResizablePanel
-            defaultSize={String(defaultSizePercent)}
-            minSize={String(panelMinSize)}
-            maxSize={String(maxSizePercent)}
-            collapsible={collapsible}
-            collapsedSize={0}
-            className="min-h-0"
-            onResize={(size) => {
-              if (collapsible && (size.asPercentage <= 0 || size.inPixels <= 0)) {
-                onOpenChange(false)
-              }
-            }}
+        <ResizableHandle withHandle className={resolvedHandleClass} />
+      ) : null}
+      {open ? (
+        <ResizablePanel
+          defaultSize={String(defaultSizePercent)}
+          minSize={String(panelMinSize)}
+          maxSize={String(maxSizePercent)}
+          collapsible={collapsible}
+          collapsedSize={0}
+          className="min-h-0"
+          onResize={(size) => {
+            if (collapsible && (size.asPercentage <= 0 || size.inPixels <= 0)) {
+              onOpenChange(false)
+            }
+          }}
+        >
+          <aside
+            className={cn(
+              "flex h-full min-h-0 flex-col overflow-hidden",
+              resolvedShellClass
+            )}
           >
-            <aside
-              className={cn(
-                "flex h-full min-h-0 flex-col overflow-hidden",
-                resolvedShellClass
-              )}
-            >
-              <div className={cn(resolvedPanelClass, "flex-1")}>
-                {panelSurface}
-              </div>
-            </aside>
-          </ResizablePanel>
-        </>
+            <div className={cn(resolvedPanelClass, "flex-1")}>
+              {panelSurface}
+            </div>
+          </aside>
+        </ResizablePanel>
       ) : null}
     </ResizablePanelGroup>
   )

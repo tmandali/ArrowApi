@@ -47,17 +47,16 @@ export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
   return null
 }
 
-const DEFAULT_WORKSPACE: WorkspaceId = "stock"
-
 /**
- * Active workspace based on the current path.
- * On global pages (pathname without a workspace prefix) the last visited
- * workspace is preserved instead of falling back to a default one.
+ * Active workspace based on the current path, or null on global pages
+ * (pathname without a workspace prefix) before any workspace has been
+ * visited — the rail then highlights nothing instead of a default one.
+ * After a workspace has been visited, the last one is preserved on global pages.
  */
-export function useActiveWorkspaceId(): WorkspaceId {
+export function useActiveWorkspaceId(): WorkspaceId | null {
   const pathname = usePathname()
   const [lastWorkspace, setLastWorkspace] =
-    React.useState<WorkspaceId>(DEFAULT_WORKSPACE)
+    React.useState<WorkspaceId | null>(null)
   const [prevPathname, setPrevPathname] = React.useState(pathname)
 
   const id = workspaceIdFromPath(pathname)

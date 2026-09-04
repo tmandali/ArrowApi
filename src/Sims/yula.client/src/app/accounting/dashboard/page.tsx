@@ -1,20 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { BarChart2Icon } from "lucide-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landing";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 
 export default function AccountingDashboardPage() {
   return (
@@ -23,21 +15,7 @@ export default function AccountingDashboardPage() {
         <WorkspacePageShell
           showSearch={true}
           searchPlaceholder="Accounting modüllerinde ara (ör: General Ledger, Balance Sheet)..."
-          breadcrumb={
-            <Breadcrumb>
-              <BreadcrumbList className="text-xs">
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link href="/accounting">Accounting</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          }
+          title={<PageHeaderTitle>Dashboard</PageHeaderTitle>}
           actions={<AIChatAssistant />}
         >
           <BlankWorkspaceLanding

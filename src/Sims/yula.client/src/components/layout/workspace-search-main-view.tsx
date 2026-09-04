@@ -20,7 +20,11 @@ import {
 } from "lucide-react";
 import { useWorkspaceSearch } from "@/context/workspace-search-context";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
-import { useWorkspaceRagSearch } from "@/hooks/use-workspace-rag-search";
+import {
+  useWorkspaceRagSearch,
+  type WorkspaceSearchResultGroup,
+  type WorkspaceSearchResultItem,
+} from "@/hooks/use-workspace-rag-search";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { WORKSPACE_SEARCH_CONFIGS } from "@/features/stock/lib/stock-menu-registry";
 import { useChatsStore } from "@/lib/stores/chats";
@@ -52,6 +56,168 @@ function getCategoryIcon(category: string, isRag = false) {
   }
 }
 
+interface SearchResultRowProps {
+  item: WorkspaceSearchResultItem;
+  isSelected: boolean;
+  activeRef?: React.Ref<HTMLDivElement>;
+  query: string;
+  itemIsPinned: boolean;
+  isEditing: boolean;
+  editingTitle: string;
+  onEditingTitleChange: (value: string) => void;
+  onStartRename: (e: React.MouseEvent, id: string, currentTitle: string) => void;
+  onSaveRename: (e: React.FormEvent | React.MouseEvent, id: string) => void;
+  onCancelEdit: () => void;
+  onSelect: () => void;
+  onHover: () => void;
+  onTogglePin: (e: React.MouseEvent) => void;
+}
+
+function SearchResultRow({
+  item,
+  isSelected,
+  activeRef,
+  query,
+  itemIsPinned,
+  isEditing,
+  editingTitle,
+  onEditingTitleChange,
+  onStartRename,
+  onSaveRename,
+  onCancelEdit,
+  onSelect,
+  onHover,
+  onTogglePin,
+}: SearchResultRowProps) {
+  const isEditingConv = isEditing && !!item.conversationId;
+
+  return (
+    <div
+      ref={activeRef}
+      onClick={() => {
+        if (!isEditingConv) onSelect();
+      }}
+      onMouseEnter={onHover}
+      className={cn(
+        "group relative flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-all cursor-pointer border-0",
+        isSelected
+          ? "bg-primary/10 text-primary font-medium dark:bg-primary/15 ring-1 ring-primary/30"
+          : "text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
+      )}
+    >
+      {isEditingConv ? (
+        <form
+          onSubmit={(e) => onSaveRename(e, item.conversationId!)}
+          onClick={(e) => e.stopPropagation()}
+          className="flex flex-1 items-center gap-1 min-w-0"
+        >
+          <input
+            type="text"
+            autoFocus
+            value={editingTitle}
+            onChange={(e) => onEditingTitleChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onCancelEdit();
+            }}
+            className="flex-1 rounded border border-primary/40 bg-background px-2 py-0.5 text-xs outline-none text-foreground"
+          />
+          <button
+            type="submit"
+            onClick={(e) => onSaveRename(e, item.conversationId!)}
+            className="p-1 rounded text-primary hover:bg-muted transition-colors"
+            title="Kaydet"
+          >
+            <Check className="size-3" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelEdit();
+            }}
+            className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
+            title="İptal"
+          >
+            <X className="size-3" />
+          </button>
+        </form>
+      ) : (
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {getCategoryIcon(item.category, !item.isExactMatch)}
+          <span className="truncate text-xs leading-tight font-normal text-foreground/90 group-hover:text-foreground">
+            {item.title}
+          </span>
+          {item.titleTr && item.titleTr !== item.title ? (
+            <span className="text-[10px] text-muted-foreground/50 truncate font-normal">
+              [{item.titleTr}]
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1 shrink-0 ml-2">
+        {item.source === "conversation" && item.conversationId ? (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <button
+              type="button"
+              title="Yeniden Adlandır"
+              aria-label="Yeniden Adlandır"
+              onClick={(e) => onStartRename(e, item.conversationId!, item.title)}
+              className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
+            >
+              <Pencil className="size-3" />
+            </button>
+            <button
+              type="button"
+              title="Yazışmayı Sil"
+              aria-label="Yazışmayı Sil"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (item.conversationId) {
+                  useChatsStore.getState().deleteConversation(item.conversationId);
+                }
+              }}
+              className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
+            >
+              <Trash2 className="size-3" />
+            </button>
+          </div>
+        ) : null}
+
+        {query.trim() && item.isExactMatch ? (
+          <span className="text-[10px] text-muted-foreground/50 bg-muted/30 px-2 py-0.5 rounded font-normal">
+            {item.category}
+          </span>
+        ) : query.trim() && !item.isExactMatch ? (
+          <Badge
+            variant="outline"
+            className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1"
+          >
+            <Sparkles className="size-2.5" /> %{item.score} Eşleşme
+          </Badge>
+        ) : null}
+
+        {item.source === "conversation" ? null : (
+          <button
+            type="button"
+            title={itemIsPinned ? "İğneyi Kaldır" : "Ana Ekrana İğnele"}
+            onClick={onTogglePin}
+            className={cn(
+              "rounded p-1 bg-transparent border-0 outline-none transition-all cursor-pointer",
+              itemIsPinned
+                ? "text-amber-500 opacity-100 hover:text-amber-600"
+                : "opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-amber-500"
+            )}
+          >
+            <Pin className={cn("size-3", itemIsPinned && "fill-amber-500/40 text-amber-500")} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function WorkspaceSearchMainView({ className }: { className?: string }) {
   const router = useRouter();
   const { setOpen, query, setQuery } = useWorkspaceSearch();
@@ -60,9 +226,38 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
   const { isPinned, togglePin } = usePinnedWorkspaceItems(workspace);
   const config = WORKSPACE_SEARCH_CONFIGS[workspace] || WORKSPACE_SEARCH_CONFIGS.stock;
 
-  const flatItems = React.useMemo(() => {
-    return groupedResults.flatMap((g) => g.items);
-  }, [groupedResults]);
+  // İki kolon: sol = menü/modül grupları, sağ = sohbet geçmişi. İkisi de aynı
+  // sorguyla canlı filtrelenir (fast path senkron, RAG 100ms debounce ile eklenir).
+  const menuGroups = React.useMemo(
+    () =>
+      groupedResults
+        .map((group) => ({
+          category: group.category,
+          items: group.items.filter((item) => item.source !== "conversation"),
+        }))
+        .filter((group) => group.items.length > 0),
+    [groupedResults]
+  );
+
+  const chatGroups = React.useMemo(
+    () =>
+      groupedResults
+        .map((group) => ({
+          category: group.category,
+          items: group.items.filter((item) => item.source === "conversation"),
+        }))
+        .filter((group) => group.items.length > 0),
+    [groupedResults]
+  );
+
+  const menuCount = menuGroups.reduce((count, group) => count + group.items.length, 0);
+  const chatCount = chatGroups.reduce((count, group) => count + group.items.length, 0);
+
+  // Klavye gezinme sırası görsel sırayı izler: sol kolon (menüler) → sağ kolon (sohbetler)
+  const flatItems = React.useMemo(
+    () => [...menuGroups, ...chatGroups].flatMap((group) => group.items),
+    [menuGroups, chatGroups]
+  );
 
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [syncedFlatItems, setSyncedFlatItems] = React.useState(flatItems);
@@ -150,6 +345,53 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [flatItems, selectedIndex, editingId, setOpen, setQuery, handleSelect]);
 
+  const renderColumnGroups = (groups: WorkspaceSearchResultGroup[], showGroupHeader: boolean) =>
+    groups.map((group) => (
+      <div key={group.category} className="space-y-1">
+        {showGroupHeader ? (
+          <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+            {group.category}
+          </div>
+        ) : null}
+        <div className="space-y-0.5">
+          {group.items.map((item) => {
+            const itemIndex = flatItems.findIndex((f) => f.id === item.id);
+            return (
+              <SearchResultRow
+                key={item.id}
+                item={item}
+                isSelected={itemIndex === selectedIndex}
+                activeRef={itemIndex === selectedIndex ? activeItemRef : undefined}
+                query={query}
+                itemIsPinned={isPinned(item.id)}
+                isEditing={!!item.conversationId && item.conversationId === editingId}
+                editingTitle={editingTitle}
+                onEditingTitleChange={setEditingTitle}
+                onStartRename={handleStartRename}
+                onSaveRename={handleSaveRename}
+                onCancelEdit={() => setEditingId(null)}
+                onSelect={() => handleSelect(item.url, item.conversationId)}
+                onHover={() => setSelectedIndex(itemIndex)}
+                onTogglePin={(e) => {
+                  e.stopPropagation();
+                  togglePin({
+                    id: item.id,
+                    title: item.title,
+                    titleTr: item.titleTr,
+                    url: item.url,
+                    category: item.category,
+                    workspace: item.workspace,
+                  });
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    ));
+
+  const isIdle = menuCount === 0 && chatCount === 0;
+
   return (
     <div
       className={cn(
@@ -157,15 +399,21 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
         className
       )}
     >
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col">
         {/* Results Header Bar */}
         <div className="flex items-center justify-between px-2 pb-2 text-xs border-b border-border/40 mb-2 shrink-0">
           <span className="font-medium text-foreground/80 text-[11.5px] flex items-center gap-1.5">
             <Sparkles className="size-3.5 text-amber-500" />
+            <span
+              className="rounded bg-muted/50 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground/80"
+              title={`Arama kapsamı: ${config.name}`}
+            >
+              {config.name}
+            </span>
             {query.trim() ? (
               <span>"{query}" Sonuçları ({flatItems.length})</span>
             ) : (
-              <span>Son Yazışmalar ({flatItems.length})</span>
+              <span>Menüler & Sohbetler ({flatItems.length})</span>
             )}
           </span>
 
@@ -185,193 +433,81 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
           </button>
         </div>
 
-        {/* Results Body Area */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-1 space-y-3 overscroll-contain no-scrollbar">
-          {isSearching ? (
-            <div className="py-12 text-center text-xs text-muted-foreground/70 font-medium flex flex-col items-center justify-center gap-2">
-              <Loader2 className="size-6 animate-spin text-amber-500/90" />
-              <p>Sonuçlar getiriliyor...</p>
+        {/* Results Body */}
+        <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
+          {isSearching && flatItems.length === 0 ? (
+            <div className="flex-1 overflow-y-auto overscroll-contain no-scrollbar">
+              <div className="py-12 text-center text-xs text-muted-foreground/70 font-medium flex flex-col items-center justify-center gap-2">
+                <Loader2 className="size-6 animate-spin text-amber-500/90" />
+                <p>Sonuçlar getiriliyor...</p>
+              </div>
             </div>
-          ) : groupedResults.length === 0 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground/80 font-medium flex flex-col items-center justify-center gap-2.5">
-              <Sparkles className="size-8 text-primary/40" />
-              {query.trim() ? (
-                <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
-                  <span className="font-semibold text-foreground">"{query}"</span> için uygun bir modül veya yazışma bulunamadı.
+          ) : isIdle ? (
+            <div className="flex-1 overflow-y-auto overscroll-contain no-scrollbar">
+              <div className="py-12 text-center text-xs text-muted-foreground/80 font-medium flex flex-col items-center justify-center gap-2.5">
+                <Sparkles className="size-8 text-primary/40" />
+                {query.trim() ? (
+                  <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
+                    <span className="font-semibold text-foreground">"{query}"</span> için uygun bir modül veya yazışma bulunamadı.
+                  </p>
+                ) : (
+                  <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
+                    Henüz bir yazışma bulunmuyor. Yula ile sohbet başlattığınızda yazışmalarınız burada listelenir.
+                  </p>
+                )}
+                <p className="max-w-[360px] text-[11.5px] text-muted-foreground/75 leading-relaxed text-center">
+                  Yazdığınızda modül, rapor ve sohbet geçmişinde arama yapılır; tam hatırlamıyorsanız yapmak istediğiniz işi tarif edin (ör:{" "}
+                  {config.examples.map((ex, i) => (
+                    <React.Fragment key={ex}>
+                      {i > 0 ? ", " : ""}
+                      <span className="text-primary font-medium">"{ex}"</span>
+                    </React.Fragment>
+                  ))}). Sol kolon menü/modül, sağ kolon sohbet geçmişi eşleşmelerini listeler.
                 </p>
-              ) : (
-                <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
-                  Henüz bir yazışma bulunmuyor. Yula ile sohbet başlattığınızda yazışmalarınız burada listelenir.
-                </p>
-              )}
-              <p className="max-w-[360px] text-[11.5px] text-muted-foreground/75 leading-relaxed text-center">
-                Yazdığınızda modül, rapor ve sohbet geçmişinde arama yapılır; tam hatırlamıyorsanız yapmak istediğiniz işi tarif edin (ör:{" "}
-                {config.examples.map((ex, i) => (
-                  <React.Fragment key={ex}>
-                    {i > 0 ? ", " : ""}
-                    <span className="text-primary font-medium">"{ex}"</span>
-                  </React.Fragment>
-                ))}). Sohbet eşleşmeleri <span className="text-sky-500 font-medium">Sohbet Geçmişi</span> grubunda listelenir.
-              </p>
+              </div>
             </div>
           ) : (
-            groupedResults.map((group) => (
-              <div key={group.category} className="space-y-1">
-                <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                  {group.category}
+            <div className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:grid-cols-2">
+              {/* Sol kolon: Menüler / Modüller */}
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-md">
+                <div className="flex shrink-0 items-center justify-between border-b px-3 py-1.5">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    <Package className="size-3" />
+                    Menüler
+                  </span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground/50">{menuCount}</span>
                 </div>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const itemIndex = flatItems.findIndex((f) => f.id === item.id);
-                    const isSelected = itemIndex === selectedIndex;
-                    const itemIsPinned = isPinned(item.id);
-                    const isEditingConv =
-                      item.source === "conversation" &&
-                      !!item.conversationId &&
-                      item.conversationId === editingId;
-
-                    return (
-                      <div
-                        key={item.id}
-                        ref={isSelected ? activeItemRef : null}
-                        onClick={() => {
-                          if (!isEditingConv) handleSelect(item.url, item.conversationId);
-                        }}
-                        onMouseEnter={() => setSelectedIndex(itemIndex)}
-                        className={cn(
-                          "group relative flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-all cursor-pointer border-0",
-                          isSelected
-                            ? "bg-primary/10 text-primary font-medium dark:bg-primary/15 ring-1 ring-primary/30"
-                            : "text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
-                        )}
-                      >
-                        {isEditingConv ? (
-                          <form
-                            onSubmit={(e) => handleSaveRename(e, item.conversationId!)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex flex-1 items-center gap-1 min-w-0"
-                          >
-                            <input
-                              type="text"
-                              autoFocus
-                              value={editingTitle}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") setEditingId(null);
-                              }}
-                              className="flex-1 rounded border border-primary/40 bg-background px-2 py-0.5 text-xs outline-none text-foreground"
-                            />
-                            <button
-                              type="submit"
-                              onClick={(e) => handleSaveRename(e, item.conversationId!)}
-                              className="p-1 rounded text-primary hover:bg-muted transition-colors"
-                              title="Kaydet"
-                            >
-                              <Check className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingId(null);
-                              }}
-                              className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                              title="İptal"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </form>
-                        ) : (
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          {getCategoryIcon(item.category, !item.isExactMatch)}
-                          <span className="truncate text-xs leading-tight font-normal text-foreground/90 group-hover:text-foreground">
-                            {item.title}
-                          </span>
-                          {item.titleTr && item.titleTr !== item.title ? (
-                            <span className="text-[10px] text-muted-foreground/50 truncate font-normal">
-                              [{item.titleTr}]
-                            </span>
-                          ) : null}
-                        </div>
-                        )}
-
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          {item.source === "conversation" && item.conversationId ? (
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                              <button
-                                type="button"
-                                title="Yeniden Adlandır"
-                                aria-label="Yeniden Adlandır"
-                                onClick={(e) =>
-                                  handleStartRename(e, item.conversationId!, item.title)
-                                }
-                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
-                              >
-                                <Pencil className="size-3" />
-                              </button>
-                              <button
-                                type="button"
-                                title="Yazışmayı Sil"
-                                aria-label="Yazışmayı Sil"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (item.conversationId) {
-                                    useChatsStore.getState().deleteConversation(item.conversationId);
-                                  }
-                                }}
-                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            </div>
-                          ) : null}
-
-                          {query.trim() && item.isExactMatch ? (
-                            <span className="text-[10px] text-muted-foreground/50 bg-muted/30 px-2 py-0.5 rounded font-normal">
-                              {item.category}
-                            </span>
-                          ) : query.trim() && !item.isExactMatch ? (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1"
-                            >
-                              <Sparkles className="size-2.5" /> %{item.score} Eşleşme
-                            </Badge>
-                          ) : null}
-
-                          {item.source === "conversation" ? null : (
-                            <button
-                              type="button"
-                              title={itemIsPinned ? "İğneyi Kaldır" : "Ana Ekrana İğnele"}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePin({
-                                  id: item.id,
-                                  title: item.title,
-                                  titleTr: item.titleTr,
-                                  url: item.url,
-                                  category: item.category,
-                                  workspace: item.workspace,
-                                });
-                              }}
-                              className={cn(
-                                "rounded p-1 bg-transparent border-0 outline-none transition-all cursor-pointer",
-                                itemIsPinned
-                                  ? "text-amber-500 opacity-100 hover:text-amber-600"
-                                  : "opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-amber-500"
-                              )}
-                            >
-                              <Pin className={cn("size-3", itemIsPinned && "fill-amber-500/40 text-amber-500")} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-1 no-scrollbar">
+                  {menuGroups.length === 0 ? (
+                    <div className="py-10 text-center text-[11px] text-muted-foreground/60">
+                      Modül bulunamadı.
+                    </div>
+                  ) : (
+                    renderColumnGroups(menuGroups, true)
+                  )}
                 </div>
-              </div>
-            ))
+              </section>
+
+              {/* Sağ kolon: Sohbet Geçmişi */}
+              <section className="flex min-h-0 flex-col overflow-hidden rounded-md">
+                <div className="flex shrink-0 items-center justify-between border-b px-3 py-1.5">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    <MessagesSquare className="size-3" />
+                    Sohbet Geçmişi
+                  </span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground/50">{chatCount}</span>
+                </div>
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-1 no-scrollbar">
+                  {chatGroups.length === 0 ? (
+                    <div className="py-10 text-center text-[11px] text-muted-foreground/60">
+                      {query.trim() ? "Yazışma bulunamadı." : "Henüz bir yazışma bulunmuyor."}
+                    </div>
+                  ) : (
+                    renderColumnGroups(chatGroups, false)
+                  )}
+                </div>
+              </section>
+            </div>
           )}
         </div>
       </div>
