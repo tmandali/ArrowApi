@@ -162,8 +162,11 @@ const nameColStyle = (width: number): React.CSSProperties => ({
 })
 
 /** Value takes whatever remains after fixed edges + Name. */
-const valueColStyle = (nameWidth: number): React.CSSProperties => ({
-  width: `calc(100% - ${EDGE_COLS_TOTAL + nameWidth}px)`,
+const valueColStyle = (
+  nameWidth: number,
+  edgeTotal: number = EDGE_COLS_TOTAL
+): React.CSSProperties => ({
+  width: `calc(100% - ${edgeTotal + nameWidth}px)`,
   boxSizing: "border-box",
 })
 
@@ -258,6 +261,11 @@ export type SchemaCriteriaFilterProps = {
   showHeader?: boolean
   /** Show Clear in the grid footer. Default true. */
   showFooterClear?: boolean
+  /**
+   * Display-only grid: hides footer/actions, blocks pointer + keyboard
+   * interaction. Used by the Live panel to mirror a running job's criteria.
+   */
+  readOnly?: boolean
   onChange?: (
     rows: CriteriaFilterRow[],
     instance: Record<string, unknown>
@@ -282,6 +290,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
     highlightRowNames,
     showHeader = true,
     showFooterClear = true,
+    readOnly = false,
     onChange,
     onRowsChange,
     onValidate,
@@ -711,6 +720,7 @@ export const SchemaCriteriaFilter = React.forwardRef<
           showHeader ? "overflow-hidden rounded-md border shadow-none" : "rounded-none"
         )}
         onKeyDownCapture={handleGridKeyDown}
+        inert={readOnly || undefined}
       >
         <Table className="w-full table-fixed border-separate border-spacing-0 text-xs">
           <colgroup>
@@ -718,18 +728,25 @@ export const SchemaCriteriaFilter = React.forwardRef<
             {stackedLayout ? (
               <col
                 style={{
-                  width: `calc(100% - ${EDGE_COLS_TOTAL}px)`,
+                  width: `calc(100% - ${EDGE_COLS_TOTAL - (readOnly ? ACTIONS_COL_WIDTH : 0)}px)`,
                   boxSizing: "border-box",
                 }}
               />
             ) : (
               <>
                 <col style={nameColStyle(colWidths.name)} />
-                <col style={valueColStyle(colWidths.name)} />
+                <col
+                  style={valueColStyle(
+                    colWidths.name,
+                    EDGE_COLS_TOTAL - (readOnly ? ACTIONS_COL_WIDTH : 0)
+                  )}
+                />
                 {descriptionColumnVisible ? <col /> : null}
               </>
             )}
-            <col style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)} />
+            {!readOnly ? (
+              <col style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)} />
+            ) : null}
           </colgroup>
           <TableHeader className="sticky top-0 z-10 [&_tr]:border-0">
             <TableRow className="hover:bg-transparent border-0">
@@ -771,29 +788,31 @@ export const SchemaCriteriaFilter = React.forwardRef<
                   ) : null}
                 </>
               )}
-              <TableHead
-                className={cn(
-                  headClass,
-                  rowIndexClass,
-                  edgeCellClass,
-                  "text-center px-0"
-                )}
-                style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
-              >
-                <div className="flex h-full items-center justify-center">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    tabIndex={-1}
-                    className="size-6"
-                    aria-label="Reset to default"
-                    onClick={resetToDefault}
-                  >
-                    <RotateCcw className="size-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
-              </TableHead>
+              {!readOnly ? (
+                <TableHead
+                  className={cn(
+                    headClass,
+                    rowIndexClass,
+                    edgeCellClass,
+                    "text-center px-0"
+                  )}
+                  style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
+                >
+                  <div className="flex h-full items-center justify-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      tabIndex={-1}
+                      className="size-6"
+                      aria-label="Reset to default"
+                      onClick={resetToDefault}
+                    >
+                      <RotateCcw className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody className="[&_tr:last-child]:border-0">
@@ -914,62 +933,66 @@ export const SchemaCriteriaFilter = React.forwardRef<
                       ) : null}
                     </>
                   )}
-                  <TableCell
-                    className={cn(
-                      cellClass,
-                      rowIndexClass,
-                      edgeCellClass,
-                      stackedLayout && "align-middle"
-                    )}
-                    style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
-                  >
-                    <div
+                  {!readOnly ? (
+                    <TableCell
                       className={cn(
-                        "flex items-center justify-center",
-                        stackedLayout ? "min-h-[4.5rem]" : "h-7"
+                        cellClass,
+                        rowIndexClass,
+                        edgeCellClass,
+                        stackedLayout && "align-middle"
                       )}
+                      style={fixedEdgeColStyle(ACTIONS_COL_WIDTH)}
                     >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        tabIndex={-1}
-                        className="size-6"
-                        onClick={() => setEditingIndex(index)}
+                      <div
+                        className={cn(
+                          "flex items-center justify-center",
+                          stackedLayout ? "min-h-[4.5rem]" : "h-7"
+                        )}
                       >
-                        <Pencil className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          tabIndex={-1}
+                          className="size-6"
+                          onClick={() => setEditingIndex(index)}
+                        >
+                          <Pencil className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               )
             })}
           </TableBody>
         </Table>
 
-        <div className="flex shrink-0 items-center gap-1 border-t border-border/60 bg-muted/10 px-2 py-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground"
-            onClick={() => addRow()}
-          >
-            <Plus className="size-3.5 mr-1" />
-            Add Row
-          </Button>
-          {showFooterClear ? (
+        {!readOnly ? (
+          <div className="flex shrink-0 items-center gap-1 border-t border-border/60 bg-muted/10 px-2 py-1.5">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={resetToDefault}
+              onClick={() => addRow()}
             >
-              <RotateCcw className="size-3.5 mr-1" />
-              Clear
+              <Plus className="size-3.5 mr-1" />
+              Add Row
             </Button>
-          ) : null}
-        </div>
+            {showFooterClear ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={resetToDefault}
+              >
+                <RotateCcw className="size-3.5 mr-1" />
+                Clear
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <Dialog

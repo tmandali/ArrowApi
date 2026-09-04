@@ -34,6 +34,7 @@ export {
 } from "./lib/compact-date"
 export { validateCellPatterns } from "./lib/validate-cell-patterns"
 export { rowsToCriteriaInstance } from "./lib/rows-to-criteria-instance"
+export { criteriaInstanceToRows } from "./lib/instance-to-criteria-rows"
 export { stripExtensionKeywords } from "./lib/strip-extension-keywords"
 export { validateCriteria } from "./lib/validate-criteria"
 export { useSharedCriteriaDraft } from "./lib/use-shared-criteria-draft"
