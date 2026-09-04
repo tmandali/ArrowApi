@@ -22,7 +22,7 @@ export default function DuckDbSpikePage() {
     async function run() {
       try {
         push({ ok: true, label: "dynamic import('@duckdb/duckdb-wasm')" });
-        const = await import("@duckdb/duckdb-wasm");
+        const duckdb = await import("@duckdb/duckdb-wasm");
 
         push({ ok: true, label: "selectBundle(/public/self-hosted)" });
         const bundle = await duckdb.selectBundle({

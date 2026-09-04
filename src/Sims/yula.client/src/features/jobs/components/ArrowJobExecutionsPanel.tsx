@@ -62,6 +62,7 @@ import {
   listArrowJobs,
 } from "@/features/jobs/arrow-job-client"
 import { ArrowJobLivePanel } from "./ArrowJobLivePanel"
+import { statusTone } from "@/features/jobs/lib/status-tone"
 import { RunProgressSteps } from "./RunProgressSteps"
 import {
   buildRunEventsFromLog,
