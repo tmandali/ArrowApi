@@ -269,3 +269,9 @@ export const useChatsStore = create<ChatsState>()(
     },
   ),
 );
+
+// İlk render'da aktif sohbet hazır olsun: persist rehydration'ı senkron
+// tamamlanmazsa bile provider ilk boyamada ChatInstance'ı mount edebilir.
+if (typeof window !== "undefined") {
+  useChatsStore.getState().ensureActiveConversation();
+}

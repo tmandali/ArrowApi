@@ -16,7 +16,7 @@ import {
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
-import { useYulaChat } from "@/hooks/use-yula-chat"
+import { useYulaChatOrNull } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { cn } from "@/utils/cn"
 import { History, Maximize2, Minimize2, SquarePen } from "lucide-react"
@@ -37,14 +37,16 @@ type WorkspaceAiDockProps = {
 }
 
 function YulaNewChatButton() {
-  const { newConversation } = useYulaChat()
+  // Dock başlığı oturum hazır olmadan da mount olabilir (defaultOpen) —
+  // tıklama anında oturum hazırdır; yine de null-güvenli tutulur.
+  const { newConversation } = useYulaChatOrNull() ?? {}
   const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen)
   const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory)
 
   const handleNew = () => {
     setSearchingHistory(false)
     setHistoryOpen(false)
-    newConversation()
+    newConversation?.()
   }
 
   return (

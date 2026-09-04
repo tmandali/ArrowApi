@@ -24,7 +24,7 @@ import {
 import { useChatsStore } from "@/lib/stores/chats"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
-import { useYulaChat } from "@/hooks/use-yula-chat"
+import { useYulaChat, useYulaChatOrNull } from "@/hooks/use-yula-chat"
 import { yulaToolPartInfo } from "@/lib/yula-tool-info"
 import type { YulaMessage } from "@/app/api/agent/chat/route"
 import { formatPathnameLabel, isWorkspaceHomePath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
@@ -33,9 +33,11 @@ import { cn } from "@/utils/cn"
 import {
   ArrowDown,
   ArrowUp,
+  CircleAlert,
   FileCode,
   FileText,
   Plus,
+  RotateCw,
   Square,
   X,
 } from "lucide-react"
@@ -62,7 +64,10 @@ export function AIChatAssistant({
 }: AIChatAssistantProps = {}) {
   const router = useRouter()
   const { open, setOpen } = useWorkspaceAiChat()
-  const { newConversation } = useYulaChat()
+  // Araç çubuğu uygulama kabuğunda yaşar; oturum henüz hazır değilken de
+  // render edilir. newConversation yalnız tıklamada çağrılır — o ana kadar
+  // oturum çoktan hazırdır, yine de null-güvenli tutulur.
+  const { newConversation } = useYulaChatOrNull() ?? {}
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname)
   const toolbarRef = React.useRef<HTMLDivElement>(null)
@@ -99,7 +104,7 @@ export function AIChatAssistant({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (isHomePage) {
-      newConversation()
+      newConversation?.()
       if (pathname !== "/") {
         router.push("/")
       }
@@ -203,8 +208,58 @@ type AIChatPanelProps = {
   belowInput?: React.ReactNode
 }
 
+/**
+ * Sohbet oturumu (YulaChatContext) henüz hazır değilse panel yerinde bekler:
+ * kısa beklemede "hazırlanıyor", ~4 sn'yi aşarsa "yüklenemedi" + yenileme.
+ * Uygulama kabuğu bu durumdan BAĞIMSIZ açılır — bekleme yalnız panel içidir.
+ */
+function ChatSessionFallback() {
+  const [isStuck, setIsStuck] = React.useState(false)
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsStuck(true), 4000)
+    return () => clearTimeout(timer)
+  }, [])
+  if (isStuck) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm">
+        <div className="flex items-center gap-2 font-medium text-destructive">
+          <CircleAlert className="size-4" aria-hidden />
+          <span>Uygulama yüklenemedi</span>
+        </div>
+        <p className="max-w-md text-center text-xs opacity-70">
+          Sohbet oturumu başlatılamadı; bu genellikle sunucu yeniden
+          başlatıldıktan sonra eski sekmenin bağlantısının kopmasından
+          (hydration hatası) kaynaklanır. Ayrıntılar için tarayıcı
+          konsoluna bakabilirsiniz.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="inline-flex h-8 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-accent"
+        >
+          <RotateCw className="size-3.5" aria-hidden />
+          Sayfayı yenile
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
+      Sohbet hazırlanıyor…
+    </div>
+  )
+}
+
 /** Docked or main screen panel body — avatar-free chat box with attach + slash commands. */
-export function AIChatPanel({
+export function AIChatPanel(props: AIChatPanelProps = {}) {
+  const session = useYulaChatOrNull()
+  if (!session) {
+    return <ChatSessionFallback />
+  }
+  return <AIChatPanelSession {...props} />
+}
+
+function AIChatPanelSession({
   centeredIntro = false,
   mode,
   belowInput,

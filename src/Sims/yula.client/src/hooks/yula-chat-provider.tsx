@@ -15,7 +15,6 @@ import {
 } from "./yula-chat-context";
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CircleAlert, RotateCw } from "lucide-react";
 import { executeClientTool, resetGridCustomView } from "@/lib/yula-client-tools";
 import {
   blockedIncompleteIntent,
@@ -1304,22 +1303,6 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 	newConversation
 ]);
 
-  // Placeholder iki kademeli: kısa süren normal bekleme ("hazırlanıyor") ve
-  // context ~4 sn içinde hazır olmazsa hydration/oturum hatası ihtimaline
-  // karşı "yüklenemedi" durumu (muhtemel neden + yenileme aksiyonu).
-  const [isLoadStuck, setIsLoadStuck] = React.useState(false);
-  React.useEffect(() => {
-    const resetLoadStuck = () => {
-      setIsLoadStuck(false);
-    }
-    if (value) {
-      resetLoadStuck();
-      return;
-    }
-    const timer = setTimeout(() => setIsLoadStuck(true), 4000);
-    return () => clearTimeout(timer);
-  }, [value]);
-
   return (
     <>
       {activeId ? (
@@ -1329,41 +1312,14 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
           onContextReady={setLiveHelpersStable}
         />
       ) : null}
-      {value ? (
-        <YulaChatContext.Provider value={value}>
-          {children}
-        </YulaChatContext.Provider>
-      ) : isLoadStuck ? (
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm">
-          <div className="flex items-center gap-2 font-medium text-destructive">
-            <CircleAlert className="size-4" aria-hidden />
-            <span>Uygulama yüklenemedi</span>
-          </div>
-          <p className="max-w-md text-center text-xs opacity-70">
-            Sohbet oturumu başlatılamadı; bu genellikle sunucu yeniden
-            başlatıldıktan sonra eski sekmenin bağlantısının kopmasından
-            (hydration hatası) kaynaklanır. Ayrıntılar için tarayıcı
-            konsoluna bakabilirsiniz.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="inline-flex h-8 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-accent"
-          >
-            <RotateCw className="size-3.5" aria-hidden />
-            Sayfayı yenile
-          </button>
-        </div>
-      ) : (
-        <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
-          Sohbet hazırlanıyor…
-        </div>
-      )}
+      <YulaChatContext.Provider value={value}>
+        {children}
+      </YulaChatContext.Provider>
     </>
   );
 }
 
-// Not: context örneği null iken çocuklar render edilmez; dock açılışı
-// ensureActiveConversation garanti ettiği için pratikte anlık olur.
-// ~4 sn içinde hazır olmazsa "Uygulama yüklenemedi" durumuna düşer
-// (hydration/oturum hatası ihtimali); kullanıcıya yenileme aksiyonu sunulur.
+// Not: Uygulama kabuğu (children) sohbet oturumundan BAĞIMSIZ render edilir;
+// context null iken yalnızca sohbet paneli kendi içinde "hazırlanıyor" gösterir
+// (AIChatPanel). Panel ~4 sn içinde hazır olmazsa "Uygulama yüklenemedi"
+// durumuna düşer (hydration/oturum hatası ihtimali); yenileme aksiyonu sunar.
