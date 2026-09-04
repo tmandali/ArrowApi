@@ -13,6 +13,7 @@ public sealed record RetailSalesReportParams(DateTime BasTarih, DateTime BitTari
 
 public sealed class RetailSalesReportWorker(
     //ILogger<RetailSalesReportWorker> logger,
+    IArrowJobExecutionContext context,
     IConfiguration configuration) : IArrowJobWorker<RetailSalesReportParams>
 {
     public async IAsyncEnumerable<RecordBatch> Handle(
@@ -21,7 +22,9 @@ public sealed class RetailSalesReportWorker(
     {
         var cnnString = configuration.GetConnectionString("retail");
         await using SqlConnection cnn = new(cnnString);
+        await context.PublishInfoAsync("Satış Raporu Başladı", cancellationToken);
         await cnn.OpenAsync(cancellationToken);
+        await context.PublishInfoAsync("Sunucuya bağlandı", cancellationToken);
 
         var command = new CommandDefinition(
             commandText: "SELECT Depo, SatisID, KasaTip, HareketBaslamaTarih, HareketBitisTarih, BelgeNo, Statu, ToplamTutar, ToplamKdvTutar, GenelIskontoTutar, Islem, SonDuzenleme, KasaID, ParaBirimi, Kasiyer, MusteriNo\n" +
