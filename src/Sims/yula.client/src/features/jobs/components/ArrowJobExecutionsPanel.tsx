@@ -6,7 +6,6 @@ import {
   CircleCheck,
   CircleX,
   Copy,
-  Eye,
   FileText,
   Filter,
   History,
@@ -90,10 +89,10 @@ function formatWhen(value?: string | null): string {
 
 function ExecutionStatusMark({
   status,
-  onView,
+  onDelete,
 }: {
   status: string
-  onView?: () => void
+  onDelete?: () => void
 }) {
   switch (status) {
     case "Completed": {
@@ -107,23 +106,23 @@ function ExecutionStatusMark({
             className="absolute inset-0 size-4 text-primary/70 transition-opacity group-hover:opacity-0 dark:text-sidebar-primary/80"
             aria-hidden
           />
-          <Eye
-            className="absolute inset-0 size-4 text-primary/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-sidebar-primary/80"
+          <Trash2
+            className="absolute inset-0 size-4 text-destructive/70 opacity-0 transition-opacity group-hover:opacity-100"
             aria-hidden
           />
         </span>
       )
-      if (!onView) return mark
+      if (!onDelete) return mark
       return (
         <span
           role="button"
           tabIndex={-1}
-          title="View report"
-          aria-label="View report"
+          title="Delete execution"
+          aria-label="Delete execution"
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            onView()
+            onDelete()
           }}
           className="flex size-5 shrink-0 items-center justify-center rounded"
         >
@@ -170,10 +169,6 @@ function ExecutionStatusMark({
         </Badge>
       )
   }
-}
-
-function shortId(id: string): string {
-  return id.slice(0, 8)
 }
 
 function sameJobId(a: string | null | undefined, b: string | null | undefined) {
@@ -317,6 +312,9 @@ export function ArrowJobExecutionsPanel({
   const [historyEvents, setHistoryEvents] = React.useState<RunEventItem[]>([])
   const [historyLoading, setHistoryLoading] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
+  /** Execution queued for deletion — set from the toolbar or the list row's
+   *  hover mark so deletion never depends on the current selection. */
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const selectedItemRef = React.useRef<HTMLButtonElement | null>(null)
@@ -646,18 +644,22 @@ export function ArrowJobExecutionsPanel({
   const handleConfirmDelete = React.useCallback(
     async (event: React.MouseEvent) => {
       event.preventDefault()
-      if (!selectedId || deleting) return
+      const targetId = deleteTargetId
+      if (!targetId || deleting) return
       setDeleting(true)
       setDeleteError(null)
       try {
-        await deleteArrowJob(selectedId)
-        removeTrackedJob(selectedId)
-        onJobDeleted?.(selectedId)
+        await deleteArrowJob(targetId)
+        removeTrackedJob(targetId)
+        onJobDeleted?.(targetId)
         setDeleteOpen(false)
-        setSelectedId(null)
-        setSelectedJob(null)
-        setHistoryEvents([])
-        setInputJson("{\n  \n}")
+        setDeleteTargetId(null)
+        if (sameJobId(selectedId, targetId)) {
+          setSelectedId(null)
+          setSelectedJob(null)
+          setHistoryEvents([])
+          setInputJson("{\n  \n}")
+        }
         await loadList(undefined, { silent: true })
       } catch (err) {
         const message =
@@ -671,7 +673,7 @@ export function ArrowJobExecutionsPanel({
         setDeleting(false)
       }
     },
-    [selectedId, deleting, removeTrackedJob, onJobDeleted, loadList]
+    [deleteTargetId, selectedId, deleting, removeTrackedJob, onJobDeleted, loadList]
   )
 
   const detailLines = React.useMemo(() => {
@@ -729,6 +731,59 @@ export function ArrowJobExecutionsPanel({
     if (loading) return
     onListLoaded?.(error ? 0 : displayItems.length)
   }, [loading, error, displayItems.length, onListLoaded])
+
+  /** Detail column header actions — shared by the classic Detail view and
+   *  the embedded result view so Delete stays available in both. */
+  const detailToolbar = (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {canCancelSelected && selectedId ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn(
+            panelHeaderActionClass,
+            "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          )}
+          disabled={cancelling}
+          onClick={handleCancelSelected}
+        >
+          <Ban className="size-3.5" />
+          {cancelling ? "Cancelling…" : "Cancel"}
+        </Button>
+      ) : null}
+      {canDeleteSelected ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn(
+            panelHeaderActionClass,
+            "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          )}
+          disabled={deleting}
+          onClick={() => {
+            setDeleteError(null)
+            setDeleteTargetId(selectedId)
+            setDeleteOpen(true)
+          }}
+        >
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
+      ) : null}
+      {canOpenSelected && selectedId ? (
+        <Button
+          type="button"
+          size="sm"
+          className={panelHeaderActionClass}
+          onClick={() => onOpenJob?.(selectedId)}
+        >
+          View report
+        </Button>
+      ) : null}
+    </div>
+  )
 
   return (
     <>
@@ -818,26 +873,60 @@ export function ArrowJobExecutionsPanel({
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 truncate font-mono text-xs">
-                            {shortId(job.id)}…
-                          </span>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <span
+                              className="min-w-0 truncate font-mono text-xs"
+                              title={job.id}
+                            >
+                              {job.id}
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={-1}
+                              title="Copy GUID"
+                              aria-label="Copy GUID"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                handleCopy(job.id, "id")
+                              }}
+                              className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+                            >
+                              <Copy className="size-3" />
+                            </span>
+                          </div>
                           <span
                             className="flex size-5 shrink-0 items-center justify-center"
                             title={job.status}
                           >
                             <ExecutionStatusMark
                               status={job.status}
-                              onView={
-                                onOpenJob
-                                  ? () => onOpenJob(job.id)
-                                  : undefined
-                              }
+                              onDelete={() => {
+                                setDeleteError(null)
+                                setDeleteTargetId(job.id)
+                                setDeleteOpen(true)
+                              }}
                             />
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                          <span>{formatWhen(job.createdAt)}</span>
-                          <span>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="min-w-0 truncate">
+                              {formatWhen(job.createdAt)}
+                            </span>
+                            <span className="opacity-50">·</span>
+                            <span
+                              className="shrink-0 tabular-nums"
+                              title="Duration"
+                            >
+                              {formatTotalDuration({
+                                createdAt: job.createdAt,
+                                completedAt: job.completedAt,
+                                status: job.status,
+                              }) ?? "—"}
+                            </span>
+                          </div>
+                          <span className="shrink-0">
                             {job.totalRows != null
                               ? `${formatCount(job.totalRows)} rows`
                               : "—"}
@@ -932,53 +1021,7 @@ export function ArrowJobExecutionsPanel({
                   ) : null}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {canCancelSelected && selectedId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      panelHeaderActionClass,
-                      "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    )}
-                    disabled={cancelling}
-                    onClick={handleCancelSelected}
-                  >
-                    <Ban className="size-3.5" />
-                    {cancelling ? "Cancelling…" : "Cancel"}
-                  </Button>
-                ) : null}
-                {canDeleteSelected ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      panelHeaderActionClass,
-                      "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    )}
-                    disabled={deleting}
-                    onClick={() => {
-                      setDeleteError(null)
-                      setDeleteOpen(true)
-                    }}
-                  >
-                    <Trash2 className="size-3.5" />
-                    Delete
-                  </Button>
-                ) : null}
-                {canOpenSelected && selectedId ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className={panelHeaderActionClass}
-                    onClick={() => onOpenJob?.(selectedId)}
-                  >
-                    View report
-                  </Button>
-                ) : null}
-              </div>
+                {detailToolbar}
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1060,7 +1103,10 @@ export function ArrowJobExecutionsPanel({
       onOpenChange={(open) => {
         if (deleting) return
         setDeleteOpen(open)
-        if (!open) setDeleteError(null)
+        if (!open) {
+          setDeleteError(null)
+          setDeleteTargetId(null)
+        }
       }}
     >
       <AlertDialogContent className="data-[size=default]:max-w-md data-[size=default]:sm:max-w-md">
@@ -1070,11 +1116,11 @@ export function ArrowJobExecutionsPanel({
           </AlertDialogMedia>
           <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
           <AlertDialogDescription>
-            {selectedId ? (
+            {deleteTargetId ? (
               <>
                 Execution{" "}
                 <span className="break-all font-mono text-foreground">
-                  {selectedId}
+                  {deleteTargetId}
                 </span>{" "}
                 will be permanently removed from history.
               </>
