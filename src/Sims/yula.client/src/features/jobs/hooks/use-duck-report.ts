@@ -193,16 +193,17 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       filtersRef.current = nextFilters
       setFilters(nextFilters)
       setPage(0)
+      setIsLoadingQuery(true)
 
-    if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
-    queryTimeoutRef.current = setTimeout(() => {
-      // Özel SQL modunda filtre hücreleri sorgu sonucunu yeniden süzer
-      if (isCustomQueryActive()) {
-        setCustomQueryTick((t) => t + 1)
-        return
-      }
-      void executeQueryRef.current(nextFilters, sortByRef.current, sortDescRef.current, 0)
-    }, 250)
+      if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+      queryTimeoutRef.current = setTimeout(() => {
+        // Özel SQL modunda filtre hücreleri sorgu sonucunu yeniden süzer
+        if (isCustomQueryActive()) {
+          setCustomQueryTick((t) => t + 1)
+          return
+        }
+        void executeQueryRef.current(nextFilters, sortByRef.current, sortDescRef.current, 0)
+      }, 250)
     },
     []
   )
@@ -211,6 +212,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     filtersRef.current = {}
     setFilters({})
     setPage(0)
+    setIsLoadingQuery(true)
     if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
     if (isCustomQueryActive()) {
       setCustomQueryTick((t) => t + 1)

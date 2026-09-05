@@ -295,11 +295,27 @@ export function ArrowReportGrid({
   }, [])
 
   const countDisplay =
-    hasActiveFilters && totalRows > 0
-      ? `${formatCount(totalFiltered)} / ${formatCount(totalRows)} (filtered)`
-      : totalRows > 0
-        ? `${formatCount(totalRows)} row${totalRows === 1 ? "" : "s"}`
-        : `${formatCount(displayRows.length)} row${displayRows.length === 1 ? "" : "s"}`
+    hasActiveFilters && totalRows > 0 ? (
+      <span className="inline-flex items-center gap-1.5 tabular-nums">
+        {isLoadingQuery ? (
+          <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
+        ) : null}
+        <span>
+          {formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
+        </span>
+      </span>
+    ) : totalRows > 0 ? (
+      <span className="inline-flex items-center gap-1.5 tabular-nums">
+        {isLoadingQuery ? (
+          <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
+        ) : null}
+        <span>
+          {formatCount(totalRows)} row{totalRows === 1 ? "" : "s"}
+        </span>
+      </span>
+    ) : (
+      `${formatCount(displayRows.length)} row${displayRows.length === 1 ? "" : "s"}`
+    )
 
   const streamingSubtitle = isSavingDisk ? (
     <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
