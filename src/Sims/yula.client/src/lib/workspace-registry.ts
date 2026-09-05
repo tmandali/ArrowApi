@@ -47,6 +47,16 @@ export const workspaceDashboardPathByWorkspace: Record<WorkspaceId, string> = {
   subcontracting: subcontractingWorkspace.dashboardPath,
 };
 
+/** Workspace ana sayfalarının (root / landing) rotaları */
+export const workspaceRootPathByWorkspace: Record<WorkspaceId, string> = {
+  system: systemWorkspace.rootPath,
+  stock: stockWorkspace.rootPath,
+  accounting: accountingWorkspace.rootPath,
+  selling: sellingWorkspace.rootPath,
+  manufacturing: manufacturingWorkspace.rootPath,
+  subcontracting: subcontractingWorkspace.rootPath,
+};
+
 /** Workspace ID'ye göre isim haritası */
 export const workspaceNameById: Record<WorkspaceId, string> = {
   system: systemWorkspace.name,

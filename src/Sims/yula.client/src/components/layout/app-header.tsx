@@ -6,7 +6,7 @@ import { WorkspaceNotificationPopover } from "@/components/layout/workspace-noti
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
 import {
-  workspaceDashboardPathByWorkspace,
+  workspaceRootPathByWorkspace,
   workspaceNameById,
 } from "@/lib/workspace-nav"
 import { YULA } from "@/components/layout/yula-brand-data"
@@ -30,12 +30,12 @@ export function AppHeader({ className }: { className?: string }) {
     ? workspaceNameById[activeWorkspaceId]
     : undefined
 
-  // "Yula <Workspace>" marka satırı → modül ana sayfası (dashboard).
+  // "Yula <Workspace>" marka satırı → her zaman workspace ana sayfası (landing).
   // Aktif workspace yoksa Yula ana ekranına döner.
   const handleBrandClick = () => {
     router.push(
       activeWorkspaceId
-        ? workspaceDashboardPathByWorkspace[activeWorkspaceId]
+        ? workspaceRootPathByWorkspace[activeWorkspaceId] ?? "/"
         : "/"
     )
   }
