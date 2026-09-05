@@ -106,7 +106,7 @@ export function ArrowJobResultPanel({
    * ucu yazılır; stream manager önce OPFS cache'i tercih eder, 404'e düşmez.
    */
   const openFromLocalCache = React.useCallback(async (): Promise<boolean> => {
-    const cached = (await opfsReportCache.hasParquetParts(jobId)) || (await opfsReportCache.has(jobId))
+    const cached = await opfsReportCache.hasParquetParts(jobId)
     if (!cached) {
       pushError("Job bulunamadı")
       return false
@@ -145,10 +145,8 @@ export function ArrowJobResultPanel({
     const load = async () => {
       try {
         // 1. Önce OPFS diskini kontrol et (0 ms):
-        // Parquet parçaları veya Arrow cache diskte zaten mevcutsa, sunucuyu beklemeden anında aç!
-        const hasParquet = await opfsReportCache.hasParquetParts(jobId)
-        const hasArrow = !hasParquet && (await opfsReportCache.has(jobId))
-        const hasLocalCache = hasParquet || hasArrow
+        // Parquet parçaları diskte zaten mevcutsa, sunucuyu beklemeden anında aç!
+        const hasLocalCache = await opfsReportCache.hasParquetParts(jobId)
 
         if (hasLocalCache) {
           if (runIdRef.current !== runId) return

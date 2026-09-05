@@ -15,7 +15,6 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
 let initPromise: Promise<void> | null = null
-const tableRowCounts = new Map<string, number>()
 const tableVfsFiles = new Map<string, string[]>()
 
 async function getDuckDb(): Promise<{
@@ -137,7 +136,6 @@ async function resetDuckDb(): Promise<{
   db: duckdb.AsyncDuckDB
   conn: duckdb.AsyncDuckDBConnection
 }> {
-  tableRowCounts.clear()
   tableVfsFiles.clear()
 
   try {
@@ -234,31 +232,6 @@ self.onmessage = async (e: MessageEvent) => {
 
     try {
       switch (type) {
-        case "INGEST_ARROW_BATCH": {
-          const { tableName, buffer, append, rowCount } = payload
-          const uint8 =
-            buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
-
-          if (!append) {
-            await safeDropObject(conn, tableName)
-            tableRowCounts.set(tableName, 0)
-          }
-
-          // Main thread zaten IPC stream olarak serileştirdi; yeniden parse/serialize yok.
-          await conn.insertArrowFromIPCStream(uint8, {
-            name: tableName,
-            create: !append,
-          })
-
-          const insertedRows = Number(rowCount ?? 0)
-          const prevCount = tableRowCounts.get(tableName) ?? 0
-          const count = prevCount + insertedRows
-          tableRowCounts.set(tableName, count)
-
-          self.postMessage({ id, success: true, rowCount: count })
-          break
-        }
-
         case "REGISTER_PARQUET_PARTS_VIEW": {
           const { tableName, jobId, partFiles } = payload as {
             tableName: string
@@ -314,19 +287,12 @@ self.onmessage = async (e: MessageEvent) => {
           const fileListSql = vfsNames.map((n) => `'${n}'`).join(", ")
           await conn.query(`CREATE OR REPLACE VIEW ${quoted} AS SELECT * FROM read_parquet([${fileListSql}]);`)
 
-          // 5. Satır sayısını al ve kaydet
+          // 5. Satır sayısını al ve dön
           const cntRes = await conn.query(`SELECT COUNT(*)::BIGINT as count FROM ${quoted};`)
           const cntRows = arrowTableToObjects(cntRes)
           const count = Number(cntRows[0]?.count ?? 0)
-          tableRowCounts.set(tableName, count)
 
           self.postMessage({ id, success: true, rowCount: count })
-          break
-        }
-
-        case "FLUSH_CHECKPOINT": {
-          await conn.query("CHECKPOINT;").catch(() => {})
-          self.postMessage({ id, success: true })
           break
         }
 
@@ -438,7 +404,6 @@ self.onmessage = async (e: MessageEvent) => {
             }
             tableVfsFiles.delete(tableName)
           }
-          tableRowCounts.delete(tableName)
           self.postMessage({ id, success: true })
           break
         }

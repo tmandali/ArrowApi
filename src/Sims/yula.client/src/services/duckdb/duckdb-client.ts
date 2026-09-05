@@ -58,8 +58,7 @@ class DuckDbClient {
 
   private postMessage<T = WorkerResponse>(
     type: string,
-    payload: Record<string, unknown>,
-    transfer?: Transferable[]
+    payload: Record<string, unknown>
   ): Promise<T> {
     const worker = this.getWorker()
     const id = ++this.messageSeq
@@ -71,11 +70,7 @@ class DuckDbClient {
             resolve: resolve as (value: WorkerResponse) => void,
             reject,
           })
-          if (transfer && transfer.length > 0) {
-            worker.postMessage({ id, type, payload }, transfer)
-          } else {
-            worker.postMessage({ id, type, payload })
-          }
+          worker.postMessage({ id, type, payload })
         })
     )
     this.sendQueue = request.then(
@@ -83,24 +78,6 @@ class DuckDbClient {
       () => undefined
     )
     return request
-  }
-
-  /**
-   * Arrow IPC buffer'ını DuckDB tablosuna aktarır.
-   */
-  async ingestArrowBatch(
-    tableName: string,
-    buffer: Uint8Array | ArrayBuffer,
-    append = false,
-    rowCount?: number
-  ): Promise<number> {
-    const res = await this.postMessage<WorkerResponse>("INGEST_ARROW_BATCH", {
-      tableName,
-      buffer,
-      append,
-      rowCount,
-    })
-    return res.rowCount ?? 0
   }
 
   /**

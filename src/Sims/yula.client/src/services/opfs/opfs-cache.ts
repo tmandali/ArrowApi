@@ -85,29 +85,6 @@ class OpfsReportCache {
   }
 
   /**
-   * OPFS diskine yeni bir parquet parçası yazar.
-   */
-  async writeParquetPart(jobId: string, partIndex: number, data: Uint8Array): Promise<string> {
-    const dir = await this.getParquetDirectory(jobId, true)
-    if (!dir) throw new Error(`OPFS parquet dizini oluşturulamadı: ${jobId}`)
-    const fileName = `sims_part_${String(partIndex).padStart(4, "0")}.parquet`
-    const fileHandle = await dir.getFileHandle(fileName, { create: true })
-    const writable = await fileHandle.createWritable()
-    try {
-      await writable.write(data as unknown as BufferSource)
-      await writable.close()
-      return fileName
-    } catch (err) {
-      try {
-        await writable.abort()
-      } catch {
-        // ignore
-      }
-      throw err
-    }
-  }
-
-  /**
    * Belirtilen jobId'ye ait tüm Parquet part dosyalarını ve dizinini siler (Rollback / Silme durumu).
    */
   async removeParquetParts(jobId: string): Promise<void> {
@@ -122,54 +99,8 @@ class OpfsReportCache {
   }
 
   /**
-   * Belirtilen jobId'ye ait rapor dosyasının OPFS diskinde olup olmadığını kontrol eder.
-   */
-  async has(jobId: string): Promise<boolean> {
-    const dir = await this.getDirectory()
-    if (!dir) return false
-    try {
-      const fileHandle = await dir.getFileHandle(`${jobId}.arrow`)
-      const file = await fileHandle.getFile()
-      return file.size > 0
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * OPFS diskindeki rapor dosyasını ReadableStream olarak döner.
-   */
-  async getStream(jobId: string): Promise<ReadableStream<Uint8Array> | null> {
-    const dir = await this.getDirectory()
-    if (!dir) return null
-    try {
-      const fileHandle = await dir.getFileHandle(`${jobId}.arrow`)
-      const file = await fileHandle.getFile()
-      if (file.size === 0) return null
-      return file.stream()
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * OPFS diskine yeni bir rapor dosyası yazmak için WritableStream açar.
-   */
-  async createWritable(jobId: string): Promise<FileSystemWritableFileStream | null> {
-    const dir = await this.getDirectory()
-    if (!dir) return null
-    try {
-      const fileHandle = await dir.getFileHandle(`${jobId}.arrow`, { create: true })
-      return await fileHandle.createWritable()
-    } catch (err) {
-      console.warn("OPFS writable oluşturulamadı:", err)
-      return null
-    }
-  }
-
-  /**
    * OPFS diskindeki rapor dosyasını siler (Yenileme / Refresh durumunda).
-   * Legacy `.parquet` kalıntıları ve multi-part parquet dizinleri de temizlenir.
+   * Legacy kalıntıları ve multi-part parquet dizinleri temizlenir.
    */
   async remove(jobId: string): Promise<void> {
     const dir = await this.getDirectory()

@@ -28,7 +28,6 @@ export type ArrowReportGridProps = {
   jobUrl: string | null | undefined
   columns?: SpreadsheetColumn[]
   expectedTotalRows?: number | null
-  initialRows?: Record<string, unknown>[]
   showFilterRow?: boolean
   onShowFilterRowChange?: (open: boolean) => void
   /** Rapor şemasının x-ai.columnDescriptions'ı — LLM kolon semantiği grounding'i */
@@ -60,7 +59,6 @@ export function ArrowReportGrid({
   jobUrl,
   columns = [],
   expectedTotalRows,
-  initialRows = [],
   showFilterRow = false,
   onShowFilterRowChange,
   columnDescriptions,
@@ -185,9 +183,7 @@ export function ArrowReportGrid({
 
   const filterKey = React.useMemo(() => JSON.stringify(filters), [filters])
 
-  const displayRows = customQuerySql || hasActiveFilters || rows.length > 0
-    ? rows
-    : initialRows
+  const displayRows = rows
 
   const sampleRows = React.useMemo(() => {
     return displayRows.slice(0, 3).map((r) => {

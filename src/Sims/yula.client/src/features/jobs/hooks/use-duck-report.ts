@@ -83,11 +83,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const queryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableReadyRef = React.useRef(false)
   const prevCompleteRef = React.useRef(false)
-  // Render için aynalanan tablo-hazır bayrağı (callback'ler taze ref okur)
-  const [tableReady, setTableReady] = React.useState(false)
   const markTableReady = React.useCallback((v: boolean) => {
     tableReadyRef.current = v
-    setTableReady(v)
   }, [])
   // Akış ilerlemesinin en güncel değerleri — callback'ler ref okur
   const latestStreamedRef = React.useRef(streamedRows)
@@ -445,7 +442,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     }
   }, [customSql, customQueryTick, tableName, onError, markTableReady])
 
-  const hasMore = tableReady && totalFiltered > 0 && rows.length < totalFiltered
+  const hasMore = rows.length > 0 && rows.length < totalFiltered
   const loadingMoreRef = React.useRef(false)
 
   const loadMore = React.useCallback(() => {
