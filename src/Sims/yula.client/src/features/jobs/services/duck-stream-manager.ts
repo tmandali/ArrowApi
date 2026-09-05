@@ -1,12 +1,8 @@
-import {
-  type RecordBatch,
-  RecordBatchReader,
-  tableToIPC,
-  Table,
-} from "apache-arrow"
 import { duckDbClient } from "@/services/duckdb"
 import { opfsReportCache } from "@/services/opfs/opfs-cache"
 import { getCompanyHeaders } from "@/lib/company-headers"
+import { arrowStreamClient } from "@/services/arrow-stream/arrow-stream-client"
+import { resolveApiUrl } from "@/lib/api-url"
 
 export type StreamSessionState = {
   jobId: string
@@ -18,6 +14,8 @@ export type StreamSessionState = {
   isSavingDisk: boolean
   isFromCache: boolean
   isComplete: boolean
+  /** DuckDB VIEW / TABLE oluşturuldu ve sorgulanabilir durumda mı? */
+  isTableReady: boolean
   /** WASM bellek tavanı / akış kesintisi: yalnızca inen satırlar mevcut. */
   isPartial: boolean
   error: string | null
@@ -72,6 +70,7 @@ class DuckStreamManager {
         isSavingDisk: false,
         isFromCache: false,
         isComplete: false,
+        isTableReady: false,
         isPartial: false,
         error: null,
         abortController,
@@ -104,8 +103,10 @@ class DuckStreamManager {
     if (session) {
       this.cancelCleanup(session)
       session.abortController.abort()
+      void arrowStreamClient.cancelStream(jobId).catch(() => {})
       void duckDbClient.dropTable(session.tableName).catch(() => {})
       void opfsReportCache.remove(jobId).catch(() => {})
+      void opfsReportCache.removeParquetParts(jobId).catch(() => {})
       this.sessions.delete(jobId)
     }
   }
@@ -125,9 +126,12 @@ class DuckStreamManager {
     let session = this.sessions.get(jobId)
     if (session) {
       session.abortController.abort()
+      void arrowStreamClient.cancelStream(jobId).catch(() => {})
     }
 
+    // Disk ve RAM önbelleklerini tamamen temizle
     await opfsReportCache.remove(jobId).catch(() => {})
+    await opfsReportCache.removeParquetParts(jobId).catch(() => {})
     await duckDbClient.dropTable(tableName).catch(() => {})
 
     const abortController = new AbortController()
@@ -142,6 +146,7 @@ class DuckStreamManager {
         isSavingDisk: false,
         isFromCache: false,
         isComplete: false,
+        isTableReady: false,
         isPartial: false,
         error: null,
         abortController,
@@ -160,13 +165,15 @@ class DuckStreamManager {
       session.isSavingDisk = false
       session.isFromCache = false
       session.isComplete = false
+      session.isTableReady = false
       session.isPartial = false
       session.error = null
       session.cleanupTimer = null
     }
 
     this.notify(session)
-    void this.startBackgroundStream(session, onError)
+    // Sunucudan zorla yeniden indirmeyi başlat (forceServerFetch: true)
+    void this.startBackgroundStream(session, onError, { forceServerFetch: true })
   }
 
   private exportState(session: StreamSessionInternal): StreamSessionState {
@@ -180,6 +187,7 @@ class DuckStreamManager {
       isSavingDisk: session.isSavingDisk,
       isFromCache: session.isFromCache,
       isComplete: session.isComplete,
+      isTableReady: session.isTableReady,
       isPartial: session.isPartial,
       error: session.error,
     }
@@ -225,114 +233,94 @@ class DuckStreamManager {
 
   private async startBackgroundStream(
     session: StreamSessionInternal,
-    onError?: (err: string | null) => void
+    onError?: (err: string | null) => void,
+    options?: { forceServerFetch?: boolean }
   ): Promise<void> {
     const { jobId, jobUrl, tableName, abortController } = session
+    const forceServerFetch = Boolean(options?.forceServerFetch)
 
     try {
-      // 1. Tablo DuckDB'de zaten mevcut mu kontrol et (0ms)
-      const check = await duckDbClient.checkTableExists(tableName)
-      if (check.exists && check.rowCount > 0) {
-        session.streamedRows = check.rowCount
-        session.isStreaming = false
-        session.isSavingDisk = false
-        session.isFromCache = true
-        session.isComplete = true
-        this.notify(session)
-        this.scheduleCleanup(session)
-        return
+      if (!forceServerFetch) {
+        // 1. Tablo veya View DuckDB'de zaten mevcut mu kontrol et (0ms)
+        const check = await duckDbClient.checkTableExists(tableName)
+        if (check.exists && check.rowCount > 0) {
+          session.streamedRows = check.rowCount
+          session.isStreaming = false
+          session.isSavingDisk = false
+          session.isFromCache = true
+          session.isComplete = true
+          session.isTableReady = true
+          this.notify(session)
+          this.scheduleCleanup(session)
+          return
+        }
+
+        // 2. RAM'de yoksa yerel OPFS diskindeki çok parçalı Parquet önbelleğini kontrol et (0 internet, 0 RAM yükü)
+        const hasParquet = await opfsReportCache.hasParquetParts(jobId)
+        if (hasParquet) {
+          const partFiles = await opfsReportCache.getParquetPartFiles(jobId)
+          if (partFiles.length > 0) {
+            const res = await duckDbClient.registerParquetPartsView({
+              tableName,
+              jobId,
+              partFiles,
+            })
+            session.streamedRows = res.rowCount
+            session.isStreaming = false
+            session.isSavingDisk = false
+            session.isFromCache = true
+            session.isComplete = true
+            session.isTableReady = true
+            this.notify(session)
+            this.scheduleCleanup(session)
+            return
+          }
+        }
       }
 
-      // Tablo henüz DuckDB'de yok, akışı başlat
+      // Tablo henüz DuckDB'de yok ve OPFS önbelleğinde bulunamadı (veya sunucudan zorla yenileme istendi), sunucudan akışı başlat
       session.isStreaming = true
+      session.isFromCache = false
       this.notify(session)
 
-      // 2. RAM'de yoksa yerel OPFS diskindeki Arrow akışını kontrol et (0 internet)
-      let stream: ReadableStream<Uint8Array> | null = null
-
-      const opfsStream = await opfsReportCache.getStream(jobId)
-      if (opfsStream) {
-        stream = opfsStream
-        session.isFromCache = true
-      } else {
-        // 3. OPFS'te de yoksa sunucudan indir
-        const res = await fetch(jobUrl, {
-          signal: abortController.signal,
-          headers: {
-            Accept: "application/vnd.apache.arrow.stream, application/octet-stream",
-            ...getCompanyHeaders(),
-          },
-        })
-
-        if (!res.ok || !res.body) {
-          throw new Error(`Veri akışı hatası (${res.status})`)
-        }
-
-        const opfsWritable = await opfsReportCache.createWritable(jobId).catch(() => null)
-        if (opfsWritable) {
-          const [streamForReader, streamForOpfs] = res.body.tee()
-          stream = streamForReader
-          // Arka planda sunucudan gelen saf Arrow binary akışını birebir diske kaydet
-          void streamForOpfs
-            .pipeTo(opfsWritable, { signal: abortController.signal })
-            .catch(() => {})
-        } else {
-          stream = res.body
-        }
-      }
-
-      const reader = await RecordBatchReader.from(stream)
-      let totalCount = 0
-      let batchGroup: RecordBatch[] = []
-      let groupRowCount = 0
-      let isFirst = true
-      const chunkSize = 50_000
-
-      for await (const batch of reader) {
-        if (abortController.signal.aborted) return
-        batchGroup.push(batch)
-        groupRowCount += batch.numRows
-
-        if (groupRowCount >= chunkSize) {
-          const table = new Table(batchGroup)
-          const bytes = tableToIPC(table, "stream")
-
-          totalCount = await duckDbClient.ingestArrowBatch(
-            tableName,
-            bytes,
-            !isFirst,
-            groupRowCount
-          )
+      // 3. OPFS'te de yoksa: Arka plan Web Worker ile boyuta göre parçalı (50-75MB) Parquet akışını başlat
+      const result = await arrowStreamClient.startStream({
+        jobId,
+        jobUrl: resolveApiUrl(jobUrl),
+        headers: getCompanyHeaders(),
+        onProgress: async (prog) => {
           if (abortController.signal.aborted) return
-          batchGroup = []
-          groupRowCount = 0
-          isFirst = false
+          session.streamedRows = prog.streamedRows
 
-          session.streamedRows = totalCount
+          if (prog.partFiles && prog.partFiles.length > 0) {
+            try {
+              const viewRes = await duckDbClient.registerParquetPartsView({
+                tableName,
+                jobId,
+                partFiles: prog.partFiles,
+              })
+              session.streamedRows = viewRes.rowCount || prog.streamedRows
+              session.isTableReady = true
+            } catch (vErr) {
+              console.warn("[DuckStreamManager] Kısmi Parquet View oluşturulamadı:", vErr)
+            }
+          }
+
           this.notify(session)
-        }
-      }
+        },
+      })
 
-      // Kalan son paketleri aktar
-      if (batchGroup.length > 0 && !abortController.signal.aborted) {
-        const table = new Table(batchGroup)
-        const bytes = tableToIPC(table, "stream")
+      if (abortController.signal.aborted) return
 
-        totalCount = await duckDbClient.ingestArrowBatch(
-          tableName,
-          bytes,
-          !isFirst,
-          groupRowCount
-        )
-        if (abortController.signal.aborted) return
-        session.streamedRows = totalCount
-      }
+      // 4. Parquet part'ları OPFS'e yazıldı; DuckDB-WASM üzerinde nihai glob VIEW oluştur
+      const viewRes = await duckDbClient.registerParquetPartsView({
+        tableName,
+        jobId,
+        partFiles: result.partFiles,
+      })
 
-      // İndirme/ingest tamamlandı. Kalıcılık: ham Arrow IPC cache
-      // (sims_arrow_reports/<jobId>.arrow) — indirme sırasında tee ile zaten
-      // OPFS'e yazıldı; F5 sonrası getStream ile yeniden ingest edilir (0 internet).
-      // Parquet dönüşümü kaldırıldı: COPY + copyFileToBuffer, WASM heap'inde
-      // tablo boyutunda spike üretiyordu ve büyük raporlarda sessizce OOM'luyordu.
+      session.streamedRows = viewRes.rowCount || result.totalRows
+      session.isTableReady = true
       session.isStreaming = false
       session.isSavingDisk = false
       session.isComplete = true
@@ -366,40 +354,17 @@ class DuckStreamManager {
           parsedMessage.includes("could not allocate block") ||
           parsedMessage.includes("Allocation failure")
 
-        const isTruncated =
-          rawMsg.includes("Expected to read") ||
-          parsedMessage.includes("Expected to read")
+        console.error("DuckStreamManager stream error:", err)
+        const userFriendlyMsg = isOom
+          ? "Rapor boyutu tarayıcı WebAssembly bellek sınırını aştı."
+          : `Rapor yüklenirken hata oluştu: ${parsedMessage}`
 
-        if ((isOom || isTruncated) && session.streamedRows > 0) {
-          // Bellek sınırına veya akış sonu kesintisine ulaşıldı, ancak şimdiye
-          // kadar inen satırları koru. Beklenen/yönetilen durum: warn yeterli,
-          // console.error Next dev overlay'de sahte Console Error üretir.
-          console.warn(
-            isOom
-              ? "WASM bellek tavanına ulaşıldı. Mevcut satırlarla devam ediliyor:"
-              : "Akış kesildi ancak inen satırlarla devam ediliyor:",
-            session.streamedRows
-          )
-          session.isStreaming = false
-          session.isSavingDisk = false
-          session.isComplete = true
-          session.isPartial = true
-          session.error = null
-          this.notify(session)
-          this.scheduleCleanup(session)
-        } else {
-          console.error("DuckStreamManager stream error:", err)
-          const userFriendlyMsg = isOom
-            ? "Rapor boyutu tarayıcı WebAssembly bellek sınırını (~3 GB) aştı."
-            : `Rapor yüklenirken hata oluştu: ${parsedMessage}`
-
-          session.error = userFriendlyMsg
-          session.isStreaming = false
-          session.isSavingDisk = false
-          this.notify(session)
-          onError?.(userFriendlyMsg)
-          this.scheduleCleanup(session)
-        }
+        session.error = userFriendlyMsg
+        session.isStreaming = false
+        session.isSavingDisk = false
+        this.notify(session)
+        onError?.(userFriendlyMsg)
+        this.scheduleCleanup(session)
       }
     }
   }

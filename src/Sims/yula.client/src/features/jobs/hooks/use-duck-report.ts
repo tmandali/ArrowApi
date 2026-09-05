@@ -81,6 +81,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
   const queryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableReadyRef = React.useRef(false)
+  const prevCompleteRef = React.useRef(false)
   // Render için aynalanan tablo-hazır bayrağı (callback'ler taze ref okur)
   const [tableReady, setTableReady] = React.useState(false)
   const markTableReady = React.useCallback((v: boolean) => {
@@ -247,10 +248,15 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         setIsFromCache(state.isFromCache)
         setIsPartial(state.isPartial)
 
-        if (state.streamedRows > 0 || state.isComplete) {
+        if ((state.isTableReady && state.streamedRows > 0) || state.isComplete || state.isFromCache) {
           if (state.streamedRows > 0) baseTotalRowsRef.current = state.streamedRows
           setTotalRows(state.streamedRows)
-          setTotalFiltered(state.streamedRows)
+          const hasActive = Object.values(filtersRef.current).some(
+            (val) => typeof val === "string" && val.trim().length > 0
+          )
+          if (!hasActive) {
+            setTotalFiltered(state.streamedRows)
+          }
 
           const shouldQuery = !tableReadyRef.current
           if (shouldQuery) {
@@ -262,6 +268,14 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
               void executeQueryRef.current({}, null, false, 0)
               // Tablo bu turda hazır olduysa bekleyen özel sorguyu koştur
               if (isCustomQueryActive()) setCustomQueryTick((t) => t + 1)
+            })
+          } else if (state.isComplete && !prevCompleteRef.current) {
+            prevCompleteRef.current = true
+            void duckDbClient.describeTable(tableName).then((discovered) => {
+              if (discovered.length > 0 && !isCustomQueryActive()) {
+                setColumns(discovered)
+              }
+              void executeQueryRef.current(filtersRef.current, sortByRef.current, sortDescRef.current, 0)
             })
           }
         }
@@ -284,6 +298,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setIsFromCache(false)
       setIsPartial(false)
       markTableReady(false)
+      prevCompleteRef.current = false
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)

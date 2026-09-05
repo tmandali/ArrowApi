@@ -106,14 +106,21 @@ export function ArrowJobResultPanel({
    * ucu yazılır; stream manager önce OPFS cache'i tercih eder, 404'e düşmez.
    */
   const openFromLocalCache = React.useCallback(async (): Promise<boolean> => {
-    const cached = await opfsReportCache.has(jobId)
+    const cached = (await opfsReportCache.hasParquetParts(jobId)) || (await opfsReportCache.has(jobId))
     if (!cached) {
       pushError("Job bulunamadı")
       return false
     }
+    const report = fallbackTitle
+      ? (findReport(fallbackTitle) ?? findReport(fallbackTitle.toLowerCase()))
+      : undefined
+    if (report) {
+      setColumnDescriptions(readReportAiMetadata(report.fullSchema).columnDescriptions)
+      setReportScope(report.scope)
+    }
     setReportUrl(`/api/arrow/jobs/${jobId}`)
     return true
-  }, [jobId, pushError])
+  }, [jobId, fallbackTitle, pushError])
 
   // job değişince akış durumunu başa al — render sırasında state ayarlama
   // (effect yalnızca fetch ömrünü yönetir).
@@ -137,6 +144,46 @@ export function ArrowJobResultPanel({
 
     const load = async () => {
       try {
+        // 1. Önce OPFS diskini kontrol et (0 ms):
+        // Parquet parçaları veya Arrow cache diskte zaten mevcutsa, sunucuyu beklemeden anında aç!
+        const hasParquet = await opfsReportCache.hasParquetParts(jobId)
+        const hasArrow = !hasParquet && (await opfsReportCache.has(jobId))
+        const hasLocalCache = hasParquet || hasArrow
+
+        if (hasLocalCache) {
+          if (runIdRef.current !== runId) return
+          const report = fallbackTitle
+            ? (findReport(fallbackTitle) ?? findReport(fallbackTitle.toLowerCase()))
+            : undefined
+          if (report) {
+            setColumnDescriptions(readReportAiMetadata(report.fullSchema).columnDescriptions)
+            setReportScope(report.scope)
+          }
+          setReportUrl(`/api/arrow/jobs/${jobId}`)
+
+          // Arka planda sunucudan ek meta bilgileri (tam başlık, totalRows) çekmeyi dene;
+          // sunucu kapalıysa veya 404 dönse bile yerel diskteki veriyi etkilemez.
+          void fetchJobStatus(jobId, abort.signal)
+            .then((job) => {
+              if (runIdRef.current !== runId || !job) return
+              if (job.name) {
+                setReportTitle(formatReportTitle(job.name, fallbackTitle))
+                const rep = findReport(job.name) ?? findReport(job.name.toLowerCase())
+                if (rep) {
+                  setColumnDescriptions(readReportAiMetadata(rep.fullSchema).columnDescriptions)
+                  setReportScope(rep.scope)
+                }
+              }
+              if (job.totalRows != null) {
+                setExpectedTotalRows(job.totalRows)
+              }
+            })
+            .catch(() => {})
+
+          return
+        }
+
+        // 2. OPFS'te yoksa sunucudan job durumunu çek
         const job = await fetchJobStatus(jobId, abort.signal)
         if (runIdRef.current !== runId) return
 

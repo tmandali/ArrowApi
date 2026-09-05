@@ -4,7 +4,7 @@ import * as React from "react"
 import { PanelLeftIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
-import { usePagePanelStore } from "@/lib/stores/page-panel"
+import { usePagePanelContext } from "@/context/page-panel-context"
 import { cn } from "@/utils/cn"
 
 type PagePanelTriggerProps = {
@@ -22,9 +22,7 @@ export function PagePanelTrigger({
   className,
   separatorClassName,
 }: PagePanelTriggerProps) {
-  const registered = usePagePanelStore((s) => s.registered)
-  const openById = usePagePanelStore((s) => s.openById)
-  const setOpen = usePagePanelStore((s) => s.setOpen)
+  const { registered, openById, setOpen } = usePagePanelContext()
 
   if (!registered) return null
 

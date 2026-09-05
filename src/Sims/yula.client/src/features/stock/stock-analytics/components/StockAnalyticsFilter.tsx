@@ -123,9 +123,9 @@ export const StockAnalyticsFilter = React.forwardRef<
         activeRunPhase={jobSession?.activeRunPhase}
         onOpenJob={jobSession?.onOpenJob}
         openJobHref={jobSession?.openJobHref}
-        onJobSelect={(jobId) => {
+        onJobSelect={(jobId, job) => {
           jobSession?.onExitCompose?.()
-          jobSession?.onJobSelect?.(jobId)
+          jobSession?.onJobSelect?.(jobId, job)
         }}
         onJobCancelled={jobSession?.onJobCancelled}
         onJobDeleted={jobSession?.onJobDeleted}

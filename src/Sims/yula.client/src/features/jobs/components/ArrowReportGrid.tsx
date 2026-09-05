@@ -173,13 +173,16 @@ export function ArrowReportGrid({
     return map
   }, [metaColumns, discoveredCols, describedCols])
 
-  /** Tool tanımı içinde LLM'e giden tipli kolon özeti. */
-  
-  const displayRows = customQuerySql
+  const hasActiveFilters = React.useMemo(
+    () => Object.values(filters).some((q) => q.trim().length > 0),
+    [filters]
+  )
+
+  const filterKey = React.useMemo(() => JSON.stringify(filters), [filters])
+
+  const displayRows = customQuerySql || hasActiveFilters || rows.length > 0
     ? rows
-    : rows.length > 0
-      ? rows
-      : initialRows
+    : initialRows
 
   const sampleRows = React.useMemo(() => {
     return displayRows.slice(0, 3).map((r) => {
@@ -287,8 +290,6 @@ export function ArrowReportGrid({
     }
   }, [])
 
-  const hasActiveFilters = Object.values(filters).some((q) => q.trim().length > 0)
-
   const countDisplay =
     hasActiveFilters && totalRows > 0
       ? `${formatCount(totalFiltered)} / ${formatCount(totalRows)} (filtered)`
@@ -337,7 +338,7 @@ export function ArrowReportGrid({
       loading={isStreaming || isSavingDisk || isLoadingQuery || (effectiveColumns.length === 0 && Boolean(jobId))}
       emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
       progressValue={progressPercent}
-      resetKey={`${jobId}:${customQuerySql ?? ""}`}
+      resetKey={`${jobId}:${customQuerySql ?? ""}:${filterKey}`}
       showFilterRow={effectiveShowFilterRow}
       onToggleFilterRow={onShowFilterRowChange}
       headerActions={

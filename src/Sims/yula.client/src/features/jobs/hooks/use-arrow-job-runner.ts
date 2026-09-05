@@ -2,7 +2,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation";import { useJobSync } from "@/context/job-sync-context"
 import {
   fetchJobRequest,
-  listArrowJobs,
+  fetchJobStatus,
 } from "@/features/jobs/arrow-job-client"
 import {
   appendOrUpdateRunEvent,
@@ -92,7 +92,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     jobName,
     title,
     basePath,
-    jobsEndpoint,
+    jobsEndpoint: _jobsEndpoint,
     workspace = "/stock",
     selectPendingJob,
   } = options
@@ -376,20 +376,35 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
       }
 
       const jobId = typeof jobOrId === "string" ? jobOrId : jobOrId.id
-      const jobStatus = typeof jobOrId === "string" ? undefined : jobOrId.status
+      let jobStatus = typeof jobOrId === "string" ? undefined : jobOrId.status
+
+      if (!jobStatus) {
+        const tracked = useActiveJobsStore.getState().jobs[jobId]
+        if (tracked?.status) {
+          jobStatus = tracked.status
+        }
+      }
 
       publishFocused(jobId)
 
-      if (liveByJobRef.current.has(jobId)) return
+      if (liveByJobRef.current.has(jobId)) {
+        if (jobStatus) {
+          patchLive(jobId, { status: jobStatus })
+        }
+        return
+      }
 
+      const isTerminal = jobStatus ? isTerminalJobStatus(jobStatus) : false
       const initialPhase: JobLiveSnapshot["phase"] =
         jobStatus === "Completed"
           ? "done"
           : jobStatus === "Cancelled"
             ? "cancelled"
-            : jobStatus && isTerminalJobStatus(jobStatus)
+            : isTerminal
               ? "idle"
-              : "running"
+              : jobStatus === "Running" || jobStatus === "Queued"
+                ? "running"
+                : "idle"
 
       liveByJobRef.current.set(jobId, {
         status: jobStatus,
@@ -405,10 +420,10 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
       const targetJob: ArrowJobStatus =
         typeof jobOrId === "string"
-          ? { id: jobId, status: jobStatus || "Queued", jobUrl: "", eventsUrl: "" }
+          ? { id: jobId, status: jobStatus || "Completed", jobUrl: "", eventsUrl: "" }
           : jobOrId
 
-      if (isInFlightStatus(targetJob.status) && !controllersRef.current.has(jobId)) {
+      if (jobStatus && isInFlightStatus(jobStatus) && !controllersRef.current.has(jobId)) {
         void fetchJobRequest(jobId).then((req) => {
           void followJob(targetJob, req ?? {})
         })
@@ -511,11 +526,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     selectPendingJob ? selectPendingJob(s.jobs) : null
   )
   const trackedId = pendingTrackedJob?.id
-  const trackedStatus = pendingTrackedJob?.status
-  const trackedName = pendingTrackedJob?.name
-  const trackedEventsUrl = pendingTrackedJob?.eventsUrl
-  const trackedJobUrl = pendingTrackedJob?.jobUrl
-  const trackedCreatedAt = pendingTrackedJob?.createdAt
 
   React.useEffect(() => {
     if (!trackedId) return
@@ -527,35 +537,28 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
     const resumeEntryInFlight = async () => {
       try {
-        const page = await listArrowJobs(jobsEndpoint, {
-          take: 20,
-          signal: abort.signal,
-        })
-        const match = page.items?.find((item) => sameJobId(item.id, trackedId))
-        let resumeTarget: ArrowJobStatus | null = null
+        const status = await fetchJobStatus(trackedId, abort.signal)
+        if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
 
-        if (match && isInFlightStatus(match.status)) {
-          resumeTarget = match
-        } else if (!match) {
-          resumeTarget = {
-            id: trackedId,
-            status: trackedStatus || "Queued",
-            name: trackedName,
-            eventsUrl: trackedEventsUrl ?? "",
-            jobUrl: trackedJobUrl ?? "",
-            createdAt: trackedCreatedAt,
+        if (!status || isTerminalJobStatus(status.status)) {
+          // Sunucuda job zaten tamamlanmış, başarısız veya silinmiş.
+          // Store'u güncelle/temizle ve kriter formunda kal (canlı ilerleme ekranına geçme).
+          if (status?.status) {
+            useActiveJobsStore.getState().updateJob(trackedId, { status: status.status })
+          } else {
+            useActiveJobsStore.getState().removeJob(trackedId)
           }
+          return
         }
 
-        if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
-        if (!resumeTarget) return
+        if (!isInFlightStatus(status.status)) return
 
         setComposing(false)
 
-        const req = (await fetchJobRequest(resumeTarget.id, abort.signal)) ?? {}
+        const req = (await fetchJobRequest(status.id, abort.signal)) ?? {}
         if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
 
-        void followJob(resumeTarget, req)
+        void followJob(status, req)
       } catch {
         // yoksay
       }
@@ -566,16 +569,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     return () => {
       abort.abort()
     }
-  }, [
-    trackedId,
-    trackedStatus,
-    trackedName,
-    trackedEventsUrl,
-    trackedJobUrl,
-    trackedCreatedAt,
-    jobsEndpoint,
-    followJob,
-  ])
+  }, [trackedId, followJob, setComposing])
 
   return {
     composing,

@@ -46,9 +46,9 @@ export function RetailSalesForm() {
   )
 
   const handleJobSelect = React.useCallback(
-    (jobId: string) => {
+    (jobId: string, job?: ArrowJobStatus) => {
       setComposing(false)
-      handleSelectJob({ id: jobId, status: "Queued", jobUrl: "", eventsUrl: "" })
+      handleSelectJob(job ?? jobId)
     },
     [setComposing, handleSelectJob]
   )

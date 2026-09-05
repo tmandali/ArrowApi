@@ -16,6 +16,7 @@ let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
 let initPromise: Promise<void> | null = null
 const tableRowCounts = new Map<string, number>()
+const tableVfsFiles = new Map<string, string[]>()
 
 async function getDuckDb(): Promise<{
   db: duckdb.AsyncDuckDB
@@ -33,11 +34,13 @@ async function getDuckDb(): Promise<{
 
       // Bilinçli olarak IN-MEMORY db: kalıcı db dosyası (opfs:// dahil) WAL +
       // checkpoint'i WASM heap'inde tutup "Allocation failure" FATAL'ı üretiyor.
-      // Kalıcılığı zaten OPFS Parquet cache'i (sims_arrow_reports) sağlıyor —
-      // F5 sonrası tablo parquet view olarak yeniden bağlanır. memory_limit,
-      // tavana değince DuckDB'nin KONTROLLÜ "Out of Memory" hatasını üretir;
-      // akış yöneticisi bu hatada inen satırlarla devam eder.
-      await newDb.open({})
+      // Kalıcılığı W3C OPFS Parquet cache'i (sims_parquet_reports) sağlıyor.
+      // opfs.fileHandling="auto" ile DuckDB-WASM opfs:/ URI'larını doğrudan çözer.
+      await newDb.open({
+        opfs: {
+          fileHandling: "auto",
+        },
+      })
 
       const newConn = await newDb.connect()
       await newConn.query("SET preserve_insertion_order=false;").catch(() => {})
@@ -86,8 +89,15 @@ function normalizeArrowValue(val: unknown): unknown {
     }
   }
 
-  // 4. Custom Arrow Struct / Object / Map (Proxy ya da Arrow Row ise düz JS objesine çevir)
+  // 4. Custom Arrow Struct / Object / Map / HugeInt (Int128)
   if (typeof val === "object" && val !== null) {
+    if ("low" in (val as any) && "high" in (val as any)) {
+      const low = BigInt((val as any).low >>> 0)
+      const high = BigInt((val as any).high)
+      const big = (high << 64n) + low
+      const num = Number(big)
+      return Number.isSafeInteger(num) ? num : big.toString()
+    }
     if (typeof (val as any).toJSON === "function") {
       return (val as any).toJSON()
     }
@@ -223,6 +233,71 @@ self.onmessage = async (e: MessageEvent) => {
           break
         }
 
+        case "REGISTER_PARQUET_PARTS_VIEW": {
+          const { tableName, jobId, partFiles } = payload as {
+            tableName: string
+            jobId: string
+            partFiles?: string[]
+          }
+
+          await safeDropObject(conn, tableName)
+          const quoted = `"${tableName.replace(/"/g, '""')}"`
+
+          // 1. OPFS dizinine eriş ve part dosyalarını belirle
+          const root = await navigator.storage.getDirectory()
+          const parquetRoot = await root.getDirectoryHandle("sims_parquet_reports", { create: true })
+          const jobDir = await parquetRoot.getDirectoryHandle(jobId, { create: false })
+
+          let filesToRegister = [...(partFiles ?? [])]
+          if (filesToRegister.length === 0) {
+            for await (const [name, handle] of (jobDir as any).entries()) {
+              if (handle.kind === "file" && name.endsWith(".parquet")) {
+                filesToRegister.push(name)
+              }
+            }
+          }
+          filesToRegister.sort((a, b) => a.localeCompare(b))
+
+          if (filesToRegister.length === 0) {
+            throw new Error(`OPFS içinde parquet parçası bulunamadı: ${jobId}`)
+          }
+
+          // 2. Önceki registered VFS dosyalarını temizle
+          const prevVfsFiles = tableVfsFiles.get(tableName) ?? []
+          for (const prev of prevVfsFiles) {
+            await db!.dropFile(prev).catch(() => {})
+          }
+
+          // 3. Her bir parçanın FileSystemFileHandle'ını DuckDB VFS'e BROWSER_FSACCESS ile bağla
+          const vfsNames: string[] = []
+          for (const fileName of filesToRegister) {
+            const fileHandle = await jobDir.getFileHandle(fileName, { create: false })
+            const vfsName = `${jobId}_${fileName}`
+            await db!.dropFile(vfsName).catch(() => {})
+            await db!.registerFileHandle(
+              vfsName,
+              fileHandle,
+              duckdb.DuckDBDataProtocol.BROWSER_FSACCESS,
+              true
+            )
+            vfsNames.push(vfsName)
+          }
+          tableVfsFiles.set(tableName, vfsNames)
+
+          // 4. DuckDB sanal dosya sistemi üzerindeki parçalardan VIEW oluştur
+          const fileListSql = vfsNames.map((n) => `'${n}'`).join(", ")
+          await conn.query(`CREATE OR REPLACE VIEW ${quoted} AS SELECT * FROM read_parquet([${fileListSql}]);`)
+
+          // 5. Satır sayısını al ve kaydet
+          const cntRes = await conn.query(`SELECT COUNT(*)::BIGINT as count FROM ${quoted};`)
+          const cntRows = arrowTableToObjects(cntRes)
+          const count = Number(cntRows[0]?.count ?? 0)
+          tableRowCounts.set(tableName, count)
+
+          self.postMessage({ id, success: true, rowCount: count })
+          break
+        }
+
         case "FLUSH_CHECKPOINT": {
           await conn.query("CHECKPOINT;").catch(() => {})
           self.postMessage({ id, success: true })
@@ -258,7 +333,8 @@ self.onmessage = async (e: MessageEvent) => {
             if (msg.includes("does not exist")) {
               self.postMessage({ id, success: true, result: { count: 0 } })
             } else {
-              throw queryErr
+              console.error("DuckDb Worker QUERY_SCALAR hatası:", queryErr, "SQL:", sql)
+              self.postMessage({ id, success: false, error: msg })
             }
           }
           break
@@ -324,6 +400,13 @@ self.onmessage = async (e: MessageEvent) => {
           const { tableName } = payload
           await safeDropObject(conn, tableName)
           await safeDropObject(conn, `${tableName}_raw`)
+          const registered = tableVfsFiles.get(tableName)
+          if (registered && db) {
+            for (const f of registered) {
+              await db.dropFile(f).catch(() => {})
+            }
+            tableVfsFiles.delete(tableName)
+          }
           tableRowCounts.delete(tableName)
           self.postMessage({ id, success: true })
           break

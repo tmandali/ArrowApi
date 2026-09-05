@@ -1,7 +1,6 @@
 import * as React from "react"
 
-import { usePagePanelStore } from "@/lib/stores/page-panel"
-import { useMounted } from "@/hooks/use-mounted"
+import { usePagePanelContext } from "@/context/page-panel-context"
 
 type UsePagePanelOptions = {
   id: string
@@ -11,29 +10,26 @@ type UsePagePanelOptions = {
 
 /**
  * Register the current page's toggleable panel (header button target) for the
- * mount lifetime and get its controlled open state. Open flags persist per
- * panel id; registration itself is session-scoped (last mounted page wins).
+ * mount lifetime and get its controlled open state.
  *
- * Hydration: the persisted open flag is applied only after mount — the
- * hydration render always uses defaultOpen so server/client markup matches.
+ * Hydration & SSR: The open state is synchronized from the root layout (via cookie),
+ * meaning the server-rendered HTML and client hydration share the exact same state,
+ * eliminating the flash of disappearing/appearing content on refresh.
  */
 export function usePagePanel({
   id,
   title,
   defaultOpen = true,
 }: UsePagePanelOptions) {
-  const mounted = useMounted()
-  const register = usePagePanelStore((s) => s.register)
-  const unregister = usePagePanelStore((s) => s.unregister)
-  const setOpen = usePagePanelStore((s) => s.setOpen)
-  const storedOpen = usePagePanelStore((s) => s.openById[id])
+  const { register, unregister, setOpen, openById } = usePagePanelContext()
+  const storedOpen = openById[id]
 
   React.useEffect(() => {
     register({ id, title, defaultOpen })
     return () => unregister(id)
   }, [id, title, defaultOpen, register, unregister])
 
-  const open = mounted ? (storedOpen ?? defaultOpen) : defaultOpen
+  const open = storedOpen ?? defaultOpen
 
   const setPanelOpen = React.useCallback(
     (next: boolean) => setOpen(id, next),

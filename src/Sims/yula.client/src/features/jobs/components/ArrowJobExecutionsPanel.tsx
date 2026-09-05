@@ -216,7 +216,7 @@ export type ArrowJobExecutionsPanelProps = {
   className?: string
   onOpenJob?: (jobId: string) => void
   /** Fired when the user picks a row in Executions. */
-  onJobSelect?: (jobId: string) => void
+  onJobSelect?: (jobId: string, job?: ArrowJobStatus) => void
   /** Fired after a job is cancelled from Detail. */
   onJobCancelled?: (jobId: string) => void
   /** Fired after a job is deleted from Detail. */
@@ -340,6 +340,7 @@ export function ArrowJobExecutionsPanel({
         })
         setItems(page.items ?? [])
         setTotal(page.total ?? 0)
+        onListLoaded?.(page.total ?? (page.items?.length ?? 0))
       } catch (err) {
         if (signal?.aborted) return
         setError(
@@ -353,7 +354,7 @@ export function ArrowJobExecutionsPanel({
         if (!signal?.aborted && !options?.silent) setLoading(false)
       }
     },
-    [jobsEndpoint]
+    [jobsEndpoint, onListLoaded]
   )
 
   React.useEffect(() => {
@@ -921,7 +922,7 @@ export function ArrowJobExecutionsPanel({
                         aria-current={selected ? "true" : undefined}
                         onClick={() => {
                           setSelectedId(job.id)
-                          onJobSelect?.(job.id)
+                          onJobSelect?.(job.id, job)
                         }}
                         onDoubleClick={() => onOpenJob?.(job.id)}
                         className={cn(

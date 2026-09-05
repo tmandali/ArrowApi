@@ -12,6 +12,7 @@ import {
   ArrowJobExecutionsPanel,
   ArrowJobResultPanel,
   type ArrowJobExecutionsPanelProps,
+  type ArrowJobStatus,
 } from "@/features/jobs"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
@@ -130,9 +131,9 @@ export const ReportModuleFilter = React.forwardRef<
         activeRunPhase={jobSession?.activeRunPhase}
         onOpenJob={jobSession?.onOpenJob}
         openJobHref={jobSession?.openJobHref}
-        onJobSelect={(jobId?: string | null) => {
+        onJobSelect={(jobId?: string | null, job?: ArrowJobStatus) => {
           jobSession?.onExitCompose?.()
-          jobSession?.onJobSelect?.(String(jobId ?? ""))
+          jobSession?.onJobSelect?.(String(jobId ?? ""), job)
         }}
         onJobCancelled={jobSession?.onJobCancelled}
         onJobDeleted={jobSession?.onJobDeleted}

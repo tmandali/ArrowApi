@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Providers } from "./providers";
+import { PAGE_PANEL_COOKIE_NAME } from "@/lib/page-panel-constants";
 import "./globals.css";
-
-
 
 // Next.js App Router `metadata` exportu bu dosyada ZORUNLUDUR —
 // yalnızca Fast Refresh kuralını susturmak için yönlendirme yapılır.
@@ -19,11 +19,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const rawCookie = cookieStore.get(PAGE_PANEL_COOKIE_NAME)?.value;
+  let initialPanelState: Record<string, boolean> = {};
+  if (rawCookie) {
+    try {
+      initialPanelState = JSON.parse(decodeURIComponent(rawCookie));
+    } catch {
+      initialPanelState = {};
+    }
+  }
+
   return (
     <html
       lang="tr"
@@ -31,7 +42,7 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers initialPanelState={initialPanelState}>{children}</Providers>
       </body>
     </html>
   );

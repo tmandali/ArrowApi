@@ -46,6 +46,11 @@ class DuckDbClient {
       }
       this.worker.onerror = (err) => {
         console.error("DuckDB Worker error:", err)
+        for (const [, pending] of this.pendingRequests.entries()) {
+          pending.reject(new Error(err.message || "DuckDB Worker hatası"))
+        }
+        this.pendingRequests.clear()
+        this.sendQueue = Promise.resolve()
       }
     }
     return this.worker
@@ -99,6 +104,18 @@ class DuckDbClient {
   }
 
   /**
+   * OPFS içindeki çok parçalı Parquet dosyalarını DuckDB üzerinde tek bir VIEW olarak bağlar.
+   */
+  async registerParquetPartsView(options: {
+    tableName: string
+    jobId: string
+    partFiles?: string[]
+  }): Promise<{ rowCount: number }> {
+    const res = await this.postMessage<WorkerResponse>("REGISTER_PARQUET_PARTS_VIEW", options)
+    return { rowCount: res.rowCount ?? 0 }
+  }
+
+  /**
    * Rapor tablosunda filtreleme, sıralama ve sayfalama ile SQL sorgusu çalıştırır.
    */
   async queryReportRows(options: {
@@ -126,8 +143,8 @@ class DuckDbClient {
     const where = buildCombinedWhereClause(filters, numericColumns)
     const escapedTable = `"${tableName.replace(/"/g, '""')}"`
 
-    // 1. Filtrelenmiş satır sayısını al
-    const countSql = `SELECT COUNT(*) as count FROM ${escapedTable} ${where};`
+    // 1. Filtrelenmiş satır sayısını al (BIGINT cast ile DuckDB HUGEINT'inin JS Number'a hatasız çevrilmesi sağlanır)
+    const countSql = `SELECT COUNT(*)::BIGINT as count FROM ${escapedTable} ${where};`
     const countRes = await this.postMessage<WorkerResponse>("QUERY_SCALAR", {
       sql: countSql,
     })
