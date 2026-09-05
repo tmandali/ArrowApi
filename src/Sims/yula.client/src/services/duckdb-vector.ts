@@ -336,10 +336,38 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
   conversationIndexInFlight = (async () => {
     try {
       await initVectorStore();
-      const texts = pending.map((p) => `Sohbet: ${p.title}. ${p.snippet}`.trim());
+
+      // Veritabanında zaten kayıtlı olan konuşma ID'lerini kontrol et (F5 sonrası 0 token)
+      const existingConvIds = new Set<string>();
+      try {
+        const existingRows = await duckDbClient.executeCustomSql(
+          `SELECT id FROM ${vectorTableName} WHERE scope = 'chats';`
+        );
+        for (const r of existingRows) {
+          if (r.id) existingConvIds.add(String(r.id));
+        }
+      } catch {
+        // ignore
+      }
+
+      const missing = pending.filter((p) => !existingConvIds.has(`conv_${p.id}`));
+      for (const p of pending) {
+        if (existingConvIds.has(`conv_${p.id}`)) {
+          conversationIndexedIds.add(p.id);
+        }
+      }
+
+      if (missing.length === 0) {
+        console.info(
+          `🤖 [WASM Vector Indexer] All ${pending.length} conversations already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+        );
+        return pending.length;
+      }
+
+      const texts = missing.map((p) => `Sohbet: ${p.title}. ${p.snippet}`.trim());
       const vectors = await getEmbeddings(texts);
-      for (let i = 0; i < pending.length; i++) {
-        const it = pending[i];
+      for (let i = 0; i < missing.length; i++) {
+        const it = missing[i];
         await insertOrReplaceVector({
           id: `conv_${it.id}`,
           scope: "chats",
@@ -358,7 +386,7 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
       if (isPersistentStoreAvailable) {
         await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
       }
-      console.info(`🤖 [WASM Vector Indexer] ${pending.length} conversations indexed into ${vectorTableName}.`);
+      console.info(`🤖 [WASM Vector Indexer] ${missing.length} new conversations indexed into ${vectorTableName}.`);
       return pending.length;
     } finally {
       conversationIndexInFlight = null;
