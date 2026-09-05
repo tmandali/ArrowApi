@@ -7,8 +7,9 @@ import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landi
 
 export function AccountingDashboard() {
   return (
-    <WorkspacePageShell showSearch={false} frameless>
+    <WorkspacePageShell hideHeader>
       <BlankWorkspaceLanding
+        withoutShell
         title="Accounting Dashboard"
         description="Bilanço, gelir tablosu, nakit akışı, genel mizan ve finansal ekstreler özet panosu."
         icon={BarChart2Icon}

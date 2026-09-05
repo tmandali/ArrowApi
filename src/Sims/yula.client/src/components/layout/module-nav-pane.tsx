@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react"
 import type { ReactNode } from "react"
+import { PanelLeftOpen } from "lucide-react"
 import { ModuleNavMenu } from "@/components/layout/module-nav-menu"
 import {
   pageContentGutterClass,
@@ -12,6 +14,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { usePagePanel } from "@/hooks/use-page-panel"
+import { usePagePanelContext } from "@/context/page-panel-context"
 import { usePersistedPanelLayout } from "@/lib/use-persisted-panel-layout"
 import { cn } from "@/utils/cn"
 
@@ -27,14 +30,10 @@ type ModuleNavPaneProps = {
  * scaffold'lar (WorkspacePageShell, ReportCriteriaShell, JobView'ler, item,
  * system) AiDock'larını bu pane ile sarmalar — davranış tüm sayfalarda aynı.
  *
- * - Kayıt: `module-nav` — pane'in olduğu sayfalarda PagePanelTrigger görünür
- *   ve bu pane'i toggle eder.
+ * - Açma / Kapama: ModuleNavMenu tepesindeki kapat butonu veya menü
+ *   kapalıyken sol üstte beliren açma butonu, ayrıca Ctrl+B / ⌘B kısayolu.
  * - Kalıcılık: genişlik + açık/kapalı durumu tüm sayfalarda ortak (`module-nav`
  *   tek anahtar; F5 sonrası geri yüklenir).
- * - Gutter sahipliği: grup `pageContentGutterClass` taşır (page header'ın
- *   px-2 inset'iyle hizalı); kartlar gruba flush durur ve kart arası boşluk
- *   yalnızca resize handle (tek gutter birimi) olur — içerik tarafları kendi
- *   dış gutter'larını eklemez, yoksa çift boşluk oluşur.
  */
 export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
   const { open: navOpen } = usePagePanel({
@@ -42,9 +41,23 @@ export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
     title: "Menu",
     defaultOpen: true,
   })
+  const { setOpen } = usePagePanelContext()
+
   const { groupRef, onLayoutChanged } = usePersistedPanelLayout(
     `module-nav:${navOpen ? "nav" : "full"}`
   )
+
+  // Ctrl+B / ⌘B ile klavyeden menü açıp kapama
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault()
+        setOpen("module-nav", !navOpen)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [navOpen, setOpen])
 
   return (
     <ResizablePanelGroup
@@ -57,9 +70,9 @@ export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
       {navOpen ? (
         <ResizablePanel
           id="module-nav"
-          defaultSize="20%"
-          minSize="14%"
-          maxSize="32%"
+          defaultSize="13%"
+          minSize="10%"
+          maxSize="20%"
           className="flex min-h-0 min-w-0 flex-col"
         >
           <ModuleNavMenu />
@@ -70,10 +83,24 @@ export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
       ) : null}
       <ResizablePanel
         id="module-content"
-        defaultSize={navOpen ? "80%" : "100%"}
-        minSize="68%"
-        className="flex min-h-0 min-w-0 flex-col"
+        defaultSize={navOpen ? "87%" : "100%"}
+        minSize="75%"
+        className="relative flex min-h-0 min-w-0 flex-col"
       >
+        {/* Menü kapalıyken sol üstte zarif açma butonu */}
+        {!navOpen && (
+          <div className="absolute left-2 top-2 z-20">
+            <button
+              type="button"
+              onClick={() => setOpen("module-nav", true)}
+              title="Menüyü Aç (Ctrl+B)"
+              className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground shadow-2xs backdrop-blur-xs transition-colors cursor-pointer"
+            >
+              <PanelLeftOpen className="size-3.5" />
+              <span className="sr-only">Menüyü Aç</span>
+            </button>
+          </div>
+        )}
         {children}
       </ResizablePanel>
     </ResizablePanelGroup>

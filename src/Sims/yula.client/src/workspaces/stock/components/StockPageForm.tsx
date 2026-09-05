@@ -12,10 +12,7 @@ export function StockPageForm() {
   }, []);
 
   return (
-    <WorkspacePageShell
-      showSearch={false}
-      frameless
-    >
+    <WorkspacePageShell hideHeader>
       <StockDashboard />
     </WorkspacePageShell>
   );

@@ -7,8 +7,9 @@ import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landi
 
 export function SubcontractingDashboard() {
   return (
-    <WorkspacePageShell showSearch={false} frameless>
+    <WorkspacePageShell hideHeader>
       <BlankWorkspaceLanding
+        withoutShell
         title="Subcontracting Dashboard"
         description="Fason üretim emirleri, dış tedarik ve fason teslimat rotalama özet panosu."
         icon={RefreshCwIcon}

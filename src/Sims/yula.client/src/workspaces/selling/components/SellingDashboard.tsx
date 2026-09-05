@@ -7,8 +7,9 @@ import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landi
 
 export function SellingDashboard() {
   return (
-    <WorkspacePageShell showSearch={false} frameless>
+    <WorkspacePageShell hideHeader>
       <BlankWorkspaceLanding
+        withoutShell
         title="Selling Dashboard"
         description="Satış siparişleri, müşteri teklifleri, faturalar ve satış analitiği özet panosu."
         icon={ShoppingCartIcon}

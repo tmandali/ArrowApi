@@ -7,8 +7,9 @@ import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landi
 
 export function ManufacturingDashboard() {
   return (
-    <WorkspacePageShell showSearch={false} frameless>
+    <WorkspacePageShell hideHeader>
       <BlankWorkspaceLanding
+        withoutShell
         title="Manufacturing Dashboard"
         description="Üretim planları, iş emirleri, ürün reçeteleri (BOM), iş kartları ve kapasite özet panosu."
         icon={FactoryIcon}
