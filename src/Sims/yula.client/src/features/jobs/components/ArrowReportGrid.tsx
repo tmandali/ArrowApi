@@ -145,6 +145,11 @@ export function ArrowReportGrid({
     | Awaited<ReturnType<typeof duckDbClient.describeTable>>
     | undefined
   >()
+
+  React.useEffect(() => {
+    setDescribedCols(undefined)
+  }, [duckTableName])
+
   React.useEffect(() => {
     if (!jobId) return
     let cancelled = false
@@ -159,8 +164,7 @@ export function ArrowReportGrid({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duckTableName])
+  }, [duckTableName, discoveredCols.length, jobId])
 
   const columnTypes = React.useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {}

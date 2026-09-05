@@ -343,6 +343,11 @@ self.onmessage = async (e: MessageEvent) => {
         case "DESCRIBE_TABLE": {
           const { tableName } = payload
           try {
+            const existing = await getCatalogType(conn, tableName)
+            if (!existing) {
+              self.postMessage({ id, success: true, columns: [] })
+              break
+            }
             const infoRes = await conn.query(`DESCRIBE "${tableName}"`)
             const infoRows = arrowTableToObjects(infoRes)
             const columns = infoRows
