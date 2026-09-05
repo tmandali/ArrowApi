@@ -53,7 +53,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [sortBy, setSortBy] = React.useState<string | null>(null)
   const [sortDesc, setSortDesc] = React.useState<boolean>(false)
   const [page, setPage] = React.useState(0)
-  const [isCountCapped, setIsCountCapped] = React.useState(false)
 
   React.useEffect(() => {
     const syncInitialColumns = () => {
@@ -142,18 +141,15 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           (val) => typeof val === "string" && val.trim().length > 0
         )
         setTotalFiltered(result.totalFiltered)
-        setIsCountCapped(Boolean(result.isCapped))
         if (!isCustomQueryActive()) {
           if (!hasActiveFilters && result.totalFiltered > 0) {
             baseTotalRowsRef.current = result.totalFiltered
+            setTotalRows(result.totalFiltered)
+          } else if (baseTotalRowsRef.current > 0) {
+            setTotalRows(baseTotalRowsRef.current)
+          } else if (latestStreamedRef.current > 0) {
+            setTotalRows(latestStreamedRef.current)
           }
-          setTotalRows(
-            baseTotalRowsRef.current > 0
-              ? baseTotalRowsRef.current
-              : latestStreamedRef.current > 0
-                ? latestStreamedRef.current
-                : result.totalFiltered
-          )
         }
       } catch (err) {
         // Bellek tavanı (kontrollü OOM) beklenen/yönetilen durum: warn bas,
@@ -476,7 +472,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     setSortDesc,
     loadMore,
     hasMore,
-    isCountCapped,
     refresh,
   }
 }

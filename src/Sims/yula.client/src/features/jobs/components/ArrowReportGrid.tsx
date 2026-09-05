@@ -92,7 +92,6 @@ export function ArrowReportGrid({
     rows,
     totalRows,
     totalFiltered,
-    isCountCapped,
     streamedRows,
     progressPercent,
     filters,
@@ -210,6 +209,8 @@ export function ArrowReportGrid({
   >()
   const columnValuesDoneRef = React.useRef("")
   React.useEffect(() => {
+    // Rapor hala akıyorsa (streaming) veya toplam satır sayısı 5 milyonu aşıyorsa digest sorgusu koşturma
+    if (isStreaming || !totalRows || totalRows > 5_000_000) return
     const key = `${duckTableName}:${Object.keys(columnTypes).length > 0 ? 1 : 0}:${totalRows ?? ""}`
     if (columnValuesDoneRef.current === key) return
     columnValuesDoneRef.current = key
@@ -228,7 +229,7 @@ export function ArrowReportGrid({
       abortCtrl.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duckTableName, columnTypes, totalRows])
+  }, [duckTableName, columnTypes, totalRows, isStreaming])
 
   // Parent callback bağlı değilse (örn. Yula içine gömülü grid) AI filtre
   // satırını kendisi açabilsin diye dahil yedek durum.
@@ -255,7 +256,7 @@ export function ArrowReportGrid({
       useYulaGridStore.getState().setRuntimeApi(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setFilter, effectiveColumns]);
+  }, [setFilter, effectiveColumns, revealFilterRow]);
 
   // Bağlam aynası senkronu: gridin GERÇEK filtre state'i tek doğruluk kaynağıdır.
   // Kullanıcı filtre hücrelerinden temizlerken mağaza aynası bayat kalıyordu →
@@ -299,7 +300,7 @@ export function ArrowReportGrid({
           <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
         ) : null}
         <span>
-          {isCountCapped ? `${formatCount(10000)}+` : formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
+          {formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
         </span>
       </span>
     ) : totalRows > 0 ? (

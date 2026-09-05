@@ -143,34 +143,22 @@ class DuckDbClient {
     // Eğer dönen satır sayısı limit'e ulaşmadıysa, tüm eşleşen satırlar zaten elimizdedir;
     // veritabanına ek bir COUNT sorgusu atmaya gerek yoktur (0 ms maliyet).
     let totalFiltered = offset + rows.length
-    let isCapped = false
 
     if (offset === 0) {
       if (hasMore) {
-        // 100M satırda WASM motorunun ve UI'ın kilitlenmesini engellemek için
-        // COUNT sorgusunu LIMIT 10001 tavanı ile çalıştır.
-        // DuckDB Parquet filtre pushdown ile 10.001 satırı bulduğu anda taramayı durdurur.
-        const cappedCountSql = `SELECT COUNT(*)::BIGINT as count FROM (SELECT 1 FROM ${escapedTable} ${where} LIMIT 10001) as __capped_t;`
+        const countSql = `SELECT COUNT(*)::BIGINT as count FROM ${escapedTable} ${where};`
         try {
           const countRes = await this.postMessage<WorkerResponse>("QUERY_SCALAR", {
-            sql: cappedCountSql,
+            sql: countSql,
           })
           const rawCount =
             countRes.result?.count ??
             countRes.result?.["count(*)"] ??
             countRes.result?.["COUNT(*)"] ??
             Object.values(countRes.result ?? {})[0]
-          const countNum = Number(rawCount ?? 0)
-          if (countNum > 10000) {
-            totalFiltered = 10001
-            isCapped = true
-          } else {
-            totalFiltered = countNum
-            isCapped = false
-          }
+          totalFiltered = Number(rawCount ?? 0)
         } catch {
-          totalFiltered = offset + rows.length + 1
-          isCapped = true
+          totalFiltered = offset + rows.length
         }
       }
     } else {
@@ -183,7 +171,6 @@ class DuckDbClient {
     return {
       rows,
       totalFiltered,
-      isCapped,
     }
   }
 
