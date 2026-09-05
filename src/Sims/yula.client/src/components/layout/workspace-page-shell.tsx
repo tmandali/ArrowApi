@@ -51,8 +51,11 @@ export function WorkspacePageShell({
   children,
   className,
   contentClassName,
-  navMenuHeaderVisible = false,
+  navMenuHeaderVisible,
 }: WorkspacePageShellProps) {
+  // Page header gizlendiğinde (ana sayfalar/panolar) menü kapatma butonu erişilebilir olsun
+  const isNavMenuHeaderVisible = navMenuHeaderVisible ?? hideHeader;
+
   return (
     <div
       className={cn(
@@ -73,7 +76,7 @@ export function WorkspacePageShell({
         </WorkspacePageHeader>
       )}
       <WorkspaceAiDock className={contentClassName}>
-        <ModuleNavPane navMenuHeaderVisible={navMenuHeaderVisible}>{children}</ModuleNavPane>
+        <ModuleNavPane navMenuHeaderVisible={isNavMenuHeaderVisible}>{children}</ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

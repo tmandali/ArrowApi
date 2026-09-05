@@ -30,6 +30,8 @@ export interface WorkspaceLandingTemplateProps {
   workspaceId?: WorkspaceId;
   customData?: Partial<WorkspaceLandingData>;
   withoutShell?: boolean;
+  /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
+  navMenuHeaderVisible?: boolean;
 }
 
 // Gözü yormayan yumuşak pastel renk tonları (soft & muted)
@@ -82,6 +84,7 @@ export function WorkspaceLandingTemplate({
   workspaceId: propWorkspaceId,
   customData,
   withoutShell = false,
+  navMenuHeaderVisible = true,
 }: WorkspaceLandingTemplateProps) {
   const pathname = usePathname();
 
@@ -375,7 +378,7 @@ export function WorkspaceLandingTemplate({
   }
 
   return (
-    <WorkspacePageShell hideHeader>
+    <WorkspacePageShell hideHeader navMenuHeaderVisible={navMenuHeaderVisible}>
       {content}
     </WorkspacePageShell>
   );
@@ -386,16 +389,20 @@ export interface BlankWorkspaceLandingProps {
   description?: string;
   icon?: LucideIcon;
   withoutShell?: boolean;
+  /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
+  navMenuHeaderVisible?: boolean;
 }
 
 export function BlankWorkspaceLanding({
   title,
   description,
   withoutShell = false,
+  navMenuHeaderVisible = true,
 }: BlankWorkspaceLandingProps) {
   return (
     <WorkspaceLandingTemplate
       withoutShell={withoutShell}
+      navMenuHeaderVisible={navMenuHeaderVisible}
       customData={{
         ...(title ? { greetingTitle: title } : {}),
         ...(description ? { greetingDescription: description } : {}),
