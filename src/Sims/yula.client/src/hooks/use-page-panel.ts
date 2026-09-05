@@ -12,9 +12,8 @@ type UsePagePanelOptions = {
  * Register the current page's toggleable panel (header button target) for the
  * mount lifetime and get its controlled open state.
  *
- * Hydration & SSR: The open state is synchronized from the root layout (via cookie),
- * meaning the server-rendered HTML and client hydration share the exact same state,
- * eliminating the flash of disappearing/appearing content on refresh.
+ * In-memory & Zero-persistence: State is managed purely in React context during
+ * the current session without cookies or localStorage, starting cleanly with defaultOpen.
  */
 export function usePagePanel({
   id,

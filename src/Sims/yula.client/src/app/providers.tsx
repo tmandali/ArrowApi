@@ -8,10 +8,8 @@ import { PagePanelProvider } from "@/context/page-panel-provider";
 
 export function Providers({
   children,
-  initialPanelState,
 }: {
   children: ReactNode;
-  initialPanelState?: Record<string, boolean>;
 }) {
   return (
     <ThemeProvider
@@ -20,7 +18,7 @@ export function Providers({
       enableSystem
       disableTransitionOnChange
     >
-      <PagePanelProvider initialOpenById={initialPanelState}>
+      <PagePanelProvider>
         <AppProviders>
           <YulaChatProvider>{children}</YulaChatProvider>
         </AppProviders>

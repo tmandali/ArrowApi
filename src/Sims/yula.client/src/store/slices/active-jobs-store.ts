@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
 import type { WorkspaceKey } from "@/lib/workspace"
 import { resolveNotificationWorkspace } from "@/lib/workspace"
 import { useNotificationsStore } from "./notifications-store"
@@ -112,79 +111,61 @@ type ActiveJobsState = {
   clear: () => void
 }
 
-export const useActiveJobsStore = create<ActiveJobsState>()(
-  persist(
-    (set, get) => ({
-      jobs: {},
-      addJob: (job) => {
-        const normalized: TrackedJob = {
-          ...job,
-          workspace: resolveNotificationWorkspace({
-            workspace: job.workspace,
-            href: job.href,
-            type: job.notificationType,
-          }),
-        }
-        set({ jobs: { ...get().jobs, [normalized.id]: normalized } })
-      },
-      updateJob: (id, patch) => {
-        const existing = get().jobs[id]
-        if (!existing) return
-        set({ jobs: { ...get().jobs, [id]: { ...existing, ...patch } } })
-      },
-      removeJob: (id) => {
-        const { [id]: _removed, ...rest } = get().jobs
-        set({ jobs: rest })
-        useNotificationsStore.getState().removeNotificationByJobId(id)
-      },
-      clearTerminal: () => {
-        const next: Record<string, TrackedJob> = {}
-        const removedIds: string[] = []
-        for (const [id, job] of Object.entries(get().jobs)) {
-          if (!isTerminalJobStatus(job.status)) {
-            next[id] = job
-          } else {
-            removedIds.push(id)
-          }
-        }
-        set({ jobs: next })
-        for (const id of removedIds) {
-          useNotificationsStore.getState().removeNotificationByJobId(id)
-        }
-      },
-      clear: () => {
-        const allIds = Object.keys(get().jobs)
-        set({ jobs: {} })
-        for (const id of allIds) {
-          useNotificationsStore.getState().removeNotificationByJobId(id)
-        }
-      },
-    }),
-    {
-      name: "sims:active-jobs",
-      partialize: (state) => ({ jobs: state.jobs }),
-      merge: (persisted, current) => {
-        const raw = (persisted ?? {}) as Partial<ActiveJobsState>
-        const jobs: Record<string, TrackedJob> = {}
-        for (const [id, job] of Object.entries(raw.jobs ?? {})) {
-          jobs[id] = {
-            ...job,
-            workspace: resolveNotificationWorkspace({
-              workspace: job.workspace,
-              href: job.href,
-              type: job.notificationType,
-            }),
-          }
-        }
-        return {
-          ...current,
-          ...raw,
-          jobs,
-        }
-      },
+export const useActiveJobsStore = create<ActiveJobsState>()((set, get) => ({
+  jobs: {},
+  addJob: (job) => {
+    const normalized: TrackedJob = {
+      ...job,
+      workspace: resolveNotificationWorkspace({
+        workspace: job.workspace,
+        href: job.href,
+        type: job.notificationType,
+      }),
     }
-  )
-)
+    set({ jobs: { ...get().jobs, [normalized.id]: normalized } })
+  },
+  updateJob: (id, patch) => {
+    const existing = get().jobs[id]
+    if (!existing) return
+    set({ jobs: { ...get().jobs, [id]: { ...existing, ...patch } } })
+  },
+  removeJob: (id) => {
+    const { [id]: _removed, ...rest } = get().jobs
+    set({ jobs: rest })
+    useNotificationsStore.getState().removeNotificationByJobId(id)
+  },
+  clearTerminal: () => {
+    const next: Record<string, TrackedJob> = {}
+    const removedIds: string[] = []
+    for (const [id, job] of Object.entries(get().jobs)) {
+      if (!isTerminalJobStatus(job.status)) {
+        next[id] = job
+      } else {
+        removedIds.push(id)
+      }
+    }
+    set({ jobs: next })
+    for (const id of removedIds) {
+      useNotificationsStore.getState().removeNotificationByJobId(id)
+    }
+  },
+  clear: () => {
+    const allIds = Object.keys(get().jobs)
+    set({ jobs: {} })
+    for (const id of allIds) {
+      useNotificationsStore.getState().removeNotificationByJobId(id)
+    }
+  },
+}))
+
+// Eski oturumlardan kalan localStorage kaydını temizle
+if (typeof window !== "undefined") {
+  try {
+    window.localStorage.removeItem("sims:active-jobs")
+  } catch {
+    // yoksay
+  }
+}
 
 export function selectPendingJobs(
   jobs: Record<string, TrackedJob>,
