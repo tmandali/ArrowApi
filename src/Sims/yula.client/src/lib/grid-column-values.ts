@@ -50,6 +50,7 @@ export interface ColumnValuesDigestInput {
   columnTypes?: Record<string, string>;
   /** Bilinen toplam satır sayısı; null/unknown ise digest üretilmez (maliyet guard'ı). */
   rowCount?: number | null;
+  signal?: AbortSignal;
 }
 
 /**
@@ -60,6 +61,7 @@ export async function computeColumnValuesDigest(
   input: ColumnValuesDigestInput,
 ): Promise<Record<string, string[]> | null> {
   if (
+    input.signal?.aborted ||
     input.rowCount == null ||
     input.rowCount > COLUMN_VALUES_MAX_TABLE_ROWS
   ) {
@@ -71,8 +73,14 @@ export async function computeColumnValuesDigest(
   if (candidates.length === 0) return null;
 
   const { duckDbClient } = await import("@/services/duckdb");
+
+  if (input.signal?.aborted) return null;
+  const tableCheck = await duckDbClient.checkTableExists(input.tableName).catch(() => ({ exists: false }));
+  if (!tableCheck.exists || input.signal?.aborted) return null;
+
   const out: Record<string, string[]> = {};
   for (const col of candidates) {
+    if (input.signal?.aborted) return null;
     try {
       const rows = await duckDbClient.executeCustomSql(
         buildColumnValuesQuery(
@@ -81,6 +89,7 @@ export async function computeColumnValuesDigest(
           COLUMN_VALUES_PER_COLUMN + 1,
         ),
       );
+      if (input.signal?.aborted) return null;
       if (rows.length === 0) continue;
       const values = rows
         .slice(0, COLUMN_VALUES_PER_COLUMN)
@@ -91,7 +100,7 @@ export async function computeColumnValuesDigest(
       if (rows.length > COLUMN_VALUES_PER_COLUMN) values.push("…");
       out[col] = values;
     } catch {
-      // Tek kolonun sorgusu patlarsa digest'i bozma
+      // Tek kolonun sorgusu patlarsa veya iptal edilirse digest'i bozma
     }
   }
   return Object.keys(out).length > 0 ? out : null;

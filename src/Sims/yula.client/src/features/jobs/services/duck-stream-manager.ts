@@ -278,22 +278,30 @@ class DuckStreamManager {
         // 2. RAM'de yoksa yerel OPFS diskindeki çok parçalı Parquet önbelleğini kontrol et (0 internet, 0 RAM yükü)
         const hasParquet = await opfsReportCache.hasParquetParts(jobId)
         if (hasParquet) {
-          const partFiles = await opfsReportCache.getParquetPartFiles(jobId)
-          if (partFiles.length > 0) {
-            const res = await duckDbClient.registerParquetPartsView({
-              tableName,
-              jobId,
-              partFiles,
-            })
-            session.streamedRows = res.rowCount
-            session.isStreaming = false
-            session.isSavingDisk = false
-            session.isFromCache = true
-            session.isComplete = true
-            session.isTableReady = true
-            this.notify(session)
-            this.scheduleCleanup(session)
-            return
+          try {
+            const partFiles = await opfsReportCache.getParquetPartFiles(jobId)
+            if (partFiles.length > 0) {
+              const res = await duckDbClient.registerParquetPartsView({
+                tableName,
+                jobId,
+                partFiles,
+              })
+              session.streamedRows = res.rowCount
+              session.isStreaming = false
+              session.isSavingDisk = false
+              session.isFromCache = true
+              session.isComplete = true
+              session.isTableReady = true
+              this.notify(session)
+              this.scheduleCleanup(session)
+              return
+            }
+          } catch (cacheAttachErr) {
+            console.warn(
+              `[DuckStreamManager] Yerel OPFS parquet parçaları geçersiz/bozuk, temizlenip sunucudan çekilecek (${jobId}):`,
+              cacheAttachErr
+            )
+            await opfsReportCache.remove(jobId).catch(() => {})
           }
         }
       }

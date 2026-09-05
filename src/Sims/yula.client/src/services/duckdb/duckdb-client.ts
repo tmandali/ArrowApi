@@ -246,6 +246,13 @@ class DuckDbClient {
    * DuckDB motorunu sıfırlayıp belleği tamamen boşaltır.
    */
   async resetDatabase(): Promise<void> {
+    // Önceki tablolara ait bekleyen sorguları iptal et
+    for (const [, pending] of this.pendingRequests.entries()) {
+      pending.reject(new DOMException("Veritabanı sıfırlandı, önceki sorgu iptal edildi", "AbortError"))
+    }
+    this.pendingRequests.clear()
+    this.sendQueue = Promise.resolve()
+
     await this.postMessage("RESET_DATABASE", {})
   }
 }

@@ -270,17 +270,33 @@ self.onmessage = async (e: MessageEvent) => {
           // 3. Her bir parçanın FileSystemFileHandle'ını DuckDB VFS'e BROWSER_FSACCESS ile bağla
           const vfsNames: string[] = []
           for (const fileName of filesToRegister) {
-            const fileHandle = await jobDir.getFileHandle(fileName, { create: false })
-            const vfsName = `${jobId}_${fileName}`
-            await db!.dropFile(vfsName).catch(() => {})
-            await db!.registerFileHandle(
-              vfsName,
-              fileHandle,
-              duckdb.DuckDBDataProtocol.BROWSER_FSACCESS,
-              true
-            )
-            vfsNames.push(vfsName)
+            try {
+              const fileHandle = await jobDir.getFileHandle(fileName, { create: false })
+              const file = await fileHandle.getFile()
+              if (file.size < 100) {
+                console.warn(
+                  `[DuckDB Worker] Geçersiz/eksik parquet parçası atlandı: ${fileName} (${file.size} byte)`
+                )
+                continue
+              }
+              const vfsName = `${jobId}_${fileName}`
+              await db!.dropFile(vfsName).catch(() => {})
+              await db!.registerFileHandle(
+                vfsName,
+                fileHandle,
+                duckdb.DuckDBDataProtocol.BROWSER_FSACCESS,
+                true
+              )
+              vfsNames.push(vfsName)
+            } catch (fErr) {
+              console.warn(`[DuckDB Worker] Dosya handle'ına erişilemedi (${fileName}):`, fErr)
+            }
           }
+
+          if (vfsNames.length === 0) {
+            throw new Error(`OPFS içinde geçerli parquet parçası bulunamadı: ${jobId}`)
+          }
+
           tableVfsFiles.set(tableName, vfsNames)
 
           // 4. DuckDB sanal dosya sistemi üzerindeki parçalardan VIEW oluştur

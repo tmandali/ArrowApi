@@ -118,6 +118,9 @@ async function flushBatchToParquet(options: {
       .build()
 
     parquetBytes = writeParquet(wasmTable, writerProperties)
+    if (!parquetBytes || parquetBytes.byteLength < 12) {
+      throw new Error(`Geçersiz parquet çıktısı: ${parquetBytes?.byteLength ?? 0} byte`)
+    }
   } finally {
     // 4. KRİTİK BELLEK TEMİZLİĞİ:
     // writeParquet, Rust tarafında wasmTable'ın sahipliğini (__destroy_into_raw) devralıp serbest bırakır.
@@ -140,16 +143,23 @@ async function flushBatchToParquet(options: {
     await writable.close()
   } catch (writeErr) {
     try {
-      await writable.abort()
+      await writable.abort().catch(() => {})
+      await jobDir.removeEntry(fileName).catch(() => {})
     } catch {
       // abort yoksay
     }
     throw writeErr
   }
 
+  const writtenFile = await fileHandle.getFile()
+  if (writtenFile.size < 12) {
+    await jobDir.removeEntry(fileName).catch(() => {})
+    throw new Error(`Yazılan parquet parçası eksik/bozuk: ${fileName} (${writtenFile.size} byte)`)
+  }
+
   return {
     fileName,
-    sizeBytes: parquetBytes.byteLength,
+    sizeBytes: writtenFile.size,
     rowCount,
   }
 }
@@ -306,7 +316,25 @@ async function processArrowStream(payload: {
       } satisfies StreamWorkerProgress & { id: number })
     }
 
-    // 5. Akış başarıyla tamamlandı
+    // 5. Akış başarıyla tamamlandı: '_complete' onay dosyasını yaz
+    try {
+      const completeHandle = await jobDir.getFileHandle("_complete", { create: true })
+      const completeWritable = await completeHandle.createWritable()
+      await completeWritable.write(
+        new TextEncoder().encode(
+          JSON.stringify({
+            jobId,
+            totalRows,
+            partFiles: session.writtenPartFiles,
+            completedAt: Date.now(),
+          })
+        )
+      )
+      await completeWritable.close()
+    } catch (manifestErr) {
+      console.warn("[ArrowParquetWorker] _complete dosyası yazılamadı:", manifestErr)
+    }
+
     self.postMessage({
       id,
       type: "COMPLETE",

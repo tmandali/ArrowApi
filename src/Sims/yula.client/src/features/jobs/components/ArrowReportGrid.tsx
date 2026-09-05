@@ -213,18 +213,19 @@ export function ArrowReportGrid({
     const key = `${duckTableName}:${Object.keys(columnTypes).length > 0 ? 1 : 0}:${totalRows ?? ""}`
     if (columnValuesDoneRef.current === key) return
     columnValuesDoneRef.current = key
-    let cancelled = false
+    const abortCtrl = new AbortController()
     void (async () => {
       const digest = await computeColumnValuesDigest({
         tableName: duckTableName,
         columns: effectiveColumns.map((c) => c.name),
         columnTypes,
         rowCount: totalRows,
+        signal: abortCtrl.signal,
       })
-      if (!cancelled) setColumnValuesDigest(digest ?? undefined)
+      if (!abortCtrl.signal.aborted) setColumnValuesDigest(digest ?? undefined)
     })()
     return () => {
-      cancelled = true
+      abortCtrl.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duckTableName, columnTypes, totalRows])

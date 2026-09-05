@@ -47,26 +47,55 @@ class OpfsReportCache {
   }
 
   /**
-   * Belirtilen jobId'ye ait çok parçalı Parquet dosyalarının var olup olmadığını kontrol eder.
+   * Belirtilen jobId'ye ait tam ve geçerli Parquet önbelleğinin var olup olmadığını kontrol eder.
+   * Yalnızca akış 100% tamamlanmışsa ('_complete' dosyası var) ve part boyutları geçerliyse true döner.
+   * Yarım kalmış / bozulmuş akış partlarını tespit ederse temizler ve false döner.
    */
   async hasParquetParts(jobId: string): Promise<boolean> {
     try {
       const dir = await this.getParquetDirectory(jobId, false)
       if (!dir) return false
+
+      // 1. _complete onay dosyasını ara
+      let isCompleted = false
+      try {
+        const completeHandle = await dir.getFileHandle("_complete", { create: false })
+        const file = await completeHandle.getFile()
+        if (file.size > 0) isCompleted = true
+      } catch {
+        isCompleted = false
+      }
+
+      if (!isCompleted) {
+        // İndirme yarım kalmış veya kesintiye uğramış; bozuk parçaları temizle
+        await this.removeParquetParts(jobId).catch(() => {})
+        return false
+      }
+
+      // 2. Parquet parçalarını tara; herhangi biri 100 byte'tan küçükse (bozuksa) temizle
+      let validPartCount = 0
       for await (const [name, handle] of (dir as any).entries()) {
         if (handle.kind === "file" && name.endsWith(".parquet")) {
           const file = await (handle as FileSystemFileHandle).getFile()
-          if (file.size > 0) return true
+          if (file.size < 100) {
+            console.warn(
+              `[OpfsReportCache] Bozuk parquet parçası bulundu (${name}, ${file.size} byte), önbellek temizleniyor: ${jobId}`
+            )
+            await this.removeParquetParts(jobId).catch(() => {})
+            return false
+          }
+          validPartCount++
         }
       }
-      return false
+
+      return validPartCount > 0
     } catch {
       return false
     }
   }
 
   /**
-   * Belirtilen jobId'ye ait tüm Parquet part dosya adlarını sıralı döner.
+   * Belirtilen jobId'ye ait geçerli (boyutu >= 100 byte) tüm Parquet part dosya adlarını sıralı döner.
    */
   async getParquetPartFiles(jobId: string): Promise<string[]> {
     try {
@@ -75,7 +104,10 @@ class OpfsReportCache {
       const parts: string[] = []
       for await (const [name, handle] of (dir as any).entries()) {
         if (handle.kind === "file" && name.endsWith(".parquet")) {
-          parts.push(name)
+          const file = await (handle as FileSystemFileHandle).getFile()
+          if (file.size >= 100) {
+            parts.push(name)
+          }
         }
       }
       return parts.sort((a, b) => a.localeCompare(b))
