@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## 🤖 Declarative YAML Agent Manifest Standards
 - Kod içerisinde komut veya prompt metni hardcode olarak yazılmaz.
-- Tüm sistem, grid ve workspace ajan yetenekleri `src/features/<workspace>/agents/*.agent.yaml` manifest dosyalarında saklanır.
+- Tüm sistem, grid ve workspace ajan yetenekleri `src/workspaces/<workspace>/agents/*.agent.yaml` (veya `src/features/system/agents/`, `src/features/reports/agents/`) manifest dosyalarında saklanır.
 - Manifest yüklemeleri Webpack/Turbopack `raw-loader` altyapısı ve `js-yaml` ile `yula-commands.ts` üzerinden dinamik olarak yürütülür.
 
 ## 📋 Yeni Bir Rapor / Ajan Eklenirken Yapılması Gerekenler (Adım Adım Checklist)
@@ -21,10 +21,10 @@ Projeye yeni bir rapor veya ajan yeteneği eklendiğinde aşağıdaki adımlar e
 
 1. **JSON Schema Tanımı (`schemas/<report>-criteria.schema.json`):**
    - `x-scope`, `x-page-path`, `x-job-endpoint` ve `x-ai` (`aliases`, `quickPrompts`, `resultsPrompts`, `columnHints`) alanları içeren kriter şemasını tanımla.
-2. **YAML Agent Manifest Tanımı (`src/features/<workspace>/agents/<name>.agent.yaml`):**
-   - Yeni workspace veya feature için komut/ajan yeteneği gerektiğinde `src/features/<workspace>/agents/<name>.agent.yaml` manifest dosyasını tanımla.
+2. **YAML Agent Manifest Tanımı (`src/workspaces/<workspace>/agents/<name>.agent.yaml`):**
+   - Yeni workspace veya feature için komut/ajan yeteneği gerektiğinde `src/workspaces/<workspace>/agents/<name>.agent.yaml` manifest dosyasını tanımla.
 3. **Rapor Kaydı (`src/features/reports/report-registry.ts`):**
-   - Oluşturulan JSON şemasını `REGISTERED_REPORTS` dizisine `scope`, `workspace`, `title`, `pagePath`, `aliases` ve `fullSchema` ile ekle.
+   - Oluşturulan JSON şemasını ilgili workspace'in `index.ts` kapısından dışa aktar ve `REGISTERED_REPORTS` dizisine `scope`, `workspace`, `title`, `pagePath`, `aliases` ve `fullSchema` ile ekle.
 4. **Next.js Rota Sayfaları (`src/app/`):**
    - Kriter / Karşılama Sayfası: `src/app/<workspace>/<report>/page.tsx`
    - GUID Sonuç Ekranı: `src/app/<workspace>/<report>/[jobId]/page.tsx`
