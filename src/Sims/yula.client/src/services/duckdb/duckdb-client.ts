@@ -129,6 +129,7 @@ class DuckDbClient {
   }): Promise<{
     rows: Record<string, unknown>[]
     totalFiltered: number
+    isCapped?: boolean
   }> {
     const {
       tableName,
@@ -143,33 +144,69 @@ class DuckDbClient {
     const where = buildCombinedWhereClause(filters, numericColumns)
     const escapedTable = `"${tableName.replace(/"/g, '""')}"`
 
-    // 1. Filtrelenmiş satır sayısını al (BIGINT cast ile DuckDB HUGEINT'inin JS Number'a hatasız çevrilmesi sağlanır)
-    const countSql = `SELECT COUNT(*)::BIGINT as count FROM ${escapedTable} ${where};`
-    const countRes = await this.postMessage<WorkerResponse>("QUERY_SCALAR", {
-      sql: countSql,
-    })
-    const rawCount =
-      countRes.result?.count ??
-      countRes.result?.["count(*)"] ??
-      countRes.result?.["COUNT(*)"] ??
-      Object.values(countRes.result ?? {})[0]
-    const totalFiltered = Number(rawCount ?? 0)
-
-    // 2. Filtrelenmiş satırları al
+    // 1. Önce istenen satırları al (LIMIT + 1 ile, hasMore tespiti için)
+    // Parquet filtre pushdown sayesinde 100M satırda dahi DuckDB yalnızca
+    // eşleşen ilk blokları tarar ve 10-20 ms içinde anında sonuç döner.
     let orderClause = ""
     if (sortBy) {
       const escapedSort = `"${sortBy.replace(/"/g, '""')}"`
       orderClause = `ORDER BY ${escapedSort} ${sortDesc ? "DESC" : "ASC"}`
     }
 
-    const selectSql = `SELECT * FROM ${escapedTable} ${where} ${orderClause} LIMIT ${limit} OFFSET ${offset};`
+    const selectSql = `SELECT * FROM ${escapedTable} ${where} ${orderClause} LIMIT ${limit + 1} OFFSET ${offset};`
     const rowsRes = await this.postMessage<WorkerResponse>("QUERY_ROWS", {
       sql: selectSql,
     })
 
+    const rawRows = rowsRes.rows ?? []
+    const hasMore = rawRows.length > limit
+    const rows = hasMore ? rawRows.slice(0, limit) : rawRows
+
+    // 2. Filtrelenmiş satır sayısı hesabı:
+    // Eğer dönen satır sayısı limit'e ulaşmadıysa, tüm eşleşen satırlar zaten elimizdedir;
+    // veritabanına ek bir COUNT sorgusu atmaya gerek yoktur (0 ms maliyet).
+    let totalFiltered = offset + rows.length
+    let isCapped = false
+
+    if (offset === 0) {
+      if (hasMore) {
+        // 100M satırda WASM motorunun ve UI'ın kilitlenmesini engellemek için
+        // COUNT sorgusunu LIMIT 10001 tavanı ile çalıştır.
+        // DuckDB Parquet filtre pushdown ile 10.001 satırı bulduğu anda taramayı durdurur.
+        const cappedCountSql = `SELECT COUNT(*)::BIGINT as count FROM (SELECT 1 FROM ${escapedTable} ${where} LIMIT 10001) as __capped_t;`
+        try {
+          const countRes = await this.postMessage<WorkerResponse>("QUERY_SCALAR", {
+            sql: cappedCountSql,
+          })
+          const rawCount =
+            countRes.result?.count ??
+            countRes.result?.["count(*)"] ??
+            countRes.result?.["COUNT(*)"] ??
+            Object.values(countRes.result ?? {})[0]
+          const countNum = Number(rawCount ?? 0)
+          if (countNum > 10000) {
+            totalFiltered = 10001
+            isCapped = true
+          } else {
+            totalFiltered = countNum
+            isCapped = false
+          }
+        } catch {
+          totalFiltered = offset + rows.length + 1
+          isCapped = true
+        }
+      }
+    } else {
+      // Sayfalama (loadMore) esnasında offset > 0 iken tekrar COUNT çalıştırma
+      if (hasMore) {
+        totalFiltered = offset + rows.length + 1
+      }
+    }
+
     return {
-      rows: rowsRes.rows ?? [],
+      rows,
       totalFiltered,
+      isCapped,
     }
   }
 

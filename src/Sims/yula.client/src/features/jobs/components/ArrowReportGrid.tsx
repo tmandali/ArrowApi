@@ -94,6 +94,7 @@ export function ArrowReportGrid({
     rows,
     totalRows,
     totalFiltered,
+    isCountCapped,
     streamedRows,
     progressPercent,
     filters,
@@ -301,7 +302,7 @@ export function ArrowReportGrid({
           <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
         ) : null}
         <span>
-          {formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
+          {isCountCapped ? `${formatCount(10000)}+` : formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
         </span>
       </span>
     ) : totalRows > 0 ? (

@@ -53,6 +53,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [sortBy, setSortBy] = React.useState<string | null>(null)
   const [sortDesc, setSortDesc] = React.useState<boolean>(false)
   const [page, setPage] = React.useState(0)
+  const [isCountCapped, setIsCountCapped] = React.useState(false)
 
   React.useEffect(() => {
     const syncInitialColumns = () => {
@@ -144,6 +145,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           (val) => typeof val === "string" && val.trim().length > 0
         )
         setTotalFiltered(result.totalFiltered)
+        setIsCountCapped(Boolean(result.isCapped))
         if (!isCustomQueryActive()) {
           if (!hasActiveFilters && result.totalFiltered > 0) {
             baseTotalRowsRef.current = result.totalFiltered
@@ -477,6 +479,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     setSortDesc,
     loadMore,
     hasMore,
+    isCountCapped,
     refresh,
   }
 }
