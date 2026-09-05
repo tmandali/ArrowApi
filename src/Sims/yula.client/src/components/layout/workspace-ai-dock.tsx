@@ -189,7 +189,7 @@ export function WorkspaceAiDock({
 
   // Search açıkken Yula paneli de gizlenir — arama görünümü tüm alanı kaplar
   // (ana ekran davranışı); panel search kapanınca yeniden belirir.
-  if (isHomePage || !open || searchOpen) {
+  if (isHomePage || searchOpen) {
     return (
       <div
         className={cn(
@@ -202,7 +202,7 @@ export function WorkspaceAiDock({
     )
   }
 
-  const isMainMode = expanded || !sideDockAllowed || startExpanded
+  const isMainMode = open && (expanded || !sideDockAllowed || startExpanded)
 
   if (isMainMode) {
     return (

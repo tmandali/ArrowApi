@@ -328,6 +328,8 @@ export function ArrowJobExecutionsPanel({
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const selectedItemRef = React.useRef<HTMLButtonElement | null>(null)
   const lastRefreshPhaseRef = React.useRef(activeRunPhase)
+  const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
+  const [refreshing, setRefreshing] = React.useState(false)
 
   const loadList = React.useCallback(
     async (signal?: AbortSignal, options?: { silent?: boolean }) => {
@@ -356,6 +358,18 @@ export function ArrowJobExecutionsPanel({
     },
     [jobsEndpoint, onListLoaded]
   )
+
+  const handleRefresh = React.useCallback(async () => {
+    setRefreshing(true)
+    const minSpinPromise = new Promise((resolve) => setTimeout(resolve, 500))
+    try {
+      setDetailRefreshToken((prev) => prev + 1)
+      await loadList()
+      await minSpinPromise
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadList])
 
   React.useEffect(() => {
     onListError?.(error)
@@ -466,26 +480,18 @@ export function ArrowJobExecutionsPanel({
 
     void loadDetail()
     return () => abort.abort()
-  }, [selectedId, activeJobId, activeRequestJson])
+  }, [selectedId, activeJobId, activeRequestJson, detailRefreshToken])
 
   // Load persisted progress for the selected run (skip while watching live active job).
-  // Canlı canlı izleme / boş seçim durumunda geçmişi başa al — render
-  // sırasında state ayarlama.
-  //
-  // SSE fallback: canlı izlemede SSE akışı tek güven kaynağıdır; tarayıcıda
-  // bağlantı koparsa adımlar "job submitted"te takılı kalır. Bu yüzden canlı
-  // job için yalnızca SSE gerçekten akarken (yerel ilk satırdan fazla adım
-  // varken) event-log yüklemesi atlanır; aksi halde event-log bootstrap edilir.
-  const liveEventsFlowing =
-    sameJobId(selectedId, activeJobId) &&
-    activeRunPhase === "running" &&
-    activeRunEvents.length > 1
+  // Aktif çalışan run için canlı SSE akışı tek güven kaynağıdır; geçmiş yüklenmez.
+  const isActiveSelected = sameJobId(selectedId, activeJobId)
+  const isLiveActive = isActiveSelected && activeRunPhase === "running"
   const historyResetKey = `${selectedId ?? ""}|${activeJobId ?? ""}|${activeRunPhase ?? ""}`
   const [syncedHistoryResetKey, setSyncedHistoryResetKey] =
     React.useState(historyResetKey)
   if (syncedHistoryResetKey !== historyResetKey) {
     setSyncedHistoryResetKey(historyResetKey)
-    const shouldClearHistory = !selectedId || liveEventsFlowing
+    const shouldClearHistory = !selectedId || isLiveActive
     if (shouldClearHistory) {
       setHistoryEvents([])
     }
@@ -493,8 +499,8 @@ export function ArrowJobExecutionsPanel({
 
   React.useEffect(() => {
     if (!selectedId) return
-    // Canlı aktif run izlenirken ve SSE akarken geçmiş yüklenmez (izleme ekranı canlıdır).
-    if (liveEventsFlowing) return
+    // Canlı aktif run izlenirken SSE akışı kullanılır, event-log sorgulanmaz.
+    if (isLiveActive) return
 
     const abort = new AbortController()
     let timer: ReturnType<typeof setInterval> | null = null
@@ -514,8 +520,11 @@ export function ArrowJobExecutionsPanel({
 
     void loadHistory()
 
-    // SSE akmıyorken canlı job'ı event-log ile hafifçe takip et (fallback).
-    if (sameJobId(selectedId, activeJobId) && activeRunPhase === "running") {
+    // Sadece aktif olmayan ama listede hala "Running/Queued" görünen geçmiş bir iş seçilmişse event-log ile takip et.
+    const isOtherRunning =
+      !isActiveSelected &&
+      (selectedJob?.status === "Running" || selectedJob?.status === "Queued")
+    if (isOtherRunning) {
       timer = setInterval(() => {
         void loadHistory()
       }, 3000)
@@ -525,7 +534,7 @@ export function ArrowJobExecutionsPanel({
       if (timer !== null) clearInterval(timer)
       abort.abort()
     }
-  }, [selectedId, activeJobId, activeRunPhase, liveEventsFlowing])
+  }, [selectedId, isLiveActive, isActiveSelected, selectedJob?.status, detailRefreshToken])
 
   // Live row/batch counts for the active run (from SSE progress events).
   const liveCounts = React.useMemo(() => {
@@ -616,17 +625,16 @@ export function ArrowJobExecutionsPanel({
     return combined
   }, [items, activeJobId, activeLiveStatus, jobName, pendingJobs, liveCounts])
 
-  const isActiveSelected = sameJobId(selectedId, activeJobId)
-  // Canlı adımlar aktarmışsa (SSE çalışıyor) onları göster; SSE tek "job
-  // submitted" satırında takılı kaldıysa event-log bootstrap'ına düş.
+  // Canlı aktif iş seçiliyken koşulsuz olarak canlı adımlar (activeRunEvents) gösterilir.
+  // Geçmiş adımlar (historyEvents) yalnızca geçmiş bir execution seçildiğinde kullanılır.
   const progressEvents =
-    isActiveSelected && activeRunEvents.length > 1
+    isActiveSelected
       ? activeRunEvents
       : historyEvents.length > 0
         ? historyEvents
         : activeRunEvents
   const progressPhase =
-    isActiveSelected && activeRunEvents.length > 1
+    isActiveSelected
       ? activeRunPhase
       : progressEvents.some((e) => e.eventName === "completed")
         ? "done"
@@ -634,9 +642,7 @@ export function ArrowJobExecutionsPanel({
           ? "cancelled"
           : progressEvents.some((e) => e.eventName === "failed")
             ? "idle"
-            : isActiveSelected && activeRunEvents.length > 0
-              ? activeRunPhase
-              : "idle"
+            : "idle"
   const showProgress = Boolean(selectedId)
   const pendingSelectedStatus = pendingJobs.find((p) =>
     sameJobId(p.id, selectedId)
@@ -856,8 +862,10 @@ export function ArrowJobExecutionsPanel({
     >
       <ResizablePanel
         id="executions-criteria"
-        defaultSize="38%"
-        minSize="18%"
+        defaultSize={360}
+        minSize={320}
+        maxSize={520}
+        groupResizeBehavior="preserve-pixel-size"
         className="min-h-0 min-w-0"
       >
         <section className={cn(panelCardClass, "h-full")}>
@@ -878,12 +886,12 @@ export function ArrowJobExecutionsPanel({
                 variant="ghost"
                 size="icon"
                 className="size-7 shrink-0"
-                disabled={loading}
-                onClick={() => void loadList()}
+                disabled={loading || refreshing}
+                onClick={handleRefresh}
                 title="Refresh"
                 aria-label="Refresh"
               >
-                <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
+                <RefreshCw className={cn("size-3.5", (loading || refreshing) && "animate-spin")} />
               </Button>
             </div>
 
@@ -1003,7 +1011,6 @@ export function ArrowJobExecutionsPanel({
 
       <ResizablePanel
         id="executions-detail"
-        defaultSize="62%"
         minSize="30%"
         className="min-h-0 min-w-0"
       >

@@ -22,13 +22,19 @@ export interface PagePanelContextValue {
   setOpen: (id: string, open: boolean) => void;
 }
 
+export const DEFAULT_PAGE_PANEL: RegisteredPagePanel = {
+  id: "module-nav",
+  title: "Menu",
+  defaultOpen: true,
+};
+
 export const PagePanelContext = React.createContext<PagePanelContextValue | null>(null);
 
 export function usePagePanelContext(): PagePanelContextValue {
   const ctx = React.useContext(PagePanelContext);
   if (!ctx) {
     return {
-      registered: null,
+      registered: DEFAULT_PAGE_PANEL,
       openById: {},
       register: () => {},
       unregister: () => {},

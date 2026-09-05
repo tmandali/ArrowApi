@@ -4,7 +4,10 @@ import * as React from "react"
 import { PanelLeftIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
-import { usePagePanelContext } from "@/context/page-panel-context"
+import {
+  DEFAULT_PAGE_PANEL,
+  usePagePanelContext,
+} from "@/context/page-panel-context"
 import { cn } from "@/utils/cn"
 
 type PagePanelTriggerProps = {
@@ -15,8 +18,7 @@ type PagePanelTriggerProps = {
 
 /**
  * Header toggle for the page's registered panel (e.g. Executions on criteria
- * pages). Renders nothing — button and separator together — when the current
- * page has no registered panel.
+ * pages). Renders immediately using DEFAULT_PAGE_PANEL to prevent layout shift on reload.
  */
 export function PagePanelTrigger({
   className,
@@ -24,12 +26,11 @@ export function PagePanelTrigger({
 }: PagePanelTriggerProps) {
   const { registered, openById, setOpen } = usePagePanelContext()
 
-  if (!registered) return null
-
-  const open = openById[registered.id] ?? registered.defaultOpen
+  const panel = registered ?? DEFAULT_PAGE_PANEL
+  const open = openById[panel.id] ?? panel.defaultOpen
   const label = open
-    ? `${registered.title} panelini kapat`
-    : `${registered.title} panelini aç`
+    ? `${panel.title} panelini kapat`
+    : `${panel.title} panelini aç`
 
   return (
     <>
@@ -42,7 +43,7 @@ export function PagePanelTrigger({
         title={label}
         aria-label={label}
         aria-pressed={open}
-        onClick={() => setOpen(registered.id, !open)}
+        onClick={() => setOpen(panel.id, !open)}
       >
         <PanelLeftIcon className="size-4" />
         <span className="sr-only">{label}</span>

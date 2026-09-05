@@ -4,10 +4,8 @@ import {
   fetchJobRequest,
   fetchJobStatus,
 } from "@/features/jobs/arrow-job-client"
-import {
-  appendOrUpdateRunEvent,
-  type RunEventItem,
-} from "@/features/jobs/run-events"
+import { arrowJobEventHub } from "@/features/jobs/services/arrow-job-event-hub"
+import type { RunEventItem } from "@/features/jobs/run-events"
 import { ApiError } from "@/services"
 import {
   isTerminalJobStatus,
@@ -15,7 +13,6 @@ import {
   type TrackedJob,
 } from "@/store/slices/active-jobs-store"
 import type {
-  ArrowJobEvent,
   ArrowJobStatus,
 } from "@/features/jobs/types"
 import type { WorkspaceKey } from "@/lib/workspace"
@@ -82,9 +79,8 @@ function sameJobId(a: string | null | undefined, b: string | null | undefined) {
   return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0
 }
 
-function payloadBelongsToJob(payload: ArrowJobEvent, jobId: string): boolean {
-  if (payload.id == null || payload.id === "") return true
-  return sameJobId(String(payload.id), jobId)
+function normId(id: string | null | undefined): string {
+  return id ? id.trim().toLowerCase() : ""
 }
 
 export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
@@ -106,7 +102,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     [router]
   );
   const location = { pathname: typeof window !== "undefined" ? window.location.pathname : "/", state: null as unknown }
-  const { trackJob, waitUntilTerminal } = useJobSync()
+  const { trackJob } = useJobSync()
 
   const locationState = location.state as {
     focusJobId?: string
@@ -129,7 +125,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   const [listRefreshToken, setListRefreshToken] = React.useState(0)
 
   const focusJobIdRef = React.useRef<string | null>(null)
-  const liveByJobRef = React.useRef(new Map<string, JobLiveSnapshot>())
   const controllersRef = React.useRef(new Map<string, AbortController>())
   const entryResumeGenRef = React.useRef(0)
   const allowEntryResumeRef = React.useRef(true)
@@ -149,33 +144,35 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
       setActiveRunPhase("idle")
       return
     }
-    const snap = liveByJobRef.current.get(jobId)
-    setActiveLiveStatus(snap?.status)
-    setActiveRequestJson(snap?.requestJson)
-    setActiveRunEvents(snap?.events ?? [])
-    setActiveRunPhase(snap?.phase ?? "idle")
+    const snap = arrowJobEventHub.getSnapshot(normId(jobId))
+    if (snap) {
+      setActiveLiveStatus(snap.status)
+      setActiveRequestJson(snap.requestJson)
+      setActiveRunEvents(snap.events)
+      setActiveRunPhase(snap.phase)
+    }
   }, [])
 
-  const patchLive = React.useCallback(
-    (jobId: string, patch: Partial<JobLiveSnapshot>) => {
-      const prev = liveByJobRef.current.get(jobId) ?? {
-        events: [],
-        phase: "idle" as const,
-      }
-      const next: JobLiveSnapshot = {
-        ...prev,
-        ...patch,
-        events: patch.events ?? prev.events,
-      }
-      liveByJobRef.current.set(jobId, next)
-      if (!sameJobId(focusJobIdRef.current, jobId)) return
-      if (patch.status !== undefined) setActiveLiveStatus(patch.status)
-      if (patch.requestJson !== undefined) setActiveRequestJson(patch.requestJson)
-      if (patch.events) setActiveRunEvents(patch.events)
-      if (patch.phase) setActiveRunPhase(patch.phase)
-    },
-    []
-  )
+  // Aktif iş değiştikçe veya hub üzerinden yeni SSE olayları aktıkça state'i otomatik senkronize et.
+  // Replay özelliği sayesinde bileşen sonradan mount olsa dahi birikmiş tüm adımları tek hamlede alır.
+  React.useEffect(() => {
+    if (!activeJobId) return
+
+    const unsub = arrowJobEventHub.subscribe(
+      activeJobId,
+      (detail) => {
+        setActiveLiveStatus(detail.snapshot.status)
+        setActiveRunEvents(detail.snapshot.events)
+        setActiveRunPhase(detail.snapshot.phase)
+        if (detail.snapshot.requestJson) {
+          setActiveRequestJson(detail.snapshot.requestJson)
+        }
+      },
+      { replay: true }
+    )
+
+    return unsub
+  }, [activeJobId])
 
   const trackRunnerJob = React.useCallback(
     (
@@ -212,28 +209,12 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
   const followJob = React.useCallback(
     async (job: ArrowJobStatus, request: Record<string, unknown>) => {
-      controllersRef.current.get(job.id)?.abort()
+      const jobKey = normId(job.id)
+      controllersRef.current.get(jobKey)?.abort()
       const abort = new AbortController()
-      controllersRef.current.set(job.id, abort)
+      controllersRef.current.set(jobKey, abort)
 
-      const requestJson = prettyJson(request)
-      const initialEvents: RunEventItem[] = [
-        {
-          id: "local-0",
-          eventName: "status",
-          title: job.status === "Running" ? "Running" : "Queued",
-          detail: "job submitted",
-          tone: "muted",
-          at: new Date().toISOString(),
-        },
-      ]
-
-      liveByJobRef.current.set(job.id, {
-        status: job.status || "Queued",
-        requestJson,
-        events: initialEvents,
-        phase: "running",
-      })
+      arrowJobEventHub.startStream(job, { request })
       publishFocused(job.id)
 
       setPendingJobs((prev) => {
@@ -252,112 +233,41 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
       trackRunnerJob(job, request)
 
-      const onSseEvent = (eventName: string, payload: ArrowJobEvent) => {
-        if (!payloadBelongsToJob(payload, job.id)) return
-
-        setPendingJobs((prev) =>
-          prev.map((p) => {
-            if (!sameJobId(p.id, job.id)) return p
-            return {
-              ...p,
-              status: payload.status || p.status,
-              totalRows:
-                typeof payload.totalRows === "number"
-                  ? payload.totalRows
-                  : p.totalRows,
-              batchCount:
-                typeof payload.batchCount === "number"
-                  ? payload.batchCount
-                  : p.batchCount,
-            }
-          })
-        )
-
-        const prev = liveByJobRef.current.get(job.id)
-        const events = appendOrUpdateRunEvent(
-          prev?.events ?? [],
-          eventName,
-          payload
-        )
-        let phase: JobLiveSnapshot["phase"] = prev?.phase ?? "running"
-        if (payload.status === "Cancelled" || eventName === "cancelled") {
-          phase = "cancelled"
-        } else if (payload.status === "Completed" || eventName === "completed") {
-          phase = "done"
-        } else if (payload.status === "Failed" || eventName === "failed") {
-          phase = "idle"
-        } else if (!isTerminalJobStatus(prev?.status)) {
-          phase = "running"
-        }
-
-        patchLive(job.id, {
-          events,
-          status: payload.status || prev?.status,
-          phase,
-        })
-      }
-
       try {
-        const terminal = await waitUntilTerminal(job.id, {
+        await arrowJobEventHub.waitUntilTerminal(job.id, {
           signal: abort.signal,
-          onEvent: onSseEvent,
+          onEvent: (_eventName, payload) => {
+            setPendingJobs((prev) =>
+              prev.map((p) => {
+                if (!sameJobId(p.id, job.id)) return p
+                return {
+                  ...p,
+                  status: payload.status || p.status,
+                  totalRows:
+                    typeof payload.totalRows === "number"
+                      ? payload.totalRows
+                      : p.totalRows,
+                  batchCount:
+                    typeof payload.batchCount === "number"
+                      ? payload.batchCount
+                      : p.batchCount,
+                }
+              })
+            )
+          },
         })
 
         setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, job.id)))
         setListRefreshToken((n) => n + 1)
-
-        const prev = liveByJobRef.current.get(job.id)
-        let events = prev?.events ?? []
-        let phase: JobLiveSnapshot["phase"] = "idle"
-
-        if (terminal.status === "Cancelled") {
-          phase = "cancelled"
-        } else if (terminal.status === "Failed") {
-          phase = "idle"
-          if (!events.some((e) => e.eventName === "failed")) {
-            events = appendOrUpdateRunEvent(events, "failed", {
-              id: job.id,
-              status: "Failed",
-              error: terminal.error || "job failed",
-            })
-          }
-        } else if (terminal.status === "Completed") {
-          phase = "done"
-          if (!events.some((e) => e.eventName === "completed")) {
-            events = appendOrUpdateRunEvent(events, "completed", {
-              id: job.id,
-              status: "Completed",
-              totalRows: terminal.totalRows,
-              batchCount: terminal.batchCount,
-            })
-          }
-        }
-
-        patchLive(job.id, {
-          events,
-          status: terminal.status,
-          phase,
-        })
-      } catch (err) {
+      } catch {
         if (abort.signal.aborted) return
         setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, job.id)))
         setListRefreshToken((n) => n + 1)
-        const prev = liveByJobRef.current.get(job.id)
-        const events = appendOrUpdateRunEvent(prev?.events ?? [], "failed", {
-          id: job.id,
-          status: "Failed",
-          error: (err as Error)?.message || "stream error",
-        })
-        patchLive(job.id, {
-          events,
-          status: "Failed",
-          phase: "idle",
-        })
       } finally {
-        controllersRef.current.delete(job.id)
+        controllersRef.current.delete(jobKey)
       }
     },
-    [patchLive, publishFocused, trackRunnerJob, waitUntilTerminal]
+    [publishFocused, trackRunnerJob]
   )
 
   const handleSubmitted = React.useCallback(
@@ -387,35 +297,15 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
       publishFocused(jobId)
 
-      if (liveByJobRef.current.has(jobId)) {
-        if (jobStatus) {
-          patchLive(jobId, { status: jobStatus })
-        }
+      const key = normId(jobId)
+      const snap = arrowJobEventHub.getSnapshot(key)
+      if (snap) {
         return
       }
 
-      const isTerminal = jobStatus ? isTerminalJobStatus(jobStatus) : false
-      const initialPhase: JobLiveSnapshot["phase"] =
-        jobStatus === "Completed"
-          ? "done"
-          : jobStatus === "Cancelled"
-            ? "cancelled"
-            : isTerminal
-              ? "idle"
-              : jobStatus === "Running" || jobStatus === "Queued"
-                ? "running"
-                : "idle"
-
-      liveByJobRef.current.set(jobId, {
-        status: jobStatus,
-        events: [],
-        phase: initialPhase,
-      })
-      publishFocused(jobId)
-
       void fetchJobRequest(jobId).then((req) => {
         if (!req) return
-        patchLive(jobId, { requestJson: prettyJson(req) })
+        setActiveRequestJson(prettyJson(req))
       })
 
       const targetJob: ArrowJobStatus =
@@ -423,13 +313,13 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
           ? { id: jobId, status: jobStatus || "Completed", jobUrl: "", eventsUrl: "" }
           : jobOrId
 
-      if (jobStatus && isInFlightStatus(jobStatus) && !controllersRef.current.has(jobId)) {
+      if (jobStatus && isInFlightStatus(jobStatus) && !arrowJobEventHub.isStreaming(key)) {
         void fetchJobRequest(jobId).then((req) => {
           void followJob(targetJob, req ?? {})
         })
       }
     },
-    [followJob, patchLive, publishFocused]
+    [followJob, publishFocused]
   )
 
   const applyExecutionFocus = React.useCallback(
@@ -477,20 +367,22 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
   const handleJobCancelled = React.useCallback(
     (jobId: string) => {
-      controllersRef.current.get(jobId)?.abort()
-      controllersRef.current.delete(jobId)
-      patchLive(jobId, { status: "Cancelled", phase: "cancelled" })
+      const key = normId(jobId)
+      controllersRef.current.get(key)?.abort()
+      controllersRef.current.delete(key)
+      arrowJobEventHub.cancelJob(jobId)
       setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, jobId)))
       setListRefreshToken((n) => n + 1)
     },
-    [patchLive]
+    []
   )
 
   const handleJobDeleted = React.useCallback(
     (jobId: string) => {
-      controllersRef.current.get(jobId)?.abort()
-      controllersRef.current.delete(jobId)
-      liveByJobRef.current.delete(jobId)
+      const key = normId(jobId)
+      controllersRef.current.get(key)?.abort()
+      controllersRef.current.delete(key)
+      arrowJobEventHub.removeJob(jobId)
       setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, jobId)))
       setListRefreshToken((n) => n + 1)
       if (sameJobId(focusJobIdRef.current, jobId)) {
@@ -530,7 +422,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   React.useEffect(() => {
     if (!trackedId) return
     if (!allowEntryResumeRef.current) return
-    if (controllersRef.current.has(trackedId)) return
+    if (controllersRef.current.has(normId(trackedId))) return
 
     const abort = new AbortController()
     const gen = ++entryResumeGenRef.current

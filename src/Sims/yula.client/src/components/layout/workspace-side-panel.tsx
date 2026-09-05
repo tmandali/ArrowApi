@@ -106,10 +106,10 @@ export function WorkspaceSidePanelLayout({
   children,
   headerActions,
   collapseLabel,
-  defaultSizePercent = WORKSPACE_SIDE_PANEL_PERCENT,
-  minSizePercent,
-  maxSizePercent = 40,
-  mainMinSizePercent = 45,
+  defaultSizePercent: _defaultSizePercent = WORKSPACE_SIDE_PANEL_PERCENT,
+  minSizePercent: _minSizePercent,
+  maxSizePercent: _maxSizePercent = 40,
+  mainMinSizePercent: _mainMinSizePercent = 45,
   className,
   mainClassName,
   panelClassName,
@@ -120,10 +120,7 @@ export function WorkspaceSidePanelLayout({
   collapsible = false,
   layoutId,
 }: WorkspaceSidePanelLayoutProps) {
-  const mainDefault = 100 - defaultSizePercent
-  const panelMinSize = minSizePercent ?? defaultSizePercent
-
-  // Resize düzenlerini oturumlar arası koru (localStorage). Split/full
+  // Resize düzenlerini oturumlar arası koru. Split/full
   // yapıları ayrı anahtarda tutulur ki panel kapalıyken oluşan 100% düzeni
   // kullanıcının kaydettiği split oranını ezmesin.
   const { groupRef, onLayoutChanged } = usePersistedPanelLayout(
@@ -169,7 +166,6 @@ export function WorkspaceSidePanelLayout({
 
   return (
     <ResizablePanelGroup
-      key={open ? "split" : "full"}
       orientation="horizontal"
       groupRef={groupRef}
       onLayoutChanged={onLayoutChanged}
@@ -177,8 +173,7 @@ export function WorkspaceSidePanelLayout({
     >
       <ResizablePanel
         id="side-main"
-        defaultSize={open ? String(mainDefault) : "100"}
-        minSize={String(mainMinSizePercent)}
+        minSize="30%"
         className="min-h-0"
       >
         <div
@@ -198,9 +193,10 @@ export function WorkspaceSidePanelLayout({
       {open ? (
         <ResizablePanel
           id="side-panel"
-          defaultSize={String(defaultSizePercent)}
-          minSize={String(panelMinSize)}
-          maxSize={String(maxSizePercent)}
+          defaultSize={380}
+          minSize={300}
+          maxSize={560}
+          groupResizeBehavior="preserve-pixel-size"
           collapsible={collapsible}
           collapsedSize={0}
           className="min-h-0"

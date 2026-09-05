@@ -68,8 +68,7 @@ const ACTIONS_COL_WIDTH = 32
  * - otherwise: Name | Value (Description stays off)
  */
 const PHONE_VIEWPORT_MAX_REM = 40
-const DEFAULT_COL_WIDTHS = { name: 224, value: 320 } as const
-const DEFAULT_COL_WIDTHS_TABLET = { name: 168, value: 220 } as const
+const DEFAULT_COL_WIDTHS = { name: 180, value: 260 } as const
 const MIN_COL_WIDTHS = { name: 112, value: 128 } as const
 
 type ResizableColKey = keyof typeof DEFAULT_COL_WIDTHS
@@ -118,6 +117,7 @@ function availableNameValueWidth(tableWidth: number): number {
  * never absorb leftover width. Prefer the requested Name width.
  */
 function clampColWidths(widths: ColWidths, tableWidth: number): ColWidths {
+  if (tableWidth <= 0) return widths
   const available = availableNameValueWidth(tableWidth)
   const name = Math.min(
     Math.max(MIN_COL_WIDTHS.name, widths.name),
@@ -131,17 +131,8 @@ function widthsForLayout(
   tableWidth: number,
   previous: ColWidths
 ): ColWidths {
-  if (layout === "stacked") return previous
-  const preferred =
-    layout === "columns" ? DEFAULT_COL_WIDTHS_TABLET : DEFAULT_COL_WIDTHS
-  // Keep user-resized widths when still in a column layout; seed from preferred on first fit.
-  const seed =
-    previous.name === DEFAULT_COL_WIDTHS.name &&
-    previous.value === DEFAULT_COL_WIDTHS.value &&
-    layout === "columns"
-      ? preferred
-      : previous
-  return clampColWidths(seed, tableWidth)
+  if (layout === "stacked" || tableWidth <= 0) return previous
+  return clampColWidths(previous, tableWidth)
 }
 
 /** No / Actions — never share leftover width with resizable columns. */
@@ -340,14 +331,19 @@ export const SchemaCriteriaFilter = React.forwardRef<
 
     const update = () => {
       const tableWidth = el.clientWidth
+      if (tableWidth <= 0) return
       const widths = colWidthsRef.current
       const nextLayout = resolveGridLayout(
         tableWidth,
         widths,
         layoutRef.current
       )
-      setLayout(nextLayout)
-      setColWidths((prev) => widthsForLayout(nextLayout, tableWidth, prev))
+      setLayout((prev) => (prev === nextLayout ? prev : nextLayout))
+      setColWidths((prev) => {
+        const next = widthsForLayout(nextLayout, tableWidth, prev)
+        if (prev.name === next.name && prev.value === next.value) return prev
+        return next
+      })
     }
 
     update()

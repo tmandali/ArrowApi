@@ -4,11 +4,10 @@ import { useRouter } from "next/navigation";
 import * as React from "react"
 import { toast } from "sonner"
 import { useWorkspaceNotifications } from "@/context/workspace-notifications-context"
-import type { ArrowJobEvent } from "@/features/jobs"
+import { type ArrowJobEvent, arrowJobEventHub } from "@/features/jobs"
 import {
   cancelArrowJob,
   fetchJobStatus,
-  readJobSseEvents,
   sleep,
 } from "@/features/jobs/arrow-job-client"
 import {
@@ -231,10 +230,23 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
             }
 
             const eventsUrl = status.eventsUrl || latest.eventsUrl
-            const terminal = await readJobSseEvents(
-              eventsUrl,
-              controller.signal,
-              (eventName, payload) => {
+            arrowJobEventHub.startStream(
+              {
+                id: job.id,
+                status: status.status,
+                eventsUrl,
+                jobUrl: status.jobUrl || latest.jobUrl,
+                name: status.name || latest.name,
+                createdAt: latest.createdAt,
+              },
+              {
+                request: latest.payload as Record<string, unknown> | undefined,
+              }
+            )
+
+            const terminal = await arrowJobEventHub.waitUntilTerminal(job.id, {
+              signal: controller.signal,
+              onEvent: (eventName, payload) => {
                 if (
                   payload.id != null &&
                   String(payload.id).localeCompare(job.id, undefined, {
@@ -247,8 +259,8 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
                   updateJob(job.id, { status: payload.status })
                 }
                 emitEvent(job.id, eventName, payload)
-              }
-            )
+              },
+            })
 
             // Always finish + notify listeners once SSE reaches a terminal
             // event — even if a resync bumped generation mid-stream.
@@ -345,91 +357,10 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
         onEvent?: (eventName: string, payload: ArrowJobEvent) => void
       }
     ) => {
-      return new Promise<ArrowJobEvent>((resolve, reject) => {
-        if (options?.signal?.aborted) {
-          reject(new DOMException("Aborted", "AbortError"))
-          return
-        }
-
-        let settled = false
-        let unsubscribe = () => {}
-
-        const cleanup = () => {
-          unsubscribe()
-          options?.signal?.removeEventListener("abort", onAbort)
-        }
-
-        const onAbort = () => {
-          if (settled) return
-          settled = true
-          cleanup()
-          reject(new DOMException("Aborted", "AbortError"))
-        }
-
-        unsubscribe = subscribe(jobId, {
-          onEvent: options?.onEvent,
-          onTerminal: (payload) => {
-            if (settled) return
-            settled = true
-            cleanup()
-            resolve(payload)
-          },
-        })
-
-        options?.signal?.addEventListener("abort", onAbort, { once: true })
-
-        const existing = useActiveJobsStore.getState().jobs[jobId]
-        if (existing && isTerminalJobStatus(existing.status)) {
-          settled = true
-          cleanup()
-          resolve({
-            id: existing.id,
-            status: existing.status,
-            jobUrl: existing.jobUrl,
-            eventsUrl: existing.eventsUrl,
-            name: existing.name,
-          })
-          return
-        }
-
-        if (!existing) {
-          void fetchJobStatus(jobId, options?.signal)
-            .then((status) => {
-              if (settled) return
-              if (status && isTerminalJobStatus(status.status)) {
-                settled = true
-                cleanup()
-                resolve({
-                  id: status.id,
-                  status: status.status,
-                  error: status.error,
-                  totalRows: status.totalRows,
-                  batchCount: status.batchCount,
-                  jobUrl: status.jobUrl,
-                  eventsUrl: status.eventsUrl,
-                  completedAt: status.completedAt,
-                  name: status.name,
-                })
-                return
-              }
-              ensureTracking()
-            })
-            .catch((error) => {
-              if (settled) return
-              if (error instanceof DOMException && error.name === "AbortError") {
-                return
-              }
-              settled = true
-              cleanup()
-              reject(error)
-            })
-          return
-        }
-
-        ensureTracking()
-      })
+      ensureTracking()
+      return arrowJobEventHub.waitUntilTerminal(jobId, options)
     },
-    [subscribe, ensureTracking]
+    [ensureTracking]
   )
 
   const cancelTrackedJob = React.useCallback(
@@ -439,6 +370,7 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // cancel best-effort; local abort still stops SSE
       }
+      arrowJobEventHub.cancelJob(jobId)
       const cancelled: ArrowJobEvent = {
         id: jobId,
         status: "Cancelled",

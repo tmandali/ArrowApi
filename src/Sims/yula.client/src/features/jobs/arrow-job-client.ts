@@ -107,8 +107,14 @@ export async function fetchJobRequest(
 ): Promise<Record<string, unknown> | null> {
   let response: Response
   try {
-    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/request`), {
-      headers: { Accept: "application/json", ...getCompanyHeaders() },
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/request?_t=${Date.now()}`), {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        ...getCompanyHeaders(),
+      },
       signal,
     })
   } catch (networkErr: unknown) {
@@ -150,13 +156,20 @@ export async function listArrowJobs(
   if (options.take != null) params.set("take", String(options.take))
   if (options.skip != null) params.set("skip", String(options.skip))
   if (options.state) params.set("state", options.state)
+  params.set("_t", String(Date.now()))
 
   const query = params.toString()
   const resolvedEndpoint = resolveApiUrl(query ? `${endpoint}?${query}` : endpoint)
   let response: Response
   try {
     response = await fetch(resolvedEndpoint, {
-      headers: { Accept: "application/json", ...getCompanyHeaders() },
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        ...getCompanyHeaders(),
+      },
       signal: options.signal,
     })
   } catch (networkErr: unknown) {
@@ -187,8 +200,14 @@ export async function fetchJobStatus(
 ): Promise<ArrowJobStatus | null> {
   let response: Response
   try {
-    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}`), {
-      headers: { Accept: "application/json", ...getCompanyHeaders() },
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}?_t=${Date.now()}`), {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        ...getCompanyHeaders(),
+      },
       signal,
     })
   } catch (networkErr: unknown) {
@@ -224,8 +243,14 @@ export async function fetchJobEventLog(
 ): Promise<ArrowJobHubMessage[]> {
   let response: Response
   try {
-    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/event-log`), {
-      headers: { Accept: "application/json", ...getCompanyHeaders() },
+    response = await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/event-log?_t=${Date.now()}`), {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        ...getCompanyHeaders(),
+      },
       signal,
     })
   } catch (networkErr: unknown) {

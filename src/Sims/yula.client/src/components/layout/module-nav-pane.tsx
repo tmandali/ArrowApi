@@ -77,7 +77,6 @@ export function ModuleNavPane({
 
   return (
     <ResizablePanelGroup
-      key={navOpen ? "nav" : "full"}
       orientation="horizontal"
       groupRef={groupRef}
       onLayoutChanged={onLayoutChanged}
@@ -86,9 +85,10 @@ export function ModuleNavPane({
       {navOpen ? (
         <ResizablePanel
           id="module-nav"
-          defaultSize="13%"
-          minSize="10%"
-          maxSize="20%"
+          defaultSize={190}
+          minSize={160}
+          maxSize={300}
+          groupResizeBehavior="preserve-pixel-size"
           className="flex min-h-0 min-w-0 flex-col"
         >
           <ModuleNavMenu headerVisible={navMenuHeaderVisible} />
@@ -99,8 +99,7 @@ export function ModuleNavPane({
       ) : null}
       <ResizablePanel
         id="module-content"
-        defaultSize={navOpen ? "87%" : "100%"}
-        minSize="75%"
+        minSize="50%"
         className={cn("flex min-h-0 min-w-0 flex-col", showOpenButton && !navOpen && "relative")}
       >
         {/* Menü kapalıyken ve bu görünümde izin verilmişse sol üstte zarif açma butonu */}
