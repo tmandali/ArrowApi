@@ -65,7 +65,11 @@ class ArrowStreamClient {
           pending.reject(new Error(data.error))
         } else if (type === "CANCELLED") {
           this.pendingRequests.delete(id)
-          pending.reject(new DOMException("Akış kullanıcı tarafından iptal edildi", "AbortError"))
+          pending.resolve({
+            totalRows: 0,
+            partFiles: [],
+            totalBytesProcessed: 0,
+          })
         }
       }
 
@@ -118,10 +122,18 @@ class ArrowStreamClient {
     const worker = this.getWorker()
     const id = ++this.messageSeq
 
-    worker.postMessage({
-      id,
-      type: "CANCEL_STREAM",
-      payload: { jobId },
+    return new Promise<void>((resolve) => {
+      this.pendingRequests.set(id, {
+        jobId,
+        resolve: () => resolve(),
+        reject: () => resolve(),
+      })
+
+      worker.postMessage({
+        id,
+        type: "CANCEL_STREAM",
+        payload: { jobId },
+      })
     })
   }
 

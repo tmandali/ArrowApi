@@ -112,15 +112,15 @@ class DuckStreamManager {
   /**
    * Akışı iptal eder ve tablosunu siler (kullanıcı açıkça iptal/silme istediğinde).
    */
-  cancel(jobId: string): void {
+  async cancel(jobId: string): Promise<void> {
     const session = this.sessions.get(jobId)
     if (session) {
       this.cancelCleanup(session)
       session.abortController.abort()
-      void arrowStreamClient.cancelStream(jobId).catch(() => {})
-      void duckDbClient.dropTable(session.tableName).catch(() => {})
-      void opfsReportCache.remove(jobId).catch(() => {})
-      void opfsReportCache.removeParquetParts(jobId).catch(() => {})
+      await arrowStreamClient.cancelStream(jobId).catch(() => {})
+      await duckDbClient.dropTable(session.tableName).catch(() => {})
+      await opfsReportCache.remove(jobId).catch(() => {})
+      await opfsReportCache.removeParquetParts(jobId).catch(() => {})
       this.sessions.delete(jobId)
     }
   }
@@ -140,13 +140,15 @@ class DuckStreamManager {
     let session = this.sessions.get(jobId)
     if (session) {
       session.abortController.abort()
-      void arrowStreamClient.cancelStream(jobId).catch(() => {})
+      await arrowStreamClient.cancelStream(jobId).catch(() => {})
     }
 
-    // Disk ve RAM önbelleklerini tamamen temizle
+    // 1. Önce DuckDB motorunu ve VFS kayıtlarını serbest bırak
+    await duckDbClient.resetDatabase().catch(() => {})
+
+    // 2. Ardından disk önbelleklerini temizle (kilit kalmadığı için güvenle silinir)
     await opfsReportCache.remove(jobId).catch(() => {})
     await opfsReportCache.removeParquetParts(jobId).catch(() => {})
-    await duckDbClient.resetDatabase().catch(() => {})
 
     const abortController = new AbortController()
     if (!session) {
@@ -320,7 +322,9 @@ class DuckStreamManager {
           if (abortController.signal.aborted) return
           session.streamedRows = prog.streamedRows
 
-          if (prog.partFiles && prog.partFiles.length > 0) {
+          // İlk parça diske yazıldığında kısmi VIEW'ı bir kez oluştur (kullanıcı bekletilmesin).
+          // Sonraki parçalarda tekrar tekrar DuckDB'ye yük bindirilmez; akış tamamlandığında nihai view bağlanır.
+          if (!session.isTableReady && prog.partFiles && prog.partFiles.length > 0) {
             try {
               const viewRes = await duckDbClient.registerParquetPartsView({
                 tableName,
@@ -330,7 +334,7 @@ class DuckStreamManager {
               session.streamedRows = viewRes.rowCount || prog.streamedRows
               session.isTableReady = true
             } catch (vErr) {
-              console.warn("[DuckStreamManager] Kısmi Parquet View oluşturulamadı:", vErr)
+              console.warn("[DuckStreamManager] İlk kısmi Parquet View oluşturulamadı:", vErr)
             }
           }
 

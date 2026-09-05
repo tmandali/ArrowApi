@@ -136,6 +136,10 @@ async function resetDuckDb(): Promise<{
   db: duckdb.AsyncDuckDB
   conn: duckdb.AsyncDuckDBConnection
 }> {
+  const allVfsFiles: string[] = []
+  for (const files of tableVfsFiles.values()) {
+    allVfsFiles.push(...files)
+  }
   tableVfsFiles.clear()
 
   try {
@@ -144,8 +148,10 @@ async function resetDuckDb(): Promise<{
       conn = null
     }
     if (db) {
+      for (const vfs of allVfsFiles) {
+        await db.dropFile(vfs).catch(() => {})
+      }
       await db.reset().catch(() => {})
-      await db.dropFiles().catch(() => {})
       const newConn = await db.connect()
       await newConn.query("SET preserve_insertion_order=false;").catch(() => {})
       await newConn.query("SET memory_limit='3GB';").catch(() => {})
@@ -267,7 +273,9 @@ self.onmessage = async (e: MessageEvent) => {
             await db!.dropFile(prev).catch(() => {})
           }
 
-          // 3. Her bir parçanın FileSystemFileHandle'ını DuckDB VFS'e BROWSER_FSACCESS ile bağla
+          // 3. Her bir parçanın File nesnesini DuckDB VFS'e BROWSER_FILEREADER ile bağla.
+          // BROWSER_FILEREADER, FileSystemSyncAccessHandle oluşturmaz; exclusive lock almaz.
+          // Bu sayede dosyalar başka işlemler/akışlar tarafından kilitlenmez, NoModificationAllowedError önlenir.
           const vfsNames: string[] = []
           for (const fileName of filesToRegister) {
             try {
@@ -283,9 +291,9 @@ self.onmessage = async (e: MessageEvent) => {
               await db!.dropFile(vfsName).catch(() => {})
               await db!.registerFileHandle(
                 vfsName,
-                fileHandle,
-                duckdb.DuckDBDataProtocol.BROWSER_FSACCESS,
-                true
+                file,
+                duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+                false
               )
               vfsNames.push(vfsName)
             } catch (fErr) {
