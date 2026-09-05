@@ -30,6 +30,7 @@ type StreamSessionInternal = StreamSessionState & {
 
 class DuckStreamManager {
   private sessions = new Map<string, StreamSessionInternal>()
+  private activeJobId: string | null = null
 
   /**
    * Belirtilen jobId için akış durumunu döner.
@@ -56,6 +57,19 @@ class DuckStreamManager {
   ): () => void {
     const { jobId, jobUrl, tableName, expectedTotalRows, onError } = options
 
+    const isDifferentReport = this.activeJobId !== null && this.activeJobId !== jobId
+    if (isDifferentReport) {
+      const prevJobId = this.activeJobId!
+      const prevSession = this.sessions.get(prevJobId)
+      if (prevSession) {
+        this.cancelCleanup(prevSession)
+        prevSession.abortController.abort()
+        void arrowStreamClient.cancelStream(prevJobId).catch(() => {})
+        this.sessions.delete(prevJobId)
+      }
+    }
+    this.activeJobId = jobId
+
     let session = this.sessions.get(jobId)
 
     if (!session) {
@@ -81,8 +95,8 @@ class DuckStreamManager {
       session.listeners.add(listener)
       this.cancelCleanup(session)
 
-      // Arka plan indirme sürecini başlat
-      void this.startBackgroundStream(session, onError)
+      // Arka plan indirme sürecini başlat (farklı rapora geçildiyse DuckDB motorunu sıfırla)
+      void this.startBackgroundStream(session, onError, { resetDatabase: isDifferentReport })
     } else {
       session.listeners.add(listener)
       this.cancelCleanup(session)
@@ -132,7 +146,7 @@ class DuckStreamManager {
     // Disk ve RAM önbelleklerini tamamen temizle
     await opfsReportCache.remove(jobId).catch(() => {})
     await opfsReportCache.removeParquetParts(jobId).catch(() => {})
-    await duckDbClient.dropTable(tableName).catch(() => {})
+    await duckDbClient.resetDatabase().catch(() => {})
 
     const abortController = new AbortController()
     if (!session) {
@@ -234,12 +248,18 @@ class DuckStreamManager {
   private async startBackgroundStream(
     session: StreamSessionInternal,
     onError?: (err: string | null) => void,
-    options?: { forceServerFetch?: boolean }
+    options?: { forceServerFetch?: boolean; resetDatabase?: boolean }
   ): Promise<void> {
     const { jobId, jobUrl, tableName, abortController } = session
     const forceServerFetch = Boolean(options?.forceServerFetch)
 
     try {
+      if (options?.resetDatabase) {
+        await duckDbClient.resetDatabase().catch((err) => {
+          console.warn("[DuckStreamManager] resetDatabase uyarısı:", err)
+        })
+      }
+
       if (!forceServerFetch) {
         // 1. Tablo veya View DuckDB'de zaten mevcut mu kontrol et (0ms)
         const check = await duckDbClient.checkTableExists(tableName)

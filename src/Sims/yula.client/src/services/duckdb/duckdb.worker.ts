@@ -137,8 +137,34 @@ async function resetDuckDb(): Promise<{
   db: duckdb.AsyncDuckDB
   conn: duckdb.AsyncDuckDBConnection
 }> {
+  tableRowCounts.clear()
+  tableVfsFiles.clear()
+
   try {
-    if (conn) await conn.close().catch(() => {})
+    if (conn) {
+      await conn.close().catch(() => {})
+      conn = null
+    }
+    if (db) {
+      await db.reset().catch(() => {})
+      await db.dropFiles().catch(() => {})
+      const newConn = await db.connect()
+      await newConn.query("SET preserve_insertion_order=false;").catch(() => {})
+      await newConn.query("SET memory_limit='3GB';").catch(() => {})
+      conn = newConn
+      console.log(
+        "[DuckDB Worker] fast reset completed (RAM freed, catalogs cleared, engine warm)"
+      )
+      return { db, conn }
+    }
+  } catch (err) {
+    console.warn(
+      "[DuckDB Worker] fast reset failed, falling back to full re-instantiate:",
+      err
+    )
+  }
+
+  try {
     if (db) await db.terminate().catch(() => {})
   } catch {
     // Ignore termination errors
