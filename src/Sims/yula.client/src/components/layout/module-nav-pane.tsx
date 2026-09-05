@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { ReactNode } from "react"
+import { PanelLeftOpen } from "lucide-react"
 import { ModuleNavMenu } from "@/components/layout/module-nav-menu"
 import {
   pageContentGutterClass,
@@ -26,6 +27,11 @@ type ModuleNavPaneProps = {
    * Varsayılan: false (header ve buton gösterilmez).
    */
   navMenuHeaderVisible?: boolean
+  /**
+   * Menü kapalıyken sol üstte açma butonu gösterilip gösterilmeyeceği.
+   * Belirtilmezse navMenuHeaderVisible ile aynı değeri alır (header visible true ise açma butonu da true olur).
+   */
+  floatingOpenButton?: boolean
 }
 
 /**
@@ -42,7 +48,10 @@ export function ModuleNavPane({
   children,
   className,
   navMenuHeaderVisible = false,
+  floatingOpenButton,
 }: ModuleNavPaneProps) {
+  const showOpenButton = floatingOpenButton ?? navMenuHeaderVisible
+
   const { open: navOpen } = usePagePanel({
     id: "module-nav",
     title: "Menu",
@@ -92,8 +101,22 @@ export function ModuleNavPane({
         id="module-content"
         defaultSize={navOpen ? "87%" : "100%"}
         minSize="75%"
-        className="flex min-h-0 min-w-0 flex-col"
+        className={cn("flex min-h-0 min-w-0 flex-col", showOpenButton && !navOpen && "relative")}
       >
+        {/* Menü kapalıyken ve bu görünümde izin verilmişse sol üstte zarif açma butonu */}
+        {!navOpen && showOpenButton && (
+          <div className="absolute left-2 top-2 z-20">
+            <button
+              type="button"
+              onClick={() => setOpen("module-nav", true)}
+              title="Menüyü Aç (Ctrl+B)"
+              className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground shadow-2xs backdrop-blur-xs transition-colors cursor-pointer"
+            >
+              <PanelLeftOpen className="size-3.5" />
+              <span className="sr-only">Menüyü Aç</span>
+            </button>
+          </div>
+        )}
         {children}
       </ResizablePanel>
     </ResizablePanelGroup>

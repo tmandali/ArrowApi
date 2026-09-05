@@ -31,6 +31,8 @@ type WorkspacePageShellProps = {
   contentClassName?: string
   /** Nav menü tepesindeki kapatma butonu / başlık alanının görünürlüğü (varsayılan: false). */
   navMenuHeaderVisible?: boolean
+  /** Menü kapalıyken açma butonunun gösterilip gösterilmeyeceği (varsayılan: isNavMenuHeaderVisible). */
+  floatingOpenButton?: boolean
 }
 
 /**
@@ -52,6 +54,7 @@ export function WorkspacePageShell({
   className,
   contentClassName,
   navMenuHeaderVisible,
+  floatingOpenButton,
 }: WorkspacePageShellProps) {
   // Page header gizlendiğinde (ana sayfalar/panolar) menü kapatma butonu erişilebilir olsun
   const isNavMenuHeaderVisible = navMenuHeaderVisible ?? hideHeader;
@@ -76,7 +79,12 @@ export function WorkspacePageShell({
         </WorkspacePageHeader>
       )}
       <WorkspaceAiDock className={contentClassName}>
-        <ModuleNavPane navMenuHeaderVisible={isNavMenuHeaderVisible}>{children}</ModuleNavPane>
+        <ModuleNavPane
+          navMenuHeaderVisible={isNavMenuHeaderVisible}
+          floatingOpenButton={floatingOpenButton ?? isNavMenuHeaderVisible}
+        >
+          {children}
+        </ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )
