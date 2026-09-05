@@ -43,6 +43,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [rows, setRows] = React.useState<T[]>([])
   const [totalRows, setTotalRows] = React.useState<number>(0)
   const [totalFiltered, setTotalFiltered] = React.useState<number>(0)
+  const [hasMoreRows, setHasMoreRows] = React.useState<boolean>(false)
   const [streamedRows, setStreamedRows] = React.useState<number>(0)
   const [filters, setFilters] = React.useState<Record<string, string>>({})
   const [isStreaming, setIsStreaming] = React.useState(false)
@@ -137,18 +138,30 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
             ? normalizedRows
             : (prev) => [...prev, ...normalizedRows]
         )
+        setHasMoreRows(result.hasMore)
+
         const hasActiveFilters = Object.values(activeFilters).some(
           (val) => typeof val === "string" && val.trim().length > 0
         )
-        setTotalFiltered(result.totalFiltered)
-        if (!isCustomQueryActive()) {
-          if (!hasActiveFilters && result.totalFiltered > 0) {
-            baseTotalRowsRef.current = result.totalFiltered
-            setTotalRows(result.totalFiltered)
-          } else if (baseTotalRowsRef.current > 0) {
-            setTotalRows(baseTotalRowsRef.current)
-          } else if (latestStreamedRef.current > 0) {
-            setTotalRows(latestStreamedRef.current)
+
+        // Sadece ilk sayfada (activePage === 0) filtrelenmiş satır sayısı güncellenir.
+        // Sonsuz kaydırmada (activePage > 0) totalFiltered ve totalRows değerleri korunur.
+        if (activePage === 0) {
+          if (result.totalFiltered !== undefined) {
+            setTotalFiltered(result.totalFiltered)
+          } else if (!hasActiveFilters) {
+            setTotalFiltered(baseTotalRowsRef.current || latestStreamedRef.current || 0)
+          }
+
+          if (!isCustomQueryActive()) {
+            if (!hasActiveFilters && (result.totalFiltered ?? 0) > 0) {
+              baseTotalRowsRef.current = result.totalFiltered!
+              setTotalRows(result.totalFiltered!)
+            } else if (baseTotalRowsRef.current > 0) {
+              setTotalRows(baseTotalRowsRef.current)
+            } else if (latestStreamedRef.current > 0) {
+              setTotalRows(latestStreamedRef.current)
+            }
           }
         }
       } catch (err) {
@@ -222,6 +235,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)
+      setHasMoreRows(false)
       setStreamedRows(0)
       setIsPartial(false)
     }
@@ -299,6 +313,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)
+      setHasMoreRows(false)
       setStreamedRows(0)
       setPage(0)
       await duckStreamManager.restart({
@@ -422,6 +437,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         setRows(capped)
         setTotalRows(capped.length)
         setTotalFiltered(capped.length)
+        setHasMoreRows(false)
       } catch (err) {
         // Özel görünüm hataları banner'a düşürülmez: model akışı zaten
         // düzeltir; kullanıcıyı kırmızı banner ile endişelendirmeye gerek yok.
@@ -438,7 +454,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     }
   }, [customSql, customQueryTick, tableName, onError, markTableReady])
 
-  const hasMore = rows.length > 0 && rows.length < totalFiltered
+  const hasMore = hasMoreRows && rows.length > 0
   const loadingMoreRef = React.useRef(false)
 
   const loadMore = React.useCallback(() => {

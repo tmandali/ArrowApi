@@ -105,7 +105,8 @@ class DuckDbClient {
     offset?: number
   }): Promise<{
     rows: Record<string, unknown>[]
-    totalFiltered: number
+    totalFiltered?: number
+    hasMore: boolean
     isCapped?: boolean
   }> {
     const {
@@ -140,12 +141,15 @@ class DuckDbClient {
     const rows = hasMore ? rawRows.slice(0, limit) : rawRows
 
     // 2. Filtrelenmiş satır sayısı hesabı:
-    // Eğer dönen satır sayısı limit'e ulaşmadıysa, tüm eşleşen satırlar zaten elimizdedir;
-    // veritabanına ek bir COUNT sorgusu atmaya gerek yoktur (0 ms maliyet).
-    let totalFiltered = offset + rows.length
+    // Yalnızca ilk sayfada (offset === 0) hesaplanır.
+    // Eğer dönen satır sayısı limit'e ulaşmadıysa ek COUNT sorgusuna gerek yoktur (0 ms).
+    // Sayfalama (offset > 0) esnasında COUNT tekrar çalıştırılmaz ve önceki değer korunur.
+    let totalFiltered: number | undefined = undefined
 
     if (offset === 0) {
-      if (hasMore) {
+      if (!hasMore) {
+        totalFiltered = rows.length
+      } else {
         const countSql = `SELECT COUNT(*)::BIGINT as count FROM ${escapedTable} ${where};`
         try {
           const countRes = await this.postMessage<WorkerResponse>("QUERY_SCALAR", {
@@ -158,19 +162,15 @@ class DuckDbClient {
             Object.values(countRes.result ?? {})[0]
           totalFiltered = Number(rawCount ?? 0)
         } catch {
-          totalFiltered = offset + rows.length
+          totalFiltered = rows.length
         }
-      }
-    } else {
-      // Sayfalama (loadMore) esnasında offset > 0 iken tekrar COUNT çalıştırma
-      if (hasMore) {
-        totalFiltered = offset + rows.length + 1
       }
     }
 
     return {
       rows,
       totalFiltered,
+      hasMore,
     }
   }
 
