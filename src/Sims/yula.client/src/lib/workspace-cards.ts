@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Package,
+  ShoppingCart,
   RefreshCw,
   BarChart2,
   Factory,
@@ -25,6 +26,15 @@ export const WORKSPACE_CARDS: WorkspaceCardItem[] = [
     description: "Stok kartları, bakiyeler, ekstreler ve analitik raporlar",
     url: "/stock",
     icon: Package,
+  },
+  {
+    id: "selling",
+    name: "Selling",
+    titleLead: "Satış",
+    titleTrail: "Yönetimi",
+    description: "Satış siparişleri, müşteri teklifleri, faturalar ve analitik",
+    url: "/selling",
+    icon: ShoppingCart,
   },
   {
     id: "subcontracting",

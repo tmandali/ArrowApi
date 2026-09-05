@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { RetailSalesForm } from "@/features/stock/retail-sales-report";
+import { RetailSalesForm } from "@/workspaces/stock";
 
 export default function RetailSalesPage() {
   return (

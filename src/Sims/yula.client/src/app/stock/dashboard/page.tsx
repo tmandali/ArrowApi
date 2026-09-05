@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockPageForm } from "@/features/stock";
+import { StockPageForm } from "@/workspaces/stock";
 
 export default function StockDashboardPage() {
   return (

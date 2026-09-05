@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockAnalyticsForm } from "@/features/stock/stock-analytics";
+import { StockAnalyticsForm } from "@/workspaces/stock";
 
 export default function StockAnalyticsPage() {
   return (

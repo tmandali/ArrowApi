@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/features/stock/lib/stock-menu-registry";
+import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/workspaces/stock/lib/stock-menu-registry";
 import { searchVectorContext } from "@/services/duckdb-vector";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import type { YulaMessage } from "@/app/api/agent/chat/route";

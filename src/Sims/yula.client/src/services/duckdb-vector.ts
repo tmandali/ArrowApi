@@ -9,7 +9,7 @@
 import { duckDbClient } from "@/services/duckdb";
 import { getEmbedding, getEmbeddings, VECTOR_DIMENSION } from "@/lib/yula-embedding";
 import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
-import { STOCK_WORKSPACE_MENU_ITEMS } from "@/features/stock/lib/stock-menu-registry";
+import { STOCK_WORKSPACE_MENU_ITEMS } from "@/workspaces/stock/lib/stock-menu-registry";
 
 import { opfsVectorCache } from "@/services/opfs/opfs-vector-cache";
 

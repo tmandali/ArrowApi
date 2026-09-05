@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { StockAnalyticsJobView } from "@/features/stock/stock-analytics";
+import { StockAnalyticsJobView } from "@/workspaces/stock";
 
 export default async function StockAnalyticsJobPage({
   params,

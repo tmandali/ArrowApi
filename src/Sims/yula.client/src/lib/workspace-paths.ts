@@ -24,8 +24,8 @@ export const emptyWorkspaceHome: Record<string, { label: string; url: string }> 
   {
     system: { label: "System", url: "/" },
     stock: { label: "Stock", url: "/stock" },
+    selling: { label: "Selling", url: "/selling" },
     subcontracting: { label: "Subcontracting", url: "/subcontracting" },
-    selling: { label: "Subcontracting", url: "/subcontracting" },
     accounting: { label: "Accounting", url: "/accounting" },
     manufacturing: { label: "Manufacturing", url: "/manufacturing" },
   }
@@ -41,7 +41,8 @@ export function workspaceLabelFromPath(pathname: string): string {
     return "System"
   }
   if (pathname.startsWith("/stock")) return "Stock"
-  if (pathname.startsWith("/subcontracting") || pathname.startsWith("/selling")) return "Subcontracting"
+  if (pathname.startsWith("/selling")) return "Selling"
+  if (pathname.startsWith("/subcontracting")) return "Subcontracting"
   if (pathname.startsWith("/accounting") || pathname.startsWith("/financial-reports")) return "Accounting"
   if (pathname.startsWith("/manufacturing")) return "Manufacturing"
   return "System"
@@ -58,8 +59,8 @@ export function workspaceIdFromPath(pathname: string): string {
     return "system"
   }
   if (pathname.startsWith("/stock")) return "stock"
+  if (pathname.startsWith("/selling")) return "selling"
   if (pathname.startsWith("/subcontracting")) return "subcontracting"
-  if (pathname.startsWith("/selling")) return "subcontracting"
   if (pathname.startsWith("/accounting")) return "accounting"
   if (pathname.startsWith("/manufacturing")) return "manufacturing"
   return "system"

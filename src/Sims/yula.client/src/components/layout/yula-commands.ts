@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import systemCommandsYaml from "@/features/system/agents/system.agent.yaml";
 import gridCommandsYaml from "@/features/reports/agents/grid.agent.yaml";
-import reportCommandsYaml from "@/features/stock/agents/report.agent.yaml";
+import reportCommandsYaml from "@/workspaces/stock/agents/report.agent.yaml";
 
 export type YulaCommand = {
   id: string;

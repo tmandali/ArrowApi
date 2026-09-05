@@ -3,6 +3,9 @@ export { MySettingsForm as UserSettingsForm } from "./components/self-service/My
 export { SystemUsersView } from "./components/admin/SystemUsersView";
 export { SystemHomeView } from "./components/SystemHomeView";
 
+export { systemWorkspace } from "./workspace.config";
+export { systemNav, systemDashboardPath } from "./routes";
+
 export const systemWorkspaceConfig = {
   id: "system",
   label: "System",

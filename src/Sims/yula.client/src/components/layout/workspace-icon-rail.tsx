@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { workspaceIconFor } from "@/components/layout/workspace-brand"
@@ -14,21 +14,8 @@ import {
 } from "@/components/ui/tooltip"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
 import { useWorkspaceLastPageStore } from "@/lib/stores/workspace-last-page"
-import type { WorkspaceId } from "@/lib/workspace-nav"
+import { getRailWorkspaces } from "@/lib/workspace-registry"
 import { cn } from "@/utils/cn"
-
-type RailWorkspace = {
-  id: WorkspaceId
-  name: string
-  url: string
-}
-
-const railWorkspaces: RailWorkspace[] = [
-  { id: "stock", name: "Stock", url: "/stock" },
-  { id: "subcontracting", name: "Subcontracting", url: "/subcontracting" },
-  { id: "accounting", name: "Accounting", url: "/accounting" },
-  { id: "manufacturing", name: "Manufacturing", url: "/manufacturing" },
-]
 
 /**
  * Full-height workspace icon rail on the far left: Yula mark on top,
@@ -36,8 +23,10 @@ const railWorkspaces: RailWorkspace[] = [
  */
 export function WorkspaceIconRail({ className }: { className?: string }) {
   const router = useRouter()
+  const pathname = usePathname()
   const activeWorkspaceId = useActiveWorkspaceId()
   const lastPathById = useWorkspaceLastPageStore((s) => s.lastPathById)
+  const railWorkspaces = getRailWorkspaces()
 
   return (
     <TooltipProvider>
@@ -73,10 +62,19 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
                   aria-label={workspace.name}
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => {
-                    if (!isActive && workspace.url) {
-                      // Workspace'te son işlem yapılan sayfa; kayıt yoksa kök
-                      const last = lastPathById[workspace.id]
-                      router.push(last ?? workspace.url)
+                    // Bayat / bozuk localStorage kaydını temizle: last path bu workspace'e ait değilse kullanma
+                    const rawLast = lastPathById[workspace.id]
+                    const validLast =
+                      rawLast && rawLast.startsWith(`/${workspace.id}`)
+                        ? rawLast
+                        : undefined
+
+                    const target = validLast ?? workspace.url
+
+                    if (pathname !== target) {
+                      router.push(target)
+                    } else if (pathname === `/${workspace.id}`) {
+                      router.push(`/${workspace.id}/dashboard`)
                     }
                   }}
                   className={cn(

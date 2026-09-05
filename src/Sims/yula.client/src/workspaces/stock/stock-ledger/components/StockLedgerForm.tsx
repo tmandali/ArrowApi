@@ -1,6 +1,6 @@
 "use client";
 
-import { ItemFormShell } from "@/features/stock/item"
+import { ItemFormShell } from "@/workspaces/stock/item"
 
 export function StockLedgerForm() {
   return (
