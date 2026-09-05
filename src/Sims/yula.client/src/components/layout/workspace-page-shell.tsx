@@ -29,6 +29,8 @@ type WorkspacePageShellProps = {
   className?: string
   /** Extra classes for the inner dock children container. */
   contentClassName?: string
+  /** Nav menü tepesindeki kapatma butonu / başlık alanının görünürlüğü (varsayılan: false). */
+  navMenuHeaderVisible?: boolean
 }
 
 /**
@@ -49,6 +51,7 @@ export function WorkspacePageShell({
   children,
   className,
   contentClassName,
+  navMenuHeaderVisible = false,
 }: WorkspacePageShellProps) {
   return (
     <div
@@ -70,7 +73,7 @@ export function WorkspacePageShell({
         </WorkspacePageHeader>
       )}
       <WorkspaceAiDock className={contentClassName}>
-        <ModuleNavPane>{children}</ModuleNavPane>
+        <ModuleNavPane navMenuHeaderVisible={navMenuHeaderVisible}>{children}</ModuleNavPane>
       </WorkspaceAiDock>
     </div>
   )

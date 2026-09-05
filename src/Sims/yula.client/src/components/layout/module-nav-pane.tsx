@@ -21,6 +21,11 @@ type ModuleNavPaneProps = {
   /** Page content rendered to the right of the nav menu. */
   children: ReactNode
   className?: string
+  /**
+   * Nav menü tepesindeki kapatma butonu / başlık alanının görünürlüğü.
+   * Varsayılan: false (header ve buton gösterilmez).
+   */
+  navMenuHeaderVisible?: boolean
 }
 
 /**
@@ -29,12 +34,15 @@ type ModuleNavPaneProps = {
  * scaffold'lar (WorkspacePageShell, ReportCriteriaShell, JobView'ler, item,
  * system) AiDock'larını bu pane ile sarmalar — davranış tüm sayfalarda aynı.
  *
- * - Açma / Kapama: ModuleNavMenu tepesindeki kapat butonu veya menü
- *   kapalıyken sol üstte beliren açma butonu, ayrıca Ctrl+B / ⌘B kısayolu.
+ * - Açma / Kapama: Page header'daki PagePanelTrigger butonu veya Ctrl+B / ⌘B kısayolu.
  * - Kalıcılık: genişlik + açık/kapalı durumu tüm sayfalarda ortak (`module-nav`
  *   tek anahtar; F5 sonrası geri yüklenir).
  */
-export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
+export function ModuleNavPane({
+  children,
+  className,
+  navMenuHeaderVisible = false,
+}: ModuleNavPaneProps) {
   const { open: navOpen } = usePagePanel({
     id: "module-nav",
     title: "Menu",
@@ -74,7 +82,7 @@ export function ModuleNavPane({ children, className }: ModuleNavPaneProps) {
           maxSize="20%"
           className="flex min-h-0 min-w-0 flex-col"
         >
-          <ModuleNavMenu />
+          <ModuleNavMenu headerVisible={navMenuHeaderVisible} />
         </ResizablePanel>
       ) : null}
       {navOpen ? (

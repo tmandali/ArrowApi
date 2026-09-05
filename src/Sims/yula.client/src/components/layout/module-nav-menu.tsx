@@ -17,34 +17,50 @@ const rowClass =
 const rowStyleClass = "text-muted-foreground hover:bg-muted hover:text-foreground"
 const rowActiveClass = "bg-primary/10 text-primary font-medium"
 
+export type ModuleNavMenuProps = {
+  /**
+   * Menü tepesindeki kapatma butonu / başlık alanının görünürlüğü.
+   * Varsayılan: false (header ve buton gösterilmez).
+   */
+  headerVisible?: boolean
+  className?: string
+}
+
 /**
  * Aktif modülün nav menüsü (workspace switcher yok) — Executions ekranının
  * solundaki panelde render edilir. Veri kaynağı workspace-nav (eski sidebar
  * menü verisi); seçili item vurgusu yapılır, gruplar aktif sayfa
  * içeriyorsa açılır.
  */
-export function ModuleNavMenu() {
+export function ModuleNavMenu({
+  headerVisible = false,
+  className,
+}: ModuleNavMenuProps = {}) {
   const pathname = usePathname()
   const items = getWorkspaceNavForPath(pathname)
   const { setOpen } = usePagePanelContext()
 
   return (
-    <section className="flex h-full min-w-0 flex-col">
-      {/* Kapatma Butonu (Başlık yok, sağa yaslı sade buton) */}
-      <div className="flex h-7 shrink-0 items-center justify-end px-1.5 pt-1">
-        <button
-          type="button"
-          onClick={() => setOpen("module-nav", false)}
-          title="Menüyü Kapat (Ctrl+B)"
-          className="flex size-6 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-        >
-          <PanelLeftClose className="size-3.5" />
-          <span className="sr-only">Menüyü Kapat</span>
-        </button>
-      </div>
+    <section className={cn("flex h-full min-w-0 flex-col", className)}>
+      {headerVisible && (
+        <div className="flex h-7 shrink-0 items-center justify-end px-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => setOpen("module-nav", false)}
+            title="Menüyü Kapat (Ctrl+B)"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <PanelLeftClose className="size-3.5" />
+            <span className="sr-only">Menüyü Kapat</span>
+          </button>
+        </div>
+      )}
 
       <nav
-        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-1.5 pt-0.5"
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-1.5",
+          headerVisible && "pt-0.5"
+        )}
         aria-label="Module menu"
       >
         {items.map((item) => {
