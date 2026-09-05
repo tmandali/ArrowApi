@@ -47,6 +47,20 @@ async function getDuckDb(): Promise<{
       // 3 GB (≈2.79 GiB) buffer pool + IPC chunk/parquet tamponları için ~1 GB
       // marj güvenli: malloc abortu (FATAL) yerine kontrollü OOM üretilir.
       await newConn.query("SET memory_limit='3GB';").catch(() => {})
+
+      // Kalıcı OPFS vektör veritabanını (yula_embed.duckdb) ikincil katalog olarak bağla
+      try {
+        await newConn.query("ATTACH 'yula_embed.duckdb' AS embed_db;").catch(async () => {
+          await newConn.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;")
+        })
+        console.log("[DuckDB Worker] Persistent embed_db attached via OPFS.")
+      } catch (attachErr) {
+        console.warn(
+          "[DuckDB Worker] Persistent embed_db could not be attached (multi-tab or unsupported), using memory catalog:",
+          attachErr
+        )
+      }
+
       db = newDb
       conn = newConn
       console.log(
@@ -175,6 +189,18 @@ async function resetDuckDb(): Promise<{
     await conn.query("CHECKPOINT;").catch(() => {})
     await conn.query("SET preserve_insertion_order=false;").catch(() => {})
     await conn.query("SET memory_limit='3GB';").catch(() => {})
+
+    // 4. embed_db kataloğunun hala bağlı olduğundan emin ol
+    const checkEmbed = await conn
+      .query(
+        `SELECT catalog_name FROM information_schema.schemata WHERE catalog_name = 'embed_db' LIMIT 1;`
+      )
+      .catch(() => null)
+    if (!checkEmbed || checkEmbed.numRows === 0) {
+      await conn.query("ATTACH 'yula_embed.duckdb' AS embed_db;").catch(async () => {
+        await conn?.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;").catch(() => {})
+      })
+    }
 
     console.log(
       "[DuckDB Worker] fast reset completed (RAM freed, report tables cleared, vector store preserved)"

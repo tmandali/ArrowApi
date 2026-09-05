@@ -20,6 +20,8 @@ export interface RagVectorItem {
 }
 
 let activeStoreDimension: number | null = null;
+let isPersistentStoreAvailable = false;
+let vectorTableName = "yula_rag_embeddings";
 
 /**
  * Oturum düzeyinde indeksleme dedup'ı: DuckDB WASM tablosu sayfa ömrü boyunca
@@ -46,14 +48,32 @@ function dedupeSessionIndex(
 /** DuckDB WASM üzerinde vektör RAG tablosunu istenen boyuta göre (örn: 384 veya 1536) hazırlar. */
 export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<void> {
   if (activeStoreDimension === dimension) return;
+
+  // 1. embed_db kataloğunun bağlı olup olmadığını kontrol et
+  try {
+    const catalogsRes = await duckDbClient.executeCustomSql(
+      "SELECT catalog_name FROM information_schema.schemata WHERE catalog_name = 'embed_db' LIMIT 1;"
+    );
+    if (catalogsRes.length > 0) {
+      isPersistentStoreAvailable = true;
+      vectorTableName = "embed_db.yula_rag_embeddings";
+    } else {
+      isPersistentStoreAvailable = false;
+      vectorTableName = "yula_rag_embeddings";
+    }
+  } catch {
+    isPersistentStoreAvailable = false;
+    vectorTableName = "yula_rag_embeddings";
+  }
+
   try {
     // Eğer mevcut tablo farklı boyuttaysa düşürüp yeni boyutla kur
     if (activeStoreDimension !== null && activeStoreDimension !== dimension) {
-      await duckDbClient.executeCustomSql("DROP TABLE IF EXISTS yula_rag_embeddings;");
+      await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${vectorTableName};`);
     }
 
     const sql = `
-      CREATE TABLE IF NOT EXISTS yula_rag_embeddings (
+      CREATE TABLE IF NOT EXISTS ${vectorTableName} (
         id VARCHAR PRIMARY KEY,
         scope VARCHAR,
         content VARCHAR,
@@ -62,14 +82,24 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
       );
     `;
     await duckDbClient.executeCustomSql(sql);
+
+    // Ana memory kataloğunda kolay erişim için alias view oluştur
+    if (isPersistentStoreAvailable) {
+      await duckDbClient
+        .executeCustomSql(
+          `CREATE OR REPLACE VIEW yula_rag_embeddings AS SELECT * FROM ${vectorTableName};`
+        )
+        .catch(() => {});
+    }
+
     activeStoreDimension = dimension;
-    console.info(`🤖 [WASM Vector Store] yula_rag_embeddings table ready (FLOAT[${dimension}]).`);
+    console.info(`🤖 [WASM Vector Store] ${vectorTableName} ready (FLOAT[${dimension}]).`);
   } catch {
-    // Tablo şema uyuşmazlığı varsa (örn: eski 384 vs 1536) tabloyu sıfırla
+    // Tablo şema uyuşmazlığı varsa tabloyu sıfırla
     try {
-      await duckDbClient.executeCustomSql("DROP TABLE IF EXISTS yula_rag_embeddings;");
+      await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${vectorTableName};`);
       const fallbackSql = `
-        CREATE TABLE yula_rag_embeddings (
+        CREATE TABLE ${vectorTableName} (
           id VARCHAR PRIMARY KEY,
           scope VARCHAR,
           content VARCHAR,
@@ -78,10 +108,31 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
         );
       `;
       await duckDbClient.executeCustomSql(fallbackSql);
+      if (isPersistentStoreAvailable) {
+        await duckDbClient
+          .executeCustomSql(
+            `CREATE OR REPLACE VIEW yula_rag_embeddings AS SELECT * FROM ${vectorTableName};`
+          )
+          .catch(() => {});
+      }
       activeStoreDimension = dimension;
-      console.info(`🤖 [WASM Vector Store] Recreated yula_rag_embeddings (FLOAT[${dimension}]).`);
+      console.info(`🤖 [WASM Vector Store] Recreated ${vectorTableName} (FLOAT[${dimension}]).`);
     } catch (recreateErr) {
-      console.warn("[Vector Store] init error:", recreateErr);
+      console.warn("[Vector Store] init error, falling back to memory:", recreateErr);
+      vectorTableName = "yula_rag_embeddings";
+      isPersistentStoreAvailable = false;
+      await duckDbClient
+        .executeCustomSql(`
+          CREATE TABLE IF NOT EXISTS yula_rag_embeddings (
+            id VARCHAR PRIMARY KEY,
+            scope VARCHAR,
+            content VARCHAR,
+            metadata JSON,
+            embedding FLOAT[${dimension}]
+          );
+        `)
+        .catch(() => {});
+      activeStoreDimension = dimension;
     }
   }
 }
@@ -161,18 +212,42 @@ async function doIndexReportSchemas(): Promise<number> {
     },
   );
 
-  // Tek toplu embedding isteği (öğe başına ayrı POST fırtınası yerine)
-  const vectors = await getEmbeddings(pending.map((p) => p.content));
-  for (let i = 0; i < pending.length; i++) {
-    await insertOrReplaceVector({ ...pending[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
+  // 1. Önce veritabanında zaten kayıtlı olan ID'leri kontrol et (F5 sonrası 0 token harca)
+  const existingIds = new Set<string>();
+  try {
+    const existingRows = await duckDbClient.executeCustomSql(`SELECT id FROM ${vectorTableName};`);
+    for (const r of existingRows) {
+      if (r.id) existingIds.add(String(r.id));
+    }
+  } catch {
+    // ignore
   }
-  const indexedCount = pending.length;
+
+  const missing = pending.filter((p) => !existingIds.has(p.id));
+
+  if (missing.length === 0) {
+    console.info(
+      `🤖 [DuckDB WASM Vector Indexer] All ${pending.length} report schemas already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+    );
+  } else {
+    // Yalnızca eksik öğeler için embedding isteği yap
+    const vectors = await getEmbeddings(missing.map((p) => p.content));
+    for (let i = 0; i < missing.length; i++) {
+      await insertOrReplaceVector({ ...missing[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
+    }
+    if (isPersistentStoreAvailable) {
+      await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
+    }
+    console.info(
+      `🤖 [DuckDB WASM Vector Indexer] ${missing.length} new report schemas indexed into ${vectorTableName}.`
+    );
+  }
 
   // 5) Workspace Menü ve Modül Öğelerinin Vektör İndeksine Eklenmesi
   const menuCount = await indexWorkspaceMenus();
-  const total = indexedCount + menuCount;
+  const total = pending.length + menuCount;
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${total} total vector items indexed into DuckDB WASM.`);
+  console.info(`🤖 [DuckDB WASM Vector Indexer] ${total} total vector items ready in DuckDB WASM.`);
   return total;
 }
 
@@ -199,12 +274,35 @@ async function doIndexWorkspaceMenus(): Promise<number> {
     },
   }));
 
-  const vectors = await getEmbeddings(pending.map((p) => p.content));
-  for (let i = 0; i < pending.length; i++) {
-    await insertOrReplaceVector({ ...pending[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
+  // 1. Önce veritabanında zaten kayıtlı olan ID'leri kontrol et
+  const existingIds = new Set<string>();
+  try {
+    const existingRows = await duckDbClient.executeCustomSql(`SELECT id FROM ${vectorTableName};`);
+    for (const r of existingRows) {
+      if (r.id) existingIds.add(String(r.id));
+    }
+  } catch {
+    // ignore
   }
 
-  console.info(`🤖 [WASM Vector Indexer] ${pending.length} workspace menu items indexed into RAG store.`);
+  const missing = pending.filter((p) => !existingIds.has(p.id));
+
+  if (missing.length === 0) {
+    console.info(
+      `🤖 [WASM Vector Indexer] All ${pending.length} workspace menu items already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+    );
+    return pending.length;
+  }
+
+  const vectors = await getEmbeddings(missing.map((p) => p.content));
+  for (let i = 0; i < missing.length; i++) {
+    await insertOrReplaceVector({ ...missing[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
+  }
+  if (isPersistentStoreAvailable) {
+    await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
+  }
+
+  console.info(`🤖 [WASM Vector Indexer] ${missing.length} workspace menu items indexed into ${vectorTableName}.`);
   return pending.length;
 }
 
@@ -257,7 +355,10 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
         });
         conversationIndexedIds.add(it.id);
       }
-      console.info(`🤖 [WASM Vector Indexer] ${pending.length} conversations indexed into RAG store.`);
+      if (isPersistentStoreAvailable) {
+        await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
+      }
+      console.info(`🤖 [WASM Vector Indexer] ${pending.length} conversations indexed into ${vectorTableName}.`);
       return pending.length;
     } finally {
       conversationIndexInFlight = null;
@@ -280,16 +381,19 @@ async function insertOrReplaceVector(item: {
   const cleanMeta = JSON.stringify(item.metadata).replace(/'/g, "''");
 
   const sql = `
-    INSERT OR REPLACE INTO yula_rag_embeddings (id, scope, content, metadata, embedding)
+    INSERT OR REPLACE INTO ${vectorTableName} (id, scope, content, metadata, embedding)
     VALUES ('${item.id}', '${item.scope}', '${cleanContent}', '${cleanMeta}', ${vecLiteral});
   `;
   try {
     await duckDbClient.executeCustomSql(sql);
   } catch (err) {
-    if (String(err).includes("yula_rag_embeddings does not exist")) {
+    if (String(err).includes("does not exist") || String(err).includes("yula_rag_embeddings")) {
       activeStoreDimension = null;
       await initVectorStore(dim);
-      await duckDbClient.executeCustomSql(sql);
+      await duckDbClient.executeCustomSql(`
+        INSERT OR REPLACE INTO ${vectorTableName} (id, scope, content, metadata, embedding)
+        VALUES ('${item.id}', '${item.scope}', '${cleanContent}', '${cleanMeta}', ${vecLiteral});
+      `);
     } else {
       throw err;
     }
@@ -348,7 +452,7 @@ export async function searchVectorContext(
         content,
         metadata,
         array_cosine_distance(embedding, ${vecLiteral}) AS distance
-      FROM yula_rag_embeddings
+      FROM ${vectorTableName}
       ORDER BY distance ASC
       LIMIT ${limit};
     `;
@@ -358,7 +462,7 @@ export async function searchVectorContext(
       const res = await duckDbClient.executeCustomSql(sql);
       if (Array.isArray(res)) rows = res;
     } catch (err) {
-      if (String(err).includes("yula_rag_embeddings does not exist")) {
+      if (String(err).includes("does not exist") || String(err).includes("yula_rag_embeddings")) {
         activeStoreDimension = null;
         return [];
       }
