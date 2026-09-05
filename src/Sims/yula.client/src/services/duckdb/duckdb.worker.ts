@@ -50,8 +50,8 @@ async function getDuckDb(): Promise<{
 
       // Kalıcı OPFS vektör veritabanını (yula_embed.duckdb) ikincil katalog olarak bağla
       try {
-        await newConn.query("ATTACH 'yula_embed.duckdb' AS embed_db;").catch(async () => {
-          await newConn.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;")
+        await newConn.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;").catch(async () => {
+          await newConn.query("ATTACH 'yula_embed.duckdb' AS embed_db;")
         })
         console.log("[DuckDB Worker] Persistent embed_db attached via OPFS.")
       } catch (attachErr) {
@@ -197,8 +197,8 @@ async function resetDuckDb(): Promise<{
       )
       .catch(() => null)
     if (!checkEmbed || checkEmbed.numRows === 0) {
-      await conn.query("ATTACH 'yula_embed.duckdb' AS embed_db;").catch(async () => {
-        await conn?.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;").catch(() => {})
+      await conn.query("ATTACH 'opfs://yula_embed.duckdb' AS embed_db;").catch(async () => {
+        await conn?.query("ATTACH 'yula_embed.duckdb' AS embed_db;").catch(() => {})
       })
     }
 
