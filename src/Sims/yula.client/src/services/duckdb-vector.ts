@@ -11,6 +11,8 @@ import { getEmbedding, getEmbeddings, VECTOR_DIMENSION } from "@/lib/yula-embedd
 import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
 import { STOCK_WORKSPACE_MENU_ITEMS } from "@/features/stock/lib/stock-menu-registry";
 
+import { opfsVectorCache } from "@/services/opfs/opfs-vector-cache";
+
 export interface RagVectorItem {
   id: string;
   scope: string;
@@ -20,8 +22,7 @@ export interface RagVectorItem {
 }
 
 let activeStoreDimension: number | null = null;
-let isPersistentStoreAvailable = false;
-let vectorTableName = "yula_rag_embeddings";
+const VECTOR_TABLE_NAME = "yula_rag_embeddings";
 
 /**
  * Oturum düzeyinde indeksleme dedup'ı: DuckDB WASM tablosu sayfa ömrü boyunca
@@ -49,31 +50,13 @@ function dedupeSessionIndex(
 export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<void> {
   if (activeStoreDimension === dimension) return;
 
-  // 1. embed_db kataloğunun bağlı olup olmadığını kontrol et
   try {
-    const catalogsRes = await duckDbClient.executeCustomSql(
-      "SELECT catalog_name FROM information_schema.schemata WHERE catalog_name = 'embed_db' LIMIT 1;"
-    );
-    if (catalogsRes.length > 0) {
-      isPersistentStoreAvailable = true;
-      vectorTableName = "embed_db.yula_rag_embeddings";
-    } else {
-      isPersistentStoreAvailable = false;
-      vectorTableName = "yula_rag_embeddings";
-    }
-  } catch {
-    isPersistentStoreAvailable = false;
-    vectorTableName = "yula_rag_embeddings";
-  }
-
-  try {
-    // Eğer mevcut tablo farklı boyuttaysa düşürüp yeni boyutla kur
     if (activeStoreDimension !== null && activeStoreDimension !== dimension) {
-      await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${vectorTableName};`);
+      await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${VECTOR_TABLE_NAME};`);
     }
 
     const sql = `
-      CREATE TABLE IF NOT EXISTS ${vectorTableName} (
+      CREATE TABLE IF NOT EXISTS ${VECTOR_TABLE_NAME} (
         id VARCHAR PRIMARY KEY,
         scope VARCHAR,
         content VARCHAR,
@@ -82,58 +65,21 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
       );
     `;
     await duckDbClient.executeCustomSql(sql);
-
-    // Ana memory kataloğunda kolay erişim için alias view oluştur
-    if (isPersistentStoreAvailable) {
-      await duckDbClient
-        .executeCustomSql(
-          `CREATE OR REPLACE VIEW yula_rag_embeddings AS SELECT * FROM ${vectorTableName};`
-        )
-        .catch(() => {});
-    }
-
     activeStoreDimension = dimension;
-    console.info(`🤖 [WASM Vector Store] ${vectorTableName} ready (FLOAT[${dimension}]).`);
-  } catch {
-    // Tablo şema uyuşmazlığı varsa tabloyu sıfırla
-    try {
-      await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${vectorTableName};`);
-      const fallbackSql = `
-        CREATE TABLE ${vectorTableName} (
-          id VARCHAR PRIMARY KEY,
-          scope VARCHAR,
-          content VARCHAR,
-          metadata JSON,
-          embedding FLOAT[${dimension}]
-        );
-      `;
-      await duckDbClient.executeCustomSql(fallbackSql);
-      if (isPersistentStoreAvailable) {
-        await duckDbClient
-          .executeCustomSql(
-            `CREATE OR REPLACE VIEW yula_rag_embeddings AS SELECT * FROM ${vectorTableName};`
-          )
-          .catch(() => {});
-      }
-      activeStoreDimension = dimension;
-      console.info(`🤖 [WASM Vector Store] Recreated ${vectorTableName} (FLOAT[${dimension}]).`);
-    } catch (recreateErr) {
-      console.warn("[Vector Store] init error, falling back to memory:", recreateErr);
-      vectorTableName = "yula_rag_embeddings";
-      isPersistentStoreAvailable = false;
-      await duckDbClient
-        .executeCustomSql(`
-          CREATE TABLE IF NOT EXISTS yula_rag_embeddings (
-            id VARCHAR PRIMARY KEY,
-            scope VARCHAR,
-            content VARCHAR,
-            metadata JSON,
-            embedding FLOAT[${dimension}]
-          );
-        `)
-        .catch(() => {});
-      activeStoreDimension = dimension;
-    }
+    console.info(`🤖 [WASM Vector Store] ${VECTOR_TABLE_NAME} ready (FLOAT[${dimension}]).`);
+  } catch (err) {
+    console.warn("[Vector Store] init error, recreating:", err);
+    await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${VECTOR_TABLE_NAME};`).catch(() => {});
+    await duckDbClient.executeCustomSql(`
+      CREATE TABLE ${VECTOR_TABLE_NAME} (
+        id VARCHAR PRIMARY KEY,
+        scope VARCHAR,
+        content VARCHAR,
+        metadata JSON,
+        embedding FLOAT[${dimension}]
+      );
+    `);
+    activeStoreDimension = dimension;
   }
 }
 
@@ -212,35 +158,45 @@ async function doIndexReportSchemas(): Promise<number> {
     },
   );
 
-  // 1. Önce veritabanında zaten kayıtlı olan ID'leri kontrol et (F5 sonrası 0 token harca)
-  const existingIds = new Set<string>();
+  // 1. OPFS kalıcı önbelleğini yükle
+  const cachedEmbeddings = await opfsVectorCache.getAll();
+
+  // 2. DuckDB'de halihazırda var olan satırları bul
+  const duckDbExistingIds = new Set<string>();
   try {
-    const existingRows = await duckDbClient.executeCustomSql(`SELECT id FROM ${vectorTableName};`);
-    for (const r of existingRows) {
-      if (r.id) existingIds.add(String(r.id));
+    const rows = await duckDbClient.executeCustomSql(`SELECT id FROM ${VECTOR_TABLE_NAME};`);
+    for (const r of rows) {
+      if (r.id) duckDbExistingIds.add(String(r.id));
     }
   } catch {
     // ignore
   }
 
-  const missing = pending.filter((p) => !existingIds.has(p.id));
-
-  if (missing.length === 0) {
+  // 3. OPFS önbelleğinde olmayan (yeni) öğeleri tespit et ve embedding üret
+  const missingFromCache = pending.filter((p) => !cachedEmbeddings.has(p.id));
+  if (missingFromCache.length > 0) {
+    const newVectors = await getEmbeddings(missingFromCache.map((p) => p.content));
+    const entriesToSave: { id: string; embedding: number[] }[] = [];
+    for (let i = 0; i < missingFromCache.length; i++) {
+      const vec = newVectors[i] ?? new Array(VECTOR_DIMENSION).fill(0);
+      cachedEmbeddings.set(missingFromCache[i].id, vec);
+      entriesToSave.push({ id: missingFromCache[i].id, embedding: vec });
+    }
+    await opfsVectorCache.setMany(entriesToSave);
     console.info(
-      `🤖 [DuckDB WASM Vector Indexer] All ${pending.length} report schemas already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+      `🤖 [DuckDB WASM Vector Indexer] ${missingFromCache.length} new report schemas generated and saved to OPFS.`
     );
   } else {
-    // Yalnızca eksik öğeler için embedding isteği yap
-    const vectors = await getEmbeddings(missing.map((p) => p.content));
-    for (let i = 0; i < missing.length; i++) {
-      await insertOrReplaceVector({ ...missing[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
-    }
-    if (isPersistentStoreAvailable) {
-      await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
-    }
     console.info(
-      `🤖 [DuckDB WASM Vector Indexer] ${missing.length} new report schemas indexed into ${vectorTableName}.`
+      `🤖 [DuckDB WASM Vector Indexer] All ${pending.length} report schemas loaded from persistent OPFS cache (0 token cost).`
     );
+  }
+
+  // 4. DuckDB tablosunda eksik olanları önbellekten doldur
+  const missingFromDuckDb = pending.filter((p) => !duckDbExistingIds.has(p.id));
+  for (const item of missingFromDuckDb) {
+    const vec = cachedEmbeddings.get(item.id) ?? new Array(VECTOR_DIMENSION).fill(0);
+    await insertOrReplaceVector({ ...item, embedding: vec });
   }
 
   // 5) Workspace Menü ve Modül Öğelerinin Vektör İndeksine Eklenmesi
@@ -274,35 +230,42 @@ async function doIndexWorkspaceMenus(): Promise<number> {
     },
   }));
 
-  // 1. Önce veritabanında zaten kayıtlı olan ID'leri kontrol et
-  const existingIds = new Set<string>();
+  const cachedEmbeddings = await opfsVectorCache.getAll();
+  const duckDbExistingIds = new Set<string>();
   try {
-    const existingRows = await duckDbClient.executeCustomSql(`SELECT id FROM ${vectorTableName};`);
-    for (const r of existingRows) {
-      if (r.id) existingIds.add(String(r.id));
+    const rows = await duckDbClient.executeCustomSql(`SELECT id FROM ${VECTOR_TABLE_NAME};`);
+    for (const r of rows) {
+      if (r.id) duckDbExistingIds.add(String(r.id));
     }
   } catch {
     // ignore
   }
 
-  const missing = pending.filter((p) => !existingIds.has(p.id));
-
-  if (missing.length === 0) {
+  const missingFromCache = pending.filter((p) => !cachedEmbeddings.has(p.id));
+  if (missingFromCache.length > 0) {
+    const newVectors = await getEmbeddings(missingFromCache.map((p) => p.content));
+    const entriesToSave: { id: string; embedding: number[] }[] = [];
+    for (let i = 0; i < missingFromCache.length; i++) {
+      const vec = newVectors[i] ?? new Array(VECTOR_DIMENSION).fill(0);
+      cachedEmbeddings.set(missingFromCache[i].id, vec);
+      entriesToSave.push({ id: missingFromCache[i].id, embedding: vec });
+    }
+    await opfsVectorCache.setMany(entriesToSave);
     console.info(
-      `🤖 [WASM Vector Indexer] All ${pending.length} workspace menu items already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+      `🤖 [WASM Vector Indexer] ${missingFromCache.length} new workspace menu items generated and saved to OPFS.`
     );
-    return pending.length;
+  } else {
+    console.info(
+      `🤖 [WASM Vector Indexer] All ${pending.length} workspace menu items loaded from persistent OPFS cache (0 token cost).`
+    );
   }
 
-  const vectors = await getEmbeddings(missing.map((p) => p.content));
-  for (let i = 0; i < missing.length; i++) {
-    await insertOrReplaceVector({ ...missing[i], embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0) });
-  }
-  if (isPersistentStoreAvailable) {
-    await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
+  const missingFromDuckDb = pending.filter((p) => !duckDbExistingIds.has(p.id));
+  for (const item of missingFromDuckDb) {
+    const vec = cachedEmbeddings.get(item.id) ?? new Array(VECTOR_DIMENSION).fill(0);
+    await insertOrReplaceVector({ ...item, embedding: vec });
   }
 
-  console.info(`🤖 [WASM Vector Indexer] ${missing.length} workspace menu items indexed into ${vectorTableName}.`);
   return pending.length;
 }
 
@@ -336,42 +299,53 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
   conversationIndexInFlight = (async () => {
     try {
       await initVectorStore();
-
-      // Veritabanında zaten kayıtlı olan konuşma ID'lerini kontrol et (F5 sonrası 0 token)
-      const existingConvIds = new Set<string>();
+      const cachedEmbeddings = await opfsVectorCache.getAll();
+      const duckDbExistingIds = new Set<string>();
       try {
-        const existingRows = await duckDbClient.executeCustomSql(
-          `SELECT id FROM ${vectorTableName} WHERE scope = 'chats';`
+        const rows = await duckDbClient.executeCustomSql(
+          `SELECT id FROM ${VECTOR_TABLE_NAME} WHERE scope = 'chats';`
         );
-        for (const r of existingRows) {
-          if (r.id) existingConvIds.add(String(r.id));
+        for (const r of rows) {
+          if (r.id) duckDbExistingIds.add(String(r.id));
         }
       } catch {
         // ignore
       }
 
-      const missing = pending.filter((p) => !existingConvIds.has(`conv_${p.id}`));
+      const missingFromCache = pending.filter((p) => !cachedEmbeddings.has(`conv_${p.id}`));
       for (const p of pending) {
-        if (existingConvIds.has(`conv_${p.id}`)) {
+        if (cachedEmbeddings.has(`conv_${p.id}`)) {
           conversationIndexedIds.add(p.id);
         }
       }
 
-      if (missing.length === 0) {
+      if (missingFromCache.length > 0) {
+        const texts = missingFromCache.map((p) => `Sohbet: ${p.title}. ${p.snippet}`.trim());
+        const newVectors = await getEmbeddings(texts);
+        const entriesToSave: { id: string; embedding: number[] }[] = [];
+        for (let i = 0; i < missingFromCache.length; i++) {
+          const it = missingFromCache[i];
+          const vec = newVectors[i] ?? new Array(VECTOR_DIMENSION).fill(0);
+          cachedEmbeddings.set(`conv_${it.id}`, vec);
+          entriesToSave.push({ id: `conv_${it.id}`, embedding: vec });
+        }
+        await opfsVectorCache.setMany(entriesToSave);
         console.info(
-          `🤖 [WASM Vector Indexer] All ${pending.length} conversations already exist in persistent OPFS store. Skipping embedding generation (0 token cost).`
+          `🤖 [WASM Vector Indexer] ${missingFromCache.length} new conversations generated and saved to OPFS.`
         );
-        return pending.length;
+      } else {
+        console.info(
+          `🤖 [WASM Vector Indexer] All ${pending.length} conversations loaded from persistent OPFS cache (0 token cost).`
+        );
       }
 
-      const texts = missing.map((p) => `Sohbet: ${p.title}. ${p.snippet}`.trim());
-      const vectors = await getEmbeddings(texts);
-      for (let i = 0; i < missing.length; i++) {
-        const it = missing[i];
+      const missingFromDuckDb = pending.filter((p) => !duckDbExistingIds.has(`conv_${p.id}`));
+      for (const it of missingFromDuckDb) {
+        const vec = cachedEmbeddings.get(`conv_${it.id}`) ?? new Array(VECTOR_DIMENSION).fill(0);
         await insertOrReplaceVector({
           id: `conv_${it.id}`,
           scope: "chats",
-          content: texts[i],
+          content: `Sohbet: ${it.title}. ${it.snippet}`.trim(),
           metadata: {
             type: "conversation",
             title: it.title,
@@ -379,14 +353,10 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
             jobId: it.jobId,
             conversationId: it.id,
           },
-          embedding: vectors[i] ?? new Array(VECTOR_DIMENSION).fill(0),
+          embedding: vec,
         });
         conversationIndexedIds.add(it.id);
       }
-      if (isPersistentStoreAvailable) {
-        await duckDbClient.executeCustomSql("CHECKPOINT embed_db;").catch(() => {});
-      }
-      console.info(`🤖 [WASM Vector Indexer] ${missing.length} new conversations indexed into ${vectorTableName}.`);
       return pending.length;
     } finally {
       conversationIndexInFlight = null;
@@ -409,7 +379,7 @@ async function insertOrReplaceVector(item: {
   const cleanMeta = JSON.stringify(item.metadata).replace(/'/g, "''");
 
   const sql = `
-    INSERT OR REPLACE INTO ${vectorTableName} (id, scope, content, metadata, embedding)
+    INSERT OR REPLACE INTO ${VECTOR_TABLE_NAME} (id, scope, content, metadata, embedding)
     VALUES ('${item.id}', '${item.scope}', '${cleanContent}', '${cleanMeta}', ${vecLiteral});
   `;
   try {
@@ -419,7 +389,7 @@ async function insertOrReplaceVector(item: {
       activeStoreDimension = null;
       await initVectorStore(dim);
       await duckDbClient.executeCustomSql(`
-        INSERT OR REPLACE INTO ${vectorTableName} (id, scope, content, metadata, embedding)
+        INSERT OR REPLACE INTO ${VECTOR_TABLE_NAME} (id, scope, content, metadata, embedding)
         VALUES ('${item.id}', '${item.scope}', '${cleanContent}', '${cleanMeta}', ${vecLiteral});
       `);
     } else {
@@ -480,7 +450,7 @@ export async function searchVectorContext(
         content,
         metadata,
         array_cosine_distance(embedding, ${vecLiteral}) AS distance
-      FROM ${vectorTableName}
+      FROM ${VECTOR_TABLE_NAME}
       ORDER BY distance ASC
       LIMIT ${limit};
     `;
