@@ -283,7 +283,17 @@ async function insertOrReplaceVector(item: {
     INSERT OR REPLACE INTO yula_rag_embeddings (id, scope, content, metadata, embedding)
     VALUES ('${item.id}', '${item.scope}', '${cleanContent}', '${cleanMeta}', ${vecLiteral});
   `;
-  await duckDbClient.executeCustomSql(sql);
+  try {
+    await duckDbClient.executeCustomSql(sql);
+  } catch (err) {
+    if (String(err).includes("yula_rag_embeddings does not exist")) {
+      activeStoreDimension = null;
+      await initVectorStore(dim);
+      await duckDbClient.executeCustomSql(sql);
+    } else {
+      throw err;
+    }
+  }
 }
 
 /**
@@ -343,8 +353,17 @@ export async function searchVectorContext(
       LIMIT ${limit};
     `;
 
-    const rows = await duckDbClient.executeCustomSql(sql);
-    if (!Array.isArray(rows)) return [];
+    let rows: Record<string, unknown>[] = [];
+    try {
+      const res = await duckDbClient.executeCustomSql(sql);
+      if (Array.isArray(res)) rows = res;
+    } catch (err) {
+      if (String(err).includes("yula_rag_embeddings does not exist")) {
+        activeStoreDimension = null;
+        return [];
+      }
+      throw err;
+    }
 
     const results: RagVectorItem[] = rows.map((r) => ({
       id: String(r.id),

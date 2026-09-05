@@ -143,24 +143,43 @@ async function resetDuckDb(): Promise<{
   tableVfsFiles.clear()
 
   try {
-    if (conn) {
-      await conn.close().catch(() => {})
-      conn = null
+    if (!db) {
+      return getDuckDb()
     }
-    if (db) {
-      for (const vfs of allVfsFiles) {
-        await db.dropFile(vfs).catch(() => {})
-      }
-      await db.reset().catch(() => {})
-      const newConn = await db.connect()
-      await newConn.query("SET preserve_insertion_order=false;").catch(() => {})
-      await newConn.query("SET memory_limit='3GB';").catch(() => {})
-      conn = newConn
-      console.log(
-        "[DuckDB Worker] fast reset completed (RAM freed, catalogs cleared, engine warm)"
+    if (!conn) {
+      conn = await db.connect()
+    }
+
+    // 1. Rapor tablolarını ve görünümlerini (report_*) düşür; yula_rag_embeddings sistem tablosunu koru
+    const tablesRes = await conn
+      .query(
+        `SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'main' AND table_name LIKE 'report_%';`
       )
-      return { db, conn }
+      .catch(() => null)
+
+    if (tablesRes) {
+      const rows = arrowTableToObjects(tablesRes)
+      for (const r of rows) {
+        const name = String(r.table_name)
+        const type = String(r.table_type).toUpperCase().includes("VIEW") ? "VIEW" : "TABLE"
+        await conn.query(`DROP ${type} IF EXISTS "${name.replace(/"/g, '""')}";`).catch(() => {})
+      }
     }
+
+    // 2. Bellekteki VFS dosyalarını DuckDB'den düşür
+    for (const vfs of allVfsFiles) {
+      await db.dropFile(vfs).catch(() => {})
+    }
+
+    // 3. DuckDB bellek tavanını ve ayarlarını tazele
+    await conn.query("CHECKPOINT;").catch(() => {})
+    await conn.query("SET preserve_insertion_order=false;").catch(() => {})
+    await conn.query("SET memory_limit='3GB';").catch(() => {})
+
+    console.log(
+      "[DuckDB Worker] fast reset completed (RAM freed, report tables cleared, vector store preserved)"
+    )
+    return { db, conn }
   } catch (err) {
     console.warn(
       "[DuckDB Worker] fast reset failed, falling back to full re-instantiate:",
