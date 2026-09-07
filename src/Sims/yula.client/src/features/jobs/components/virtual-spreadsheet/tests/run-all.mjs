@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const testFiles = [
   "filter-parser.test.mjs",
   "export-formats.test.mjs",
+  "test-parquet-merge.mjs",
 ]
 
 console.log("==================================================")

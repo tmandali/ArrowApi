@@ -37,6 +37,8 @@ import {
 } from "@/components/ui/dialog"
 import { useDuckReport, type ReportColumnMeta } from "../hooks/use-duck-report"
 import { duckDbClient } from "@/services/duckdb"
+import { opfsReportCache } from "@/services/opfs/opfs-cache"
+import { exportOpfsMergedParquet } from "@/services/opfs/opfs-parquet-merge"
 
 import { deriveColumnKind } from "../lib/column-type-utils"
 import { computeColumnValuesDigest } from "@/lib/grid-column-values"
@@ -544,6 +546,22 @@ export function ArrowReportGrid({
         const stamp = new Date().toISOString().slice(0, 10)
         const fileName = `${sanitizedTitle}_${stamp}`
 
+        // PARQUET ÖZEL AKIŞI: Eğer OPFS'te parquet parçaları varsa,
+        // DuckDB 32-bit WASM motorunun bellek taşması (OOM) hatasını önlemek için
+        // parçaları doğrudan parquet-wasm lazy stream ile birleştirip indiriyoruz.
+        if (format === "parquet" && jobId) {
+          const hasParts = await opfsReportCache.hasParquetParts(jobId)
+          if (hasParts && !customQuerySql && Object.keys(filters).length === 0) {
+            const result = await exportOpfsMergedParquet({ jobId, fileName })
+            const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+            toast.success(
+              `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+              { id: exportToastId }
+            )
+            return
+          }
+        }
+
         const result = await duckDbClient.exportReportTable({
           tableName: duckTableName,
           fileName,
@@ -586,6 +604,34 @@ export function ArrowReportGrid({
         }
       } catch (err) {
         console.error("Export error:", err)
+        // Eğer DuckDB Parquet oluştururken bellek (OOM) veya başka bir hata verdiyse
+        // ve OPFS'te bu rapora ait parçalar mevcutsa, parçaları birleştirerek kullanıcıyı kurtar
+        if (format === "parquet" && jobId) {
+          try {
+            const hasParts = await opfsReportCache.hasParquetParts(jobId)
+            if (hasParts) {
+              toast.loading("DuckDB bellek sınırına ulaşıldı, OPFS parçaları doğrudan birleştiriliyor...", {
+                id: exportToastId,
+              })
+              const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
+                .toLowerCase()
+                .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
+                .replace(/_+/g, "_")
+                .slice(0, 40)
+              const stamp = new Date().toISOString().slice(0, 10)
+              const fallbackFileName = `${sanitizedTitle}_${stamp}`
+              const result = await exportOpfsMergedParquet({ jobId, fileName: fallbackFileName })
+              const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+              toast.success(
+                `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+                { id: exportToastId }
+              )
+              return
+            }
+          } catch (fallbackErr) {
+            console.error("OPFS Parquet fallback error:", fallbackErr)
+          }
+        }
         toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })
       } finally {
         setIsExporting(false)
@@ -602,6 +648,8 @@ export function ArrowReportGrid({
       numericColumns,
       sortBy,
       sortDesc,
+      jobId,
+      customQuerySql,
     ]
   )
 
