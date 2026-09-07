@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Calendar,
   Columns3,
   ListFilter,
   Pin,
@@ -139,8 +140,82 @@ export type SpreadsheetColumn = {
   label: string
   align?: "left" | "right"
   kind?: string
+  /** Ham fiziksel DuckDB veri tipi (BIGINT, VARCHAR, DATE, DECIMAL, BOOLEAN...) */
+  duckType?: string
   /** Bu kolon için sıralama tıklaması aktif mi? (varsayılan: true) */
   sortable?: boolean
+}
+
+/**
+ * Kolonun veri tipini (Sayı, Tarih, Mantıksal, Metin) temsil eden kompakt rozet.
+ */
+function renderColumnTypeBadge(col: SpreadsheetColumn) {
+  const duck = (col.duckType || "").toUpperCase()
+  let kind = col.kind
+
+  if (!kind) {
+    if (duck.includes("DATE") || duck.includes("TIME")) {
+      kind = "date"
+    } else if (duck.includes("BOOL")) {
+      kind = "bool"
+    } else if (
+      duck.includes("INT") ||
+      duck.includes("FLOAT") ||
+      duck.includes("DOUBLE") ||
+      duck.includes("DECIMAL") ||
+      duck.includes("NUMERIC") ||
+      duck.includes("REAL") ||
+      col.align === "right"
+    ) {
+      kind = "number"
+    } else {
+      kind = "text"
+    }
+  }
+
+  const detailedType = col.duckType ? ` (${col.duckType})` : ""
+
+  if (kind === "date") {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono text-muted-foreground/80 select-none"
+        title={`Veri Tipi: Tarih${detailedType}`}
+      >
+        <Calendar className="size-2.5" />
+      </span>
+    )
+  }
+
+  if (kind === "number") {
+    return (
+      <span
+        className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
+        title={`Veri Tipi: Sayı / Tutar${detailedType}`}
+      >
+        123
+      </span>
+    )
+  }
+
+  if (kind === "bool") {
+    return (
+      <span
+        className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
+        title={`Veri Tipi: Mantıksal${detailedType}`}
+      >
+        bool
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
+      title={`Veri Tipi: Metin${detailedType}`}
+    >
+      Aa
+    </span>
+  )
 }
 
 export type VirtualSpreadsheetProps<T> = {
@@ -1249,7 +1324,7 @@ export function VirtualSpreadsheet<T>({
               <PopoverContent
                 align="end"
                 sideOffset={6}
-                className="w-64 p-2 shadow-lg flex flex-col gap-1.5"
+                className="w-72 p-2 shadow-lg flex flex-col gap-1.5"
                 onOpenAutoFocus={(e) => {
                   e.preventDefault()
                   searchInputRef.current?.focus()
@@ -1357,9 +1432,7 @@ export function VirtualSpreadsheet<T>({
                               onCheckedChange={() => toggleColumnVisibility(col.name)}
                             />
                             <span className="truncate flex-1">{col.label}</span>
-                            {col.align === "right" ? (
-                              <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
-                            ) : null}
+                            {renderColumnTypeBadge(col)}
                           </div>
 
                           <button

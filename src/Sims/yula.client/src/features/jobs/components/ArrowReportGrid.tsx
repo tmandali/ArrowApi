@@ -116,31 +116,6 @@ export function ArrowReportGrid({
     customSql: customQuerySql,
   })
 
-  const effectiveColumns = React.useMemo<SpreadsheetColumn[]>(() => {
-    // Özel SQL modunda kolonlar sorgu sonucundan gelir (gruplama/aggregate adları)
-    if (customQuerySql) {
-      return discoveredCols.map((c) => ({
-        name: c.name,
-        label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
-        align: c.align ?? (c.isNumeric ? "right" : "left"),
-      }))
-    }
-    if (columns.length > 0) return columns
-    return discoveredCols.map((c) => ({
-      name: c.name,
-      label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
-      align: c.align ?? (c.isNumeric ? "right" : "left"),
-    }))
-  }, [customQuerySql, columns, discoveredCols])
-
-  const storageKey = React.useMemo(() => {
-    if (reportScope) return `arrow_grid_${reportScope}`
-    if (title && title !== "Report Result") {
-      return `arrow_grid_${title.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`
-    }
-    return undefined
-  }, [reportScope, title])
-
   /**
    * Arrow/şemasından türetilmiş kolon tip haritası.
    * Yula'ya (LLM) şema grounding olarak verilir; filtre değerlerinin
@@ -196,6 +171,41 @@ export function ArrowReportGrid({
     }
     return map
   }, [metaColumns, discoveredCols, describedCols])
+
+  const effectiveColumns = React.useMemo<SpreadsheetColumn[]>(() => {
+    // Özel SQL modunda kolonlar sorgu sonucundan gelir (gruplama/aggregate adları)
+    if (customQuerySql) {
+      return discoveredCols.map((c) => ({
+        name: c.name,
+        label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
+        align: c.align ?? (c.isNumeric ? "right" : "left"),
+        kind: columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.isNumeric),
+        duckType: columnDuckTypes[c.name] ?? c.duckType,
+      }))
+    }
+    if (columns.length > 0) {
+      return columns.map((c) => ({
+        ...c,
+        kind: c.kind ?? columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.align === "right"),
+        duckType: c.duckType ?? columnDuckTypes[c.name],
+      }))
+    }
+    return discoveredCols.map((c) => ({
+      name: c.name,
+      label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
+      align: c.align ?? (c.isNumeric ? "right" : "left"),
+      kind: columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.isNumeric),
+      duckType: columnDuckTypes[c.name] ?? c.duckType,
+    }))
+  }, [customQuerySql, columns, discoveredCols, columnTypes, columnDuckTypes])
+
+  const storageKey = React.useMemo(() => {
+    if (reportScope) return `arrow_grid_${reportScope}`
+    if (title && title !== "Report Result") {
+      return `arrow_grid_${title.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`
+    }
+    return undefined
+  }, [reportScope, title])
 
   const hasActiveFilters = React.useMemo(
     () => Object.values(filters).some((q) => q.trim().length > 0),
