@@ -33,10 +33,40 @@ Projeye yeni bir rapor veya ajan komutu eklendiğinde aşağıdaki adımlar eksi
    - Yeni workspace veya feature komutu/ajan yeteneği gerektiğinde hardcode kod yazmak yerine ilgili `agents/` klasöründe YAML manifest dosyasını tanımla.
 3. **Rapor Kaydı (`src/features/reports/report-registry.ts`):**
    - Oluşturulan JSON şemasını ilgili workspace'in `index.ts` Public API'sinden dışa aç ve `REGISTERED_REPORTS` dizisine `scope`, `workspace`, `title`, `pagePath`, `aliases` ve `fullSchema` ile ekle.
-4. **Next.js Rota Sayfaları (`src/app/`):**
-   - Kriter / Karşılama Sayfası: `src/app/<workspace>/<report>/page.tsx`
-   - GUID Sonuç Ekranı: `src/app/<workspace>/<report>/[jobId]/page.tsx`
-5. **Sonuç Ekranı Bileşeni (`<Report>JobView.tsx`):**
-   - Rapor sonuç bileşenini standart OPFS + DuckDB WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur.
+4. **Next.js Rota Sayfası (`src/app/`):**
+   - Rapor Ekranı: `src/app/<workspace>/<report>/page.tsx` (Tek sayfa standardı: kriter filtreleri, yürütme geçmişi ve sonuç DuckDB gridi aynı sayfada birleşiktir; doğrudan iş bağlantıları `?jobId=<guid>` parametresi ile açılır).
+5. **Sonuç Ekranı Bileşeni (`<Report>ResultGrid.tsx`):**
+   - Rapor sonuç bileşenini standart OPFS + DuckDB WASM destekli `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` ile oluştur ve Form içinde `renderResult` prop'una bağla.
 6. **Yol & Başlık Biçimlendirme (`src/lib/workspace-paths.ts`):**
    - `formatPathnameLabel(pathname)` fonksiyonuna raporun Türkçe etiketini ekle (`if (pathname.includes("/<workspace>/<report>")) return "<Rapor Adı>"`).
+
+### 📊 Rapor Yaşam Döngüsü, Tek Sayfa Mimarisi ve SSE Akışı
+
+#### 1. Tek Sayfa Mimarisi (Single-Page Unified Report Flow)
+- Rapor rotası daima `src/app/<workspace>/<report>/page.tsx` altındadır. Eski ayrı `[jobId]` sayfaları yerine `?jobId=<guid>` URL sorgu parametresi kullanılır (`/[jobId]` klasörleri geriye dönük uyumluluk için `redirect` ile `?jobId=` formatına yönlendirir).
+- Rapor ekranı 3 temel bloktan oluşur:
+  1. **Kriter Filtreleri Formu (`<Report>Form.tsx` & `<Report>Filter.tsx`)**: Kullanıcı kriterlerini girer veya AI üzerinden şema tabanlı doldurur.
+  2. **Birleşik Yürütme Paneli (`<ArrowJobExecutionsPanel />`)**:
+     - Sol tarafta geçmiş yürütmeler listesi (tarih, süre, satır sayısı, durum ikonu).
+     - Sağ tarafta seçili işin kriterleri (JSON veya kriter tablosu) ve canlı ilerleme akışı (`<RunProgressSteps />`).
+     - `Completed`, `Failed` ve `Cancelled` işler üzerinde hover yapıldığında silme çöp kutusu görünür.
+     - Çalışan işler için iptal etme (`Cancel`), sonlanmış işler için silme (`Delete`) aksiyonları sayfa başlığında ve panelde entegredir.
+  3. **Sonuç Grid Paneli (`<ArrowJobResultPanel />` & `<ArrowReportGrid />`)**: DuckDB WASM ve W3C OPFS disk önbelleğiyle büyük veriyi sıfır bellek yüküyle sunar.
+
+#### 2. SSE Canlı Olay Akışı (Server-Sent Events)
+- **Backend (`src/Arrow.Jobs.AspNetCore/ArrowJobSse.cs`)**:
+  - Endpoint: `GET /api/arrow/jobs/{jobId}/events` (`Content-Type: text/event-stream`).
+  - **Anti-Buffering Başlıkları**: `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`, `Connection: keep-alive`. Proxy/Next.js katmanlarının küçük olayları tutmasını engeller.
+  - Her olay yazıldıktan sonra `await response.Body.FlushAsync(cancellationToken)` ile anında istemciye fırlatılır.
+  - Desteklenen olaylar: `status`, `info`, `progress`, `completed`, `failed`, `cancelled`.
+  - Bağlantı anında geçmiş olaylar (`event-log`) replay edilir; sonrasında canlı akış başlar.
+- **İstemci Olay Dağıtıcısı (`src/features/jobs/services/arrow-job-event-hub.ts`)**:
+  - `ArrowJobEventHub`: Native `EventTarget` tabanlı, React yaşam döngüsünden bağımsız singleton Pub/Sub servisidir (`arrowJobEventHub`).
+  - **Deduplication**: Aynı `jobId` için birden fazla bileşen bağlansa dahi tek bir SSE bağlantısı açılır.
+  - **Replay**: `arrowJobEventHub.subscribe(jobId, callback, { replay: true })` ile yeni abone olan bileşenler son snapshot'ı derhal alır.
+  - **Anında İlk Adım**: `startStream` tetiklendiğinde (`initialPhase === "running"`), ağ el sıkışması bitmeden önce `Running — status` adımı `0ms` ile snapshot'a işlenerek UI'a derhal yansıtılır.
+  - **Mikro-Ritim (`arrow-job-client.ts` -> `readJobSseEvents`)**: Backend'in 2ms içinde peş peşe fırlattığı hazırlık adımları (`status`, `info`) aynı TCP paketinde gelse bile, adımlar arasına ~70ms görsel tempo bırakılarak React'in hepsini tek karede patlatması önlenir.
+  - **Progress Hızı**: Yüksek frekanslı `progress` (satır sayısı) adımları hiçbir gecikmeye takılmadan tam hızda akar; UI bildirimleri ~60ms throttle ile akıcı render edilir.
+- **İş Durumu Yönetimi (`src/store/slices/active-jobs-store.ts`)**:
+  - Zustand tabanlı store aktif işleri (`Queued`, `Running`, `Completed`, `Failed`, `Cancelled`) globalde takip eder.
+  - `isTerminalJobStatus(status)`: `Completed`, `Failed`, `Cancelled` durumlarında işin sonlandığını doğrular.

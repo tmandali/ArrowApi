@@ -1,5 +1,4 @@
-import { AppLayout } from "@/components/layout/app-layout";
-import { RetailSalesJobView } from "@/workspaces/stock";
+import { redirect } from "next/navigation";
 
 export default async function RetailSalesJobPage({
   params,
@@ -7,11 +6,5 @@ export default async function RetailSalesJobPage({
   params: Promise<{ jobId: string }>;
 }) {
   const { jobId } = await params;
-  return (
-    <AppLayout>
-      <div className="flex h-full min-h-0 flex-1 flex-col">
-        <RetailSalesJobView jobId={jobId} />
-      </div>
-    </AppLayout>
-  );
+  redirect(`/stock/retail-sales-report?jobId=${encodeURIComponent(jobId)}`);
 }

@@ -55,6 +55,9 @@ export class ArrowJobEventHub extends EventTarget {
       abortController: AbortController
       subscribersCount: number
       cleanupTimer?: ReturnType<typeof setTimeout> | null
+      lastProgressEmitMs?: number
+      pendingProgressTimer?: ReturnType<typeof setTimeout> | null
+      lastProgressPayload?: ArrowJobEvent | null
     }
   >()
 
@@ -110,19 +113,6 @@ export class ArrowJobEventHub extends EventTarget {
       ? prettyJson(options.request)
       : session?.snapshot.requestJson
 
-    const initialEvents: RunEventItem[] = session?.snapshot.events.length
-      ? session.snapshot.events
-      : [
-          {
-            id: "local-0",
-            eventName: "status",
-            title: job.status === "Running" ? "Running" : "Queued",
-            detail: "job submitted",
-            tone: "muted",
-            at: new Date().toISOString(),
-          },
-        ]
-
     const initialPhase: JobPhase =
       job.status === "Completed"
         ? "done"
@@ -131,6 +121,21 @@ export class ArrowJobEventHub extends EventTarget {
           : job.status === "Failed"
             ? "idle"
             : "running"
+
+    const initialEvents: RunEventItem[] = session?.snapshot.events.length
+      ? session.snapshot.events
+      : initialPhase === "running"
+        ? [
+            {
+              id: `${key}-status-0`,
+              eventName: "status",
+              title: "Running",
+              detail: "status",
+              tone: "muted",
+              at: job.createdAt || new Date().toISOString(),
+            },
+          ]
+        : []
 
     const snapshot: JobHubSnapshot = {
       jobId: key,
@@ -205,7 +210,41 @@ export class ArrowJobEventHub extends EventTarget {
         isStreaming: phase === "running",
       }
 
-      this.emitEvent(key, eventName, payload)
+      // Progress olayları yüksek frekansta (saniyede onlarca kez) gelebilir.
+      // Snapshot her zaman anında güncellenirken, UI yayınları ~60ms aralıkla akıcı dağıtılır.
+      // Diğer tüm olaylar (status, info, completed, failed, cancelled) bekletilmeden derhal iletilir.
+      if (eventName === "progress") {
+        const now = Date.now()
+        const elapsed = now - (session.lastProgressEmitMs ?? 0)
+        if (elapsed >= 60) {
+          if (session.pendingProgressTimer) {
+            clearTimeout(session.pendingProgressTimer)
+            session.pendingProgressTimer = null
+          }
+          session.lastProgressEmitMs = now
+          this.emitEvent(key, eventName, payload)
+        } else {
+          session.lastProgressPayload = payload
+          if (!session.pendingProgressTimer) {
+            session.pendingProgressTimer = setTimeout(() => {
+              session.pendingProgressTimer = null
+              session.lastProgressEmitMs = Date.now()
+              const pending = session.lastProgressPayload
+              session.lastProgressPayload = null
+              if (pending && !abortController.signal.aborted) {
+                this.emitEvent(key, "progress", pending)
+              }
+            }, Math.max(16, 60 - elapsed))
+          }
+        }
+      } else {
+        if (session.pendingProgressTimer) {
+          clearTimeout(session.pendingProgressTimer)
+          session.pendingProgressTimer = null
+          session.lastProgressPayload = null
+        }
+        this.emitEvent(key, eventName, payload)
+      }
     }
 
     try {
@@ -221,6 +260,12 @@ export class ArrowJobEventHub extends EventTarget {
 
       if (terminal.status === "Cancelled") {
         phase = "cancelled"
+        events = appendOrUpdateRunEvent(events, "cancelled", {
+          id: key,
+          status: "Cancelled",
+          totalRows: terminal.totalRows,
+          batchCount: terminal.batchCount,
+        })
       } else if (terminal.status === "Failed") {
         phase = "idle"
         if (!events.some((e) => e.eventName === "failed")) {
@@ -258,9 +303,20 @@ export class ArrowJobEventHub extends EventTarget {
             : prev.batchCount,
       }
 
+      if (session.pendingProgressTimer) {
+        clearTimeout(session.pendingProgressTimer)
+        session.pendingProgressTimer = null
+        session.lastProgressPayload = null
+      }
+
       const terminalEventName = terminal.status.toLowerCase()
       this.emitEvent(key, terminalEventName, terminal)
     } catch (err) {
+      if (session.pendingProgressTimer) {
+        clearTimeout(session.pendingProgressTimer)
+        session.pendingProgressTimer = null
+        session.lastProgressPayload = null
+      }
       if (abortController.signal.aborted) return
 
       const prev = session.snapshot
@@ -458,25 +514,63 @@ export class ArrowJobEventHub extends EventTarget {
     })
   }
 
-  cancelJob(jobId: string) {
+  cancelJob(
+    jobId: string,
+    finalCounts?: { totalRows?: number | null; batchCount?: number | null }
+  ) {
     const key = normId(jobId)
     let session = this.sessions.get(key)
+    const totalRows =
+      typeof finalCounts?.totalRows === "number"
+        ? finalCounts.totalRows
+        : session?.snapshot.totalRows
+    const batchCount =
+      typeof finalCounts?.batchCount === "number"
+        ? finalCounts.batchCount
+        : session?.snapshot.batchCount
+
     if (session) {
+      if (session.pendingProgressTimer) {
+        clearTimeout(session.pendingProgressTimer)
+        session.pendingProgressTimer = null
+        session.lastProgressPayload = null
+      }
       session.abortController.abort()
+
+      let events = session.snapshot.events
+      events = appendOrUpdateRunEvent(events, "cancelled", {
+        id: key,
+        status: "Cancelled",
+        totalRows: totalRows ?? undefined,
+        batchCount: batchCount ?? undefined,
+      })
+
       session.snapshot = {
         ...session.snapshot,
         status: "Cancelled",
         phase: "cancelled",
         isStreaming: false,
+        totalRows,
+        batchCount,
+        events,
       }
     } else {
+      const events = appendOrUpdateRunEvent([], "cancelled", {
+        id: key,
+        status: "Cancelled",
+        totalRows: totalRows ?? undefined,
+        batchCount: batchCount ?? undefined,
+      })
+
       session = {
         snapshot: {
           jobId: key,
           status: "Cancelled",
           phase: "cancelled",
-          events: [],
+          events,
           isStreaming: false,
+          totalRows,
+          batchCount,
         },
         abortController: new AbortController(),
         subscribersCount: 0,
@@ -484,13 +578,23 @@ export class ArrowJobEventHub extends EventTarget {
       }
       this.sessions.set(key, session)
     }
-    this.emitEvent(key, "cancelled", { id: key, status: "Cancelled" })
+    this.emitEvent(key, "cancelled", {
+      id: key,
+      status: "Cancelled",
+      totalRows: totalRows ?? undefined,
+      batchCount: batchCount ?? undefined,
+    })
   }
 
   removeJob(jobId: string) {
     const key = normId(jobId)
     const session = this.sessions.get(key)
     if (session) {
+      if (session.pendingProgressTimer) {
+        clearTimeout(session.pendingProgressTimer)
+        session.pendingProgressTimer = null
+        session.lastProgressPayload = null
+      }
       session.abortController.abort()
       this.sessions.delete(key)
     }

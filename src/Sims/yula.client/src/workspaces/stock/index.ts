@@ -6,17 +6,14 @@ export { stockNav, stockDashboardPath } from "./routes";
 // Public Forms & Views
 export {
   StockBalanceForm,
-  StockBalanceJobView,
   stockBalanceCriteriaSchema,
 } from "./stock-balance";
 export {
   StockAnalyticsForm,
-  StockAnalyticsJobView,
   stockAnalyticsCriteriaSchema,
 } from "./stock-analytics";
 export {
   RetailSalesForm,
-  RetailSalesJobView,
   retailSalesCriteriaSchema,
 } from "./retail-sales-report";
 export { StockLedgerForm } from "./stock-ledger";

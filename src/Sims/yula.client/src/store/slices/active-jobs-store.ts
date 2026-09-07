@@ -7,10 +7,18 @@ export const TERMINAL_JOB_STATUSES = new Set([
   "Completed",
   "Failed",
   "Cancelled",
+  "Canceled",
 ])
 
 export function isTerminalJobStatus(status: string | undefined): boolean {
-  return status != null && TERMINAL_JOB_STATUSES.has(status)
+  if (!status) return false
+  const s = status.trim().toLowerCase()
+  return (
+    s === "completed" ||
+    s === "failed" ||
+    s === "cancelled" ||
+    s === "canceled"
+  )
 }
 
 /**

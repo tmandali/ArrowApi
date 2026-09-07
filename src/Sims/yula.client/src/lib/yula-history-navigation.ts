@@ -79,7 +79,7 @@ export function restoreConversationExecution(
     scope,
     job: {
       id: jobId,
-      status: tracked?.status || "Completed",
+      status: tracked?.status || "",
       eventsUrl: tracked?.eventsUrl ?? "",
       jobUrl: tracked?.jobUrl ?? "",
       createdAt: tracked?.createdAt,

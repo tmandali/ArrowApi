@@ -15,7 +15,9 @@ internal static class ArrowJobSse
         CancellationToken cancellationToken)
     {
         response.Headers.ContentType = "text/event-stream";
-        response.Headers.CacheControl = "no-cache";
+        response.Headers.CacheControl = "no-cache, no-transform";
+        response.Headers["X-Accel-Buffering"] = "no";
+        response.Headers["Connection"] = "keep-alive";
 
         TimeSpan heartbeatInterval = TimeSpan.FromSeconds(15);
 

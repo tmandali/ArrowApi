@@ -3,7 +3,6 @@
 import * as React from "react"
 import { usePersistedPanelLayout } from "@/lib/use-persisted-panel-layout"
 import {
-  Ban,
   CircleCheck,
   CircleX,
   Copy,
@@ -47,7 +46,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   panelCardClass,
-  panelHeaderActionClass,
   panelHeaderClass,
   panelHeaderIconClass,
   panelHeaderSubtitleClass,
@@ -61,8 +59,11 @@ import {
   fetchJobRequest,
   listArrowJobs,
 } from "@/features/jobs/arrow-job-client"
-import { ArrowJobLivePanel } from "./ArrowJobLivePanel"
 import { statusTone } from "@/features/jobs/lib/status-tone"
+import {
+  arrowJobEventHub,
+  type JobHubSnapshot,
+} from "@/features/jobs/services/arrow-job-event-hub"
 import { RunProgressSteps } from "./RunProgressSteps"
 import {
   buildRunEventsFromLog,
@@ -71,7 +72,7 @@ import {
 } from "@/features/jobs/run-events"
 import type { JsonSchemaObject } from "@/features/report-criteria"
 import type { ArrowJobStatus } from "../types"
-import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
+import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 import { ApiError } from "@/services"
@@ -132,19 +133,50 @@ function ExecutionStatusMark({
       )
     }
     case "Failed":
-      return (
-        <CircleX
-          className="size-4 shrink-0 text-destructive/70"
-          aria-label="Failed"
-        />
-      )
     case "Cancelled":
-      return (
-        <CircleX
-          className="size-4 shrink-0 text-muted-foreground/70"
-          aria-label="Cancelled"
-        />
+    case "Canceled": {
+      const isFailed = status === "Failed"
+      const Icon = CircleX
+      const mark = (
+        <span
+          className="relative block size-4 shrink-0"
+          role="img"
+          aria-label={status}
+        >
+          <Icon
+            className={cn(
+              "absolute inset-0 size-4 transition-opacity",
+              isFailed ? "text-destructive/70" : "text-muted-foreground/70",
+              onDelete && "group-hover:opacity-0"
+            )}
+            aria-hidden
+          />
+          {onDelete ? (
+            <Trash2
+              className="absolute inset-0 size-4 text-destructive/70 opacity-0 transition-opacity group-hover:opacity-100"
+              aria-hidden
+            />
+          ) : null}
+        </span>
       )
+      if (!onDelete) return mark
+      return (
+        <span
+          role="button"
+          tabIndex={-1}
+          title={`Delete ${status.toLowerCase()} execution`}
+          aria-label={`Delete ${status.toLowerCase()} execution`}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onDelete()
+          }}
+          className="flex size-5 shrink-0 items-center justify-center rounded"
+        >
+          {mark}
+        </span>
+      )
+    }
     case "Running":
       return (
         <Loader2
@@ -264,6 +296,15 @@ export type ArrowJobExecutionsPanelProps = {
    * completed jobs open the result grid in place instead of the Detail view.
    */
   renderResult?: (jobId: string) => React.ReactNode
+  /** Bitmiş raporlarda "result" (grid) veya "detail" kutusu görünümü */
+  viewMode?: "result" | "detail"
+  onViewModeChange?: (mode: "result" | "detail") => void
+  onSelectedCompletedChange?: (isCompleted: boolean) => void
+  deleteJobTriggerRef?: React.MutableRefObject<(() => void) | null>
+  onCanDeleteChange?: (canDelete: boolean) => void
+  cancelJobTriggerRef?: React.MutableRefObject<(() => void) | null>
+  onCanCancelChange?: (canCancel: boolean) => void
+  onCancellingChange?: (cancelling: boolean) => void
 }
 
 /**
@@ -292,8 +333,16 @@ export function ArrowJobExecutionsPanel({
   detailSlotTitle = "Criteria",
   detailSlotActions,
   criteriaActive = false,
-  criteriaSchema,
+  criteriaSchema: _criteriaSchema,
   renderResult,
+  viewMode,
+  onViewModeChange,
+  onSelectedCompletedChange,
+  deleteJobTriggerRef,
+  onCanDeleteChange,
+  cancelJobTriggerRef,
+  onCanCancelChange,
+  onCancellingChange,
 }: ArrowJobExecutionsPanelProps) {
   const showCriteriaSlot = detailSlot != null
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
@@ -313,10 +362,24 @@ export function ArrowJobExecutionsPanel({
   )
   // Seçili job satırlardan türetilir (state değil) — seçim/silme/silinme
   // otomatik yansır.
-  const selectedJob = React.useMemo(
-    () => items.find((item) => sameJobId(item.id, selectedId)) ?? null,
-    [items, selectedId]
-  )
+  const selectedJob = React.useMemo(() => {
+    const found = items.find((item) => sameJobId(item.id, selectedId))
+    if (found) return found
+    const pending = pendingJobs.find((item) => sameJobId(item.id, selectedId))
+    if (pending) {
+      return {
+        id: pending.id,
+        status: pending.status || "Queued",
+        name: pending.name || jobName,
+        createdAt: pending.createdAt || new Date().toISOString(),
+        totalRows: pending.totalRows ?? undefined,
+        batchCount: pending.batchCount ?? undefined,
+        jobUrl: "",
+        eventsUrl: "",
+      } as ArrowJobStatus
+    }
+    return null
+  }, [items, pendingJobs, selectedId, jobName])
   const [inputJson, setInputJson] = React.useState("{\n  \n}")
   const [historyEvents, setHistoryEvents] = React.useState<RunEventItem[]>([])
   const [historyLoading, setHistoryLoading] = React.useState(false)
@@ -332,10 +395,12 @@ export function ArrowJobExecutionsPanel({
   const [refreshing, setRefreshing] = React.useState(false)
 
   const onListLoadedRef = React.useRef(onListLoaded)
-  onListLoadedRef.current = onListLoaded
-
   const onListErrorRef = React.useRef(onListError)
-  onListErrorRef.current = onListError
+
+  React.useEffect(() => {
+    onListLoadedRef.current = onListLoaded
+    onListErrorRef.current = onListError
+  }, [onListLoaded, onListError])
 
   const loadList = React.useCallback(
     async (signal?: AbortSignal, options?: { silent?: boolean }) => {
@@ -494,7 +559,89 @@ export function ArrowJobExecutionsPanel({
   // Load persisted progress for the selected run (skip while watching live active job).
   // Aktif çalışan run için canlı SSE akışı tek güven kaynağıdır; geçmiş yüklenmez.
   const isActiveSelected = sameJobId(selectedId, activeJobId)
-  const isLiveActive = isActiveSelected && activeRunPhase === "running"
+
+  // Seçili iş için ArrowJobEventHub snapshot'ı ve canlı aboneliği
+  const [hubSnapshot, setHubSnapshot] = React.useState<JobHubSnapshot | null>(
+    () => (selectedId ? arrowJobEventHub.getSnapshot(selectedId) ?? null : null)
+  )
+
+  const [syncedSelectedId, setSyncedSelectedId] = React.useState(selectedId)
+  if (syncedSelectedId !== selectedId) {
+    setSyncedSelectedId(selectedId)
+    setHubSnapshot(selectedId ? arrowJobEventHub.getSnapshot(selectedId) ?? null : null)
+  }
+
+  React.useEffect(() => {
+    if (!selectedId) return
+
+    const isJobInFlight =
+      selectedJob?.status === "Running" ||
+      selectedJob?.status === "Queued" ||
+      (isActiveSelected && activeRunPhase === "running")
+
+    if (isJobInFlight && !arrowJobEventHub.isStreaming(selectedId)) {
+      arrowJobEventHub.startStream({
+        id: selectedId,
+        status: selectedJob?.status || activeLiveStatus || "Running",
+        name: selectedJob?.name || jobName,
+        eventsUrl: selectedJob?.eventsUrl,
+        jobUrl: selectedJob?.jobUrl,
+        createdAt: selectedJob?.createdAt,
+      })
+    }
+
+    const unsub = arrowJobEventHub.subscribe(
+      selectedId,
+      (detail) => {
+        setHubSnapshot({ ...detail.snapshot })
+      },
+      { replay: true }
+    )
+
+    return unsub
+  }, [
+    selectedId,
+    selectedJob?.status,
+    selectedJob?.name,
+    selectedJob?.eventsUrl,
+    selectedJob?.jobUrl,
+    selectedJob?.createdAt,
+    jobName,
+    isActiveSelected,
+    activeLiveStatus,
+    activeRunPhase,
+  ])
+
+  const hubEvents = hubSnapshot?.events ?? []
+  const hasHubEvents = hubEvents.length > 0
+
+  const isRunningPhase =
+    hubSnapshot?.phase === "running" ||
+    (isActiveSelected && activeRunPhase === "running") ||
+    selectedJob?.status === "Running" ||
+    selectedJob?.status === "Queued"
+
+  const isLiveActive =
+    isRunningPhase ||
+    Boolean(hubSnapshot?.isStreaming) ||
+    (isActiveSelected && activeRunPhase === "running")
+
+  const pendingSelectedStatus = pendingJobs.find((p) =>
+    sameJobId(p.id, selectedId)
+  )?.status
+  const selectedDisplayStatus =
+    hubSnapshot?.status ||
+    (isActiveSelected && activeLiveStatus) ||
+    pendingSelectedStatus ||
+    displayStatusFor(selectedJob, activeJobId, undefined)
+
+  const normStatus = (selectedDisplayStatus || "").trim().toLowerCase()
+  const isTerminal =
+    normStatus === "completed" ||
+    normStatus === "cancelled" ||
+    normStatus === "canceled" ||
+    normStatus === "failed"
+
   const historyResetKey = `${selectedId ?? ""}|${activeJobId ?? ""}|${activeRunPhase ?? ""}`
   const [syncedHistoryResetKey, setSyncedHistoryResetKey] =
     React.useState(historyResetKey)
@@ -508,8 +655,12 @@ export function ArrowJobExecutionsPanel({
 
   React.useEffect(() => {
     if (!selectedId) return
-    // Canlı aktif run izlenirken SSE akışı kullanılır, event-log sorgulanmaz.
+    // Canlı aktif SSE akışı varsa HTTP ile polling yapma
     if (isLiveActive) return
+    // Terminal bir işse ve sunucunun persisted event-log'u zaten çekildiyse tekrarlama
+    if (isTerminal && historyEvents.length > 0) return
+    // Devam eden olmayan ama henüz history çekilmemişse ya da hub event'i yoksa yükle
+    if (!isTerminal && hasHubEvents) return
 
     const abort = new AbortController()
     let timer: ReturnType<typeof setInterval> | null = null
@@ -531,7 +682,7 @@ export function ArrowJobExecutionsPanel({
 
     // Sadece aktif olmayan ama listede hala "Running/Queued" görünen geçmiş bir iş seçilmişse event-log ile takip et.
     const isOtherRunning =
-      !isActiveSelected &&
+      !isLiveActive &&
       (selectedJob?.status === "Running" || selectedJob?.status === "Queued")
     if (isOtherRunning) {
       timer = setInterval(() => {
@@ -543,60 +694,100 @@ export function ArrowJobExecutionsPanel({
       if (timer !== null) clearInterval(timer)
       abort.abort()
     }
-  }, [selectedId, isLiveActive, isActiveSelected, selectedJob?.status, detailRefreshToken])
+  }, [
+    selectedId,
+    isLiveActive,
+    isTerminal,
+    hasHubEvents,
+    historyEvents.length,
+    selectedJob?.status,
+    detailRefreshToken,
+  ])
 
-  // Live row/batch counts for the active run (from SSE progress events).
+  // Live row/batch counts for the currently selected job (when running in EventHub).
   const liveCounts = React.useMemo(() => {
-    if (!activeJobId) return null
+    if (!selectedId) return null
+    if (hubSnapshot?.totalRows != null || hubSnapshot?.batchCount != null) {
+      return {
+        totalRows: hubSnapshot.totalRows ?? null,
+        batchCount: hubSnapshot.batchCount ?? null,
+      }
+    }
+    const sourceEvents =
+      hubSnapshot?.events?.length
+        ? hubSnapshot.events
+        : isActiveSelected && activeRunEvents.length > 0
+          ? activeRunEvents
+          : []
     let totalRows: number | null = null
     let batchCount: number | null = null
-    for (const event of activeRunEvents) {
+    for (const event of sourceEvents) {
       if (typeof event.totalRows === "number") totalRows = event.totalRows
       if (typeof event.batchCount === "number") batchCount = event.batchCount
     }
     return totalRows == null && batchCount == null
       ? null
       : { totalRows, batchCount }
-  }, [activeJobId, activeRunEvents])
+  }, [selectedId, hubSnapshot, isActiveSelected, activeRunEvents])
 
   // Patch live status + merge pending queued jobs not yet in the API list.
+  // TEK KAYNAK (Single Source of Truth):
+  // 1. Bitmiş işler (Completed, Cancelled, Failed) için `items` (veritabanı) kesindir.
+  // 2. Devam eden işler (Running, Queued) için `pendingJobs` veya aktif SSE akışı günceller.
+  // 3. SEÇİLEN İŞ (selectedId) ASLA LİSTEDEKİ SATIR SAYISINI VEYA DURUMUNU EZEMEZ!
+  // Patch live status + merge pending queued jobs not yet in the API list.
+  // TEK KAYNAK (Single Source of Truth):
+  // 1. Bitmiş işler (Completed, Cancelled, Failed) için sunucu veritabanı (items) kesindir.
+  // 2. Devam eden işler (Running, Queued) için EventHub canlı SSE akışındaki satır/batch sayıları anlık yansıtılır.
+  // 3. Bitmiş bir iş seçildiğinde asla ara SSE sayılarıyla ezilemez.
   const displayItems = React.useMemo(() => {
-    let next = items
+    const next = items.map((job) => {
+      // Bitmiş işler için sunucu veritabanındaki değerler korunur
+      if (isTerminalJobStatus(job.status)) {
+        return job
+      }
 
-    // Apply SSE-driven statuses and row counts for every pending job, not only the focused one.
-    if (pendingJobs.length > 0) {
-      next = next.map((job) => {
-        const pending = pendingJobs.find((p) => sameJobId(p.id, job.id))
-        if (!pending) return job
-        return {
-          ...job,
-          status: pending.status || job.status,
-          totalRows: pending.totalRows ?? job.totalRows,
-          batchCount: pending.batchCount ?? job.batchCount,
-        }
-      })
-    }
+      // Devam eden iş için canlı EventHub snapshot'ı veya pendingJobs'tan anlık sayaçları al
+      const liveSnap = sameJobId(job.id, selectedId)
+        ? hubSnapshot
+        : arrowJobEventHub.getSnapshot(job.id)
+      const pending = pendingJobs.find((p) => sameJobId(p.id, job.id))
 
-    if (activeJobId && activeLiveStatus) {
-      next = next.map((job) =>
-        sameJobId(job.id, activeJobId)
-          ? { ...job, status: activeLiveStatus }
-          : job
-      )
-    }
+      const liveStatus =
+        liveSnap?.status ||
+        pending?.status ||
+        (sameJobId(job.id, activeJobId) ? activeLiveStatus : null) ||
+        job.status
 
+      const liveTotalRows =
+        liveSnap?.totalRows ?? pending?.totalRows ?? job.totalRows
+      const liveBatchCount =
+        liveSnap?.batchCount ?? pending?.batchCount ?? job.batchCount
+
+      return {
+        ...job,
+        status: liveStatus,
+        totalRows: liveTotalRows ?? undefined,
+        batchCount: liveBatchCount ?? undefined,
+      }
+    })
+
+    // API listesine henüz girmemiş yeni başlatılan bekleyen işler
     const extras: ArrowJobStatus[] = []
     for (const pending of pendingJobs) {
       if (next.some((job) => sameJobId(job.id, pending.id))) continue
+      const snap = sameJobId(pending.id, selectedId)
+        ? hubSnapshot
+        : arrowJobEventHub.getSnapshot(pending.id)
       extras.push({
         id: pending.id,
-        status: pending.status || "Queued",
+        status: snap?.status || pending.status || "Queued",
         name: pending.name || jobName,
         jobUrl: "",
         eventsUrl: "",
         createdAt: pending.createdAt || new Date().toISOString(),
-        totalRows: pending.totalRows ?? undefined,
-        batchCount: pending.batchCount ?? undefined,
+        totalRows: snap?.totalRows ?? pending.totalRows ?? undefined,
+        batchCount: snap?.batchCount ?? pending.batchCount ?? undefined,
       })
     }
 
@@ -605,82 +796,223 @@ export function ArrowJobExecutionsPanel({
       !next.some((job) => sameJobId(job.id, activeJobId)) &&
       !extras.some((job) => sameJobId(job.id, activeJobId))
     ) {
+      const activeSnap = sameJobId(activeJobId, selectedId)
+        ? hubSnapshot
+        : arrowJobEventHub.getSnapshot(activeJobId)
       extras.unshift({
         id: activeJobId,
-        status: activeLiveStatus || "Queued",
+        status: activeLiveStatus || activeSnap?.status || "Queued",
         name: jobName,
         jobUrl: "",
         eventsUrl: "",
         createdAt: new Date().toISOString(),
-        totalRows: liveCounts?.totalRows ?? undefined,
-        batchCount: liveCounts?.batchCount ?? undefined,
+        totalRows: activeSnap?.totalRows ?? undefined,
+        batchCount: activeSnap?.batchCount ?? undefined,
       })
     }
 
-    const combined = extras.length > 0 ? [...extras, ...next] : next
+    return extras.length > 0 ? [...extras, ...next] : next
+  }, [items, pendingJobs, activeJobId, activeLiveStatus, jobName, hubSnapshot, selectedId])
 
-    if (activeJobId && liveCounts) {
-      return combined.map((job) =>
-        sameJobId(job.id, activeJobId)
-          ? {
-              ...job,
-              totalRows: liveCounts.totalRows ?? job.totalRows,
-              batchCount: liveCounts.batchCount ?? job.batchCount,
-            }
-          : job
-      )
+  // Seçili işin gösterilecek adımları:
+  // - Bitmiş (terminal) işler için sunucunun event-log'u (historyEvents) esastır.
+  // - Canlı akan işler için EventHub (hubEvents) veya activeRunEvents önceliklidir.
+  const rawProgressEvents =
+    isTerminal && historyEvents.length > 0
+      ? historyEvents
+      : hasHubEvents
+        ? hubEvents
+        : isActiveSelected && activeRunEvents.length > 0
+          ? activeRunEvents
+          : historyEvents
+
+  // İlerleme adımlarındaki satır sayısını seçili işin authoritative `totalRows` değeriyle eşitle.
+  // Yalnızca iş terminal (Completed / Cancelled) ise sunucu sayısına eşitlenir;
+  // İş akarken canlı SSE sayaçları olduğu gibi akar.
+  const progressEvents = React.useMemo(() => {
+    if (
+      !isTerminal ||
+      !selectedJob ||
+      typeof selectedJob.totalRows !== "number" ||
+      selectedJob.totalRows <= 0
+    ) {
+      return rawProgressEvents
     }
+    const targetRows = selectedJob.totalRows
+    const hasProgress = rawProgressEvents.some((e) => e.eventName === "progress")
+    if (!hasProgress) return rawProgressEvents
 
-    return combined
-  }, [items, activeJobId, activeLiveStatus, jobName, pendingJobs, liveCounts])
+    return rawProgressEvents.map((e) => {
+      if (
+        e.eventName === "progress" &&
+        (e.totalRows == null || e.totalRows < targetRows)
+      ) {
+        return {
+          ...e,
+          detail: `${formatCount(targetRows)} rows`,
+          totalRows: targetRows,
+          batchCount: selectedJob.batchCount ?? e.batchCount,
+        }
+      }
+      if (
+        e.eventName === "cancelled" &&
+        (e.totalRows == null || e.totalRows < targetRows)
+      ) {
+        return {
+          ...e,
+          detail: `${formatCount(targetRows)} rows · stopped`,
+          totalRows: targetRows,
+          batchCount: selectedJob.batchCount ?? e.batchCount,
+        }
+      }
+      if (
+        e.eventName === "completed" &&
+        (e.totalRows == null || e.totalRows < targetRows)
+      ) {
+        return {
+          ...e,
+          detail: `${formatCount(targetRows)} rows ready`,
+          totalRows: targetRows,
+          batchCount: selectedJob.batchCount ?? e.batchCount,
+        }
+      }
+      return e
+    })
+  }, [rawProgressEvents, selectedJob, isTerminal])
 
-  // Canlı aktif iş seçiliyken koşulsuz olarak canlı adımlar (activeRunEvents) gösterilir.
-  // Geçmiş adımlar (historyEvents) yalnızca geçmiş bir execution seçildiğinde kullanılır.
-  const progressEvents =
-    isActiveSelected
-      ? activeRunEvents
-      : historyEvents.length > 0
-        ? historyEvents
-        : activeRunEvents
+  const [internalViewMode, setInternalViewMode] = React.useState<"result" | "detail">("result")
+  const currentViewMode = viewMode ?? internalViewMode
+
+  const setEffectiveViewMode = React.useCallback(
+    (mode: "result" | "detail") => {
+      setInternalViewMode(mode)
+      onViewModeChange?.(mode)
+    },
+    [onViewModeChange]
+  )
+
   const progressPhase =
-    isActiveSelected
+    hubSnapshot?.phase ??
+    (isActiveSelected
       ? activeRunPhase
-      : progressEvents.some((e) => e.eventName === "completed")
+      : normStatus === "completed" || progressEvents.some((e) => e.eventName === "completed")
         ? "done"
-        : progressEvents.some((e) => e.eventName === "cancelled")
+        : normStatus === "cancelled" || normStatus === "canceled" || progressEvents.some((e) => e.eventName === "cancelled")
           ? "cancelled"
-          : progressEvents.some((e) => e.eventName === "failed")
+          : normStatus === "failed" || progressEvents.some((e) => e.eventName === "failed")
             ? "idle"
-            : "idle"
+            : isRunningPhase
+              ? "running"
+              : "idle")
   const showProgress = Boolean(selectedId)
-  const pendingSelectedStatus = pendingJobs.find((p) =>
-    sameJobId(p.id, selectedId)
-  )?.status
-  const selectedDisplayStatus =
-    (isActiveSelected && activeLiveStatus) ||
-    pendingSelectedStatus ||
-    displayStatusFor(selectedJob, activeJobId, undefined)
-  const canOpenSelected =
-    selectedDisplayStatus === "Completed" && Boolean(onOpenJob)
-  /**
-   * 3-panel run flow: selected run in flight → Live panel (read-only criteria
-   * + SSE stream); completed (+ renderResult) → embedded result panel;
-   * otherwise the classic Detail view.
-   */
+
   const selectedInFlight =
-    selectedDisplayStatus === "Running" ||
-    selectedDisplayStatus === "Queued" ||
-    (isActiveSelected && activeRunPhase === "running")
-  const liveMode = Boolean(selectedId) && selectedInFlight
+    !isTerminal &&
+    (normStatus === "running" ||
+      normStatus === "queued" ||
+      isRunningPhase)
+  const isSelectedCompleted =
+    Boolean(selectedId) && normStatus === "completed"
+
+  const onSelectedCompletedChangeRef = React.useRef(onSelectedCompletedChange)
+
+  React.useEffect(() => {
+    onSelectedCompletedChangeRef.current = onSelectedCompletedChange
+  }, [onSelectedCompletedChange])
+
+  React.useEffect(() => {
+    onSelectedCompletedChangeRef.current?.(isSelectedCompleted)
+  }, [isSelectedCompleted])
+
   const resultMode =
-    Boolean(selectedId) &&
-    selectedDisplayStatus === "Completed" &&
-    renderResult != null
+    isSelectedCompleted &&
+    renderResult != null &&
+    currentViewMode !== "detail"
   const criteriaVisible = showCriteriaSlot && !selectedId
-  const canCancelSelected =
-    Boolean(selectedId) && !criteriaVisible && !liveMode && selectedInFlight
   const canDeleteSelected =
-    Boolean(selectedId) && !criteriaVisible && !liveMode
+    Boolean(selectedId) && !criteriaVisible && !selectedInFlight
+
+  const onCanDeleteChangeRef = React.useRef(onCanDeleteChange)
+  React.useEffect(() => {
+    onCanDeleteChangeRef.current = onCanDeleteChange
+  }, [onCanDeleteChange])
+
+  React.useEffect(() => {
+    onCanDeleteChangeRef.current?.(canDeleteSelected)
+  }, [canDeleteSelected])
+
+  React.useEffect(() => {
+    if (deleteJobTriggerRef) {
+      deleteJobTriggerRef.current = () => {
+        if (!selectedId || deleting) return
+        setDeleteError(null)
+        setDeleteTargetId(selectedId)
+        setDeleteOpen(true)
+      }
+      return () => {
+        deleteJobTriggerRef.current = null
+      }
+    }
+  }, [deleteJobTriggerRef, selectedId, deleting])
+
+  const canCancelSelected =
+    Boolean(selectedId) && !criteriaVisible && selectedInFlight
+
+  const onCanCancelChangeRef = React.useRef(onCanCancelChange)
+  React.useEffect(() => {
+    onCanCancelChangeRef.current = onCanCancelChange
+  }, [onCanCancelChange])
+
+  React.useEffect(() => {
+    onCanCancelChangeRef.current?.(canCancelSelected)
+  }, [canCancelSelected])
+
+  const onCancellingChangeRef = React.useRef(onCancellingChange)
+  React.useEffect(() => {
+    onCancellingChangeRef.current = onCancellingChange
+  }, [onCancellingChange])
+
+  const handleCancelSelected = React.useCallback(async () => {
+    if (!selectedId || cancelling) return
+    setCancelling(true)
+    onCancellingChangeRef.current?.(true)
+    try {
+      const cancelledStatus = await cancelArrowJob(selectedId)
+      arrowJobEventHub.cancelJob(selectedId, {
+        totalRows: cancelledStatus?.totalRows,
+        batchCount: cancelledStatus?.batchCount,
+      })
+      removeTrackedJob(selectedId)
+      setItems((prev) =>
+        prev.map((item) =>
+          sameJobId(item.id, selectedId)
+            ? {
+                ...item,
+                status: "Cancelled",
+                totalRows: cancelledStatus?.totalRows ?? item.totalRows,
+                batchCount: cancelledStatus?.batchCount ?? item.batchCount,
+              }
+            : item
+        )
+      )
+      onJobCancelled?.(selectedId)
+      void loadList(undefined, { silent: true })
+    } catch (err) {
+      console.warn("Cancel job error:", err)
+    } finally {
+      setCancelling(false)
+      onCancellingChangeRef.current?.(false)
+    }
+  }, [selectedId, cancelling, removeTrackedJob, onJobCancelled, loadList])
+
+  React.useEffect(() => {
+    if (cancelJobTriggerRef) {
+      cancelJobTriggerRef.current = handleCancelSelected
+      return () => {
+        cancelJobTriggerRef.current = null
+      }
+    }
+  }, [cancelJobTriggerRef, handleCancelSelected])
 
   const handleCopy = React.useCallback(
     (value: string, mode: "id" | "url") => {
@@ -693,20 +1025,7 @@ export function ArrowJobExecutionsPanel({
     [openJobHref]
   )
 
-  const handleCancelSelected = React.useCallback(async () => {
-    if (!selectedId || cancelling) return
-    setCancelling(true)
-    try {
-      await cancelArrowJob(selectedId)
-      removeTrackedJob(selectedId)
-      onJobCancelled?.(selectedId)
-      void loadList(undefined, { silent: true })
-    } catch (err) {
-      console.warn("Cancel job error:", err)
-    } finally {
-      setCancelling(false)
-    }
-  }, [selectedId, cancelling, removeTrackedJob, onJobCancelled, loadList])
+
 
   const handleConfirmDelete = React.useCallback(
     async (event: React.MouseEvent) => {
@@ -760,20 +1079,24 @@ export function ArrowJobExecutionsPanel({
       {
         label: "Rows",
         value:
-          isActiveSelected && liveCounts?.totalRows != null
-            ? formatCount(liveCounts.totalRows)
-            : selectedJob?.totalRows != null
-              ? formatCount(selectedJob.totalRows)
-              : "—",
+          isTerminal && selectedJob?.totalRows != null
+            ? formatCount(selectedJob.totalRows)
+            : liveCounts?.totalRows != null
+              ? formatCount(liveCounts.totalRows)
+              : selectedJob?.totalRows != null
+                ? formatCount(selectedJob.totalRows)
+                : "—",
       },
       {
         label: "Batches",
         value:
-          isActiveSelected && liveCounts?.batchCount != null
-            ? formatCount(liveCounts.batchCount)
-            : selectedJob?.batchCount != null
-              ? formatCount(selectedJob.batchCount)
-              : "—",
+          isTerminal && selectedJob?.batchCount != null
+            ? formatCount(selectedJob.batchCount)
+            : liveCounts?.batchCount != null
+              ? formatCount(liveCounts.batchCount)
+              : selectedJob?.batchCount != null
+                ? formatCount(selectedJob.batchCount)
+                : "—",
       },
     ]
     if (selectedJob?.error) {
@@ -783,73 +1106,23 @@ export function ArrowJobExecutionsPanel({
   }, [
     selectedJob,
     selectedDisplayStatus,
+    isTerminal,
     isActiveSelected,
     liveCounts,
     progressEvents,
   ])
 
   const running =
-    isActiveSelected &&
-    activeRunPhase === "running" &&
-    progressEvents === activeRunEvents
+    isRunningPhase &&
+    progressPhase !== "done" &&
+    progressPhase !== "cancelled"
 
   React.useEffect(() => {
     if (loading) return
     onListLoadedRef.current?.(error ? 0 : displayItems.length)
   }, [loading, error, displayItems.length])
 
-  /** Detail column header actions — shared by the classic Detail view and
-   *  the embedded result view so Delete stays available in both. */
-  const detailToolbar = (
-    <div className="flex shrink-0 items-center gap-1.5">
-      {canCancelSelected && selectedId ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn(
-            panelHeaderActionClass,
-            "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          )}
-          disabled={cancelling}
-          onClick={handleCancelSelected}
-        >
-          <Ban className="size-3.5" />
-          {cancelling ? "Cancelling…" : "Cancel"}
-        </Button>
-      ) : null}
-      {canDeleteSelected ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn(
-            panelHeaderActionClass,
-            "gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          )}
-          disabled={deleting}
-          onClick={() => {
-            setDeleteError(null)
-            setDeleteTargetId(selectedId)
-            setDeleteOpen(true)
-          }}
-        >
-          <Trash2 className="size-3.5" />
-          Delete
-        </Button>
-      ) : null}
-      {canOpenSelected && selectedId ? (
-        <Button
-          type="button"
-          size="sm"
-          className={panelHeaderActionClass}
-          onClick={() => onOpenJob?.(selectedId)}
-        >
-          View report
-        </Button>
-      ) : null}
-    </div>
-  )
+
 
   return (
     <>
@@ -939,6 +1212,7 @@ export function ArrowJobExecutionsPanel({
                         aria-current={selected ? "true" : undefined}
                         onClick={() => {
                           setSelectedId(job.id)
+                          setEffectiveViewMode("result")
                           onJobSelect?.(job.id, job)
                         }}
                         onDoubleClick={() => onOpenJob?.(job.id)}
@@ -1023,24 +1297,7 @@ export function ArrowJobExecutionsPanel({
         minSize="30%"
         className="min-h-0 min-w-0"
       >
-        {liveMode ? (
-          <ArrowJobLivePanel
-            className="h-full"
-            schema={criteriaSchema}
-            requestJson={
-              isActiveSelected && activeRequestJson ? activeRequestJson : inputJson
-            }
-            events={progressEvents}
-            phase={progressPhase}
-            running={running}
-            loading={historyLoading && progressEvents.length === 0}
-            liveStatus={selectedDisplayStatus}
-            cancelling={cancelling}
-            onCancel={
-              selectedId ? () => void handleCancelSelected() : undefined
-            }
-          />
-        ) : resultMode && selectedId ? (
+        {resultMode && selectedId ? (
           renderResult(selectedId)
         ) : criteriaVisible ? (
           <section className={cn(panelCardClass, "h-full min-w-0")}>
@@ -1069,6 +1326,14 @@ export function ArrowJobExecutionsPanel({
                   <FileText className={panelHeaderIconClass} aria-hidden />
                   <span className={panelHeaderTitleClass}>Detail</span>
                 </div>
+                {selectedDisplayStatus ? (
+                  <Badge
+                    variant={statusTone(selectedDisplayStatus)}
+                    className="h-5 shrink-0 px-1.5 text-[10px]"
+                  >
+                    {selectedDisplayStatus}
+                  </Badge>
+                ) : null}
                 <div className="flex min-w-0 items-center gap-1">
                   <span
                     className={cn(
@@ -1096,7 +1361,6 @@ export function ArrowJobExecutionsPanel({
                   ) : null}
                 </div>
               </div>
-                {detailToolbar}
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

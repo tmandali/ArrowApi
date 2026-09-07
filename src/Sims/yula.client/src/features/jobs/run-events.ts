@@ -72,13 +72,19 @@ export function mapSseToRunEvent(
     }
   }
   if (eventName === "cancelled") {
+    const detail =
+      typeof payload.totalRows === "number" && payload.totalRows > 0
+        ? `${formatCount(payload.totalRows)} rows · stopped`
+        : "report stopped"
     return {
       id: "cancelled",
       eventName,
       title: "Cancelled",
-      detail: "report stopped",
+      detail,
       tone: "danger",
       at,
+      totalRows: payload.totalRows,
+      batchCount: payload.batchCount,
     }
   }
   return {
@@ -129,13 +135,31 @@ export function appendOrUpdateRunEvent(
     eventName === "failed" ||
     eventName === "cancelled"
   ) {
-    const idx = prev.findIndex((e) => e.eventName === eventName)
+    const next = [...prev]
+
+    // Final satır sayısı terminal event ile geldiyse, önceki progress adımını da aynı sayıya yükselt
+    if (
+      (eventName === "completed" || eventName === "cancelled") &&
+      typeof payload.totalRows === "number" &&
+      payload.totalRows > 0
+    ) {
+      const progressIdx = next.findIndex((e) => e.eventName === "progress")
+      if (progressIdx >= 0) {
+        next[progressIdx] = {
+          ...next[progressIdx],
+          detail: `${formatCount(payload.totalRows)} rows`,
+          totalRows: payload.totalRows,
+          batchCount: payload.batchCount ?? next[progressIdx].batchCount,
+        }
+      }
+    }
+
+    const idx = next.findIndex((e) => e.eventName === eventName)
     if (idx >= 0) {
-      const next = [...prev]
-      next[idx] = { ...item, id: prev[idx].id }
+      next[idx] = { ...item, id: next[idx].id }
       return next
     }
-    return [...prev, item]
+    return [...next, item]
   }
 
   if (eventName === "info") {

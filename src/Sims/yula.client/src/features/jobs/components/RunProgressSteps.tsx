@@ -49,13 +49,13 @@ export function RunProgressSteps({
           <MarkerContent>Loading progress…</MarkerContent>
         </Marker>
       ) : events.length === 0 ? (
-        <Marker>
-          <MarkerContent>
-            {runningOnly
-              ? "Waiting for SSE events…"
-              : "No progress log for this run."}
-          </MarkerContent>
-        </Marker>
+        running ? null : (
+          <Marker>
+            <MarkerContent>
+              No progress log for this run.
+            </MarkerContent>
+          </Marker>
+        )
       ) : (
         <div className="flex flex-col gap-2">
           {events.map((step, index) => {

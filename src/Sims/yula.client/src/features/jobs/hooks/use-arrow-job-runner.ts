@@ -47,7 +47,9 @@ export type JobLiveSnapshot = {
 }
 
 function isInFlightStatus(status: string | undefined): boolean {
-  return status === "Running" || status === "Queued"
+  if (!status) return false
+  const s = status.trim().toLowerCase()
+  return s === "running" || s === "queued"
 }
 
 function prettyJson(value: unknown): string {
@@ -130,13 +132,35 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   const allowEntryResumeRef = React.useRef(true)
 
   const jobHref = React.useCallback(
-    (jobId: string) => `${basePath}/${jobId}`,
+    (jobId: string) => `${basePath}?jobId=${encodeURIComponent(jobId)}`,
     [basePath]
   )
+
+  const syncUrlWithJob = React.useCallback((jobId: string | null) => {
+    if (typeof window === "undefined") return
+    try {
+      const url = new URL(window.location.href)
+      if (jobId) {
+        url.searchParams.set("jobId", jobId)
+        url.searchParams.delete("job")
+      } else {
+        url.searchParams.delete("jobId")
+        url.searchParams.delete("job")
+      }
+      const nextQuery = url.searchParams.toString()
+      const nextUrl = nextQuery ? `${url.pathname}?${nextQuery}` : url.pathname
+      if (window.location.pathname + window.location.search !== nextUrl) {
+        window.history.replaceState(window.history.state, "", nextUrl)
+      }
+    } catch {
+      // noop
+    }
+  }, [])
 
   const publishFocused = React.useCallback((jobId: string | null) => {
     focusJobIdRef.current = jobId
     setActiveJobId(jobId)
+    syncUrlWithJob(jobId)
     if (!jobId) {
       setActiveLiveStatus(undefined)
       setActiveRequestJson(undefined)
@@ -150,8 +174,13 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
       setActiveRequestJson(snap.requestJson)
       setActiveRunEvents(snap.events)
       setActiveRunPhase(snap.phase)
+    } else {
+      setActiveLiveStatus(undefined)
+      setActiveRequestJson(undefined)
+      setActiveRunEvents([])
+      setActiveRunPhase("idle")
     }
-  }, [])
+  }, [syncUrlWithJob])
 
   // Aktif iş değiştikçe veya hub üzerinden yeni SSE olayları aktıkça state'i otomatik senkronize et.
   // Replay özelliği sayesinde bileşen sonradan mount olsa dahi birikmiş tüm adımları tek hamlede alır.
@@ -260,7 +289,11 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, job.id)))
         setListRefreshToken((n) => n + 1)
       } catch {
-        if (abort.signal.aborted) return
+        const snap = arrowJobEventHub.getSnapshot(jobKey)
+        if (snap?.phase === "cancelled" || snap?.status === "Cancelled") {
+          setActiveLiveStatus("Cancelled")
+          setActiveRunPhase("cancelled")
+        }
         setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, job.id)))
         setListRefreshToken((n) => n + 1)
       } finally {
@@ -303,6 +336,20 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         return
       }
 
+      if (jobStatus) {
+        setActiveLiveStatus(jobStatus)
+        const lower = jobStatus.toLowerCase()
+        if (lower === "completed") {
+          setActiveRunPhase("done")
+        } else if (lower === "cancelled" || lower === "canceled") {
+          setActiveRunPhase("cancelled")
+        } else if (lower === "failed") {
+          setActiveRunPhase("idle")
+        } else if (isInFlightStatus(jobStatus)) {
+          setActiveRunPhase("running")
+        }
+      }
+
       void fetchJobRequest(jobId).then((req) => {
         if (!req) return
         setActiveRequestJson(prettyJson(req))
@@ -310,7 +357,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
       const targetJob: ArrowJobStatus =
         typeof jobOrId === "string"
-          ? { id: jobId, status: jobStatus || "Completed", jobUrl: "", eventsUrl: "" }
+          ? { id: jobId, status: jobStatus || "", jobUrl: "", eventsUrl: "" }
           : jobOrId
 
       if (jobStatus && isInFlightStatus(jobStatus) && !arrowJobEventHub.isStreaming(key)) {
@@ -344,20 +391,46 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     if (pending) {
       applyExecutionFocusRef.current(pending.job, pending.request)
     } else if (typeof window !== "undefined") {
-      const jobId = new URLSearchParams(window.location.search).get("job")
-      if (jobId) {
-        const tracked = useActiveJobsStore.getState().jobs[jobId]
-        applyExecutionFocusRef.current(
-          {
-            id: jobId,
-            status: tracked?.status || "Completed",
-            eventsUrl: tracked?.eventsUrl ?? "",
-            jobUrl: tracked?.jobUrl ?? "",
-            createdAt: tracked?.createdAt,
-            name: tracked?.name,
-          },
-          tracked?.payload,
-        )
+      const search = new URLSearchParams(window.location.search)
+      const queryJobId = search.get("jobId") || search.get("job")
+      if (queryJobId) {
+        const tracked = useActiveJobsStore.getState().jobs[queryJobId]
+        if (tracked?.status) {
+          applyExecutionFocusRef.current(
+            {
+              id: queryJobId,
+              status: tracked.status,
+              eventsUrl: tracked.eventsUrl ?? "",
+              jobUrl: tracked.jobUrl ?? "",
+              createdAt: tracked.createdAt,
+              name: tracked.name,
+            },
+            tracked.payload,
+          )
+        } else {
+          // Sayfa ilk defa URL query param ile açıldığında işin durumu henüz bilinmiyor.
+          // "Completed" varsaymak yerine önce boş geçilir; fetchJobStatus ile gerçek durum öğrenilir.
+          applyExecutionFocusRef.current({
+            id: queryJobId,
+            status: "",
+            jobUrl: "",
+            eventsUrl: "",
+          })
+          void fetchJobStatus(queryJobId).then((st) => {
+            if (st) {
+              applyExecutionFocusRef.current({
+                id: queryJobId,
+                status: st.status,
+                jobUrl: st.jobUrl,
+                eventsUrl: st.eventsUrl,
+                createdAt: st.createdAt,
+                name: st.name,
+                totalRows: st.totalRows ?? undefined,
+                batchCount: st.batchCount ?? undefined,
+              })
+            }
+          })
+        }
       }
     }
     return subscribeExecutionFocus(jobName, (focus) => {
@@ -371,6 +444,8 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
       controllersRef.current.get(key)?.abort()
       controllersRef.current.delete(key)
       arrowJobEventHub.cancelJob(jobId)
+      setActiveLiveStatus("Cancelled")
+      setActiveRunPhase("cancelled")
       setPendingJobs((prev) => prev.filter((p) => !sameJobId(p.id, jobId)))
       setListRefreshToken((n) => n + 1)
     },

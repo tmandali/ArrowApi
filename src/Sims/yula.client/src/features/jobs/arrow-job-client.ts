@@ -296,12 +296,25 @@ export async function fetchJobEventLog(
     .filter((item): item is ArrowJobHubMessage => item != null)
 }
 
-export async function cancelArrowJob(jobId: string): Promise<void> {
+export async function cancelArrowJob(
+  jobId: string
+): Promise<ArrowJobStatus | null> {
   try {
-    await fetch(resolveApiUrl(`/api/arrow/jobs/${jobId}/cancel`), {
-      method: "POST",
-      headers: { ...getCompanyHeaders() },
-    })
+    const response = await fetch(
+      resolveApiUrl(`/api/arrow/jobs/${jobId}/cancel`),
+      {
+        method: "POST",
+        headers: { ...getCompanyHeaders() },
+      }
+    )
+    if (response.ok) {
+      try {
+        return (await response.json()) as ArrowJobStatus
+      } catch {
+        return null
+      }
+    }
+    return null
   } catch (networkErr: unknown) {
     const err = networkErr as Error
     throw new ApiError(
@@ -408,9 +421,21 @@ export async function readJobSseEvents(
       const parts = buffer.split(/\r?\n/)
       buffer = parts.pop() ?? ""
 
-      for (const line of parts) {
+      for (let i = 0; i < parts.length; i++) {
+        const line = parts[i]
         if (line === "") {
+          const flushedName = eventName
           flush()
+          // Aynı ağ paketinde birden fazla hazırlık adımı (info/status) birikmişse,
+          // kullanıcının adımları "tek seferde" donuk görmek yerine canlı birer adımla
+          // izleyebilmesi için progress harici adımlar arasında kısa bir görsel tempo (70ms) bırak.
+          if (
+            flushedName !== "progress" &&
+            parts.slice(i + 1).some((p) => p.startsWith("event:"))
+          ) {
+            await new Promise((r) => setTimeout(r, 70))
+            if (signal.aborted) break
+          }
           continue
         }
         if (line.startsWith(":")) continue

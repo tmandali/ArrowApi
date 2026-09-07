@@ -1,6 +1,5 @@
 export { RetailSalesForm } from "./components/RetailSalesForm"
 export { RetailSalesFilter } from "./components/RetailSalesFilter"
 export type { RetailSalesJobSession } from "./components/RetailSalesFilter"
-export { RetailSalesJobView } from "./components/RetailSalesJobView"
 export { RetailSalesResultGrid } from "./components/RetailSalesResultGrid"
 export { default as retailSalesCriteriaSchema } from "./schemas/retail-sales-criteria.schema.json"

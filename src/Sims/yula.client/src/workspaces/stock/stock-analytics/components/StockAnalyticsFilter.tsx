@@ -35,6 +35,14 @@ export type StockAnalyticsJobSession = Pick<
   | "pendingJobs"
   | "listRefreshToken"
   | "onListError"
+  | "viewMode"
+  | "onViewModeChange"
+  | "onSelectedCompletedChange"
+  | "deleteJobTriggerRef"
+  | "onCanDeleteChange"
+  | "cancelJobTriggerRef"
+  | "onCanCancelChange"
+  | "onCancellingChange"
 > & {
   /** New / empty list → show criteria grid in the Detail column. */
   composing?: boolean
@@ -133,6 +141,14 @@ export const StockAnalyticsFilter = React.forwardRef<
         onListError={jobSession?.onListError}
         pendingJobs={jobSession?.pendingJobs}
         listRefreshToken={jobSession?.listRefreshToken}
+        viewMode={jobSession?.viewMode}
+        onViewModeChange={jobSession?.onViewModeChange}
+        onSelectedCompletedChange={jobSession?.onSelectedCompletedChange}
+        deleteJobTriggerRef={jobSession?.deleteJobTriggerRef}
+        onCanDeleteChange={jobSession?.onCanDeleteChange}
+        cancelJobTriggerRef={jobSession?.cancelJobTriggerRef}
+        onCanCancelChange={jobSession?.onCanCancelChange}
+        onCancellingChange={jobSession?.onCancellingChange}
         detailSlot={
           <SchemaCriteriaFilter
             key="stock-analytics-criteria"

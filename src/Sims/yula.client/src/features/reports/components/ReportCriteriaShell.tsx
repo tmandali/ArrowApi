@@ -47,6 +47,8 @@ export type ReportCriteriaShellProps = {
   ) => void
   /** Header'daki "New" butonu — compose moduna geçiştir. */
   onStartNewReport?: () => void
+  /** Header sağ aksiyonlarına eklenecek özel butonlar (örn. Detail / Grid geçiş butonu). */
+  headerActions?: React.ReactNode
   /**
    * Criteria + Executions filtresini render eder. Shell, kriter gridi handle'ını
    * toplayan callback ref'i ve Run/onListError yardımcılarını bu callback
@@ -74,6 +76,7 @@ export function ReportCriteriaShell({
   activeJobId,
   onJobCreated,
   onStartNewReport,
+  headerActions,
   renderFilter,
 }: ReportCriteriaShellProps) {
   // Kriter gridi handle'ı callback ref olarak toplanır: setter commit fazında
@@ -229,6 +232,7 @@ export function ReportCriteriaShell({
           </div>
 
           <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
+            {headerActions}
             <Button
               type="button"
               variant="outline"

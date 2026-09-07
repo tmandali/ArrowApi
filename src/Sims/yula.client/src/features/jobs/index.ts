@@ -1,7 +1,5 @@
 export { ArrowJobExecutionsPanel } from "./components/ArrowJobExecutionsPanel"
 export type { ArrowJobExecutionsPanelProps } from "./components/ArrowJobExecutionsPanel"
-export { ArrowJobLivePanel } from "./components/ArrowJobLivePanel"
-export type { ArrowJobLivePanelProps } from "./components/ArrowJobLivePanel"
 export { RunProgressSteps } from "./components/RunProgressSteps"
 export { statusTone } from "./lib/status-tone"
 export { ArrowJobResultPanel } from "./components/ArrowJobResultPanel"
