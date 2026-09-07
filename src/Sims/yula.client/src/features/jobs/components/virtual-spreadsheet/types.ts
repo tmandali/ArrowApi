@@ -178,4 +178,8 @@ export type VirtualSpreadsheetProps<T> = {
   sortConfigs?: ColumnSortConfigs
   /** Çoklu sıralama değiştiğinde veya kolon sırası değiştiğinde çağrılır */
   onSortConfigsChange?: (configs: ColumnSortConfigs, orderedColumnNames?: string[]) => void
+  /** Grid genişletilmiş / odak modunda mı? */
+  isMaximized?: boolean
+  /** Genişletilmiş mod aç/kapat tıklandığında çağrılır */
+  onToggleMaximize?: (maximized: boolean) => void
 }

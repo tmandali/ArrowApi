@@ -55,6 +55,9 @@ interface GridState {
   unregister: () => void;
   registerScreen: (screen: YulaScreenRegistration) => void;
   unregisterScreen: () => void;
+  isMaximized: boolean;
+  setIsMaximized: (maximized: boolean) => void;
+  toggleMaximized: () => void;
   setFilters: (
     filters:
       | Record<string, string>
@@ -148,6 +151,9 @@ export const useYulaGridStore = create<GridState>((set) => ({
       }
       return { spec };
     }),
+  isMaximized: false,
+  setIsMaximized: (isMaximized) => set({ isMaximized }),
+  toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
   unregister: () =>
     set({
       spec: null,
@@ -155,6 +161,7 @@ export const useYulaGridStore = create<GridState>((set) => ({
       customQuerySql: null,
       customQueryTitle: null,
       runtimeApi: null,
+      isMaximized: false,
     }),
   setFilters: (filtersOrFn) =>
     set((s) => ({

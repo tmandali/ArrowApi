@@ -26,6 +26,7 @@ import { findActiveJobByPayload } from "@/store/slices/active-jobs-store"
 import { ApiError } from "@/services"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
+import { useYulaGridStore } from "@/lib/stores/grid"
 import { readReportAiMetadata } from "@/lib/report-ai-metadata"
 import { buildCriteriaDigest } from "@/features/report-criteria/lib/build-criteria-digest"
 import { registerReportRunner } from "@/lib/report-run-bus"
@@ -213,9 +214,11 @@ export function ReportCriteriaShell({
     return registerReportRunner(mode, () => void handleCriteriaSubmit());
   }, [mode, handleCriteriaSubmit]);
 
+  const isGridMaximized = useYulaGridStore((s) => s.isMaximized)
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {searchOpen ? null : (
+      {searchOpen || isGridMaximized ? null : (
         <div className={pageHeaderShellClass}>
         <header
           className={cn(
@@ -251,7 +254,7 @@ export function ReportCriteriaShell({
         </div>
       )}
 
-      {!searchOpen && listErrorBanner ? (
+      {!searchOpen && !isGridMaximized && listErrorBanner ? (
         <WorkspaceBanner
           tone="error"
           onDismiss={() => setListErrorBanner(null)}
@@ -260,7 +263,7 @@ export function ReportCriteriaShell({
         </WorkspaceBanner>
       ) : null}
 
-      {!searchOpen && criteriaBanner ? (
+      {!searchOpen && !isGridMaximized && criteriaBanner ? (
         <WorkspaceBanner
           tone={criteriaBanner.tone === "error" ? "error" : "success"}
           href={criteriaBanner.href}

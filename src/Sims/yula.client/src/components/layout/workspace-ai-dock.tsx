@@ -1,5 +1,6 @@
 "use client";
 
+// Workspace AI Dock component
 import * as React from "react"
 import { usePathname } from "next/navigation"
 import { isWorkspaceHomePath, isConversationOnScreen } from "@/lib/workspace-paths"
@@ -21,7 +22,7 @@ import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useYulaChatOrNull } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { cn } from "@/utils/cn"
-import { History, Maximize2, Minimize2, SquarePen } from "lucide-react"
+import { History, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -131,30 +132,6 @@ export function YulaHistoryToggle() {
   )
 }
 
-function YulaExpandToggle() {
-  const { expanded, toggleExpanded, sideDockAllowed } = useWorkspaceAiChat()
-
-  if (!sideDockAllowed) return null
-
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-7 shrink-0"
-      onClick={toggleExpanded}
-      aria-label={expanded ? YULA.restoreLabel : YULA.expandLabel}
-      title={expanded ? YULA.restoreLabel : YULA.expandLabel}
-    >
-      {expanded ? (
-        <Minimize2 className="size-3.5 text-muted-foreground" />
-      ) : (
-        <Maximize2 className="size-3.5 text-muted-foreground" />
-      )}
-    </Button>
-  )
-}
-
 export function WorkspaceAiDock({
   children,
   className,
@@ -234,7 +211,6 @@ export function WorkspaceAiDock({
               </button>
               <YulaScreenHistoryButton />
               <YulaNewChatButton />
-              <YulaExpandToggle />
             </div>
           ) : null}
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -257,7 +233,6 @@ export function WorkspaceAiDock({
         <div className="flex items-center gap-0.5">
           <YulaScreenHistoryButton />
           <YulaNewChatButton />
-          <YulaExpandToggle />
         </div>
       }
       panel={<AIChatPanel centeredIntro={centeredIntro} />}

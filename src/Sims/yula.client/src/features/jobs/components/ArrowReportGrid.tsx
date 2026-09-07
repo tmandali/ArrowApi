@@ -47,6 +47,7 @@ import { VirtualSpreadsheet } from "./VirtualSpreadsheet"
 import {
   cellInputClass,
   cellClass,
+  ROW_HEIGHT,
   type SpreadsheetColumn,
   type ColumnAggregationConfig,
   type ColumnAggregationValues,
@@ -122,6 +123,7 @@ export function ArrowReportGrid({
   // Yula set_grid_query: özel görünüm (gruplama/aggregate) aktif mi?
   const customQuerySql = useYulaGridStore((s) => s.customQuerySql)
   const customQueryTitle = useYulaGridStore((s) => s.customQueryTitle)
+  const isMaximized = useYulaGridStore((s) => s.isMaximized)
 
   const {
     columns: discoveredCols,
@@ -1128,6 +1130,8 @@ export function ArrowReportGrid({
       onSortConfigsChange={(configs, orderedCols) => setMultiSorting(configs, orderedCols)}
       onSortChange={(colName) => toggleSort(colName, effectiveColumns.map((c) => c.name))}
       onSortSettingChange={(colName, desc) => setSorting(colName, desc)}
+      rowHeight={ROW_HEIGHT}
+      isMaximized={isMaximized}
       renderFilterCell={(col, index) => {
         const val = filters[col.name] ?? ""
         return (

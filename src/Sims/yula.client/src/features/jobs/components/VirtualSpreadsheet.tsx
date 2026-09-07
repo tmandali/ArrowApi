@@ -6,6 +6,8 @@ import {
   ArrowUp,
   ArrowUpDown,
   ListFilter,
+  Maximize2,
+  Minimize2,
   Sigma,
   Table2,
 } from "lucide-react"
@@ -13,6 +15,8 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { useVirtualWindow } from "@/hooks/use-virtual-window"
+import { useYulaGridStore } from "@/lib/stores/grid"
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import {
   panelCardClass,
   panelHeaderClass,
@@ -104,7 +108,48 @@ export function VirtualSpreadsheet<T>({
   onSortSettingChange,
   sortConfigs,
   onSortConfigsChange,
+  isMaximized: controlledMaximized,
+  onToggleMaximize,
 }: VirtualSpreadsheetProps<T>) {
+  const storeMaximized = useYulaGridStore((s) => s.isMaximized)
+  const setStoreMaximized = useYulaGridStore((s) => s.setIsMaximized)
+
+  const isMaximized = controlledMaximized !== undefined ? controlledMaximized : storeMaximized
+
+  const handleToggleMaximize = React.useCallback(() => {
+    const next = !isMaximized
+    if (onToggleMaximize) {
+      onToggleMaximize(next)
+    } else {
+      setStoreMaximized(next)
+    }
+  }, [isMaximized, onToggleMaximize, setStoreMaximized])
+
+  // Esc tuşu ile genişletilmiş moddan çıkış
+  React.useEffect(() => {
+    if (!isMaximized) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        if (onToggleMaximize) {
+          onToggleMaximize(false)
+        } else {
+          setStoreMaximized(false)
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isMaximized, onToggleMaximize, setStoreMaximized])
+
+  // Genişletilmiş moda geçildiğinde sanal pencere ölçümlerini anında tazele
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"))
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [isMaximized])
+
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
     if (disablePersistence) return undefined
@@ -1270,6 +1315,24 @@ export function VirtualSpreadsheet<T>({
             >
               <Sigma className="size-3.5" />
             </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant={isMaximized ? "secondary" : "outline"}
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={handleToggleMaximize}
+            title={isMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+            aria-label={isMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+          >
+            {isMaximized ? (
+              <Minimize2 className="size-3.5" />
+            ) : (
+              <Maximize2 className="size-3.5" />
+            )}
+          </Button>
+          {isMaximized ? (
+            <AIChatAssistant separator={false} />
           ) : null}
         </div>
       </div>

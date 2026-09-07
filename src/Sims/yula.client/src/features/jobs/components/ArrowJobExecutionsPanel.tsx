@@ -79,6 +79,7 @@ import {
 import type { JsonSchemaObject } from "@/features/report-criteria"
 import type { ArrowJobStatus } from "../types"
 import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store"
+import { useYulaGridStore } from "@/lib/stores/grid"
 import { cn } from "@/utils/cn"
 import { formatCount, formatBytes } from "@/utils/format"
 import { opfsReportCache, type OpfsJobParquetDetail } from "@/services/opfs/opfs-cache"
@@ -352,6 +353,7 @@ export function ArrowJobExecutionsPanel({
   onCancellingChange,
 }: ArrowJobExecutionsPanelProps) {
   const showCriteriaSlot = detailSlot != null
+  const isGridMaximized = useYulaGridStore((s) => s.isMaximized)
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
   // Header butonunun (PagePanelTrigger) hedefi — Executions kolonu açık/kapalı.
   // Resize düzenini oturumlar arası koru (localStorage) — criteria/detail oranları.
@@ -1192,14 +1194,15 @@ export function ArrowJobExecutionsPanel({
       onLayoutChanged={onLayoutChanged}
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
-      <ResizablePanel
-        id="executions-criteria"
-        defaultSize={360}
-        minSize={320}
-        maxSize={520}
-        groupResizeBehavior="preserve-pixel-size"
-        className="min-h-0 min-w-0"
-      >
+      {!isGridMaximized ? (
+        <ResizablePanel
+          id="executions-criteria"
+          defaultSize={360}
+          minSize={320}
+          maxSize={520}
+          groupResizeBehavior="preserve-pixel-size"
+          className="min-h-0 min-w-0"
+        >
         <section className={cn(panelCardClass, "h-full")}>
             <div className={panelHeaderClass}>
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1340,12 +1343,15 @@ export function ArrowJobExecutionsPanel({
           </ScrollArea>
         </section>
       </ResizablePanel>
-      <ResizableHandle withHandle className={panelResizeHandleClass} />
+      ) : null}
+      {!isGridMaximized ? (
+        <ResizableHandle withHandle className={panelResizeHandleClass} />
+      ) : null}
 
       <ResizablePanel
         id="executions-detail"
-        minSize="30%"
-        className="min-h-0 min-w-0"
+        minSize={isGridMaximized ? "100%" : "30%"}
+        className="min-h-0 min-w-0 flex-1"
       >
         {resultMode && selectedId ? (
           renderResult(selectedId)
