@@ -1,6 +1,6 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
 
-// Next karşılığı: ?url suffix yerine public/duckdb altındaki self-hosted dosyalar
+// Next.js DuckDB Worker - self-hosted WASM bundles
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
     mainModule: "/duckdb/duckdb-mvp.wasm",
