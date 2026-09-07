@@ -13,7 +13,7 @@ import {
   Filter,
   Download,
   Database,
-  FileText,
+  FileArchive,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -423,12 +423,16 @@ export function ArrowReportGrid({
   } | null>(null)
 
   const runExport = React.useCallback(
-    async (format: "xlsx" | "parquet" | "csv" = "xlsx", maxTotalRows?: number) => {
+    async (format: "xlsx" | "parquet" | "csv" | "zip" = "xlsx", maxTotalRows?: number) => {
       setExportWarning(null)
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       setIsExporting(true)
       const formatLabel =
-        format === "xlsx" ? "Excel dosyası" : format === "parquet" ? "Parquet dosyası" : "CSV dosyası"
+        format === "xlsx"
+          ? "Excel dosyası"
+          : format === "parquet"
+          ? "Parquet dosyası"
+          : "Sıkıştırılmış CSV arşivi"
       const exportToastId = toast.loading(`${formatLabel} hazırlanıyor...`)
       try {
         const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
@@ -447,7 +451,7 @@ export function ArrowReportGrid({
           sortBy,
           sortDesc,
           columns: effectiveColumns.map((c) => c.name),
-          preferredFormat: format,
+          preferredFormat: format === "csv" ? "zip" : format,
           maxTotalRows,
         })
 
@@ -466,6 +470,12 @@ export function ArrowReportGrid({
           const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
           toast.success(
             `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            { id: exportToastId }
+          )
+        } else if (result.format === "zip") {
+          const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+          toast.success(
+            `Sıkıştırılmış CSV indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
             { id: exportToastId }
           )
         } else {
@@ -495,11 +505,11 @@ export function ArrowReportGrid({
   )
 
   const handleExportClick = React.useCallback(
-    (format: "xlsx" | "parquet" | "csv" = "xlsx") => {
+    (format: "xlsx" | "parquet" | "csv" | "zip" = "xlsx") => {
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
 
-      // Parquet ve CSV için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
+      // Parquet, CSV ve ZIP için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
       if (format === "xlsx") {
         if (exportRowCount > 2_000_000) {
           setExportWarning({ type: "hard_limit", count: exportRowCount })
@@ -619,13 +629,13 @@ export function ArrowReportGrid({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleExportClick("csv")}
+                onClick={() => handleExportClick("zip")}
                 className="cursor-pointer gap-2 py-2"
               >
-                <FileText className="size-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                <FileArchive className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-medium text-xs">CSV (.csv)</span>
-                  <span className="text-[10px] text-muted-foreground">Noktalı virgül (;) & UTF-8 BOM</span>
+                  <span className="font-medium text-xs">CSV (.zip)</span>
+                  <span className="text-[10px] text-muted-foreground">Sıkıştırılmış Excel uyumlu CSV arşivi</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>

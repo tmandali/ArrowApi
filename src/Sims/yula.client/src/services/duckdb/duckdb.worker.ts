@@ -1,4 +1,5 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
+import { createSingleFileZip } from "./zip-packer"
 
 // Next karşılığı: ?url suffix yerine public/duckdb altındaki self-hosted dosyalar
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
@@ -468,7 +469,7 @@ self.onmessage = async (e: MessageEvent) => {
             whereClause?: string
             orderClause?: string
             fileName?: string
-            preferredFormat?: "xlsx" | "csv" | "parquet"
+            preferredFormat?: "xlsx" | "csv" | "parquet" | "zip"
             maxRowsPerSheet?: number
             maxTotalRows?: number
           }
@@ -498,7 +499,7 @@ self.onmessage = async (e: MessageEvent) => {
               ? maxTotalRows
               : totalRowsToExport
 
-          let format: "xlsx" | "csv" | "parquet" = "csv"
+          let format: "xlsx" | "csv" | "parquet" | "zip" = "zip"
           let outFileName = ""
           let fileBuffer: Uint8Array | null = null
           let sheetCount = 1
@@ -600,7 +601,7 @@ self.onmessage = async (e: MessageEvent) => {
             }
           }
 
-          // 2. CSV Fallback (Excel açılabilsin diye UTF-8 BOM ve noktalı virgül standardı)
+          // 3. CSV / ZIP Fallback veya doğrudan CSV tercihi -> Doğrudan .zip olarak paketle
           if (!fileBuffer) {
             const tempCsv = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv`
             const csvSql =
@@ -616,13 +617,26 @@ self.onmessage = async (e: MessageEvent) => {
 
             // UTF-8 BOM (0xEF, 0xBB, 0xBF) ekle — Excel'in Türkçe karakterleri sormadan düzgün açması için
             const bom = new Uint8Array([0xef, 0xbb, 0xbf])
-            const finalBuffer = new Uint8Array(bom.length + rawCsvBuffer.length)
-            finalBuffer.set(bom, 0)
-            finalBuffer.set(rawCsvBuffer, bom.length)
+            const csvWithBom = new Uint8Array(bom.length + rawCsvBuffer.length)
+            csvWithBom.set(bom, 0)
+            csvWithBom.set(rawCsvBuffer, bom.length)
 
-            fileBuffer = finalBuffer
-            format = "csv"
-            outFileName = `${fileName}.csv`
+            // Doğrudan .zip arşivine paketle: Kullanıcı dosyayı indirdiğinde %80-%90 daha küçük boyutta
+            // standart PKZIP (.zip) arşivi olarak alır. Çift tıklamayla açtığında içinden Excel uyumlu
+            // UTF-8 BOM'lu .csv çıkar.
+            try {
+              fileBuffer = await createSingleFileZip(`${fileName}.csv`, csvWithBom)
+              format = "zip"
+              outFileName = `${fileName}.zip`
+            } catch (zipErr) {
+              console.warn(
+                "[duckdb.worker] ZIP packaging failed, falling back to raw CSV:",
+                zipErr
+              )
+              fileBuffer = csvWithBom
+              format = "csv"
+              outFileName = `${fileName}.csv`
+            }
           }
 
           const transferBuffer = fileBuffer.buffer.slice(
