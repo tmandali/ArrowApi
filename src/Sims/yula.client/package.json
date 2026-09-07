@@ -10,6 +10,7 @@
     "lint": "oxlint",
     "copy:duckdb": "node scripts/copy-duckdb-assets.mjs",
     "copy:parquet": "node scripts/copy-parquet-assets.mjs",
+    "test:grid": "node src/features/jobs/components/virtual-spreadsheet/tests/run-all.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

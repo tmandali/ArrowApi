@@ -15,7 +15,11 @@ src/features/jobs/components/
     ├── column-sizing.ts                  # Canvas 2D reflow-free metin ölçümü ve auto-fit genişlik hesaplamaları
     ├── ColumnTypeBadge.tsx               # Şema destekli veri tipi rozetleri (Sayi, Tarih, Mantiksal, Metin)
     ├── ColumnManagementMenu.tsx          # Kolon goster/gizle, sabitle/kaldir, arama ve klavye etkilesimli Popover menusu
-    └── TableSkeletonRows.tsx             # Ilk yukleme ve sonsuz kaydirma icin sticky destekli iskelet satirlari
+    ├── TableSkeletonRows.tsx             # Ilk yukleme ve sonsuz kaydirma icin sticky destekli iskelet satirlari
+    └── tests/                            # Otomasyon testleri: npm run test:grid
+        ├── filter-parser.test.mjs        # DuckDB WHERE SQL üretimi, istemci arama ve şema formatlama testleri
+        ├── export-formats.test.mjs       # Excel 1M/2M limitleri, ZSTD Parquet ve GZIP CSV kural testleri
+        └── run-all.mjs                   # Tüm grid testlerini tek komutla koşan test orkestratörü
 ```
 
 ### Sorumluluk Bölüşümü:
@@ -107,12 +111,37 @@ Tablonun kolon konfigürasyonu istemci tarafında kalıcı olarak saklanır:
 
 ## 🧪 5. Test ve Doğrulama Kontrol Listesi
 
-Bu bileşen üzerinde herhangi bir kod değişikliği yapıldığında aşağıdaki adımlarla doğrulayın:
-1. `npm run typecheck` (tsc): Sıfır hata vermeli.
-2. `npm run lint` (oxlint): Sıfır hata vermeli.
-3. **Manuel Kontrol:**
-   - Kolon ayırıcıya basıldığında sürüklemenin tetiklenmediğini doğrulayın.
-   - Kolon ayırıcıya çift tıklandığında kolonun içeriğe tam sığdığını doğrulayın.
-   - Kolon menüsünden bir kolon sabitlendiğinde (Pin) listenin soluna geçtiğini ve ayracın altına yerleştiğini doğrulayın.
-   - Tablo yatay kaydırıldığında sabit kolonların yerinde kaldığını ve son sabit kolonun sağında derinlik gölgesinin belirdiğini doğrulayın.
-   - Sayfa yenilendiğinde (F5) kolon sırası, genişliği, gizliliği ve sabitlemelerin korunduğunu doğrulayın.
+Bu bileşen üzerinde herhangi bir kod değişikliği veya optimizasyon yapıldığında aşağıdaki adımlarla doğrulayın:
+
+### 1. Otomasyon Testleri (`npm run test:grid`):
+Tek komutla tüm tablo ve DuckDB kurallarını test eder:
+```bash
+npm run test:grid
+```
+Test suite (`src/features/jobs/components/virtual-spreadsheet/tests/`) şunları garanti eder:
+- **`filter-parser.test.mjs`:**
+  - `Item contains 'Elma'` -> `TRIM(CAST("Item" AS VARCHAR)) ILIKE '%Elma%'`
+  - Çok kelimeli aramalar (`Elma Sirke`) -> Bağımsız kelime `AND` eşleştirmesi
+  - Boş/null hücre filtreleri (`''`, `boş`, `null` -> `IS NULL OR TRIM(...) = ''`)
+  - Dolu hücre filtreleri (`<>''`, `dolu` -> `IS NOT NULL AND TRIM(...) != ''`)
+  - Metin içindeki tireler (`MERKEZ - ŞUBE`) aralık filtresi olarak bozulmamalı
+  - Sayısal ve tarih aralıkları (`100..500`, `10 - 50` -> `>= 100 AND <= 500`)
+  - Sayısal karşılaştırma operatörleri (`>=50`, `<=100`, `>0`, `=25`)
+  - İstemci tarafı in-memory (`filter-matcher.ts`) ile DuckDB SQL arama uyumu
+  - Şema tabanlı hücre formatlama (`BIGINT`/`INTEGER` asla binlik nokta almaz; `DECIMAL`/`FLOAT` Türkçe formatlanır)
+- **`export-formats.test.mjs`:**
+  - DuckDB C++ GZIP CSV sözdizimi (`COMPRESSION GZIP`, `DELIMITER ';'`)
+  - Apache Parquet ZSTD sıkıştırma sözdizimi (`FORMAT PARQUET, COMPRESSION ZSTD`)
+  - Excel 1.000.000 satır limitini aşan durumlarda otomatik sayfalara (`Sayfa 1`, `Sayfa 2`...) bölme mantığı
+  - DuckDB-Wasm Issue #2119 fazladan çöp bayt tespiti ve `PK\x03\x04` imza kırpma doğrulaması
+
+### 2. Statik Analiz & Derleme:
+- `npm run lint` (oxlint): **0 warnings, 0 errors** olmalı.
+- `npm run typecheck` (tsc): **0 errors** olmalı.
+
+### 3. Manuel Fonksiyonel Kontrol Listesi:
+- Kolon ayırıcıya basıldığında sürüklemenin (D&D) tetiklenmediğini doğrulayın.
+- Kolon ayırıcıya çift tıklandığında kolonun içeriğe tam sığdığını doğrulayın.
+- Kolon menüsünden bir kolon sabitlendiğinde (Pin) listenin soluna geçtiğini ve ayracın altına yerleştiğini doğrulayın.
+- Tablo yatay kaydırıldığında sabit kolonların yerinde kaldığını ve son sabit kolonun sağında derinlik gölgesinin belirdiğini doğrulayın.
+- Sayfa yenilendiğinde (F5) kolon sırası, genişliği, gizliliği ve sabitlemelerin korunduğunu doğrulayın.
