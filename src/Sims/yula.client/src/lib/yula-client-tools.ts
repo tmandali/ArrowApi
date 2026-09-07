@@ -619,6 +619,7 @@ export async function resetGridCustomView(): Promise<void> {
   const store = useYulaGridStore.getState();
   store.setCustomQuerySql(null);
   store.setFilters({});
+  store.runtimeApi?.setSort(null, null);
   store.runtimeApi?.clearAll();
   const spec = store.spec;
   if (!spec) return;

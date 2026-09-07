@@ -117,14 +117,36 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       // Özel SQL modu: temel tablo sorgusu sonucu ezmeyesin diye atlanır
       if (!tableReadyRef.current || isCustomQueryActive()) return
       const seq = ++querySeqRef.current
+      // Sıralama kolonu geçerlilik kontrolü:
+      // Eğer seçili sıralama kolonu bilinen kolonlar arasında yoksa (örneğin özel SQL'den
+      // türetilmiş "Kayıt Sayısı" gibi alias'lar temel tabloda bulunmaz), sıralamayı yoksay
+      // ve ref/state'i temizle; böylece DuckDB Binder Error vermez.
+      let effectiveSort = activeSort
+      let effectiveSortDesc = activeSortDesc
+      if (
+        effectiveSort &&
+        columns.length > 0 &&
+        !columns.some((c) => c.name === effectiveSort)
+      ) {
+        console.warn(
+          `[useDuckReport] Sıralama kolonu (${effectiveSort}) tabloda bulunamadı; sıralama sıfırlandı.`
+        )
+        effectiveSort = null
+        effectiveSortDesc = false
+        sortByRef.current = null
+        sortDescRef.current = false
+        setSortBy(null)
+        setSortDesc(false)
+      }
+
       setIsLoadingQuery(true)
       try {
         const result = await duckDbClient.queryReportRows({
           tableName,
           filters: activeFilters,
           numericColumns,
-          sortBy: activeSort,
-          sortDesc: activeSortDesc,
+          sortBy: effectiveSort,
+          sortDesc: effectiveSortDesc,
           limit: pageSize,
           offset: activePage * pageSize,
         })
@@ -181,7 +203,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         if (seq === querySeqRef.current) setIsLoadingQuery(false)
       }
     },
-    [tableName, numericColumns, pageSize]
+    [tableName, numericColumns, pageSize, columns]
   )
 
   const executeQueryRef = React.useRef(executeQuery)
@@ -429,7 +451,22 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
               : latestExpectedRef.current ?? 0
         setTotalRows(restoredBase)
         setTotalFiltered(restoredBase)
-        void executeQueryRef.current({}, null, false, 0)
+
+        // Özel sorgudan kalan türetilmiş sıralama kolonu temel tabloda yoksa temizle
+        const discSet = new Set(discovered.map((c) => c.name))
+        const sortStillValid = Boolean(
+          sortByRef.current && discSet.has(sortByRef.current)
+        )
+        const nextSort = sortStillValid ? sortByRef.current : null
+        const nextDesc = sortStillValid ? sortDescRef.current : false
+        if (!sortStillValid && sortByRef.current) {
+          sortByRef.current = null
+          sortDescRef.current = false
+          setSortBy(null)
+          setSortDesc(false)
+        }
+
+        void executeQueryRef.current(filtersRef.current, nextSort, nextDesc, 0)
       })()
       return () => {
         cancelledRestore = true
@@ -460,33 +497,52 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           setFilters(next)
         }
 
-        // Aktif filtre hücreleri özel sorgu SONUÇLARI üzerinde de çalışsın:
-        // SELECT * FROM (<özel sorgu>) AS __custom_view WHERE ...
+        // Sıralama kontrolü: görünümde olan kolonlar sıralanabilir
+        const activeSort = sortByRef.current
+        const activeSortDesc = sortDescRef.current
+        const hasValidSort = Boolean(activeSort && viewCols.has(activeSort))
+        if (activeSort && !hasValidSort) {
+          sortByRef.current = null
+          sortDescRef.current = false
+          setSortBy(null)
+          setSortDesc(false)
+        }
+
+        // Aktif filtre veya sıralama özel sorgu SONUÇLARI üzerinde de çalışsın:
+        // SELECT * FROM (<özel sorgu>) AS __custom_view [WHERE ...] [ORDER BY ...]
         const activeFilters = filtersRef.current
-        if (Object.values(activeFilters).some((v) => v && v.trim())) {
-          const numericSet = new Set<string>(
-            Object.entries(first ?? {})
-              .filter(([, v]) => typeof v === "number" || typeof v === "bigint")
-              .map(([k]) => k)
-          )
-          const { buildCombinedWhereClause } = await import(
-            "@/services/duckdb/filter-parser"
-          )
-          const where = buildCombinedWhereClause(activeFilters, numericSet)
-          if (where) {
-            try {
-              const filtered = await duckDbClient.executeCustomSql(
-                `SELECT * FROM (${customSql}) AS __custom_view ${where}`
-              )
-              if (cancelled || seq !== querySeqRef.current) return
-              resultRows = (filtered as T[]) ?? []
-            } catch (filterErr) {
-              // Süzülmüş sorgu patlarsa banner çıkarmadan süzüsüz devam et
-              console.warn(
-                "[useDuckReport] özel görünüm filtresi uygulanamadı:",
-                filterErr
-              )
-            }
+        const hasActiveFilters = Object.values(activeFilters).some(
+          (v) => v && v.trim()
+        )
+        const orderClause = hasValidSort
+          ? `ORDER BY "${activeSort!.replace(/"/g, '""')}" ${activeSortDesc ? "DESC" : "ASC"}`
+          : ""
+
+        if (hasActiveFilters || orderClause) {
+          let where = ""
+          if (hasActiveFilters) {
+            const numericSet = new Set<string>(
+              Object.entries(first ?? {})
+                .filter(([, v]) => typeof v === "number" || typeof v === "bigint")
+                .map(([k]) => k)
+            )
+            const { buildCombinedWhereClause } = await import(
+              "@/services/duckdb/filter-parser"
+            )
+            where = buildCombinedWhereClause(activeFilters, numericSet)
+          }
+
+          try {
+            const wrappedSql = `SELECT * FROM (${customSql}) AS __custom_view ${where} ${orderClause}`
+            const filteredAndSorted = await duckDbClient.executeCustomSql(wrappedSql)
+            if (cancelled || seq !== querySeqRef.current) return
+            resultRows = (filteredAndSorted as T[]) ?? []
+          } catch (filterErr) {
+            // Süzülmüş/sıralanmış sorgu patlarsa banner çıkarmadan devam et
+            console.warn(
+              "[useDuckReport] özel görünüm filtre/sıralama uygulanamadı:",
+              filterErr
+            )
           }
         }
         const capped = resultRows.slice(0, 5000)

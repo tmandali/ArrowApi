@@ -136,9 +136,28 @@ class DuckDbClient {
     }
 
     const selectSql = `SELECT * FROM ${escapedTable} ${where} ${orderClause} LIMIT ${limit + 1} OFFSET ${offset};`
-    const rowsRes = await this.postMessage<WorkerResponse>("QUERY_ROWS", {
-      sql: selectSql,
-    })
+    let rowsRes: WorkerResponse
+    try {
+      rowsRes = await this.postMessage<WorkerResponse>("QUERY_ROWS", {
+        sql: selectSql,
+      })
+    } catch (err) {
+      const msg = String(err)
+      // Binder Error: ORDER BY kolonu tabloda bulunamadıysa (ör. türetilmiş veya eski alias)
+      // işlemi patlatmak yerine sıralamasız fallback yap ve uyarı bas.
+      if (orderClause && (msg.includes("Referenced column") || msg.includes("Binder Error"))) {
+        console.warn(
+          `[DuckDbClient] Sıralama kolonu (${sortBy}) tabloda bulunamadı; sıralamasız sorgulanıyor:`,
+          err
+        )
+        const fallbackSql = `SELECT * FROM ${escapedTable} ${where} LIMIT ${limit + 1} OFFSET ${offset};`
+        rowsRes = await this.postMessage<WorkerResponse>("QUERY_ROWS", {
+          sql: fallbackSql,
+        })
+      } else {
+        throw err
+      }
+    }
 
     const rawRows = rowsRes.rows ?? []
     const hasMore = rawRows.length > limit
