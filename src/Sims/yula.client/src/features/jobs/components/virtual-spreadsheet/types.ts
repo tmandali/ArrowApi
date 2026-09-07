@@ -13,6 +13,35 @@ export const cellClass =
 export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
 
+export type AggregationType =
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "count"
+  | "distinct"
+  | "none"
+
+export type ColumnAggregationConfig = Record<string, AggregationType>
+
+export type ColumnAggregationValue = {
+  type: AggregationType
+  value: number | string | null
+  formatted: string
+  label: string
+}
+
+export type ColumnAggregationValues = Record<string, ColumnAggregationValue>
+
+export interface GridPersistedState {
+  order?: string[]
+  widths?: Record<string, string | number>
+  hidden?: string[]
+  pinned?: string[]
+  aggregations?: ColumnAggregationConfig
+  showFooter?: boolean
+}
+
 export type SpreadsheetColumn = {
   name: string
   label: string
@@ -22,6 +51,8 @@ export type SpreadsheetColumn = {
   duckType?: string
   /** Bu kolon için sıralama tıklaması aktif mi? (varsayılan: true) */
   sortable?: boolean
+  /** Bu kolonda hesaplanabilir varsayılan veya özel aggregate tipi */
+  defaultAggregation?: AggregationType
 }
 
 export type VirtualSpreadsheetProps<T> = {
@@ -100,4 +131,16 @@ export type VirtualSpreadsheetProps<T> = {
   onPinnedColumnsChange?: (pinned: string[]) => void
   /** Sona yaklaşıldığında yükleme sürüyor mu? (skeleton satırları gösterir) */
   loadingMore?: boolean
+  /** Kolon alt toplam / özet çubuğu (footer) gösterilsin mi? (varsayılan: true) */
+  showFooterRow?: boolean
+  /** Alt toplam satırını aç/kapat toggle fonksiyonu */
+  onToggleFooterRow?: (show: boolean) => void
+  /** Kolon bazlı aktif özet türleri (örn: { Qty: "sum", UnitPrice: "avg" }) */
+  aggregationConfigs?: ColumnAggregationConfig
+  /** Özet türü seçimi değiştiğinde çağrılır */
+  onAggregationConfigsChange?: (configs: ColumnAggregationConfig) => void
+  /** Dışarıdan sağlanan hesaplanmış özet değerleri (DuckDB pushdown için) */
+  aggregationValues?: ColumnAggregationValues
+  /** Varsayılan özet konfigürasyonu */
+  defaultAggregationConfigs?: ColumnAggregationConfig
 }

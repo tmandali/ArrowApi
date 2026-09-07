@@ -9,6 +9,7 @@ const testFiles = [
   "export-formats.test.mjs",
   "test-parquet-merge.mjs",
   "test-criteria-input-engine.mjs",
+  "test-aggregations.mjs",
 ]
 
 console.log("==================================================")

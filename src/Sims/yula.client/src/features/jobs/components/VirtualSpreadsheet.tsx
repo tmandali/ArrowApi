@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   ListFilter,
+  Sigma,
   Table2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -31,10 +32,16 @@ import {
   headClass,
   type SpreadsheetColumn,
   type VirtualSpreadsheetProps,
+  type AggregationType,
+  type ColumnAggregationConfig,
+  type GridPersistedState,
   calculateColumnAutoFitWidth,
   getDefaultColumnWidth,
   ColumnManagementMenu,
   TableSkeletonRows,
+  TableFooterSummaryRow,
+  computeInMemoryAggregations,
+  getDefaultAggregationForColumn,
 } from "./virtual-spreadsheet"
 
 /**
@@ -78,6 +85,12 @@ export function VirtualSpreadsheet<T>({
   pinnedColumnCount = 1,
   pinnedColumns,
   onPinnedColumnsChange,
+  showFooterRow = true,
+  onToggleFooterRow,
+  aggregationConfigs,
+  onAggregationConfigsChange,
+  aggregationValues,
+  defaultAggregationConfigs,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -120,6 +133,37 @@ export function VirtualSpreadsheet<T>({
   const [internalColumnOrder, setInternalColumnOrder] = React.useState<string[] | null>(null)
 
   const activeColumnOrder = columnOrder ?? internalColumnOrder
+
+  // Alt toplam (Footer Aggregation) konfigürasyonu
+  const initialAggregations = React.useMemo(() => {
+    const map: ColumnAggregationConfig = { ...(defaultAggregationConfigs || {}) }
+    for (const col of columns) {
+      if (!map[col.name]) {
+        map[col.name] = getDefaultAggregationForColumn(col)
+      }
+    }
+    return map
+  }, [columns, defaultAggregationConfigs])
+
+  const [internalAggregationConfigs, setInternalAggregationConfigs] =
+    React.useState<ColumnAggregationConfig>(initialAggregations)
+
+  const activeAggregationConfigs = React.useMemo(() => {
+    if (aggregationConfigs !== undefined) return aggregationConfigs
+    return internalAggregationConfigs
+  }, [aggregationConfigs, internalAggregationConfigs])
+
+  const handleAggregationChange = React.useCallback(
+    (columnName: string, nextType: AggregationType) => {
+      const next = { ...activeAggregationConfigs, [columnName]: nextType }
+      if (onAggregationConfigsChange) {
+        onAggregationConfigsChange(next)
+      } else {
+        setInternalAggregationConfigs(next)
+      }
+    },
+    [activeAggregationConfigs, onAggregationConfigsChange]
+  )
 
   const orderedColumns = React.useMemo(() => {
     const colMap = new Map(columns.map((c) => [c.name, c]))
@@ -501,18 +545,15 @@ export function VirtualSpreadsheet<T>({
     try {
       const raw = localStorage.getItem(effectiveStorageKey)
       if (raw) {
-        const parsed = JSON.parse(raw) as {
-          colWidths?: Record<string, string | number>
-          columnOrder?: string[]
-          hiddenColumns?: string[]
-          pinnedColumns?: string[]
-        }
+        const parsed = JSON.parse(raw) as GridPersistedState
         if (parsed) {
-          if (parsed.colWidths && typeof parsed.colWidths === "object") {
-            setColWidths(parsed.colWidths)
+          const rawWidths = parsed.widths || (parsed as { colWidths?: Record<string, string | number> }).colWidths
+          if (rawWidths && typeof rawWidths === "object") {
+            setColWidths(rawWidths)
           }
-          if (Array.isArray(parsed.columnOrder) && parsed.columnOrder.length > 0) {
-            const valid = parsed.columnOrder.filter((name) =>
+          const rawOrder = parsed.order || (parsed as { columnOrder?: string[] }).columnOrder
+          if (Array.isArray(rawOrder) && rawOrder.length > 0) {
+            const valid = rawOrder.filter((name) =>
               columns.some((c) => c.name === name)
             )
             if (valid.length > 0) {
@@ -526,8 +567,9 @@ export function VirtualSpreadsheet<T>({
               }
             }
           }
-          if (Array.isArray(parsed.hiddenColumns)) {
-            const valid = parsed.hiddenColumns.filter((name) =>
+          const rawHidden = parsed.hidden || (parsed as { hiddenColumns?: string[] }).hiddenColumns
+          if (Array.isArray(rawHidden)) {
+            const valid = rawHidden.filter((name) =>
               columns.some((c) => c.name === name)
             )
             if (valid.length < columns.length) {
@@ -538,14 +580,22 @@ export function VirtualSpreadsheet<T>({
               }
             }
           }
-          if (Array.isArray(parsed.pinnedColumns)) {
-            const valid = parsed.pinnedColumns.filter((name) =>
+          const rawPinned = parsed.pinned || (parsed as { pinnedColumns?: string[] }).pinnedColumns
+          if (Array.isArray(rawPinned)) {
+            const valid = rawPinned.filter((name) =>
               columns.some((c) => c.name === name)
             )
             if (onPinnedColumnsChange) {
               onPinnedColumnsChange(valid)
             } else {
               setInternalPinnedColumns(valid)
+            }
+          }
+          if (parsed.aggregations && typeof parsed.aggregations === "object") {
+            if (onAggregationConfigsChange) {
+              onAggregationConfigsChange(parsed.aggregations)
+            } else {
+              setInternalAggregationConfigs(parsed.aggregations)
             }
           }
         }
@@ -555,7 +605,7 @@ export function VirtualSpreadsheet<T>({
     } finally {
       isStorageLoadedRef.current = true
     }
-  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange])
+  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange, onAggregationConfigsChange])
 
   // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
   React.useEffect(() => {
@@ -568,8 +618,9 @@ export function VirtualSpreadsheet<T>({
       const hasOrder = Boolean(activeColumnOrder && activeColumnOrder.length > 0)
       const hasHidden = activeHiddenColumns.length > 0
       const hasPinned = internalPinnedColumns !== null
+      const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
 
-      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned) {
+      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations) {
         try {
           localStorage.removeItem(effectiveStorageKey)
         } catch {}
@@ -577,11 +628,12 @@ export function VirtualSpreadsheet<T>({
       }
 
       try {
-        const data = {
-          colWidths: hasWidths ? colWidths : undefined,
-          columnOrder: hasOrder ? activeColumnOrder : undefined,
-          hiddenColumns: hasHidden ? activeHiddenColumns : undefined,
-          pinnedColumns: hasPinned ? activePinnedColumns : undefined,
+        const data: GridPersistedState = {
+          widths: hasWidths ? colWidths : undefined,
+          order: hasOrder ? (activeColumnOrder ?? undefined) : undefined,
+          hidden: hasHidden ? activeHiddenColumns : undefined,
+          pinned: hasPinned ? (activePinnedColumns ?? undefined) : undefined,
+          aggregations: hasAggregations ? activeAggregationConfigs : undefined,
         }
         localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
       } catch {
@@ -590,7 +642,7 @@ export function VirtualSpreadsheet<T>({
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns, activePinnedColumns, internalPinnedColumns])
+  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns, activePinnedColumns, internalPinnedColumns, activeAggregationConfigs])
 
   const getColWidth = React.useCallback(
     (col: SpreadsheetColumn): number | string => {
@@ -857,6 +909,16 @@ export function VirtualSpreadsheet<T>({
     })
   }, [items, onSortChange, disableSorting, activeSortColumn, activeSortDirection, orderedColumns])
 
+  // Özet değerlerini hesapla (Dışarıdan aggregationValues verilmediyse bellek içi hesapla)
+  const computedAggregationValues = React.useMemo(() => {
+    if (aggregationValues) return aggregationValues
+    return computeInMemoryAggregations(
+      displayItems as readonly Record<string, unknown>[],
+      visibleColumns,
+      activeAggregationConfigs
+    )
+  }, [aggregationValues, displayItems, visibleColumns, activeAggregationConfigs])
+
   const headerScrollRef = React.useRef<HTMLDivElement>(null)
   const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
 
@@ -1005,6 +1067,20 @@ export function VirtualSpreadsheet<T>({
               }
             >
               <ListFilter className="size-3.5" />
+            </Button>
+          ) : null}
+          {onToggleFooterRow ? (
+            <Button
+              type="button"
+              variant={showFooterRow ? "secondary" : "outline"}
+              size="icon"
+              className="size-7 shrink-0"
+              disabled={columns.length === 0}
+              onClick={() => onToggleFooterRow(!showFooterRow)}
+              title={showFooterRow ? "Alt toplam satırını gizle" : "Alt toplam satırını göster"}
+              aria-label={showFooterRow ? "Alt toplam satırını gizle" : "Alt toplam satırını göster"}
+            >
+              <Sigma className="size-3.5" />
             </Button>
           ) : null}
         </div>
@@ -1278,6 +1354,17 @@ export function VirtualSpreadsheet<T>({
                   </>
                 )}
                 </tbody>
+                {showFooterRow && visibleColumns.length > 0 ? (
+                  <TableFooterSummaryRow
+                    visibleColumns={visibleColumns}
+                    effectivePinnedCount={effectivePinnedCount}
+                    isScrolledLeft={isScrolledLeft}
+                    getStickyLeftOffset={getStickyLeftOffset}
+                    aggregationConfigs={activeAggregationConfigs}
+                    aggregationValues={computedAggregationValues}
+                    onAggregationChange={handleAggregationChange}
+                  />
+                ) : null}
             </table>
           </div>
         </div>

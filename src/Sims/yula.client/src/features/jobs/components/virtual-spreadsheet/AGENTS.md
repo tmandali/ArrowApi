@@ -16,9 +16,14 @@ src/features/jobs/components/
     ├── ColumnTypeBadge.tsx               # Şema destekli veri tipi rozetleri (Sayi, Tarih, Mantiksal, Metin)
     ├── ColumnManagementMenu.tsx          # Kolon goster/gizle, sabitle/kaldir, arama ve klavye etkilesimli Popover menusu
     ├── TableSkeletonRows.tsx             # Ilk yukleme ve sonsuz kaydirma icin sticky destekli iskelet satirlari
+    ├── TableFooterSummaryRow.tsx         # Airtable/Excel tarzi alt toplam satiri (SUM, AVG, MIN, MAX, COUNT, DISTINCT)
+    ├── column-aggregations.ts            # Bellek ici ve DuckDB tek gecisli SQL alt toplam hesaplama motoru
     └── tests/                            # Otomasyon testleri: npm run test:grid
         ├── filter-parser.test.mjs        # DuckDB WHERE SQL üretimi, istemci arama ve şema formatlama testleri
         ├── export-formats.test.mjs       # Excel 1M/2M limitleri, ZSTD Parquet ve GZIP CSV kural testleri
+        ├── test-parquet-merge.mjs        # OPFS parça birleştirme ve lazy parquet akış testleri
+        ├── test-criteria-input-engine.mjs# D365/BC sözdizimi, tarih ve zorunlu alan doğrulama testleri
+        ├── test-aggregations.mjs         # Kolon alt toplam (SUM, AVG, DISTINCT) ve SQL üretim testleri
         └── run-all.mjs                   # Tüm grid testlerini tek komutla koşan test orkestratörü
 ```
 
@@ -71,6 +76,16 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
   - `export function VirtualSpreadsheet<T>`
   - `export type { SpreadsheetColumn, VirtualSpreadsheetProps }`
 - Stil ve sayısal sabitler (`ROW_HEIGHT`, `cellClass`, `cellInputClass`, `headClass`, `SKELETON_ROWS`, `MIN_COL_WIDTH`) ise doğrudan `./virtual-spreadsheet` modülünden import edilir.
+
+### Kural 7: Kolon Alt Toplam / Özet Çubuğu (Footer Aggregations)
+- `<tfoot>` tablonun en altında dikey scroll penceresinde `sticky bottom-0 z-20` olarak yer alır ve dikey kaydırmada daima görünür kalır.
+- Yatay kaydırmada `thead` ve `tbody` ile kusursuz senkronizasyon sağlanır: `getStickyLeftOffset(index)` ile pinned kolonların sol mesafeleri, `isLastPinned && isScrolledLeft` sağ kenar gölgesi birebir korunur.
+- **İki Kademeli Hesaplama Mimarisi:**
+  - **DuckDB SQL Pushdown:** DuckDB WASM üzerinde aktif filtrelerle `buildDuckDbAggregationSql()` tek geçişli SQL sorgusu çalıştırır (1M filtrelenmiş satırda ~15-20 ms).
+  - **In-Memory Fallback:** DuckDB henüz hazır değilken veya küçük veri kümelerinde `computeInMemoryAggregations()` ile CPU üzerinde anında hesaplanır.
+- **Desteklenen Metrikler:** Sayısal kolonlar için `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `DISTINCT`; metin/tarih kolonları için `COUNT`, `DISTINCT`; `None` (kapatma).
+- **LocalStorage Kalıcılığı:** Kullanıcının seçtiği kolon metrikleri (`aggregations`) ve çubuk görünürlük durumu (`showFooterSummary`) `GridPersistedState` içine kaydedilir ve "Varsayılana Sıfırla" ile temizlenir.
+
 
 ---
 
