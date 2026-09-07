@@ -454,12 +454,12 @@ export function ArrowReportGrid({
           </div>
         )
       }}
-      renderRow={(row, index) => {
+      renderRow={(row, index, cols = effectiveColumns) => {
         const values = (row.values ?? row) as Record<string, unknown>
 
         return (
           <tr key={index} className="hover:bg-muted/30">
-            {effectiveColumns.map((col) => {
+            {cols.map((col) => {
               const rawVal = values[col.name]
               const formattedVal = formatGridCellValue(
                 rawVal,

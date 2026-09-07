@@ -131,7 +131,7 @@ export type VirtualSpreadsheetProps<T> = {
   /** Sanal pencereye alınacak tam (filtreli) satır listesi. */
   items: readonly T[]
   /** Her satır için `<tr>...</tr>` üreten renderer (key'i renderer sağlar). */
-  renderRow: (item: T, index: number) => React.ReactNode
+  renderRow: (item: T, index: number, columns?: readonly SpreadsheetColumn[]) => React.ReactNode
   rowHeight?: number
   /**
    * Başlangıç kolon genişlikleri (örn. `{ Name: "20%" }`). Kullanıcı handle ile
@@ -146,6 +146,12 @@ export type VirtualSpreadsheetProps<T> = {
   onSortChange?: (columnName: string, nextDirection: "asc" | "desc" | null) => void
   /** Sıralamayı tamamen devre dışı bırakmak için (örn. hiyerarşik ağaç listelerinde). */
   disableSorting?: boolean
+  /** Dışarıdan yönetilen kolon sıralaması (kolon isimleri dizisi). */
+  columnOrder?: string[]
+  /** Kolon sıralaması sürükle-bırak ile değiştiğinde çağrılır. */
+  onColumnOrderChange?: (newOrder: string[]) => void
+  /** Kolon sürükle-bırak ile sıralamayı devre dışı bırakır (örn. hiyerarşik ağaçlarda). */
+  disableColumnReorder?: boolean
   /** Filtre satırı `<tr>`'sinin ek class'ı. */
   filterRowClassName?: string
   title?: string
@@ -187,6 +193,9 @@ export function VirtualSpreadsheet<T>({
   sortDirection,
   onSortChange,
   disableSorting = false,
+  columnOrder,
+  onColumnOrderChange,
+  disableColumnReorder = false,
   filterRowClassName,
   title,
   subtitle,
@@ -203,6 +212,40 @@ export function VirtualSpreadsheet<T>({
   hasMore = false,
   loadingMore = false,
 }: VirtualSpreadsheetProps<T>) {
+  // Kolon sıralama düzeni (Sürükle - Bırak)
+  const [internalColumnOrder, setInternalColumnOrder] = React.useState<string[] | null>(null)
+
+  React.useEffect(() => {
+    setInternalColumnOrder(null)
+  }, [resetKey])
+
+  const activeColumnOrder = columnOrder ?? internalColumnOrder
+
+  const orderedColumns = React.useMemo(() => {
+    if (!activeColumnOrder || activeColumnOrder.length === 0) return columns
+    const colMap = new Map(columns.map((c) => [c.name, c]))
+    const result: SpreadsheetColumn[] = []
+    for (const name of activeColumnOrder) {
+      const col = colMap.get(name)
+      if (col) {
+        result.push(col)
+        colMap.delete(name)
+      }
+    }
+    for (const col of colMap.values()) {
+      result.push(col)
+    }
+    return result
+  }, [columns, activeColumnOrder])
+
+  // Sürükle - bırak görsel durumları
+  const [draggedColName, setDraggedColName] = React.useState<string | null>(null)
+  const [dropTarget, setDropTarget] = React.useState<{
+    name: string
+    position: "before" | "after"
+  } | null>(null)
+  const isDraggingRef = React.useRef(false)
+
   const [internalSort, setInternalSort] = React.useState<{
     column: string | null
     direction: "asc" | "desc" | null
@@ -216,6 +259,8 @@ export function VirtualSpreadsheet<T>({
 
   const handleHeaderClick = React.useCallback(
     (col: SpreadsheetColumn) => {
+      // Sürükleme işlemi yeni bittiyse tıklama (sıralama) tetikleme
+      if (isDraggingRef.current) return
       if (disableSorting || col.sortable === false) return
 
       let nextDir: "asc" | "desc" | null = "asc"
@@ -240,6 +285,97 @@ export function VirtualSpreadsheet<T>({
     },
     [disableSorting, activeSortColumn, activeSortDirection, onSortChange]
   )
+
+  const handleDragStart = React.useCallback(
+    (event: React.DragEvent, col: SpreadsheetColumn) => {
+      if (disableColumnReorder) return
+      isDraggingRef.current = true
+      event.dataTransfer.setData("text/plain", col.name)
+      event.dataTransfer.effectAllowed = "move"
+      setDraggedColName(col.name)
+    },
+    [disableColumnReorder]
+  )
+
+  const handleDragOver = React.useCallback(
+    (event: React.DragEvent, col: SpreadsheetColumn) => {
+      if (!draggedColName || draggedColName === col.name) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = "move"
+
+      const rect = event.currentTarget.getBoundingClientRect()
+      const midpoint = rect.left + rect.width / 2
+      const position: "before" | "after" = event.clientX < midpoint ? "before" : "after"
+
+      setDropTarget((prev) => {
+        if (prev?.name === col.name && prev?.position === position) return prev
+        return { name: col.name, position }
+      })
+    },
+    [draggedColName]
+  )
+
+  const handleDragLeave = React.useCallback(
+    (event: React.DragEvent, col: SpreadsheetColumn) => {
+      const related = event.relatedTarget as HTMLElement | null
+      if (!event.currentTarget.contains(related)) {
+        setDropTarget((prev) => (prev?.name === col.name ? null : prev))
+      }
+    },
+    []
+  )
+
+  const handleDrop = React.useCallback(
+    (event: React.DragEvent, col: SpreadsheetColumn) => {
+      event.preventDefault()
+      if (!draggedColName || draggedColName === col.name) {
+        setDraggedColName(null)
+        setDropTarget(null)
+        setTimeout(() => {
+          isDraggingRef.current = false
+        }, 50)
+        return
+      }
+
+      const rect = event.currentTarget.getBoundingClientRect()
+      const midpoint = rect.left + rect.width / 2
+      const position: "before" | "after" = event.clientX < midpoint ? "before" : "after"
+
+      const currentOrder = orderedColumns.map((c) => c.name)
+      const fromIndex = currentOrder.indexOf(draggedColName)
+      if (fromIndex !== -1) {
+        const nextOrder = [...currentOrder]
+        nextOrder.splice(fromIndex, 1)
+
+        let targetIndex = nextOrder.indexOf(col.name)
+        if (position === "after") {
+          targetIndex += 1
+        }
+        nextOrder.splice(targetIndex, 0, draggedColName)
+
+        if (onColumnOrderChange) {
+          onColumnOrderChange(nextOrder)
+        } else {
+          setInternalColumnOrder(nextOrder)
+        }
+      }
+
+      setDraggedColName(null)
+      setDropTarget(null)
+      setTimeout(() => {
+        isDraggingRef.current = false
+      }, 50)
+    },
+    [draggedColName, orderedColumns, onColumnOrderChange]
+  )
+
+  const handleDragEnd = React.useCallback(() => {
+    setDraggedColName(null)
+    setDropTarget(null)
+    setTimeout(() => {
+      isDraggingRef.current = false
+    }, 50)
+  }, [])
 
   const [colWidths, setColWidths] = React.useState<
     Record<string, string | number>
@@ -274,14 +410,14 @@ export function VirtualSpreadsheet<T>({
   )
 
   const totalTableWidth = React.useMemo(() => {
-    return columns.reduce((sum, col) => {
+    return orderedColumns.reduce((sum, col) => {
       const w = getColWidth(col)
       if (typeof w === "number") return sum + w
       if (typeof w === "string" && w.endsWith("px")) return sum + parseFloat(w)
       if (typeof w === "string" && w.endsWith("%")) return sum + 110
       return sum + 100
     }, 0)
-  }, [columns, getColWidth])
+  }, [orderedColumns, getColWidth])
 
   const handleResizeStart = React.useCallback(
     (event: React.PointerEvent, col: SpreadsheetColumn) => {
@@ -339,7 +475,7 @@ export function VirtualSpreadsheet<T>({
 
   const colGroup = (
     <colgroup>
-      {columns.map((col) => {
+      {orderedColumns.map((col) => {
         const w = getColWidth(col)
         return (
           <col
@@ -355,22 +491,40 @@ export function VirtualSpreadsheet<T>({
 
   const renderVirtualRow = React.useCallback(
     (item: T, rowIndex: number) => {
-      const rendered = renderRow(item, rowIndex)
+      const rendered = renderRow(item, rowIndex, orderedColumns)
       if (
         React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
         rendered.type === "tr"
       ) {
         const childrenArray = React.Children.toArray(rendered.props.children)
+        // Eğer kolon sırası değiştiyse, <td> çocuklarını key'e göre orderedColumns sırasına diz!
+        // Böylece renderRow içinde varsayılan sırayla dönen <td> elemanları da anında yeni sıraya dizilir.
+        const tdMap = new Map<string, React.ReactNode>()
+        for (const child of childrenArray) {
+          if (React.isValidElement(child) && child.key != null) {
+            // React key formatı '.$colName' veya 'colName' olabilir
+            const rawKey = String(child.key).replace(/^\.\$/, "")
+            tdMap.set(rawKey, child)
+          }
+        }
+
+        let sortedChildren: React.ReactNode[]
+        if (tdMap.size === orderedColumns.length) {
+          sortedChildren = orderedColumns.map((c) => tdMap.get(c.name) ?? null)
+        } else {
+          sortedChildren = childrenArray
+        }
+
         return React.cloneElement(
           rendered,
           undefined,
-          ...childrenArray,
+          ...sortedChildren,
           <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
         )
       }
       return rendered
     },
-    [renderRow]
+    [renderRow, orderedColumns]
   )
 
   // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
@@ -378,7 +532,7 @@ export function VirtualSpreadsheet<T>({
     if (onSortChange || disableSorting || !activeSortColumn || !activeSortDirection) {
       return items
     }
-    const col = columns.find((c) => c.name === activeSortColumn)
+    const col = orderedColumns.find((c) => c.name === activeSortColumn)
     const isNum = col?.align === "right"
     const dir = activeSortDirection === "asc" ? 1 : -1
 
@@ -408,7 +562,7 @@ export function VirtualSpreadsheet<T>({
 
       return String(aVal).localeCompare(String(bVal), "tr", { numeric: true }) * dir
     })
-  }, [items, onSortChange, disableSorting, activeSortColumn, activeSortDirection, columns])
+  }, [items, onSortChange, disableSorting, activeSortColumn, activeSortDirection, orderedColumns])
 
   const headerScrollRef = React.useRef<HTMLDivElement>(null)
   const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
@@ -570,13 +724,17 @@ export function VirtualSpreadsheet<T>({
                   {colGroup}
                   <thead>
                     <tr>
-                      {columns.map((col) => {
+                      {orderedColumns.map((col) => {
                         const w = getColWidth(col)
                         const isSorted =
                           activeSortColumn === col.name && activeSortDirection !== null
                         const isAsc = isSorted && activeSortDirection === "asc"
                         const isDesc = isSorted && activeSortDirection === "desc"
                         const canSort = !disableSorting && col.sortable !== false
+                        const canDrag = !disableColumnReorder
+                        const isBeingDragged = draggedColName === col.name
+                        const isDropBefore = dropTarget?.name === col.name && dropTarget.position === "before"
+                        const isDropAfter = dropTarget?.name === col.name && dropTarget.position === "after"
 
                         let sortTooltip = col.label
                         if (canSort) {
@@ -588,16 +746,30 @@ export function VirtualSpreadsheet<T>({
                             sortTooltip = `${col.label} — Doğal sıraya dönmek için tıkla`
                           }
                         }
+                        if (canDrag) {
+                          sortTooltip += " (Sırasını değiştirmek için sürükleyin)"
+                        }
 
                         return (
                           <th
                             key={col.name}
+                            draggable={canDrag}
+                            onDragStart={(e) => handleDragStart(e, col)}
+                            onDragOver={(e) => handleDragOver(e, col)}
+                            onDragLeave={(e) => handleDragLeave(e, col)}
+                            onDrop={(e) => handleDrop(e, col)}
+                            onDragEnd={handleDragEnd}
                             className={cn(
                               headClass,
-                              "relative overflow-hidden group/th",
-                              canSort &&
-                                "cursor-pointer hover:bg-muted/70 transition-colors select-none",
-                              col.align === "left" ? "text-left" : "text-right"
+                              "relative overflow-hidden group/th select-none",
+                              canDrag && "cursor-grab active:cursor-grabbing",
+                              canSort && "hover:bg-muted/70 transition-colors",
+                              col.align === "left" ? "text-left" : "text-right",
+                              isBeingDragged && "opacity-40 bg-muted/90",
+                              isDropBefore &&
+                                "before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary before:z-20",
+                              isDropAfter &&
+                                "after:absolute after:inset-y-0 after:right-0 after:w-1 after:bg-primary after:z-20"
                             )}
                             style={{ width: typeof w === "number" ? `${w}px` : w }}
                             title={sortTooltip}
@@ -633,6 +805,8 @@ export function VirtualSpreadsheet<T>({
                               aria-orientation="vertical"
                               aria-label={`Resize ${col.label} column (double-click to auto fit)`}
                               title="Genişletmek için sürükleyin, içeriğe tam sığdırmak için çift tıklayın"
+                              draggable={false}
+                              onDragStart={(e) => e.stopPropagation()}
                               className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
                               onPointerDown={(event) =>
                                 handleResizeStart(event, col)
@@ -652,7 +826,7 @@ export function VirtualSpreadsheet<T>({
                     </tr>
                     {showFilterRow && renderFilterCell ? (
                       <tr className={filterRowClassName}>
-                        {columns.map((col, index) => (
+                        {orderedColumns.map((col, index) => (
                           <th key={col.name} className={cellClass}>
                             {renderFilterCell(col, index)}
                           </th>
@@ -689,7 +863,7 @@ export function VirtualSpreadsheet<T>({
                 {displayItems.length === 0 && loading ? (
                   Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
                     <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
-                      {columns.map((col) => (
+                      {orderedColumns.map((col) => (
                         <td
                           key={col.name}
                           className={cn(
@@ -718,7 +892,7 @@ export function VirtualSpreadsheet<T>({
                 ) : displayItems.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={columns.length + 1}
+                      colSpan={orderedColumns.length + 1}
                       className="py-8 text-center text-xs text-muted-foreground"
                     >
                       Kayıt bulunamadı
@@ -732,7 +906,7 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: startIndex * rowHeight }}
                       >
-                        <td colSpan={columns.length + 1} className="p-0 border-0" />
+                        <td colSpan={orderedColumns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                     {windowRows.map((row, index) =>
@@ -741,7 +915,7 @@ export function VirtualSpreadsheet<T>({
                     {loadingMore && hasMore
                       ? Array.from({ length: SKELETON_ROWS }, (_, skeletonIndex) => (
                           <tr key={`skeleton-${skeletonIndex}`} aria-hidden>
-                            {columns.map((col) => (
+                            {orderedColumns.map((col) => (
                               <td
                                 key={col.name}
                                 className={cn(
@@ -774,12 +948,12 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: (displayItems.length - endIndex) * rowHeight }}
                       >
-                        <td colSpan={columns.length + 1} className="p-0 border-0" />
+                        <td colSpan={orderedColumns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                   </>
                 )}
-              </tbody>
+                </tbody>
             </table>
           </div>
         </div>
