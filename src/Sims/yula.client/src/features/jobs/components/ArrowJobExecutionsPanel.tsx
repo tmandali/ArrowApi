@@ -12,7 +12,13 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
+  ChevronRight,
 } from "lucide-react"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1451,23 +1457,44 @@ export function ArrowJobExecutionsPanel({
                       </div>
                     ))}
                     {opfsDetail && opfsDetail.files.length > 0 ? (
-                      <div className="group grid min-w-0 gap-0.5 sm:col-span-2">
-                        <dt className="text-[11px] text-muted-foreground">
-                          OPFS Files
-                        </dt>
-                        <dd className="font-mono text-[11px] text-foreground break-all">
-                          {opfsDetail.files.map((file) => (
-                            <span key={file.name} className="mr-3 inline-flex items-center gap-1">
-                              <span className="text-foreground font-medium">{file.name}</span>
-                              <span className="text-muted-foreground">({formatBytes(file.sizeBytes)})</span>
-                              {file.lastModified ? (
-                                <span className="text-[10px] text-muted-foreground/75">
-                                  [{formatWhen(new Date(file.lastModified).toISOString())}]
-                                </span>
-                              ) : null}
-                            </span>
-                          ))}
-                        </dd>
+                      <div className="sm:col-span-2 pt-1">
+                        <Collapsible defaultOpen={false}>
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className="group/trigger flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/trigger:rotate-90" />
+                              <dt className="cursor-pointer font-medium">
+                                OPFS Files ({opfsDetail.files.length})
+                              </dt>
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <dd className="mt-1 flex flex-col gap-0.5 rounded border border-border/40 bg-muted/20 p-2 font-mono text-[11px]">
+                              {opfsDetail.files.map((file) => (
+                                <div
+                                  key={file.name}
+                                  className="flex items-center justify-between gap-2 border-b border-border/20 py-0.5 last:border-0 last:pb-0"
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span className="truncate font-medium text-foreground">
+                                      {file.name}
+                                    </span>
+                                    {file.lastModified ? (
+                                      <span className="text-[10px] text-muted-foreground/80">
+                                        [{formatWhen(new Date(file.lastModified).toISOString())}]
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <span className="shrink-0 text-muted-foreground tabular-nums">
+                                    {formatBytes(file.sizeBytes)}
+                                  </span>
+                                </div>
+                              ))}
+                            </dd>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
                     ) : null}
                   </dl>
