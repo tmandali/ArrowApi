@@ -442,24 +442,29 @@ export function ArrowReportGrid({
 
         return (
           <tr key={index} className="hover:bg-muted/30">
-            {effectiveColumns.map((col) => (
-              <td
-                key={col.name}
-                className={cn(
-                  cellClass,
-                  col.align === "left" ? "text-left" : "text-right"
-                )}
-              >
-                <div
+            {effectiveColumns.map((col) => {
+              const rawVal = values[col.name]
+              const formattedVal = formatGridCellValue(rawVal, col.align, columnTypes[col.name])
+              return (
+                <td
+                  key={col.name}
                   className={cn(
-                    "flex h-7 min-w-0 items-center px-2 tabular-nums text-foreground",
-                    col.align === "right" && "justify-end"
+                    cellClass,
+                    col.align === "left" ? "text-left" : "text-right"
                   )}
                 >
-                  {formatGridCellValue(values[col.name], col.align, columnTypes[col.name])}
-                </div>
-              </td>
-            ))}
+                  <div
+                    className={cn(
+                      "flex h-7 min-w-0 items-center px-2 tabular-nums text-foreground",
+                      col.align === "right" && "justify-end"
+                    )}
+                    title={rawVal != null ? String(rawVal) : undefined}
+                  >
+                    <span className="truncate">{formattedVal}</span>
+                  </div>
+                </td>
+              )
+            })}
           </tr>
         )
       }}

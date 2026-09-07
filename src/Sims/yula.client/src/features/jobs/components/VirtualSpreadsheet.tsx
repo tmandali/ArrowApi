@@ -29,6 +29,67 @@ export const cellClass =
 export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
 
+/**
+ * Kolon tipine, ismine ve etiket uzunluğuna göre akıllı varsayılan genişlik (piksel) hesaplar.
+ * Grid'in tüm kolonları dar bir alana sığmaya zorlanıp hücreleri ezmesini önler.
+ */
+function getDefaultColumnWidth(col: SpreadsheetColumn): number {
+  const name = col.name.toLowerCase()
+  const label = (col.label || col.name).toLowerCase()
+
+  // Uzun metin / Açıklama / Ad alanları
+  if (
+    name.includes("desc") ||
+    name.includes("name") ||
+    name.includes("aciklama") ||
+    name.includes("adi") ||
+    name.includes("ad") ||
+    name.includes("title") ||
+    label.includes("açıklama") ||
+    label.includes("tanım") ||
+    label.includes("adı")
+  ) {
+    return Math.max(200, Math.min(360, (col.label || col.name).length * 9 + 60))
+  }
+
+  // Kod, Barkod, Seri, No, Guid, Id
+  if (
+    name.includes("code") ||
+    name.includes("kod") ||
+    name.includes("barcode") ||
+    name.includes("barkod") ||
+    name.includes("no") ||
+    name.includes("guid") ||
+    name.includes("id")
+  ) {
+    return Math.max(130, (col.label || col.name).length * 9 + 40)
+  }
+
+  // Tarih / Zaman
+  if (name.includes("date") || name.includes("tarih") || name.includes("time")) {
+    return Math.max(120, (col.label || col.name).length * 9 + 40)
+  }
+
+  // Sayısal alanlar (Miktar, Fiyat, Tutar, Bakiye, Maliyet)
+  if (
+    col.align === "right" ||
+    name.includes("qty") ||
+    name.includes("miktar") ||
+    name.includes("price") ||
+    name.includes("fiyat") ||
+    name.includes("amount") ||
+    name.includes("tutar") ||
+    name.includes("cost") ||
+    name.includes("maliyet") ||
+    name.includes("balance") ||
+    name.includes("bakiye")
+  ) {
+    return Math.max(110, (col.label || col.name).length * 9 + 40)
+  }
+
+  return Math.max(130, (col.label || col.name).length * 9 + 40)
+}
+
 export type SpreadsheetColumn = {
   name: string
   label: string
@@ -123,18 +184,38 @@ export function VirtualSpreadsheet<T>({
     setColWidths(initialColWidths ?? {})
   }
 
+  const getColWidth = React.useCallback(
+    (col: SpreadsheetColumn): number | string => {
+      if (colWidths[col.name] !== undefined) return colWidths[col.name]!
+      if (initialColWidths?.[col.name] !== undefined) return initialColWidths[col.name]!
+      return getDefaultColumnWidth(col)
+    },
+    [colWidths, initialColWidths]
+  )
+
+  const totalTableWidth = React.useMemo(() => {
+    return columns.reduce((sum, col) => {
+      const w = getColWidth(col)
+      if (typeof w === "number") return sum + w
+      if (typeof w === "string" && w.endsWith("px")) return sum + parseFloat(w)
+      if (typeof w === "string" && w.endsWith("%")) return sum + 140
+      return sum + 130
+    }, 0)
+  }, [columns, getColWidth])
+
   const handleResizeStart = React.useCallback(
     (event: React.PointerEvent, col: SpreadsheetColumn) => {
       event.preventDefault()
       event.stopPropagation()
       const th = (event.currentTarget as HTMLElement).closest("th")
-      const startWidth = th?.getBoundingClientRect().width ?? 0
+      const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 130
+      const startWidth = th?.getBoundingClientRect().width || fallbackW
       resizeRef.current = { startX: event.clientX, startWidth, name: col.name }
       const target = event.currentTarget as HTMLElement
       if (target.hasPointerCapture(event.pointerId)) return
       target.setPointerCapture(event.pointerId)
     },
-    []
+    [getColWidth]
   )
 
   const handleResizeMove = React.useCallback((event: React.PointerEvent) => {
@@ -157,12 +238,15 @@ export function VirtualSpreadsheet<T>({
 
   const colGroup = (
     <colgroup>
-      {columns.map((col) => (
-        <col
-          key={col.name}
-          style={{ width: colWidths[col.name] ?? undefined }}
-        />
-      ))}
+      {columns.map((col) => {
+        const w = getColWidth(col)
+        return (
+          <col
+            key={col.name}
+            style={{ width: typeof w === "number" ? `${w}px` : w }}
+          />
+        )
+      })}
     </colgroup>
   )
 
@@ -278,39 +362,48 @@ export function VirtualSpreadsheet<T>({
           ref={scrollRef}
           onScroll={handleScroll}
         >
-          <div className="min-w-[42rem]">
+          <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
             <div className="sticky top-0 z-10 bg-card">
-              <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+              <table
+                className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
+                style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
+              >
                 {colGroup}
                 <thead>
                   <tr>
-                    {columns.map((col, colIndex) => (
-                      <th
-                        key={col.name}
-                        className={cn(
-                          headClass,
-                          "relative",
-                          col.align === "left" ? "text-left" : "text-right"
-                        )}
-                        style={{ width: colWidths[col.name] ?? undefined }}
-                      >
-                        {col.label}
-                        {colIndex < columns.length - 1 ? (
-                          <span
-                            role="separator"
-                            aria-orientation="vertical"
-                            aria-label={`Resize ${col.label} column`}
-                            className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
-                            onPointerDown={(event) =>
-                              handleResizeStart(event, col)
-                            }
-                            onPointerMove={handleResizeMove}
-                            onPointerUp={handleResizeEnd}
-                            onPointerCancel={handleResizeEnd}
-                          />
-                        ) : null}
-                      </th>
-                    ))}
+                    {columns.map((col, colIndex) => {
+                      const w = getColWidth(col)
+                      return (
+                        <th
+                          key={col.name}
+                          className={cn(
+                            headClass,
+                            "relative overflow-hidden",
+                            col.align === "left" ? "text-left" : "text-right"
+                          )}
+                          style={{ width: typeof w === "number" ? `${w}px` : w }}
+                          title={col.label}
+                        >
+                          <div className="flex h-full w-full items-center min-w-0 pr-2">
+                            <span className="truncate">{col.label}</span>
+                          </div>
+                          {colIndex < columns.length - 1 ? (
+                            <span
+                              role="separator"
+                              aria-orientation="vertical"
+                              aria-label={`Resize ${col.label} column`}
+                              className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
+                              onPointerDown={(event) =>
+                                handleResizeStart(event, col)
+                              }
+                              onPointerMove={handleResizeMove}
+                              onPointerUp={handleResizeEnd}
+                              onPointerCancel={handleResizeEnd}
+                            />
+                          ) : null}
+                        </th>
+                      )
+                    })}
                   </tr>
                   {showFilterRow && renderFilterCell ? (
                     <tr className={filterRowClassName}>
@@ -325,7 +418,10 @@ export function VirtualSpreadsheet<T>({
               </table>
             </div>
 
-            <table className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs">
+            <table
+              className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
+              style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
+            >
               {colGroup}
               <tbody>
                 {items.length === 0 && loading ? (
