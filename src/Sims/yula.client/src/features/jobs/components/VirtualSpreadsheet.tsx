@@ -5,25 +5,11 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Calendar,
-  Columns3,
   ListFilter,
-  Pin,
-  RotateCcw,
-  Search,
   Table2,
-  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { useVirtualWindow } from "@/hooks/use-virtual-window"
 import {
@@ -33,274 +19,29 @@ import {
   panelHeaderSubtitleClass,
   panelHeaderTitleClass,
 } from "@/components/layout/panel-chrome"
-import { formatGridCellValue } from "@/utils/format-cell"
 import { cn } from "@/utils/cn"
 
-export const ROW_HEIGHT = 28
+export type { SpreadsheetColumn, VirtualSpreadsheetProps } from "./virtual-spreadsheet"
+export {
+  ROW_HEIGHT,
+  cellInputClass,
+  cellClass,
+  headClass,
+} from "./virtual-spreadsheet"
 
-const SKELETON_ROWS = 3
-const MIN_COL_WIDTH = 64
-
-export const cellInputClass =
-  "h-7 w-full min-w-0 rounded-none border border-transparent bg-transparent px-2 py-0 text-xs shadow-none outline-none ring-0 transition-none focus-visible:border-border focus-visible:bg-background focus-visible:ring-0 md:text-xs/relaxed placeholder:text-muted-foreground/70"
-
-export const cellClass =
-  "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
-export const headClass =
-  "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
-
-let measurementCanvas: HTMLCanvasElement | null = null
-
-/**
- * Canvas 2D context kullanarak verilen metnin piksel genişliğini ölçer (0 ms, reflow yok).
- */
-function measureTextWidth(text: string, font = "12px sans-serif"): number {
-  if (typeof document === "undefined" || !text) return (text?.length || 0) * 8
-  try {
-    if (!measurementCanvas) {
-      measurementCanvas = document.createElement("canvas")
-    }
-    const ctx = measurementCanvas.getContext("2d")
-    if (!ctx) return text.length * 8
-    ctx.font = font
-    return ctx.measureText(text).width
-  } catch {
-    return text.length * 8
-  }
-}
-
-/**
- * Kolon başlığı ve mevcut satır içeriklerine göre en uygun "tam sığdır" (fit-content) piksel genişliğini hesaplar.
- */
-function calculateColumnAutoFitWidth<T>(
-  col: SpreadsheetColumn,
-  items: readonly T[]
-): number {
-  const headerWidth =
-    measureTextWidth(col.label || col.name || "", "bold 11px sans-serif") + 40
-
-  let maxContentWidth = 0
-  const sampleLimit = Math.min(items.length, 120)
-
-  for (let i = 0; i < sampleLimit; i++) {
-    const item = items[i] as Record<string, unknown> | null | undefined
-    if (!item) continue
-
-    const rowValues =
-      item.values && typeof item.values === "object"
-        ? (item.values as Record<string, unknown>)
-        : null
-
-    const nestedRow =
-      item.row && typeof item.row === "object"
-        ? (item.row as Record<string, unknown>)
-        : null
-
-    const rawVal =
-      rowValues?.[col.name] ??
-      nestedRow?.[col.name] ??
-      item[col.name] ??
-      (col.kind === "account" ? (nestedRow?.name as unknown) ?? item.name : undefined)
-
-    if (rawVal == null) continue
-
-    const formattedVal = formatGridCellValue(rawVal, col.align)
-    let w = measureTextWidth(formattedVal, "12px sans-serif")
-
-    if (typeof item.depth === "number") {
-      w += item.depth * 16 + 24
-    }
-
-    if (w > maxContentWidth) {
-      maxContentWidth = w
-    }
-  }
-
-  const contentWidth = maxContentWidth > 0 ? maxContentWidth + 28 : 0
-  const fitWidth = Math.round(Math.max(headerWidth, contentWidth))
-  return Math.max(MIN_COL_WIDTH, Math.min(520, fitWidth))
-}
-
-/**
- * Kolon hizalamasına (align) ve etiket uzunluğuna göre varsayılan piksel genişliği hesaplar.
- * İsim listesi veya kelime tahmini içermez; tamamen yapısal özelliklere dayanır.
- */
-function getDefaultColumnWidth(col: SpreadsheetColumn): number {
-  const labelLen = (col.label || col.name || "").length;
-  // Sayısal (sağa hizalı) kolonlar için kompakt genişlik (80px - 130px)
-  if (col.align === "right") {
-    return Math.max(80, Math.min(130, labelLen * 7 + 28));
-  }
-  // Metin / genel (sola hizalı) kolonlar için dengeli genişlik (100px - 220px)
-  return Math.max(100, Math.min(220, labelLen * 8 + 32));
-}
-
-export type SpreadsheetColumn = {
-  name: string
-  label: string
-  align?: "left" | "right"
-  kind?: string
-  /** Ham fiziksel DuckDB veri tipi (BIGINT, VARCHAR, DATE, DECIMAL, BOOLEAN...) */
-  duckType?: string
-  /** Bu kolon için sıralama tıklaması aktif mi? (varsayılan: true) */
-  sortable?: boolean
-}
-
-/**
- * Kolonun veri tipini (Sayı, Tarih, Mantıksal, Metin) temsil eden kompakt rozet.
- */
-function renderColumnTypeBadge(col: SpreadsheetColumn, isPinned = false) {
-  const duck = (col.duckType || "").toUpperCase()
-  let kind = col.kind
-
-  if (!kind) {
-    if (duck.includes("DATE") || duck.includes("TIME")) {
-      kind = "date"
-    } else if (duck.includes("BOOL")) {
-      kind = "bool"
-    } else if (
-      duck.includes("INT") ||
-      duck.includes("FLOAT") ||
-      duck.includes("DOUBLE") ||
-      duck.includes("DECIMAL") ||
-      duck.includes("NUMERIC") ||
-      duck.includes("REAL") ||
-      col.align === "right"
-    ) {
-      kind = "number"
-    } else {
-      kind = "text"
-    }
-  }
-
-  const detailedType = col.duckType ? ` (${col.duckType})` : ""
-  const badgeBaseClass = cn(
-    "inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[9px] font-mono select-none transition-colors",
-    isPinned
-      ? "bg-primary/15 text-primary font-semibold border border-primary/30"
-      : "bg-muted/80 text-muted-foreground/80 font-medium"
-  )
-
-  if (kind === "date") {
-    return (
-      <span
-        className={cn(badgeBaseClass, "gap-0.5")}
-        title={`Veri Tipi: Tarih${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
-      >
-        <Calendar className="size-2.5" />
-      </span>
-    )
-  }
-
-  if (kind === "number") {
-    return (
-      <span
-        className={badgeBaseClass}
-        title={`Veri Tipi: Sayı / Tutar${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
-      >
-        123
-      </span>
-    )
-  }
-
-  if (kind === "bool") {
-    return (
-      <span
-        className={badgeBaseClass}
-        title={`Veri Tipi: Mantıksal${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
-      >
-        bool
-      </span>
-    )
-  }
-
-  return (
-    <span
-      className={badgeBaseClass}
-      title={`Veri Tipi: Metin${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
-    >
-      Aa
-    </span>
-  )
-}
-
-export type VirtualSpreadsheetProps<T> = {
-  /** Görünen (filtreli) kolonlar. Sıfırsa boş durum gösterilir. */
-  columns: readonly SpreadsheetColumn[]
-  /** Sanal pencereye alınacak tam (filtreli) satır listesi. */
-  items: readonly T[]
-  /** Her satır için `<tr>...</tr>` üreten renderer (key'i renderer sağlar). */
-  renderRow: (item: T, index: number, columns?: readonly SpreadsheetColumn[]) => React.ReactNode
-  rowHeight?: number
-  /**
-   * Başlangıç kolon genişlikleri (örn. `{ Name: "20%" }`). Kullanıcı handle ile
-   * sürükledikçe piksel değerine güncellenir.
-   */
-  initialColWidths?: Record<string, string | number>
-  /** Dışarıdan yönetilen aktif sıralama kolonu. */
-  sortColumn?: string | null
-  /** Dışarıdan yönetilen aktif sıralama yönü ("asc" | "desc" | null). */
-  sortDirection?: "asc" | "desc" | null
-  /** Sıralama değiştiğinde çağrılır (veritabanı / DuckDB SQL ORDER BY için). */
-  onSortChange?: (columnName: string, nextDirection: "asc" | "desc" | null) => void
-  /** Sıralamayı tamamen devre dışı bırakmak için (örn. hiyerarşik ağaç listelerinde). */
-  disableSorting?: boolean
-  /** Dışarıdan yönetilen kolon sıralaması (kolon isimleri dizisi). */
-  columnOrder?: string[]
-  /** Kolon sıralaması sürükle-bırak ile değiştiğinde çağrılır. */
-  onColumnOrderChange?: (newOrder: string[]) => void
-  /** Kolon sürükle-bırak ile sıralamayı devre dışı bırakır (örn. hiyerarşik ağaçlarda). */
-  disableColumnReorder?: boolean
-  /** Dışarıdan yönetilen gizli kolon isimleri listesi. */
-  hiddenColumns?: string[]
-  /** Gizli kolon listesi değiştiğinde çağrılır. */
-  onHiddenColumnsChange?: (hiddenColumns: string[]) => void
-  /** Kolon gizleme / gösterme menüsünü devre dışı bırakır. */
-  disableColumnVisibility?: boolean
-  /** Filtre satırı `<tr>`'sinin ek class'ı. */
-  filterRowClassName?: string
-  title?: string
-  subtitle?: React.ReactNode
-  /** Header sağındaki ekstra aksiyonlar (filtre toggle'dan önce çizilir). */
-  headerActions?: React.ReactNode
-  showFilterRow?: boolean
-  onToggleFilterRow?: (open: boolean) => void
-  /** Filtre hücresi renderer'ı (kolon bazlı Input). */
-  renderFilterCell?: (column: SpreadsheetColumn, index: number) => React.ReactNode
-  emptyMessage?: string
-  className?: string
-  /** Rapor yükleniyor mu? (ilk açılışta animasyonlu kart gösterir) */
-  loading?: boolean
-  loadingMessage?: React.ReactNode
-  progressValue?: number | null
-  /** Değişince scroll 0'a sıfırlanır (yeni rapor). */
-  resetKey?: unknown
-  /** Listenin sonuna yaklaşılınca çağrılır (infinite scroll / lazy batch). */
-  onNeedMore?: () => void
-  /** Yüklenecek daha fazla satır var mı? */
-  hasMore?: boolean
-  /**
-   * Kolon sırası, genişlikleri ve gizlilik tercihlerini localStorage'da
-   * kalıcı olarak saklamak için benzersiz anahtar (örn. "arrow_grid_stock_balance").
-   * Belirtilmezse title'dan otomatik türetilir.
-   */
-  storageKey?: string
-  /**
-   * Kalıcı state (localStorage) kullanımını devre dışı bırakır (varsayılan: false).
-   */
-  disablePersistence?: boolean
-  /**
-   * Solda sabitlenecek (sticky/pinned) kolon sayısı (varsayılan: 1).
-   * 0 verilirse sabitleme devre dışı kalır.
-   */
-  pinnedColumnCount?: number
-  /** Sabitlenmiş kolon isimleri (kontrollü mod) */
-  pinnedColumns?: string[]
-  /** Sabitlenmiş kolonlar değiştiğinde çağrılır */
-  onPinnedColumnsChange?: (pinned: string[]) => void
-  /** Sona yaklaşıldığında yükleme sürüyor mu? (skeleton satırları gösterir) */
-  loadingMore?: boolean
-}
+import {
+  ROW_HEIGHT,
+  SKELETON_ROWS,
+  MIN_COL_WIDTH,
+  cellClass,
+  headClass,
+  type SpreadsheetColumn,
+  type VirtualSpreadsheetProps,
+  calculateColumnAutoFitWidth,
+  getDefaultColumnWidth,
+  ColumnManagementMenu,
+  TableSkeletonRows,
+} from "./virtual-spreadsheet"
 
 /**
  * Sanal pencereli spreadsheet iskeleti: sabit header + filtre satırı + spacer'lı
@@ -415,26 +156,6 @@ export function VirtualSpreadsheet<T>({
 
   // Kolon gizleme / gösterme durumu
   const [internalHiddenColumns, setInternalHiddenColumns] = React.useState<string[]>([])
-  const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
-  const [columnSearch, setColumnSearch] = React.useState("")
-  const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
-  const searchInputRef = React.useRef<HTMLInputElement>(null)
-  const columnItemRefs = React.useRef<(HTMLDivElement | null)[]>([])
-
-  // Menü açıldığında odağı arama kutusuna taşı
-  React.useEffect(() => {
-    if (columnMenuOpen) {
-      setFocusedColIndex(-1)
-      const timer = setTimeout(() => {
-        searchInputRef.current?.focus()
-        searchInputRef.current?.select()
-      }, 30)
-      return () => clearTimeout(timer)
-    } else {
-      setColumnSearch("")
-      setFocusedColIndex(-1)
-    }
-  }, [columnMenuOpen])
 
   const activeHiddenColumns = hiddenColumns ?? internalHiddenColumns
   const hiddenSet = React.useMemo(
@@ -522,84 +243,6 @@ export function VirtualSpreadsheet<T>({
       }
     },
     [pinnedSet, activePinnedColumns, orderedColumns, visibleColumns, onPinnedColumnsChange, onColumnOrderChange]
-  )
-
-  const filteredMenuColumns = React.useMemo(() => {
-    if (!columnSearch.trim()) return orderedColumns
-    const query = columnSearch.toLowerCase().trim()
-    return orderedColumns.filter(
-      (c) =>
-        c.label.toLowerCase().includes(query) ||
-        c.name.toLowerCase().includes(query)
-    )
-  }, [orderedColumns, columnSearch])
-
-  const handleColumnSearchChange = React.useCallback((val: string) => {
-    setColumnSearch(val)
-    setFocusedColIndex(-1)
-  }, [])
-
-  const handleMenuKeyDown = React.useCallback(
-    (event: React.KeyboardEvent) => {
-      const count = filteredMenuColumns.length
-
-      if (event.key === "ArrowDown") {
-        event.preventDefault()
-        if (count === 0) return
-        setFocusedColIndex((prev) => {
-          const next = prev < count - 1 ? prev + 1 : 0
-          columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
-          return next
-        })
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault()
-        if (count === 0) return
-        setFocusedColIndex((prev) => {
-          if (prev === -1) {
-            const next = count - 1
-            columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
-            return next
-          }
-          if (prev === 0) {
-            searchInputRef.current?.focus()
-            return -1
-          }
-          const next = prev - 1
-          columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
-          return next
-        })
-      } else if (event.key === "Enter") {
-        event.preventDefault()
-        if (focusedColIndex >= 0 && focusedColIndex < count) {
-          toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
-        } else if (focusedColIndex === -1 && count > 0) {
-          toggleColumnVisibility(filteredMenuColumns[0].name)
-        }
-      } else if (event.key === " ") {
-        // Sadece listede bir kolon seçiliyken Space ile aç/kapat (arama kutusunda boşluk yazabilsin)
-        if (focusedColIndex >= 0 && focusedColIndex < count) {
-          event.preventDefault()
-          toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
-        }
-      } else if (event.key === "p" || event.key === "P") {
-        // Seçili kolonu sabitle / sabitlemeyi kaldır
-        if (focusedColIndex >= 0 && focusedColIndex < count) {
-          event.preventDefault()
-          toggleColumnPin(filteredMenuColumns[focusedColIndex].name)
-        }
-      } else if (event.key === "Escape") {
-        if (columnSearch) {
-          event.preventDefault()
-          event.stopPropagation()
-          setColumnSearch("")
-          setFocusedColIndex(-1)
-          searchInputRef.current?.focus()
-        } else {
-          setColumnMenuOpen(false)
-        }
-      }
-    },
-    [filteredMenuColumns, focusedColIndex, columnSearch, toggleColumnVisibility, toggleColumnPin]
   )
 
   // Sürükle - bırak görsel durumları
@@ -964,6 +607,15 @@ export function VirtualSpreadsheet<T>({
     }
   }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
 
+  const canResetColumns = React.useMemo(() => {
+    return (
+      hiddenColumnsCount > 0 ||
+      Boolean(activeColumnOrder && activeColumnOrder.length > 0) ||
+      Object.keys(colWidths).length > 0 ||
+      internalPinnedColumns !== null
+    )
+  }, [hiddenColumnsCount, activeColumnOrder, colWidths, internalPinnedColumns])
+
   const totalTableWidth = React.useMemo(() => {
     return visibleColumns.reduce((sum, col) => {
       const w = getColWidth(col)
@@ -1303,208 +955,20 @@ export function VirtualSpreadsheet<T>({
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-center">
           {headerActions}
-          {!disableColumnVisibility && columns.length > 0 ? (
-            <Popover open={columnMenuOpen} onOpenChange={setColumnMenuOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant={hiddenColumnsCount > 0 ? "secondary" : "outline"}
-                  size="icon"
-                  className="relative size-7 shrink-0"
-                  disabled={columns.length === 0}
-                  title={
-                    hiddenColumnsCount > 0
-                      ? `${hiddenColumnsCount} kolon gizli — Kolonları Göster / Gizle`
-                      : "Kolonları Göster / Gizle"
-                  }
-                  aria-label="Kolonları Göster / Gizle"
-                >
-                  <Columns3 className="size-3.5" />
-                  {hiddenColumnsCount > 0 ? (
-                    <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground shadow-xs">
-                      {hiddenColumnsCount}
-                    </span>
-                  ) : null}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                sideOffset={6}
-                className="w-72 p-2 shadow-lg flex flex-col gap-1.5"
-                onOpenAutoFocus={(e) => {
-                  e.preventDefault()
-                  searchInputRef.current?.focus()
-                }}
-                onKeyDown={handleMenuKeyDown}
-              >
-                <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
-                  <div className="flex items-center gap-1.5 font-medium text-foreground text-xs">
-                    <Columns3 className="size-3.5 text-muted-foreground" />
-                    <span>Kolonlar</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {visibleColumns.length} / {orderedColumns.length}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={
-                        hiddenColumnsCount === 0 &&
-                        (!activeColumnOrder || activeColumnOrder.length === 0) &&
-                        Object.keys(colWidths).length === 0
-                      }
-                      onClick={handleResetColumns}
-                      className="flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/70 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
-                      title="Varsayılana Sıfırla"
-                      aria-label="Varsayılana Sıfırla"
-                    >
-                      <RotateCcw className="size-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Kolon arama (her zaman görünür, menü açıldığında otomatik odaklanır) */}
-                <div className="relative flex items-center">
-                  <Search className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
-                  <Input
-                    ref={searchInputRef}
-                    value={columnSearch}
-                    onChange={(e) => handleColumnSearchChange(e.target.value)}
-                    placeholder="Kolon ara…"
-                    className="h-7 pl-7 pr-6 text-xs"
-                    autoFocus
-                  />
-                  {columnSearch ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setColumnSearch("")
-                        setFocusedColIndex(-1)
-                        searchInputRef.current?.focus()
-                      }}
-                      className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Kolon Listesi (Klavye Ok Tuşları ile gezinilebilir, Boşluk/Enter ile seçilebilir) */}
-                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5" role="listbox">
-                  {filteredMenuColumns.map((col, index) => {
-                    const isVisible = !hiddenSet.has(col.name)
-                    const isLastVisible = isVisible && visibleColumns.length <= 1
-                    const isFocused = focusedColIndex === index
-                    const isPinned = pinnedSet.has(col.name)
-                    const prevCol = index > 0 ? filteredMenuColumns[index - 1] : null
-                    const isFirstUnpinned = !isPinned && prevCol !== null && pinnedSet.has(prevCol.name)
-
-                    return (
-                      <React.Fragment key={col.name}>
-                        {isFirstUnpinned ? (
-                          <div
-                            className="my-1.5 border-t border-border/60"
-                            role="separator"
-                            aria-orientation="horizontal"
-                          />
-                        ) : null}
-                        <div
-                          ref={(el) => {
-                            columnItemRefs.current[index] = el
-                          }}
-                          tabIndex={-1}
-                          onClick={() => setFocusedColIndex(index)}
-                          onMouseEnter={() => setFocusedColIndex(index)}
-                          className={cn(
-                            "group flex items-center justify-between gap-1.5 rounded px-2 py-1 text-xs transition-colors select-none",
-                            isFocused && "bg-accent text-accent-foreground",
-                            !isFocused && "hover:bg-muted/60 text-foreground"
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              "flex min-w-0 flex-1 items-center gap-2",
-                              isLastVisible
-                                ? "opacity-50 cursor-not-allowed"
-                                : "cursor-pointer"
-                            )}
-                            onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
-                            title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
-                          >
-                            <Checkbox
-                              checked={isVisible}
-                              disabled={isLastVisible}
-                              tabIndex={-1}
-                              onCheckedChange={() => toggleColumnVisibility(col.name)}
-                            />
-                            <span className="truncate flex-1">{col.label}</span>
-                          </div>
-
-                          {/* Sağ Slot: Varsayılan Veri Tipi Rozeti <-> Hover / Klavye Odak Pin/Unpin Butonu */}
-                          <div className="relative flex size-6 shrink-0 items-center justify-center">
-                            {/* Varsayılan: Veri Tipi Rozeti (Hover ve Klavye Odak durumunda yerini Pin/Unpin butonuna bırakır) */}
-                            <div
-                              className={cn(
-                                "flex items-center justify-center transition-opacity",
-                                isFocused
-                                  ? "opacity-0 pointer-events-none"
-                                  : "group-hover:opacity-0 group-hover:pointer-events-none"
-                              )}
-                            >
-                              {renderColumnTypeBadge(col, isPinned)}
-                            </div>
-
-                            {/* Hover / Klavye Odak: Pin / Unpin Butonu */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleColumnPin(col.name)
-                              }}
-                              disabled={!isVisible}
-                              className={cn(
-                                "absolute inset-0 flex items-center justify-center rounded transition-all",
-                                isFocused
-                                  ? "opacity-100 scale-100"
-                                  : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 focus:opacity-100",
-                                isPinned
-                                  ? "text-primary hover:text-primary/80 hover:bg-primary/10"
-                                  : "text-muted-foreground/60 hover:text-foreground hover:bg-muted",
-                                !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
-                              )}
-                              title={
-                                !isVisible
-                                  ? "Gizli kolon sabitlenemez"
-                                  : isPinned
-                                  ? "Sabitlemeyi kaldır (P)"
-                                  : "Sola sabitle (P)"
-                              }
-                              aria-label={
-                                isPinned
-                                  ? `${col.label} sabitlemesini kaldır`
-                                  : `${col.label} sola sabitle`
-                              }
-                            >
-                              <Pin
-                                className={cn(
-                                  "size-3.5 transition-transform",
-                                  isPinned ? "fill-primary rotate-45" : "-rotate-45"
-                                )}
-                              />
-                            </button>
-                          </div>
-                        </div>
-                      </React.Fragment>
-                    )
-                  })}
-                  {filteredMenuColumns.length === 0 ? (
-                    <div className="py-3 text-center text-xs text-muted-foreground">
-                      Kolon bulunamadı
-                    </div>
-                  ) : null}
-                </div>
-              </PopoverContent>
-            </Popover>
+          {!disableColumnVisibility ? (
+            <ColumnManagementMenu
+              columns={columns}
+              orderedColumns={orderedColumns}
+              visibleColumns={visibleColumns}
+              hiddenSet={hiddenSet}
+              pinnedSet={pinnedSet}
+              toggleColumnVisibility={toggleColumnVisibility}
+              toggleColumnPin={toggleColumnPin}
+              onResetColumns={handleResetColumns}
+              canReset={canResetColumns}
+              hiddenColumnsCount={hiddenColumnsCount}
+              disabled={columns.length === 0}
+            />
           ) : null}
           {onToggleFilterRow ? (
             <Button
@@ -1740,44 +1204,14 @@ export function VirtualSpreadsheet<T>({
                 {colGroup}
                 <tbody>
                 {displayItems.length === 0 && loading ? (
-                  Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
-                    <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
-                      {visibleColumns.map((col, colIdx) => {
-                        const isPinned = colIdx < effectivePinnedCount
-                        const isLastPinned = colIdx === effectivePinnedCount - 1
-                        const stickyLeft = getStickyLeftOffset(colIdx)
-                        return (
-                          <td
-                            key={col.name}
-                            className={cn(
-                              cellClass,
-                              col.align === "left" ? "text-left" : "text-right",
-                              isPinned && "sticky z-10 bg-background",
-                              isScrolledLeft &&
-                                isLastPinned &&
-                                "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
-                            )}
-                            style={isPinned ? { left: `${stickyLeft}px` } : undefined}
-                          >
-                            <div
-                              className={cn(
-                                "flex h-7 min-w-0 items-center px-2",
-                                col.align === "right" && "justify-end"
-                              )}
-                            >
-                              <Skeleton
-                                className={cn(
-                                  "h-3.5",
-                                  col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
-                                )}
-                              />
-                            </div>
-                          </td>
-                        )
-                      })}
-                      <td className={cn(cellClass, "p-0")} aria-hidden />
-                    </tr>
-                  ))
+                  <TableSkeletonRows
+                    count={initialSkeletonCount}
+                    prefix="initial-skeleton"
+                    visibleColumns={visibleColumns}
+                    effectivePinnedCount={effectivePinnedCount}
+                    isScrolledLeft={isScrolledLeft}
+                    getStickyLeftOffset={getStickyLeftOffset}
+                  />
                 ) : displayItems.length === 0 ? (
                   <tr>
                     <td
@@ -1801,46 +1235,16 @@ export function VirtualSpreadsheet<T>({
                     {windowRows.map((row, index) =>
                       renderVirtualRow(row, startIndex + index)
                     )}
-                    {loadingMore && hasMore
-                      ? Array.from({ length: SKELETON_ROWS }, (_, skeletonIndex) => (
-                          <tr key={`skeleton-${skeletonIndex}`} aria-hidden>
-                            {visibleColumns.map((col, colIdx) => {
-                              const isPinned = colIdx < effectivePinnedCount
-                              const isLastPinned = colIdx === effectivePinnedCount - 1
-                              const stickyLeft = getStickyLeftOffset(colIdx)
-                              return (
-                                <td
-                                  key={col.name}
-                                  className={cn(
-                                    cellClass,
-                                    col.align === "left" ? "text-left" : "text-right",
-                                    isPinned && "sticky z-10 bg-background",
-                                    isScrolledLeft &&
-                                      isLastPinned &&
-                                      "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
-                                  )}
-                                  style={isPinned ? { left: `${stickyLeft}px` } : undefined}
-                                >
-                                  <div
-                                    className={cn(
-                                      "flex h-7 min-w-0 items-center px-2",
-                                      col.align === "right" && "justify-end"
-                                    )}
-                                  >
-                                    <Skeleton
-                                      className={cn(
-                                        "h-3.5",
-                                        col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
-                                      )}
-                                    />
-                                  </div>
-                                </td>
-                              )
-                            })}
-                            <td className={cn(cellClass, "p-0")} aria-hidden />
-                          </tr>
-                        ))
-                      : null}
+                    {loadingMore && hasMore ? (
+                      <TableSkeletonRows
+                        count={SKELETON_ROWS}
+                        prefix="skeleton"
+                        visibleColumns={visibleColumns}
+                        effectivePinnedCount={effectivePinnedCount}
+                        isScrolledLeft={isScrolledLeft}
+                        getStickyLeftOffset={getStickyLeftOffset}
+                      />
+                    ) : null}
                     {endIndex < displayItems.length ? (
                       <tr
                         aria-hidden
