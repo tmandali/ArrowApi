@@ -333,6 +333,8 @@ export function VirtualSpreadsheet<T>({
     position: "before" | "after"
   } | null>(null)
   const isDraggingRef = React.useRef(false)
+  const isResizingRef = React.useRef(false)
+  const isHoveringSeparatorRef = React.useRef(false)
 
   const [internalSort, setInternalSort] = React.useState<{
     column: string | null
@@ -347,8 +349,8 @@ export function VirtualSpreadsheet<T>({
 
   const handleHeaderClick = React.useCallback(
     (col: SpreadsheetColumn) => {
-      // Sürükleme işlemi yeni bittiyse tıklama (sıralama) tetikleme
-      if (isDraggingRef.current) return
+      // Sürükleme veya boyutlandırma işlemi yeni bittiyse tıklama (sıralama) tetikleme
+      if (isDraggingRef.current || isResizingRef.current || resizeRef.current !== null) return
       if (disableSorting || col.sortable === false) return
 
       let nextDir: "asc" | "desc" | null = "asc"
@@ -376,7 +378,23 @@ export function VirtualSpreadsheet<T>({
 
   const handleDragStart = React.useCallback(
     (event: React.DragEvent, col: SpreadsheetColumn) => {
-      if (disableColumnReorder) return
+      // Yeniden boyutlandırma sırasında veya ayırıcı çizgiden sürüklemeyi kesinlikle engelle
+      if (
+        disableColumnReorder ||
+        resizeRef.current !== null ||
+        isResizingRef.current ||
+        isHoveringSeparatorRef.current
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[role="separator"]')) {
+        event.preventDefault()
+        return
+      }
+
       isDraggingRef.current = true
       event.dataTransfer.setData("text/plain", col.name)
       event.dataTransfer.effectAllowed = "move"
@@ -387,6 +405,7 @@ export function VirtualSpreadsheet<T>({
 
   const handleDragOver = React.useCallback(
     (event: React.DragEvent, col: SpreadsheetColumn) => {
+      if (resizeRef.current !== null || isResizingRef.current) return
       if (!draggedColName || draggedColName === col.name) return
       event.preventDefault()
       event.dataTransfer.dropEffect = "move"
@@ -416,6 +435,11 @@ export function VirtualSpreadsheet<T>({
   const handleDrop = React.useCallback(
     (event: React.DragEvent, col: SpreadsheetColumn) => {
       event.preventDefault()
+      if (resizeRef.current !== null || isResizingRef.current) {
+        setDraggedColName(null)
+        setDropTarget(null)
+        return
+      }
       if (!draggedColName || draggedColName === col.name) {
         setDraggedColName(null)
         setDropTarget(null)
@@ -525,6 +549,10 @@ export function VirtualSpreadsheet<T>({
     (event: React.PointerEvent, col: SpreadsheetColumn) => {
       event.preventDefault()
       event.stopPropagation()
+      isResizingRef.current = true
+      isDraggingRef.current = false
+      setDraggedColName(null)
+      setDropTarget(null)
       const th = (event.currentTarget as HTMLElement).closest("th")
       const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 100
       const startWidth = th?.getBoundingClientRect().width || fallbackW
@@ -560,6 +588,9 @@ export function VirtualSpreadsheet<T>({
       target.releasePointerCapture(event.pointerId)
     }
     resizeRef.current = null
+    setTimeout(() => {
+      isResizingRef.current = false
+    }, 150)
   }, [])
 
   /**
@@ -1025,7 +1056,20 @@ export function VirtualSpreadsheet<T>({
                               aria-label={`Resize ${col.label} column (double-click to auto fit)`}
                               title="Genişletmek için sürükleyin, içeriğe tam sığdırmak için çift tıklayın"
                               draggable={false}
-                              onDragStart={(e) => e.stopPropagation()}
+                              onMouseEnter={() => {
+                                isHoveringSeparatorRef.current = true
+                              }}
+                              onMouseLeave={() => {
+                                isHoveringSeparatorRef.current = false
+                              }}
+                              onMouseDown={(e) => {
+                                // HTML5 dragstart'ın th seviyesinde başlamasını kesinlikle engelle
+                                e.stopPropagation()
+                              }}
+                              onDragStart={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                              }}
                               className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
                               onPointerDown={(event) =>
                                 handleResizeStart(event, col)
