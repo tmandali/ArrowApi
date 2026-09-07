@@ -7,6 +7,7 @@ import {
   ArrowUpDown,
   Columns3,
   ListFilter,
+  Pin,
   RotateCcw,
   Search,
   Table2,
@@ -212,6 +213,10 @@ export type VirtualSpreadsheetProps<T> = {
    * 0 verilirse sabitleme devre dışı kalır.
    */
   pinnedColumnCount?: number
+  /** Sabitlenmiş kolon isimleri (kontrollü mod) */
+  pinnedColumns?: string[]
+  /** Sabitlenmiş kolonlar değiştiğinde çağrılır */
+  onPinnedColumnsChange?: (pinned: string[]) => void
   /** Sona yaklaşıldığında yükleme sürüyor mu? (skeleton satırları gösterir) */
   loadingMore?: boolean
 }
@@ -255,6 +260,8 @@ export function VirtualSpreadsheet<T>({
   storageKey,
   disablePersistence = false,
   pinnedColumnCount = 1,
+  pinnedColumns,
+  onPinnedColumnsChange,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -274,27 +281,56 @@ export function VirtualSpreadsheet<T>({
     isStorageLoadedRef.current = false
   }
 
+  // Sabitlenmiş kolonlar (Varsayılan olarak ilk pinnedColumnCount kadar kolon)
+  const defaultPinnedColumns = React.useMemo(() => {
+    const count = Math.max(0, pinnedColumnCount)
+    return columns.slice(0, count).map((c) => c.name)
+  }, [columns, pinnedColumnCount])
+
+  const [internalPinnedColumns, setInternalPinnedColumns] = React.useState<string[] | null>(null)
+
+  const activePinnedColumns = React.useMemo(() => {
+    if (pinnedColumns !== undefined) return pinnedColumns
+    if (internalPinnedColumns !== null) return internalPinnedColumns
+    return defaultPinnedColumns
+  }, [pinnedColumns, internalPinnedColumns, defaultPinnedColumns])
+
+  const pinnedSet = React.useMemo(
+    () => new Set(activePinnedColumns),
+    [activePinnedColumns]
+  )
+
   // Kolon sıralama düzeni (Sürükle - Bırak)
   const [internalColumnOrder, setInternalColumnOrder] = React.useState<string[] | null>(null)
 
   const activeColumnOrder = columnOrder ?? internalColumnOrder
 
   const orderedColumns = React.useMemo(() => {
-    if (!activeColumnOrder || activeColumnOrder.length === 0) return columns
     const colMap = new Map(columns.map((c) => [c.name, c]))
-    const result: SpreadsheetColumn[] = []
-    for (const name of activeColumnOrder) {
-      const col = colMap.get(name)
-      if (col) {
-        result.push(col)
-        colMap.delete(name)
+    const baseCols: SpreadsheetColumn[] = []
+
+    if (activeColumnOrder && activeColumnOrder.length > 0) {
+      for (const name of activeColumnOrder) {
+        const col = colMap.get(name)
+        if (col) {
+          baseCols.push(col)
+          colMap.delete(name)
+        }
       }
+      for (const col of colMap.values()) {
+        baseCols.push(col)
+      }
+    } else {
+      baseCols.push(...columns)
     }
-    for (const col of colMap.values()) {
-      result.push(col)
-    }
-    return result
-  }, [columns, activeColumnOrder])
+
+    if (pinnedSet.size === 0) return baseCols
+
+    // Sabitlenmiş kolonları daima tablonun soluna grupla
+    const pinned = baseCols.filter((c) => pinnedSet.has(c.name))
+    const unpinned = baseCols.filter((c) => !pinnedSet.has(c.name))
+    return [...pinned, ...unpinned]
+  }, [columns, activeColumnOrder, pinnedSet])
 
   // Kolon gizleme / gösterme durumu
   const [internalHiddenColumns, setInternalHiddenColumns] = React.useState<string[]>([])
@@ -302,7 +338,7 @@ export function VirtualSpreadsheet<T>({
   const [columnSearch, setColumnSearch] = React.useState("")
   const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
-  const columnItemRefs = React.useRef<(HTMLLabelElement | null)[]>([])
+  const columnItemRefs = React.useRef<(HTMLDivElement | null)[]>([])
 
   // Menü açıldığında odağı arama kutusuna taşı
   React.useEffect(() => {
@@ -332,6 +368,16 @@ export function VirtualSpreadsheet<T>({
     return filtered.length > 0 ? filtered : orderedColumns
   }, [orderedColumns, hiddenSet])
 
+  // Solda sabitlenecek (sticky) kolon sayısı — tablonun tamamının sabitlenmesi engellenir (en az 1 kolon scroll edilebilir kalır)
+  const visiblePinnedCount = React.useMemo(() => {
+    return visibleColumns.filter((c) => pinnedSet.has(c.name)).length
+  }, [visibleColumns, pinnedSet])
+
+  const effectivePinnedCount = Math.min(
+    visiblePinnedCount,
+    visibleColumns.length > 1 ? visibleColumns.length - 1 : 0
+  )
+
   const hiddenColumnsCount = hiddenSet.size
 
   const toggleColumnVisibility = React.useCallback(
@@ -353,6 +399,49 @@ export function VirtualSpreadsheet<T>({
     [hiddenSet, activeHiddenColumns, visibleColumns.length, onHiddenColumnsChange]
   )
 
+  const toggleColumnPin = React.useCallback(
+    (columnName: string) => {
+      const isCurrentlyPinned = pinnedSet.has(columnName)
+      let nextPinned: string[]
+      let nextOrder: string[]
+
+      const currentOrder = orderedColumns.map((c) => c.name)
+
+      if (isCurrentlyPinned) {
+        // Sabitlemeyi kaldır (Unpin)
+        nextPinned = activePinnedColumns.filter((name) => name !== columnName)
+        const pinnedSetNext = new Set(nextPinned)
+        const pinnedCols = currentOrder.filter((name) => pinnedSetNext.has(name))
+        const unpinnedCols = currentOrder.filter((name) => !pinnedSetNext.has(name))
+        nextOrder = [...pinnedCols, ...unpinnedCols]
+      } else {
+        // Sola sabitle (Pin) — En az 1 kolonun kaydırılabilir (unpinned) kalmasını garanti et
+        const visiblePinned = visibleColumns.filter((c) => pinnedSet.has(c.name))
+        if (visiblePinned.length >= visibleColumns.length - 1) {
+          return
+        }
+
+        nextPinned = [...activePinnedColumns, columnName]
+        const pinnedSetNext = new Set(nextPinned)
+        const pinnedCols = currentOrder.filter((name) => pinnedSetNext.has(name))
+        const unpinnedCols = currentOrder.filter((name) => !pinnedSetNext.has(name))
+        nextOrder = [...pinnedCols, ...unpinnedCols]
+      }
+
+      if (onPinnedColumnsChange) {
+        onPinnedColumnsChange(nextPinned)
+      } else {
+        setInternalPinnedColumns(nextPinned)
+      }
+
+      if (onColumnOrderChange) {
+        onColumnOrderChange(nextOrder)
+      } else {
+        setInternalColumnOrder(nextOrder)
+      }
+    },
+    [pinnedSet, activePinnedColumns, orderedColumns, visibleColumns, onPinnedColumnsChange, onColumnOrderChange]
+  )
 
   const filteredMenuColumns = React.useMemo(() => {
     if (!columnSearch.trim()) return orderedColumns
@@ -411,6 +500,12 @@ export function VirtualSpreadsheet<T>({
           event.preventDefault()
           toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
         }
+      } else if (event.key === "p" || event.key === "P") {
+        // Seçili kolonu sabitle / sabitlemeyi kaldır
+        if (focusedColIndex >= 0 && focusedColIndex < count) {
+          event.preventDefault()
+          toggleColumnPin(filteredMenuColumns[focusedColIndex].name)
+        }
       } else if (event.key === "Escape") {
         if (columnSearch) {
           event.preventDefault()
@@ -423,7 +518,7 @@ export function VirtualSpreadsheet<T>({
         }
       }
     },
-    [filteredMenuColumns, focusedColIndex, columnSearch, toggleColumnVisibility]
+    [filteredMenuColumns, focusedColIndex, columnSearch, toggleColumnVisibility, toggleColumnPin]
   )
 
   // Sürükle - bırak görsel durumları
@@ -570,10 +665,38 @@ export function VirtualSpreadsheet<T>({
         }
         nextOrder.splice(targetIndex, 0, draggedColName)
 
+        const wasPinned = pinnedSet.has(draggedColName)
+        const isDroppingInPinnedArea = targetIndex < effectivePinnedCount
+
+        let nextPinned = activePinnedColumns
+        if (!wasPinned && isDroppingInPinnedArea) {
+          // Unpinned kolon pinned alanına sürüklendi -> otomatik sabitle
+          if (visibleColumns.filter((c) => pinnedSet.has(c.name)).length < visibleColumns.length - 1) {
+            nextPinned = [...activePinnedColumns, draggedColName]
+          }
+        } else if (wasPinned && !isDroppingInPinnedArea) {
+          // Pinned kolon unpinned alana sürüklendi -> sabitlemeyi kaldır
+          nextPinned = activePinnedColumns.filter((name) => name !== draggedColName)
+        }
+
+        const nextPinnedSet = new Set(nextPinned)
+        const finalOrder = [
+          ...nextOrder.filter((name) => nextPinnedSet.has(name)),
+          ...nextOrder.filter((name) => !nextPinnedSet.has(name)),
+        ]
+
+        if (nextPinned !== activePinnedColumns) {
+          if (onPinnedColumnsChange) {
+            onPinnedColumnsChange(nextPinned)
+          } else {
+            setInternalPinnedColumns(nextPinned)
+          }
+        }
+
         if (onColumnOrderChange) {
-          onColumnOrderChange(nextOrder)
+          onColumnOrderChange(finalOrder)
         } else {
-          setInternalColumnOrder(nextOrder)
+          setInternalColumnOrder(finalOrder)
         }
       }
 
@@ -583,7 +706,16 @@ export function VirtualSpreadsheet<T>({
         isDraggingRef.current = false
       }, 50)
     },
-    [draggedColName, orderedColumns, onColumnOrderChange]
+    [
+      draggedColName,
+      orderedColumns,
+      pinnedSet,
+      effectivePinnedCount,
+      activePinnedColumns,
+      visibleColumns,
+      onPinnedColumnsChange,
+      onColumnOrderChange,
+    ]
   )
 
   const handleDragEnd = React.useCallback(() => {
@@ -631,6 +763,7 @@ export function VirtualSpreadsheet<T>({
           colWidths?: Record<string, string | number>
           columnOrder?: string[]
           hiddenColumns?: string[]
+          pinnedColumns?: string[]
         }
         if (parsed) {
           if (parsed.colWidths && typeof parsed.colWidths === "object") {
@@ -663,6 +796,16 @@ export function VirtualSpreadsheet<T>({
               }
             }
           }
+          if (Array.isArray(parsed.pinnedColumns)) {
+            const valid = parsed.pinnedColumns.filter((name) =>
+              columns.some((c) => c.name === name)
+            )
+            if (onPinnedColumnsChange) {
+              onPinnedColumnsChange(valid)
+            } else {
+              setInternalPinnedColumns(valid)
+            }
+          }
         }
       }
     } catch {
@@ -670,9 +813,9 @@ export function VirtualSpreadsheet<T>({
     } finally {
       isStorageLoadedRef.current = true
     }
-  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange])
+  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange])
 
-  // Kolon sırası, genişliği veya gizlilik değiştiğinde 250ms debounce ile localStorage'a kaydet
+  // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
   React.useEffect(() => {
     if (!isStorageLoadedRef.current || !effectiveStorageKey || typeof window === "undefined") {
       return
@@ -682,8 +825,9 @@ export function VirtualSpreadsheet<T>({
       const hasWidths = Object.keys(colWidths).length > 0
       const hasOrder = Boolean(activeColumnOrder && activeColumnOrder.length > 0)
       const hasHidden = activeHiddenColumns.length > 0
+      const hasPinned = internalPinnedColumns !== null
 
-      if (!hasWidths && !hasOrder && !hasHidden) {
+      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned) {
         try {
           localStorage.removeItem(effectiveStorageKey)
         } catch {}
@@ -695,6 +839,7 @@ export function VirtualSpreadsheet<T>({
           colWidths: hasWidths ? colWidths : undefined,
           columnOrder: hasOrder ? activeColumnOrder : undefined,
           hiddenColumns: hasHidden ? activeHiddenColumns : undefined,
+          pinnedColumns: hasPinned ? activePinnedColumns : undefined,
         }
         localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
       } catch {
@@ -703,7 +848,7 @@ export function VirtualSpreadsheet<T>({
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns])
+  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns, activePinnedColumns, internalPinnedColumns])
 
   const getColWidth = React.useCallback(
     (col: SpreadsheetColumn): number | string => {
@@ -725,13 +870,18 @@ export function VirtualSpreadsheet<T>({
     } else {
       setInternalColumnOrder(null)
     }
+    if (onPinnedColumnsChange) {
+      onPinnedColumnsChange(defaultPinnedColumns)
+    } else {
+      setInternalPinnedColumns(null)
+    }
     setColWidths(initialColWidths ?? {})
     if (effectiveStorageKey && typeof window !== "undefined") {
       try {
         localStorage.removeItem(effectiveStorageKey)
       } catch {}
     }
-  }, [onHiddenColumnsChange, onColumnOrderChange, initialColWidths, effectiveStorageKey])
+  }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
 
   const totalTableWidth = React.useMemo(() => {
     return visibleColumns.reduce((sum, col) => {
@@ -743,11 +893,7 @@ export function VirtualSpreadsheet<T>({
     }, 0)
   }, [visibleColumns, getColWidth])
 
-  // Solda sabitlenecek (sticky) kolon sayısı — tablonun tamamının sabitlenmesi engellenir (en az 1 kolon scroll edilebilir kalır)
-  const effectivePinnedCount = Math.min(
-    Math.max(0, pinnedColumnCount),
-    visibleColumns.length > 1 ? visibleColumns.length - 1 : 0
-  )
+
 
   // Her sabit kolonun soldan piksel mesafesini dinamik hesaplar
   const getStickyLeftOffset = React.useCallback(
@@ -1168,9 +1314,10 @@ export function VirtualSpreadsheet<T>({
                     const isVisible = !hiddenSet.has(col.name)
                     const isLastVisible = isVisible && visibleColumns.length <= 1
                     const isFocused = focusedColIndex === index
+                    const isPinned = pinnedSet.has(col.name)
 
                     return (
-                      <label
+                      <div
                         key={col.name}
                         ref={(el) => {
                           columnItemRefs.current[index] = el
@@ -1179,26 +1326,68 @@ export function VirtualSpreadsheet<T>({
                         onClick={() => setFocusedColIndex(index)}
                         onMouseEnter={() => setFocusedColIndex(index)}
                         className={cn(
-                          "flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors select-none",
+                          "group flex items-center justify-between gap-1.5 rounded px-2 py-1 text-xs transition-colors select-none",
                           isFocused && "bg-accent text-accent-foreground",
-                          !isFocused && "hover:bg-muted/60 text-foreground",
-                          isLastVisible
-                            ? "opacity-50 cursor-not-allowed bg-muted/20"
-                            : "cursor-pointer"
+                          !isFocused && "hover:bg-muted/60 text-foreground"
                         )}
-                        title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
                       >
-                        <Checkbox
-                          checked={isVisible}
-                          disabled={isLastVisible}
-                          tabIndex={-1}
-                          onCheckedChange={() => toggleColumnVisibility(col.name)}
-                        />
-                        <span className="truncate flex-1">{col.label}</span>
-                        {col.align === "right" ? (
-                          <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
-                        ) : null}
-                      </label>
+                        <div
+                          className={cn(
+                            "flex min-w-0 flex-1 items-center gap-2",
+                            isLastVisible
+                              ? "opacity-50 cursor-not-allowed"
+                              : "cursor-pointer"
+                          )}
+                          onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
+                          title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
+                        >
+                          <Checkbox
+                            checked={isVisible}
+                            disabled={isLastVisible}
+                            tabIndex={-1}
+                            onCheckedChange={() => toggleColumnVisibility(col.name)}
+                          />
+                          <span className="truncate flex-1">{col.label}</span>
+                          {col.align === "right" ? (
+                            <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
+                          ) : null}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleColumnPin(col.name)
+                          }}
+                          disabled={!isVisible}
+                          className={cn(
+                            "flex size-5 shrink-0 items-center justify-center rounded transition-colors",
+                            isPinned
+                              ? "text-primary hover:text-primary/80 hover:bg-primary/10"
+                              : "text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 focus:opacity-100",
+                            !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
+                          )}
+                          title={
+                            !isVisible
+                              ? "Gizli kolon sabitlenemez"
+                              : isPinned
+                              ? "Sabitlemeyi kaldır (P)"
+                              : "Sola sabitle (P)"
+                          }
+                          aria-label={
+                            isPinned
+                              ? `${col.label} sabitlemesini kaldır`
+                              : `${col.label} sola sabitle`
+                          }
+                        >
+                          <Pin
+                            className={cn(
+                              "size-3 transition-transform",
+                              isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                            )}
+                          />
+                        </button>
+                      </div>
                     )
                   })}
                   {filteredMenuColumns.length === 0 ? (
