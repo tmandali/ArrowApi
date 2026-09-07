@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Filter,
   Download,
-  ChevronDown,
   Database,
   FileText,
 } from "lucide-react"
@@ -572,19 +571,17 @@ export function ArrowReportGrid({
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+                size="icon"
+                className="size-7 shrink-0"
                 disabled={isStreaming || isSavingDisk || isExporting || effectiveColumns.length === 0}
-                title="Dışa Aktar (Excel, Parquet, CSV)"
-                aria-label="Dışa Aktar"
+                title="Export (Excel, Parquet, CSV)"
+                aria-label="Export"
               >
                 {isExporting ? (
                   <Spinner className="size-3.5" />
                 ) : (
                   <Download className="size-3.5 text-muted-foreground" />
                 )}
-                <span>Dışa Aktar</span>
-                <ChevronDown className="size-3 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
