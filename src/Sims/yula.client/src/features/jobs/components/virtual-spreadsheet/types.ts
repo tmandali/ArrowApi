@@ -42,6 +42,13 @@ export interface GridPersistedState {
   showFooter?: boolean
 }
 
+export interface AiSqlView {
+  id: string
+  title: string
+  sql: string
+  createdAt: number
+}
+
 export type SpreadsheetColumn = {
   name: string
   label: string
@@ -143,4 +150,14 @@ export type VirtualSpreadsheetProps<T> = {
   aggregationValues?: ColumnAggregationValues
   /** Varsayılan özet konfigürasyonu */
   defaultAggregationConfigs?: ColumnAggregationConfig
+  /** AI SQL görünümleri listesi */
+  aiViews?: readonly AiSqlView[]
+  /** Aktif AI SQL görünümü ID'si (null ise varsayılan ham veri görünümü) */
+  activeAiViewId?: string | null
+  /** AI görünümü seçildiğinde veya ham veriye dönüldüğünde çağrılır */
+  onSelectAiView?: (viewId: string | null) => void
+  /** AI görünümünün adı değiştirildiğinde çağrılır */
+  onRenameAiView?: (viewId: string, nextTitle: string) => void
+  /** AI görünümü silindiğinde çağrılır */
+  onDeleteAiView?: (viewId: string) => void
 }

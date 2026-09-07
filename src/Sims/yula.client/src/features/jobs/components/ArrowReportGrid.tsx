@@ -55,6 +55,7 @@ import {
   buildDuckDbAggregationSql,
   formatAggregatedValue,
   AGGREGATION_SHORT_LABELS,
+  type AiSqlView,
 } from "./virtual-spreadsheet"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
@@ -246,6 +247,121 @@ export function ArrowReportGrid({
     }
     return undefined
   }, [reportScope, title])
+
+  // AI SQL Görünümleri Yönetimi
+  const [aiViews, setAiViews] = React.useState<AiSqlView[]>([])
+  const [activeAiViewId, setActiveAiViewId] = React.useState<string | null>(null)
+
+  // LocalStorage'dan AI görünümlerini yükle
+  React.useEffect(() => {
+    if (!storageKey || typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem(`${storageKey}_ai_views`)
+      if (raw) {
+        const parsed = JSON.parse(raw) as AiSqlView[]
+        if (Array.isArray(parsed)) {
+          setAiViews(parsed)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [storageKey])
+
+  // customQuerySql değiştiğinde (AI yeni bir SQL ürettiğinde) otomatik kaydet ve aktif et
+  React.useEffect(() => {
+    if (!customQuerySql) {
+      setActiveAiViewId(null)
+      return
+    }
+
+    setAiViews((prev) => {
+      const existing = prev.find((v) => v.sql.trim() === customQuerySql.trim())
+      if (existing) {
+        setActiveAiViewId(existing.id)
+        return prev
+      }
+
+      const newView: AiSqlView = {
+        id: `ai_${Date.now()}`,
+        title: customQueryTitle || `AI Görünümü ${prev.length + 1}`,
+        sql: customQuerySql,
+        createdAt: Date.now(),
+      }
+      setActiveAiViewId(newView.id)
+      const next = [...prev, newView]
+
+      if (storageKey && typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`${storageKey}_ai_views`, JSON.stringify(next))
+        } catch {
+          // ignore
+        }
+      }
+      return next
+    })
+  }, [customQuerySql, customQueryTitle, storageKey])
+
+  const handleSelectAiView = React.useCallback(
+    (viewId: string | null) => {
+      if (!viewId) {
+        useYulaGridStore.getState().setCustomQuerySql(null, null)
+        setActiveAiViewId(null)
+        return
+      }
+      const target = aiViews.find((v) => v.id === viewId)
+      if (target) {
+        useYulaGridStore.getState().setCustomQuerySql(target.sql, target.title)
+        setActiveAiViewId(target.id)
+      }
+    },
+    [aiViews]
+  )
+
+  const handleRenameAiView = React.useCallback(
+    (viewId: string, nextTitle: string) => {
+      setAiViews((prev) => {
+        const next = prev.map((v) =>
+          v.id === viewId ? { ...v, title: nextTitle } : v
+        )
+        if (storageKey && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`${storageKey}_ai_views`, JSON.stringify(next))
+          } catch {
+            // ignore
+          }
+        }
+        return next
+      })
+
+      if (activeAiViewId === viewId && customQuerySql) {
+        useYulaGridStore.getState().setCustomQuerySql(customQuerySql, nextTitle)
+      }
+    },
+    [activeAiViewId, customQuerySql, storageKey]
+  )
+
+  const handleDeleteAiView = React.useCallback(
+    (viewId: string) => {
+      setAiViews((prev) => {
+        const next = prev.filter((v) => v.id !== viewId)
+        if (storageKey && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`${storageKey}_ai_views`, JSON.stringify(next))
+          } catch {
+            // ignore
+          }
+        }
+        return next
+      })
+
+      if (activeAiViewId === viewId) {
+        useYulaGridStore.getState().setCustomQuerySql(null, null)
+        setActiveAiViewId(null)
+      }
+    },
+    [activeAiViewId, storageKey]
+  )
 
   const hasActiveFilters = React.useMemo(
     () => Object.values(filters).some((q) => q.trim().length > 0),
@@ -761,6 +877,11 @@ export function ArrowReportGrid({
       progressValue={progressPercent}
       resetKey={`${jobId}:${customQuerySql ?? ""}:${filterKey}`}
       storageKey={storageKey}
+      aiViews={aiViews}
+      activeAiViewId={activeAiViewId}
+      onSelectAiView={handleSelectAiView}
+      onRenameAiView={handleRenameAiView}
+      onDeleteAiView={handleDeleteAiView}
       hiddenColumns={hiddenColumns}
       onHiddenColumnsChange={setHiddenColumns}
       pinnedColumns={pinnedColumns}

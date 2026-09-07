@@ -40,6 +40,7 @@ import {
   ColumnManagementMenu,
   TableSkeletonRows,
   TableFooterSummaryRow,
+  AiViewDropdown,
   computeInMemoryAggregations,
   getDefaultAggregationForColumn,
 } from "./virtual-spreadsheet"
@@ -91,6 +92,11 @@ export function VirtualSpreadsheet<T>({
   onAggregationConfigsChange,
   aggregationValues,
   defaultAggregationConfigs,
+  aiViews,
+  activeAiViewId,
+  onSelectAiView,
+  onRenameAiView,
+  onDeleteAiView,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -1025,10 +1031,19 @@ export function VirtualSpreadsheet<T>({
     <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
       <div className={panelHeaderClass}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 shrink-0">
             <Table2 className={panelHeaderIconClass} aria-hidden />
             <span className={panelHeaderTitleClass}>{title}</span>
           </div>
+          {aiViews && (aiViews.length > 0 || activeAiViewId != null) ? (
+            <AiViewDropdown
+              aiViews={aiViews}
+              activeAiViewId={activeAiViewId}
+              onSelectAiView={onSelectAiView}
+              onRenameAiView={onRenameAiView}
+              onDeleteAiView={onDeleteAiView}
+            />
+          ) : null}
           {subtitle != null ? (
             <span className={panelHeaderSubtitleClass}>{subtitle}</span>
           ) : null}

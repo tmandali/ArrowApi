@@ -86,6 +86,14 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 - **Desteklenen Metrikler:** Sayısal kolonlar için `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `DISTINCT`; metin/tarih kolonları için `COUNT`, `DISTINCT`; `None` (kapatma).
 - **LocalStorage Kalıcılığı:** Kullanıcının seçtiği kolon metrikleri (`aggregations`) ve çubuk görünürlük durumu (`showFooterSummary`) `GridPersistedState` içine kaydedilir ve "Varsayılana Sıfırla" ile temizlenir.
 
+### Kural 8: AI SQL Görünümleri ve Açılır Seçici (AI SQL Views Dropdown)
+- Yula AI `set_grid_query` çalıştırdığında veya yeni bir analitik sorgu ürettiğinde, bu sorgu tabloyu geçici ezmek yerine otomatik olarak `${storageKey}_ai_views` altında yeni bir AI Görünümü (`AiSqlView`) olarak saklanır.
+- Rapor başlığının hemen sağında rozet şeklinde açılır menü (`AiViewDropdown`) yer alır: `[ ✦ {view.title} ▾ ]` veya `[ ⊞ Ham Veri ▾ ]`.
+- Kullanıcı tek tıkla `Ham Veri (Tüm Kayıtlar)` ile AI SQL analizleri arasında geçiş yapabilir.
+- Menü üzerinden AI görünümleri **yeniden adlandırılabilir** (`rename`), **silinebilir** (`delete`) ve **SQL sorgusu incelenebilir/kopyalanabilir**.
+- Silinen görünüm aktifse grid otomatik olarak temel `Ham Veri` görünümüne geri döner.
+
+
 
 ---
 

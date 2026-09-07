@@ -10,6 +10,7 @@ const testFiles = [
   "test-parquet-merge.mjs",
   "test-criteria-input-engine.mjs",
   "test-aggregations.mjs",
+  "test-ai-views.mjs",
 ]
 
 console.log("==================================================")
