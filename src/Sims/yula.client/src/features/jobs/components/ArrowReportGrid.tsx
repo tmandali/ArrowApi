@@ -566,6 +566,18 @@ export function ArrowReportGrid({
               <X className="size-3 shrink-0" />
             </Button>
           ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => void refresh()}
+            disabled={isStreaming || isSavingDisk || isExporting}
+            title="Verileri sunucudan yeniden çek"
+            aria-label="Refresh report"
+          >
+            <RotateCw className={cn("size-3.5", (isStreaming || isSavingDisk) && "animate-spin")} />
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -618,18 +630,6 @@ export function ArrowReportGrid({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-7 shrink-0"
-            onClick={() => void refresh()}
-            disabled={isStreaming || isSavingDisk || isExporting}
-            title="Verileri sunucudan yeniden çek"
-            aria-label="Refresh report"
-          >
-            <RotateCw className={cn("size-3.5", (isStreaming || isSavingDisk) && "animate-spin")} />
-          </Button>
         </>
       }
       onNeedMore={loadMore}
