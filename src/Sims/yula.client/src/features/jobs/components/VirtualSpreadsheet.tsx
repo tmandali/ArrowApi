@@ -35,12 +35,12 @@ export const headClass =
  */
 function getDefaultColumnWidth(col: SpreadsheetColumn): number {
   const labelLen = (col.label || col.name || "").length;
-  // Sayısal (sağa hizalı) kolonlar için kompakt genişlik
+  // Sayısal (sağa hizalı) kolonlar için kompakt genişlik (80px - 130px)
   if (col.align === "right") {
-    return Math.max(100, Math.min(180, labelLen * 9 + 36));
+    return Math.max(80, Math.min(130, labelLen * 7 + 28));
   }
-  // Metin / genel (sola hizalı) kolonlar için genişlik
-  return Math.max(140, Math.min(320, labelLen * 10 + 44));
+  // Metin / genel (sola hizalı) kolonlar için dengeli genişlik (100px - 220px)
+  return Math.max(100, Math.min(220, labelLen * 8 + 32));
 }
 
 export type SpreadsheetColumn = {
@@ -151,8 +151,8 @@ export function VirtualSpreadsheet<T>({
       const w = getColWidth(col)
       if (typeof w === "number") return sum + w
       if (typeof w === "string" && w.endsWith("px")) return sum + parseFloat(w)
-      if (typeof w === "string" && w.endsWith("%")) return sum + 140
-      return sum + 130
+      if (typeof w === "string" && w.endsWith("%")) return sum + 110
+      return sum + 100
     }, 0)
   }, [columns, getColWidth])
 
@@ -161,7 +161,7 @@ export function VirtualSpreadsheet<T>({
       event.preventDefault()
       event.stopPropagation()
       const th = (event.currentTarget as HTMLElement).closest("th")
-      const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 130
+      const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 100
       const startWidth = th?.getBoundingClientRect().width || fallbackW
       resizeRef.current = { startX: event.clientX, startWidth, name: col.name }
       const target = event.currentTarget as HTMLElement
