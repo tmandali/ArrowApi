@@ -82,7 +82,11 @@ export function TableFooterSummaryRow({
                   >
                     {agg && currentType !== "none" ? (
                       <span className="truncate tabular-nums text-foreground/90 font-semibold">
-                        <span className="text-muted-foreground font-normal mr-1">{agg.label}:</span>
+                        {agg.label ? (
+                          <span className="text-muted-foreground/80 font-normal mr-1 text-[11px] select-none">
+                            {agg.label}
+                          </span>
+                        ) : null}
                         {agg.formatted}
                       </span>
                     ) : (
