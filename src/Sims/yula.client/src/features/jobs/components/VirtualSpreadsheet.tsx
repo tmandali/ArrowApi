@@ -149,7 +149,7 @@ export type SpreadsheetColumn = {
 /**
  * Kolonun veri tipini (Sayı, Tarih, Mantıksal, Metin) temsil eden kompakt rozet.
  */
-function renderColumnTypeBadge(col: SpreadsheetColumn) {
+function renderColumnTypeBadge(col: SpreadsheetColumn, isPinned = false) {
   const duck = (col.duckType || "").toUpperCase()
   let kind = col.kind
 
@@ -174,12 +174,18 @@ function renderColumnTypeBadge(col: SpreadsheetColumn) {
   }
 
   const detailedType = col.duckType ? ` (${col.duckType})` : ""
+  const badgeBaseClass = cn(
+    "inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[9px] font-mono select-none transition-colors",
+    isPinned
+      ? "bg-primary/15 text-primary font-semibold border border-primary/30"
+      : "bg-muted/80 text-muted-foreground/80 font-medium"
+  )
 
   if (kind === "date") {
     return (
       <span
-        className="inline-flex items-center gap-0.5 rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono text-muted-foreground/80 select-none"
-        title={`Veri Tipi: Tarih${detailedType}`}
+        className={cn(badgeBaseClass, "gap-0.5")}
+        title={`Veri Tipi: Tarih${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
       >
         <Calendar className="size-2.5" />
       </span>
@@ -189,8 +195,8 @@ function renderColumnTypeBadge(col: SpreadsheetColumn) {
   if (kind === "number") {
     return (
       <span
-        className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
-        title={`Veri Tipi: Sayı / Tutar${detailedType}`}
+        className={badgeBaseClass}
+        title={`Veri Tipi: Sayı / Tutar${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
       >
         123
       </span>
@@ -200,8 +206,8 @@ function renderColumnTypeBadge(col: SpreadsheetColumn) {
   if (kind === "bool") {
     return (
       <span
-        className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
-        title={`Veri Tipi: Mantıksal${detailedType}`}
+        className={badgeBaseClass}
+        title={`Veri Tipi: Mantıksal${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
       >
         bool
       </span>
@@ -210,8 +216,8 @@ function renderColumnTypeBadge(col: SpreadsheetColumn) {
 
   return (
     <span
-      className="inline-flex items-center rounded bg-muted/80 px-1 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 select-none"
-      title={`Veri Tipi: Metin${detailedType}`}
+      className={badgeBaseClass}
+      title={`Veri Tipi: Metin${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
     >
       Aa
     </span>
@@ -1432,43 +1438,61 @@ export function VirtualSpreadsheet<T>({
                               onCheckedChange={() => toggleColumnVisibility(col.name)}
                             />
                             <span className="truncate flex-1">{col.label}</span>
-                            {renderColumnTypeBadge(col)}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleColumnPin(col.name)
-                            }}
-                            disabled={!isVisible}
-                            className={cn(
-                              "flex size-5 shrink-0 items-center justify-center rounded transition-colors",
-                              isPinned
-                                ? "text-primary hover:text-primary/80 hover:bg-primary/10"
-                                : "text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 focus:opacity-100",
-                              !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
-                            )}
-                            title={
-                              !isVisible
-                                ? "Gizli kolon sabitlenemez"
-                                : isPinned
-                                ? "Sabitlemeyi kaldır (P)"
-                                : "Sola sabitle (P)"
-                            }
-                            aria-label={
-                              isPinned
-                                ? `${col.label} sabitlemesini kaldır`
-                                : `${col.label} sola sabitle`
-                            }
-                          >
-                            <Pin
+                          {/* Sağ Slot: Varsayılan Veri Tipi Rozeti <-> Hover / Klavye Odak Pin/Unpin Butonu */}
+                          <div className="relative flex size-6 shrink-0 items-center justify-center">
+                            {/* Varsayılan: Veri Tipi Rozeti (Hover ve Klavye Odak durumunda yerini Pin/Unpin butonuna bırakır) */}
+                            <div
                               className={cn(
-                                "size-3 transition-transform",
-                                isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                                "flex items-center justify-center transition-opacity",
+                                isFocused
+                                  ? "opacity-0 pointer-events-none"
+                                  : "group-hover:opacity-0 group-hover:pointer-events-none"
                               )}
-                            />
-                          </button>
+                            >
+                              {renderColumnTypeBadge(col, isPinned)}
+                            </div>
+
+                            {/* Hover / Klavye Odak: Pin / Unpin Butonu */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleColumnPin(col.name)
+                              }}
+                              disabled={!isVisible}
+                              className={cn(
+                                "absolute inset-0 flex items-center justify-center rounded transition-all",
+                                isFocused
+                                  ? "opacity-100 scale-100"
+                                  : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 focus:opacity-100",
+                                isPinned
+                                  ? "text-primary hover:text-primary/80 hover:bg-primary/10"
+                                  : "text-muted-foreground/60 hover:text-foreground hover:bg-muted",
+                                !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
+                              )}
+                              title={
+                                !isVisible
+                                  ? "Gizli kolon sabitlenemez"
+                                  : isPinned
+                                  ? "Sabitlemeyi kaldır (P)"
+                                  : "Sola sabitle (P)"
+                              }
+                              aria-label={
+                                isPinned
+                                  ? `${col.label} sabitlemesini kaldır`
+                                  : `${col.label} sola sabitle`
+                              }
+                            >
+                              <Pin
+                                className={cn(
+                                  "size-3.5 transition-transform",
+                                  isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                                )}
+                              />
+                            </button>
+                          </div>
                         </div>
                       </React.Fragment>
                     )
