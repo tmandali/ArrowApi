@@ -423,7 +423,10 @@ export function ArrowReportGrid({
   } | null>(null)
 
   const runExport = React.useCallback(
-    async (format: "xlsx" | "parquet" | "csv" | "zip" = "xlsx", maxTotalRows?: number) => {
+    async (
+      format: "xlsx" | "parquet" | "csv" | "zip" | "gz" = "xlsx",
+      maxTotalRows?: number
+    ) => {
       setExportWarning(null)
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       setIsExporting(true)
@@ -432,6 +435,8 @@ export function ArrowReportGrid({
           ? "Excel dosyası"
           : format === "parquet"
           ? "Parquet dosyası"
+          : format === "gz"
+          ? "Gzip CSV dosyası"
           : "Sıkıştırılmış CSV arşivi"
       const exportToastId = toast.loading(`${formatLabel} hazırlanıyor...`)
       try {
@@ -451,7 +456,7 @@ export function ArrowReportGrid({
           sortBy,
           sortDesc,
           columns: effectiveColumns.map((c) => c.name),
-          preferredFormat: format === "csv" ? "zip" : format,
+          preferredFormat: format,
           maxTotalRows,
         })
 
@@ -470,6 +475,12 @@ export function ArrowReportGrid({
           const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
           toast.success(
             `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            { id: exportToastId }
+          )
+        } else if (result.format === "gz") {
+          const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+          toast.success(
+            `Gzip CSV indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
             { id: exportToastId }
           )
         } else if (result.format === "zip") {
@@ -505,7 +516,7 @@ export function ArrowReportGrid({
   )
 
   const handleExportClick = React.useCallback(
-    (format: "xlsx" | "parquet" | "csv" | "zip" = "xlsx") => {
+    (format: "xlsx" | "parquet" | "csv" | "zip" | "gz" = "xlsx") => {
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
 
@@ -629,13 +640,13 @@ export function ArrowReportGrid({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleExportClick("zip")}
+                onClick={() => handleExportClick("gz")}
                 className="cursor-pointer gap-2 py-2"
               >
                 <FileArchive className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-medium text-xs">CSV (.zip)</span>
-                  <span className="text-[10px] text-muted-foreground">Sıkıştırılmış Excel uyumlu CSV arşivi</span>
+                  <span className="font-medium text-xs">CSV (.csv.gz)</span>
+                  <span className="text-[10px] text-muted-foreground">Doğrudan C++ GZIP akışı — Hızlı & Kompakt</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>

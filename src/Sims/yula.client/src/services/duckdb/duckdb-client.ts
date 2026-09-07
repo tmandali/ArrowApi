@@ -9,7 +9,7 @@ type WorkerResponse = {
   rowCount?: number
   error?: string
   buffer?: ArrayBuffer
-  format?: "xlsx" | "csv" | "parquet" | "zip"
+  format?: "xlsx" | "csv" | "parquet" | "zip" | "gz"
   fileName?: string
   sheetCount?: number
 }
@@ -238,11 +238,11 @@ class DuckDbClient {
     sortBy?: string | null
     sortDesc?: boolean
     columns?: string[]
-    preferredFormat?: "xlsx" | "csv" | "parquet" | "zip"
+    preferredFormat?: "xlsx" | "csv" | "parquet" | "zip" | "gz"
     maxRowsPerSheet?: number
     maxTotalRows?: number
   }): Promise<{
-    format: "xlsx" | "csv" | "parquet" | "zip"
+    format: "xlsx" | "csv" | "parquet" | "zip" | "gz"
     fileName: string
     sizeBytes: number
     totalRows: number
@@ -290,20 +290,23 @@ class DuckDbClient {
         ? "application/vnd.apache.parquet"
         : res.format === "zip"
         ? "application/zip"
+        : res.format === "gz"
+        ? "application/gzip"
         : "text/csv;charset=utf-8;"
 
     const blob = new Blob([res.buffer], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = res.fileName || `${fileName}.${res.format || "zip"}`
+    const defaultExt = res.format === "gz" ? ".csv.gz" : `.${res.format || "csv"}`
+    link.download = res.fileName || `${fileName}${defaultExt}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 60000)
 
     return {
-      format: res.format ?? "zip",
+      format: res.format ?? "gz",
       fileName: link.download,
       sizeBytes: blob.size,
       totalRows: res.totalRows ?? 0,

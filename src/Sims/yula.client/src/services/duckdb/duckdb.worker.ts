@@ -469,7 +469,7 @@ self.onmessage = async (e: MessageEvent) => {
             whereClause?: string
             orderClause?: string
             fileName?: string
-            preferredFormat?: "xlsx" | "csv" | "parquet" | "zip"
+            preferredFormat?: "xlsx" | "csv" | "parquet" | "zip" | "gz"
             maxRowsPerSheet?: number
             maxTotalRows?: number
           }
@@ -499,7 +499,7 @@ self.onmessage = async (e: MessageEvent) => {
               ? maxTotalRows
               : totalRowsToExport
 
-          let format: "xlsx" | "csv" | "parquet" | "zip" = "zip"
+          let format: "xlsx" | "csv" | "parquet" | "zip" | "gz" = "gz"
           let outFileName = ""
           let fileBuffer: Uint8Array | null = null
           let sheetCount = 1
@@ -601,7 +601,33 @@ self.onmessage = async (e: MessageEvent) => {
             }
           }
 
-          // 3. CSV / ZIP Fallback veya doğrudan CSV tercihi -> Doğrudan .zip olarak paketle
+          // 3. GZ formatı (DuckDB C++ yerel GZIP streaming akışı — Sıfır ara bellek, hızlı & kompakt)
+          if (!fileBuffer && preferredFormat === "gz") {
+            try {
+              const tempGz = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv.gz`
+              const gzSql =
+                targetRows < totalRowsToExport
+                  ? `${baseQuery} LIMIT ${targetRows}`
+                  : baseQuery
+              await conn.query(
+                `COPY (${gzSql}) TO '${tempGz}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"', COMPRESSION GZIP);`
+              )
+              const rawGzBuffer = await db!.copyFileToBuffer(tempGz)
+              await db!.dropFile(tempGz).catch(() => {})
+
+              fileBuffer = rawGzBuffer
+              format = "gz"
+              outFileName = `${fileName}.csv.gz`
+            } catch (gzErr) {
+              console.warn(
+                "[duckdb.worker] GZIP export failed, falling back to raw CSV/ZIP:",
+                gzErr
+              )
+              fileBuffer = null
+            }
+          }
+
+          // 4. CSV / ZIP Fallback veya doğrudan ZIP tercihi
           if (!fileBuffer) {
             const tempCsv = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv`
             const csvSql =
@@ -621,18 +647,22 @@ self.onmessage = async (e: MessageEvent) => {
             csvWithBom.set(bom, 0)
             csvWithBom.set(rawCsvBuffer, bom.length)
 
-            // Doğrudan .zip arşivine paketle: Kullanıcı dosyayı indirdiğinde %80-%90 daha küçük boyutta
-            // standart PKZIP (.zip) arşivi olarak alır. Çift tıklamayla açtığında içinden Excel uyumlu
-            // UTF-8 BOM'lu .csv çıkar.
-            try {
-              fileBuffer = await createSingleFileZip(`${fileName}.csv`, csvWithBom)
-              format = "zip"
-              outFileName = `${fileName}.zip`
-            } catch (zipErr) {
-              console.warn(
-                "[duckdb.worker] ZIP packaging failed, falling back to raw CSV:",
-                zipErr
-              )
+            // Tercih ZIP ise doğrudan .zip arşivine paketle, aksi halde raw CSV
+            if (preferredFormat === "zip") {
+              try {
+                fileBuffer = await createSingleFileZip(`${fileName}.csv`, csvWithBom)
+                format = "zip"
+                outFileName = `${fileName}.zip`
+              } catch (zipErr) {
+                console.warn(
+                  "[duckdb.worker] ZIP packaging failed, falling back to raw CSV:",
+                  zipErr
+                )
+                fileBuffer = csvWithBom
+                format = "csv"
+                outFileName = `${fileName}.csv`
+              }
+            } else {
               fileBuffer = csvWithBom
               format = "csv"
               outFileName = `${fileName}.csv`
