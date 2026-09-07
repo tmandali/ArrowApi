@@ -402,7 +402,7 @@ export function ArrowReportGrid({
       onNeedMore={loadMore}
       hasMore={hasMore}
       loadingMore={isLoadingQuery}
-      renderFilterCell={(col) => {
+      renderFilterCell={(col, index) => {
         const val = filters[col.name] ?? ""
         return (
           <div className="group relative flex w-full items-center">
@@ -413,7 +413,7 @@ export function ArrowReportGrid({
                 val && "pr-5",
                 col.align === "right" && "text-right"
               )}
-              placeholder="Filtrele…"
+              placeholder={index === 0 ? "Filtrele…" : undefined}
               title="Arama terimi, boşluklu kelimeler, aralık (10..50), >100 veya boş hücreler için '' yazabilirsiniz"
               value={val}
               onChange={(event) => setFilter(col.name, event.target.value)}
