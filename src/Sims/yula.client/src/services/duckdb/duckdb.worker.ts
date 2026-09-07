@@ -461,6 +461,7 @@ self.onmessage = async (e: MessageEvent) => {
             fileName = "rapor",
             preferredFormat = "xlsx",
             maxRowsPerSheet = 1_000_000,
+            maxTotalRows,
           } = payload as {
             tableName: string
             columns?: string[]
@@ -469,6 +470,7 @@ self.onmessage = async (e: MessageEvent) => {
             fileName?: string
             preferredFormat?: "xlsx" | "csv"
             maxRowsPerSheet?: number
+            maxTotalRows?: number
           }
 
           const escapedTable = `"${tableName.replace(/"/g, '""')}"`
@@ -491,6 +493,11 @@ self.onmessage = async (e: MessageEvent) => {
             totalRowsToExport = 0
           }
 
+          const targetRows =
+            maxTotalRows && maxTotalRows > 0 && maxTotalRows < totalRowsToExport
+              ? maxTotalRows
+              : totalRowsToExport
+
           let format: "xlsx" | "csv" = "csv"
           let outFileName = ""
           let fileBuffer: Uint8Array | null = null
@@ -506,22 +513,27 @@ self.onmessage = async (e: MessageEvent) => {
               const tempXlsx = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.xlsx`
               const chunkSize = Math.min(Math.max(10_000, maxRowsPerSheet), 1_000_000)
 
-              if (totalRowsToExport > chunkSize) {
+              if (targetRows > chunkSize) {
                 // Excel 1.048.576 satır sınırını aşıyor: otomatik çoklu sayfa (auto-split)
-                sheetCount = Math.ceil(totalRowsToExport / chunkSize)
+                sheetCount = Math.ceil(targetRows / chunkSize)
                 for (let s = 0; s < sheetCount; s++) {
                   const offset = s * chunkSize
+                  const currentChunk = Math.min(chunkSize, targetRows - offset)
                   const sheetName = `Sayfa ${s + 1}`
                   const mode = s === 0 ? "create" : "append"
-                  const chunkSql = `${baseQuery} LIMIT ${chunkSize} OFFSET ${offset}`
+                  const chunkSql = `${baseQuery} LIMIT ${currentChunk} OFFSET ${offset}`
                   await conn.query(
                     `COPY (${chunkSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET '${sheetName}', MODE '${mode}');`
                   )
                 }
               } else {
                 // 1 milyondan az satır: tek sayfada hızlı dışa aktar
+                const singleSql =
+                  targetRows < totalRowsToExport
+                    ? `${baseQuery} LIMIT ${targetRows}`
+                    : baseQuery
                 await conn.query(
-                  `COPY (${baseQuery}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET 'Sayfa 1', MODE 'create');`
+                  `COPY (${singleSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET 'Sayfa 1', MODE 'create');`
                 )
               }
 
@@ -531,7 +543,7 @@ self.onmessage = async (e: MessageEvent) => {
               outFileName = `${fileName}.xlsx`
             } catch (xlsxErr) {
               console.warn(
-                "[DuckDB Worker] excel extension yüklenemedi veya export başarısız oldu, UTF-8 BOM CSV fallback uygulanıyor:",
+                "[duckdb.worker] Excel extension export failed, falling back to UTF-8 BOM CSV:",
                 xlsxErr
               )
               fileBuffer = null
@@ -539,23 +551,27 @@ self.onmessage = async (e: MessageEvent) => {
             }
           }
 
-          // 2. CSV fallback veya doğrudan CSV tercihi
+          // 2. CSV Fallback (Excel açılabilsin diye UTF-8 BOM ve noktalı virgül standardı)
           if (!fileBuffer) {
             const tempCsv = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv`
+            const csvSql =
+              targetRows < totalRowsToExport
+                ? `${baseQuery} LIMIT ${targetRows}`
+                : baseQuery
             // Excel Türkiye/Avrupa standardı: Noktalı virgül (;) ayracı
             await conn.query(
-              `COPY (${baseQuery}) TO '${tempCsv}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"');`
+              `COPY (${csvSql}) TO '${tempCsv}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"');`
             )
             const rawCsvBuffer = await db!.copyFileToBuffer(tempCsv)
             await db!.dropFile(tempCsv).catch(() => {})
 
-            // Excel'in Türkçe karakterleri (ğ, ü, ş, ı, ö, ç, İ) doğrudan tanıması için UTF-8 BOM (0xEF, 0xBB, 0xBF) ekle
+            // UTF-8 BOM (0xEF, 0xBB, 0xBF) ekle — Excel'in Türkçe karakterleri sormadan düzgün açması için
             const bom = new Uint8Array([0xef, 0xbb, 0xbf])
-            const merged = new Uint8Array(bom.length + rawCsvBuffer.length)
-            merged.set(bom, 0)
-            merged.set(rawCsvBuffer, bom.length)
+            const finalBuffer = new Uint8Array(bom.length + rawCsvBuffer.length)
+            finalBuffer.set(bom, 0)
+            finalBuffer.set(rawCsvBuffer, bom.length)
 
-            fileBuffer = merged
+            fileBuffer = finalBuffer
             format = "csv"
             outFileName = `${fileName}.csv`
           }
@@ -565,14 +581,15 @@ self.onmessage = async (e: MessageEvent) => {
             fileBuffer.byteOffset + fileBuffer.byteLength
           ) as ArrayBuffer
 
-          ;(self as any).postMessage(
+          ;(self as unknown as Worker).postMessage(
             {
+              action: "EXPORT_TABLE_RESPONSE",
               id,
               success: true,
               buffer: transferBuffer,
               format,
               fileName: outFileName,
-              totalRows: totalRowsToExport,
+              totalRows: targetRows,
               sheetCount,
             },
             [transferBuffer]

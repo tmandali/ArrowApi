@@ -2,11 +2,19 @@
 
 import { useYulaGridStore } from "@/lib/stores/grid";
 import * as React from "react"
-import { RotateCw, X, DatabaseIcon, TriangleAlert, FileSpreadsheet } from "lucide-react"
+import { RotateCw, X, DatabaseIcon, TriangleAlert, FileSpreadsheet, AlertCircle, AlertTriangle, Filter } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useDuckReport, type ReportColumnMeta } from "../hooks/use-duck-report"
 import { duckDbClient } from "@/services/duckdb"
 
@@ -390,64 +398,98 @@ export function ArrowReportGrid({
   }, [effectiveColumns])
 
   const [isExporting, setIsExporting] = React.useState(false)
+  const [exportWarning, setExportWarning] = React.useState<{
+    type: "warning" | "hard_limit"
+    count: number
+  } | null>(null)
 
-  const handleExport = React.useCallback(async () => {
-    if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
-    setIsExporting(true)
-    const exportToastId = toast.loading("Excel dosyası hazırlanıyor...")
-    try {
-      const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
-        .toLowerCase()
-        .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
-        .replace(/_+/g, "_")
-        .slice(0, 40)
-      const stamp = new Date().toISOString().slice(0, 10)
-      const fileName = `${sanitizedTitle}_${stamp}`
+  const runExport = React.useCallback(
+    async (maxTotalRows?: number) => {
+      setExportWarning(null)
+      if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+      setIsExporting(true)
+      const exportToastId = toast.loading("Excel dosyası hazırlanıyor...")
+      try {
+        const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
+          .toLowerCase()
+          .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
+          .replace(/_+/g, "_")
+          .slice(0, 40)
+        const stamp = new Date().toISOString().slice(0, 10)
+        const fileName = `${sanitizedTitle}_${stamp}`
 
-      const result = await duckDbClient.exportReportTable({
-        tableName: duckTableName,
-        fileName,
-        filters,
-        numericColumns,
-        sortBy,
-        sortDesc,
-        columns: effectiveColumns.map((c) => c.name),
-        preferredFormat: "xlsx",
-      })
+        const result = await duckDbClient.exportReportTable({
+          tableName: duckTableName,
+          fileName,
+          filters,
+          numericColumns,
+          sortBy,
+          sortDesc,
+          columns: effectiveColumns.map((c) => c.name),
+          preferredFormat: "xlsx",
+          maxTotalRows,
+        })
 
-      if (result.format === "xlsx") {
-        if (result.sheetCount && result.sheetCount > 1) {
-          toast.success(
-            `Excel dosyası indirildi (${result.sheetCount} sayfa / ${formatCount(result.totalRows)} satır)`,
-            { id: exportToastId }
-          )
+        if (result.format === "xlsx") {
+          if (result.sheetCount && result.sheetCount > 1) {
+            toast.success(
+              `Excel dosyası indirildi (${result.sheetCount} sayfa / ${formatCount(result.totalRows)} satır)`,
+              { id: exportToastId }
+            )
+          } else {
+            toast.success(`Excel dosyası indirildi (${result.fileName})`, {
+              id: exportToastId,
+            })
+          }
         } else {
-          toast.success(`Excel dosyası indirildi (${result.fileName})`, {
+          toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
             id: exportToastId,
           })
         }
-      } else {
-        toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
-          id: exportToastId,
-        })
+      } catch (err) {
+        console.error("Export error:", err)
+        toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })
+      } finally {
+        setIsExporting(false)
       }
-    } catch (err) {
-      console.error("Export error:", err)
-      toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })
-    } finally {
-      setIsExporting(false)
+    },
+    [
+      duckTableName,
+      isExporting,
+      isStreaming,
+      isSavingDisk,
+      effectiveColumns,
+      title,
+      filters,
+      numericColumns,
+      sortBy,
+      sortDesc,
+    ]
+  )
+
+  const handleExportClick = React.useCallback(() => {
+    if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+    const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
+
+    if (exportRowCount > 2_000_000) {
+      setExportWarning({ type: "hard_limit", count: exportRowCount })
+      return
     }
+    if (exportRowCount > 1_000_000) {
+      setExportWarning({ type: "warning", count: exportRowCount })
+      return
+    }
+    void runExport()
   }, [
     duckTableName,
     isExporting,
     isStreaming,
     isSavingDisk,
-    effectiveColumns,
-    title,
-    filters,
-    numericColumns,
-    sortBy,
-    sortDesc,
+    effectiveColumns.length,
+    hasActiveFilters,
+    totalFiltered,
+    totalRows,
+    runExport,
   ])
 
   const subtitle =
@@ -456,7 +498,8 @@ export function ArrowReportGrid({
     (isStreaming || isSavingDisk || effectiveColumns.length === 0 ? null : countDisplay)
 
   return (
-    <VirtualSpreadsheet
+    <>
+      <VirtualSpreadsheet
       columns={effectiveColumns}
       items={displayRows}
       title={title}
@@ -494,7 +537,7 @@ export function ArrowReportGrid({
             variant="outline"
             size="icon"
             className="size-7 shrink-0"
-            onClick={() => void handleExport()}
+            onClick={() => handleExportClick()}
             disabled={isStreaming || isSavingDisk || isExporting || effectiveColumns.length === 0}
             title="Excel'e Aktar (.xlsx / .csv)"
             aria-label="Excel'e Aktar"
@@ -596,5 +639,114 @@ export function ArrowReportGrid({
         )
       }}
     />
+
+    <Dialog
+      open={exportWarning !== null}
+      onOpenChange={(open) => {
+        if (!open) setExportWarning(null)
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        {exportWarning?.type === "hard_limit" ? (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="size-5 shrink-0" />
+                <DialogTitle className="text-base font-semibold">
+                  Excel Dışa Aktarma Sınırı Aşıldı
+                </DialogTitle>
+              </div>
+              <DialogDescription className="pt-2 text-xs leading-relaxed text-muted-foreground">
+                Bu raporda{" "}
+                <strong className="font-semibold text-foreground tabular-nums">
+                  {formatCount(exportWarning.count)} satır
+                </strong>{" "}
+                veri bulunmaktadır. Microsoft Excel&apos;in tek sayfa sınırı 1.048.576 satırdır ve 2 milyonun üzerindeki veri kümelerinde Excel kilitlenmekte veya çökmektedir.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+              <p className="font-semibold">Önerilen Çözüm:</p>
+              <p className="mt-0.5 text-muted-foreground">
+                Excel uygulamasının kilitlenmesini önlemek için lütfen tarih, şube, cari veya ürün filtrelerini daraltarak sonuçları en fazla 1-2 milyon satır ile sınırlandırın.
+              </p>
+            </div>
+
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExportWarning(null)}
+              >
+                <Filter className="mr-1.5 size-3.5" />
+                Filtreleri Düzenle
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void runExport(1_000_000)}
+              >
+                <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
+                İlk 1.000.000 Satırı İndir
+              </Button>
+            </DialogFooter>
+          </>
+        ) : exportWarning?.type === "warning" ? (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                <AlertTriangle className="size-5 shrink-0" />
+                <DialogTitle className="text-base font-semibold">
+                  Büyük Veri Kümesi Uyarısı
+                </DialogTitle>
+              </div>
+              <DialogDescription className="pt-2 text-xs leading-relaxed text-muted-foreground">
+                Bu raporda{" "}
+                <strong className="font-semibold text-foreground tabular-nums">
+                  {formatCount(exportWarning.count)} satır
+                </strong>{" "}
+                veri bulunmaktadır. Microsoft Excel tek sayfada en fazla 1.048.576 satır desteklediği için veriniz{" "}
+                <strong className="font-semibold text-foreground">2 çalışma sayfasına</strong> (Sayfa 1 ve Sayfa 2) bölünerek aktarılacaktır.
+              </DialogDescription>
+            </DialogHeader>
+
+            <p className="text-xs text-muted-foreground">
+              2 çalışma sayfasından oluşan büyük dosyaları açarken bilgisayarınızda kısa süreli donma veya performans kaybı yaşanabilir.
+            </p>
+
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExportWarning(null)}
+              >
+                Vazgeç / Filtrele
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void runExport(1_000_000)}
+              >
+                <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
+                İlk 1.000.000 Satırı Al
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => void runExport()}
+              >
+                2 Sayfa Olarak İndir
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

@@ -240,6 +240,7 @@ class DuckDbClient {
     columns?: string[]
     preferredFormat?: "xlsx" | "csv"
     maxRowsPerSheet?: number
+    maxTotalRows?: number
   }): Promise<{
     format: "xlsx" | "csv"
     fileName: string
@@ -257,6 +258,7 @@ class DuckDbClient {
       columns,
       preferredFormat = "xlsx",
       maxRowsPerSheet = 1_000_000,
+      maxTotalRows,
     } = options
 
     const whereClause = buildCombinedWhereClause(filters, numericColumns)
@@ -274,6 +276,7 @@ class DuckDbClient {
       fileName,
       preferredFormat,
       maxRowsPerSheet,
+      maxTotalRows,
     })
 
     if (!res.buffer) {
