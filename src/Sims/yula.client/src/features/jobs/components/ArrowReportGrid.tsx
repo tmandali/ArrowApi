@@ -2,11 +2,31 @@
 
 import { useYulaGridStore } from "@/lib/stores/grid";
 import * as React from "react"
-import { RotateCw, X, DatabaseIcon, TriangleAlert, FileSpreadsheet, AlertCircle, AlertTriangle, Filter } from "lucide-react"
+import {
+  RotateCw,
+  X,
+  DatabaseIcon,
+  TriangleAlert,
+  FileSpreadsheet,
+  AlertCircle,
+  AlertTriangle,
+  Filter,
+  Download,
+  ChevronDown,
+  Database,
+  FileText,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
@@ -404,11 +424,13 @@ export function ArrowReportGrid({
   } | null>(null)
 
   const runExport = React.useCallback(
-    async (maxTotalRows?: number) => {
+    async (format: "xlsx" | "parquet" | "csv" = "xlsx", maxTotalRows?: number) => {
       setExportWarning(null)
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       setIsExporting(true)
-      const exportToastId = toast.loading("Excel dosyası hazırlanıyor...")
+      const formatLabel =
+        format === "xlsx" ? "Excel dosyası" : format === "parquet" ? "Parquet dosyası" : "CSV dosyası"
+      const exportToastId = toast.loading(`${formatLabel} hazırlanıyor...`)
       try {
         const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
           .toLowerCase()
@@ -426,7 +448,7 @@ export function ArrowReportGrid({
           sortBy,
           sortDesc,
           columns: effectiveColumns.map((c) => c.name),
-          preferredFormat: "xlsx",
+          preferredFormat: format,
           maxTotalRows,
         })
 
@@ -441,6 +463,12 @@ export function ArrowReportGrid({
               id: exportToastId,
             })
           }
+        } else if (result.format === "parquet") {
+          const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+          toast.success(
+            `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            { id: exportToastId }
+          )
         } else {
           toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
             id: exportToastId,
@@ -467,30 +495,37 @@ export function ArrowReportGrid({
     ]
   )
 
-  const handleExportClick = React.useCallback(() => {
-    if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
-    const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
+  const handleExportClick = React.useCallback(
+    (format: "xlsx" | "parquet" | "csv" = "xlsx") => {
+      if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+      const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
 
-    if (exportRowCount > 2_000_000) {
-      setExportWarning({ type: "hard_limit", count: exportRowCount })
-      return
-    }
-    if (exportRowCount > 1_000_000) {
-      setExportWarning({ type: "warning", count: exportRowCount })
-      return
-    }
-    void runExport()
-  }, [
-    duckTableName,
-    isExporting,
-    isStreaming,
-    isSavingDisk,
-    effectiveColumns.length,
-    hasActiveFilters,
-    totalFiltered,
-    totalRows,
-    runExport,
-  ])
+      // Parquet ve CSV için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
+      if (format === "xlsx") {
+        if (exportRowCount > 2_000_000) {
+          setExportWarning({ type: "hard_limit", count: exportRowCount })
+          return
+        }
+        if (exportRowCount > 1_000_000) {
+          setExportWarning({ type: "warning", count: exportRowCount })
+          return
+        }
+      }
+
+      void runExport(format)
+    },
+    [
+      duckTableName,
+      isExporting,
+      isStreaming,
+      isSavingDisk,
+      effectiveColumns.length,
+      hasActiveFilters,
+      totalFiltered,
+      totalRows,
+      runExport,
+    ]
+  )
 
   const subtitle =
     streamingSubtitle ??
@@ -532,22 +567,60 @@ export function ArrowReportGrid({
               <X className="size-3 shrink-0" />
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-7 shrink-0"
-            onClick={() => handleExportClick()}
-            disabled={isStreaming || isSavingDisk || isExporting || effectiveColumns.length === 0}
-            title="Excel'e Aktar (.xlsx / .csv)"
-            aria-label="Excel'e Aktar"
-          >
-            {isExporting ? (
-              <Spinner className="size-3.5" />
-            ) : (
-              <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+                disabled={isStreaming || isSavingDisk || isExporting || effectiveColumns.length === 0}
+                title="Dışa Aktar (Excel, Parquet, CSV)"
+                aria-label="Dışa Aktar"
+              >
+                {isExporting ? (
+                  <Spinner className="size-3.5" />
+                ) : (
+                  <Download className="size-3.5 text-muted-foreground" />
+                )}
+                <span>Dışa Aktar</span>
+                <ChevronDown className="size-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem
+                onClick={() => handleExportClick("xlsx")}
+                className="cursor-pointer gap-2 py-2"
+              >
+                <FileSpreadsheet className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-medium text-xs">Excel (.xlsx)</span>
+                  <span className="text-[10px] text-muted-foreground">Microsoft Excel tablosu</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExportClick("parquet")}
+                className="cursor-pointer gap-2 py-2"
+              >
+                <Database className="size-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-medium text-xs">Apache Parquet (.parquet)</span>
+                  <span className="text-[10px] text-muted-foreground">Python, Pandas, BI — ZSTD & Hızlı</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleExportClick("csv")}
+                className="cursor-pointer gap-2 py-2"
+              >
+                <FileText className="size-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-medium text-xs">CSV (.csv)</span>
+                  <span className="text-[10px] text-muted-foreground">Noktalı virgül (;) & UTF-8 BOM</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             type="button"
             variant="outline"
@@ -686,10 +759,19 @@ export function ArrowReportGrid({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => void runExport(1_000_000)}
+                onClick={() => void runExport("xlsx", 1_000_000)}
               >
                 <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
-                İlk 1.000.000 Satırı İndir
+                İlk 1.000.000 (Excel)
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => void runExport("parquet")}
+              >
+                <Database className="mr-1.5 size-3.5 text-purple-400" />
+                Tümünü Parquet İndir ({formatCount(exportWarning.count)})
               </Button>
             </DialogFooter>
           </>
@@ -729,16 +811,16 @@ export function ArrowReportGrid({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => void runExport(1_000_000)}
+                onClick={() => void runExport("xlsx", 1_000_000)}
               >
                 <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
-                İlk 1.000.000 Satırı Al
+                İlk 1.000.000 (Excel)
               </Button>
               <Button
                 type="button"
                 variant="default"
                 size="sm"
-                onClick={() => void runExport()}
+                onClick={() => void runExport("xlsx")}
               >
                 2 Sayfa Olarak İndir
               </Button>

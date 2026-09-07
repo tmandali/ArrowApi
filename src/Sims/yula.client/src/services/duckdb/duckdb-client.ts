@@ -9,7 +9,7 @@ type WorkerResponse = {
   rowCount?: number
   error?: string
   buffer?: ArrayBuffer
-  format?: "xlsx" | "csv"
+  format?: "xlsx" | "csv" | "parquet"
   fileName?: string
   sheetCount?: number
 }
@@ -238,11 +238,11 @@ class DuckDbClient {
     sortBy?: string | null
     sortDesc?: boolean
     columns?: string[]
-    preferredFormat?: "xlsx" | "csv"
+    preferredFormat?: "xlsx" | "csv" | "parquet"
     maxRowsPerSheet?: number
     maxTotalRows?: number
   }): Promise<{
-    format: "xlsx" | "csv"
+    format: "xlsx" | "csv" | "parquet"
     fileName: string
     sizeBytes: number
     totalRows: number
@@ -286,6 +286,8 @@ class DuckDbClient {
     const mimeType =
       res.format === "xlsx"
         ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : res.format === "parquet"
+        ? "application/vnd.apache.parquet"
         : "text/csv;charset=utf-8;"
 
     const blob = new Blob([res.buffer], { type: mimeType })
