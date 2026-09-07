@@ -907,14 +907,14 @@ export function VirtualSpreadsheet<T>({
               <PopoverContent
                 align="end"
                 sideOffset={6}
-                className="w-64 p-2 shadow-lg"
+                className="w-64 p-2 shadow-lg flex flex-col gap-1.5"
                 onOpenAutoFocus={(e) => {
                   e.preventDefault()
                   searchInputRef.current?.focus()
                 }}
                 onKeyDown={handleMenuKeyDown}
               >
-                <div className="flex items-center justify-between border-b border-border/50 px-0.5 pb-1.5">
+                <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
                   <div className="flex items-center gap-1.5 font-medium text-foreground text-xs">
                     <Columns3 className="size-3.5 text-muted-foreground" />
                     <span>Kolonlar</span>
@@ -940,15 +940,15 @@ export function VirtualSpreadsheet<T>({
                   </div>
                 </div>
 
-                {/* Kolon arama (dengeli üst/alt boşluk) */}
-                <div className="relative my-1.5 flex items-center">
+                {/* Kolon arama (her zaman görünür, menü açıldığında otomatik odaklanır) */}
+                <div className="relative flex items-center">
                   <Search className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
                   <Input
                     ref={searchInputRef}
                     value={columnSearch}
                     onChange={(e) => handleColumnSearchChange(e.target.value)}
                     placeholder="Kolon ara…"
-                    className="h-7 pl-7 pr-6 text-xs bg-muted/20"
+                    className="h-7 pl-7 pr-6 text-xs"
                     autoFocus
                   />
                   {columnSearch ? (
@@ -967,7 +967,7 @@ export function VirtualSpreadsheet<T>({
                 </div>
 
                 {/* Kolon Listesi (Klavye Ok Tuşları ile gezinilebilir, Boşluk/Enter ile seçilebilir) */}
-                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5 pt-0.5" role="listbox">
+                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5" role="listbox">
                   {filteredMenuColumns.map((col, index) => {
                     const isVisible = !hiddenSet.has(col.name)
                     const isLastVisible = isVisible && visibleColumns.length <= 1
