@@ -268,11 +268,30 @@ export function VirtualSpreadsheet<T>({
   const [internalHiddenColumns, setInternalHiddenColumns] = React.useState<string[]>([])
   const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
   const [columnSearch, setColumnSearch] = React.useState("")
+  const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
+  const searchInputRef = React.useRef<HTMLInputElement>(null)
+  const columnItemRefs = React.useRef<(HTMLLabelElement | null)[]>([])
 
   React.useEffect(() => {
     setInternalHiddenColumns([])
     setColumnSearch("")
+    setFocusedColIndex(-1)
   }, [resetKey])
+
+  // Menü açıldığında odağı arama kutusuna taşı
+  React.useEffect(() => {
+    if (columnMenuOpen) {
+      setFocusedColIndex(-1)
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }, 30)
+      return () => clearTimeout(timer)
+    } else {
+      setColumnSearch("")
+      setFocusedColIndex(-1)
+    }
+  }, [columnMenuOpen])
 
   const activeHiddenColumns = hiddenColumns ?? internalHiddenColumns
   const hiddenSet = React.useMemo(
@@ -325,6 +344,60 @@ export function VirtualSpreadsheet<T>({
         c.name.toLowerCase().includes(query)
     )
   }, [orderedColumns, columnSearch])
+
+  const handleColumnSearchChange = React.useCallback((val: string) => {
+    setColumnSearch(val)
+    setFocusedColIndex(-1)
+  }, [])
+
+  const handleMenuKeyDown = React.useCallback(
+    (event: React.KeyboardEvent) => {
+      const count = filteredMenuColumns.length
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault()
+        if (count === 0) return
+        setFocusedColIndex((prev) => {
+          const next = prev < count - 1 ? prev + 1 : 0
+          columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
+          return next
+        })
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault()
+        if (count === 0) return
+        setFocusedColIndex((prev) => {
+          if (prev <= 0) {
+            searchInputRef.current?.focus()
+            return -1
+          }
+          const next = prev - 1
+          columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
+          return next
+        })
+      } else if (event.key === " " || event.key === "Enter") {
+        if (focusedColIndex === -1 && event.key === "Enter" && count === 1) {
+          event.preventDefault()
+          toggleColumnVisibility(filteredMenuColumns[0].name)
+          return
+        }
+        if (focusedColIndex >= 0 && focusedColIndex < count) {
+          event.preventDefault()
+          toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
+        }
+      } else if (event.key === "Escape") {
+        if (columnSearch) {
+          event.preventDefault()
+          event.stopPropagation()
+          setColumnSearch("")
+          setFocusedColIndex(-1)
+          searchInputRef.current?.focus()
+        } else {
+          setColumnMenuOpen(false)
+        }
+      }
+    },
+    [filteredMenuColumns, focusedColIndex, columnSearch, toggleColumnVisibility]
+  )
 
   // Sürükle - bırak görsel durumları
   const [draggedColName, setDraggedColName] = React.useState<string | null>(null)
@@ -830,7 +903,16 @@ export function VirtualSpreadsheet<T>({
                   ) : null}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" sideOffset={6} className="w-64 p-2.5 shadow-lg">
+              <PopoverContent
+                align="end"
+                sideOffset={6}
+                className="w-64 p-2.5 shadow-lg"
+                onOpenAutoFocus={(e) => {
+                  e.preventDefault()
+                  searchInputRef.current?.focus()
+                }}
+                onKeyDown={handleMenuKeyDown}
+              >
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
                     <Columns3 className="size-3.5 text-muted-foreground" />
@@ -863,48 +945,70 @@ export function VirtualSpreadsheet<T>({
                   </button>
                 </div>
 
-                {/* Kolon arama (kolon sayısı > 5 ise) */}
-                {orderedColumns.length > 5 ? (
-                  <div className="relative flex items-center">
-                    <Search className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
-                    <Input
-                      value={columnSearch}
-                      onChange={(e) => setColumnSearch(e.target.value)}
-                      placeholder="Kolon ara…"
-                      className="h-7 pl-7 pr-6 text-xs"
-                    />
-                    {columnSearch ? (
-                      <button
-                        type="button"
-                        onClick={() => setColumnSearch("")}
-                        className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
+                {/* Kolon arama (her zaman görünür, menü açıldığında otomatik odaklanır) */}
+                <div className="relative flex items-center">
+                  <Search className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
+                  <Input
+                    ref={searchInputRef}
+                    value={columnSearch}
+                    onChange={(e) => handleColumnSearchChange(e.target.value)}
+                    placeholder="Kolon ara…"
+                    className="h-7 pl-7 pr-6 text-xs"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault()
+                        if (filteredMenuColumns.length > 0) {
+                          setFocusedColIndex(0)
+                          columnItemRefs.current[0]?.scrollIntoView({ block: "nearest" })
+                        }
+                      }
+                    }}
+                  />
+                  {columnSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setColumnSearch("")
+                        setFocusedColIndex(-1)
+                        searchInputRef.current?.focus()
+                      }}
+                      className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  ) : null}
+                </div>
 
-                {/* Kolon Listesi */}
-                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5">
-                  {filteredMenuColumns.map((col) => {
+                {/* Kolon Listesi (Klavye Ok Tuşları ile gezinilebilir, Boşluk/Enter ile seçilebilir) */}
+                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5" role="listbox">
+                  {filteredMenuColumns.map((col, index) => {
                     const isVisible = !hiddenSet.has(col.name)
                     const isLastVisible = isVisible && visibleColumns.length <= 1
+                    const isFocused = focusedColIndex === index
 
                     return (
                       <label
                         key={col.name}
+                        ref={(el) => {
+                          columnItemRefs.current[index] = el
+                        }}
+                        tabIndex={-1}
+                        onMouseEnter={() => setFocusedColIndex(index)}
                         className={cn(
                           "flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors select-none",
+                          isFocused && "bg-accent text-accent-foreground ring-1 ring-primary/40",
+                          !isFocused && "hover:bg-muted/60 text-foreground",
                           isLastVisible
                             ? "opacity-50 cursor-not-allowed bg-muted/20"
-                            : "hover:bg-muted/60 cursor-pointer text-foreground"
+                            : "cursor-pointer"
                         )}
                         title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
                       >
                         <Checkbox
                           checked={isVisible}
                           disabled={isLastVisible}
+                          tabIndex={-1}
                           onCheckedChange={() => toggleColumnVisibility(col.name)}
                         />
                         <span className="truncate flex-1">{col.label}</span>
