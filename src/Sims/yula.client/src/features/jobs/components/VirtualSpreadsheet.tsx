@@ -94,7 +94,10 @@ export function VirtualSpreadsheet<T>({
   defaultAggregationConfigs,
   aiViews,
   activeAiViewId,
+  currentQuerySql,
+  currentQueryTitle,
   onSelectAiView,
+  onSaveCurrentAiView,
   onRenameAiView,
   onDeleteAiView,
 }: VirtualSpreadsheetProps<T>) {
@@ -1035,11 +1038,14 @@ export function VirtualSpreadsheet<T>({
             <Table2 className={panelHeaderIconClass} aria-hidden />
             <span className={panelHeaderTitleClass}>{title}</span>
           </div>
-          {aiViews && (aiViews.length > 0 || activeAiViewId != null) ? (
+          {aiViews && (aiViews.length > 0 || activeAiViewId != null || Boolean(currentQuerySql)) ? (
             <AiViewDropdown
               aiViews={aiViews}
               activeAiViewId={activeAiViewId}
+              currentQuerySql={currentQuerySql}
+              currentQueryTitle={currentQueryTitle}
               onSelectAiView={onSelectAiView}
+              onSaveCurrentAiView={onSaveCurrentAiView}
               onRenameAiView={onRenameAiView}
               onDeleteAiView={onDeleteAiView}
             />

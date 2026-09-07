@@ -266,39 +266,49 @@ export function ArrowReportGrid({
     }
   }, [storageKey])
 
-  // customQuerySql değiştiğinde (AI yeni bir SQL ürettiğinde) otomatik kaydet ve aktif et
+  // customQuerySql değiştiğinde kayıtlı görünümler içinde var mı kontrol et (oto-kayıt YAPMAZ)
   React.useEffect(() => {
     if (!customQuerySql) {
       setActiveAiViewId(null)
       return
     }
 
-    setAiViews((prev) => {
-      const existing = prev.find((v) => v.sql.trim() === customQuerySql.trim())
-      if (existing) {
-        setActiveAiViewId(existing.id)
-        return prev
-      }
+    const existing = aiViews.find((v) => v.sql.trim() === customQuerySql.trim())
+    if (existing) {
+      setActiveAiViewId(existing.id)
+    } else {
+      setActiveAiViewId(null)
+    }
+  }, [customQuerySql, aiViews])
+
+  // Kullanıcı "Kaydet" dediğinde aktif AI sorgusunu kalıcı görünümlere ekle
+  const handleSaveCurrentAiView = React.useCallback(
+    (saveTitle: string) => {
+      if (!customQuerySql) return
 
       const newView: AiSqlView = {
         id: `ai_${Date.now()}`,
-        title: customQueryTitle || `AI Görünümü ${prev.length + 1}`,
+        title: saveTitle || customQueryTitle || "AI Görünümü",
         sql: customQuerySql,
         createdAt: Date.now(),
       }
-      setActiveAiViewId(newView.id)
-      const next = [...prev, newView]
 
-      if (storageKey && typeof window !== "undefined") {
-        try {
-          localStorage.setItem(`${storageKey}_ai_views`, JSON.stringify(next))
-        } catch {
-          // ignore
+      setAiViews((prev) => {
+        const next = [...prev, newView]
+        if (storageKey && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`${storageKey}_ai_views`, JSON.stringify(next))
+          } catch {
+            // ignore
+          }
         }
-      }
-      return next
-    })
-  }, [customQuerySql, customQueryTitle, storageKey])
+        return next
+      })
+
+      setActiveAiViewId(newView.id)
+    },
+    [customQuerySql, customQueryTitle, storageKey]
+  )
 
   const handleSelectAiView = React.useCallback(
     (viewId: string | null) => {
@@ -877,7 +887,10 @@ export function ArrowReportGrid({
       storageKey={storageKey}
       aiViews={aiViews}
       activeAiViewId={activeAiViewId}
+      currentQuerySql={customQuerySql}
+      currentQueryTitle={customQueryTitle}
       onSelectAiView={handleSelectAiView}
+      onSaveCurrentAiView={handleSaveCurrentAiView}
       onRenameAiView={handleRenameAiView}
       onDeleteAiView={handleDeleteAiView}
       hiddenColumns={hiddenColumns}

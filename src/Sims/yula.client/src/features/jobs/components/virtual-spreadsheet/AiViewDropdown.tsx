@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  BookmarkPlus,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -35,7 +36,10 @@ import type { AiSqlView } from "./types"
 export interface AiViewDropdownProps {
   aiViews?: readonly AiSqlView[]
   activeAiViewId?: string | null
+  currentQuerySql?: string | null
+  currentQueryTitle?: string | null
   onSelectAiView?: (viewId: string | null) => void
+  onSaveCurrentAiView?: (title: string) => void
   onRenameAiView?: (viewId: string, nextTitle: string) => void
   onDeleteAiView?: (viewId: string) => void
   className?: string
@@ -44,24 +48,58 @@ export interface AiViewDropdownProps {
 export function AiViewDropdown({
   aiViews = [],
   activeAiViewId = null,
+  currentQuerySql = null,
+  currentQueryTitle = null,
   onSelectAiView,
+  onSaveCurrentAiView,
   onRenameAiView,
   onDeleteAiView,
   className,
 }: AiViewDropdownProps) {
-  // Eğer hiç AI görünümü yoksa ve ham veri modundaysak render etme
   const hasViews = aiViews.length > 0
-  const activeView = activeAiViewId
+  const isCurrentQueryActive = Boolean(currentQuerySql)
+
+  // Aktif sorgu kayıtlı mı kontrolü
+  const savedMatch = isCurrentQueryActive
+    ? aiViews.find(
+        (v) => v.id === activeAiViewId || v.sql.trim() === currentQuerySql?.trim()
+      )
+    : activeAiViewId
     ? aiViews.find((v) => v.id === activeAiViewId)
     : null
+
+  const isCurrentQuerySaved = Boolean(savedMatch)
+  const activeTitle = savedMatch
+    ? savedMatch.title
+    : isCurrentQueryActive
+    ? currentQueryTitle || "AI Analizi"
+    : "Ham Veri"
+
+  // Kaydetme diyalog state'i
+  const [isSavingCurrent, setIsSavingCurrent] = React.useState(false)
+  const [saveTitleInput, setSaveTitleInput] = React.useState("")
 
   // Yeniden adlandırma diyalog state'i
   const [renamingView, setRenamingView] = React.useState<AiSqlView | null>(null)
   const [renameInput, setRenameInput] = React.useState("")
 
   // SQL inceleme diyalog state'i
-  const [inspectingView, setInspectingView] = React.useState<AiSqlView | null>(null)
+  const [inspectingSql, setInspectingSql] = React.useState<{ title: string; sql: string } | null>(null)
   const [copied, setCopied] = React.useState(false)
+
+  const handleOpenSaveCurrent = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setSaveTitleInput(currentQueryTitle || "AI Analitik Görünümü")
+    setIsSavingCurrent(true)
+  }
+
+  const handleConfirmSaveCurrent = () => {
+    if (saveTitleInput.trim()) {
+      onSaveCurrentAiView?.(saveTitleInput.trim())
+    }
+    setIsSavingCurrent(false)
+  }
 
   const handleOpenRename = (view: AiSqlView, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -77,17 +115,17 @@ export function AiViewDropdown({
     setRenamingView(null)
   }
 
-  const handleOpenInspectSql = (view: AiSqlView, e: React.MouseEvent) => {
+  const handleOpenInspectSql = (title: string, sql: string, e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
-    setInspectingView(view)
+    setInspectingSql({ title, sql })
     setCopied(false)
   }
 
   const handleCopySql = async () => {
-    if (!inspectingView) return
+    if (!inspectingSql) return
     try {
-      await navigator.clipboard.writeText(inspectingView.sql)
+      await navigator.clipboard.writeText(inspectingSql.sql)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -101,7 +139,7 @@ export function AiViewDropdown({
     onDeleteAiView?.(viewId)
   }
 
-  if (!hasViews && !activeView) {
+  if (!hasViews && !isCurrentQueryActive) {
     return null
   }
 
@@ -115,28 +153,81 @@ export function AiViewDropdown({
             <button
               type="button"
               className={cn(
-                "group inline-flex h-6 max-w-56 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors outline-none",
+                "group inline-flex h-6 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors outline-none",
                 "border focus-visible:ring-1 focus-visible:ring-primary/50",
-                activeView
+                isCurrentQueryActive
                   ? "bg-amber-500/10 text-amber-900 border-amber-500/30 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:text-amber-200 dark:border-amber-400/25"
                   : "bg-muted/50 text-foreground border-border/80 hover:bg-muted/80"
               )}
-              title={activeView ? `Aktif Görünüm: ${activeView.title}` : "Aktif Görünüm: Ham Veri"}
+              title={
+                isCurrentQueryActive
+                  ? isCurrentQuerySaved
+                    ? `Aktif Kayıtlı Görünüm: ${activeTitle}`
+                    : `Aktif Geçici AI Görünümü (Kaydedilmedi): ${activeTitle}`
+                  : "Aktif Görünüm: Ham Veri"
+              }
             >
-              {activeView ? (
+              {isCurrentQueryActive ? (
                 <Sparkles className="size-3 text-amber-700 shrink-0 dark:text-amber-400" />
               ) : (
                 <Table2 className="size-3 text-muted-foreground shrink-0" />
               )}
-              <span className="truncate">{activeView ? activeView.title : "Ham Veri"}</span>
+              <span className="truncate">{activeTitle}</span>
+              {isCurrentQueryActive && !isCurrentQuerySaved ? (
+                <span
+                  className="size-1.5 rounded-full bg-amber-500 shrink-0"
+                  title="Kaydedilmedi"
+                />
+              ) : null}
               <ChevronDown className="size-3 text-muted-foreground/60 shrink-0 group-hover:text-foreground transition-colors" />
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="start" className="w-64 text-xs">
+          <DropdownMenuContent align="start" className="w-72 text-xs">
+            {/* Kaydedilmemiş Geçici Görünüm Banner'ı */}
+            {isCurrentQueryActive && !isCurrentQuerySaved ? (
+              <>
+                <div className="p-2 border-b border-border/80 bg-amber-500/5 dark:bg-amber-400/5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-semibold text-foreground truncate">
+                        {activeTitle}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Kaydedilmemiş geçici analiz
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {currentQuerySql ? (
+                        <button
+                          type="button"
+                          onClick={(e) =>
+                            handleOpenInspectSql(activeTitle, currentQuerySql, e)
+                          }
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title="SQL Sorgusunu İncele"
+                        >
+                          <Code2 className="size-3.5" />
+                        </button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 shrink-0 bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600"
+                        onClick={handleOpenSaveCurrent}
+                      >
+                        <BookmarkPlus className="size-3" />
+                        Kaydet
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
             <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
               <span>Görünümler</span>
-              <span className="text-[10px] lowercase font-normal">{aiViews.length} AI analizi</span>
+              <span className="text-[10px] lowercase font-normal">{aiViews.length} kayıtlı</span>
             </div>
 
             {/* Ham Veri (Orijinal Tablo) */}
@@ -144,27 +235,27 @@ export function AiViewDropdown({
               onClick={() => onSelectAiView?.(null)}
               className={cn(
                 "cursor-pointer flex items-center justify-between py-1.5",
-                activeAiViewId == null && "font-semibold text-primary bg-primary/5"
+                !isCurrentQueryActive && "font-semibold text-primary bg-primary/5"
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <Table2 className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="truncate">Ham Veri (Tüm Kayıtlar)</span>
               </div>
-              {activeAiViewId == null ? <Check className="size-3.5 text-primary shrink-0" /> : null}
+              {!isCurrentQueryActive ? <Check className="size-3.5 text-primary shrink-0" /> : null}
             </DropdownMenuItem>
 
             {aiViews.length > 0 ? <DropdownMenuSeparator /> : null}
 
             {aiViews.length > 0 ? (
               <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                AI SQL Görünümleri
+                Kayıtlı AI Görünümleri
               </div>
             ) : null}
 
-            {/* AI SQL Görünümleri Listesi */}
+            {/* Kayıtlı AI SQL Görünümleri Listesi */}
             {aiViews.map((view) => {
-              const isSelected = activeAiViewId === view.id
+              const isSelected = isCurrentQueryActive && savedMatch?.id === view.id
               return (
                 <DropdownMenuItem
                   key={view.id}
@@ -183,7 +274,7 @@ export function AiViewDropdown({
                   <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      onClick={(e) => handleOpenInspectSql(view, e)}
+                      onClick={(e) => handleOpenInspectSql(view.title, view.sql, e)}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="SQL Sorgusunu İncele"
                       aria-label="SQL Sorgusunu İncele"
@@ -216,6 +307,56 @@ export function AiViewDropdown({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Görünümü Kaydet Diyaloğu */}
+      <Dialog open={isSavingCurrent} onOpenChange={setIsSavingCurrent}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+              <BookmarkPlus className="size-4 text-amber-600 dark:text-amber-400" />
+              AI Görünümünü Kaydet
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Bu analitik görünümü daha sonra tek tıkla açabilmek için listenize kaydedin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={saveTitleInput}
+              onChange={(e) => setSaveTitleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  handleConfirmSaveCurrent()
+                }
+              }}
+              placeholder="Görünüm adı..."
+              className="text-xs"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSavingCurrent(false)}
+              className="text-xs"
+            >
+              İptal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmSaveCurrent}
+              disabled={!saveTitleInput.trim()}
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600"
+            >
+              Kaydet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Yeniden Adlandırma Diyaloğu */}
       <Dialog open={Boolean(renamingView)} onOpenChange={(open) => !open && setRenamingView(null)}>
@@ -268,12 +409,12 @@ export function AiViewDropdown({
       </Dialog>
 
       {/* SQL İnceleme Diyaloğu */}
-      <Dialog open={Boolean(inspectingView)} onOpenChange={(open) => !open && setInspectingView(null)}>
+      <Dialog open={Boolean(inspectingSql)} onOpenChange={(open) => !open && setInspectingSql(null)}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <Code2 className="size-4 text-amber-700 dark:text-amber-400" />
-              {inspectingView?.title} — SQL Sorgusu
+              {inspectingSql?.title} — SQL Sorgusu
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Bu görünüm DuckDB WASM üzerinde aşağıdaki salt-okunur SQL ile üretilmiştir.
@@ -281,7 +422,7 @@ export function AiViewDropdown({
           </DialogHeader>
           <div className="py-2">
             <pre className="p-3 bg-muted/60 border border-border/80 rounded-md text-xs font-mono overflow-x-auto max-h-72 select-text whitespace-pre-wrap break-all">
-              {inspectingView?.sql}
+              {inspectingSql?.sql}
             </pre>
           </div>
           <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
@@ -298,7 +439,7 @@ export function AiViewDropdown({
             <Button
               type="button"
               size="sm"
-              onClick={() => setInspectingView(null)}
+              onClick={() => setInspectingSql(null)}
               className="text-xs"
             >
               Kapat

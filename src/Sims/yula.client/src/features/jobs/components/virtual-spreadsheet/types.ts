@@ -154,8 +154,14 @@ export type VirtualSpreadsheetProps<T> = {
   aiViews?: readonly AiSqlView[]
   /** Aktif AI SQL görünümü ID'si (null ise varsayılan ham veri görünümü) */
   activeAiViewId?: string | null
+  /** Aktif özel SQL sorgusu (kaydedilmemiş de olabilir) */
+  currentQuerySql?: string | null
+  /** Aktif özel sorgu başlığı */
+  currentQueryTitle?: string | null
   /** AI görünümü seçildiğinde veya ham veriye dönüldüğünde çağrılır */
   onSelectAiView?: (viewId: string | null) => void
+  /** Aktif geçici AI görünümünü kalıcı olarak kaydetmek için çağrılır */
+  onSaveCurrentAiView?: (title: string) => void
   /** AI görünümünün adı değiştirildiğinde çağrılır */
   onRenameAiView?: (viewId: string, nextTitle: string) => void
   /** AI görünümü silindiğinde çağrılır */

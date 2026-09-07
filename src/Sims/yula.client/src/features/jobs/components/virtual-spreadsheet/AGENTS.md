@@ -87,10 +87,11 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 - **LocalStorage Kalıcılığı:** Kullanıcının seçtiği kolon metrikleri (`aggregations`) ve çubuk görünürlük durumu (`showFooterSummary`) `GridPersistedState` içine kaydedilir ve "Varsayılana Sıfırla" ile temizlenir.
 
 ### Kural 8: AI SQL Görünümleri ve Açılır Seçici (AI SQL Views Dropdown)
-- Yula AI `set_grid_query` çalıştırdığında veya yeni bir analitik sorgu ürettiğinde, bu sorgu tabloyu geçici ezmek yerine otomatik olarak `${storageKey}_ai_views` altında yeni bir AI Görünümü (`AiSqlView`) olarak saklanır.
+- Yula AI `set_grid_query` çalıştırdığında veya yeni bir analitik sorgu ürettiğinde, bu sorgu ekranda geçici AI görünümü olarak anında çalıştırılır ve başlık rozetinde (`[ ✦ {title} • ▾ ]`) gösterilir; ancak **otomatik olarak kalıcı listeye kaydedilmez**.
+- Kullanıcı isterse açılır menüdeki **"Kaydet"** butonu ile bu görünümü isimlendirip `${storageKey}_ai_views` altında kalıcı hale getirir.
 - Rapor başlığının hemen sağında rozet şeklinde açılır menü (`AiViewDropdown`) yer alır: `[ ✦ {view.title} ▾ ]` veya `[ ⊞ Ham Veri ▾ ]`.
-- Kullanıcı tek tıkla `Ham Veri (Tüm Kayıtlar)` ile AI SQL analizleri arasında geçiş yapabilir.
-- Menü üzerinden AI görünümleri **yeniden adlandırılabilir** (`rename`), **silinebilir** (`delete`) ve **SQL sorgusu incelenebilir/kopyalanabilir**.
+- Kullanıcı tek tıkla `Ham Veri (Tüm Kayıtlar)` ile kayıtlı veya geçici AI SQL analizleri arasında geçiş yapabilir. Ham veriye dönüldüğünde kaydedilmemiş geçici sorgu temizlenir ve kalıcı listeyi kirletmez.
+- Menü üzerinden kayıtlı AI görünümleri **yeniden adlandırılabilir** (`rename`), **silinebilir** (`delete`) ve **SQL sorgusu incelenebilir/kopyalanabilir**.
 - Silinen görünüm aktifse grid otomatik olarak temel `Ham Veri` görünümüne geri döner.
 
 
