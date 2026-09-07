@@ -692,7 +692,7 @@ async function setGridQuery(
   // Grid görünümü TÜM grupları göstermeli: model run_expert_sql alışkanlığıyla
   // LIMIT 50 gibi bir sınır yazarsa soyulur; güvenlik sınırını guard ekler.
   const cleanedSql = (input.sql as string).replace(/\s+LIMIT\s+\d+\s*$/i, "").trim();
-  const guard = guardReadOnlySelect(cleanedSql, 500);
+  const guard = guardReadOnlySelect(cleanedSql, 0);
   if (!guard.ok) {
     return { status: "error", error: guard.error, hint: guard.hint };
   }

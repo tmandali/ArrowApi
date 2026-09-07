@@ -128,7 +128,7 @@ export function guardReadOnlySelect(
     }
   }
 
-  const limited = !/\blimit\b/i.test(lowered)
-  const sql = limited ? `${body} LIMIT ${rowLimit}` : body
-  return { ok: true, sql, limited }
+  const shouldAddLimit = rowLimit > 0 && !/\blimit\b/i.test(lowered);
+  const sql = shouldAddLimit ? `${body} LIMIT ${rowLimit}` : body;
+  return { ok: true, sql, limited: shouldAddLimit };
 }
