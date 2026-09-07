@@ -74,19 +74,29 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 
 ---
 
-## ⌨️ 3. Kolon Menüsü & Klavye Erişilebilirliği (ColumnManagementMenu)
+## ⌨️ 3. Kolon Menüsü & Sıralama / Sabitleme (ColumnManagementMenu)
 
-`ColumnManagementMenu` bileşeni tam klavye erişilebilirliğine sahiptir:
+`ColumnManagementMenu` bileşeni tam klavye ve sürükle-bırak erişilebilirliğine sahiptir:
 - **Otomatik Odak:** Menü açıldığında odak derhal arama kutusuna (`Input`) geçer ve mevcut metin seçilir (`select()`).
 - **Klavye Tuşları:**
   - `ArrowDown` / `ArrowUp`: Kolonlar listesinde dikey gezinme (seçili öğe otomatik `scrollIntoView` ile görünür kılınır).
+  - `Alt+ArrowUp`: Seçili kolonu bir yukarı (sola) taşır ve odağı üzerinde tutar.
+  - `Alt+ArrowDown`: Seçili kolonu bir aşağı (sağa) taşır ve odağı üzerinde tutar.
   - `Enter` / `Space`: Seçili kolonun görünürlüğünü aç/kapat (Checkbox toggle).
   - `P` / `p`: Seçili kolonu sola sabitle / sabitlemeyi kaldır (Pin/Unpin toggle).
   - `Escape`: Arama doluysa aramayı temizler; arama boşsa menüyü kapatır.
 - **Cascading Render Önleme:** Menü açık/kapalı durumu değiştiğinde `useEffect` içinde senkron `setState` çağrılmamalıdır (`react/set-state-in-effect` kuralı). State temizliği ve odak yönetimi doğrudan `onOpenChange` ve `onOpenAutoFocus` callback'leri içinde yürütülür.
-- **Çift Görevli Dinamik Slot (Morphing Slot):**
+- **Çok Fonksiyonlu Dinamik Slot (Morphing Action Bar):**
   - Kolon listesindeki sağ slot varsayılanda veri tipi rozetini (`ColumnTypeBadge`) gösterir.
-  - Satır üzerine hover yapıldığında veya klavye ile odaklanıldığında rozet pürüzsüzce kaybolarak yerini **Pin / Unpin** butonuna bırakır.
+  - Satır üzerine hover yapıldığında veya klavye ile odaklanıldığında rozet pürüzsüzce kaybolarak yerini **3'lü Hızlı Aksiyon Çubuğuna** bırakır:
+    1. **`▲` Bir Yukarı Taşı (`ChevronUp`):** Kolonu listede bir yukarı (tabloda bir sola) taşır. En üstte disabled'dır.
+    2. **`▼` Bir Aşağı Taşı (`ChevronDown`):** Kolonu listede bir aşağı (tabloda bir sağa) taşır. En altta disabled'dır.
+    3. **`📌` Sola Sabitle / Kaldır (`Pin`):** Kolonu sola sabitler veya sabitlemeyi kaldırır.
+- **Menü İçi Sürükle - Bırak (D&D Reordering):**
+  - Her satırın solunda tutmaç ikonu (`GripVertical`) yer alır. Kullanıcı istediği satırı tutarak menü içinde yukarı/aşağı sürükleyebilir.
+  - Hedef satırın üzerine gelindiğinde mavi hedef çizgisi (`border-t-2 border-primary`) belirir ve bırakıldığında tablo ile anında senkronize olur.
+- **Bütünleşik Sıralama Motoru (`executeColumnReorder`):**
+  - Hem tablo başlığındaki sürükle-bırak, hem menü içi sürükleme, hem de `▲` / `▼` butonları tek bir `executeColumnReorder` fonksiyonunu paylaşır. Sabit kolon sınırları, otomatik pin/unpin dönüşümleri ve `localStorage` kalıcılığı tüm bu kanallarda %100 aynı kurallarla çalışır.
 
 ---
 

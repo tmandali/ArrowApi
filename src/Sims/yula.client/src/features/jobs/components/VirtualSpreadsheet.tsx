@@ -350,6 +350,84 @@ export function VirtualSpreadsheet<T>({
     []
   )
 
+  const executeColumnReorder = React.useCallback(
+    (draggedName: string, targetName: string, position: "before" | "after" = "before") => {
+      const currentOrder = orderedColumns.map((c) => c.name)
+      const fromIndex = currentOrder.indexOf(draggedName)
+      if (fromIndex === -1) return
+
+      const nextOrder = [...currentOrder]
+      nextOrder.splice(fromIndex, 1)
+
+      let targetIndex = nextOrder.indexOf(targetName)
+      if (targetIndex === -1) return
+      if (position === "after") {
+        targetIndex += 1
+      }
+      nextOrder.splice(targetIndex, 0, draggedName)
+
+      const wasPinned = pinnedSet.has(draggedName)
+      const isDroppingInPinnedArea = targetIndex < effectivePinnedCount
+
+      let nextPinned = activePinnedColumns
+      if (!wasPinned && isDroppingInPinnedArea) {
+        // Unpinned kolon pinned alanına sürüklendi/taşındı -> otomatik sabitle
+        if (visibleColumns.filter((c) => pinnedSet.has(c.name)).length < visibleColumns.length - 1) {
+          nextPinned = [...activePinnedColumns, draggedName]
+        }
+      } else if (wasPinned && !isDroppingInPinnedArea) {
+        // Pinned kolon unpinned alana sürüklendi/taşındı -> sabitlemeyi kaldır
+        nextPinned = activePinnedColumns.filter((name) => name !== draggedName)
+      }
+
+      const nextPinnedSet = new Set(nextPinned)
+      const finalOrder = [
+        ...nextOrder.filter((name) => nextPinnedSet.has(name)),
+        ...nextOrder.filter((name) => !nextPinnedSet.has(name)),
+      ]
+
+      if (nextPinned !== activePinnedColumns) {
+        if (onPinnedColumnsChange) {
+          onPinnedColumnsChange(nextPinned)
+        } else {
+          setInternalPinnedColumns(nextPinned)
+        }
+      }
+
+      if (onColumnOrderChange) {
+        onColumnOrderChange(finalOrder)
+      } else {
+        setInternalColumnOrder(finalOrder)
+      }
+    },
+    [
+      orderedColumns,
+      pinnedSet,
+      effectivePinnedCount,
+      activePinnedColumns,
+      visibleColumns,
+      onPinnedColumnsChange,
+      onColumnOrderChange,
+    ]
+  )
+
+  const moveColumn = React.useCallback(
+    (columnName: string, direction: "up" | "down") => {
+      const currentOrder = orderedColumns.map((c) => c.name)
+      const currentIndex = currentOrder.indexOf(columnName)
+      if (currentIndex === -1) return
+
+      if (direction === "up" && currentIndex > 0) {
+        const targetName = currentOrder[currentIndex - 1]
+        executeColumnReorder(columnName, targetName, "before")
+      } else if (direction === "down" && currentIndex < currentOrder.length - 1) {
+        const targetName = currentOrder[currentIndex + 1]
+        executeColumnReorder(columnName, targetName, "after")
+      }
+    },
+    [orderedColumns, executeColumnReorder]
+  )
+
   const handleDrop = React.useCallback(
     (event: React.DragEvent, col: SpreadsheetColumn) => {
       event.preventDefault()
@@ -371,52 +449,7 @@ export function VirtualSpreadsheet<T>({
       const midpoint = rect.left + rect.width / 2
       const position: "before" | "after" = event.clientX < midpoint ? "before" : "after"
 
-      const currentOrder = orderedColumns.map((c) => c.name)
-      const fromIndex = currentOrder.indexOf(draggedColName)
-      if (fromIndex !== -1) {
-        const nextOrder = [...currentOrder]
-        nextOrder.splice(fromIndex, 1)
-
-        let targetIndex = nextOrder.indexOf(col.name)
-        if (position === "after") {
-          targetIndex += 1
-        }
-        nextOrder.splice(targetIndex, 0, draggedColName)
-
-        const wasPinned = pinnedSet.has(draggedColName)
-        const isDroppingInPinnedArea = targetIndex < effectivePinnedCount
-
-        let nextPinned = activePinnedColumns
-        if (!wasPinned && isDroppingInPinnedArea) {
-          // Unpinned kolon pinned alanına sürüklendi -> otomatik sabitle
-          if (visibleColumns.filter((c) => pinnedSet.has(c.name)).length < visibleColumns.length - 1) {
-            nextPinned = [...activePinnedColumns, draggedColName]
-          }
-        } else if (wasPinned && !isDroppingInPinnedArea) {
-          // Pinned kolon unpinned alana sürüklendi -> sabitlemeyi kaldır
-          nextPinned = activePinnedColumns.filter((name) => name !== draggedColName)
-        }
-
-        const nextPinnedSet = new Set(nextPinned)
-        const finalOrder = [
-          ...nextOrder.filter((name) => nextPinnedSet.has(name)),
-          ...nextOrder.filter((name) => !nextPinnedSet.has(name)),
-        ]
-
-        if (nextPinned !== activePinnedColumns) {
-          if (onPinnedColumnsChange) {
-            onPinnedColumnsChange(nextPinned)
-          } else {
-            setInternalPinnedColumns(nextPinned)
-          }
-        }
-
-        if (onColumnOrderChange) {
-          onColumnOrderChange(finalOrder)
-        } else {
-          setInternalColumnOrder(finalOrder)
-        }
-      }
+      executeColumnReorder(draggedColName, col.name, position)
 
       setDraggedColName(null)
       setDropTarget(null)
@@ -424,16 +457,7 @@ export function VirtualSpreadsheet<T>({
         isDraggingRef.current = false
       }, 50)
     },
-    [
-      draggedColName,
-      orderedColumns,
-      pinnedSet,
-      effectivePinnedCount,
-      activePinnedColumns,
-      visibleColumns,
-      onPinnedColumnsChange,
-      onColumnOrderChange,
-    ]
+    [draggedColName, executeColumnReorder]
   )
 
   const handleDragEnd = React.useCallback(() => {
@@ -958,10 +982,13 @@ export function VirtualSpreadsheet<T>({
               pinnedSet={pinnedSet}
               toggleColumnVisibility={toggleColumnVisibility}
               toggleColumnPin={toggleColumnPin}
+              onMoveColumn={moveColumn}
+              onReorderColumn={executeColumnReorder}
               onResetColumns={handleResetColumns}
               canReset={canResetColumns}
               hiddenColumnsCount={hiddenColumnsCount}
               disabled={columns.length === 0}
+              disableReorder={disableColumnReorder}
             />
           ) : null}
           {onToggleFilterRow ? (

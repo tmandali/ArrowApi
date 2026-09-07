@@ -1,5 +1,14 @@
 import * as React from "react"
-import { Columns3, Pin, RotateCcw, Search, X } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  Columns3,
+  GripVertical,
+  Pin,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -20,10 +29,17 @@ export interface ColumnManagementMenuProps {
   pinnedSet: Set<string>
   toggleColumnVisibility: (columnName: string) => void
   toggleColumnPin: (columnName: string) => void
+  onMoveColumn?: (columnName: string, direction: "up" | "down") => void
+  onReorderColumn?: (
+    draggedName: string,
+    targetName: string,
+    position?: "before" | "after"
+  ) => void
   onResetColumns: () => void
   canReset: boolean
   hiddenColumnsCount: number
   disabled?: boolean
+  disableReorder?: boolean
 }
 
 export function ColumnManagementMenu({
@@ -34,20 +50,27 @@ export function ColumnManagementMenu({
   pinnedSet,
   toggleColumnVisibility,
   toggleColumnPin,
+  onMoveColumn,
+  onReorderColumn,
   onResetColumns,
   canReset,
   hiddenColumnsCount,
   disabled = false,
+  disableReorder = false,
 }: ColumnManagementMenuProps) {
   const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
   const [columnSearch, setColumnSearch] = React.useState("")
   const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
+  const [menuDraggedCol, setMenuDraggedCol] = React.useState<string | null>(null)
+  const [menuDropTarget, setMenuDropTarget] = React.useState<string | null>(null)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const columnItemRefs = React.useRef<(HTMLDivElement | null)[]>([])
 
   const handleOpenChange = React.useCallback((open: boolean) => {
     setColumnMenuOpen(open)
     setFocusedColIndex(-1)
+    setMenuDraggedCol(null)
+    setMenuDropTarget(null)
     if (!open) {
       setColumnSearch("")
     }
@@ -73,6 +96,19 @@ export function ColumnManagementMenu({
       const count = filteredMenuColumns.length
 
       if (event.key === "ArrowDown") {
+        if (event.altKey && !disableReorder) {
+          event.preventDefault()
+          if (focusedColIndex >= 0 && focusedColIndex < count) {
+            const col = filteredMenuColumns[focusedColIndex]
+            onMoveColumn?.(col.name, "down")
+            if (focusedColIndex < count - 1) {
+              const next = focusedColIndex + 1
+              setFocusedColIndex(next)
+              columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
+            }
+          }
+          return
+        }
         event.preventDefault()
         if (count === 0) return
         setFocusedColIndex((prev) => {
@@ -81,6 +117,19 @@ export function ColumnManagementMenu({
           return next
         })
       } else if (event.key === "ArrowUp") {
+        if (event.altKey && !disableReorder) {
+          event.preventDefault()
+          if (focusedColIndex >= 0 && focusedColIndex < count) {
+            const col = filteredMenuColumns[focusedColIndex]
+            onMoveColumn?.(col.name, "up")
+            if (focusedColIndex > 0) {
+              const next = focusedColIndex - 1
+              setFocusedColIndex(next)
+              columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
+            }
+          }
+          return
+        }
         event.preventDefault()
         if (count === 0) return
         setFocusedColIndex((prev) => {
@@ -128,7 +177,15 @@ export function ColumnManagementMenu({
         }
       }
     },
-    [filteredMenuColumns, focusedColIndex, columnSearch, toggleColumnVisibility, toggleColumnPin]
+    [
+      filteredMenuColumns,
+      focusedColIndex,
+      columnSearch,
+      toggleColumnVisibility,
+      toggleColumnPin,
+      onMoveColumn,
+      disableReorder,
+    ]
   )
 
   return (
@@ -154,7 +211,7 @@ export function ColumnManagementMenu({
       <PopoverContent
         align="end"
         sideOffset={6}
-        className="w-72 p-2 shadow-lg flex flex-col gap-1.5"
+        className="w-80 p-2 shadow-lg flex flex-col gap-1.5"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -210,8 +267,8 @@ export function ColumnManagementMenu({
           ) : null}
         </div>
 
-        {/* Kolon Listesi (Klavye Ok Tuşları ile gezinilebilir, Boşluk/Enter ile seçilebilir) */}
-        <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5" role="listbox">
+        {/* Kolon Listesi (Klavye Ok Tuşları / Alt+Ok Tuşları / D&D ile sıralanabilir) */}
+        <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5" role="listbox">
           {filteredMenuColumns.map((col, index) => {
             const isVisible = !hiddenSet.has(col.name)
             const isLastVisible = isVisible && visibleColumns.length <= 1
@@ -219,6 +276,10 @@ export function ColumnManagementMenu({
             const isPinned = pinnedSet.has(col.name)
             const prevCol = index > 0 ? filteredMenuColumns[index - 1] : null
             const isFirstUnpinned = !isPinned && prevCol !== null && pinnedSet.has(prevCol.name)
+            const globalIndex = orderedColumns.findIndex((c) => c.name === col.name)
+            const canMoveUp = !disableReorder && globalIndex > 0
+            const canMoveDown = !disableReorder && globalIndex < orderedColumns.length - 1
+            const isDropTarget = menuDropTarget === col.name
 
             return (
               <React.Fragment key={col.name}>
@@ -234,17 +295,49 @@ export function ColumnManagementMenu({
                     columnItemRefs.current[index] = el
                   }}
                   tabIndex={-1}
+                  draggable={!disableReorder}
+                  onDragStart={(e) => {
+                    if (disableReorder) return
+                    e.dataTransfer.setData("text/plain", col.name)
+                    e.dataTransfer.effectAllowed = "move"
+                    setMenuDraggedCol(col.name)
+                  }}
+                  onDragOver={(e) => {
+                    if (menuDraggedCol && menuDraggedCol !== col.name) {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = "move"
+                      setMenuDropTarget(col.name)
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (menuDropTarget === col.name) {
+                      setMenuDropTarget(null)
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (menuDraggedCol && menuDraggedCol !== col.name) {
+                      onReorderColumn?.(menuDraggedCol, col.name, "before")
+                    }
+                    setMenuDraggedCol(null)
+                    setMenuDropTarget(null)
+                  }}
+                  onDragEnd={() => {
+                    setMenuDraggedCol(null)
+                    setMenuDropTarget(null)
+                  }}
                   onClick={() => setFocusedColIndex(index)}
                   onMouseEnter={() => setFocusedColIndex(index)}
                   className={cn(
-                    "group flex items-center justify-between gap-1.5 rounded px-2 py-1 text-xs transition-colors select-none",
+                    "group flex items-center justify-between gap-1.5 rounded px-1.5 py-1 text-xs transition-colors select-none",
                     isFocused && "bg-accent text-accent-foreground",
-                    !isFocused && "hover:bg-muted/60 text-foreground"
+                    !isFocused && "hover:bg-muted/60 text-foreground",
+                    isDropTarget && "border-t-2 border-primary"
                   )}
                 >
                   <div
                     className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2",
+                      "flex min-w-0 flex-1 items-center gap-1.5",
                       isLastVisible
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer"
@@ -252,6 +345,9 @@ export function ColumnManagementMenu({
                     onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
                     title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
                   >
+                    {!disableReorder ? (
+                      <GripVertical className="size-3 text-muted-foreground/30 group-hover:text-muted-foreground/80 shrink-0 cursor-grab active:cursor-grabbing" />
+                    ) : null}
                     <Checkbox
                       checked={isVisible}
                       disabled={isLastVisible}
@@ -261,9 +357,9 @@ export function ColumnManagementMenu({
                     <span className="truncate flex-1">{col.label}</span>
                   </div>
 
-                  {/* Sağ Slot: Varsayılan Veri Tipi Rozeti <-> Hover / Klavye Odak Pin/Unpin Butonu */}
-                  <div className="relative flex size-6 shrink-0 items-center justify-center">
-                    {/* Varsayılan: Veri Tipi Rozeti (Hover ve Klavye Odak durumunda yerini Pin/Unpin butonuna bırakır) */}
+                  {/* Sağ Slot: Varsayılan Veri Tipi Rozeti <-> Hover / Odak Aksiyonları (Yukarı / Aşağı / Pin) */}
+                  <div className="relative flex items-center justify-end shrink-0 min-w-6">
+                    {/* Varsayılan: Veri Tipi Rozeti */}
                     <div
                       className={cn(
                         "flex items-center justify-center transition-opacity",
@@ -275,44 +371,81 @@ export function ColumnManagementMenu({
                       <ColumnTypeBadge col={col} isPinned={isPinned} />
                     </div>
 
-                    {/* Hover / Klavye Odak: Pin / Unpin Butonu */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleColumnPin(col.name)
-                      }}
-                      disabled={!isVisible}
+                    {/* Hover / Klavye Odak: Hızlı Aksiyon Butonları [ ▲ ] [ ▼ ] [ 📌 ] */}
+                    <div
                       className={cn(
-                        "absolute inset-0 flex items-center justify-center rounded transition-all",
+                        "absolute right-0 flex items-center gap-0.5 transition-all",
                         isFocused
                           ? "opacity-100 scale-100"
-                          : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 focus:opacity-100",
-                        isPinned
-                          ? "text-primary hover:text-primary/80 hover:bg-primary/10"
-                          : "text-muted-foreground/60 hover:text-foreground hover:bg-muted",
-                        !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
+                          : "opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto"
                       )}
-                      title={
-                        !isVisible
-                          ? "Gizli kolon sabitlenemez"
-                          : isPinned
-                          ? "Sabitlemeyi kaldır (P)"
-                          : "Sola sabitle (P)"
-                      }
-                      aria-label={
-                        isPinned
-                          ? `${col.label} sabitlemesini kaldır`
-                          : `${col.label} sola sabitle`
-                      }
                     >
-                      <Pin
+                      {/* Bir Yukarı Taşı (Sola kaydır) */}
+                      <button
+                        type="button"
+                        disabled={!canMoveUp}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onMoveColumn?.(col.name, "up")
+                        }}
+                        className="flex size-5 items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                        title="Bir yukarı taşı (Sola kaydır) [Alt+Yukarı]"
+                        aria-label={`${col.label} bir yukarı taşı`}
+                      >
+                        <ChevronUp className="size-3.5" />
+                      </button>
+
+                      {/* Bir Aşağı Taşı (Sağa kaydır) */}
+                      <button
+                        type="button"
+                        disabled={!canMoveDown}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onMoveColumn?.(col.name, "down")
+                        }}
+                        className="flex size-5 items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none transition-colors"
+                        title="Bir aşağı taşı (Sağa kaydır) [Alt+Aşağı]"
+                        aria-label={`${col.label} bir aşağı taşı`}
+                      >
+                        <ChevronDown className="size-3.5" />
+                      </button>
+
+                      {/* Sola Sabitle / Kaldır */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleColumnPin(col.name)
+                        }}
+                        disabled={!isVisible}
                         className={cn(
-                          "size-3.5 transition-transform",
-                          isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                          "flex size-5 items-center justify-center rounded transition-colors",
+                          isPinned
+                            ? "text-primary hover:text-primary/80 hover:bg-primary/10"
+                            : "text-muted-foreground/70 hover:text-foreground hover:bg-muted",
+                          !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
                         )}
-                      />
-                    </button>
+                        title={
+                          !isVisible
+                            ? "Gizli kolon sabitlenemez"
+                            : isPinned
+                            ? "Sabitlemeyi kaldır (P)"
+                            : "Sola sabitle (P)"
+                        }
+                        aria-label={
+                          isPinned
+                            ? `${col.label} sabitlemesini kaldır`
+                            : `${col.label} sola sabitle`
+                        }
+                      >
+                        <Pin
+                          className={cn(
+                            "size-3 transition-transform",
+                            isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                          )}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </React.Fragment>
