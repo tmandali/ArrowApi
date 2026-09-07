@@ -197,6 +197,16 @@ export type VirtualSpreadsheetProps<T> = {
   onNeedMore?: () => void
   /** Yüklenecek daha fazla satır var mı? */
   hasMore?: boolean
+  /**
+   * Kolon sırası, genişlikleri ve gizlilik tercihlerini localStorage'da
+   * kalıcı olarak saklamak için benzersiz anahtar (örn. "arrow_grid_stock_balance").
+   * Belirtilmezse title'dan otomatik türetilir.
+   */
+  storageKey?: string
+  /**
+   * Kalıcı state (localStorage) kullanımını devre dışı bırakır (varsayılan: false).
+   */
+  disablePersistence?: boolean
   /** Sona yaklaşıldığında yükleme sürüyor mu? (skeleton satırları gösterir) */
   loadingMore?: boolean
 }
@@ -237,13 +247,29 @@ export function VirtualSpreadsheet<T>({
   onNeedMore,
   hasMore = false,
   loadingMore = false,
+  storageKey,
+  disablePersistence = false,
 }: VirtualSpreadsheetProps<T>) {
+  // Kalıcı yerel depolama anahtarı (localStorage)
+  const effectiveStorageKey = React.useMemo(() => {
+    if (disablePersistence) return undefined
+    if (storageKey) return storageKey
+    if (title && title !== "Report Result" && title !== "Data") {
+      return `arrow_grid_${title.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`
+    }
+    return undefined
+  }, [disablePersistence, storageKey, title])
+
+  const isStorageLoadedRef = React.useRef(false)
+  const prevStorageKeyRef = React.useRef(effectiveStorageKey)
+
+  if (prevStorageKeyRef.current !== effectiveStorageKey) {
+    prevStorageKeyRef.current = effectiveStorageKey
+    isStorageLoadedRef.current = false
+  }
+
   // Kolon sıralama düzeni (Sürükle - Bırak)
   const [internalColumnOrder, setInternalColumnOrder] = React.useState<string[] | null>(null)
-
-  React.useEffect(() => {
-    setInternalColumnOrder(null)
-  }, [resetKey])
 
   const activeColumnOrder = columnOrder ?? internalColumnOrder
 
@@ -271,12 +297,6 @@ export function VirtualSpreadsheet<T>({
   const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const columnItemRefs = React.useRef<(HTMLLabelElement | null)[]>([])
-
-  React.useEffect(() => {
-    setInternalHiddenColumns([])
-    setColumnSearch("")
-    setFocusedColIndex(-1)
-  }, [resetKey])
 
   // Menü açıldığında odağı arama kutusuna taşı
   React.useEffect(() => {
@@ -573,18 +593,106 @@ export function VirtualSpreadsheet<T>({
     moved?: boolean
   } | null>(null)
 
-  // resetKey/başlangıç genişlikleri değişince sütun genişliklerini başa al —
-  // render sırasında state ayarlama (içerik anahtarı ile, inline objelerde döngüsüz).
+  // Başlangıç genişlikleri değişince sütun genişliklerini senkronize et
   const initialWidthsKey = React.useMemo(
     () => JSON.stringify(initialColWidths ?? null),
     [initialColWidths]
   )
-  const widthsSyncKey = `${String(resetKey)}|${initialWidthsKey}`
-  const [syncedWidthsKey, setSyncedWidthsKey] = React.useState(widthsSyncKey)
-  if (syncedWidthsKey !== widthsSyncKey) {
-    setSyncedWidthsKey(widthsSyncKey)
-    setColWidths(initialColWidths ?? {})
+  const [syncedInitialWidthsKey, setSyncedInitialWidthsKey] = React.useState(initialWidthsKey)
+  if (syncedInitialWidthsKey !== initialWidthsKey) {
+    setSyncedInitialWidthsKey(initialWidthsKey)
+    if (!isStorageLoadedRef.current) {
+      setColWidths(initialColWidths ?? {})
+    }
   }
+
+  // Sayfa açıldığında veya kolonlar yüklendiğinde localStorage'dan ayarları geri yükle
+  React.useEffect(() => {
+    if (!effectiveStorageKey || typeof window === "undefined" || columns.length === 0) {
+      return
+    }
+    if (isStorageLoadedRef.current) return
+
+    try {
+      const raw = localStorage.getItem(effectiveStorageKey)
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          colWidths?: Record<string, string | number>
+          columnOrder?: string[]
+          hiddenColumns?: string[]
+        }
+        if (parsed) {
+          if (parsed.colWidths && typeof parsed.colWidths === "object") {
+            setColWidths(parsed.colWidths)
+          }
+          if (Array.isArray(parsed.columnOrder) && parsed.columnOrder.length > 0) {
+            const valid = parsed.columnOrder.filter((name) =>
+              columns.some((c) => c.name === name)
+            )
+            if (valid.length > 0) {
+              const existingSet = new Set(valid)
+              const remaining = columns.filter((c) => !existingSet.has(c.name)).map((c) => c.name)
+              const fullOrder = [...valid, ...remaining]
+              if (onColumnOrderChange) {
+                onColumnOrderChange(fullOrder)
+              } else {
+                setInternalColumnOrder(fullOrder)
+              }
+            }
+          }
+          if (Array.isArray(parsed.hiddenColumns)) {
+            const valid = parsed.hiddenColumns.filter((name) =>
+              columns.some((c) => c.name === name)
+            )
+            if (valid.length < columns.length) {
+              if (onHiddenColumnsChange) {
+                onHiddenColumnsChange(valid)
+              } else {
+                setInternalHiddenColumns(valid)
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore parse or quota errors
+    } finally {
+      isStorageLoadedRef.current = true
+    }
+  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange])
+
+  // Kolon sırası, genişliği veya gizlilik değiştiğinde 250ms debounce ile localStorage'a kaydet
+  React.useEffect(() => {
+    if (!isStorageLoadedRef.current || !effectiveStorageKey || typeof window === "undefined") {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      const hasWidths = Object.keys(colWidths).length > 0
+      const hasOrder = Boolean(activeColumnOrder && activeColumnOrder.length > 0)
+      const hasHidden = activeHiddenColumns.length > 0
+
+      if (!hasWidths && !hasOrder && !hasHidden) {
+        try {
+          localStorage.removeItem(effectiveStorageKey)
+        } catch {}
+        return
+      }
+
+      try {
+        const data = {
+          colWidths: hasWidths ? colWidths : undefined,
+          columnOrder: hasOrder ? activeColumnOrder : undefined,
+          hiddenColumns: hasHidden ? activeHiddenColumns : undefined,
+        }
+        localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
+      } catch {
+        // ignore quota errors
+      }
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns])
 
   const getColWidth = React.useCallback(
     (col: SpreadsheetColumn): number | string => {
@@ -607,7 +715,12 @@ export function VirtualSpreadsheet<T>({
       setInternalColumnOrder(null)
     }
     setColWidths(initialColWidths ?? {})
-  }, [onHiddenColumnsChange, onColumnOrderChange, initialColWidths])
+    if (effectiveStorageKey && typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(effectiveStorageKey)
+      } catch {}
+    }
+  }, [onHiddenColumnsChange, onColumnOrderChange, initialColWidths, effectiveStorageKey])
 
   const totalTableWidth = React.useMemo(() => {
     return visibleColumns.reduce((sum, col) => {

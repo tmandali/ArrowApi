@@ -133,6 +133,14 @@ export function ArrowReportGrid({
     }))
   }, [customQuerySql, columns, discoveredCols])
 
+  const storageKey = React.useMemo(() => {
+    if (reportScope) return `arrow_grid_${reportScope}`
+    if (title && title !== "Report Result") {
+      return `arrow_grid_${title.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`
+    }
+    return undefined
+  }, [reportScope, title])
+
   /**
    * Arrow/şemasından türetilmiş kolon tip haritası.
    * Yula'ya (LLM) şema grounding olarak verilir; filtre değerlerinin
@@ -377,6 +385,7 @@ export function ArrowReportGrid({
       emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
       progressValue={progressPercent}
       resetKey={`${jobId}:${customQuerySql ?? ""}:${filterKey}`}
+      storageKey={storageKey}
       showFilterRow={effectiveShowFilterRow}
       onToggleFilterRow={onShowFilterRowChange}
       headerActions={
