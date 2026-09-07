@@ -199,6 +199,16 @@ export function VirtualSpreadsheet<T>({
     moved?: boolean
   } | null>(null)
 
+  // Klavye navigasyonu ve hücre odağı (focus ring) durumu
+  const [focusedCell, setFocusedCell] = React.useState<{
+    rowIndex: number
+    colIndex: number
+  } | null>(null)
+  const [copiedCell, setCopiedCell] = React.useState<{
+    rowIndex: number
+    colIndex: number
+  } | null>(null)
+
   // resetKey/başlangıç genişlikleri değişince sütun genişliklerini başa al —
   // render sırasında state ayarlama (içerik anahtarı ile, inline objelerde döngüsüz).
   const initialWidthsKey = React.useMemo(
@@ -301,25 +311,17 @@ export function VirtualSpreadsheet<T>({
     </colgroup>
   )
 
-  const renderVirtualRow = React.useCallback(
-    (item: T, rowIndex: number) => {
-      const rendered = renderRow(item, rowIndex)
-      if (
-        React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
-        rendered.type === "tr"
-      ) {
-        const childrenArray = React.Children.toArray(rendered.props.children)
-        return React.cloneElement(
-          rendered,
-          undefined,
-          ...childrenArray,
-          <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
-        )
-      }
-      return rendered
-    },
-    [renderRow]
-  )
+  const colOffsets = React.useMemo(() => {
+    let currentLeft = 0
+    return columns.map((col) => {
+      const w = getColWidth(col)
+      const numW = typeof w === "number" ? w : parseFloat(String(w)) || 100
+      const left = currentLeft
+      const right = currentLeft + numW
+      currentLeft += numW
+      return { left, width: numW, right }
+    })
+  }, [columns, getColWidth])
 
   const headerScrollRef = React.useRef<HTMLDivElement>(null)
   const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
@@ -338,10 +340,235 @@ export function VirtualSpreadsheet<T>({
 
   React.useEffect(() => {
     reset()
+    setFocusedCell(null)
     if (headerScrollRef.current) {
       headerScrollRef.current.scrollLeft = 0
     }
   }, [resetKey, reset])
+
+  const scrollToCell = React.useCallback(
+    (rowIndex: number, colIndex: number) => {
+      const el = scrollRef.current
+      if (!el) return
+
+      // Dikey otomatik kaydırma
+      const targetTop = rowIndex * rowHeight
+      const targetBottom = targetTop + rowHeight
+      const viewTop = el.scrollTop
+      const viewBottom = viewTop + el.clientHeight
+
+      if (targetTop < viewTop) {
+        el.scrollTop = targetTop
+      } else if (targetBottom > viewBottom) {
+        el.scrollTop = targetBottom - el.clientHeight
+      }
+
+      // Yatay otomatik kaydırma
+      const colOffset = colOffsets[colIndex]
+      if (colOffset) {
+        const viewLeft = el.scrollLeft
+        const viewRight = viewLeft + el.clientWidth
+
+        if (colOffset.left < viewLeft) {
+          el.scrollLeft = colOffset.left
+        } else if (colOffset.right > viewRight) {
+          el.scrollLeft = colOffset.right - el.clientWidth
+        }
+      }
+    },
+    [colOffsets, rowHeight, scrollRef]
+  )
+
+  const copyFocusedCellValue = React.useCallback(
+    (rowIndex: number, colIndex: number) => {
+      const col = columns[colIndex]
+      const item = items[rowIndex] as Record<string, unknown> | null | undefined
+      if (!col || !item) return
+
+      const rowValues =
+        item.values && typeof item.values === "object"
+          ? (item.values as Record<string, unknown>)
+          : null
+
+      const nestedRow =
+        item.row && typeof item.row === "object"
+          ? (item.row as Record<string, unknown>)
+          : null
+
+      const rawVal =
+        rowValues?.[col.name] ??
+        nestedRow?.[col.name] ??
+        item[col.name] ??
+        (col.kind === "account" ? (nestedRow?.name as unknown) ?? item.name : undefined)
+
+      const formatted = formatGridCellValue(rawVal, col.align)
+      if (formatted != null && typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(formatted).catch(() => {})
+        setCopiedCell({ rowIndex, colIndex })
+        setTimeout(() => setCopiedCell(null), 400)
+      }
+    },
+    [columns, items]
+  )
+
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return
+      }
+
+      if (items.length === 0 || columns.length === 0) return
+
+      // Ctrl+C / Cmd+C: Seçili hücreyi kopyala
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+        const selection = window.getSelection()
+        if (!selection || selection.isCollapsed) {
+          if (focusedCell) {
+            event.preventDefault()
+            copyFocusedCellValue(focusedCell.rowIndex, focusedCell.colIndex)
+            return
+          }
+        }
+      }
+
+      if (event.key === "Escape") {
+        setFocusedCell(null)
+        return
+      }
+
+      let curRow = focusedCell?.rowIndex ?? 0
+      let curCol = focusedCell?.colIndex ?? 0
+      let handled = false
+
+      switch (event.key) {
+        case "ArrowUp":
+          curRow = Math.max(0, curRow - 1)
+          handled = true
+          break
+        case "ArrowDown":
+          curRow = Math.min(items.length - 1, curRow + 1)
+          handled = true
+          break
+        case "ArrowLeft":
+          curCol = Math.max(0, curCol - 1)
+          handled = true
+          break
+        case "ArrowRight":
+          curCol = Math.min(columns.length - 1, curCol + 1)
+          handled = true
+          break
+        case "Home":
+          if (event.ctrlKey || event.metaKey) {
+            curRow = 0
+          }
+          curCol = 0
+          handled = true
+          break
+        case "End":
+          if (event.ctrlKey || event.metaKey) {
+            curRow = items.length - 1
+          }
+          curCol = columns.length - 1
+          handled = true
+          break
+        case "PageUp":
+          curRow = Math.max(0, curRow - (viewportRows || 15))
+          handled = true
+          break
+        case "PageDown":
+          curRow = Math.min(items.length - 1, curRow + (viewportRows || 15))
+          handled = true
+          break
+        case "Tab":
+          if (event.shiftKey) {
+            if (curCol > 0) {
+              curCol--
+            } else if (curRow > 0) {
+              curRow--
+              curCol = columns.length - 1
+            }
+          } else {
+            if (curCol < columns.length - 1) {
+              curCol++
+            } else if (curRow < items.length - 1) {
+              curRow++
+              curCol = 0
+            }
+          }
+          handled = true
+          break
+        default:
+          break
+      }
+
+      if (handled) {
+        event.preventDefault()
+        setFocusedCell({ rowIndex: curRow, colIndex: curCol })
+        scrollToCell(curRow, curCol)
+      }
+    },
+    [columns.length, copyFocusedCellValue, focusedCell, items.length, scrollToCell, viewportRows]
+  )
+
+  const renderVirtualRow = React.useCallback(
+    (item: T, rowIndex: number) => {
+      const rendered = renderRow(item, rowIndex)
+      if (
+        React.isValidElement<{ className?: string; children?: React.ReactNode }>(rendered) &&
+        rendered.type === "tr"
+      ) {
+        const isRowFocused = focusedCell?.rowIndex === rowIndex
+        const childrenArray = React.Children.toArray(rendered.props.children)
+
+        const cellsWithFocus = childrenArray.map((child, colIdx) => {
+          if (
+            React.isValidElement<{
+              className?: string
+              onClick?: (e: React.MouseEvent) => void
+            }>(child) &&
+            child.type === "td"
+          ) {
+            const isCellFocused = isRowFocused && focusedCell?.colIndex === colIdx
+            const isCellCopied =
+              copiedCell?.rowIndex === rowIndex && copiedCell?.colIndex === colIdx
+
+            return React.cloneElement(child, {
+              className: cn(
+                child.props.className,
+                isCellFocused &&
+                  "relative z-10 outline outline-2 outline-primary -outline-offset-2 bg-primary/15",
+                isCellCopied && "bg-primary/30 transition-colors duration-150"
+              ),
+              onClick: (e: React.MouseEvent) => {
+                child.props.onClick?.(e)
+                setFocusedCell({ rowIndex, colIndex: colIdx })
+              },
+            })
+          }
+          return child
+        })
+
+        return React.cloneElement(
+          rendered,
+          {
+            className: cn(
+              rendered.props.className,
+              isRowFocused && "bg-muted/30"
+            ),
+          },
+          ...cellsWithFocus,
+          <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
+        )
+      }
+      return rendered
+    },
+    [copiedCell, focusedCell, renderRow]
+  )
 
   // Dikey scrollbar genişliğini ölç — başlığın sağ ucunu body scrollbar'ı ile tam hizalar
   React.useEffect(() => {
@@ -393,28 +620,39 @@ export function VirtualSpreadsheet<T>({
     [scrollRef]
   )
 
-  const handleCopy = React.useCallback((event: React.ClipboardEvent) => {
-    const selection = window.getSelection()
-    if (!selection || selection.isCollapsed) return
-    const rawText = selection.toString()
-    if (!rawText) return
-    // Tek hücre / tek satır seçiminde tarayıcının eklediği \t ve \n karakterlerini temizle
-    const lines = rawText.split(/\r?\n/)
-    if (lines.length <= 1) {
-      const clean = rawText.trim()
-      if (clean) {
-        event.clipboardData.setData("text/plain", clean)
+  const handleCopy = React.useCallback(
+    (event: React.ClipboardEvent) => {
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed) {
+        const rawText = selection.toString()
+        if (!rawText) return
+        // Tek hücre / tek satır seçiminde tarayıcının eklediği \t ve \n karakterlerini temizle
+        const lines = rawText.split(/\r?\n/)
+        if (lines.length <= 1) {
+          const clean = rawText.trim()
+          if (clean) {
+            event.clipboardData.setData("text/plain", clean)
+            event.preventDefault()
+          }
+          return
+        }
+        // Çok satırlı kopyalamalarda da satır başı ve sonundaki gereksiz ayrıcıları temizle
+        const cleanLines = lines.map((l) => l.trim()).join("\n").trim()
+        if (cleanLines) {
+          event.clipboardData.setData("text/plain", cleanLines)
+          event.preventDefault()
+        }
+        return
+      }
+
+      // Fareyle metin seçilmemişse ama bir hücre odaklanmışsa doğrudan o hücre değerini kopyala
+      if (focusedCell) {
+        copyFocusedCellValue(focusedCell.rowIndex, focusedCell.colIndex)
         event.preventDefault()
       }
-      return
-    }
-    // Çok satırlı kopyalamalarda da satır başı ve sonundaki gereksiz ayrıcıları temizle
-    const cleanLines = lines.map((l) => l.trim()).join("\n").trim()
-    if (cleanLines) {
-      event.clipboardData.setData("text/plain", cleanLines)
-      event.preventDefault()
-    }
-  }, [])
+    },
+    [copyFocusedCellValue, focusedCell]
+  )
 
   return (
     <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
@@ -544,9 +782,11 @@ export function VirtualSpreadsheet<T>({
 
           {/* Gövde Veri Satırları Alanı (Dikey scrollbar tam buradan başlar) */}
           <div
-            className="min-h-0 flex-1 overflow-auto"
+            className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
             ref={scrollRef}
             onScroll={handleScroll}
+            onKeyDown={handleKeyDown}
+            tabIndex={0}
           >
             <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
               <table
