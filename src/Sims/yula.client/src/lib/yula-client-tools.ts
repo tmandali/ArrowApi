@@ -187,13 +187,35 @@ async function analyzeGrid(
     const tableLabel = ds.isCustom ? "(aktif özel görünüm)" : ds.tableName;
 
     if (op === "count") {
+      if (byColumn && ds.columns.includes(byColumn)) {
+        const gcol = sqlSafeId(byColumn);
+        const limitN = Math.max(1, Math.min(50, topN));
+        const rows = await duckDbClient.executeCustomSql(
+          `SELECT ${gcol} AS label, COUNT(*) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${limitN}`,
+        );
+        return {
+          status: "ok",
+          operation: "count-by",
+          table: tableLabel,
+          byColumn,
+          items: rows.map((r) => ({
+            label: String(r.label ?? ""),
+            value: Number(r.value ?? 0),
+          })),
+        };
+      }
+      const countExpr =
+        column && ds.columns.includes(column)
+          ? `COUNT(${sqlSafeId(column)})`
+          : "COUNT(*)";
       const rows = await duckDbClient.executeCustomSql(
-        `SELECT COUNT(*) AS cnt FROM ${ds.from}`,
+        `SELECT ${countExpr} AS cnt FROM ${ds.from}`,
       );
       return {
         status: "ok",
         operation: "count",
         table: tableLabel,
+        column,
         count: Number(rows[0]?.cnt ?? 0),
       };
     }
@@ -207,12 +229,29 @@ async function analyzeGrid(
         hint: "availableColumns içinden bir kolon seç; toplama/ortalama için numericColumns gerekir.",
       };
     }
-    // Sayısal olmayan kolona toplama uygulamak Binder Error üretir
-    // (örn. sum(VARCHAR)) — sessiz fallback YOK; model düzeltmeli kolonla tekrar çağırır.
+
+    // Sayısal olmayan kolonda top istendiyse: en sık geçen değerlerin sayımı (frekans analizi)
     if (!ds.numeric.has(column)) {
+      if (op === "top") {
+        const col = sqlSafeId(column);
+        const limitN = Math.max(1, Math.min(50, topN));
+        const rows = await duckDbClient.executeCustomSql(
+          `SELECT ${col} AS label, COUNT(*) AS value FROM ${ds.from} GROUP BY ${col} ORDER BY value DESC LIMIT ${limitN}`,
+        );
+        return {
+          status: "ok",
+          operation: "top-count",
+          table: tableLabel,
+          column,
+          items: rows.map((r) => ({
+            label: String(r.label ?? ""),
+            value: Number(r.value ?? 0),
+          })),
+        };
+      }
       return {
         status: "error",
-        error: `"${column}" sayısal bir kolon değil; SUM/AVG/top işlemi uygulanamaz.`,
+        error: `"${column}" sayısal bir kolon değil; SUM/AVG işlemi uygulanamaz.`,
         numericColumns: [...ds.numeric],
         hint: "Aynı aracı numericColumns listesinden bir column ile tekrar çağır.",
       };
@@ -952,6 +991,258 @@ async function applyFilter(
   };
 }
 
+async function sortCurrentGrid(
+  column: string,
+  direction: "asc" | "desc" | "none",
+): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const spec = await ensureGridSpec();
+  if (!spec) {
+    return { status: "error", error: "Açık tablo yok." };
+  }
+  const resolved = resolveFieldLoose(column, spec.columns);
+  if (!resolved) {
+    return {
+      status: "error",
+      error: `Sıralama için geçersiz kolon: ${column}`,
+      availableColumns: spec.columns,
+    };
+  }
+  const runtimeApi = store.runtimeApi;
+  if (!runtimeApi) {
+    return {
+      status: "error",
+      error: "Açık grid bulunamadı; sıralama uygulanamadı.",
+      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+    };
+  }
+  const dir = direction === "none" ? null : direction;
+  runtimeApi.setSort(resolved, dir);
+  return {
+    status: "ok",
+    column: resolved,
+    direction,
+    message:
+      direction === "none"
+        ? `${resolved} sıralaması kaldırıldı; doğal sıraya dönüldü.`
+        : `${resolved} kolonuna göre ${direction === "asc" ? "artan (A-Z / küçükten büyüğe)" : "azalan (Z-A / büyükten küçüğe)"} sıralandı.`,
+  };
+}
+
+async function configureGridColumns(args: {
+  visibleColumns?: string[];
+  hiddenColumns?: string[];
+  order?: string[];
+}): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const spec = await ensureGridSpec();
+  if (!spec) {
+    return { status: "error", error: "Açık tablo yok." };
+  }
+  const runtimeApi = store.runtimeApi;
+  if (!runtimeApi) {
+    return {
+      status: "error",
+      error: "Açık grid bulunamadı.",
+      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+    };
+  }
+
+  // visibleColumns varsa: sadece bu kolonlar açık, diğerleri gizli
+  if (Array.isArray(args.visibleColumns) && args.visibleColumns.length > 0) {
+    const resolvedVisible = args.visibleColumns
+      .map((c) => resolveFieldLoose(c, spec.columns))
+      .filter((c): c is string => !!c);
+    if (resolvedVisible.length === 0) {
+      return {
+        status: "error",
+        error: "Belirtilen kolonların hiçbiri tabloda bulunamadı.",
+        availableColumns: spec.columns,
+      };
+    }
+    runtimeApi.setVisibleColumns(resolvedVisible);
+    return {
+      status: "ok",
+      visibleColumns: resolvedVisible,
+      hiddenCount: spec.columns.length - resolvedVisible.length,
+      message: `${resolvedVisible.length} kolon gösteriliyor (${spec.columns.length - resolvedVisible.length} kolon gizlendi).`,
+    };
+  }
+
+  // hiddenColumns varsa: bu kolonlar gizlenir
+  if (Array.isArray(args.hiddenColumns) && args.hiddenColumns.length > 0) {
+    const resolvedHidden = args.hiddenColumns
+      .map((c) => resolveFieldLoose(c, spec.columns))
+      .filter((c): c is string => !!c);
+    runtimeApi.setHiddenColumns(resolvedHidden);
+    return {
+      status: "ok",
+      hiddenColumns: resolvedHidden,
+      message: `${resolvedHidden.length} kolon gizlendi (${resolvedHidden.join(", ")}).`,
+    };
+  }
+
+  // order varsa: kolon sırası güncellenir
+  if (Array.isArray(args.order) && args.order.length > 0) {
+    const resolvedOrder = args.order
+      .map((c) => resolveFieldLoose(c, spec.columns))
+      .filter((c): c is string => !!c);
+    runtimeApi.setColumnOrder(resolvedOrder);
+    return {
+      status: "ok",
+      order: resolvedOrder,
+      message: "Kolon gösterim sırası düzenlendi.",
+    };
+  }
+
+  return {
+    status: "ok",
+    message: "Değişiklik yapılmadı (visibleColumns, hiddenColumns veya order belirtilmedi).",
+  };
+}
+
+async function pinGridColumns(columns: string[]): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const spec = await ensureGridSpec();
+  if (!spec) {
+    return { status: "error", error: "Açık tablo yok." };
+  }
+  const runtimeApi = store.runtimeApi;
+  if (!runtimeApi) {
+    return {
+      status: "error",
+      error: "Açık grid bulunamadı.",
+      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+    };
+  }
+  const resolved = columns
+    .map((c) => resolveFieldLoose(c, spec.columns))
+    .filter((c): c is string => !!c);
+  if (resolved.length === 0) {
+    return {
+      status: "error",
+      error: "Sabitlenecek kolonlar tabloda bulunamadı.",
+      availableColumns: spec.columns,
+    };
+  }
+  runtimeApi.setPinnedColumns(resolved);
+  return {
+    status: "ok",
+    pinnedColumns: resolved,
+    message: `${resolved.join(", ")} sola sabitlendi (sticky).`,
+  };
+}
+
+async function applyGridFiltersMulti(
+  filters: Record<string, string>,
+  clearOthers = false,
+): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const spec = await ensureGridSpec();
+  if (!spec) {
+    return { status: "error", error: "Açık tablo yok." };
+  }
+  const runtimeApi = store.runtimeApi;
+  if (!runtimeApi) {
+    return {
+      status: "error",
+      error: "Açık grid bulunamadı.",
+      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+    };
+  }
+
+  const resolvedFilters: Record<string, string> = {};
+  const notFound: string[] = [];
+
+  for (const [col, val] of Object.entries(filters)) {
+    const resolved = resolveFieldLoose(col, spec.columns);
+    if (resolved) {
+      resolvedFilters[resolved] = val;
+    } else {
+      notFound.push(col);
+    }
+  }
+
+  if (Object.keys(resolvedFilters).length === 0) {
+    return {
+      status: "error",
+      error: "Filtre uygulanacak geçerli kolon bulunamadı.",
+      notFound,
+      availableColumns: spec.columns,
+    };
+  }
+
+  runtimeApi.applyFilters(resolvedFilters, clearOthers);
+  store.setFilters((prev) =>
+    clearOthers ? resolvedFilters : { ...prev, ...resolvedFilters },
+  );
+
+  const appliedList = Object.entries(resolvedFilters)
+    .map(([k, v]) => `${k}='${v}'`)
+    .join(", ");
+
+  return {
+    status: "ok",
+    appliedFilters: resolvedFilters,
+    notFound: notFound.length > 0 ? notFound : undefined,
+    message: `Filtreler uygulandı: ${appliedList}`,
+  };
+}
+
+async function resetGridLayout(options?: {
+  resetFilters?: boolean;
+  resetSort?: boolean;
+  resetColumns?: boolean;
+}): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const runtimeApi = store.runtimeApi;
+  const opt = options ?? {
+    resetFilters: true,
+    resetSort: true,
+    resetColumns: true,
+  };
+  if (opt.resetFilters) {
+    store.setFilters({});
+  }
+  if (runtimeApi) {
+    runtimeApi.resetLayout({
+      filters: opt.resetFilters,
+      sort: opt.resetSort,
+      columns: opt.resetColumns,
+    });
+  }
+  return {
+    status: "ok",
+    reset: opt,
+    message: "Grid görünümü ve düzeni varsayılan ayarlara döndürüldü.",
+  };
+}
+
+async function exportGridData(
+  format: "xlsx" | "parquet" | "csv" | "gz",
+): Promise<unknown> {
+  const store = useYulaGridStore.getState();
+  const runtimeApi = store.runtimeApi;
+  if (!runtimeApi || !runtimeApi.exportGrid) {
+    return {
+      status: "error",
+      error: "Grid dışa aktarma servisi bağlı değil.",
+    };
+  }
+  await runtimeApi.exportGrid(format);
+  const labels: Record<string, string> = {
+    xlsx: "Excel (.xlsx)",
+    parquet: "Apache Parquet (.parquet)",
+    csv: "CSV (.csv)",
+    gz: "Sıkıştırılmış CSV (.csv.gz)",
+  };
+  return {
+    status: "ok",
+    format,
+    message: `${labels[format] || format} formatında dosya indirme işlemi başlatıldı.`,
+  };
+}
+
 export async function executeClientTool(
   toolName: string,
   input: unknown,
@@ -1209,6 +1500,46 @@ export async function executeClientTool(
       const field = String(args.field ?? "");
       const value = String(args.value ?? "");
       return await applyFilter(field, value, String(args.op ?? "eq"));
+    }
+    case "set_grid_sort": {
+      const column = String(args.column ?? "");
+      const direction = String(args.direction ?? "asc") as "asc" | "desc" | "none";
+      return await sortCurrentGrid(column, direction);
+    }
+    case "configure_grid_columns": {
+      return await configureGridColumns({
+        visibleColumns: Array.isArray(args.visibleColumns)
+          ? (args.visibleColumns as string[])
+          : undefined,
+        hiddenColumns: Array.isArray(args.hiddenColumns)
+          ? (args.hiddenColumns as string[])
+          : undefined,
+        order: Array.isArray(args.order)
+          ? (args.order as string[])
+          : undefined,
+      });
+    }
+    case "pin_grid_columns": {
+      const columns = Array.isArray(args.columns)
+        ? (args.columns as string[])
+        : [];
+      return await pinGridColumns(columns);
+    }
+    case "apply_grid_filters": {
+      const filters = (args.filters ?? {}) as Record<string, string>;
+      const clearOthers = Boolean(args.clearOthers);
+      return await applyGridFiltersMulti(filters, clearOthers);
+    }
+    case "reset_grid_layout": {
+      return await resetGridLayout({
+        resetFilters: args.resetFilters !== false,
+        resetSort: args.resetSort !== false,
+        resetColumns: args.resetColumns !== false,
+      });
+    }
+    case "export_grid_data": {
+      const format = String(args.format ?? "xlsx") as "xlsx" | "parquet" | "csv" | "gz";
+      return await exportGridData(format);
     }
     default:
       return { status: "unknown-tool", toolName };

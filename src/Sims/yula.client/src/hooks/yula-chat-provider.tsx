@@ -332,16 +332,17 @@ function ChatInstance({
             }
           }
 
+          const hasActiveGrid = Boolean(spec && spec.columns && spec.columns.length > 0);
           const specMatchesJob =
-            Boolean(spec && spec.columns.length > 0) &&
+            hasActiveGrid &&
             (!expectedTable || spec?.tableName === expectedTable);
 
           const phase: "results" | "results-loading" | "workspace" =
-            jobDetail
-              ? specMatchesJob
-                ? "results"
-                : "results-loading"
-              : "workspace";
+            hasActiveGrid
+              ? "results"
+              : jobDetail
+                ? "results-loading"
+                : "workspace";
 
           // WASM Vector RAG araması (all-minilm + array_cosine_distance)
           let ragContext: Array<{ scope: string; content: string; metadata?: Record<string, unknown>; distance?: number }> = [];
@@ -451,9 +452,9 @@ function ChatInstance({
                 workspaceId,
                 workspaceLabel,
                 phase,
-                jobId: jobId ?? undefined,
+                jobId: jobId ?? (spec?.tableName?.startsWith("report_") ? spec.tableName.replace(/^report_/, "") : undefined),
                 grid:
-                  phase === "results" && spec && spec.columns.length > 0
+                  (phase === "results" || hasActiveGrid) && spec && spec.columns.length > 0
                     ? {
                         ...spec,
                         filters: useYulaGridStore.getState().filters,

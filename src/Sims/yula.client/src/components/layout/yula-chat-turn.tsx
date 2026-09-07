@@ -22,6 +22,12 @@ import { describeYulaStreamError } from "@/lib/yula-stream-error";
 
 const SCREEN_TOOLS = new Set([
   "filter_current_grid",
+  "apply_grid_filters",
+  "set_grid_sort",
+  "configure_grid_columns",
+  "pin_grid_columns",
+  "reset_grid_layout",
+  "export_grid_data",
   "set_grid_query",
   "run_report",
   "run_job",
@@ -45,7 +51,17 @@ function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
     case "visualize_grid_data":
       return "Grafik hazırlanıyor…";
     case "filter_current_grid":
+    case "apply_grid_filters":
       return "Filtre uygulanıyor…";
+    case "set_grid_sort":
+      return "Tablo sıralanıyor…";
+    case "configure_grid_columns":
+    case "pin_grid_columns":
+      return "Kolonlar düzenleniyor…";
+    case "reset_grid_layout":
+      return "Görünüm sıfırlanıyor…";
+    case "export_grid_data":
+      return "Dosya dışa aktarılıyor…";
     case "set_grid_query":
       return "Tablo görünümü güncelleniyor…";
     default:
@@ -68,7 +84,7 @@ function SilentTurnFallback({
   const hasScreenOk = toolParts.some(
     (i) => SCREEN_TOOLS.has(i.toolName) && !isFailedToolInfo(i) && i.state === "output-available",
   );
-  if (hasScreenOk && failed.length === 0 && !streamErrorText) return null;
+  if (hasScreenOk && !streamErrorText) return null;
 
   const friendlyStreamError = describeYulaStreamError(streamErrorText);
   const hint =
@@ -202,9 +218,8 @@ export function YulaChatTurn({
   // Metin yazılmayan turlarda son başarılı araç çıktısının "message" alanı
   // görünür yanıt olarak kullanılır (LLM, terminal ekran araçlarından sonra yazmaz)
   const streamErrorText = assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined;
-  const hasFailedTools = toolParts.some((i) => isFailedToolInfo(i));
   let fallbackToolText = "";
-  if (!assistantText.trim() && !hasFailedTools && !streamErrorText) {
+  if (!assistantText.trim() && !streamErrorText) {
     for (let i = toolParts.length - 1; i >= 0; i--) {
       const info = toolParts[i];
       if (info.state !== "output-available" || isFailedToolInfo(info)) continue;

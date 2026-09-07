@@ -282,6 +282,94 @@ export function extractWorkedSteps(
         });
         break;
       }
+      case "set_grid_sort": {
+        const col = typeof inputObj.column === "string" ? inputObj.column : "";
+        const dir = typeof inputObj.direction === "string" ? inputObj.direction : "asc";
+        const dirText = dir === "none" ? "Doğal sıra" : dir === "asc" ? "Artan (A-Z)" : "Azalan (Z-A)";
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: dir === "none" ? `Sıralama kaldırıldı: ${col}` : `Sıralandı: ${col} (${dirText})`,
+          subLabel: isPending ? "Tablo sıralanıyor..." : dirText,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "configure_grid_columns": {
+        const visible = Array.isArray(inputObj.visibleColumns) ? inputObj.visibleColumns : null;
+        const hidden = Array.isArray(inputObj.hiddenColumns) ? inputObj.hiddenColumns : null;
+        let label = "Kolonlar düzenlendi";
+        if (visible) label = `${visible.length} kolon gösteriliyor`;
+        else if (hidden) label = `${hidden.length} kolon gizlendi`;
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label,
+          subLabel: isPending ? "Kolon görünürlüğü ayarlanıyor..." : undefined,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "pin_grid_columns": {
+        const cols = Array.isArray(inputObj.columns) ? inputObj.columns : [];
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: `Kolonlar sabitlendi: ${cols.join(", ")}`,
+          subLabel: isPending ? "Kolonlar sabitleniyor..." : "Sticky",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "apply_grid_filters": {
+        const filters = (inputObj.filters ?? {}) as Record<string, string>;
+        const count = Object.keys(filters).length;
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: `${count} kolona filtre uygulandı`,
+          subLabel: isPending
+            ? "Filtreler uygulanıyor..."
+            : Object.entries(filters)
+                .map(([k, v]) => `${k}:${v}`)
+                .join(", "),
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "reset_grid_layout": {
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: "Grid görünümü sıfırlandı",
+          subLabel: isPending ? "Varsayılan düzene dönülüyor..." : "Varsayılan",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "export_grid_data": {
+        const fmt = String(inputObj.format ?? "xlsx").toUpperCase();
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: `Dışa aktarıldı (${fmt})`,
+          subLabel: isPending ? "Dosya hazırlanıyor ve indiriliyor..." : `${fmt} indirildi`,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
       case "set_grid_query": {
         const title = typeof inputObj.title === "string" ? inputObj.title.trim() : "";
         const sql = typeof inputObj.sql === "string" ? inputObj.sql.replace(/\s+/g, " ").trim() : "";

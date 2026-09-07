@@ -9,6 +9,9 @@ import {
   Package,
   ShieldAlert,
   HelpCircle,
+  ArrowUpDown,
+  Columns,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import systemCommandsYaml from "@/features/system/agents/system.agent.yaml";
@@ -53,6 +56,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   RotateCcw,
   Package,
   ShieldAlert,
+  ArrowUpDown,
+  Columns,
+  Download,
 };
 
 function resolveIcon(iconName: string): LucideIcon {

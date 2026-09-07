@@ -465,6 +465,144 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
         required: ["field", "value"],
       }),
     }),
+    set_grid_sort: dynamicTool({
+      description: [
+        "Kullanıcının açık tablosunu belirtilen kolona göre sıralar (ASC/DESC/none).",
+        "DuckDB seviyesinde pencereli ORDER BY çalışır, anında yenilenir.",
+        "direction: 'asc' (küçükten büyüğe / A-Z) · 'desc' (büyükten küçüğe / Z-A) · 'none' (sıralamayı kaldır / doğal sıra).",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        column: string;
+        direction: "asc" | "desc" | "none";
+      }>({
+        type: "object",
+        properties: {
+          column: {
+            type: "string",
+            enum: cols,
+            description: "Sıralanacak hedef kolon adı.",
+          },
+          direction: {
+            type: "string",
+            enum: ["asc", "desc", "none"],
+            description: "asc: artan · desc: azalan · none: sıralamayı sıfırla",
+          },
+        },
+        required: ["column", "direction"],
+      }),
+    }),
+    configure_grid_columns: dynamicTool({
+      description: [
+        "Grid kolonlarının görünürlüğünü, gizliliğini ve sırasını düzenler.",
+        "Kullanıcı 'sadece X, Y, Z kolonlarını göster' dediğinde visibleColumns ver (diğerleri gizlenir).",
+        "Kullanıcı 'X ve Y kolonlarını gizle' dediğinde hiddenColumns ver.",
+        "Kullanıcı kolon sırasını değiştirmek istediğinde order ver.",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        visibleColumns?: string[];
+        hiddenColumns?: string[];
+        order?: string[];
+      }>({
+        type: "object",
+        properties: {
+          visibleColumns: {
+            type: "array",
+            items: { type: "string" },
+            description: "Yalnızca bu kolonlar görünür kalır, diğer tüm kolonlar gizlenir.",
+          },
+          hiddenColumns: {
+            type: "array",
+            items: { type: "string" },
+            description: "Gizlenecek kolon adları listesi.",
+          },
+          order: {
+            type: "array",
+            items: { type: "string" },
+            description: "Kolonların soldan sağa gösterim sırası.",
+          },
+        },
+      }),
+    }),
+    pin_grid_columns: dynamicTool({
+      description: [
+        "Grid kolonlarını tablonun soluna sabitler (sticky pinned columns).",
+        "Kullanıcı tabloyu sağa kaydırırken bu kolonlar daima görünür kalır.",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        columns: string[];
+      }>({
+        type: "object",
+        properties: {
+          columns: {
+            type: "array",
+            items: { type: "string" },
+            description: "Sola sabitlenecek kolon adları.",
+          },
+        },
+        required: ["columns"],
+      }),
+    }),
+    apply_grid_filters: dynamicTool({
+      description: [
+        "Grid tablosuna tek seferde birden fazla kolon filtresi uygular.",
+        "filters: Kolon adı ve D365 ifadesi eşlemesi (örn: { 'InventLocationId': 'MERKEZ', 'QtyOnHand': '>10' }).",
+        "clearOthers: true verilirse diğer aktif filtreleri temizleyip yalnız belirtilen filtreleri uygular.",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        filters: Record<string, string>;
+        clearOthers?: boolean;
+      }>({
+        type: "object",
+        properties: {
+          filters: {
+            type: "object",
+            description: "Kolon adı -> D365 filtre değeri eşleme objesi (örn: { QtyOnHand: '>0', InventLocationId: 'MERKEZ' }).",
+          },
+          clearOthers: {
+            type: "boolean",
+            description: "Diğer mevcut filtreler temizlensin mi? (varsayılan: false — mevcutlarla birleştirir)",
+          },
+        },
+        required: ["filters"],
+      }),
+    }),
+    reset_grid_layout: dynamicTool({
+      description: [
+        "Grid görünümünü varsayılan ayarlara döndürür: gizli kolonları açar, sıralamayı sıfırlar, pinleri kaldırır ve/veya filtreleri temizler.",
+        "Kullanıcı 'görünümü sıfırla', 'tüm kolonları geri getir', 'tabloyu eski haline getir' dediğinde kullanılır.",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        resetFilters?: boolean;
+        resetSort?: boolean;
+        resetColumns?: boolean;
+      }>({
+        type: "object",
+        properties: {
+          resetFilters: { type: "boolean", description: "Filtreler temizlensin mi (varsayılan true)" },
+          resetSort: { type: "boolean", description: "Sıralama sıfırlansın mı (varsayılan true)" },
+          resetColumns: { type: "boolean", description: "Gizli kolonlar açılıp sıra sıfırlansın mı (varsayılan true)" },
+        },
+      }),
+    }),
+    export_grid_data: dynamicTool({
+      description: [
+        "Açık grid verisini kullanıcının tarayıcısına doğrudan dosya olarak indirir (Excel, Parquet, GZIP CSV).",
+        "Kullanıcı 'bu veriyi Excel/CSV/Parquet olarak indir / dışa aktar' dediğinde bu aracı çağır.",
+      ].join(" "),
+      inputSchema: jsonSchema<{
+        format: "xlsx" | "parquet" | "csv" | "gz";
+      }>({
+        type: "object",
+        properties: {
+          format: {
+            type: "string",
+            enum: ["xlsx", "parquet", "csv", "gz"],
+            description: "İndirme formatı: xlsx (Excel) · parquet · csv · gz (Sıkıştırılmış CSV.gz)",
+          },
+        },
+        required: ["format"],
+      }),
+    }),
   };
 }
 

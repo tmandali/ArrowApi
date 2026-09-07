@@ -193,14 +193,15 @@ export function extractJobIdFromPath(pathname?: string | null): string | null {
   return isGuidString(lastSeg) ? lastSeg : null
 }
 
-/** Path GUID veya `?job=` query. */
+/** Path GUID veya `?jobId=` / `?job=` query. */
 export function extractJobIdFromHref(href?: string | null): string | null {
   if (!href) return null
   const fromPath = extractJobIdFromPath(href)
   if (fromPath) return fromPath
   const q = href.split("?")[1]
   if (!q) return null
-  const job = new URLSearchParams(q).get("job")
+  const params = new URLSearchParams(q)
+  const job = params.get("jobId") || params.get("job")
   return isGuidString(job) ? job!.trim() : null
 }
 
@@ -218,7 +219,7 @@ export function reportExecutionPath(href?: string | null): string | null {
 
 export function reportExecutionHref(pagePath: string, jobId: string): string {
   const base = reportExecutionPath(pagePath) ?? (pagePath.replace(/\/+$/, "") || "/")
-  return `${base}?job=${encodeURIComponent(jobId)}`
+  return `${base}?jobId=${encodeURIComponent(jobId)}`
 }
 
 /** `/stock/stock-balance` → `stock-balance` */
@@ -229,9 +230,9 @@ export function reportScopeFromPath(href?: string | null): string | null {
   return parts.length >= 2 ? parts[1] : null
 }
 
-/** True if the current URL path is a GUID-backed report result page (e.g. /<workspace>/<report>/<jobId>). */
+/** True if the current URL path is a GUID-backed report result page (path or ?jobId= query). */
 export function isReportResultPath(pathname?: string | null): boolean {
-  return extractJobIdFromPath(pathname) !== null
+  return extractJobIdFromPath(pathname) !== null || extractJobIdFromHref(pathname) !== null
 }
 
 /**

@@ -229,6 +229,51 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     void executeQueryRef.current({}, sortByRef.current, sortDescRef.current, 0)
   }, [])
 
+  // Programatik sıralama (AI veya UI kontrolleri için doğrudan ASC/DESC/null ayarı)
+  const setSorting = React.useCallback((columnName: string | null, desc = false) => {
+    sortByRef.current = columnName
+    sortDescRef.current = desc
+    setSortBy(columnName)
+    setSortDesc(desc)
+    setPage(0)
+    setIsLoadingQuery(true)
+
+    if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+    if (isCustomQueryActive()) {
+      setCustomQueryTick((t) => t + 1)
+      return
+    }
+    void executeQueryRef.current(filtersRef.current, columnName, desc, 0)
+  }, [])
+
+  // Çoklu filtre uygulama (AI veya toplu filtre işlemleri için)
+  const applyFilters = React.useCallback(
+    (newFilters: Record<string, string>, clearOthers = false) => {
+      const nextFilters = clearOthers ? {} : { ...filtersRef.current }
+      for (const [col, val] of Object.entries(newFilters)) {
+        if (!val || val.trim() === "") {
+          delete nextFilters[col]
+        } else {
+          nextFilters[col] = val
+        }
+      }
+      filtersRef.current = nextFilters
+      setFilters(nextFilters)
+      setPage(0)
+      setIsLoadingQuery(true)
+
+      if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+      queryTimeoutRef.current = setTimeout(() => {
+        if (isCustomQueryActive()) {
+          setCustomQueryTick((t) => t + 1)
+          return
+        }
+        void executeQueryRef.current(nextFilters, sortByRef.current, sortDescRef.current, 0)
+      }, 250)
+    },
+    []
+  )
+
   // 3 aşamalı kolon sıralama döngüsü: ASC -> DESC -> Doğal (None)
   const toggleSort = React.useCallback((columnName: string) => {
     let nextSortBy: string | null = columnName
@@ -515,6 +560,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     sortDesc,
     setSortBy,
     setSortDesc,
+    setSorting,
+    applyFilters,
     toggleSort,
     loadMore,
     hasMore,

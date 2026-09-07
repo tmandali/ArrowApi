@@ -59,11 +59,46 @@ interface GridState {
   setCustomQuerySql: (sql: string | null, title?: string | null) => void;
 }
 
+export interface GridRuntimeSnapshot {
+  sortBy: string | null;
+  sortDesc: boolean;
+  hiddenColumns: string[];
+  pinnedColumns: string[];
+  columnOrder: string[];
+  filters: Record<string, string>;
+  rowCount: number | null;
+}
+
 export interface YulaGridRuntimeApi {
   /** Modelin yazdığı değeri gridin filtre hücresine uygular ve satırı açar */
   applyFilter: (column: string, value: string) => void;
+  /** Birden fazla filtreyi aynı anda uygular */
+  applyFilters: (filters: Record<string, string>, clearOthers?: boolean) => void;
   /** Tüm filtre hücrelerini boşaltır */
   clearAll: () => void;
+  /** Tablo sıralamasını günceller */
+  setSort: (column: string | null, direction: "asc" | "desc" | null) => void;
+  /** Görünür kolonları belirler (harici olanlar gizlenir) */
+  setVisibleColumns: (columns: string[]) => void;
+  /** Belirli kolonları gizler */
+  setHiddenColumns: (columns: string[]) => void;
+  /** Kolonları sola veya sağa sabitler */
+  setPinnedColumns: (columns: string[]) => void;
+  /** Kolonların görüntüleme sırasını belirler */
+  setColumnOrder: (columns: string[]) => void;
+  /** Grid düzenini (sıralama, gizli kolonlar, pinler, filtreler) sıfırlar */
+  resetLayout: (options?: {
+    filters?: boolean;
+    sort?: boolean;
+    columns?: boolean;
+    resetFilters?: boolean;
+    resetSort?: boolean;
+    resetColumns?: boolean;
+  }) => void;
+  /** Grid verisini dışa aktarır (xlsx, csv, parquet, gz) */
+  exportGrid?: (format: "xlsx" | "parquet" | "csv" | "gz", filename?: string) => Promise<void> | void;
+  /** Anlık grid durumunu döner */
+  getGridState?: () => GridRuntimeSnapshot;
 }
 
 export const useYulaGridStore = create<GridState>((set) => ({

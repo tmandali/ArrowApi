@@ -243,6 +243,12 @@ export async function POST(req: Request) {
         hasToolCall(
           "set_grid_query",
           "filter_current_grid",
+          "set_grid_sort",
+          "configure_grid_columns",
+          "pin_grid_columns",
+          "apply_grid_filters",
+          "reset_grid_layout",
+          "export_grid_data",
           "visualize_grid_data",
           "run_report",
           "run_job",

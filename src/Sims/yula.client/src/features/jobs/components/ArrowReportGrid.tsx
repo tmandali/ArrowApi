@@ -14,6 +14,7 @@ import {
   Download,
   Database,
   FileArchive,
+  EyeOff,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -135,6 +136,9 @@ export function ArrowReportGrid({
     sortBy,
     sortDesc,
     toggleSort,
+    setSorting,
+    applyFilters: duckApplyFilters,
+    clearFilters,
   } = useDuckReport({
     jobId,
     jobUrl,
@@ -305,7 +309,38 @@ export function ArrowReportGrid({
     else setInternalShowFilterRow(true);
   }, [onShowFilterRowChange]);
 
-  // Yula aracının yazdığı değeri doğrudan kendi filtre hücremize uygula
+  // AI & Kontrollü Grid Düzeni Durumu (Kolon Gizleme, Sabitleme, Sıralama Düzeni)
+  const [hiddenColumns, setHiddenColumns] = React.useState<string[] | undefined>(undefined);
+  const [pinnedColumns, setPinnedColumns] = React.useState<string[] | undefined>(undefined);
+  const [columnOrder, setColumnOrder] = React.useState<string[] | undefined>(undefined);
+
+  // Anlık snapshot referansı (her render'da güncellenir, runtimeApi'yi yeniden tetiklemez)
+  const latestGridStateRef = React.useRef({
+    sortBy,
+    sortDesc,
+    hiddenColumns: hiddenColumns ?? [],
+    pinnedColumns: pinnedColumns ?? [],
+    columnOrder: columnOrder ?? [],
+    filters,
+    rowCount: totalFiltered,
+    effectiveColumns,
+  });
+  React.useEffect(() => {
+    latestGridStateRef.current = {
+      sortBy,
+      sortDesc,
+      hiddenColumns: hiddenColumns ?? [],
+      pinnedColumns: pinnedColumns ?? [],
+      columnOrder: columnOrder ?? [],
+      filters,
+      rowCount: totalFiltered,
+      effectiveColumns,
+    };
+  });
+
+  const handleExportClickRef = React.useRef<(format?: "xlsx" | "parquet" | "csv" | "gz") => void>(undefined);
+
+  // Yula aracının çağrılarını doğrudan grid ve DuckDB motoruna bağla
   React.useEffect(() => {
     const store = useYulaGridStore.getState();
     store.setRuntimeApi({
@@ -313,15 +348,76 @@ export function ArrowReportGrid({
         setFilter(column, value);
         revealFilterRow();
       },
+      applyFilters: (newFilters, clearOthers) => {
+        duckApplyFilters(newFilters, clearOthers);
+        revealFilterRow();
+      },
       clearAll: () => {
-        effectiveColumns.forEach((c) => setFilter(c.name, ""));
+        clearFilters();
+      },
+      setSort: (column, direction) => {
+        if (!column || direction === null) {
+          setSorting(null, false);
+        } else {
+          setSorting(column, direction === "desc");
+        }
+      },
+      setVisibleColumns: (visibleCols) => {
+        const visibleSet = new Set(visibleCols);
+        const toHide = effectiveColumns
+          .map((c) => c.name)
+          .filter((name) => !visibleSet.has(name));
+        setHiddenColumns(toHide);
+      },
+      setHiddenColumns: (toHide) => {
+        setHiddenColumns(toHide);
+      },
+      setPinnedColumns: (pinned) => {
+        setPinnedColumns(pinned);
+      },
+      setColumnOrder: (order) => {
+        setColumnOrder(order);
+      },
+      resetLayout: (options) => {
+        const opt = options ?? { filters: true, sort: true, columns: true };
+        if (opt.filters) clearFilters();
+        if (opt.sort) setSorting(null, false);
+        if (opt.columns) {
+          setHiddenColumns([]);
+          setPinnedColumns(undefined);
+          setColumnOrder(undefined);
+        }
+      },
+      exportGrid: async (format) => {
+        handleExportClickRef.current?.(format);
+      },
+      getGridState: () => {
+        const s = latestGridStateRef.current;
+        return {
+          sortBy: s.sortBy,
+          sortDesc: s.sortDesc,
+          hiddenColumns: s.hiddenColumns,
+          pinnedColumns: s.pinnedColumns,
+          columnOrder:
+            s.columnOrder.length > 0
+              ? s.columnOrder
+              : s.effectiveColumns.map((c) => c.name),
+          filters: s.filters,
+          rowCount: s.rowCount,
+        };
       },
     });
     return () => {
       useYulaGridStore.getState().setRuntimeApi(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setFilter, effectiveColumns, revealFilterRow]);
+  }, [
+    setFilter,
+    duckApplyFilters,
+    clearFilters,
+    setSorting,
+    effectiveColumns,
+    revealFilterRow,
+  ]);
 
   // Bağlam aynası senkronu: gridin GERÇEK filtre state'i tek doğruluk kaynağıdır.
   // Kullanıcı filtre hücrelerinden temizlerken mağaza aynası bayat kalıyordu →
@@ -540,6 +636,9 @@ export function ArrowReportGrid({
       runExport,
     ]
   )
+  React.useEffect(() => {
+    handleExportClickRef.current = handleExportClick;
+  }, [handleExportClick]);
 
   const subtitle =
     streamingSubtitle ??
@@ -559,6 +658,12 @@ export function ArrowReportGrid({
       progressValue={progressPercent}
       resetKey={`${jobId}:${customQuerySql ?? ""}:${filterKey}`}
       storageKey={storageKey}
+      hiddenColumns={hiddenColumns}
+      onHiddenColumnsChange={setHiddenColumns}
+      pinnedColumns={pinnedColumns}
+      onPinnedColumnsChange={setPinnedColumns}
+      columnOrder={columnOrder}
+      onColumnOrderChange={setColumnOrder}
       showFilterRow={effectiveShowFilterRow}
       onToggleFilterRow={onShowFilterRowChange}
       headerActions={
@@ -578,6 +683,20 @@ export function ArrowReportGrid({
               <span className="truncate">
                 {customQueryTitle ?? "Aktif Veri Kümesi"}
               </span>
+              <X className="size-3 shrink-0" />
+            </Button>
+          ) : null}
+          {hiddenColumns && hiddenColumns.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setHiddenColumns([])}
+              title={`${hiddenColumns.length} kolon gizlendi — tümünü göstermek için tıklayın`}
+            >
+              <EyeOff className="size-3.5 shrink-0" />
+              <span>{hiddenColumns.length} gizli</span>
               <X className="size-3 shrink-0" />
             </Button>
           ) : null}

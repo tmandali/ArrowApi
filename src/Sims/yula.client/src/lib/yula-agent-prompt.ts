@@ -105,7 +105,13 @@ const REPORTS_DIGEST_LINES = DEMO_REPORTS.map((r) => {
 const GRID_PRESENT_RULES = [
   "ACTIVE TABLE & GRID OPERATIONS:",
   "• set_grid_query: Use when user asks for custom views, calculations, derived columns (e.g. Total = Qty * UnitPrice), grouping, aggregations, or column renaming/aliasing. Write valid SELECT queries referencing the active table name. Use { reset: true } to restore the default table view.",
-  "• filter_current_grid: Use for row-level filtering by column values, thresholds, ranges, or empty/non-empty states. Pass D365 filter expressions as-is (e.g. '>50', '100..500', 'SKU*'). Use field: '*' to clear all filters.",
+  "• set_grid_sort: Use when user asks to sort the table rows by a column. Direction: 'asc' (A-Z / small-to-large) or 'desc' (Z-A / large-to-small), or 'none' to clear sorting.",
+  "• configure_grid_columns: Use when user wants to show only specific columns (visibleColumns), hide certain columns (hiddenColumns), or reorder columns (order). For example, when user says 'sadece X, Y ve Z'yi göster', use visibleColumns: ['X', 'Y', 'Z'].",
+  "• pin_grid_columns: Use to pin important columns to the left side of the table (sticky).",
+  "• apply_grid_filters: Use to apply multiple column filters simultaneously. Pass D365 filter expressions in the filters object (e.g. { QtyOnHand: '>0', InventLocationId: 'MERKEZ' }).",
+  "• filter_current_grid: Use for single column filtering or clearing all filters (field: '*').",
+  "• reset_grid_layout: Use when user asks to reset grid view, unhide all columns, clear sorting, or restore default layout.",
+  "• export_grid_data: Use when user asks to download or export the active grid data (format: 'xlsx' | 'parquet' | 'csv' | 'gz').",
   "• visualize_grid_data: Use when user requests charts (bar, line, pie), visual trends, or distributions. Provide dimension and metric columns; do not write raw data in text.",
   "• analyze_grid_data: Use for fast KPI aggregates (sum, avg, min, max, count, topN) on numeric columns.",
   "• profile_grid_table: Use when user asks for deep data profiling, quality checks, anomaly detection, or statistical distributions.",
@@ -128,7 +134,7 @@ const SQL_EXPERT_RULES = [
   "SQL EXPERT & QUERY GUIDELINES:",
   "• Use run_expert_sql strictly for read-only SELECT queries that verify findings or compute advanced metrics.",
   "• If the user wants the actual grid UI table to show transformed/derived columns, use set_grid_query instead.",
-  "• For simple value/range filters on the existing table, use filter_current_grid instead of SQL.",
+  "• For simple value/range filters or sorting on the existing table, prefer grid tools (set_grid_sort, apply_grid_filters, filter_current_grid) instead of SQL to keep UI state fast and responsive.",
 ].join("\n");
 
 const DUCKDB_RULES = [
