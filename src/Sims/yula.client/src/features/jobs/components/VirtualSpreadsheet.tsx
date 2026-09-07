@@ -1,8 +1,25 @@
 "use client";
 
 import * as React from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, ListFilter, Table2 } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Columns3,
+  ListFilter,
+  RotateCcw,
+  Search,
+  Table2,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
@@ -152,6 +169,12 @@ export type VirtualSpreadsheetProps<T> = {
   onColumnOrderChange?: (newOrder: string[]) => void
   /** Kolon sürükle-bırak ile sıralamayı devre dışı bırakır (örn. hiyerarşik ağaçlarda). */
   disableColumnReorder?: boolean
+  /** Dışarıdan yönetilen gizli kolon isimleri listesi. */
+  hiddenColumns?: string[]
+  /** Gizli kolon listesi değiştiğinde çağrılır. */
+  onHiddenColumnsChange?: (hiddenColumns: string[]) => void
+  /** Kolon gizleme / gösterme menüsünü devre dışı bırakır. */
+  disableColumnVisibility?: boolean
   /** Filtre satırı `<tr>`'sinin ek class'ı. */
   filterRowClassName?: string
   title?: string
@@ -196,6 +219,9 @@ export function VirtualSpreadsheet<T>({
   columnOrder,
   onColumnOrderChange,
   disableColumnReorder = false,
+  hiddenColumns,
+  onHiddenColumnsChange,
+  disableColumnVisibility = false,
   filterRowClassName,
   title,
   subtitle,
@@ -237,6 +263,68 @@ export function VirtualSpreadsheet<T>({
     }
     return result
   }, [columns, activeColumnOrder])
+
+  // Kolon gizleme / gösterme durumu
+  const [internalHiddenColumns, setInternalHiddenColumns] = React.useState<string[]>([])
+  const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
+  const [columnSearch, setColumnSearch] = React.useState("")
+
+  React.useEffect(() => {
+    setInternalHiddenColumns([])
+    setColumnSearch("")
+  }, [resetKey])
+
+  const activeHiddenColumns = hiddenColumns ?? internalHiddenColumns
+  const hiddenSet = React.useMemo(
+    () => new Set(activeHiddenColumns),
+    [activeHiddenColumns]
+  )
+
+  const visibleColumns = React.useMemo(() => {
+    if (hiddenSet.size === 0) return orderedColumns
+    const filtered = orderedColumns.filter((col) => !hiddenSet.has(col.name))
+    // En az 1 kolonun görünür kalmasını garanti et
+    return filtered.length > 0 ? filtered : orderedColumns
+  }, [orderedColumns, hiddenSet])
+
+  const hiddenColumnsCount = hiddenSet.size
+
+  const toggleColumnVisibility = React.useCallback(
+    (columnName: string) => {
+      let nextHidden: string[]
+      if (hiddenSet.has(columnName)) {
+        nextHidden = activeHiddenColumns.filter((name) => name !== columnName)
+      } else {
+        if (visibleColumns.length <= 1) return
+        nextHidden = [...activeHiddenColumns, columnName]
+      }
+
+      if (onHiddenColumnsChange) {
+        onHiddenColumnsChange(nextHidden)
+      } else {
+        setInternalHiddenColumns(nextHidden)
+      }
+    },
+    [hiddenSet, activeHiddenColumns, visibleColumns.length, onHiddenColumnsChange]
+  )
+
+  const handleShowAllColumns = React.useCallback(() => {
+    if (onHiddenColumnsChange) {
+      onHiddenColumnsChange([])
+    } else {
+      setInternalHiddenColumns([])
+    }
+  }, [onHiddenColumnsChange])
+
+  const filteredMenuColumns = React.useMemo(() => {
+    if (!columnSearch.trim()) return orderedColumns
+    const query = columnSearch.toLowerCase().trim()
+    return orderedColumns.filter(
+      (c) =>
+        c.label.toLowerCase().includes(query) ||
+        c.name.toLowerCase().includes(query)
+    )
+  }, [orderedColumns, columnSearch])
 
   // Sürükle - bırak görsel durumları
   const [draggedColName, setDraggedColName] = React.useState<string | null>(null)
@@ -409,15 +497,29 @@ export function VirtualSpreadsheet<T>({
     [colWidths, initialColWidths]
   )
 
+  const handleResetColumns = React.useCallback(() => {
+    if (onHiddenColumnsChange) {
+      onHiddenColumnsChange([])
+    } else {
+      setInternalHiddenColumns([])
+    }
+    if (onColumnOrderChange) {
+      onColumnOrderChange([])
+    } else {
+      setInternalColumnOrder(null)
+    }
+    setColWidths(initialColWidths ?? {})
+  }, [onHiddenColumnsChange, onColumnOrderChange, initialColWidths])
+
   const totalTableWidth = React.useMemo(() => {
-    return orderedColumns.reduce((sum, col) => {
+    return visibleColumns.reduce((sum, col) => {
       const w = getColWidth(col)
       if (typeof w === "number") return sum + w
       if (typeof w === "string" && w.endsWith("px")) return sum + parseFloat(w)
       if (typeof w === "string" && w.endsWith("%")) return sum + 110
       return sum + 100
     }, 0)
-  }, [orderedColumns, getColWidth])
+  }, [visibleColumns, getColWidth])
 
   const handleResizeStart = React.useCallback(
     (event: React.PointerEvent, col: SpreadsheetColumn) => {
@@ -475,7 +577,7 @@ export function VirtualSpreadsheet<T>({
 
   const colGroup = (
     <colgroup>
-      {orderedColumns.map((col) => {
+      {visibleColumns.map((col) => {
         const w = getColWidth(col)
         return (
           <col
@@ -491,14 +593,14 @@ export function VirtualSpreadsheet<T>({
 
   const renderVirtualRow = React.useCallback(
     (item: T, rowIndex: number) => {
-      const rendered = renderRow(item, rowIndex, orderedColumns)
+      const rendered = renderRow(item, rowIndex, visibleColumns)
       if (
         React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
         rendered.type === "tr"
       ) {
         const childrenArray = React.Children.toArray(rendered.props.children)
-        // Eğer kolon sırası değiştiyse, <td> çocuklarını key'e göre orderedColumns sırasına diz!
-        // Böylece renderRow içinde varsayılan sırayla dönen <td> elemanları da anında yeni sıraya dizilir.
+        // Eğer kolon sırası veya görünürlüğü değiştiyse, <td> çocuklarını key'e göre visibleColumns sırasına diz!
+        // Böylece renderRow içinde varsayılan sırayla dönen <td> elemanları da anında yeni sıraya dizilir ve gizlenenler elenir.
         const tdMap = new Map<string, React.ReactNode>()
         for (const child of childrenArray) {
           if (React.isValidElement(child) && child.key != null) {
@@ -509,8 +611,8 @@ export function VirtualSpreadsheet<T>({
         }
 
         let sortedChildren: React.ReactNode[]
-        if (tdMap.size === orderedColumns.length) {
-          sortedChildren = orderedColumns.map((c) => tdMap.get(c.name) ?? null)
+        if (tdMap.size >= visibleColumns.length && visibleColumns.every((c) => tdMap.has(c.name))) {
+          sortedChildren = visibleColumns.map((c) => tdMap.get(c.name) ?? null)
         } else {
           sortedChildren = childrenArray
         }
@@ -524,7 +626,7 @@ export function VirtualSpreadsheet<T>({
       }
       return rendered
     },
-    [renderRow, orderedColumns]
+    [renderRow, visibleColumns]
   )
 
   // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
@@ -673,6 +775,123 @@ export function VirtualSpreadsheet<T>({
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-center">
           {headerActions}
+          {!disableColumnVisibility && columns.length > 0 ? (
+            <Popover open={columnMenuOpen} onOpenChange={setColumnMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant={hiddenColumnsCount > 0 ? "secondary" : "outline"}
+                  size="icon"
+                  className="relative size-7 shrink-0"
+                  disabled={columns.length === 0}
+                  title={
+                    hiddenColumnsCount > 0
+                      ? `${hiddenColumnsCount} kolon gizli — Kolonları Göster / Gizle`
+                      : "Kolonları Göster / Gizle"
+                  }
+                  aria-label="Kolonları Göster / Gizle"
+                >
+                  <Columns3 className="size-3.5" />
+                  {hiddenColumnsCount > 0 ? (
+                    <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground shadow-xs">
+                      {hiddenColumnsCount}
+                    </span>
+                  ) : null}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={6} className="w-64 p-2.5 shadow-lg">
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Columns3 className="size-3.5 text-muted-foreground" />
+                    <span>Kolonlar</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {visibleColumns.length} / {orderedColumns.length} görünür
+                  </span>
+                </div>
+
+                {/* Hızlı aksiyonlar: Tümünü Göster / Sıfırla */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <button
+                    type="button"
+                    disabled={hiddenColumnsCount === 0}
+                    onClick={handleShowAllColumns}
+                    className="text-[11px] font-medium text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    Tümünü Göster
+                  </button>
+                  <button
+                    type="button"
+                    disabled={hiddenColumnsCount === 0 && (!activeColumnOrder || activeColumnOrder.length === 0)}
+                    onClick={handleResetColumns}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Kolon sırasını ve gizlilik ayarlarını varsayılana döndür"
+                  >
+                    <RotateCcw className="size-2.5" />
+                    <span>Sıfırla</span>
+                  </button>
+                </div>
+
+                {/* Kolon arama (kolon sayısı > 5 ise) */}
+                {orderedColumns.length > 5 ? (
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
+                    <Input
+                      value={columnSearch}
+                      onChange={(e) => setColumnSearch(e.target.value)}
+                      placeholder="Kolon ara…"
+                      className="h-7 pl-7 pr-6 text-xs"
+                    />
+                    {columnSearch ? (
+                      <button
+                        type="button"
+                        onClick={() => setColumnSearch("")}
+                        className="absolute right-1.5 flex size-4 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* Kolon Listesi */}
+                <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5">
+                  {filteredMenuColumns.map((col) => {
+                    const isVisible = !hiddenSet.has(col.name)
+                    const isLastVisible = isVisible && visibleColumns.length <= 1
+
+                    return (
+                      <label
+                        key={col.name}
+                        className={cn(
+                          "flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors select-none",
+                          isLastVisible
+                            ? "opacity-50 cursor-not-allowed bg-muted/20"
+                            : "hover:bg-muted/60 cursor-pointer text-foreground"
+                        )}
+                        title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
+                      >
+                        <Checkbox
+                          checked={isVisible}
+                          disabled={isLastVisible}
+                          onCheckedChange={() => toggleColumnVisibility(col.name)}
+                        />
+                        <span className="truncate flex-1">{col.label}</span>
+                        {col.align === "right" ? (
+                          <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
+                        ) : null}
+                      </label>
+                    )
+                  })}
+                  {filteredMenuColumns.length === 0 ? (
+                    <div className="py-3 text-center text-xs text-muted-foreground">
+                      Kolon bulunamadı
+                    </div>
+                  ) : null}
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : null}
           {onToggleFilterRow ? (
             <Button
               type="button"
@@ -724,7 +943,7 @@ export function VirtualSpreadsheet<T>({
                   {colGroup}
                   <thead>
                     <tr>
-                      {orderedColumns.map((col) => {
+                      {visibleColumns.map((col) => {
                         const w = getColWidth(col)
                         const isSorted =
                           activeSortColumn === col.name && activeSortDirection !== null
@@ -826,7 +1045,7 @@ export function VirtualSpreadsheet<T>({
                     </tr>
                     {showFilterRow && renderFilterCell ? (
                       <tr className={filterRowClassName}>
-                        {orderedColumns.map((col, index) => (
+                        {visibleColumns.map((col, index) => (
                           <th key={col.name} className={cellClass}>
                             {renderFilterCell(col, index)}
                           </th>
@@ -863,7 +1082,7 @@ export function VirtualSpreadsheet<T>({
                 {displayItems.length === 0 && loading ? (
                   Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
                     <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
-                      {orderedColumns.map((col) => (
+                      {visibleColumns.map((col) => (
                         <td
                           key={col.name}
                           className={cn(
@@ -892,7 +1111,7 @@ export function VirtualSpreadsheet<T>({
                 ) : displayItems.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={orderedColumns.length + 1}
+                      colSpan={visibleColumns.length + 1}
                       className="py-8 text-center text-xs text-muted-foreground"
                     >
                       Kayıt bulunamadı
@@ -906,7 +1125,7 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: startIndex * rowHeight }}
                       >
-                        <td colSpan={orderedColumns.length + 1} className="p-0 border-0" />
+                        <td colSpan={visibleColumns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                     {windowRows.map((row, index) =>
@@ -915,7 +1134,7 @@ export function VirtualSpreadsheet<T>({
                     {loadingMore && hasMore
                       ? Array.from({ length: SKELETON_ROWS }, (_, skeletonIndex) => (
                           <tr key={`skeleton-${skeletonIndex}`} aria-hidden>
-                            {orderedColumns.map((col) => (
+                            {visibleColumns.map((col) => (
                               <td
                                 key={col.name}
                                 className={cn(
@@ -948,7 +1167,7 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: (displayItems.length - endIndex) * rowHeight }}
                       >
-                        <td colSpan={orderedColumns.length + 1} className="p-0 border-0" />
+                        <td colSpan={visibleColumns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                   </>
