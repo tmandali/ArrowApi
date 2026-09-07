@@ -14,6 +14,7 @@ import {
   panelHeaderSubtitleClass,
   panelHeaderTitleClass,
 } from "@/components/layout/panel-chrome"
+import { formatGridCellValue } from "@/utils/format-cell"
 import { cn } from "@/utils/cn"
 
 export const ROW_HEIGHT = 28
@@ -28,6 +29,78 @@ export const cellClass =
   "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
 export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
+
+let measurementCanvas: HTMLCanvasElement | null = null
+
+/**
+ * Canvas 2D context kullanarak verilen metnin piksel genişliğini ölçer (0 ms, reflow yok).
+ */
+function measureTextWidth(text: string, font = "12px sans-serif"): number {
+  if (typeof document === "undefined" || !text) return (text?.length || 0) * 8
+  try {
+    if (!measurementCanvas) {
+      measurementCanvas = document.createElement("canvas")
+    }
+    const ctx = measurementCanvas.getContext("2d")
+    if (!ctx) return text.length * 8
+    ctx.font = font
+    return ctx.measureText(text).width
+  } catch {
+    return text.length * 8
+  }
+}
+
+/**
+ * Kolon başlığı ve mevcut satır içeriklerine göre en uygun "tam sığdır" (fit-content) piksel genişliğini hesaplar.
+ */
+function calculateColumnAutoFitWidth<T>(
+  col: SpreadsheetColumn,
+  items: readonly T[]
+): number {
+  const headerWidth =
+    measureTextWidth(col.label || col.name || "", "bold 11px sans-serif") + 40
+
+  let maxContentWidth = 0
+  const sampleLimit = Math.min(items.length, 120)
+
+  for (let i = 0; i < sampleLimit; i++) {
+    const item = items[i] as Record<string, unknown> | null | undefined
+    if (!item) continue
+
+    const rowValues =
+      item.values && typeof item.values === "object"
+        ? (item.values as Record<string, unknown>)
+        : null
+
+    const nestedRow =
+      item.row && typeof item.row === "object"
+        ? (item.row as Record<string, unknown>)
+        : null
+
+    const rawVal =
+      rowValues?.[col.name] ??
+      nestedRow?.[col.name] ??
+      item[col.name] ??
+      (col.kind === "account" ? (nestedRow?.name as unknown) ?? item.name : undefined)
+
+    if (rawVal == null) continue
+
+    const formattedVal = formatGridCellValue(rawVal, col.align)
+    let w = measureTextWidth(formattedVal, "12px sans-serif")
+
+    if (typeof item.depth === "number") {
+      w += item.depth * 16 + 24
+    }
+
+    if (w > maxContentWidth) {
+      maxContentWidth = w
+    }
+  }
+
+  const contentWidth = maxContentWidth > 0 ? maxContentWidth + 28 : 0
+  const fitWidth = Math.round(Math.max(headerWidth, contentWidth))
+  return Math.max(MIN_COL_WIDTH, Math.min(520, fitWidth))
+}
 
 /**
  * Kolon hizalamasına (align) ve etiket uzunluğuna göre varsayılan piksel genişliği hesaplar.
@@ -47,6 +120,7 @@ export type SpreadsheetColumn = {
   name: string
   label: string
   align?: "left" | "right"
+  kind?: string
 }
 
 export type VirtualSpreadsheetProps<T> = {
@@ -122,6 +196,7 @@ export function VirtualSpreadsheet<T>({
     startX: number
     startWidth: number
     name: string
+    moved?: boolean
   } | null>(null)
 
   // resetKey/başlangıç genişlikleri değişince sütun genişliklerini başa al —
@@ -163,7 +238,12 @@ export function VirtualSpreadsheet<T>({
       const th = (event.currentTarget as HTMLElement).closest("th")
       const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 100
       const startWidth = th?.getBoundingClientRect().width || fallbackW
-      resizeRef.current = { startX: event.clientX, startWidth, name: col.name }
+      resizeRef.current = {
+        startX: event.clientX,
+        startWidth,
+        name: col.name,
+        moved: false,
+      }
       const target = event.currentTarget as HTMLElement
       if (target.hasPointerCapture(event.pointerId)) return
       target.setPointerCapture(event.pointerId)
@@ -175,6 +255,9 @@ export function VirtualSpreadsheet<T>({
     const ref = resizeRef.current
     if (!ref) return
     const delta = event.clientX - ref.startX
+    // 3px altındaki mikro titreşimleri yok say — böylece çift tıkla otomatik sığdırma temiz çalışsın
+    if (!ref.moved && Math.abs(delta) < 3) return
+    ref.moved = true
     const width = Math.max(MIN_COL_WIDTH, ref.startWidth + delta)
     setColWidths((prev) => ({ ...prev, [ref.name]: Math.round(width) }))
   }, [])
@@ -188,6 +271,19 @@ export function VirtualSpreadsheet<T>({
     }
     resizeRef.current = null
   }, [])
+
+  /**
+   * Çift tıklamayla kolonu içeriğe ve başlığa göre en uygun genişliğe otomatik sığdırır.
+   */
+  const handleAutoFit = React.useCallback(
+    (event: React.MouseEvent, col: SpreadsheetColumn) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const autoWidth = calculateColumnAutoFitWidth(col, items)
+      setColWidths((prev) => ({ ...prev, [col.name]: autoWidth }))
+    },
+    [items]
+  )
 
   const colGroup = (
     <colgroup>
@@ -404,7 +500,8 @@ export function VirtualSpreadsheet<T>({
                             <span
                               role="separator"
                               aria-orientation="vertical"
-                              aria-label={`Resize ${col.label} column`}
+                              aria-label={`Resize ${col.label} column (double-click to auto fit)`}
+                              title="Genişletmek için sürükleyin, içeriğe tam sığdırmak için çift tıklayın"
                               className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
                               onPointerDown={(event) =>
                                 handleResizeStart(event, col)
@@ -412,6 +509,9 @@ export function VirtualSpreadsheet<T>({
                               onPointerMove={handleResizeMove}
                               onPointerUp={handleResizeEnd}
                               onPointerCancel={handleResizeEnd}
+                              onDoubleClick={(event) =>
+                                handleAutoFit(event, col)
+                              }
                             />
                           </th>
                         )
