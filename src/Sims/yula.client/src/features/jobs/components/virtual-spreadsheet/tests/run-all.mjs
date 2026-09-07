@@ -8,6 +8,7 @@ const testFiles = [
   "filter-parser.test.mjs",
   "export-formats.test.mjs",
   "test-parquet-merge.mjs",
+  "test-criteria-input-engine.mjs",
 ]
 
 console.log("==================================================")

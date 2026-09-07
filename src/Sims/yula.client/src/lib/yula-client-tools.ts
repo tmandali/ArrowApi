@@ -1542,6 +1542,108 @@ export async function executeClientTool(
       const format = String(args.format ?? "xlsx") as "xlsx" | "parquet" | "csv" | "gz";
       return await exportGridData(format);
     }
+    case "validate_criteria_input": {
+      const scope = String(args.report ?? "stock-balance");
+      const { findReport } = await import("@/features/reports/report-registry");
+      const meta = findReport(scope);
+      if (!meta) {
+        return {
+          valid: false,
+          scope,
+          reportTitle: scope,
+          summary: `Bilinmeyen rapor: '${scope}'`,
+          errors: [{ field: "report", fieldTitle: "Rapor", message: `Bilinmeyen rapor: '${scope}'` }],
+          warnings: [],
+        };
+      }
+      const { validateCriteriaInput } = await import("@/features/report-criteria");
+      const criteriaObj = (args.criteria ?? {}) as Record<string, unknown>;
+      const partial = Boolean(args.partial);
+      return validateCriteriaInput(meta.fullSchema, criteriaObj, { scope, partial });
+    }
+    case "get_current_criteria": {
+      const scope = String(args.report ?? "stock-balance");
+      const { evaluateCurrentDraftCriteria } = await import("@/features/report-criteria");
+      try {
+        const res = evaluateCurrentDraftCriteria(scope);
+        return {
+          status: "ok",
+          scope: res.scope,
+          reportTitle: res.reportTitle,
+          valid: res.report.valid,
+          summary: res.report.summary,
+          instance: res.instance,
+          errors: res.report.errors,
+          warnings: res.report.warnings,
+        };
+      } catch (err) {
+        return {
+          status: "error",
+          scope,
+          reportTitle: scope,
+          valid: false,
+          summary: err instanceof Error ? err.message : String(err),
+          instance: {},
+          errors: [{ field: "form", fieldTitle: "Form", message: String(err) }],
+          warnings: [],
+        };
+      }
+    }
+    case "list_report_executions": {
+      const scope = String(args.report ?? "stock-balance");
+      const limit = typeof args.limit === "number" ? args.limit : 10;
+      try {
+        const { findReport } = await import("@/features/reports/report-registry");
+        const meta = findReport(scope);
+        const endpoint =
+          typeof meta?.fullSchema?.["x-job-endpoint"] === "string"
+            ? (meta.fullSchema["x-job-endpoint"] as string)
+            : "/api/arrow/jobs";
+        const { listArrowJobs } = await import("@/features/jobs/arrow-job-client");
+        const res = await listArrowJobs(endpoint, { take: limit });
+        const executions = (res.items || []).slice(0, limit).map((j) => ({
+          jobId: j.id,
+          status: j.status,
+          createdAt: j.createdAt,
+          rowCount: j.totalRows,
+          href: meta ? `${meta.pagePath}/${j.id}` : undefined,
+        }));
+        return {
+          status: "ok",
+          executions,
+          message: `${executions.length} adet çalıştırma geçmişi listelendi.`,
+        };
+      } catch (err) {
+        return {
+          status: "error",
+          executions: [],
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
+    case "cancel_job": {
+      const jobId = String(args.jobId ?? "").trim();
+      if (!jobId) {
+        return { status: "error", jobId: "", message: "İptal edilecek job GUID belirtilmedi." };
+      }
+      try {
+        const { cancelArrowJob } = await import("@/features/jobs/arrow-job-client");
+        await cancelArrowJob(jobId);
+        const { useActiveJobsStore } = await import("@/store/slices/active-jobs-store");
+        useActiveJobsStore.getState().updateJob(jobId, { status: "Cancelled" });
+        return {
+          status: "ok",
+          jobId,
+          message: `İş başarıyla iptal edildi (${jobId}).`,
+        };
+      } catch (err) {
+        return {
+          status: "error",
+          jobId,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
     default:
       return { status: "unknown-tool", toolName };
   }

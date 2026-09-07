@@ -237,6 +237,114 @@ export const STATIC_TOOLS = {
         z.object({ status: z.literal("error"), error: z.string() }),
       ]),
     }),
+    validate_criteria_input: tool({
+      description: [
+        "Kullanıcının belirttiği veya formdaki kriterleri şemaya ve D365/BC kurallarına göre doğrular (Criteria Input Engine).",
+        "Tarih ve sayı aralıkları ('..', '10..20', '2026-01-01..2026-08-31'), göreli tarihler ('dün', 'bugün', 'geçen hafta'),",
+        "seçenekler (enum) ve zorunlu alan kontrolü yapar. Hata, uyarı ve önerileri döner.",
+        "Kullanıcı kriter girdiğinde, 'doğrula', 'kontrol et', 'bu kriter doğru mu?' dediğinde veya çalıştırmadan önce denetlemek için ÇAĞIR.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+        criteria: z.record(z.string(), z.unknown()).default({}).describe("Doğrulanacak kriterler"),
+        partial: z.boolean().default(false).describe("Yalnız girilen alanları kontrol et (zorunlu alan eksikliklerini hata sayma)"),
+      }),
+      outputSchema: z.object({
+        valid: z.boolean(),
+        scope: z.string(),
+        reportTitle: z.string(),
+        summary: z.string(),
+        sanitizedCriteria: z.record(z.string(), z.unknown()).optional(),
+        errors: z.array(
+          z.object({
+            field: z.string(),
+            fieldTitle: z.string(),
+            message: z.string(),
+            received: z.unknown().optional(),
+          }),
+        ),
+        warnings: z.array(
+          z.object({
+            field: z.string(),
+            fieldTitle: z.string(),
+            message: z.string(),
+            suggestion: z.string().optional(),
+          }),
+        ),
+      }),
+    }),
+    get_current_criteria: tool({
+      description: [
+        "Aktif raporun ekranındaki canlı kriter formu taslağını (current draft criteria) okur ve doğrulama durumunu döner.",
+        "Kullanıcı 'formda ne var?', 'ekrandaki kriterler neler?', 'kriterleri kontrol et', 'şu anki form geçerli mi?' dediğinde ÇAĞIR.",
+        "Kullanıcıya formdaki mevcut değerleri, eksik zorunlu alanları ve format hatalarını bildir.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+      }),
+      outputSchema: z.object({
+        status: z.string(),
+        scope: z.string(),
+        reportTitle: z.string(),
+        valid: z.boolean(),
+        summary: z.string(),
+        instance: z.record(z.string(), z.unknown()),
+        errors: z.array(
+          z.object({
+            field: z.string(),
+            fieldTitle: z.string(),
+            message: z.string(),
+            received: z.unknown().optional(),
+          }),
+        ),
+        warnings: z.array(
+          z.object({
+            field: z.string(),
+            fieldTitle: z.string(),
+            message: z.string(),
+            suggestion: z.string().optional(),
+          }),
+        ),
+      }),
+    }),
+    list_report_executions: tool({
+      description: [
+        "Aktif veya belirtilen raporun geçmiş ve çalışan işlerini (job execution history) listeler.",
+        "Kullanıcı 'önceki çalıştırmalar', 'çalışan işler', 'iş listesi', 'hangi raporlar çalıştı' dediğinde ÇAĞIR.",
+      ].join(" "),
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+        limit: z.number().default(10).describe("Maksimum listelenecek iş adedi"),
+      }),
+      outputSchema: z.object({
+        status: z.string(),
+        executions: z.array(
+          z.object({
+            jobId: z.string(),
+            status: z.string(),
+            createdAt: z.string().optional(),
+            rowCount: z.number().optional(),
+            href: z.string().optional(),
+          }),
+        ),
+        message: z.string().optional(),
+      }),
+    }),
+    cancel_job: tool({
+      description: [
+        "Çalışmakta olan bir backend rapor işini (running job) iptal eder.",
+        "Kullanıcı 'işi durdur', 'iptal et', 'job'ı kes', 'raporu durdur' dediğinde ÇAĞIR.",
+      ].join(" "),
+      inputSchema: z.object({
+        jobId: z.string().describe("İptal edilecek iş GUID'i"),
+        report: z.string().optional().describe("Rapor scope'u"),
+      }),
+      outputSchema: z.object({
+        status: z.string(),
+        jobId: z.string(),
+        message: z.string(),
+      }),
+    }),
   } satisfies ToolSet;
 
 export type YulaStaticTools = typeof STATIC_TOOLS;

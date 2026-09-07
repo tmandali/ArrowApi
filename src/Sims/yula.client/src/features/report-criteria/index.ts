@@ -42,6 +42,14 @@ export {
   applyCriteriaToDraft,
   resolveRelativeDateString,
 } from "./lib/apply-criteria-to-draft"
+export {
+  validateCriteriaInput,
+  inspectCriteriaSchema,
+  evaluateCurrentDraftCriteria,
+  type CriteriaValidationReport,
+  type CriteriaFieldErrorDetail,
+  type CriteriaFieldWarningDetail,
+} from "./lib/criteria-input-engine"
 
 export { CriteriaGridCellCombobox } from "./components/CriteriaGridCellCombobox"
 export { CriteriaSimpleCombobox } from "./components/CriteriaSimpleCombobox"
