@@ -149,7 +149,7 @@ export function AiViewDropdown({
 
   return (
     <>
-      <div className={cn("inline-flex items-center gap-1.5 min-w-0 select-none", className)}>
+      <div className={cn("inline-flex items-center gap-1.5 min-w-0 shrink select-none", className)}>
         <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" aria-hidden />
 
         <DropdownMenu>
@@ -157,7 +157,7 @@ export function AiViewDropdown({
             <button
               type="button"
               className={cn(
-                "group inline-flex h-6 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors outline-none",
+                "group inline-flex h-6 min-w-0 max-w-44 sm:max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors outline-none shrink",
                 "border focus-visible:ring-1 focus-visible:ring-primary/50",
                 isCurrentQueryActive
                   ? "bg-amber-500/10 text-amber-900 border-amber-500/30 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:text-amber-200 dark:border-amber-400/25"
@@ -176,7 +176,7 @@ export function AiViewDropdown({
               ) : (
                 <Table2 className="size-3 text-muted-foreground shrink-0" />
               )}
-              <span className="truncate">{activeTitle}</span>
+              <span className="min-w-0 flex-1 truncate">{activeTitle}</span>
               {isCurrentQueryActive && !isCurrentQuerySaved ? (
                 <span
                   className="size-1.5 rounded-full bg-amber-500 shrink-0"

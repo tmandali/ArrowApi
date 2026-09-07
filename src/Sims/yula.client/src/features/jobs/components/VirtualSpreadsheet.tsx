@@ -1033,8 +1033,8 @@ export function VirtualSpreadsheet<T>({
   return (
     <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
       <div className={panelHeaderClass}>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5 shrink-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden mr-2">
+          <div className="flex min-w-0 max-w-[160px] sm:max-w-[240px] items-center gap-1.5 shrink">
             <Table2 className={panelHeaderIconClass} aria-hidden />
             <span className={panelHeaderTitleClass}>{title}</span>
           </div>
@@ -1051,10 +1051,10 @@ export function VirtualSpreadsheet<T>({
             />
           ) : null}
           {subtitle != null ? (
-            <span className={panelHeaderSubtitleClass}>{subtitle}</span>
+            <span className={cn(panelHeaderSubtitleClass, "min-w-0 shrink truncate")}>{subtitle}</span>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 self-center">
+        <div className="flex shrink-0 items-center gap-1.5 self-center ml-auto">
           {headerActions}
           {!disableColumnVisibility ? (
             <ColumnManagementMenu
