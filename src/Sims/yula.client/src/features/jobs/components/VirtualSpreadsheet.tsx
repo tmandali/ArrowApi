@@ -225,6 +225,9 @@ export function VirtualSpreadsheet<T>({
     [renderRow]
   )
 
+  const headerScrollRef = React.useRef<HTMLDivElement>(null)
+  const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
+
   const {
     scrollRef,
     onScroll,
@@ -239,7 +242,24 @@ export function VirtualSpreadsheet<T>({
 
   React.useEffect(() => {
     reset()
+    if (headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = 0
+    }
   }, [resetKey, reset])
+
+  // Dikey scrollbar genişliğini ölç — başlığın sağ ucunu body scrollbar'ı ile tam hizalar
+  React.useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const updateScrollbarWidth = () => {
+      const sw = el.offsetWidth - el.clientWidth
+      setScrollbarWidth((prev) => (prev !== sw ? sw : prev))
+    }
+    updateScrollbarWidth()
+    const observer = new ResizeObserver(updateScrollbarWidth)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [scrollRef, items.length, loading])
 
   const onNeedMoreRef = React.useRef(onNeedMore)
   React.useEffect(() => {
@@ -248,16 +268,33 @@ export function VirtualSpreadsheet<T>({
 
   const handleScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget
+      // Yatay kaydırmayı kolon başlıklarına senkronize et
+      if (headerScrollRef.current && headerScrollRef.current.scrollLeft !== el.scrollLeft) {
+        headerScrollRef.current.scrollLeft = el.scrollLeft
+      }
+      const sw = el.offsetWidth - el.clientWidth
+      if (sw !== scrollbarWidth) {
+        setScrollbarWidth(sw)
+      }
       onScroll(event)
       if (hasMore && !loadingMore) {
-        const el = event.currentTarget
         const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight)
         if (remaining < 300) {
           onNeedMoreRef.current?.()
         }
       }
     },
-    [onScroll, hasMore, loadingMore]
+    [onScroll, hasMore, loadingMore, scrollbarWidth]
+  )
+
+  const handleHeaderWheel = React.useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (event.deltaX !== 0 && scrollRef.current) {
+        scrollRef.current.scrollLeft += event.deltaX
+      }
+    },
+    [scrollRef]
   )
 
   const handleCopy = React.useCallback((event: React.ClipboardEvent) => {
@@ -332,74 +369,92 @@ export function VirtualSpreadsheet<T>({
           )}
         </div>
       ) : (
-        <div
-          className="min-h-0 flex-1 overflow-auto"
-          ref={scrollRef}
-          onScroll={handleScroll}
-        >
-          <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
-            <div className="sticky top-0 z-10 bg-card">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Sabit Kolon Başlıkları Alanı (Dikey scrollbar dışındadır; dikey scroll tam buradan başlar) */}
+          <div className="flex shrink-0 bg-muted/40">
+            <div
+              ref={headerScrollRef}
+              onWheel={handleHeaderWheel}
+              className="min-w-0 flex-1 overflow-x-hidden"
+            >
+              <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
+                <table
+                  className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
+                  style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
+                >
+                  {colGroup}
+                  <thead>
+                    <tr>
+                      {columns.map((col) => {
+                        const w = getColWidth(col)
+                        return (
+                          <th
+                            key={col.name}
+                            className={cn(
+                              headClass,
+                              "relative overflow-hidden",
+                              col.align === "left" ? "text-left" : "text-right"
+                            )}
+                            style={{ width: typeof w === "number" ? `${w}px` : w }}
+                            title={col.label}
+                          >
+                            <div className="flex h-full w-full items-center min-w-0 pr-2">
+                              <span className="truncate">{col.label}</span>
+                            </div>
+                            <span
+                              role="separator"
+                              aria-orientation="vertical"
+                              aria-label={`Resize ${col.label} column`}
+                              className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
+                              onPointerDown={(event) =>
+                                handleResizeStart(event, col)
+                              }
+                              onPointerMove={handleResizeMove}
+                              onPointerUp={handleResizeEnd}
+                              onPointerCancel={handleResizeEnd}
+                            />
+                          </th>
+                        )
+                      })}
+                      {/* Sağ taraftaki artan boşluğu emen dolgu başlık hücresi */}
+                      <th className={cn(headClass, "p-0")} aria-hidden />
+                    </tr>
+                    {showFilterRow && renderFilterCell ? (
+                      <tr className={filterRowClassName}>
+                        {columns.map((col, index) => (
+                          <th key={col.name} className={cellClass}>
+                            {renderFilterCell(col, index)}
+                          </th>
+                        ))}
+                        <th className={cn(cellClass, "p-0")} aria-hidden />
+                      </tr>
+                    ) : null}
+                  </thead>
+                </table>
+              </div>
+            </div>
+            {scrollbarWidth > 0 ? (
+              <div
+                style={{ width: `${scrollbarWidth}px` }}
+                className="shrink-0 bg-muted/40 border-b border-border/60"
+                aria-hidden
+              />
+            ) : null}
+          </div>
+
+          {/* Gövde Veri Satırları Alanı (Dikey scrollbar tam buradan başlar) */}
+          <div
+            className="min-h-0 flex-1 overflow-auto"
+            ref={scrollRef}
+            onScroll={handleScroll}
+          >
+            <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
               <table
                 className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
                 style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
               >
                 {colGroup}
-                <thead>
-                  <tr>
-                    {columns.map((col) => {
-                      const w = getColWidth(col)
-                      return (
-                        <th
-                          key={col.name}
-                          className={cn(
-                            headClass,
-                            "relative overflow-hidden",
-                            col.align === "left" ? "text-left" : "text-right"
-                          )}
-                          style={{ width: typeof w === "number" ? `${w}px` : w }}
-                          title={col.label}
-                        >
-                          <div className="flex h-full w-full items-center min-w-0 pr-2">
-                            <span className="truncate">{col.label}</span>
-                          </div>
-                          <span
-                            role="separator"
-                            aria-orientation="vertical"
-                            aria-label={`Resize ${col.label} column`}
-                            className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
-                            onPointerDown={(event) =>
-                              handleResizeStart(event, col)
-                            }
-                            onPointerMove={handleResizeMove}
-                            onPointerUp={handleResizeEnd}
-                            onPointerCancel={handleResizeEnd}
-                          />
-                        </th>
-                      )
-                    })}
-                    {/* Sağ taraftaki artan boşluğu emen dolgu başlık hücresi */}
-                    <th className={cn(headClass, "p-0")} aria-hidden />
-                  </tr>
-                  {showFilterRow && renderFilterCell ? (
-                    <tr className={filterRowClassName}>
-                      {columns.map((col, index) => (
-                        <th key={col.name} className={cellClass}>
-                          {renderFilterCell(col, index)}
-                        </th>
-                      ))}
-                      <th className={cn(cellClass, "p-0")} aria-hidden />
-                    </tr>
-                  ) : null}
-                </thead>
-              </table>
-            </div>
-
-            <table
-              className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
-              style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
-            >
-              {colGroup}
-              <tbody>
+                <tbody>
                 {items.length === 0 && loading ? (
                   Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
                     <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
@@ -497,7 +552,8 @@ export function VirtualSpreadsheet<T>({
             </table>
           </div>
         </div>
-      )}
-    </div>
-  )
+      </div>
+    )}
+  </div>
+)
 }
