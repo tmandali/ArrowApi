@@ -452,6 +452,98 @@ self.onmessage = async (e: MessageEvent) => {
           break
         }
 
+        case "EXPORT_TABLE": {
+          const {
+            tableName,
+            columns,
+            whereClause = "",
+            orderClause = "",
+            fileName = "rapor",
+            preferredFormat = "xlsx",
+          } = payload as {
+            tableName: string
+            columns?: string[]
+            whereClause?: string
+            orderClause?: string
+            fileName?: string
+            preferredFormat?: "xlsx" | "csv"
+          }
+
+          const escapedTable = `"${tableName.replace(/"/g, '""')}"`
+          const selectCols =
+            columns && columns.length > 0
+              ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
+              : "*"
+
+          const queryToExport = `SELECT ${selectCols} FROM ${escapedTable} ${whereClause} ${orderClause}`.trim()
+
+          let format: "xlsx" | "csv" = "csv"
+          let outFileName = ""
+          let fileBuffer: Uint8Array | null = null
+
+          // 1. xlsx formatı istendiyse DuckDB excel eklentisini dene
+          if (preferredFormat === "xlsx") {
+            try {
+              // DuckDB WASM'da excel extension'ını dinamik yükle
+              await conn.query("LOAD excel;").catch(async () => {
+                await conn.query("INSTALL excel; LOAD excel;")
+              })
+              const tempXlsx = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.xlsx`
+              await conn.query(
+                `COPY (${queryToExport}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true);`
+              )
+              fileBuffer = await db!.copyFileToBuffer(tempXlsx)
+              await db!.dropFile(tempXlsx).catch(() => {})
+              format = "xlsx"
+              outFileName = `${fileName}.xlsx`
+            } catch (xlsxErr) {
+              console.warn(
+                "[DuckDB Worker] excel extension yüklenemedi veya export başarısız oldu, UTF-8 BOM CSV fallback uygulanıyor:",
+                xlsxErr
+              )
+              fileBuffer = null
+            }
+          }
+
+          // 2. CSV fallback veya doğrudan CSV tercihi
+          if (!fileBuffer) {
+            const tempCsv = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv`
+            // Excel Türkiye/Avrupa standardı: Noktalı virgül (;) ayracı
+            await conn.query(
+              `COPY (${queryToExport}) TO '${tempCsv}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"');`
+            )
+            const rawCsvBuffer = await db!.copyFileToBuffer(tempCsv)
+            await db!.dropFile(tempCsv).catch(() => {})
+
+            // Excel'in Türkçe karakterleri (ğ, ü, ş, ı, ö, ç, İ) doğrudan tanıması için UTF-8 BOM (0xEF, 0xBB, 0xBF) ekle
+            const bom = new Uint8Array([0xef, 0xbb, 0xbf])
+            const merged = new Uint8Array(bom.length + rawCsvBuffer.length)
+            merged.set(bom, 0)
+            merged.set(rawCsvBuffer, bom.length)
+
+            fileBuffer = merged
+            format = "csv"
+            outFileName = `${fileName}.csv`
+          }
+
+          const transferBuffer = fileBuffer.buffer.slice(
+            fileBuffer.byteOffset,
+            fileBuffer.byteOffset + fileBuffer.byteLength
+          ) as ArrayBuffer
+
+          ;(self as any).postMessage(
+            {
+              id,
+              success: true,
+              buffer: transferBuffer,
+              format,
+              fileName: outFileName,
+            },
+            [transferBuffer]
+          )
+          break
+        }
+
         default:
           throw new Error(`Bilinmeyen mesaj tipi: ${type}`)
       }

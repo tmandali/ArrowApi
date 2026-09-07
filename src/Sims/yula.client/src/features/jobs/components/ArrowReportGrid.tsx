@@ -2,7 +2,8 @@
 
 import { useYulaGridStore } from "@/lib/stores/grid";
 import * as React from "react"
-import { RotateCw, X, DatabaseIcon, TriangleAlert } from "lucide-react"
+import { RotateCw, X, DatabaseIcon, TriangleAlert, FileSpreadsheet } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -378,6 +379,66 @@ export function ArrowReportGrid({
         {expectedTotalRows ? ` / ${formatCount(expectedTotalRows)}` : ""} rows
       </span>
     ) : null
+  const numericColumns = React.useMemo(() => {
+    const set = new Set<string>()
+    for (const col of effectiveColumns) {
+      if (col.align === "right" || col.kind === "number") {
+        set.add(col.name)
+      }
+    }
+    return set
+  }, [effectiveColumns])
+
+  const [isExporting, setIsExporting] = React.useState(false)
+
+  const handleExport = React.useCallback(async () => {
+    if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+    setIsExporting(true)
+    const exportToastId = toast.loading("Excel dosyası hazırlanıyor...")
+    try {
+      const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
+        .toLowerCase()
+        .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 40)
+      const stamp = new Date().toISOString().slice(0, 10)
+      const fileName = `${sanitizedTitle}_${stamp}`
+
+      const result = await duckDbClient.exportReportTable({
+        tableName: duckTableName,
+        fileName,
+        filters,
+        numericColumns,
+        sortBy,
+        sortDesc,
+        columns: effectiveColumns.map((c) => c.name),
+        preferredFormat: "xlsx",
+      })
+
+      toast.success(
+        result.format === "xlsx"
+          ? `Excel dosyası indirildi (${result.fileName})`
+          : `Excel uyumlu CSV indirildi (${result.fileName})`,
+        { id: exportToastId }
+      )
+    } catch (err) {
+      console.error("Export error:", err)
+      toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })
+    } finally {
+      setIsExporting(false)
+    }
+  }, [
+    duckTableName,
+    isExporting,
+    isStreaming,
+    isSavingDisk,
+    effectiveColumns,
+    title,
+    filters,
+    numericColumns,
+    sortBy,
+    sortDesc,
+  ])
 
   const subtitle =
     streamingSubtitle ??
@@ -423,8 +484,24 @@ export function ArrowReportGrid({
             variant="outline"
             size="icon"
             className="size-7 shrink-0"
+            onClick={() => void handleExport()}
+            disabled={isStreaming || isSavingDisk || isExporting || effectiveColumns.length === 0}
+            title="Excel'e Aktar (.xlsx / .csv)"
+            aria-label="Excel'e Aktar"
+          >
+            {isExporting ? (
+              <Spinner className="size-3.5" />
+            ) : (
+              <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="size-7 shrink-0"
             onClick={() => void refresh()}
-            disabled={isStreaming || isSavingDisk}
+            disabled={isStreaming || isSavingDisk || isExporting}
             title="Verileri sunucudan yeniden çek"
             aria-label="Refresh report"
           >

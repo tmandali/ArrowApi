@@ -8,6 +8,9 @@ type WorkerResponse = {
   result?: Record<string, unknown>
   rowCount?: number
   error?: string
+  buffer?: ArrayBuffer
+  format?: "xlsx" | "csv"
+  fileName?: string
 }
 
 class DuckDbClient {
@@ -220,6 +223,73 @@ class DuckDbClient {
       rowCount?: number
     }>("CHECK_TABLE_EXISTS", { tableName })
     return { exists: Boolean(res?.exists), rowCount: res?.rowCount ?? 0 }
+  }
+
+  /**
+   * Rapor tablosunu DuckDB WASM motoru üzerinden Excel (.xlsx) veya
+   * UTF-8 BOM CSV olarak dışa aktarır ve tarayıcıda doğrudan indirme başlatır.
+   */
+  async exportReportTable(options: {
+    tableName: string
+    fileName?: string
+    filters?: Record<string, string>
+    numericColumns?: Set<string>
+    sortBy?: string | null
+    sortDesc?: boolean
+    columns?: string[]
+    preferredFormat?: "xlsx" | "csv"
+  }): Promise<{ format: "xlsx" | "csv"; fileName: string; sizeBytes: number }> {
+    const {
+      tableName,
+      fileName = "rapor",
+      filters = {},
+      numericColumns = new Set(),
+      sortBy,
+      sortDesc = false,
+      columns,
+      preferredFormat = "xlsx",
+    } = options
+
+    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    let orderClause = ""
+    if (sortBy) {
+      const escapedSort = `"${sortBy.replace(/"/g, '""')}"`
+      orderClause = `ORDER BY ${escapedSort} ${sortDesc ? "DESC" : "ASC"}`
+    }
+
+    const res = await this.postMessage<WorkerResponse>("EXPORT_TABLE", {
+      tableName,
+      columns,
+      whereClause,
+      orderClause,
+      fileName,
+      preferredFormat,
+    })
+
+    if (!res.buffer) {
+      throw new Error("Dışa aktarılan dosya tamponu boş döndü.")
+    }
+
+    const mimeType =
+      res.format === "xlsx"
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : "text/csv;charset=utf-8;"
+
+    const blob = new Blob([res.buffer], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = res.fileName || `${fileName}.${res.format || "csv"}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+
+    return {
+      format: res.format ?? "csv",
+      fileName: link.download,
+      sizeBytes: blob.size,
+    }
   }
 
   /**
