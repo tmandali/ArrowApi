@@ -366,7 +366,12 @@ export function VirtualSpreadsheet<T>({
         event.preventDefault()
         if (count === 0) return
         setFocusedColIndex((prev) => {
-          if (prev <= 0) {
+          if (prev === -1) {
+            const next = count - 1
+            columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
+            return next
+          }
+          if (prev === 0) {
             searchInputRef.current?.focus()
             return -1
           }
@@ -374,12 +379,15 @@ export function VirtualSpreadsheet<T>({
           columnItemRefs.current[next]?.scrollIntoView({ block: "nearest" })
           return next
         })
-      } else if (event.key === " " || event.key === "Enter") {
-        if (focusedColIndex === -1 && event.key === "Enter" && count === 1) {
-          event.preventDefault()
+      } else if (event.key === "Enter") {
+        event.preventDefault()
+        if (focusedColIndex >= 0 && focusedColIndex < count) {
+          toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
+        } else if (focusedColIndex === -1 && count > 0) {
           toggleColumnVisibility(filteredMenuColumns[0].name)
-          return
         }
+      } else if (event.key === " ") {
+        // Sadece listede bir kolon seçiliyken Space ile aç/kapat (arama kutusunda boşluk yazabilsin)
         if (focusedColIndex >= 0 && focusedColIndex < count) {
           event.preventDefault()
           toggleColumnVisibility(filteredMenuColumns[focusedColIndex].name)
@@ -955,15 +963,6 @@ export function VirtualSpreadsheet<T>({
                     placeholder="Kolon ara…"
                     className="h-7 pl-7 pr-6 text-xs"
                     autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault()
-                        if (filteredMenuColumns.length > 0) {
-                          setFocusedColIndex(0)
-                          columnItemRefs.current[0]?.scrollIntoView({ block: "nearest" })
-                        }
-                      }
-                    }}
                   />
                   {columnSearch ? (
                     <button
@@ -994,10 +993,11 @@ export function VirtualSpreadsheet<T>({
                           columnItemRefs.current[index] = el
                         }}
                         tabIndex={-1}
+                        onClick={() => setFocusedColIndex(index)}
                         onMouseEnter={() => setFocusedColIndex(index)}
                         className={cn(
                           "flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors select-none",
-                          isFocused && "bg-accent text-accent-foreground ring-1 ring-primary/40",
+                          isFocused && "bg-accent text-accent-foreground",
                           !isFocused && "hover:bg-muted/60 text-foreground",
                           isLastVisible
                             ? "opacity-50 cursor-not-allowed bg-muted/20"
