@@ -58,20 +58,24 @@ function buildSingleColumnCondition(
   let trimmed = rawFilter.trim()
   if (!trimmed) return null
 
+  const colTrim = `TRIM(CAST(${col} AS VARCHAR))`
+
   // 1. D365 '@' öneki (Büyük/küçük harf duyarsız arama işareti)
   if (trimmed.startsWith("@")) {
     trimmed = trimmed.slice(1).trim()
     if (!trimmed) return null
   }
 
-  // 2. Boş hücre kontrolü: `''` veya `""`
-  if (trimmed === "''" || trimmed === '""') {
-    return `(${col} IS NULL OR CAST(${col} AS VARCHAR) = '')`
+  // 2. Boş hücre kontrolü: `''`, `""`, `' '`, `" "`, `boş`, `bos`, `empty`, `null`
+  const emptyKeywords = /^(?:''|""|' '|" "|boş|bos|empty|null)$/i
+  if (emptyKeywords.test(trimmed)) {
+    return `(${col} IS NULL OR ${colTrim} = '')`
   }
 
-  // 2b. Dolu hücre kontrolü (boş OLMAYANLAR): `<>''`, `<>""`, `!= ''`, `!''`
-  if (/^(?:<>|!=|!)\s*(?:''|"")$/.test(trimmed)) {
-    return `(NOT (${col} IS NULL OR CAST(${col} AS VARCHAR) = ''))`
+  // 2b. Dolu hücre kontrolü (boş OLMAYANLAR): `<>''`, `<>""`, `!= ''`, `!''`, `dolu`, `not null`
+  const notEmptyKeywords = /^(?:(?:<>|!=|!)\s*(?:''|""|' '|" ")|dolu|not\s*null)$/i
+  if (notEmptyKeywords.test(trimmed)) {
+    return `(${col} IS NOT NULL AND ${colTrim} != '')`
   }
 
   // 3. Dynamics 365 Açık uçlu aralıklar: `..500` veya `..sku-99` veya `..31.12.2026` (<= maxVal)
@@ -88,7 +92,7 @@ function buildSingleColumnCondition(
     }
     const maxVal = normalizeD365DateValue(rawMax)
     const escaped = escapeSqlString(maxVal)
-    return `(UPPER(CAST(${col} AS VARCHAR)) <= '${escaped.toUpperCase()}')`
+    return `(UPPER(${colTrim}) <= '${escaped.toUpperCase()}')`
   }
 
   // 4. Dynamics 365 Açık uçlu aralıklar: `100..` veya `sku-00..` veya `01.01.2026..` (>= minVal)
@@ -105,14 +109,38 @@ function buildSingleColumnCondition(
     }
     const minVal = normalizeD365DateValue(rawMin)
     const escaped = escapeSqlString(minVal)
-    return `(UPPER(CAST(${col} AS VARCHAR)) >= '${escaped.toUpperCase()}')`
+    return `(UPPER(${colTrim}) >= '${escaped.toUpperCase()}')`
   }
 
   // 5. Dynamics 365 Kapalı aralık: `100..500` veya `sku-01..sku-05` veya `01.01.2026..31.12.2026`
-  const rangeMatch = trimmed.match(/^(.+?)\s*(?:\.\.|\s+-\s+)\s*(.+)$/)
-  if (rangeMatch) {
-    const rawMin = rangeMatch[1].trim()
-    const rawMax = rangeMatch[2].trim()
+  // `..` standardı sayı, tarih veya metin aralığı olabilir.
+  // ` - ` (tire) ise YALNIZCA her iki taraf da geçerli sayı veya tarih olduğunda aralık sayılır;
+  // metinlerde tire ("MERKEZ - ŞUBE") normal metin aramasıdır.
+  let isRange = false
+  let rawMin = ""
+  let rawMax = ""
+
+  const dotRange = trimmed.match(/^(.+?)\s*\.\.\s*(.+)$/)
+  if (dotRange) {
+    isRange = true
+    rawMin = dotRange[1].trim()
+    rawMax = dotRange[2].trim()
+  } else {
+    const dashRange = trimmed.match(/^(.+?)\s+-\s+(.+)$/)
+    if (dashRange) {
+      const p1 = dashRange[1].trim()
+      const p2 = dashRange[2].trim()
+      const isNumRange = (isNumeric || isNumericString(p1)) && isNumericString(p2)
+      const isDateRange = /^\d{1,4}[./-]\d{1,2}[./-]\d{1,4}$/.test(p1) && /^\d{1,4}[./-]\d{1,2}[./-]\d{1,4}$/.test(p2)
+      if (isNumRange || isDateRange) {
+        isRange = true
+        rawMin = p1
+        rawMax = p2
+      }
+    }
+  }
+
+  if (isRange) {
     if (
       (isNumeric && !isNaN(parseFloat(rawMin)) && !isNaN(parseFloat(rawMax))) ||
       (isNumericString(rawMin) && isNumericString(rawMax))
@@ -129,7 +157,7 @@ function buildSingleColumnCondition(
     const maxVal = normalizeD365DateValue(rawMax)
     const escMin = escapeSqlString(minVal)
     const escMax = escapeSqlString(maxVal)
-    return `(UPPER(CAST(${col} AS VARCHAR)) >= '${escMin.toUpperCase()}' AND UPPER(CAST(${col} AS VARCHAR)) <= '${escMax.toUpperCase()}')`
+    return `(UPPER(${colTrim}) >= '${escMin.toUpperCase()}' AND UPPER(${colTrim}) <= '${escMax.toUpperCase()}')`
   }
 
   // 6. Karşılaştırma operatörleri: `>`, `>=`, `<`, `<=`, `<>`, `!=`, `=`
@@ -151,12 +179,12 @@ function buildSingleColumnCondition(
     const rightVal = normalizeD365DateValue(rawRight)
     const escaped = escapeSqlString(rightVal)
     if (op === "=") {
-      return `(CAST(${col} AS VARCHAR) ILIKE '${escaped}')`
+      return `(${colTrim} ILIKE '${escaped}')`
     }
     if (op === "!=") {
-      return `(CAST(${col} AS VARCHAR) NOT ILIKE '${escaped}' OR ${col} IS NULL)`
+      return `(${colTrim} NOT ILIKE '${escaped}' OR ${col} IS NULL)`
     }
-    return `(UPPER(CAST(${col} AS VARCHAR)) ${op} '${escaped.toUpperCase()}')`
+    return `(UPPER(${colTrim}) ${op} '${escaped.toUpperCase()}')`
   }
 
   // 7. Not contains / Not equal: `!keyword`
@@ -176,11 +204,11 @@ function buildSingleColumnCondition(
     const keyword = normalizeD365DateValue(rawKeyword)
     if (keyword.includes("*") || keyword.includes("?")) {
       const pattern = convertWildcardsToSqlLike(keyword)
-      return `(CAST(${col} AS VARCHAR) NOT ILIKE '${pattern}' OR ${col} IS NULL)`
+      return `(${colTrim} NOT ILIKE '${pattern}' OR ${col} IS NULL)`
     }
 
     const escaped = escapeSqlString(keyword)
-    return `(CAST(${col} AS VARCHAR) NOT ILIKE '${escaped}' OR ${col} IS NULL)`
+    return `(${colTrim} NOT ILIKE '%${escaped}%' OR ${col} IS NULL)`
   }
 
   // 8. Sayısal kolon eşitlik kontrolü: `100` (eğer tam sayıysa)
@@ -194,15 +222,34 @@ function buildSingleColumnCondition(
   // 9. Wildcards: `*` ve `?` (örn. `*kelime*`, `kelime*`, `*kelime`)
   if (trimmed.includes("*") || trimmed.includes("?")) {
     const pattern = convertWildcardsToSqlLike(trimmed)
-    return `(CAST(${col} AS VARCHAR) ILIKE '${pattern}')`
+    return `(${colTrim} ILIKE '${pattern}')`
   }
 
-  // 10. Dynamics 365 Varsayılan Eşitlik (=) Filtresi:
-  // D365 standardında operatörsüz veya jokersiz girilen değerler doğrudan tam eşleşmedir (=).
-  // Kullanıcı içeren aramak istediğinde D365 standardı olan `*kelime*` veya `kelime*` yazar.
+  // 10. Tırnak içine alınmış tam arama: `"Elma Sirkesi"` veya `'Elma Sirkesi'`
+  const quotedMatch = trimmed.match(/^["'](.*)["']$/)
+  if (quotedMatch) {
+    const inner = quotedMatch[1].trim()
+    const escaped = escapeSqlString(inner)
+    return `(${colTrim} ILIKE '%${escaped}%')`
+  }
+
+  // 11. Çoklu Kelime & İçerir (Contains / Multi-word Token Matching):
+  // Kullanıcı arama kutusuna "Elma Sirke" veya "Elma" girdiğinde:
+  // Veride "Elma Sirkesi", "Kırmızı Elma" gibi boşluk içeren kayıtlar filtrelenir.
+  // Boşlukla ayrılmış her token bağımsız olarak ILIKE '%token%' şeklinde AND'lenir.
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  if (words.length > 1) {
+    const clauses = words.map((w) => {
+      const normalizedWord = normalizeD365DateValue(w)
+      const esc = escapeSqlString(normalizedWord)
+      return `${colTrim} ILIKE '%${esc}%'`
+    })
+    return `(${clauses.join(" AND ")})`
+  }
+
   const normalizedText = normalizeD365DateValue(trimmed)
   const escaped = escapeSqlString(normalizedText)
-  return `(CAST(${col} AS VARCHAR) ILIKE '${escaped}')`
+  return `(${colTrim} ILIKE '%${escaped}%')`
 }
 
 /**

@@ -99,17 +99,26 @@ function matchSingleCondition(cellValue: unknown, query: string): boolean {
   if (!trimmed) return true
 
   const cellStr = cellValue == null ? "" : String(cellValue).trim()
-  const cellLower = cellStr.toLowerCase()
+  // Verideki ardışık boşlukları tek boşluğa normalize et
+  const normCellStr = cellStr.replace(/\s+/g, " ")
+  const normCellLower = normCellStr.toLowerCase()
 
-  // 1. Boş hücre kontrolü: `''` veya `""`
-  if (trimmed === "''" || trimmed === '""') {
-    return cellStr === ""
+  // 1. Boş hücre kontrolü: `''`, `""`, `' '`, `" "`, `boş`, `bos`, `empty`, `null`
+  const emptyKeywords = /^(?:''|""|' '|" "|boş|bos|empty|null)$/i
+  if (emptyKeywords.test(trimmed)) {
+    return normCellStr === ""
+  }
+
+  // 1b. Dolu hücre kontrolü (boş OLMAYANLAR): `<>''`, `<>""`, `!= ''`, `!''`, `dolu`, `not null`
+  const notEmptyKeywords = /^(?:(?:<>|!=|!)\s*(?:''|""|' '|" ")|dolu|not\s*null)$/i
+  if (notEmptyKeywords.test(trimmed)) {
+    return normCellStr !== ""
   }
 
   // 2. Boolean (Mantıksal) alan kontrolü (true/false, yes/no, evet/hayır, 1/0)
-  const isCellBool = typeof cellValue === "boolean" || cellLower === "true" || cellLower === "false"
+  const isCellBool = typeof cellValue === "boolean" || normCellLower === "true" || normCellLower === "false"
   if (isCellBool) {
-    const isCellTrue = cellValue === true || cellLower === "true"
+    const isCellTrue = cellValue === true || normCellLower === "true"
     const trueKeywords = ["true", "yes", "evet", "1", "t", "y", "aktif", "active"]
     const falseKeywords = ["false", "no", "hayır", "0", "f", "n", "pasif", "passive", "inactive"]
 
@@ -236,17 +245,31 @@ function matchSingleCondition(cellValue: unknown, query: string): boolean {
     if (cellNum != null && targetNum != null) {
       return cellNum !== targetNum
     }
-    return !cellLower.includes(target.toLowerCase())
+    return !normCellLower.includes(target.toLowerCase())
   }
 
   // 5. Dynamics 365 Wildcards: `*` ve `?`
   if (trimmed.includes("*") || trimmed.includes("?")) {
     const rx = wildcardToRegExp(trimmed)
-    return rx.test(cellStr)
+    return rx.test(normCellStr)
   }
 
-  // 6. Düz metin eşleşmesi (Contains)
-  return cellLower.includes(trimmed.toLowerCase())
+  // 6. Tırnak içine alınmış tam arama: `"Elma Sirkesi"` veya `'Elma Sirkesi'`
+  const quotedMatch = trimmed.match(/^["'](.*)["']$/)
+  if (quotedMatch) {
+    const inner = quotedMatch[1].trim().toLowerCase()
+    return normCellLower.includes(inner)
+  }
+
+  // 7. Çoklu Kelime & İçerir (Multi-word Token Matching):
+  // Boşlukla ayrılmış kelimelerin hepsi hücre değerinde geçiyorsa eşleşir.
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  if (words.length > 1) {
+    return words.every((w) => normCellLower.includes(w.toLowerCase()))
+  }
+
+  // 8. Düz metin eşleşmesi (Contains)
+  return normCellLower.includes(trimmed.toLowerCase())
 }
 
 export function matchCellFilter(
