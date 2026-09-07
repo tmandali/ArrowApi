@@ -335,6 +335,17 @@ export function VirtualSpreadsheet<T>({
     }
   }, [onHiddenColumnsChange])
 
+  const handleHideAllColumns = React.useCallback(() => {
+    if (orderedColumns.length <= 1) return
+    // İlk kolon hariç diğer tüm kolonları gizle (en az 1 kolon görünür kalmalıdır)
+    const nextHidden = orderedColumns.slice(1).map((c) => c.name)
+    if (onHiddenColumnsChange) {
+      onHiddenColumnsChange(nextHidden)
+    } else {
+      setInternalHiddenColumns(nextHidden)
+    }
+  }, [orderedColumns, onHiddenColumnsChange])
+
   const filteredMenuColumns = React.useMemo(() => {
     if (!columnSearch.trim()) return orderedColumns
     const query = columnSearch.toLowerCase().trim()
@@ -931,22 +942,38 @@ export function VirtualSpreadsheet<T>({
                   </span>
                 </div>
 
-                {/* Hızlı aksiyonlar: Tümünü Göster / Sıfırla */}
-                <div className="flex items-center justify-between pt-0.5">
+                {/* Hızlı aksiyonlar: Tümünü Göster / Tümünü Gizle / Sıfırla */}
+                <div className="flex items-center justify-between pt-0.5 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={hiddenColumnsCount === 0}
+                      onClick={handleShowAllColumns}
+                      className="font-medium text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      Tümünü Göster
+                    </button>
+                    <span className="text-muted-foreground/40">•</span>
+                    <button
+                      type="button"
+                      disabled={visibleColumns.length <= 1}
+                      onClick={handleHideAllColumns}
+                      className="font-medium text-muted-foreground hover:text-foreground hover:underline disabled:opacity-40 disabled:hover:no-underline cursor-pointer disabled:cursor-not-allowed"
+                      title="İlk kolon hariç tüm kolonları gizle"
+                    >
+                      Tümünü Gizle
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    disabled={hiddenColumnsCount === 0}
-                    onClick={handleShowAllColumns}
-                    className="text-[11px] font-medium text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    Tümünü Göster
-                  </button>
-                  <button
-                    type="button"
-                    disabled={hiddenColumnsCount === 0 && (!activeColumnOrder || activeColumnOrder.length === 0)}
+                    disabled={
+                      hiddenColumnsCount === 0 &&
+                      (!activeColumnOrder || activeColumnOrder.length === 0) &&
+                      Object.keys(colWidths).length === 0
+                    }
                     onClick={handleResetColumns}
-                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Kolon sırasını ve gizlilik ayarlarını varsayılana döndür"
+                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Kolon sırasını, genişliklerini ve gizlilik ayarlarını varsayılana döndür"
                   >
                     <RotateCcw className="size-2.5" />
                     <span>Sıfırla</span>
