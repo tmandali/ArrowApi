@@ -11,6 +11,7 @@ const testFiles = [
   "test-criteria-input-engine.mjs",
   "test-aggregations.mjs",
   "test-ai-views.mjs",
+  "test-multi-sort.mjs",
 ]
 
 console.log("==================================================")

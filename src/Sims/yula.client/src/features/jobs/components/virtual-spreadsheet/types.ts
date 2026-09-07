@@ -33,6 +33,9 @@ export type ColumnAggregationValue = {
 
 export type ColumnAggregationValues = Record<string, ColumnAggregationValue>
 
+export type ColumnSortDirection = "asc" | "desc"
+export type ColumnSortConfigs = Record<string, ColumnSortDirection>
+
 export interface GridPersistedState {
   order?: string[]
   widths?: Record<string, string | number>
@@ -42,6 +45,7 @@ export interface GridPersistedState {
   showFooter?: boolean
   sortBy?: string | null
   sortDesc?: boolean
+  sortConfigs?: ColumnSortConfigs
 }
 
 export interface AiSqlView {
@@ -170,4 +174,8 @@ export type VirtualSpreadsheetProps<T> = {
   onDeleteAiView?: (viewId: string) => void
   /** Sıralama ayarı (kolon ve yön) localStorage'dan yüklendiğinde çağrılır */
   onSortSettingChange?: (sortBy: string | null, sortDesc: boolean) => void
+  /** Çoklu kolon sıralama haritası (örn: { "City": "asc", "Total": "desc" }) */
+  sortConfigs?: ColumnSortConfigs
+  /** Çoklu sıralama değiştiğinde veya kolon sırası değiştiğinde çağrılır */
+  onSortConfigsChange?: (configs: ColumnSortConfigs, orderedColumnNames?: string[]) => void
 }

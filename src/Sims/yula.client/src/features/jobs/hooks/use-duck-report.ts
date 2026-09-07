@@ -1,7 +1,8 @@
 import * as React from "react"
-import { duckDbClient } from "@/services/duckdb"
+import { duckDbClient, type SortConfig } from "@/services/duckdb"
 import { useYulaGridStore } from "@/lib/stores/grid"
 import { duckStreamManager } from "../services/duck-stream-manager"
+import type { ColumnSortConfigs } from "../components/virtual-spreadsheet/types"
 
 export type ReportColumnMeta = {
   name: string
@@ -54,6 +55,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [isLoadingMore, setIsLoadingMore] = React.useState(false)
   const [sortBy, setSortBy] = React.useState<string | null>(null)
   const [sortDesc, setSortDesc] = React.useState<boolean>(false)
+  const [sortConfigs, setSortConfigs] = React.useState<ColumnSortConfigs>({})
   const [page, setPage] = React.useState(0)
 
   React.useEffect(() => {
@@ -99,10 +101,12 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const filtersRef = React.useRef(filters)
   const sortByRef = React.useRef(sortBy)
   const sortDescRef = React.useRef(sortDesc)
+  const sortConfigsRef = React.useRef(sortConfigs)
   React.useEffect(() => {
     filtersRef.current = filters
     sortByRef.current = sortBy
     sortDescRef.current = sortDesc
+    sortConfigsRef.current = sortConfigs
   })
   // Tablo ingest tamamlandığında özel sorguyu (yeniden) tetiklemek için tık
   const [customQueryTick, setCustomQueryTick] = React.useState(0)
@@ -113,32 +117,43 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       activeFilters = filtersRef.current,
       activeSort = sortByRef.current,
       activeSortDesc = sortDescRef.current,
-      activePage = 0
+      activePage = 0,
+      activeSortConfigs = sortConfigsRef.current,
+      orderedColumnNames?: string[]
     ) => {
       // Özel SQL modu: temel tablo sorgusu sonucu ezmeyesin diye atlanır
       if (!tableReadyRef.current || isCustomQueryActive()) return
       const seq = ++querySeqRef.current
-      // Sıralama kolonu geçerlilik kontrolü:
-      // Eğer seçili sıralama kolonu bilinen kolonlar arasında yoksa (örneğin özel SQL'den
-      // türetilmiş "Kayıt Sayısı" gibi alias'lar temel tabloda bulunmaz), sıralamayı yoksay
-      // ve ref/state'i temizle; böylece DuckDB Binder Error vermez.
-      let effectiveSort = activeSort
-      let effectiveSortDesc = activeSortDesc
-      if (
-        effectiveSort &&
-        columns.length > 0 &&
-        !columns.some((c) => c.name === effectiveSort)
-      ) {
-        console.warn(
-          `[useDuckReport] Sıralama kolonu (${effectiveSort}) tabloda bulunamadı; sıralama sıfırlandı.`
-        )
-        effectiveSort = null
-        effectiveSortDesc = false
-        sortByRef.current = null
-        sortDescRef.current = false
-        setSortBy(null)
-        setSortDesc(false)
+
+      // Çoklu Kolon Sıralaması ("soldan sağa doğru çalışır" kuralı):
+      // Tablodaki kolonların soldan sağa sırası (orderedColumnNames veya columns)
+      // öncelik sırasını belirler.
+      const order =
+        orderedColumnNames && orderedColumnNames.length > 0
+          ? orderedColumnNames
+          : columns.map((c) => c.name)
+
+      const knownColSet = new Set(columns.map((c) => c.name))
+      const sortList: SortConfig[] = []
+
+      for (const colName of order) {
+        const dir = activeSortConfigs[colName]
+        if (dir && (knownColSet.size === 0 || knownColSet.has(colName))) {
+          sortList.push({ column: colName, desc: dir === "desc" })
+        }
       }
+
+      // Fallback: Eğer sortConfigs boşsa ancak tekli sortBy aktifse (geriye dönük API)
+      if (
+        sortList.length === 0 &&
+        activeSort &&
+        (knownColSet.size === 0 || knownColSet.has(activeSort))
+      ) {
+        sortList.push({ column: activeSort, desc: activeSortDesc })
+      }
+
+      const effectiveSort = sortList.length > 0 ? sortList[0].column : null
+      const effectiveSortDesc = sortList.length > 0 ? sortList[0].desc : false
 
       if (activePage === 0) {
         setIsLoadingQuery(true)
@@ -152,6 +167,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           numericColumns,
           sortBy: effectiveSort,
           sortDesc: effectiveSortDesc,
+          sortConfigs: sortList,
           limit: pageSize,
           offset: activePage * pageSize,
         })
@@ -262,22 +278,55 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     void executeQueryRef.current({}, sortByRef.current, sortDescRef.current, 0)
   }, [])
 
-  // Programatik sıralama (AI veya UI kontrolleri için doğrudan ASC/DESC/null ayarı)
-  const setSorting = React.useCallback((columnName: string | null, desc = false) => {
-    sortByRef.current = columnName
-    sortDescRef.current = desc
-    setSortBy(columnName)
-    setSortDesc(desc)
-    setPage(0)
-    setIsLoadingQuery(true)
+  // Çoklu sıralama ayarı (kolonlar ve yönleri)
+  const setMultiSorting = React.useCallback(
+    (configs: ColumnSortConfigs, orderedColumnNames?: string[]) => {
+      sortConfigsRef.current = configs
+      setSortConfigs(configs)
 
-    if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
-    if (isCustomQueryActive()) {
-      setCustomQueryTick((t) => t + 1)
-      return
-    }
-    void executeQueryRef.current(filtersRef.current, columnName, desc, 0)
-  }, [])
+      const order =
+        orderedColumnNames && orderedColumnNames.length > 0
+          ? orderedColumnNames
+          : columns.map((c) => c.name)
+
+      const firstSorted = order.find((c) => configs[c])
+      const nextSortBy = firstSorted ?? null
+      const nextSortDesc = firstSorted ? configs[firstSorted] === "desc" : false
+
+      sortByRef.current = nextSortBy
+      sortDescRef.current = nextSortDesc
+      setSortBy(nextSortBy)
+      setSortDesc(nextSortDesc)
+      setPage(0)
+      setIsLoadingQuery(true)
+
+      if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+      if (isCustomQueryActive()) {
+        setCustomQueryTick((t) => t + 1)
+        return
+      }
+      void executeQueryRef.current(
+        filtersRef.current,
+        nextSortBy,
+        nextSortDesc,
+        0,
+        configs,
+        orderedColumnNames
+      )
+    },
+    [columns]
+  )
+
+  // Programatik sıralama (tekli veya eski API uyumluluğu için)
+  const setSorting = React.useCallback(
+    (columnName: string | null, desc = false) => {
+      const nextConfigs: ColumnSortConfigs = columnName
+        ? { [columnName]: desc ? "desc" : "asc" }
+        : {}
+      setMultiSorting(nextConfigs)
+    },
+    [setMultiSorting]
+  )
 
   // Çoklu filtre uygulama (AI veya toplu filtre işlemleri için)
   const applyFilters = React.useCallback(
@@ -301,40 +350,36 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           setCustomQueryTick((t) => t + 1)
           return
         }
-        void executeQueryRef.current(nextFilters, sortByRef.current, sortDescRef.current, 0)
+        void executeQueryRef.current(
+          nextFilters,
+          sortByRef.current,
+          sortDescRef.current,
+          0,
+          sortConfigsRef.current
+        )
       }, 250)
     },
     []
   )
 
-  // 3 aşamalı kolon sıralama döngüsü: ASC -> DESC -> Doğal (None)
-  const toggleSort = React.useCallback((columnName: string) => {
-    let nextSortBy: string | null = columnName
-    let nextSortDesc = false
-
-    if (sortByRef.current === columnName) {
-      if (!sortDescRef.current) {
-        nextSortDesc = true
+  // 3 aşamalı kolon sıralama döngüsü: None -> ASC -> DESC -> None
+  // Birden fazla kolon sıralı kalabilir; soldan sağa sırayla çalışır.
+  const toggleSort = React.useCallback(
+    (columnName: string, orderedColumnNames?: string[]) => {
+      const nextConfigs: ColumnSortConfigs = { ...sortConfigsRef.current }
+      const currentDir = nextConfigs[columnName]
+      if (!currentDir) {
+        nextConfigs[columnName] = "asc"
+      } else if (currentDir === "asc") {
+        nextConfigs[columnName] = "desc"
       } else {
-        nextSortBy = null
-        nextSortDesc = false
+        delete nextConfigs[columnName]
       }
-    }
 
-    sortByRef.current = nextSortBy
-    sortDescRef.current = nextSortDesc
-    setSortBy(nextSortBy)
-    setSortDesc(nextSortDesc)
-    setPage(0)
-    setIsLoadingQuery(true)
-
-    if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
-    if (isCustomQueryActive()) {
-      setCustomQueryTick((t) => t + 1)
-      return
-    }
-    void executeQueryRef.current(filtersRef.current, nextSortBy, nextSortDesc, 0)
-  }, [])
+      setMultiSorting(nextConfigs, orderedColumnNames)
+    },
+    [setMultiSorting]
+  )
 
   // Arka plan akış yöneticisine abone ol (Kullanıcı sayfa değiştirse dahi akış kesilmez)
   React.useEffect(() => {
@@ -463,8 +508,17 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         setTotalRows(restoredBase)
         setTotalFiltered(restoredBase)
 
-        // Özel sorgudan kalan türetilmiş sıralama kolonu temel tabloda yoksa temizle
+        // Özel sorgudan kalan türetilmiş sıralama kolonları temel tabloda yoksa temizle
         const discSet = new Set(discovered.map((c) => c.name))
+        const nextConfigs: ColumnSortConfigs = {}
+        for (const [col, dir] of Object.entries(sortConfigsRef.current)) {
+          if (discSet.has(col)) {
+            nextConfigs[col] = dir
+          }
+        }
+        sortConfigsRef.current = nextConfigs
+        setSortConfigs(nextConfigs)
+
         const sortStillValid = Boolean(
           sortByRef.current && discSet.has(sortByRef.current)
         )
@@ -477,7 +531,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           setSortDesc(false)
         }
 
-        void executeQueryRef.current(filtersRef.current, nextSort, nextDesc, 0)
+        void executeQueryRef.current(filtersRef.current, nextSort, nextDesc, 0, nextConfigs)
       })()
       return () => {
         cancelledRestore = true
@@ -509,6 +563,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         }
 
         // Sıralama kontrolü: görünümde olan kolonlar sıralanabilir
+        const validCustomSortList: SortConfig[] = []
+        for (const [col, dir] of Object.entries(sortConfigsRef.current)) {
+          if (viewCols.has(col)) {
+            validCustomSortList.push({ column: col, desc: dir === "desc" })
+          }
+        }
+
         const activeSort = sortByRef.current
         const activeSortDesc = sortDescRef.current
         const hasValidSort = Boolean(activeSort && viewCols.has(activeSort))
@@ -525,9 +586,14 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         const hasActiveFilters = Object.values(activeFilters).some(
           (v) => v && v.trim()
         )
-        const orderClause = hasValidSort
-          ? `ORDER BY "${activeSort!.replace(/"/g, '""')}" ${activeSortDesc ? "DESC" : "ASC"}`
-          : ""
+        let orderClause = ""
+        if (validCustomSortList.length > 0) {
+          orderClause = `ORDER BY ${validCustomSortList
+            .map((s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`)
+            .join(", ")}`
+        } else if (hasValidSort) {
+          orderClause = `ORDER BY "${activeSort!.replace(/"/g, '""')}" ${activeSortDesc ? "DESC" : "ASC"}`
+        }
 
         if (hasActiveFilters || orderClause) {
           let where = ""
@@ -603,7 +669,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     loadingMoreRef.current = true
     const nextPage = page + 1
     setPage(nextPage)
-    void executeQuery(filters, sortBy, sortDesc, nextPage).finally(() => {
+    void executeQuery(
+      filters,
+      sortBy,
+      sortDesc,
+      nextPage,
+      sortConfigsRef.current
+    ).finally(() => {
       loadingMoreRef.current = false
     })
   }, [isLoadingQuery, isLoadingMore, hasMore, page, filters, sortBy, sortDesc, executeQuery])
@@ -626,9 +698,12 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     isLoadingMore,
     sortBy,
     sortDesc,
+    sortConfigs,
     setSortBy,
     setSortDesc,
+    setSortConfigs,
     setSorting,
+    setMultiSorting,
     applyFilters,
     toggleSort,
     loadMore,

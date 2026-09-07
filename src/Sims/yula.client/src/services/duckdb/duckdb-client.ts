@@ -1,5 +1,10 @@
 import { buildCombinedWhereClause } from "./filter-parser"
 
+export type SortConfig = {
+  column: string
+  desc: boolean
+}
+
 type WorkerResponse = {
   id: number
   success: boolean
@@ -105,6 +110,7 @@ class DuckDbClient {
     numericColumns?: Set<string>
     sortBy?: string | null
     sortDesc?: boolean
+    sortConfigs?: SortConfig[]
     limit?: number
     offset?: number
   }): Promise<{
@@ -119,6 +125,7 @@ class DuckDbClient {
       numericColumns = new Set(),
       sortBy,
       sortDesc = false,
+      sortConfigs,
       limit = 1000,
       offset = 0,
     } = options
@@ -130,7 +137,12 @@ class DuckDbClient {
     // Parquet filtre pushdown sayesinde 100M satırda dahi DuckDB yalnızca
     // eşleşen ilk blokları tarar ve 10-20 ms içinde anında sonuç döner.
     let orderClause = ""
-    if (sortBy) {
+    if (sortConfigs && sortConfigs.length > 0) {
+      const orderParts = sortConfigs.map(
+        (s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`
+      )
+      orderClause = `ORDER BY ${orderParts.join(", ")}`
+    } else if (sortBy) {
       const escapedSort = `"${sortBy.replace(/"/g, '""')}"`
       orderClause = `ORDER BY ${escapedSort} ${sortDesc ? "DESC" : "ASC"}`
     }
@@ -256,6 +268,7 @@ class DuckDbClient {
     numericColumns?: Set<string>
     sortBy?: string | null
     sortDesc?: boolean
+    sortConfigs?: SortConfig[]
     columns?: string[]
     preferredFormat?: "xlsx" | "csv" | "parquet" | "gz"
     maxRowsPerSheet?: number
@@ -274,6 +287,7 @@ class DuckDbClient {
       numericColumns = new Set(),
       sortBy,
       sortDesc = false,
+      sortConfigs,
       columns,
       preferredFormat = "xlsx",
       maxRowsPerSheet = 1_000_000,
@@ -282,7 +296,12 @@ class DuckDbClient {
 
     const whereClause = buildCombinedWhereClause(filters, numericColumns)
     let orderClause = ""
-    if (sortBy) {
+    if (sortConfigs && sortConfigs.length > 0) {
+      const orderParts = sortConfigs.map(
+        (s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`
+      )
+      orderClause = `ORDER BY ${orderParts.join(", ")}`
+    } else if (sortBy) {
       const escapedSort = `"${sortBy.replace(/"/g, '""')}"`
       orderClause = `ORDER BY ${escapedSort} ${sortDesc ? "DESC" : "ASC"}`
     }

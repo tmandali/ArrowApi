@@ -22,7 +22,7 @@ import {
 } from "@/components/layout/panel-chrome"
 import { cn } from "@/utils/cn"
 
-export type { SpreadsheetColumn, VirtualSpreadsheetProps } from "./virtual-spreadsheet"
+export type { SpreadsheetColumn, VirtualSpreadsheetProps, ColumnSortConfigs } from "./virtual-spreadsheet"
 
 import {
   ROW_HEIGHT,
@@ -32,6 +32,7 @@ import {
   headClass,
   type SpreadsheetColumn,
   type VirtualSpreadsheetProps,
+  type ColumnSortConfigs,
   type AggregationType,
   type ColumnAggregationConfig,
   type GridPersistedState,
@@ -101,6 +102,8 @@ export function VirtualSpreadsheet<T>({
   onRenameAiView,
   onDeleteAiView,
   onSortSettingChange,
+  sortConfigs,
+  onSortConfigsChange,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -315,9 +318,34 @@ export function VirtualSpreadsheet<T>({
     column: null,
     direction: null,
   })
+  const [internalSortConfigs, setInternalSortConfigs] = React.useState<ColumnSortConfigs>({})
 
-  const activeSortColumn = sortColumn !== undefined ? sortColumn : internalSort.column
-  const activeSortDirection = sortDirection !== undefined ? sortDirection : internalSort.direction
+  const activeSortConfigs = React.useMemo<ColumnSortConfigs>(() => {
+    if (sortConfigs !== undefined) return sortConfigs
+    if (Object.keys(internalSortConfigs).length > 0) return internalSortConfigs
+    // Fallback tekli sort props/state
+    if (sortColumn && sortDirection) {
+      return { [sortColumn]: sortDirection }
+    }
+    if (internalSort.column && internalSort.direction) {
+      return { [internalSort.column]: internalSort.direction }
+    }
+    return {}
+  }, [sortConfigs, internalSortConfigs, sortColumn, sortDirection, internalSort])
+
+  const activeSortColumn = React.useMemo(() => {
+    if (sortColumn !== undefined) return sortColumn
+    const sortedCols = orderedColumns.map((c) => c.name).filter((name) => activeSortConfigs[name])
+    return sortedCols.length > 0 ? sortedCols[0] : internalSort.column
+  }, [sortColumn, orderedColumns, activeSortConfigs, internalSort.column])
+
+  const activeSortDirection = React.useMemo(() => {
+    if (sortDirection !== undefined) return sortDirection
+    if (activeSortColumn && activeSortConfigs[activeSortColumn]) {
+      return activeSortConfigs[activeSortColumn]
+    }
+    return internalSort.direction
+  }, [sortDirection, activeSortColumn, activeSortConfigs, internalSort.direction])
 
   const handleHeaderClick = React.useCallback(
     (col: SpreadsheetColumn) => {
@@ -325,27 +353,41 @@ export function VirtualSpreadsheet<T>({
       if (isDraggingRef.current || isResizingRef.current || resizeRef.current !== null) return
       if (disableSorting || col.sortable === false) return
 
+      const currentDir = activeSortConfigs[col.name]
       let nextDir: "asc" | "desc" | null = "asc"
-      if (activeSortColumn === col.name) {
-        if (activeSortDirection === "asc") {
-          nextDir = "desc"
-        } else if (activeSortDirection === "desc") {
-          nextDir = null
-        } else {
-          nextDir = "asc"
-        }
+      if (currentDir === "asc") {
+        nextDir = "desc"
+      } else if (currentDir === "desc") {
+        nextDir = null
+      } else {
+        nextDir = "asc"
       }
 
-      if (onSortChange) {
-        onSortChange(col.name, nextDir)
+      const nextConfigs: ColumnSortConfigs = { ...activeSortConfigs }
+      if (nextDir) {
+        nextConfigs[col.name] = nextDir
       } else {
-        setInternalSort({
-          column: nextDir ? col.name : null,
-          direction: nextDir,
-        })
+        delete nextConfigs[col.name]
+      }
+
+      const orderedColNames = orderedColumns.map((c) => c.name)
+
+      if (onSortConfigsChange) {
+        onSortConfigsChange(nextConfigs, orderedColNames)
+      } else {
+        setInternalSortConfigs(nextConfigs)
+        if (onSortChange) {
+          const firstSorted = orderedColNames.find((c) => nextConfigs[c])
+          onSortChange(firstSorted ?? col.name, firstSorted ? nextConfigs[firstSorted] : null)
+        } else {
+          setInternalSort({
+            column: nextDir ? col.name : null,
+            direction: nextDir,
+          })
+        }
       }
     },
-    [disableSorting, activeSortColumn, activeSortDirection, onSortChange]
+    [disableSorting, activeSortConfigs, orderedColumns, onSortConfigsChange, onSortChange]
   )
 
   const handleDragStart = React.useCallback(
@@ -453,6 +495,12 @@ export function VirtualSpreadsheet<T>({
       } else {
         setInternalColumnOrder(finalOrder)
       }
+
+      // Çoklu sıralama aktifse ve kolon sırası değiştiyse, "soldan sağa doğru çalışır"
+      // kuralı gereğince sıralama önceliğini yeni kolon sırasına göre anında güncelle
+      if (Object.keys(activeSortConfigs).length > 1 && onSortConfigsChange) {
+        onSortConfigsChange(activeSortConfigs, finalOrder)
+      }
     },
     [
       orderedColumns,
@@ -462,6 +510,8 @@ export function VirtualSpreadsheet<T>({
       visibleColumns,
       onPinnedColumnsChange,
       onColumnOrderChange,
+      activeSortConfigs,
+      onSortConfigsChange,
     ]
   )
 
@@ -611,10 +661,27 @@ export function VirtualSpreadsheet<T>({
               setInternalAggregationConfigs(parsed.aggregations)
             }
           }
-          if (parsed.sortBy !== undefined) {
+          if (parsed.sortConfigs && typeof parsed.sortConfigs === "object") {
+            const validConfigs: ColumnSortConfigs = {}
+            for (const [col, dir] of Object.entries(parsed.sortConfigs)) {
+              if (
+                columns.some((c) => c.name === col) &&
+                (dir === "asc" || dir === "desc")
+              ) {
+                validConfigs[col] = dir
+              }
+            }
+            if (onSortConfigsChange) {
+              onSortConfigsChange(validConfigs)
+            } else {
+              setInternalSortConfigs(validConfigs)
+            }
+          } else if (parsed.sortBy !== undefined) {
             const colExists = !parsed.sortBy || columns.some((c) => c.name === parsed.sortBy)
             if (colExists && onSortSettingChange) {
               onSortSettingChange(parsed.sortBy, Boolean(parsed.sortDesc))
+            } else if (colExists && onSortConfigsChange && parsed.sortBy) {
+              onSortConfigsChange({ [parsed.sortBy]: parsed.sortDesc ? "desc" : "asc" })
             }
           }
         }
@@ -624,7 +691,16 @@ export function VirtualSpreadsheet<T>({
     } finally {
       isStorageLoadedRef.current = true
     }
-  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange, onAggregationConfigsChange, onSortSettingChange])
+  }, [
+    effectiveStorageKey,
+    columns,
+    onColumnOrderChange,
+    onHiddenColumnsChange,
+    onPinnedColumnsChange,
+    onAggregationConfigsChange,
+    onSortSettingChange,
+    onSortConfigsChange,
+  ])
 
   // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
   React.useEffect(() => {
@@ -643,7 +719,8 @@ export function VirtualSpreadsheet<T>({
         activePinnedColumns.some((col, idx) => col !== defaultPinnedColumns[idx])
       const hasPinned = isPinnedModified
       const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
-      const hasSort = Boolean(sortColumn)
+      const hasSortConfigs = Object.keys(activeSortConfigs).length > 0
+      const hasSort = Boolean(sortColumn) || hasSortConfigs
 
       if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations && !hasSort) {
         try {
@@ -659,8 +736,9 @@ export function VirtualSpreadsheet<T>({
           hidden: hasHidden ? activeHiddenColumns : undefined,
           pinned: hasPinned ? activePinnedColumns : undefined,
           aggregations: hasAggregations ? activeAggregationConfigs : undefined,
-          sortBy: hasSort ? sortColumn : undefined,
-          sortDesc: hasSort ? (sortDirection === "desc") : undefined,
+          sortBy: hasSort ? (activeSortColumn ?? sortColumn ?? undefined) : undefined,
+          sortDesc: hasSort ? (activeSortDirection === "desc") : undefined,
+          sortConfigs: hasSortConfigs ? activeSortConfigs : undefined,
         }
         localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
       } catch {
@@ -681,6 +759,9 @@ export function VirtualSpreadsheet<T>({
     activeAggregationConfigs,
     sortColumn,
     sortDirection,
+    activeSortConfigs,
+    activeSortColumn,
+    activeSortDirection,
   ])
 
   const getColWidth = React.useCallback(
@@ -708,16 +789,30 @@ export function VirtualSpreadsheet<T>({
     } else {
       setInternalPinnedColumns(null)
     }
+    if (onSortConfigsChange) {
+      onSortConfigsChange({})
+    }
+    setInternalSortConfigs({})
     if (onSortSettingChange) {
       onSortSettingChange(null, false)
     }
+    setInternalSort({ column: null, direction: null })
     setColWidths(initialColWidths ?? {})
     if (effectiveStorageKey && typeof window !== "undefined") {
       try {
         localStorage.removeItem(effectiveStorageKey)
       } catch {}
     }
-  }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, onSortSettingChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
+  }, [
+    onHiddenColumnsChange,
+    onColumnOrderChange,
+    onPinnedColumnsChange,
+    onSortConfigsChange,
+    onSortSettingChange,
+    defaultPinnedColumns,
+    initialColWidths,
+    effectiveStorageKey,
+  ])
 
   const canResetColumns = React.useMemo(() => {
     const isPinnedModified =
@@ -731,7 +826,7 @@ export function VirtualSpreadsheet<T>({
       )) ||
       (activePinnedColumns.length !== defaultPinnedColumns.length ||
         activePinnedColumns.some((c, i) => c !== defaultPinnedColumns[i]))
-    const hasSort = Boolean(sortColumn)
+    const hasSort = Boolean(sortColumn) || Object.keys(activeSortConfigs).length > 0
 
     return (
       hiddenColumnsCount > 0 ||
@@ -749,6 +844,7 @@ export function VirtualSpreadsheet<T>({
     activePinnedColumns,
     defaultPinnedColumns,
     sortColumn,
+    activeSortConfigs,
   ])
 
   const totalTableWidth = React.useMemo(() => {
@@ -939,40 +1035,53 @@ export function VirtualSpreadsheet<T>({
 
   // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
   const displayItems = React.useMemo(() => {
-    if (onSortChange || disableSorting || !activeSortColumn || !activeSortDirection) {
+    if (onSortChange || onSortConfigsChange || disableSorting) {
       return items
     }
-    const col = orderedColumns.find((c) => c.name === activeSortColumn)
-    const isNum = col?.align === "right"
-    const dir = activeSortDirection === "asc" ? 1 : -1
+    const sortList = orderedColumns
+      .filter((c) => activeSortConfigs[c.name])
+      .map((c) => ({
+        colName: c.name,
+        dir: activeSortConfigs[c.name] === "asc" ? 1 : -1,
+        isNum: c.align === "right",
+      }))
+
+    if (sortList.length === 0) return items
 
     return [...items].sort((a, b) => {
       const aObj = a as Record<string, unknown>
       const bObj = b as Record<string, unknown>
-      const aVal =
-        aObj?.values && typeof aObj.values === "object"
-          ? (aObj.values as Record<string, unknown>)[activeSortColumn]
-          : aObj?.[activeSortColumn]
-      const bVal =
-        bObj?.values && typeof bObj.values === "object"
-          ? (bObj.values as Record<string, unknown>)[activeSortColumn]
-          : bObj?.[activeSortColumn]
 
-      if (aVal == null && bVal == null) return 0
-      if (aVal == null) return 1
-      if (bVal == null) return -1
+      for (const sortItem of sortList) {
+        const aVal =
+          aObj?.values && typeof aObj.values === "object"
+            ? (aObj.values as Record<string, unknown>)[sortItem.colName]
+            : aObj?.[sortItem.colName]
+        const bVal =
+          bObj?.values && typeof bObj.values === "object"
+            ? (bObj.values as Record<string, unknown>)[sortItem.colName]
+            : bObj?.[sortItem.colName]
 
-      if (isNum || typeof aVal === "number" || typeof bVal === "number") {
-        const numA = Number(aVal)
-        const numB = Number(bVal)
-        if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
-          return (numA - numB) * dir
+        if (aVal == null && bVal == null) continue
+        if (aVal == null) return 1
+        if (bVal == null) return -1
+
+        if (sortItem.isNum || typeof aVal === "number" || typeof bVal === "number") {
+          const numA = Number(aVal)
+          const numB = Number(bVal)
+          if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) {
+            return (numA - numB) * sortItem.dir
+          }
+        }
+
+        const cmp = String(aVal).localeCompare(String(bVal), "tr", { numeric: true })
+        if (cmp !== 0) {
+          return cmp * sortItem.dir
         }
       }
-
-      return String(aVal).localeCompare(String(bVal), "tr", { numeric: true }) * dir
+      return 0
     })
-  }, [items, onSortChange, disableSorting, activeSortColumn, activeSortDirection, orderedColumns])
+  }, [items, onSortChange, onSortConfigsChange, disableSorting, activeSortConfigs, orderedColumns])
 
   // Özet değerlerini hesapla (Dışarıdan aggregationValues verilmediyse bellek içi hesapla)
   const computedAggregationValues = React.useMemo(() => {
@@ -1202,10 +1311,18 @@ export function VirtualSpreadsheet<T>({
                         const isPinned = colIndex < effectivePinnedCount
                         const isLastPinned = colIndex === effectivePinnedCount - 1
                         const stickyLeft = getStickyLeftOffset(colIndex)
-                        const isSorted =
-                          activeSortColumn === col.name && activeSortDirection !== null
-                        const isAsc = isSorted && activeSortDirection === "asc"
-                        const isDesc = isSorted && activeSortDirection === "desc"
+                        const colSortDir = activeSortConfigs[col.name]
+                        const isSorted = colSortDir !== undefined && colSortDir !== null
+                        const isAsc = colSortDir === "asc"
+                        const isDesc = colSortDir === "desc"
+
+                        // Çoklu sıralama önceliği: sıralı kolonlar soldan sağa sırayla numaralandırılır
+                        const sortedColNames = orderedColumns
+                          .map((c) => c.name)
+                          .filter((name) => activeSortConfigs[name])
+                        const hasMultipleSorts = sortedColNames.length > 1
+                        const sortPriority = isSorted ? sortedColNames.indexOf(col.name) + 1 : 0
+
                         const canSort = !disableSorting && col.sortable !== false
                         const canDrag = !disableColumnReorder
                         const isBeingDragged = draggedColName === col.name
@@ -1217,9 +1334,13 @@ export function VirtualSpreadsheet<T>({
                           if (!isSorted) {
                             sortTooltip = `${col.label} — Sıralamak için tıkla (Artan)`
                           } else if (isAsc) {
-                            sortTooltip = `${col.label} — Ters sıralamak için tıkla (Azalan)`
+                            sortTooltip = hasMultipleSorts
+                              ? `${col.label} — Sıralama Önceliği: ${sortPriority} (Artan). Ters çevirmek için tıkla`
+                              : `${col.label} — Ters sıralamak için tıkla (Azalan)`
                           } else {
-                            sortTooltip = `${col.label} — Doğal sıraya dönmek için tıkla`
+                            sortTooltip = hasMultipleSorts
+                              ? `${col.label} — Sıralama Önceliği: ${sortPriority} (Azalan). Sıralamayı kaldırmak için tıkla`
+                              : `${col.label} — Doğal sıraya dönmek için tıkla`
                           }
                         }
                         if (canDrag) {
@@ -1266,17 +1387,31 @@ export function VirtualSpreadsheet<T>({
                             >
                               <span className="truncate">{col.label}</span>
                               {canSort ? (
-                                <span className="ml-1 inline-flex shrink-0 items-center justify-center">
+                                <span className="ml-1 inline-flex shrink-0 items-center justify-center gap-0.5">
                                   {isAsc ? (
-                                    <ArrowUp
-                                      className="size-3 text-primary stroke-[2.5]"
-                                      aria-label="Artan sırada"
-                                    />
+                                    <>
+                                      <ArrowUp
+                                        className="size-3 text-primary stroke-[2.5]"
+                                        aria-label="Artan sırada"
+                                      />
+                                      {hasMultipleSorts ? (
+                                        <span className="text-[9px] font-bold text-primary leading-none select-none">
+                                          {sortPriority}
+                                        </span>
+                                      ) : null}
+                                    </>
                                   ) : isDesc ? (
-                                    <ArrowDown
-                                      className="size-3 text-primary stroke-[2.5]"
-                                      aria-label="Azalan sırada"
-                                    />
+                                    <>
+                                      <ArrowDown
+                                        className="size-3 text-primary stroke-[2.5]"
+                                        aria-label="Azalan sırada"
+                                      />
+                                      {hasMultipleSorts ? (
+                                        <span className="text-[9px] font-bold text-primary leading-none select-none">
+                                          {sortPriority}
+                                        </span>
+                                      ) : null}
+                                    </>
                                   ) : (
                                     <ArrowUpDown className="size-3 text-muted-foreground/40 opacity-0 transition-opacity group-hover/th:opacity-100" />
                                   )}

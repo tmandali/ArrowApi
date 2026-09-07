@@ -143,8 +143,10 @@ export function ArrowReportGrid({
     refresh,
     sortBy,
     sortDesc,
+    sortConfigs,
     toggleSort,
     setSorting,
+    setMultiSorting,
     applyFilters: duckApplyFilters,
     clearFilters,
   } = useDuckReport({
@@ -451,6 +453,7 @@ export function ArrowReportGrid({
   const latestGridStateRef = React.useRef({
     sortBy,
     sortDesc,
+    sortConfigs,
     hiddenColumns: hiddenColumns ?? [],
     pinnedColumns: pinnedColumns ?? [],
     columnOrder: columnOrder ?? [],
@@ -462,6 +465,7 @@ export function ArrowReportGrid({
     latestGridStateRef.current = {
       sortBy,
       sortDesc,
+      sortConfigs,
       hiddenColumns: hiddenColumns ?? [],
       pinnedColumns: pinnedColumns ?? [],
       columnOrder: columnOrder ?? [],
@@ -529,6 +533,7 @@ export function ArrowReportGrid({
         return {
           sortBy: s.sortBy,
           sortDesc: s.sortDesc,
+          sortConfigs: s.sortConfigs,
           hiddenColumns: s.hiddenColumns,
           pinnedColumns: s.pinnedColumns,
           columnOrder:
@@ -734,6 +739,17 @@ export function ArrowReportGrid({
           }
         }
 
+        const sortList: { column: string; desc: boolean }[] = []
+        for (const col of effectiveColumns) {
+          const dir = sortConfigs[col.name]
+          if (dir) {
+            sortList.push({ column: col.name, desc: dir === "desc" })
+          }
+        }
+        if (sortList.length === 0 && sortBy) {
+          sortList.push({ column: sortBy, desc: sortDesc })
+        }
+
         const result = await duckDbClient.exportReportTable({
           tableName: duckTableName,
           fileName,
@@ -741,6 +757,7 @@ export function ArrowReportGrid({
           numericColumns,
           sortBy,
           sortDesc,
+          sortConfigs: sortList,
           columns: effectiveColumns.map((c) => c.name),
           preferredFormat: format,
           maxTotalRows,
@@ -775,7 +792,9 @@ export function ArrowReportGrid({
           })
         }
       } catch (err) {
-        console.error("Export error:", err)
+        toast.error(`Dışa aktarma hatası: ${String(err)}`, {
+          id: exportToastId,
+        })
         // Eğer DuckDB Parquet oluştururken bellek (OOM) veya başka bir hata verdiyse
         // ve OPFS'te bu rapora ait parçalar mevcutsa, parçaları birleştirerek kullanıcıyı kurtar
         if (format === "parquet" && jobId) {
@@ -820,6 +839,7 @@ export function ArrowReportGrid({
       numericColumns,
       sortBy,
       sortDesc,
+      sortConfigs,
       jobId,
       customQuerySql,
     ]
@@ -987,7 +1007,9 @@ export function ArrowReportGrid({
       loadingMore={isLoadingMore}
       sortColumn={sortBy}
       sortDirection={sortBy ? (sortDesc ? "desc" : "asc") : null}
-      onSortChange={(colName) => toggleSort(colName)}
+      sortConfigs={sortConfigs}
+      onSortConfigsChange={(configs, orderedCols) => setMultiSorting(configs, orderedCols)}
+      onSortChange={(colName) => toggleSort(colName, effectiveColumns.map((c) => c.name))}
       onSortSettingChange={(colName, desc) => setSorting(colName, desc)}
       renderFilterCell={(col, index) => {
         const val = filters[col.name] ?? ""
