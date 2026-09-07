@@ -1077,8 +1077,8 @@ export function VirtualSpreadsheet<T>({
               className="size-7 shrink-0"
               disabled={columns.length === 0}
               onClick={() => onToggleFooterRow(!showFooterRow)}
-              title={showFooterRow ? "Alt toplam satırını gizle" : "Alt toplam satırını göster"}
-              aria-label={showFooterRow ? "Alt toplam satırını gizle" : "Alt toplam satırını göster"}
+              title={showFooterRow ? "Hide summary row (Σ)" : "Show summary row (Σ)"}
+              aria-label={showFooterRow ? "Hide summary row (Σ)" : "Show summary row (Σ)"}
             >
               <Sigma className="size-3.5" />
             </Button>

@@ -74,7 +74,11 @@ export function TableFooterSummaryRow({
                       "group flex h-full w-full items-center justify-between gap-1 text-[11px] font-medium leading-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
                       isNumeric ? "flex-row-reverse text-right" : "text-left"
                     )}
-                    title={`Özet Değiştir: ${col.label}`}
+                    title={
+                      agg && currentType !== "none"
+                        ? `${col.label} (${AGGREGATION_LABELS[currentType]})`
+                        : col.label
+                    }
                   >
                     {agg && currentType !== "none" ? (
                       <span className="truncate tabular-nums text-foreground/90 font-semibold">
@@ -91,7 +95,7 @@ export function TableFooterSummaryRow({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align={isNumeric ? "end" : "start"} className="w-48 text-xs">
                   <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    {col.label} Özeti
+                    {col.label}
                   </div>
                   <DropdownMenuSeparator />
                   {available.map((type) => {

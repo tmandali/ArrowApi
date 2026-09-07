@@ -7,22 +7,22 @@ import type {
 import { formatGridCellValue } from "@/utils/format-cell"
 
 export const AGGREGATION_LABELS: Record<AggregationType, string> = {
-  sum: "Toplam (SUM)",
-  avg: "Ortalama (AVG)",
-  min: "Minimum (MIN)",
-  max: "Maksimum (MAX)",
-  count: "Dolu Satır (COUNT)",
-  distinct: "Benzersiz Değer (DISTINCT)",
-  none: "Temizle (Yok)",
+  sum: "Σ  SUM",
+  avg: "x̄  AVG",
+  min: "↓  MIN",
+  max: "↑  MAX",
+  count: "#  COUNT",
+  distinct: "⊛  DISTINCT",
+  none: "—  None",
 }
 
 export const AGGREGATION_SHORT_LABELS: Record<AggregationType, string> = {
-  sum: "Top",
-  avg: "Ort",
-  min: "Min",
-  max: "Mak",
-  count: "Sayı",
-  distinct: "Tekil",
+  sum: "Σ",
+  avg: "AVG",
+  min: "MIN",
+  max: "MAX",
+  count: "COUNT",
+  distinct: "DISTINCT",
   none: "",
 }
 
