@@ -520,25 +520,48 @@ self.onmessage = async (e: MessageEvent) => {
                   const offset = s * chunkSize
                   const currentChunk = Math.min(chunkSize, targetRows - offset)
                   const sheetName = `Sayfa ${s + 1}`
-                  const mode = s === 0 ? "create" : "append"
+                  const modeClause = s === 0 ? "MODE 'create'" : "MODE 'append'"
                   const chunkSql = `${baseQuery} LIMIT ${currentChunk} OFFSET ${offset}`
                   await conn.query(
-                    `COPY (${chunkSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET '${sheetName}', MODE '${mode}');`
+                    `COPY (${chunkSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET '${sheetName}', ${modeClause});`
                   )
                 }
               } else {
-                // 1 milyondan az satır: tek sayfada hızlı dışa aktar
+                // 1 milyondan az satır: tek sayfada doğrudan uyumlu dışa aktar
                 const singleSql =
                   targetRows < totalRowsToExport
                     ? `${baseQuery} LIMIT ${targetRows}`
                     : baseQuery
                 await conn.query(
-                  `COPY (${singleSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET 'Sayfa 1', MODE 'create');`
+                  `COPY (${singleSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET 'Sayfa 1');`
                 )
               }
 
-              fileBuffer = await db!.copyFileToBuffer(tempXlsx)
+              const rawBuffer = await db!.copyFileToBuffer(tempXlsx)
               await db!.dropFile(tempXlsx).catch(() => {})
+
+              // DuckDB-Wasm Issue #2119: DuckDB-Wasm virtual FS exportunda bazen dosyanın başına
+              // 1 veya daha fazla ekstra bayt eklenebiliyor (PK offset kayması).
+              // Standart bir .xlsx (ZIP) dosyası daima 0x50, 0x4B, 0x03, 0x04 ("PK\x03\x04") ile başlar.
+              let pkOffset = -1
+              for (let i = 0; i < Math.min(rawBuffer.length - 3, 64); i++) {
+                if (
+                  rawBuffer[i] === 0x50 &&
+                  rawBuffer[i + 1] === 0x4b &&
+                  rawBuffer[i + 2] === 0x03 &&
+                  rawBuffer[i + 3] === 0x04
+                ) {
+                  pkOffset = i
+                  break
+                }
+              }
+
+              if (pkOffset === -1) {
+                throw new Error("Üretilen Excel dosyasında geçerli ZIP/XLSX (PK) imzası bulunamadı.")
+              }
+
+              const clean = pkOffset > 0 ? rawBuffer.subarray(pkOffset) : rawBuffer
+              fileBuffer = new Uint8Array(clean)
               format = "xlsx"
               outFileName = `${fileName}.xlsx`
             } catch (xlsxErr) {
