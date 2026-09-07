@@ -1315,79 +1315,89 @@ export function VirtualSpreadsheet<T>({
                     const isLastVisible = isVisible && visibleColumns.length <= 1
                     const isFocused = focusedColIndex === index
                     const isPinned = pinnedSet.has(col.name)
+                    const prevCol = index > 0 ? filteredMenuColumns[index - 1] : null
+                    const isFirstUnpinned = !isPinned && prevCol !== null && pinnedSet.has(prevCol.name)
 
                     return (
-                      <div
-                        key={col.name}
-                        ref={(el) => {
-                          columnItemRefs.current[index] = el
-                        }}
-                        tabIndex={-1}
-                        onClick={() => setFocusedColIndex(index)}
-                        onMouseEnter={() => setFocusedColIndex(index)}
-                        className={cn(
-                          "group flex items-center justify-between gap-1.5 rounded px-2 py-1 text-xs transition-colors select-none",
-                          isFocused && "bg-accent text-accent-foreground",
-                          !isFocused && "hover:bg-muted/60 text-foreground"
-                        )}
-                      >
+                      <React.Fragment key={col.name}>
+                        {isFirstUnpinned ? (
+                          <div
+                            className="my-1.5 border-t border-border/60"
+                            role="separator"
+                            aria-orientation="horizontal"
+                          />
+                        ) : null}
                         <div
-                          className={cn(
-                            "flex min-w-0 flex-1 items-center gap-2",
-                            isLastVisible
-                              ? "opacity-50 cursor-not-allowed"
-                              : "cursor-pointer"
-                          )}
-                          onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
-                          title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
-                        >
-                          <Checkbox
-                            checked={isVisible}
-                            disabled={isLastVisible}
-                            tabIndex={-1}
-                            onCheckedChange={() => toggleColumnVisibility(col.name)}
-                          />
-                          <span className="truncate flex-1">{col.label}</span>
-                          {col.align === "right" ? (
-                            <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
-                          ) : null}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleColumnPin(col.name)
+                          ref={(el) => {
+                            columnItemRefs.current[index] = el
                           }}
-                          disabled={!isVisible}
+                          tabIndex={-1}
+                          onClick={() => setFocusedColIndex(index)}
+                          onMouseEnter={() => setFocusedColIndex(index)}
                           className={cn(
-                            "flex size-5 shrink-0 items-center justify-center rounded transition-colors",
-                            isPinned
-                              ? "text-primary hover:text-primary/80 hover:bg-primary/10"
-                              : "text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 focus:opacity-100",
-                            !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
+                            "group flex items-center justify-between gap-1.5 rounded px-2 py-1 text-xs transition-colors select-none",
+                            isFocused && "bg-accent text-accent-foreground",
+                            !isFocused && "hover:bg-muted/60 text-foreground"
                           )}
-                          title={
-                            !isVisible
-                              ? "Gizli kolon sabitlenemez"
-                              : isPinned
-                              ? "Sabitlemeyi kaldır (P)"
-                              : "Sola sabitle (P)"
-                          }
-                          aria-label={
-                            isPinned
-                              ? `${col.label} sabitlemesini kaldır`
-                              : `${col.label} sola sabitle`
-                          }
                         >
-                          <Pin
+                          <div
                             className={cn(
-                              "size-3 transition-transform",
-                              isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                              "flex min-w-0 flex-1 items-center gap-2",
+                              isLastVisible
+                                ? "opacity-50 cursor-not-allowed"
+                                : "cursor-pointer"
                             )}
-                          />
-                        </button>
-                      </div>
+                            onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
+                            title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
+                          >
+                            <Checkbox
+                              checked={isVisible}
+                              disabled={isLastVisible}
+                              tabIndex={-1}
+                              onCheckedChange={() => toggleColumnVisibility(col.name)}
+                            />
+                            <span className="truncate flex-1">{col.label}</span>
+                            {col.align === "right" ? (
+                              <span className="text-[10px] text-muted-foreground/60 font-mono">123</span>
+                            ) : null}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleColumnPin(col.name)
+                            }}
+                            disabled={!isVisible}
+                            className={cn(
+                              "flex size-5 shrink-0 items-center justify-center rounded transition-colors",
+                              isPinned
+                                ? "text-primary hover:text-primary/80 hover:bg-primary/10"
+                                : "text-muted-foreground/40 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 focus:opacity-100",
+                              !isVisible && "opacity-20 cursor-not-allowed pointer-events-none"
+                            )}
+                            title={
+                              !isVisible
+                                ? "Gizli kolon sabitlenemez"
+                                : isPinned
+                                ? "Sabitlemeyi kaldır (P)"
+                                : "Sola sabitle (P)"
+                            }
+                            aria-label={
+                              isPinned
+                                ? `${col.label} sabitlemesini kaldır`
+                                : `${col.label} sola sabitle`
+                            }
+                          >
+                            <Pin
+                              className={cn(
+                                "size-3 transition-transform",
+                                isPinned ? "fill-primary rotate-45" : "-rotate-45"
+                              )}
+                            />
+                          </button>
+                        </div>
+                      </React.Fragment>
                     )
                   })}
                   {filteredMenuColumns.length === 0 ? (
