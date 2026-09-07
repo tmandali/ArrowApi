@@ -424,7 +424,7 @@ export function ArrowReportGrid({
 
   const runExport = React.useCallback(
     async (
-      format: "xlsx" | "parquet" | "csv" | "zip" | "gz" = "xlsx",
+      format: "xlsx" | "parquet" | "csv" | "gz" = "xlsx",
       maxTotalRows?: number
     ) => {
       setExportWarning(null)
@@ -437,7 +437,7 @@ export function ArrowReportGrid({
           ? "Parquet dosyası"
           : format === "gz"
           ? "Gzip CSV dosyası"
-          : "Sıkıştırılmış CSV arşivi"
+          : "CSV dosyası"
       const exportToastId = toast.loading(`${formatLabel} hazırlanıyor...`)
       try {
         const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
@@ -483,12 +483,6 @@ export function ArrowReportGrid({
             `Gzip CSV indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
             { id: exportToastId }
           )
-        } else if (result.format === "zip") {
-          const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
-          toast.success(
-            `Sıkıştırılmış CSV indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
-            { id: exportToastId }
-          )
         } else {
           toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
             id: exportToastId,
@@ -516,11 +510,11 @@ export function ArrowReportGrid({
   )
 
   const handleExportClick = React.useCallback(
-    (format: "xlsx" | "parquet" | "csv" | "zip" | "gz" = "xlsx") => {
+    (format: "xlsx" | "parquet" | "csv" | "gz" = "xlsx") => {
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
       const exportRowCount = hasActiveFilters ? totalFiltered : totalRows
 
-      // Parquet, CSV ve ZIP için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
+      // Parquet ve CSV için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
       if (format === "xlsx") {
         if (exportRowCount > 2_000_000) {
           setExportWarning({ type: "hard_limit", count: exportRowCount })

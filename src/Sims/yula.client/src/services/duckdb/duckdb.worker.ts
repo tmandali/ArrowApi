@@ -1,5 +1,4 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
-import { createSingleFileZip } from "./zip-packer"
 
 // Next karşılığı: ?url suffix yerine public/duckdb altındaki self-hosted dosyalar
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
@@ -469,7 +468,7 @@ self.onmessage = async (e: MessageEvent) => {
             whereClause?: string
             orderClause?: string
             fileName?: string
-            preferredFormat?: "xlsx" | "csv" | "parquet" | "zip" | "gz"
+            preferredFormat?: "xlsx" | "csv" | "parquet" | "gz"
             maxRowsPerSheet?: number
             maxTotalRows?: number
           }
@@ -499,7 +498,7 @@ self.onmessage = async (e: MessageEvent) => {
               ? maxTotalRows
               : totalRowsToExport
 
-          let format: "xlsx" | "csv" | "parquet" | "zip" | "gz" = "gz"
+          let format: "xlsx" | "csv" | "parquet" | "gz" = "gz"
           let outFileName = ""
           let fileBuffer: Uint8Array | null = null
           let sheetCount = 1
@@ -647,26 +646,9 @@ self.onmessage = async (e: MessageEvent) => {
             csvWithBom.set(bom, 0)
             csvWithBom.set(rawCsvBuffer, bom.length)
 
-            // Tercih ZIP ise doğrudan .zip arşivine paketle, aksi halde raw CSV
-            if (preferredFormat === "zip") {
-              try {
-                fileBuffer = await createSingleFileZip(`${fileName}.csv`, csvWithBom)
-                format = "zip"
-                outFileName = `${fileName}.zip`
-              } catch (zipErr) {
-                console.warn(
-                  "[duckdb.worker] ZIP packaging failed, falling back to raw CSV:",
-                  zipErr
-                )
-                fileBuffer = csvWithBom
-                format = "csv"
-                outFileName = `${fileName}.csv`
-              }
-            } else {
-              fileBuffer = csvWithBom
-              format = "csv"
-              outFileName = `${fileName}.csv`
-            }
+            fileBuffer = csvWithBom
+            format = "csv"
+            outFileName = `${fileName}.csv`
           }
 
           const transferBuffer = fileBuffer.buffer.slice(
