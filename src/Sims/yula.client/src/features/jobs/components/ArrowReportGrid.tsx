@@ -564,9 +564,121 @@ export function ArrowReportGrid({
     useYulaGridStore.getState().setFilters(filters);
   }, [filters]);
 
+  const numericColumns = React.useMemo(() => {
+    const set = new Set<string>()
+    for (const col of effectiveColumns) {
+      if (col.align === "right" || col.kind === "number") {
+        set.add(col.name)
+      }
+    }
+    return set
+  }, [effectiveColumns])
+
+  // Helper: Görünüm adını güvenli SQL tanımlayıcısına dönüştürür (örn: "Ege Bölgesi Satışları" -> "view_ege_bolgesi_satislari")
+  const sanitizeViewIdentifier = React.useCallback((name: string, id: string): string => {
+    const slug = name
+      .replace(/[Ğğ]/g, "g")
+      .replace(/[Üü]/g, "u")
+      .replace(/[Şş]/g, "s")
+      .replace(/[İıI]/g, "i")
+      .replace(/[Öö]/g, "o")
+      .replace(/[Çç]/g, "c")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/gi, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 30)
+      .replace(/^_+|_+$/g, "")
+    return `view_${slug || id.slice(0, 8)}`
+  }, [])
+
+  // Kayıtlı AI SQL Görünümlerinin DuckDB VIEW eşlemesi
+  const savedViewSpecs = React.useMemo(() => {
+    return aiViews.map((v) => ({
+      name: sanitizeViewIdentifier(v.title, v.id),
+      title: v.title,
+      sql: v.sql,
+    }))
+  }, [aiViews, sanitizeViewIdentifier])
+
+  // Kayıtlı görünümleri DuckDB içinde SQL VIEW olarak senkronize et
+  React.useEffect(() => {
+    if (!duckTableName || isStreaming || isSavingDisk) return
+    for (const v of savedViewSpecs) {
+      void duckDbClient
+        .createOrReplaceView({
+          viewName: v.name,
+          selectSql: v.sql,
+        })
+        .catch((err) => {
+          console.warn(`[ArrowReportGrid] Kayıtlı görünüm (${v.name}) DuckDB view senkronizasyon hatası:`, err)
+        })
+    }
+  }, [duckTableName, isStreaming, isSavingDisk, savedViewSpecs])
+
+  // Canlı aktif görünümü ("active_view") DuckDB VIEW olarak 300ms debounce ile senkronize et
+  React.useEffect(() => {
+    if (!duckTableName || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+
+    const timer = setTimeout(() => {
+      // 1. Sıralama clause'u (soldan sağa çoklu sıralama)
+      const sortList: { column: string; desc: boolean }[] = []
+      for (const col of effectiveColumns) {
+        const dir = sortConfigs[col.name]
+        if (dir) {
+          sortList.push({ column: col.name, desc: dir === "desc" })
+        }
+      }
+      if (sortList.length === 0 && sortBy) {
+        sortList.push({ column: sortBy, desc: sortDesc })
+      }
+
+      let orderClause = ""
+      if (sortList.length > 0) {
+        orderClause = `ORDER BY ${sortList
+          .map((s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`)
+          .join(", ")}`
+      }
+
+      // 2. Filtre WHERE clause'u
+      const whereClause = buildCombinedWhereClause(filters, numericColumns)
+
+      // 3. SELECT SQL oluşturma
+      let selectSql = ""
+      if (customQuerySql) {
+        const cleanQuery = customQuerySql.trim().replace(/;+$/, "")
+        selectSql = `SELECT * FROM (${cleanQuery}) AS __active_base ${whereClause} ${orderClause}`
+      } else {
+        const selectCols = effectiveColumns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(", ")
+        selectSql = `SELECT ${selectCols} FROM "${duckTableName.replace(/"/g, '""')}" ${whereClause} ${orderClause}`
+      }
+
+      void duckDbClient
+        .createOrReplaceView({
+          viewName: "active_view",
+          selectSql,
+        })
+        .catch((err) => {
+          console.warn("[ArrowReportGrid] active_view DuckDB senkronizasyon uyarısı:", err)
+        })
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [
+    duckTableName,
+    isStreaming,
+    isSavingDisk,
+    effectiveColumns,
+    filters,
+    numericColumns,
+    sortBy,
+    sortDesc,
+    sortConfigs,
+    customQuerySql,
+  ])
+
   // Yula bağlamı — TEK yerden doğrudan store kaydı (aracı katman yok).
   // Gridin tüm verisi burada hesaplanır; veri geldikçe (DESCRIBE, örnek
-  // satırlar, değer sözlüğü) spec otomatik güncellenir.
+  // satırlar, değer sözlüğü, active_view) spec otomatik güncellenir.
   const yulaContext = React.useMemo(
     () => ({
       tableName: duckTableName,
@@ -578,8 +690,21 @@ export function ArrowReportGrid({
       columnValues: columnValuesDigest,
       columnDescriptions,
       reportScope,
+      activeViewName: "active_view",
+      savedViews: savedViewSpecs,
     }),
-    [duckTableName, title, effectiveColumns, totalFiltered, columnTypes, sampleRows, columnValuesDigest, columnDescriptions, reportScope],
+    [
+      duckTableName,
+      title,
+      effectiveColumns,
+      totalFiltered,
+      columnTypes,
+      sampleRows,
+      columnValuesDigest,
+      columnDescriptions,
+      reportScope,
+      savedViewSpecs,
+    ]
   )
 
   React.useEffect(() => {
@@ -589,6 +714,7 @@ export function ArrowReportGrid({
   React.useEffect(() => {
     return () => {
       useYulaGridStore.getState().unregister()
+      void duckDbClient.dropView("active_view").catch(() => {})
     }
   }, [])
 
@@ -632,15 +758,6 @@ export function ArrowReportGrid({
         {expectedTotalRows ? ` / ${formatCount(expectedTotalRows)}` : ""} rows
       </span>
     ) : null
-  const numericColumns = React.useMemo(() => {
-    const set = new Set<string>()
-    for (const col of effectiveColumns) {
-      if (col.align === "right" || col.kind === "number") {
-        set.add(col.name)
-      }
-    }
-    return set
-  }, [effectiveColumns])
 
   const [aggregationConfigs, setAggregationConfigs] = React.useState<ColumnAggregationConfig>({})
   const [duckDbAggregations, setDuckDbAggregations] = React.useState<ColumnAggregationValues | undefined>(undefined)

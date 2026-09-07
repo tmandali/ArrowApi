@@ -19,6 +19,10 @@ export interface YulaGridSpec {
   columnDescriptions?: Record<string, string>;
   /** Aktif raporun scope'u (örn. "stock-balance") — şema tool'u için kimlik */
   reportScope?: string;
+  /** DuckDB'de aktif süzülmüş/canlı görünümün SQL VIEW adı (varsayılan: "active_view") */
+  activeViewName?: string;
+  /** DuckDB'de kayıtlı özel görünümlerin listesi (view_xxx adıyla erişilebilir) */
+  savedViews?: Array<{ name: string; title: string; sql: string }>;
 }
 
 export interface YulaScreenRegistration {
@@ -132,6 +136,8 @@ export const useYulaGridStore = create<GridState>((set) => ({
         s.spec.title === spec.title &&
         s.spec.rowCount === spec.rowCount &&
         s.spec.reportScope === spec.reportScope &&
+        s.spec.activeViewName === spec.activeViewName &&
+        JSON.stringify(s.spec.savedViews) === JSON.stringify(spec.savedViews) &&
         JSON.stringify(s.spec.columns) === JSON.stringify(spec.columns) &&
         JSON.stringify(s.spec.columnTypes) === JSON.stringify(spec.columnTypes) &&
         JSON.stringify(s.spec.sampleRows) === JSON.stringify(spec.sampleRows) &&

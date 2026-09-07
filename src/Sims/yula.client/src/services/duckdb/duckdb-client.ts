@@ -218,6 +218,32 @@ class DuckDbClient {
   }
 
   /**
+   * DuckDB içinde bir SQL VIEW oluşturur veya günceller (CREATE OR REPLACE VIEW).
+   * Fiziksel kopyalama yapmaz, 0 MB bellek tüketir ve AI'nın doğrudan görünüm üzerinden
+   * sorgu atmasını sağlar.
+   */
+  async createOrReplaceView(options: {
+    viewName: string
+    selectSql: string
+  }): Promise<void> {
+    const { viewName, selectSql } = options
+    const escapedView = `"${viewName.replace(/"/g, '""')}"`
+    // Sondaki noktalı virgülleri temizle
+    const cleanSql = selectSql.trim().replace(/;+$/, "")
+    const ddl = `CREATE OR REPLACE VIEW ${escapedView} AS ${cleanSql};`
+    await this.postMessage<WorkerResponse>("QUERY_ROWS", { sql: ddl })
+  }
+
+  /**
+   * DuckDB içindeki bir VIEW'ı kaldırır (DROP VIEW IF EXISTS).
+   */
+  async dropView(viewName: string): Promise<void> {
+    const escapedView = `"${viewName.replace(/"/g, '""')}"`
+    const ddl = `DROP VIEW IF EXISTS ${escapedView};`
+    await this.postMessage<WorkerResponse>("QUERY_ROWS", { sql: ddl })
+  }
+
+  /**
    * Tablo şemasını ve kolon tiplerini sorgular.
    */
   async describeTable(tableName: string): Promise<

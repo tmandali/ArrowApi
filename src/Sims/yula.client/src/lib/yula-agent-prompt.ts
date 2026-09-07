@@ -21,6 +21,10 @@ export interface YulaGridContext {
   columnValues?: Record<string, string[]>;
   /** Kolon → yetkili semantik tanım (rapor şeması x-ai.columnDescriptions) */
   columnDescriptions?: Record<string, string>;
+  /** DuckDB'de aktif süzülmüş/canlı görünümün SQL VIEW adı (varsayılan: "active_view") */
+  activeViewName?: string;
+  /** DuckDB'de kayıtlı özel görünümlerin listesi (view_xxx adıyla erişilebilir) */
+  savedViews?: Array<{ name: string; title: string; sql: string }>;
 }
 
 export type YulaScreenPhase =
@@ -132,6 +136,10 @@ const GRID_ABSENT_RULES = [
 
 const SQL_EXPERT_RULES = [
   "SQL EXPERT & QUERY GUIDELINES:",
+  "• DUCKDB VIEWS GROUNDING: The current screen view (with active filters, sorting, and selected query) is automatically synchronized as a DuckDB VIEW named 'active_view'.",
+  "• When the user asks questions about the current screen/view (e.g. 'bu görünümdeki ortalama vade nedir?', 'en yüksek 5 müşteri', 'buradaki toplam ciro', 'bu listede...'): write SQL queries directly targeting 'active_view' (e.g. SELECT \"Customer\", \"Total\" FROM active_view ORDER BY \"Total\" DESC LIMIT 5).",
+  "• Query the base table name (e.g. report_xxx) only when the user explicitly asks about unfiltered raw data or the entire dataset.",
+  "• When saved views are present (e.g. view_xxx), you can join or compare them in run_expert_sql (e.g. comparing two regional views).",
   "• Use run_expert_sql strictly for read-only SELECT queries that verify findings or compute advanced metrics.",
   "• If the user wants the actual grid UI table to show transformed/derived columns, use set_grid_query instead.",
   "• For simple value/range filters or sorting on the existing table, prefer grid tools (set_grid_sort, apply_grid_filters, filter_current_grid) instead of SQL to keep UI state fast and responsive.",
@@ -317,10 +325,17 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
         ? `CURRENT ACTIVE FILTERS: ${JSON.stringify(context.grid.filters)}`
         : "CURRENT ACTIVE FILTERS: None (no filters are currently applied on screen).";
 
+    const savedViewsNotice =
+      context.grid.savedViews && context.grid.savedViews.length > 0
+        ? `Saved DuckDB Views available for querying: ${context.grid.savedViews.map((v) => `${v.name} ("${v.title}")`).join(", ")}.`
+        : null;
+
     const gridLines = [
       viewModeNotice,
       isCustomActive ? `ACTIVE CUSTOM QUERY SQL: ${context.grid.customQuerySql}` : null,
       `Active table: ${context.grid.tableName} · ${context.grid.rowCount ?? "?"} rows.`,
+      `Active DuckDB View: "active_view" (Represents currently visible & filtered rows on screen. Prefer querying FROM active_view for questions about the active screen view).`,
+      savedViewsNotice,
       `Columns: ${context.grid.columns.join(", ")}.`,
       activeFiltersText,
     ].filter(Boolean);

@@ -426,6 +426,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
       description: [
         "SQL uzmanının yazdığı TEK salt-okunur SELECT'i çalıştırır; ilk 50 satırı MODELE döner (grid DEĞİŞTİRMEZ).",
         "KAPSAM: yalnız gridin ifade EDEMEYECEĞİ sorgular — aggregate, karşılaştırmalı kolonlar (Qty > UnitPrice), oran/hesap, window.",
+        "DUCKDB VIEW: Ekrandaki süzülmüş/aktif görünümü sorgulamak için 'FROM active_view', ham tablonun tümünü sorgulamak için aktif tablo adını kullanabilirsiniz.",
         "Basit kolon filtreleri (değer/aralık/boş-dolu) için BU ARACI KULLANMA — filter_current_grid ile filtrele; aksi halde grid hücreleri ve tablo senkron dışı kalır.",
         "display: 'silent' = keşif/doğrulama sorgusu, ekrana tablo basılmaz (varsayılan keşiflerde BUNU kullan) · 'card' = kullanıcıdan 'göster/show' istenirse tablo kartı basılır.",
         "Sonuç satırları card modunda ekranda otomatik tablo olur; satırları metinde TEKRAR yazma — yalnız bulgu/yorum yaz.",
@@ -436,7 +437,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
         properties: {
           sql: {
             type: "string",
-            description: "Salt-okunur tek SELECT sorgusu (tablo adı yukarıda)",
+            description: "Salt-okunur tek SELECT sorgusu (aktif süzülmüş liste için 'active_view', tüm ham veri için tablo adı)",
           },
           display: {
             type: "string",

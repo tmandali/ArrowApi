@@ -12,6 +12,7 @@ const testFiles = [
   "test-aggregations.mjs",
   "test-ai-views.mjs",
   "test-multi-sort.mjs",
+  "test-duckdb-views.mjs",
 ]
 
 console.log("==================================================")
