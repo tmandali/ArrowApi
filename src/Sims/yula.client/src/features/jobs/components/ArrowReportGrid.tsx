@@ -415,12 +415,22 @@ export function ArrowReportGrid({
         preferredFormat: "xlsx",
       })
 
-      toast.success(
-        result.format === "xlsx"
-          ? `Excel dosyası indirildi (${result.fileName})`
-          : `Excel uyumlu CSV indirildi (${result.fileName})`,
-        { id: exportToastId }
-      )
+      if (result.format === "xlsx") {
+        if (result.sheetCount && result.sheetCount > 1) {
+          toast.success(
+            `Excel dosyası indirildi (${result.sheetCount} sayfa / ${formatCount(result.totalRows)} satır)`,
+            { id: exportToastId }
+          )
+        } else {
+          toast.success(`Excel dosyası indirildi (${result.fileName})`, {
+            id: exportToastId,
+          })
+        }
+      } else {
+        toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
+          id: exportToastId,
+        })
+      }
     } catch (err) {
       console.error("Export error:", err)
       toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })

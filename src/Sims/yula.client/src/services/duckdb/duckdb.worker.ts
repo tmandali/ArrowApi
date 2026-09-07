@@ -460,6 +460,7 @@ self.onmessage = async (e: MessageEvent) => {
             orderClause = "",
             fileName = "rapor",
             preferredFormat = "xlsx",
+            maxRowsPerSheet = 1_000_000,
           } = payload as {
             tableName: string
             columns?: string[]
@@ -467,6 +468,7 @@ self.onmessage = async (e: MessageEvent) => {
             orderClause?: string
             fileName?: string
             preferredFormat?: "xlsx" | "csv"
+            maxRowsPerSheet?: number
           }
 
           const escapedTable = `"${tableName.replace(/"/g, '""')}"`
@@ -475,11 +477,24 @@ self.onmessage = async (e: MessageEvent) => {
               ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
               : "*"
 
-          const queryToExport = `SELECT ${selectCols} FROM ${escapedTable} ${whereClause} ${orderClause}`.trim()
+          const baseQuery = `SELECT ${selectCols} FROM ${escapedTable} ${whereClause} ${orderClause}`.trim()
+
+          // Filtrelenmiş toplam satır sayısını al
+          let totalRowsToExport = 0
+          try {
+            const countRes = await conn.query(
+              `SELECT COUNT(*)::BIGINT as cnt FROM ${escapedTable} ${whereClause};`
+            )
+            const countRows = arrowTableToObjects(countRes)
+            totalRowsToExport = Number(countRows[0]?.cnt ?? 0)
+          } catch {
+            totalRowsToExport = 0
+          }
 
           let format: "xlsx" | "csv" = "csv"
           let outFileName = ""
           let fileBuffer: Uint8Array | null = null
+          let sheetCount = 1
 
           // 1. xlsx formatı istendiyse DuckDB excel eklentisini dene
           if (preferredFormat === "xlsx") {
@@ -489,9 +504,27 @@ self.onmessage = async (e: MessageEvent) => {
                 await conn.query("INSTALL excel; LOAD excel;")
               })
               const tempXlsx = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.xlsx`
-              await conn.query(
-                `COPY (${queryToExport}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true);`
-              )
+              const chunkSize = Math.min(Math.max(10_000, maxRowsPerSheet), 1_000_000)
+
+              if (totalRowsToExport > chunkSize) {
+                // Excel 1.048.576 satır sınırını aşıyor: otomatik çoklu sayfa (auto-split)
+                sheetCount = Math.ceil(totalRowsToExport / chunkSize)
+                for (let s = 0; s < sheetCount; s++) {
+                  const offset = s * chunkSize
+                  const sheetName = `Sayfa ${s + 1}`
+                  const mode = s === 0 ? "create" : "append"
+                  const chunkSql = `${baseQuery} LIMIT ${chunkSize} OFFSET ${offset}`
+                  await conn.query(
+                    `COPY (${chunkSql}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET '${sheetName}', MODE '${mode}');`
+                  )
+                }
+              } else {
+                // 1 milyondan az satır: tek sayfada hızlı dışa aktar
+                await conn.query(
+                  `COPY (${baseQuery}) TO '${tempXlsx}' (FORMAT xlsx, HEADER true, SHEET 'Sayfa 1', MODE 'create');`
+                )
+              }
+
               fileBuffer = await db!.copyFileToBuffer(tempXlsx)
               await db!.dropFile(tempXlsx).catch(() => {})
               format = "xlsx"
@@ -502,6 +535,7 @@ self.onmessage = async (e: MessageEvent) => {
                 xlsxErr
               )
               fileBuffer = null
+              sheetCount = 1
             }
           }
 
@@ -510,7 +544,7 @@ self.onmessage = async (e: MessageEvent) => {
             const tempCsv = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.csv`
             // Excel Türkiye/Avrupa standardı: Noktalı virgül (;) ayracı
             await conn.query(
-              `COPY (${queryToExport}) TO '${tempCsv}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"');`
+              `COPY (${baseQuery}) TO '${tempCsv}' (HEADER true, DELIMITER ';', QUOTE '"', ESCAPE '"');`
             )
             const rawCsvBuffer = await db!.copyFileToBuffer(tempCsv)
             await db!.dropFile(tempCsv).catch(() => {})
@@ -538,6 +572,8 @@ self.onmessage = async (e: MessageEvent) => {
               buffer: transferBuffer,
               format,
               fileName: outFileName,
+              totalRows: totalRowsToExport,
+              sheetCount,
             },
             [transferBuffer]
           )

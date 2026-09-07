@@ -11,6 +11,7 @@ type WorkerResponse = {
   buffer?: ArrayBuffer
   format?: "xlsx" | "csv"
   fileName?: string
+  sheetCount?: number
 }
 
 class DuckDbClient {
@@ -238,7 +239,14 @@ class DuckDbClient {
     sortDesc?: boolean
     columns?: string[]
     preferredFormat?: "xlsx" | "csv"
-  }): Promise<{ format: "xlsx" | "csv"; fileName: string; sizeBytes: number }> {
+    maxRowsPerSheet?: number
+  }): Promise<{
+    format: "xlsx" | "csv"
+    fileName: string
+    sizeBytes: number
+    totalRows: number
+    sheetCount: number
+  }> {
     const {
       tableName,
       fileName = "rapor",
@@ -248,6 +256,7 @@ class DuckDbClient {
       sortDesc = false,
       columns,
       preferredFormat = "xlsx",
+      maxRowsPerSheet = 1_000_000,
     } = options
 
     const whereClause = buildCombinedWhereClause(filters, numericColumns)
@@ -264,6 +273,7 @@ class DuckDbClient {
       orderClause,
       fileName,
       preferredFormat,
+      maxRowsPerSheet,
     })
 
     if (!res.buffer) {
@@ -289,6 +299,8 @@ class DuckDbClient {
       format: res.format ?? "csv",
       fileName: link.download,
       sizeBytes: blob.size,
+      totalRows: res.totalRows ?? 0,
+      sheetCount: res.sheetCount ?? 1,
     }
   }
 
