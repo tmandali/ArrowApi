@@ -429,6 +429,11 @@ export function VirtualSpreadsheet<T>({
   const isDraggingRef = React.useRef(false)
   const isResizingRef = React.useRef(false)
   const isHoveringSeparatorRef = React.useRef(false)
+  const [hoveredSeparatorCol, setHoveredSeparatorCol] = React.useState<string | null>(null)
+  const lastSeparatorClickRef = React.useRef<{ time: number; colName: string }>({
+    time: 0,
+    colName: "",
+  })
 
   const [internalSort, setInternalSort] = React.useState<{
     column: string | null
@@ -732,10 +737,38 @@ export function VirtualSpreadsheet<T>({
     }, 0)
   }, [visibleColumns, getColWidth])
 
-  const handleResizeStart = React.useCallback(
-    (event: React.PointerEvent, col: SpreadsheetColumn) => {
+  /**
+   * Çift tıklamayla kolonu içeriğe ve başlığa göre en uygun genişliğe otomatik sığdırır.
+   */
+  const handleAutoFit = React.useCallback(
+    (event: React.MouseEvent | React.PointerEvent, col: SpreadsheetColumn) => {
       event.preventDefault()
       event.stopPropagation()
+      const autoWidth = calculateColumnAutoFitWidth(col, items)
+      setColWidths((prev) => ({ ...prev, [col.name]: autoWidth }))
+    },
+    [items]
+  )
+
+  const handleResizeStart = React.useCallback(
+    (event: React.PointerEvent, col: SpreadsheetColumn) => {
+      if (event.button !== 0) return
+      event.stopPropagation()
+
+      // Çift tıklama algılama (350ms penceresi) — çift tıklamada resize ve sürükleme başlatılmaz
+      const now = Date.now()
+      if (
+        lastSeparatorClickRef.current.colName === col.name &&
+        now - lastSeparatorClickRef.current.time < 350
+      ) {
+        lastSeparatorClickRef.current = { time: 0, colName: "" }
+        resizeRef.current = null
+        isResizingRef.current = false
+        handleAutoFit(event, col)
+        return
+      }
+      lastSeparatorClickRef.current = { time: now, colName: col.name }
+
       isResizingRef.current = true
       isDraggingRef.current = false
       setDraggedColName(null)
@@ -753,7 +786,7 @@ export function VirtualSpreadsheet<T>({
       if (target.hasPointerCapture(event.pointerId)) return
       target.setPointerCapture(event.pointerId)
     },
-    [getColWidth]
+    [getColWidth, handleAutoFit]
   )
 
   const handleResizeMove = React.useCallback((event: React.PointerEvent) => {
@@ -779,19 +812,6 @@ export function VirtualSpreadsheet<T>({
       isResizingRef.current = false
     }, 150)
   }, [])
-
-  /**
-   * Çift tıklamayla kolonu içeriğe ve başlığa göre en uygun genişliğe otomatik sığdırır.
-   */
-  const handleAutoFit = React.useCallback(
-    (event: React.MouseEvent, col: SpreadsheetColumn) => {
-      event.preventDefault()
-      event.stopPropagation()
-      const autoWidth = calculateColumnAutoFitWidth(col, items)
-      setColWidths((prev) => ({ ...prev, [col.name]: autoWidth }))
-    },
-    [items]
-  )
 
   const colGroup = (
     <colgroup>
@@ -1207,7 +1227,7 @@ export function VirtualSpreadsheet<T>({
                         return (
                           <th
                             key={col.name}
-                            draggable={canDrag}
+                            draggable={canDrag && hoveredSeparatorCol !== col.name}
                             onDragStart={(e) => handleDragStart(e, col)}
                             onDragOver={(e) => handleDragOver(e, col)}
                             onDragLeave={(e) => handleDragLeave(e, col)}
@@ -1216,7 +1236,7 @@ export function VirtualSpreadsheet<T>({
                             className={cn(
                               headClass,
                               "relative overflow-hidden group/th select-none",
-                              canDrag && "cursor-grab active:cursor-grabbing",
+                              canDrag && hoveredSeparatorCol !== col.name && "cursor-grab active:cursor-grabbing",
                               canSort && "hover:bg-muted/70 transition-colors",
                               col.align === "left" ? "text-left" : "text-right",
                               isBeingDragged && "opacity-40 bg-muted/90",
@@ -1262,9 +1282,11 @@ export function VirtualSpreadsheet<T>({
                               draggable={false}
                               onMouseEnter={() => {
                                 isHoveringSeparatorRef.current = true
+                                setHoveredSeparatorCol(col.name)
                               }}
                               onMouseLeave={() => {
                                 isHoveringSeparatorRef.current = false
+                                setHoveredSeparatorCol(null)
                               }}
                               onMouseDown={(e) => {
                                 // HTML5 dragstart'ın th seviyesinde başlamasını kesinlikle engelle
@@ -1274,6 +1296,15 @@ export function VirtualSpreadsheet<T>({
                                 e.preventDefault()
                                 e.stopPropagation()
                               }}
+                              onClick={(e) => {
+                                // Sıralama tıklamasının th seviyesine sıçramasını engelle
+                                e.stopPropagation()
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation()
+                                e.preventDefault()
+                                handleAutoFit(e, col)
+                              }}
                               className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
                               onPointerDown={(event) =>
                                 handleResizeStart(event, col)
@@ -1281,9 +1312,6 @@ export function VirtualSpreadsheet<T>({
                               onPointerMove={handleResizeMove}
                               onPointerUp={handleResizeEnd}
                               onPointerCancel={handleResizeEnd}
-                              onDoubleClick={(event) =>
-                                handleAutoFit(event, col)
-                              }
                             />
                           </th>
                         )
