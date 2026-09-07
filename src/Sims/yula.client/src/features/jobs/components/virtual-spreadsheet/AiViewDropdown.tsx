@@ -28,7 +28,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/utils/cn"
 import type { AiSqlView } from "./types"
 
@@ -76,9 +75,13 @@ export function AiViewDropdown({
     ? currentQueryTitle || "AI Analizi"
     : defaultLabel
 
-  // Kaydetme diyalog state'i
-  const [isSavingCurrent, setIsSavingCurrent] = React.useState(false)
-  const [saveTitleInput, setSaveTitleInput] = React.useState("")
+  // Tek tıkla doğrudan kaydetme (modal olmadan)
+  const handleQuickSave = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const titleToSave = currentQueryTitle?.trim() || activeTitle || "AI Görünümü"
+    onSaveCurrentAiView?.(titleToSave)
+  }
 
   // Satır içi (inline) yeniden adlandırma state'i
   const [editingViewId, setEditingViewId] = React.useState<string | null>(null)
@@ -87,20 +90,6 @@ export function AiViewDropdown({
   // SQL inceleme diyalog state'i
   const [inspectingSql, setInspectingSql] = React.useState<{ title: string; sql: string } | null>(null)
   const [copied, setCopied] = React.useState(false)
-
-  const handleOpenSaveCurrent = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    setSaveTitleInput(currentQueryTitle || "AI Analitik Görünümü")
-    setIsSavingCurrent(true)
-  }
-
-  const handleConfirmSaveCurrent = () => {
-    if (saveTitleInput.trim()) {
-      onSaveCurrentAiView?.(saveTitleInput.trim())
-    }
-    setIsSavingCurrent(false)
-  }
 
   const handleStartRename = (view: AiSqlView, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -146,7 +135,7 @@ export function AiViewDropdown({
 
   return (
     <>
-      <div className={cn("inline-flex items-center min-w-0 shrink select-none", className)}>
+      <div className={cn("inline-flex items-center gap-1 min-w-0 shrink select-none", className)}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -213,7 +202,8 @@ export function AiViewDropdown({
                         type="button"
                         size="sm"
                         className="h-6 px-2 text-[11px] gap-1 shrink-0 bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600"
-                        onClick={handleOpenSaveCurrent}
+                        onClick={handleQuickSave}
+                        title="Görünümü kaydet"
                       >
                         <BookmarkPlus className="size-3" />
                         Kaydet
@@ -366,58 +356,22 @@ export function AiViewDropdown({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Geçici AI görünümü aktifse tek tıkla doğrudan kaydetme ikonu */}
+        {isCurrentQueryActive && !isCurrentQuerySaved ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleQuickSave}
+            className="size-6 text-amber-700 hover:bg-amber-500/15 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-400/15 shrink-0"
+            title="Görünümü kaydet"
+            aria-label="Görünümü kaydet"
+          >
+            <BookmarkPlus className="size-3.5" />
+          </Button>
+        ) : null}
       </div>
-
-      {/* Görünümü Kaydet Diyaloğu */}
-      <Dialog open={isSavingCurrent} onOpenChange={setIsSavingCurrent}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-              <BookmarkPlus className="size-4 text-amber-600 dark:text-amber-400" />
-              AI Görünümünü Kaydet
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Bu analitik görünümü daha sonra tek tıkla açabilmek için listenize kaydedin.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={saveTitleInput}
-              onChange={(e) => setSaveTitleInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleConfirmSaveCurrent()
-                }
-              }}
-              placeholder="Görünüm adı..."
-              className="text-xs"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsSavingCurrent(false)}
-              className="text-xs"
-            >
-              İptal
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConfirmSaveCurrent}
-              disabled={!saveTitleInput.trim()}
-              className="text-xs bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600"
-            >
-              Kaydet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
 
       {/* SQL İnceleme Diyaloğu */}
       <Dialog open={Boolean(inspectingSql)} onOpenChange={(open) => !open && setInspectingSql(null)}>
