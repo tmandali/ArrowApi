@@ -229,6 +229,35 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     void executeQueryRef.current({}, sortByRef.current, sortDescRef.current, 0)
   }, [])
 
+  // 3 aşamalı kolon sıralama döngüsü: ASC -> DESC -> Doğal (None)
+  const toggleSort = React.useCallback((columnName: string) => {
+    let nextSortBy: string | null = columnName
+    let nextSortDesc = false
+
+    if (sortByRef.current === columnName) {
+      if (!sortDescRef.current) {
+        nextSortDesc = true
+      } else {
+        nextSortBy = null
+        nextSortDesc = false
+      }
+    }
+
+    sortByRef.current = nextSortBy
+    sortDescRef.current = nextSortDesc
+    setSortBy(nextSortBy)
+    setSortDesc(nextSortDesc)
+    setPage(0)
+    setIsLoadingQuery(true)
+
+    if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+    if (isCustomQueryActive()) {
+      setCustomQueryTick((t) => t + 1)
+      return
+    }
+    void executeQueryRef.current(filtersRef.current, nextSortBy, nextSortDesc, 0)
+  }, [])
+
   // Arka plan akış yöneticisine abone ol (Kullanıcı sayfa değiştirse dahi akış kesilmez)
   React.useEffect(() => {
     const resetStreamState = () => {
@@ -486,6 +515,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     sortDesc,
     setSortBy,
     setSortDesc,
+    toggleSort,
     loadMore,
     hasMore,
     refresh,

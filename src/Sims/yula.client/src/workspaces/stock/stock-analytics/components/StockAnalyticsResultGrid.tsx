@@ -277,6 +277,7 @@ export const StockAnalyticsResultGrid = React.forwardRef<
       className={className}
       resetKey={columns}
       initialColWidths={initialColWidths}
+      disableSorting
       filterRowClassName="bg-muted/10"
       showFilterRow={showFilterRow}
       onToggleFilterRow={onShowFilterRowChange}

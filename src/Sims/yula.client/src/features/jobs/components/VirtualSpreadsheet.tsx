@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"
-import { ListFilter, Table2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, ListFilter, Table2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -121,6 +121,8 @@ export type SpreadsheetColumn = {
   label: string
   align?: "left" | "right"
   kind?: string
+  /** Bu kolon için sıralama tıklaması aktif mi? (varsayılan: true) */
+  sortable?: boolean
 }
 
 export type VirtualSpreadsheetProps<T> = {
@@ -136,6 +138,14 @@ export type VirtualSpreadsheetProps<T> = {
    * sürükledikçe piksel değerine güncellenir.
    */
   initialColWidths?: Record<string, string | number>
+  /** Dışarıdan yönetilen aktif sıralama kolonu. */
+  sortColumn?: string | null
+  /** Dışarıdan yönetilen aktif sıralama yönü ("asc" | "desc" | null). */
+  sortDirection?: "asc" | "desc" | null
+  /** Sıralama değiştiğinde çağrılır (veritabanı / DuckDB SQL ORDER BY için). */
+  onSortChange?: (columnName: string, nextDirection: "asc" | "desc" | null) => void
+  /** Sıralamayı tamamen devre dışı bırakmak için (örn. hiyerarşik ağaç listelerinde). */
+  disableSorting?: boolean
   /** Filtre satırı `<tr>`'sinin ek class'ı. */
   filterRowClassName?: string
   title?: string
@@ -173,6 +183,10 @@ export function VirtualSpreadsheet<T>({
   renderRow,
   rowHeight = ROW_HEIGHT,
   initialColWidths,
+  sortColumn,
+  sortDirection,
+  onSortChange,
+  disableSorting = false,
   filterRowClassName,
   title,
   subtitle,
@@ -189,6 +203,44 @@ export function VirtualSpreadsheet<T>({
   hasMore = false,
   loadingMore = false,
 }: VirtualSpreadsheetProps<T>) {
+  const [internalSort, setInternalSort] = React.useState<{
+    column: string | null
+    direction: "asc" | "desc" | null
+  }>({
+    column: null,
+    direction: null,
+  })
+
+  const activeSortColumn = sortColumn !== undefined ? sortColumn : internalSort.column
+  const activeSortDirection = sortDirection !== undefined ? sortDirection : internalSort.direction
+
+  const handleHeaderClick = React.useCallback(
+    (col: SpreadsheetColumn) => {
+      if (disableSorting || col.sortable === false) return
+
+      let nextDir: "asc" | "desc" | null = "asc"
+      if (activeSortColumn === col.name) {
+        if (activeSortDirection === "asc") {
+          nextDir = "desc"
+        } else if (activeSortDirection === "desc") {
+          nextDir = null
+        } else {
+          nextDir = "asc"
+        }
+      }
+
+      if (onSortChange) {
+        onSortChange(col.name, nextDir)
+      } else {
+        setInternalSort({
+          column: nextDir ? col.name : null,
+          direction: nextDir,
+        })
+      }
+    },
+    [disableSorting, activeSortColumn, activeSortDirection, onSortChange]
+  )
+
   const [colWidths, setColWidths] = React.useState<
     Record<string, string | number>
   >({})
@@ -197,16 +249,6 @@ export function VirtualSpreadsheet<T>({
     startWidth: number
     name: string
     moved?: boolean
-  } | null>(null)
-
-  // Klavye navigasyonu ve hücre odağı (focus ring) durumu
-  const [focusedCell, setFocusedCell] = React.useState<{
-    rowIndex: number
-    colIndex: number
-  } | null>(null)
-  const [copiedCell, setCopiedCell] = React.useState<{
-    rowIndex: number
-    colIndex: number
   } | null>(null)
 
   // resetKey/başlangıç genişlikleri değişince sütun genişliklerini başa al —
@@ -311,17 +353,62 @@ export function VirtualSpreadsheet<T>({
     </colgroup>
   )
 
-  const colOffsets = React.useMemo(() => {
-    let currentLeft = 0
-    return columns.map((col) => {
-      const w = getColWidth(col)
-      const numW = typeof w === "number" ? w : parseFloat(String(w)) || 100
-      const left = currentLeft
-      const right = currentLeft + numW
-      currentLeft += numW
-      return { left, width: numW, right }
+  const renderVirtualRow = React.useCallback(
+    (item: T, rowIndex: number) => {
+      const rendered = renderRow(item, rowIndex)
+      if (
+        React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
+        rendered.type === "tr"
+      ) {
+        const childrenArray = React.Children.toArray(rendered.props.children)
+        return React.cloneElement(
+          rendered,
+          undefined,
+          ...childrenArray,
+          <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
+        )
+      }
+      return rendered
+    },
+    [renderRow]
+  )
+
+  // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
+  const displayItems = React.useMemo(() => {
+    if (onSortChange || disableSorting || !activeSortColumn || !activeSortDirection) {
+      return items
+    }
+    const col = columns.find((c) => c.name === activeSortColumn)
+    const isNum = col?.align === "right"
+    const dir = activeSortDirection === "asc" ? 1 : -1
+
+    return [...items].sort((a, b) => {
+      const aObj = a as Record<string, unknown>
+      const bObj = b as Record<string, unknown>
+      const aVal =
+        aObj?.values && typeof aObj.values === "object"
+          ? (aObj.values as Record<string, unknown>)[activeSortColumn]
+          : aObj?.[activeSortColumn]
+      const bVal =
+        bObj?.values && typeof bObj.values === "object"
+          ? (bObj.values as Record<string, unknown>)[activeSortColumn]
+          : bObj?.[activeSortColumn]
+
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+
+      if (isNum || typeof aVal === "number" || typeof bVal === "number") {
+        const numA = Number(aVal)
+        const numB = Number(bVal)
+        if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+          return (numA - numB) * dir
+        }
+      }
+
+      return String(aVal).localeCompare(String(bVal), "tr", { numeric: true }) * dir
     })
-  }, [columns, getColWidth])
+  }, [items, onSortChange, disableSorting, activeSortColumn, activeSortDirection, columns])
 
   const headerScrollRef = React.useRef<HTMLDivElement>(null)
   const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
@@ -334,241 +421,16 @@ export function VirtualSpreadsheet<T>({
     startIndex,
     endIndex,
     visible: windowRows,
-  } = useVirtualWindow(items, rowHeight)
+  } = useVirtualWindow(displayItems, rowHeight)
 
   const initialSkeletonCount = Math.min(10, Math.max(6, viewportRows ? viewportRows - 4 : 8))
 
   React.useEffect(() => {
     reset()
-    setFocusedCell(null)
     if (headerScrollRef.current) {
       headerScrollRef.current.scrollLeft = 0
     }
-  }, [resetKey, reset])
-
-  const scrollToCell = React.useCallback(
-    (rowIndex: number, colIndex: number) => {
-      const el = scrollRef.current
-      if (!el) return
-
-      // Dikey otomatik kaydırma
-      const targetTop = rowIndex * rowHeight
-      const targetBottom = targetTop + rowHeight
-      const viewTop = el.scrollTop
-      const viewBottom = viewTop + el.clientHeight
-
-      if (targetTop < viewTop) {
-        el.scrollTop = targetTop
-      } else if (targetBottom > viewBottom) {
-        el.scrollTop = targetBottom - el.clientHeight
-      }
-
-      // Yatay otomatik kaydırma
-      const colOffset = colOffsets[colIndex]
-      if (colOffset) {
-        const viewLeft = el.scrollLeft
-        const viewRight = viewLeft + el.clientWidth
-
-        if (colOffset.left < viewLeft) {
-          el.scrollLeft = colOffset.left
-        } else if (colOffset.right > viewRight) {
-          el.scrollLeft = colOffset.right - el.clientWidth
-        }
-      }
-    },
-    [colOffsets, rowHeight, scrollRef]
-  )
-
-  const copyFocusedCellValue = React.useCallback(
-    (rowIndex: number, colIndex: number) => {
-      const col = columns[colIndex]
-      const item = items[rowIndex] as Record<string, unknown> | null | undefined
-      if (!col || !item) return
-
-      const rowValues =
-        item.values && typeof item.values === "object"
-          ? (item.values as Record<string, unknown>)
-          : null
-
-      const nestedRow =
-        item.row && typeof item.row === "object"
-          ? (item.row as Record<string, unknown>)
-          : null
-
-      const rawVal =
-        rowValues?.[col.name] ??
-        nestedRow?.[col.name] ??
-        item[col.name] ??
-        (col.kind === "account" ? (nestedRow?.name as unknown) ?? item.name : undefined)
-
-      const formatted = formatGridCellValue(rawVal, col.align)
-      if (formatted != null && typeof navigator !== "undefined" && navigator.clipboard) {
-        navigator.clipboard.writeText(formatted).catch(() => {})
-        setCopiedCell({ rowIndex, colIndex })
-        setTimeout(() => setCopiedCell(null), 400)
-      }
-    },
-    [columns, items]
-  )
-
-  const handleKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      const target = event.target as HTMLElement
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return
-      }
-
-      if (items.length === 0 || columns.length === 0) return
-
-      // Ctrl+C / Cmd+C: Seçili hücreyi kopyala
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
-        const selection = window.getSelection()
-        if (!selection || selection.isCollapsed) {
-          if (focusedCell) {
-            event.preventDefault()
-            copyFocusedCellValue(focusedCell.rowIndex, focusedCell.colIndex)
-            return
-          }
-        }
-      }
-
-      if (event.key === "Escape") {
-        setFocusedCell(null)
-        return
-      }
-
-      let curRow = focusedCell?.rowIndex ?? 0
-      let curCol = focusedCell?.colIndex ?? 0
-      let handled = false
-
-      switch (event.key) {
-        case "ArrowUp":
-          curRow = Math.max(0, curRow - 1)
-          handled = true
-          break
-        case "ArrowDown":
-          curRow = Math.min(items.length - 1, curRow + 1)
-          handled = true
-          break
-        case "ArrowLeft":
-          curCol = Math.max(0, curCol - 1)
-          handled = true
-          break
-        case "ArrowRight":
-          curCol = Math.min(columns.length - 1, curCol + 1)
-          handled = true
-          break
-        case "Home":
-          if (event.ctrlKey || event.metaKey) {
-            curRow = 0
-          }
-          curCol = 0
-          handled = true
-          break
-        case "End":
-          if (event.ctrlKey || event.metaKey) {
-            curRow = items.length - 1
-          }
-          curCol = columns.length - 1
-          handled = true
-          break
-        case "PageUp":
-          curRow = Math.max(0, curRow - (viewportRows || 15))
-          handled = true
-          break
-        case "PageDown":
-          curRow = Math.min(items.length - 1, curRow + (viewportRows || 15))
-          handled = true
-          break
-        case "Tab":
-          if (event.shiftKey) {
-            if (curCol > 0) {
-              curCol--
-            } else if (curRow > 0) {
-              curRow--
-              curCol = columns.length - 1
-            }
-          } else {
-            if (curCol < columns.length - 1) {
-              curCol++
-            } else if (curRow < items.length - 1) {
-              curRow++
-              curCol = 0
-            }
-          }
-          handled = true
-          break
-        default:
-          break
-      }
-
-      if (handled) {
-        event.preventDefault()
-        setFocusedCell({ rowIndex: curRow, colIndex: curCol })
-        scrollToCell(curRow, curCol)
-      }
-    },
-    [columns.length, copyFocusedCellValue, focusedCell, items.length, scrollToCell, viewportRows]
-  )
-
-  const renderVirtualRow = React.useCallback(
-    (item: T, rowIndex: number) => {
-      const rendered = renderRow(item, rowIndex)
-      if (
-        React.isValidElement<{ className?: string; children?: React.ReactNode }>(rendered) &&
-        rendered.type === "tr"
-      ) {
-        const isRowFocused = focusedCell?.rowIndex === rowIndex
-        const childrenArray = React.Children.toArray(rendered.props.children)
-
-        const cellsWithFocus = childrenArray.map((child, colIdx) => {
-          if (
-            React.isValidElement<{
-              className?: string
-              onClick?: (e: React.MouseEvent) => void
-            }>(child) &&
-            child.type === "td"
-          ) {
-            const isCellFocused = isRowFocused && focusedCell?.colIndex === colIdx
-            const isCellCopied =
-              copiedCell?.rowIndex === rowIndex && copiedCell?.colIndex === colIdx
-
-            return React.cloneElement(child, {
-              className: cn(
-                child.props.className,
-                isCellFocused &&
-                  "relative z-10 outline outline-2 outline-primary -outline-offset-2 bg-primary/15",
-                isCellCopied && "bg-primary/30 transition-colors duration-150"
-              ),
-              onClick: (e: React.MouseEvent) => {
-                child.props.onClick?.(e)
-                setFocusedCell({ rowIndex, colIndex: colIdx })
-              },
-            })
-          }
-          return child
-        })
-
-        return React.cloneElement(
-          rendered,
-          {
-            className: cn(
-              rendered.props.className,
-              isRowFocused && "bg-muted/30"
-            ),
-          },
-          ...cellsWithFocus,
-          <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
-        )
-      }
-      return rendered
-    },
-    [copiedCell, focusedCell, renderRow]
-  )
+  }, [resetKey, reset, activeSortColumn, activeSortDirection])
 
   // Dikey scrollbar genişliğini ölç — başlığın sağ ucunu body scrollbar'ı ile tam hizalar
   React.useEffect(() => {
@@ -582,7 +444,7 @@ export function VirtualSpreadsheet<T>({
     const observer = new ResizeObserver(updateScrollbarWidth)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [scrollRef, items.length, loading])
+  }, [scrollRef, displayItems.length, loading])
 
   const onNeedMoreRef = React.useRef(onNeedMore)
   React.useEffect(() => {
@@ -620,39 +482,28 @@ export function VirtualSpreadsheet<T>({
     [scrollRef]
   )
 
-  const handleCopy = React.useCallback(
-    (event: React.ClipboardEvent) => {
-      const selection = window.getSelection()
-      if (selection && !selection.isCollapsed) {
-        const rawText = selection.toString()
-        if (!rawText) return
-        // Tek hücre / tek satır seçiminde tarayıcının eklediği \t ve \n karakterlerini temizle
-        const lines = rawText.split(/\r?\n/)
-        if (lines.length <= 1) {
-          const clean = rawText.trim()
-          if (clean) {
-            event.clipboardData.setData("text/plain", clean)
-            event.preventDefault()
-          }
-          return
-        }
-        // Çok satırlı kopyalamalarda da satır başı ve sonundaki gereksiz ayrıcıları temizle
-        const cleanLines = lines.map((l) => l.trim()).join("\n").trim()
-        if (cleanLines) {
-          event.clipboardData.setData("text/plain", cleanLines)
-          event.preventDefault()
-        }
-        return
-      }
-
-      // Fareyle metin seçilmemişse ama bir hücre odaklanmışsa doğrudan o hücre değerini kopyala
-      if (focusedCell) {
-        copyFocusedCellValue(focusedCell.rowIndex, focusedCell.colIndex)
+  const handleCopy = React.useCallback((event: React.ClipboardEvent) => {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed) return
+    const rawText = selection.toString()
+    if (!rawText) return
+    // Tek hücre / tek satır seçiminde tarayıcının eklediği \t ve \n karakterlerini temizle
+    const lines = rawText.split(/\r?\n/)
+    if (lines.length <= 1) {
+      const clean = rawText.trim()
+      if (clean) {
+        event.clipboardData.setData("text/plain", clean)
         event.preventDefault()
       }
-    },
-    [copyFocusedCellValue, focusedCell]
-  )
+      return
+    }
+    // Çok satırlı kopyalamalarda da satır başı ve sonundaki gereksiz ayrıcıları temizle
+    const cleanLines = lines.map((l) => l.trim()).join("\n").trim()
+    if (cleanLines) {
+      event.clipboardData.setData("text/plain", cleanLines)
+      event.preventDefault()
+    }
+  }, [])
 
   return (
     <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
@@ -721,19 +572,61 @@ export function VirtualSpreadsheet<T>({
                     <tr>
                       {columns.map((col) => {
                         const w = getColWidth(col)
+                        const isSorted =
+                          activeSortColumn === col.name && activeSortDirection !== null
+                        const isAsc = isSorted && activeSortDirection === "asc"
+                        const isDesc = isSorted && activeSortDirection === "desc"
+                        const canSort = !disableSorting && col.sortable !== false
+
+                        let sortTooltip = col.label
+                        if (canSort) {
+                          if (!isSorted) {
+                            sortTooltip = `${col.label} — Sıralamak için tıkla (Artan)`
+                          } else if (isAsc) {
+                            sortTooltip = `${col.label} — Ters sıralamak için tıkla (Azalan)`
+                          } else {
+                            sortTooltip = `${col.label} — Doğal sıraya dönmek için tıkla`
+                          }
+                        }
+
                         return (
                           <th
                             key={col.name}
                             className={cn(
                               headClass,
-                              "relative overflow-hidden",
+                              "relative overflow-hidden group/th",
+                              canSort &&
+                                "cursor-pointer hover:bg-muted/70 transition-colors select-none",
                               col.align === "left" ? "text-left" : "text-right"
                             )}
                             style={{ width: typeof w === "number" ? `${w}px` : w }}
-                            title={col.label}
+                            title={sortTooltip}
+                            onClick={() => handleHeaderClick(col)}
                           >
-                            <div className="flex h-full w-full items-center min-w-0 pr-2">
+                            <div
+                              className={cn(
+                                "flex h-full w-full items-center min-w-0 pr-2",
+                                col.align === "right" && "justify-end"
+                              )}
+                            >
                               <span className="truncate">{col.label}</span>
+                              {canSort ? (
+                                <span className="ml-1 inline-flex shrink-0 items-center justify-center">
+                                  {isAsc ? (
+                                    <ArrowUp
+                                      className="size-3 text-primary stroke-[2.5]"
+                                      aria-label="Artan sırada"
+                                    />
+                                  ) : isDesc ? (
+                                    <ArrowDown
+                                      className="size-3 text-primary stroke-[2.5]"
+                                      aria-label="Azalan sırada"
+                                    />
+                                  ) : (
+                                    <ArrowUpDown className="size-3 text-muted-foreground/40 opacity-0 transition-opacity group-hover/th:opacity-100" />
+                                  )}
+                                </span>
+                              ) : null}
                             </div>
                             <span
                               role="separator"
@@ -782,11 +675,9 @@ export function VirtualSpreadsheet<T>({
 
           {/* Gövde Veri Satırları Alanı (Dikey scrollbar tam buradan başlar) */}
           <div
-            className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
+            className="min-h-0 flex-1 overflow-auto"
             ref={scrollRef}
             onScroll={handleScroll}
-            onKeyDown={handleKeyDown}
-            tabIndex={0}
           >
             <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
               <table
@@ -795,7 +686,7 @@ export function VirtualSpreadsheet<T>({
               >
                 {colGroup}
                 <tbody>
-                {items.length === 0 && loading ? (
+                {displayItems.length === 0 && loading ? (
                   Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
                     <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
                       {columns.map((col) => (
@@ -824,7 +715,7 @@ export function VirtualSpreadsheet<T>({
                       <td className={cn(cellClass, "p-0")} aria-hidden />
                     </tr>
                   ))
-                ) : items.length === 0 ? (
+                ) : displayItems.length === 0 ? (
                   <tr>
                     <td
                       colSpan={columns.length + 1}
@@ -877,11 +768,11 @@ export function VirtualSpreadsheet<T>({
                           </tr>
                         ))
                       : null}
-                    {endIndex < items.length ? (
+                    {endIndex < displayItems.length ? (
                       <tr
                         aria-hidden
                         className="p-0"
-                        style={{ height: (items.length - endIndex) * rowHeight }}
+                        style={{ height: (displayItems.length - endIndex) * rowHeight }}
                       >
                         <td colSpan={columns.length + 1} className="p-0 border-0" />
                       </tr>

@@ -104,6 +104,9 @@ export function ArrowReportGrid({
     isFromCache,
     isLoadingQuery,
     refresh,
+    sortBy,
+    sortDesc,
+    toggleSort,
   } = useDuckReport({
     jobId,
     jobUrl,
@@ -413,6 +416,9 @@ export function ArrowReportGrid({
       onNeedMore={loadMore}
       hasMore={hasMore}
       loadingMore={isLoadingQuery}
+      sortColumn={sortBy}
+      sortDirection={sortBy ? (sortDesc ? "desc" : "asc") : null}
+      onSortChange={(colName) => toggleSort(colName)}
       renderFilterCell={(col, index) => {
         const val = filters[col.name] ?? ""
         return (
