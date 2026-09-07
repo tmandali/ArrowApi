@@ -129,7 +129,7 @@ export function ReportCriteriaShell({
   // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
   const { open: searchOpen } = useWorkspaceSearch()
   const handleListError = React.useCallback((message: string | null) => {
-    setListErrorBanner(message)
+    setListErrorBanner((prev) => (prev !== message ? message : prev))
   }, [])
   const [submittingCriteria, setSubmittingCriteria] = React.useState(false)
 

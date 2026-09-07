@@ -51,6 +51,10 @@ export interface ColumnValuesDigestInput {
   /** Bilinen toplam satır sayısı; null/unknown ise digest üretilmez (maliyet guard'ı). */
   rowCount?: number | null;
   signal?: AbortSignal;
+  client?: {
+    checkTableExists: (tableName: string) => Promise<{ exists: boolean }>;
+    executeCustomSql: (query: string) => Promise<Record<string, unknown>[]>;
+  };
 }
 
 /**
@@ -60,48 +64,57 @@ export interface ColumnValuesDigestInput {
 export async function computeColumnValuesDigest(
   input: ColumnValuesDigestInput,
 ): Promise<Record<string, string[]> | null> {
-  if (
-    input.signal?.aborted ||
-    input.rowCount == null ||
-    input.rowCount > COLUMN_VALUES_MAX_TABLE_ROWS
-  ) {
+  try {
+    if (
+      input.signal?.aborted ||
+      input.rowCount == null ||
+      input.rowCount > COLUMN_VALUES_MAX_TABLE_ROWS
+    ) {
+      return null;
+    }
+    const candidates = input.columns
+      .filter((c) => isLowCardinalityCandidate(input.columnTypes?.[c]))
+      .slice(0, COLUMN_VALUES_MAX_COLUMNS);
+    if (candidates.length === 0) return null;
+
+    let duckDb = input.client;
+    if (!duckDb) {
+      const mod = await import("@/services/duckdb").catch(() => null);
+      duckDb = mod?.duckDbClient;
+    }
+    if (!duckDb) return null;
+
+    if (input.signal?.aborted) return null;
+    const tableCheck = await duckDb.checkTableExists(input.tableName).catch(() => ({ exists: false }));
+    if (!tableCheck.exists || input.signal?.aborted) return null;
+
+    const out: Record<string, string[]> = {};
+    for (const col of candidates) {
+      if (input.signal?.aborted) return null;
+      try {
+        const rows = await duckDb.executeCustomSql(
+          buildColumnValuesQuery(
+            input.tableName,
+            col,
+            COLUMN_VALUES_PER_COLUMN + 1,
+          ),
+        );
+        if (input.signal?.aborted) return null;
+        if (rows.length === 0) continue;
+        const values = rows
+          .slice(0, COLUMN_VALUES_PER_COLUMN)
+          .map((r) => {
+            const v = (r as Record<string, unknown>).value;
+            return v === null || v === undefined || v === "" ? "(boş)" : String(v);
+          });
+        if (rows.length > COLUMN_VALUES_PER_COLUMN) values.push("…");
+        out[col] = values;
+      } catch {
+        // Tek kolonun sorgusu patlarsa veya iptal edilirse digest'i bozma
+      }
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  } catch {
     return null;
   }
-  const candidates = input.columns
-    .filter((c) => isLowCardinalityCandidate(input.columnTypes?.[c]))
-    .slice(0, COLUMN_VALUES_MAX_COLUMNS);
-  if (candidates.length === 0) return null;
-
-  const { duckDbClient } = await import("@/services/duckdb");
-
-  if (input.signal?.aborted) return null;
-  const tableCheck = await duckDbClient.checkTableExists(input.tableName).catch(() => ({ exists: false }));
-  if (!tableCheck.exists || input.signal?.aborted) return null;
-
-  const out: Record<string, string[]> = {};
-  for (const col of candidates) {
-    if (input.signal?.aborted) return null;
-    try {
-      const rows = await duckDbClient.executeCustomSql(
-        buildColumnValuesQuery(
-          input.tableName,
-          col,
-          COLUMN_VALUES_PER_COLUMN + 1,
-        ),
-      );
-      if (input.signal?.aborted) return null;
-      if (rows.length === 0) continue;
-      const values = rows
-        .slice(0, COLUMN_VALUES_PER_COLUMN)
-        .map((r) => {
-          const v = (r as Record<string, unknown>).value;
-          return v === null || v === undefined || v === "" ? "(boş)" : String(v);
-        });
-      if (rows.length > COLUMN_VALUES_PER_COLUMN) values.push("…");
-      out[col] = values;
-    } catch {
-      // Tek kolonun sorgusu patlarsa veya iptal edilirse digest'i bozma
-    }
-  }
-  return Object.keys(out).length > 0 ? out : null;
 }

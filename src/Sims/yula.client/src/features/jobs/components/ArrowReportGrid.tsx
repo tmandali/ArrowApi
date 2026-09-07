@@ -216,14 +216,19 @@ export function ArrowReportGrid({
     columnValuesDoneRef.current = key
     const abortCtrl = new AbortController()
     void (async () => {
-      const digest = await computeColumnValuesDigest({
-        tableName: duckTableName,
-        columns: effectiveColumns.map((c) => c.name),
-        columnTypes,
-        rowCount: totalRows,
-        signal: abortCtrl.signal,
-      })
-      if (!abortCtrl.signal.aborted) setColumnValuesDigest(digest ?? undefined)
+      try {
+        const digest = await computeColumnValuesDigest({
+          tableName: duckTableName,
+          columns: effectiveColumns.map((c) => c.name),
+          columnTypes,
+          rowCount: totalRows,
+          signal: abortCtrl.signal,
+          client: duckDbClient,
+        })
+        if (!abortCtrl.signal.aborted) setColumnValuesDigest(digest ?? undefined)
+      } catch {
+        // Digest is optional metadata, never crash the report grid
+      }
     })()
     return () => {
       abortCtrl.abort()

@@ -331,10 +331,18 @@ export function ArrowJobExecutionsPanel({
   const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
   const [refreshing, setRefreshing] = React.useState(false)
 
+  const onListLoadedRef = React.useRef(onListLoaded)
+  onListLoadedRef.current = onListLoaded
+
+  const onListErrorRef = React.useRef(onListError)
+  onListErrorRef.current = onListError
+
   const loadList = React.useCallback(
     async (signal?: AbortSignal, options?: { silent?: boolean }) => {
-      if (!options?.silent) setLoading(true)
-      setError(null)
+      if (!options?.silent) {
+        setLoading(true)
+        setError(null)
+      }
       try {
         const page = await listArrowJobs(jobsEndpoint, {
           take: 50,
@@ -342,7 +350,8 @@ export function ArrowJobExecutionsPanel({
         })
         setItems(page.items ?? [])
         setTotal(page.total ?? 0)
-        onListLoaded?.(page.total ?? (page.items?.length ?? 0))
+        setError(null)
+        onListLoadedRef.current?.(page.total ?? (page.items?.length ?? 0))
       } catch (err) {
         if (signal?.aborted) return
         setError(
@@ -356,7 +365,7 @@ export function ArrowJobExecutionsPanel({
         if (!signal?.aborted && !options?.silent) setLoading(false)
       }
     },
-    [jobsEndpoint, onListLoaded]
+    [jobsEndpoint]
   )
 
   const handleRefresh = React.useCallback(async () => {
@@ -372,8 +381,8 @@ export function ArrowJobExecutionsPanel({
   }, [loadList])
 
   React.useEffect(() => {
-    onListError?.(error)
-  }, [error, onListError])
+    onListErrorRef.current?.(error)
+  }, [error])
 
   React.useEffect(() => {
     const abort = new AbortController()
@@ -786,8 +795,8 @@ export function ArrowJobExecutionsPanel({
 
   React.useEffect(() => {
     if (loading) return
-    onListLoaded?.(error ? 0 : displayItems.length)
-  }, [loading, error, displayItems.length, onListLoaded])
+    onListLoadedRef.current?.(error ? 0 : displayItems.length)
+  }, [loading, error, displayItems.length])
 
   /** Detail column header actions — shared by the classic Detail view and
    *  the embedded result view so Delete stays available in both. */

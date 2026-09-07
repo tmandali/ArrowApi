@@ -53,6 +53,17 @@ export function RetailSalesForm() {
     [setComposing, handleSelectJob]
   )
 
+  const handleExitCompose = React.useCallback(() => {
+    setComposing(false)
+  }, [setComposing])
+
+  const handleListLoaded = React.useCallback(
+    (count: number) => {
+      if (count === 0) setComposing(true)
+    },
+    [setComposing]
+  )
+
   /** Aktif job in-flight iken kriter gridi + Run/Clear kilitlenir. */
   const criteriaLocked = Boolean(activeJobId) && activeRunPhase === "running"
 
@@ -93,15 +104,13 @@ export function RetailSalesForm() {
             criteriaLocked,
             pendingJobs,
             listRefreshToken,
-            onExitCompose: () => setComposing(false),
+            onExitCompose: handleExitCompose,
             onJobSelect: handleJobSelect,
             onJobCancelled: handleJobCancelled,
             onOpenJob: handleNavigateToJob,
             openJobHref: jobHref,
             onJobDeleted: handleJobDeleted,
-            onListLoaded: (count) => {
-              if (count === 0) setComposing(true)
-            },
+            onListLoaded: handleListLoaded,
             onListError,
           }}
           onRun={onRun}
