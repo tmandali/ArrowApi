@@ -40,6 +40,8 @@ export interface GridPersistedState {
   pinned?: string[]
   aggregations?: ColumnAggregationConfig
   showFooter?: boolean
+  sortBy?: string | null
+  sortDesc?: boolean
 }
 
 export interface AiSqlView {
@@ -166,4 +168,6 @@ export type VirtualSpreadsheetProps<T> = {
   onRenameAiView?: (viewId: string, nextTitle: string) => void
   /** AI görünümü silindiğinde çağrılır */
   onDeleteAiView?: (viewId: string) => void
+  /** Sıralama ayarı (kolon ve yön) localStorage'dan yüklendiğinde çağrılır */
+  onSortSettingChange?: (sortBy: string | null, sortDesc: boolean) => void
 }

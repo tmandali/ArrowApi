@@ -100,6 +100,7 @@ export function VirtualSpreadsheet<T>({
   onSaveCurrentAiView,
   onRenameAiView,
   onDeleteAiView,
+  onSortSettingChange,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -610,6 +611,12 @@ export function VirtualSpreadsheet<T>({
               setInternalAggregationConfigs(parsed.aggregations)
             }
           }
+          if (parsed.sortBy !== undefined) {
+            const colExists = !parsed.sortBy || columns.some((c) => c.name === parsed.sortBy)
+            if (colExists && onSortSettingChange) {
+              onSortSettingChange(parsed.sortBy, Boolean(parsed.sortDesc))
+            }
+          }
         }
       }
     } catch {
@@ -617,7 +624,7 @@ export function VirtualSpreadsheet<T>({
     } finally {
       isStorageLoadedRef.current = true
     }
-  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange, onAggregationConfigsChange])
+  }, [effectiveStorageKey, columns, onColumnOrderChange, onHiddenColumnsChange, onPinnedColumnsChange, onAggregationConfigsChange, onSortSettingChange])
 
   // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
   React.useEffect(() => {
@@ -636,8 +643,9 @@ export function VirtualSpreadsheet<T>({
         activePinnedColumns.some((col, idx) => col !== defaultPinnedColumns[idx])
       const hasPinned = isPinnedModified
       const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
+      const hasSort = Boolean(sortColumn)
 
-      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations) {
+      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations && !hasSort) {
         try {
           localStorage.removeItem(effectiveStorageKey)
         } catch {}
@@ -651,6 +659,8 @@ export function VirtualSpreadsheet<T>({
           hidden: hasHidden ? activeHiddenColumns : undefined,
           pinned: hasPinned ? activePinnedColumns : undefined,
           aggregations: hasAggregations ? activeAggregationConfigs : undefined,
+          sortBy: hasSort ? sortColumn : undefined,
+          sortDesc: hasSort ? (sortDirection === "desc") : undefined,
         }
         localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
       } catch {
@@ -669,6 +679,8 @@ export function VirtualSpreadsheet<T>({
     internalPinnedColumns,
     defaultPinnedColumns,
     activeAggregationConfigs,
+    sortColumn,
+    sortDirection,
   ])
 
   const getColWidth = React.useCallback(
@@ -696,13 +708,16 @@ export function VirtualSpreadsheet<T>({
     } else {
       setInternalPinnedColumns(null)
     }
+    if (onSortSettingChange) {
+      onSortSettingChange(null, false)
+    }
     setColWidths(initialColWidths ?? {})
     if (effectiveStorageKey && typeof window !== "undefined") {
       try {
         localStorage.removeItem(effectiveStorageKey)
       } catch {}
     }
-  }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
+  }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, onSortSettingChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
 
   const canResetColumns = React.useMemo(() => {
     const isPinnedModified =
@@ -716,12 +731,14 @@ export function VirtualSpreadsheet<T>({
       )) ||
       (activePinnedColumns.length !== defaultPinnedColumns.length ||
         activePinnedColumns.some((c, i) => c !== defaultPinnedColumns[i]))
+    const hasSort = Boolean(sortColumn)
 
     return (
       hiddenColumnsCount > 0 ||
       Boolean(activeColumnOrder && activeColumnOrder.length > 0) ||
       Object.keys(colWidths).length > 0 ||
-      isPinnedModified
+      isPinnedModified ||
+      hasSort
     )
   }, [
     hiddenColumnsCount,
@@ -731,6 +748,7 @@ export function VirtualSpreadsheet<T>({
     internalPinnedColumns,
     activePinnedColumns,
     defaultPinnedColumns,
+    sortColumn,
   ])
 
   const totalTableWidth = React.useMemo(() => {

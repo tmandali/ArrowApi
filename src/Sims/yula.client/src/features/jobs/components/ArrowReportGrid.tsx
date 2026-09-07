@@ -988,6 +988,7 @@ export function ArrowReportGrid({
       sortColumn={sortBy}
       sortDirection={sortBy ? (sortDesc ? "desc" : "asc") : null}
       onSortChange={(colName) => toggleSort(colName)}
+      onSortSettingChange={(colName, desc) => setSorting(colName, desc)}
       renderFilterCell={(col, index) => {
         const val = filters[col.name] ?? ""
         return (
