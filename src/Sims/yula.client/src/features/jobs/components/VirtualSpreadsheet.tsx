@@ -22,12 +22,6 @@ import {
 import { cn } from "@/utils/cn"
 
 export type { SpreadsheetColumn, VirtualSpreadsheetProps } from "./virtual-spreadsheet"
-export {
-  ROW_HEIGHT,
-  cellInputClass,
-  cellClass,
-  headClass,
-} from "./virtual-spreadsheet"
 
 import {
   ROW_HEIGHT,

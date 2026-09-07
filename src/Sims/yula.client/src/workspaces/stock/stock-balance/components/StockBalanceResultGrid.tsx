@@ -9,11 +9,11 @@ import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 import { formatGridCellValue } from "@/utils/format-cell"
 import { matchCellFilter } from "@/utils/filter-matcher"
+import { VirtualSpreadsheet } from "@/features/jobs/components/VirtualSpreadsheet"
 import {
-  VirtualSpreadsheet,
   cellInputClass,
   cellClass,
-} from "@/features/jobs/components/VirtualSpreadsheet"
+} from "@/features/jobs/components/virtual-spreadsheet"
 import type {
   StockBalanceColumn,
   StockBalanceGridRow,

@@ -13,12 +13,12 @@ import { deriveColumnKind } from "../lib/column-type-utils"
 import { computeColumnValuesDigest } from "@/lib/grid-column-values"
 import { resetGridCustomView } from "@/lib/yula-client-tools"
 import { formatGridCellValue, formatColumnLabel } from "@/utils/format-cell"
+import { VirtualSpreadsheet } from "./VirtualSpreadsheet"
 import {
-  VirtualSpreadsheet,
   cellInputClass,
   cellClass,
   type SpreadsheetColumn,
-} from "./VirtualSpreadsheet"
+} from "./virtual-spreadsheet"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 

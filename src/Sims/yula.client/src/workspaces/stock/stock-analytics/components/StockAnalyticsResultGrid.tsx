@@ -13,11 +13,11 @@ import { WORKSPACE_SIDE_PANEL_PERCENT } from "@/components/layout/workspace-side
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
 import { matchCellFilter } from "@/utils/filter-matcher"
+import { VirtualSpreadsheet } from "@/features/jobs/components/VirtualSpreadsheet"
 import {
-  VirtualSpreadsheet,
   cellInputClass,
   cellClass,
-} from "@/features/jobs/components/VirtualSpreadsheet"
+} from "@/features/jobs/components/virtual-spreadsheet"
 import type { ReportColumn, ReportGridRow } from "@/features/jobs"
 
 /** Match the header action buttons (h-7, text-xs, no shadow) in the grid header. */

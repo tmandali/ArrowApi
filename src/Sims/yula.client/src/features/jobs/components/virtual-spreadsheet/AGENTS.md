@@ -62,11 +62,11 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 ### Kural 5: Görünürlük Sınırı (Minimum 1 Kolon Kuralı)
 - Kullanıcı tüm kolonları gizleyemez. Tabloda kalan son görünür kolonun checkbox'ı `disabled` duruma getirilir ve gizleme eylemi engellenir.
 
-### Kural 6: Public API & Geriye Dönük Uyumluluk
-- `VirtualSpreadsheet.tsx` dosyası, mevcut tüketicilerin (`ArrowReportGrid`, `StockBalanceResultGrid`, `StockAnalyticsResultGrid`, `RetailSalesResultGrid` vb.) bozulmaması için aşağıdaki sembolleri doğrudan dışa aktarmaya devam etmelidir:
+### Kural 6: Public API & React Fast Refresh Standartı
+- `VirtualSpreadsheet.tsx` dosyası, React Fast Refresh standardına tam uyum için sadece bileşeni ve tipleri dışa aktarır (`react(only-export-components)` kuralı):
   - `export function VirtualSpreadsheet<T>`
   - `export type { SpreadsheetColumn, VirtualSpreadsheetProps }`
-  - `export { ROW_HEIGHT, cellInputClass, cellClass, headClass }`
+- Stil ve sayısal sabitler (`ROW_HEIGHT`, `cellClass`, `cellInputClass`, `headClass`, `SKELETON_ROWS`, `MIN_COL_WIDTH`) ise doğrudan `./virtual-spreadsheet` modülünden import edilir.
 
 ---
 
