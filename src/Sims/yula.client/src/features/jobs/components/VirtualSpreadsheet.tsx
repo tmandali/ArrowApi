@@ -589,7 +589,10 @@ export function VirtualSpreadsheet<T>({
               }
             }
           }
-          const rawPinned = parsed.pinned || (parsed as { pinnedColumns?: string[] }).pinnedColumns
+          const rawPinned =
+            parsed.pinned !== undefined
+              ? parsed.pinned
+              : (parsed as { pinnedColumns?: string[] }).pinnedColumns
           if (Array.isArray(rawPinned)) {
             const valid = rawPinned.filter((name) =>
               columns.some((c) => c.name === name)
@@ -626,7 +629,12 @@ export function VirtualSpreadsheet<T>({
       const hasWidths = Object.keys(colWidths).length > 0
       const hasOrder = Boolean(activeColumnOrder && activeColumnOrder.length > 0)
       const hasHidden = activeHiddenColumns.length > 0
-      const hasPinned = internalPinnedColumns !== null
+      const isPinnedModified =
+        pinnedColumns !== undefined ||
+        internalPinnedColumns !== null ||
+        activePinnedColumns.length !== defaultPinnedColumns.length ||
+        activePinnedColumns.some((col, idx) => col !== defaultPinnedColumns[idx])
+      const hasPinned = isPinnedModified
       const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
 
       if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations) {
@@ -641,7 +649,7 @@ export function VirtualSpreadsheet<T>({
           widths: hasWidths ? colWidths : undefined,
           order: hasOrder ? (activeColumnOrder ?? undefined) : undefined,
           hidden: hasHidden ? activeHiddenColumns : undefined,
-          pinned: hasPinned ? (activePinnedColumns ?? undefined) : undefined,
+          pinned: hasPinned ? activePinnedColumns : undefined,
           aggregations: hasAggregations ? activeAggregationConfigs : undefined,
         }
         localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
@@ -651,7 +659,17 @@ export function VirtualSpreadsheet<T>({
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [effectiveStorageKey, colWidths, activeColumnOrder, activeHiddenColumns, activePinnedColumns, internalPinnedColumns, activeAggregationConfigs])
+  }, [
+    effectiveStorageKey,
+    colWidths,
+    activeColumnOrder,
+    activeHiddenColumns,
+    activePinnedColumns,
+    pinnedColumns,
+    internalPinnedColumns,
+    defaultPinnedColumns,
+    activeAggregationConfigs,
+  ])
 
   const getColWidth = React.useCallback(
     (col: SpreadsheetColumn): number | string => {
@@ -687,13 +705,33 @@ export function VirtualSpreadsheet<T>({
   }, [onHiddenColumnsChange, onColumnOrderChange, onPinnedColumnsChange, defaultPinnedColumns, initialColWidths, effectiveStorageKey])
 
   const canResetColumns = React.useMemo(() => {
+    const isPinnedModified =
+      (pinnedColumns !== undefined && (
+        pinnedColumns.length !== defaultPinnedColumns.length ||
+        pinnedColumns.some((c, i) => c !== defaultPinnedColumns[i])
+      )) ||
+      (internalPinnedColumns !== null && (
+        internalPinnedColumns.length !== defaultPinnedColumns.length ||
+        internalPinnedColumns.some((c, i) => c !== defaultPinnedColumns[i])
+      )) ||
+      (activePinnedColumns.length !== defaultPinnedColumns.length ||
+        activePinnedColumns.some((c, i) => c !== defaultPinnedColumns[i]))
+
     return (
       hiddenColumnsCount > 0 ||
       Boolean(activeColumnOrder && activeColumnOrder.length > 0) ||
       Object.keys(colWidths).length > 0 ||
-      internalPinnedColumns !== null
+      isPinnedModified
     )
-  }, [hiddenColumnsCount, activeColumnOrder, colWidths, internalPinnedColumns])
+  }, [
+    hiddenColumnsCount,
+    activeColumnOrder,
+    colWidths,
+    pinnedColumns,
+    internalPinnedColumns,
+    activePinnedColumns,
+    defaultPinnedColumns,
+  ])
 
   const totalTableWidth = React.useMemo(() => {
     return visibleColumns.reduce((sum, col) => {
