@@ -71,30 +71,33 @@ export function TableFooterSummaryRow({
                   <button
                     type="button"
                     className={cn(
-                      "group flex h-full w-full items-center justify-between gap-1 text-[11px] font-medium leading-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
-                      isNumeric ? "flex-row-reverse text-right" : "text-left"
+                      "group flex h-full w-full items-center gap-1 text-[11px] font-medium leading-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
+                      isNumeric ? "flex-row-reverse text-right justify-between" : "text-left justify-between",
+                      currentType === "none" && (isNumeric ? "justify-end" : "justify-start")
                     )}
                     title={
-                      agg && currentType !== "none"
+                      currentType !== "none"
                         ? `${col.label} (${AGGREGATION_LABELS[currentType]})`
-                        : col.label
+                        : `${col.label} (+)`
                     }
                   >
-                    {agg && currentType !== "none" ? (
-                      <span className="truncate tabular-nums text-foreground/90 font-semibold">
-                        {agg.label ? (
-                          <span className="text-muted-foreground/80 font-normal mr-1 text-[11px] select-none">
-                            {agg.label}
-                          </span>
-                        ) : null}
-                        {agg.formatted}
-                      </span>
+                    {currentType !== "none" ? (
+                      <>
+                        <span className="truncate tabular-nums text-foreground/90 font-semibold">
+                          {agg?.label ? (
+                            <span className="text-muted-foreground/80 font-normal mr-1 text-[11px] select-none">
+                              {agg.label}
+                            </span>
+                          ) : null}
+                          {agg ? agg.formatted : "..."}
+                        </span>
+                        <ChevronDown className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-muted-foreground" />
+                      </>
                     ) : (
-                      <span className="text-muted-foreground/40 text-[10px] group-hover:text-muted-foreground transition-colors">
+                      <span className="text-muted-foreground/30 text-xs group-hover:text-muted-foreground transition-colors select-none px-1">
                         +
                       </span>
                     )}
-                    <ChevronDown className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align={isNumeric ? "end" : "start"} className="w-48 text-xs">
