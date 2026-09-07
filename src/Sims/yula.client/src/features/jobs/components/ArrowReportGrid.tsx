@@ -139,6 +139,7 @@ export function ArrowReportGrid({
     isPartial,
     isFromCache,
     isLoadingQuery,
+    isLoadingMore,
     refresh,
     sortBy,
     sortDesc,
@@ -588,25 +589,17 @@ export function ArrowReportGrid({
 
   const countDisplay =
     hasActiveFilters && totalRows > 0 ? (
-      <span className="inline-flex items-center gap-1.5 tabular-nums">
-        {isLoadingQuery ? (
-          <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
-        ) : null}
-        <span>
-          {formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
-        </span>
+      <span className="tabular-nums">
+        {formatCount(totalFiltered)} / {formatCount(totalRows)} (filtered)
       </span>
     ) : totalRows > 0 ? (
-      <span className="inline-flex items-center gap-1.5 tabular-nums">
-        {isLoadingQuery ? (
-          <Spinner className="size-3 text-muted-foreground animate-spin" aria-hidden />
-        ) : null}
-        <span>
-          {formatCount(totalRows)} row{totalRows === 1 ? "" : "s"}
-        </span>
+      <span className="tabular-nums">
+        {formatCount(totalRows)} row{totalRows === 1 ? "" : "s"}
       </span>
     ) : (
-      `${formatCount(displayRows.length)} row${displayRows.length === 1 ? "" : "s"}`
+      <span className="tabular-nums">
+        {formatCount(displayRows.length)} row{displayRows.length === 1 ? "" : "s"}
+      </span>
     )
 
   const streamingSubtitle = isSavingDisk ? (
@@ -880,7 +873,7 @@ export function ArrowReportGrid({
       title={title}
       subtitle={subtitle}
       className={className}
-      loading={isStreaming || isSavingDisk || isLoadingQuery || (effectiveColumns.length === 0 && Boolean(jobId))}
+      loading={isStreaming || isSavingDisk || (isLoadingQuery && displayRows.length === 0) || (effectiveColumns.length === 0 && Boolean(jobId))}
       emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
       progressValue={progressPercent}
       resetKey={`${jobId}:${customQuerySql ?? ""}:${filterKey}`}
@@ -991,7 +984,7 @@ export function ArrowReportGrid({
       aggregationValues={duckDbAggregations}
       onNeedMore={loadMore}
       hasMore={hasMore}
-      loadingMore={isLoadingQuery}
+      loadingMore={isLoadingMore}
       sortColumn={sortBy}
       sortDirection={sortBy ? (sortDesc ? "desc" : "asc") : null}
       onSortChange={(colName) => toggleSort(colName)}

@@ -51,6 +51,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [isFromCache, setIsFromCache] = React.useState(false)
   const [isPartial, setIsPartial] = React.useState(false)
   const [isLoadingQuery, setIsLoadingQuery] = React.useState(false)
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false)
   const [sortBy, setSortBy] = React.useState<string | null>(null)
   const [sortDesc, setSortDesc] = React.useState<boolean>(false)
   const [page, setPage] = React.useState(0)
@@ -139,7 +140,11 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         setSortDesc(false)
       }
 
-      setIsLoadingQuery(true)
+      if (activePage === 0) {
+        setIsLoadingQuery(true)
+      } else {
+        setIsLoadingMore(true)
+      }
       try {
         const result = await duckDbClient.queryReportRows({
           tableName,
@@ -200,7 +205,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           console.error("Query error:", err)
         }
       } finally {
-        if (seq === querySeqRef.current) setIsLoadingQuery(false)
+        if (seq === querySeqRef.current) {
+          if (activePage === 0) {
+            setIsLoadingQuery(false)
+          } else {
+            setIsLoadingMore(false)
+          }
+        }
       }
     },
     [tableName, numericColumns, pageSize, columns]
@@ -588,14 +599,14 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const loadingMoreRef = React.useRef(false)
 
   const loadMore = React.useCallback(() => {
-    if (isLoadingQuery || !hasMore || loadingMoreRef.current) return
+    if (isLoadingQuery || isLoadingMore || !hasMore || loadingMoreRef.current) return
     loadingMoreRef.current = true
     const nextPage = page + 1
     setPage(nextPage)
     void executeQuery(filters, sortBy, sortDesc, nextPage).finally(() => {
       loadingMoreRef.current = false
     })
-  }, [isLoadingQuery, hasMore, page, filters, sortBy, sortDesc, executeQuery])
+  }, [isLoadingQuery, isLoadingMore, hasMore, page, filters, sortBy, sortDesc, executeQuery])
 
   return {
     columns,
@@ -612,6 +623,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     isFromCache,
     isPartial,
     isLoadingQuery,
+    isLoadingMore,
     sortBy,
     sortDesc,
     setSortBy,
