@@ -12,6 +12,7 @@ import {
   Sparkles,
   Table2,
   Trash2,
+  X,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -78,8 +79,8 @@ export function AiViewDropdown({
   const [isSavingCurrent, setIsSavingCurrent] = React.useState(false)
   const [saveTitleInput, setSaveTitleInput] = React.useState("")
 
-  // Yeniden adlandırma diyalog state'i
-  const [renamingView, setRenamingView] = React.useState<AiSqlView | null>(null)
+  // Satır içi (inline) yeniden adlandırma state'i
+  const [editingViewId, setEditingViewId] = React.useState<string | null>(null)
   const [renameInput, setRenameInput] = React.useState("")
 
   // SQL inceleme diyalog state'i
@@ -100,18 +101,22 @@ export function AiViewDropdown({
     setIsSavingCurrent(false)
   }
 
-  const handleOpenRename = (view: AiSqlView, e: React.MouseEvent) => {
+  const handleStartRename = (view: AiSqlView, e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
-    setRenamingView(view)
+    setEditingViewId(view.id)
     setRenameInput(view.title)
   }
 
-  const handleConfirmRename = () => {
-    if (renamingView && renameInput.trim()) {
-      onRenameAiView?.(renamingView.id, renameInput.trim())
+  const handleConfirmRename = (viewId: string) => {
+    if (renameInput.trim()) {
+      onRenameAiView?.(viewId, renameInput.trim())
     }
-    setRenamingView(null)
+    setEditingViewId(null)
+  }
+
+  const handleCancelRename = () => {
+    setEditingViewId(null)
   }
 
   const handleOpenInspectSql = (title: string, sql: string, e: React.MouseEvent) => {
@@ -242,6 +247,70 @@ export function AiViewDropdown({
             {/* Görünümler Listesi */}
             {aiViews.map((view) => {
               const isSelected = isCurrentQueryActive && savedMatch?.id === view.id
+              const isEditing = editingViewId === view.id
+
+              if (isEditing) {
+                return (
+                  <div
+                    key={view.id}
+                    className="flex items-center gap-1.5 py-1 px-2 w-full bg-muted/70 rounded-md my-0.5 border border-primary/40"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                    }}
+                  >
+                    <Sparkles className="size-3 text-amber-700 shrink-0 dark:text-amber-400" />
+                    <input
+                      type="text"
+                      value={renameInput}
+                      onChange={(e) => setRenameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleConfirmRename(view.id)
+                        } else if (e.key === "Escape") {
+                          e.preventDefault()
+                          handleCancelRename()
+                        }
+                      }}
+                      autoFocus
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="h-6 flex-1 min-w-0 px-1.5 text-xs bg-background border border-border/80 rounded outline-none focus:border-primary text-foreground"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handleConfirmRename(view.id)
+                      }}
+                      className="p-1 rounded text-primary hover:bg-primary/10 transition-colors"
+                      title="Kaydet (Enter)"
+                      aria-label="Kaydet"
+                    >
+                      <Check className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handleCancelRename()
+                      }}
+                      className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
+                      title="İptal (Esc)"
+                      aria-label="İptal"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                )
+              }
+
               return (
                 <DropdownMenuItem
                   key={view.id}
@@ -269,7 +338,7 @@ export function AiViewDropdown({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => handleOpenRename(view, e)}
+                      onClick={(e) => handleStartRename(view, e)}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Yeniden Adlandır"
                       aria-label="Yeniden Adlandır"
@@ -344,55 +413,6 @@ export function AiViewDropdown({
         </DialogContent>
       </Dialog>
 
-      {/* Yeniden Adlandırma Diyaloğu */}
-      <Dialog open={Boolean(renamingView)} onOpenChange={(open) => !open && setRenamingView(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-              <Pencil className="size-4 text-primary" />
-              Görünümü Yeniden Adlandır
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Bu AI analitik görünümüne kolay hatırlayabileceğiniz yeni bir ad verin.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={renameInput}
-              onChange={(e) => setRenameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleConfirmRename()
-                }
-              }}
-              placeholder="Görünüm adı..."
-              className="text-xs"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setRenamingView(null)}
-              className="text-xs"
-            >
-              İptal
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConfirmRename}
-              disabled={!renameInput.trim()}
-              className="text-xs"
-            >
-              Kaydet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* SQL İnceleme Diyaloğu */}
       <Dialog open={Boolean(inspectingSql)} onOpenChange={(open) => !open && setInspectingSql(null)}>
