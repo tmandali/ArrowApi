@@ -503,31 +503,9 @@ self.onmessage = async (e: MessageEvent) => {
           let fileBuffer: Uint8Array | null = null
           let sheetCount = 1
 
-          // 1. Parquet formatı (DuckDB'nin yerel motoru, ZSTD sıkıştırma, limitsiz satır boyutu)
-          if (preferredFormat === "parquet") {
-            try {
-              const tempParquet = `export_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.parquet`
-              const parquetSql =
-                targetRows < totalRowsToExport
-                  ? `${baseQuery} LIMIT ${targetRows}`
-                  : baseQuery
-              await conn.query(
-                `COPY (${parquetSql}) TO '${tempParquet}' (FORMAT PARQUET, COMPRESSION ZSTD);`
-              )
-              const rawParquetBuffer = await db!.copyFileToBuffer(tempParquet)
-              await db!.dropFile(tempParquet).catch(() => {})
-
-              fileBuffer = new Uint8Array(rawParquetBuffer)
-              format = "parquet"
-              outFileName = `${fileName}.parquet`
-            } catch (pErr) {
-              console.warn(
-                "[duckdb.worker] Parquet export failed, falling back to CSV:",
-                pErr
-              )
-              fileBuffer = null
-            }
-          }
+          // NOT: Apache Parquet ihracı, DuckDB 32-bit WASM heap'indeki bellek aşımını (OOM)
+          // önlemek için doğrudan OPFS parçaları ve parquet-wasm lazy stream üzerinden yürütülür.
+          // DuckDB içerisindeki 'COPY TO PARQUET' kaldırılmıştır.
 
           // 2. xlsx formatı istendiyse DuckDB excel eklentisini dene
           if (!fileBuffer && preferredFormat === "xlsx") {

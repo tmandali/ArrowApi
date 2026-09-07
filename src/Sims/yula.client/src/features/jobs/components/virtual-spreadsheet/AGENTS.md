@@ -141,7 +141,7 @@ Test suite (`src/features/jobs/components/virtual-spreadsheet/tests/`) şunları
   - Şema tabanlı hücre formatlama (`BIGINT`/`INTEGER` asla binlik nokta almaz; `DECIMAL`/`FLOAT` Türkçe formatlanır)
 - **`export-formats.test.mjs`:**
   - DuckDB C++ GZIP CSV sözdizimi (`COMPRESSION GZIP`, `DELIMITER ';'`)
-  - Apache Parquet ZSTD sıkıştırma sözdizimi (`FORMAT PARQUET, COMPRESSION ZSTD`)
+  - Apache Parquet ihracı: DuckDB WASM 32-bit OOM'u önlemek için OPFS parçaları ve parquet-wasm lazy-stream ile sıfır bellek yüküyle birleştirme (`test-parquet-merge.mjs`)
   - Excel 1.000.000 satır limitini aşan durumlarda otomatik sayfalara (`Sayfa 1`, `Sayfa 2`...) bölme mantığı
   - DuckDB-Wasm Issue #2119 fazladan çöp bayt tespiti ve `PK\x03\x04` imza kırpma doğrulaması
 
