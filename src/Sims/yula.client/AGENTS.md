@@ -73,3 +73,49 @@ Projeye yeni bir rapor veya ajan yeteneği eklendiğinde aşağıdaki adımlar e
 - **Aktif sağlayıcı:** `AI_PROVIDER` / `NEXT_PUBLIC_AI_PROVIDER` (`foundry` ≡ `azure`). Env’de Azure kimliği varsa varsayılan Microsoft Foundry’dir. Kullanıcı seçimi `yula_ai_config` (localStorage) + model popover’daki sağlayıcı listesi (`listConfiguredProviders`). Kayıt yoksa istek gövdesine `provider` yazılmaz; sunucu env’e güvenir.
 - **Asistan metni:** `sanitize-assistant-text` sızıntı/yazı sistemi çöpünü temizler; akışta kelime yutmamak için metni `trim` etmez.
 - **Rapor evreleri (karıştırma):** `/<workspace>/<rapor>` = kriter/job oluşturma (`apply_criteria` / `run_job`). `/<workspace>/<rapor>/<jobGuid>` = sonuç tablosu analizi (grid araçları). Sohbet geçmişi `pathname` + `jobId` tutar; analiz sohbeti açılınca GUID URL’ye dönülür. Kayıt, kullanıcının gerçekte kaldığı URL formunu korur (GUID path / `?job=`). Sohbet KENDİ aracıyla (`navigate_to_page` / `run_report` / `run_job` ve grid-slash kuyruğu) sayfa değiştirirse: push öncesi `beginConversationFollow` bayrağı konur, hedefe VARILDIĞINDA ekran-eşleme efekti `followArrivedConversation` ile kaydı yeni sayfaya bağlar (son açılan sayfa kazanır, aktif sohbet korunur, yeni sohbet AÇILMAZ, dock otomatik açılır). Bağlama push’tan ÖNCE YAPILMAZ — persist efekti eski sayfada kaydedip ezer. `saveMessages` içerik değişmeden sayfa bağını oynatmaz. Kullanıcı ELLE (breadcrumb/link/menü) sayfa değiştirirse KATI kural: her URL değişimi taze sohbet açar (normalizePath birebir eşleşme; gevşek baz-rota/rapor eşleşmesi yok); history tıklaması kaydın birebir sayfasına gittiği için korunur. Açılışta `healConversationRecords` ana sayfaya kalmış eski kayıtları mesajlardaki son navigasyon hedefine bağlar.
+
+## 🤖 Yula AI Agent Core: 3 Katmanlı Araç Mimarisi
+
+Yula AI Agent Core, ekran evrelerine (State-Driven Tool Swapping) göre 3 ana araç katmanıyla çalışır:
+
+```
+                          ┌─────────────────────────────┐
+                          │     Yula AI Agent Core      │
+                          └──────────────┬──────────────┘
+                                         │
+     ┌───────────────────────────────────┼───────────────────────────────────┐
+     ▼                                   ▼                                   ▼
+┌─────────────────────────┐   ┌─────────────────────────┐   ┌─────────────────────────┐
+│ Katman 1: Spreadsheet   │   │ Katman 2: DuckDB SQL    │   │ Katman 3: Criteria &    │
+│ (UI / Görünüm & Odak)   │   │ (Analitik & Hesaplama)  │   │ Job Lifecycle Engine    │
+├─────────────────────────┤   ├─────────────────────────┤   ├─────────────────────────┤
+│ • set_grid_query        │   │ • run_expert_sql        │   │ • inspect_criteria_schema│
+│ • set_grid_sort         │   │ • profile_grid_table    │   │ • get_current_criteria   │
+│ • configure_grid_columns│   │ • analyze_grid_data     │   │ • validate_criteria_input│
+│ • pin_grid_columns      │   │ • visualize_grid_data   │   │ • apply_criteria         │
+│ • apply_grid_filters    │   │                         │   │ • run_job / run_report   │
+│ • export_grid_data      │   │                         │   │ • list_report_executions │
+│ • reset_grid_layout     │   │                         │   │ • cancel_job             │
+└─────────────────────────┘   └─────────────────────────┘   └─────────────────────────┘
+```
+
+### 1. Katman 1: Virtual Spreadsheet UI Tools
+- İstemci tarafında çalışan, kullanıcının gördüğü tablo görünümünü anında değiştiren araçlar.
+- `set_grid_query` (DuckDB görünümü / türetilmiş kolon / GROUP BY), `set_grid_sort` (sıralama), `configure_grid_columns` (kolon gizle/göster/sırala), `pin_grid_columns` (kolon sabitleme), `apply_grid_filters` (D365 süzgeçleri), `reset_grid_layout` (varsayılan düzene dönme), `export_grid_data` (Parquet/Excel/CSV dışa aktarım).
+
+### 2. Katman 2: DuckDB SQL Tools
+- Büyük veri üzerinde analitik, istatistiksel ve özet hesaplamalar yürüten araçlar.
+- `run_expert_sql` (salt okunur SQL analitiği), `profile_grid_table` (veri kalitesi, boş değerler, min/max metrikleri), `analyze_grid_data` (hızlı KPI hesaplamaları), `visualize_grid_data` (grafik veri çıkarımı).
+
+### 3. Katman 3: Criteria Input Engine & Job Lifecycle Tools
+- Rapor kriter formunu canlı denetleyen, D365/BC sözdizimini doğrulayan ve iş yaşam döngüsünü yöneten araçlar.
+- **Criteria Input Engine (`src/features/report-criteria/lib/criteria-input-engine.ts`)**:
+  - D365 / Business Central Sözdizimi: Tarih ve sayı aralıkları (`100..200`, `2026-08-01..2026-08-31`, `..2026-08-31`), göreli tarihler (`dün`, `bugün`, `geçen hafta`, `bu ay`), karşılaştırmalar (`>100`, `<=50`, `<>0`) ve seçenekler (`10|20|30`).
+  - Şema & Zorunluluk Kontrolü: JSON Schema'daki `required` alanların eksiklik tespiti, `enum` kontrolü ve tip uyumu.
+  - Canlı Form Senkronizasyonu: `get_current_criteria` / `evaluateCurrentDraftCriteria` ile ekrandaki form taslağının içeriği okunur ve anlık doğrulama raporu (`errors`, `warnings`, `sanitizedCriteria`, `summary`) üretilir.
+- **Job Lifecycle**:
+  - `apply_criteria`: Doğrulanmış kriterleri forma yazar ve vurgular.
+  - `run_job` / `run_report`: Doğrulanmış kriterlerle backend job başlatır.
+  - `list_report_executions`: Raporun geçmiş çalışmalarını listeler.
+  - `cancel_job`: Çalışan işi backend ve UI seviyesinde iptal eder.
+
