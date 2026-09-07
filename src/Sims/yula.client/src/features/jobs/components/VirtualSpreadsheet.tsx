@@ -30,64 +30,17 @@ export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
 
 /**
- * Kolon tipine, ismine ve etiket uzunluğuna göre akıllı varsayılan genişlik (piksel) hesaplar.
- * Grid'in tüm kolonları dar bir alana sığmaya zorlanıp hücreleri ezmesini önler.
+ * Kolon hizalamasına (align) ve etiket uzunluğuna göre varsayılan piksel genişliği hesaplar.
+ * İsim listesi veya kelime tahmini içermez; tamamen yapısal özelliklere dayanır.
  */
 function getDefaultColumnWidth(col: SpreadsheetColumn): number {
-  const name = col.name.toLowerCase()
-  const label = (col.label || col.name).toLowerCase()
-
-  // Uzun metin / Açıklama / Ad alanları
-  if (
-    name.includes("desc") ||
-    name.includes("name") ||
-    name.includes("aciklama") ||
-    name.includes("adi") ||
-    name.includes("ad") ||
-    name.includes("title") ||
-    label.includes("açıklama") ||
-    label.includes("tanım") ||
-    label.includes("adı")
-  ) {
-    return Math.max(200, Math.min(360, (col.label || col.name).length * 9 + 60))
+  const labelLen = (col.label || col.name || "").length;
+  // Sayısal (sağa hizalı) kolonlar için kompakt genişlik
+  if (col.align === "right") {
+    return Math.max(100, Math.min(180, labelLen * 9 + 36));
   }
-
-  // Kod, Barkod, Seri, No, Guid, Id
-  if (
-    name.includes("code") ||
-    name.includes("kod") ||
-    name.includes("barcode") ||
-    name.includes("barkod") ||
-    name.includes("no") ||
-    name.includes("guid") ||
-    name.includes("id")
-  ) {
-    return Math.max(130, (col.label || col.name).length * 9 + 40)
-  }
-
-  // Tarih / Zaman
-  if (name.includes("date") || name.includes("tarih") || name.includes("time")) {
-    return Math.max(120, (col.label || col.name).length * 9 + 40)
-  }
-
-  // Sayısal alanlar (Miktar, Fiyat, Tutar, Bakiye, Maliyet)
-  if (
-    col.align === "right" ||
-    name.includes("qty") ||
-    name.includes("miktar") ||
-    name.includes("price") ||
-    name.includes("fiyat") ||
-    name.includes("amount") ||
-    name.includes("tutar") ||
-    name.includes("cost") ||
-    name.includes("maliyet") ||
-    name.includes("balance") ||
-    name.includes("bakiye")
-  ) {
-    return Math.max(110, (col.label || col.name).length * 9 + 40)
-  }
-
-  return Math.max(130, (col.label || col.name).length * 9 + 40)
+  // Metin / genel (sola hizalı) kolonlar için genişlik
+  return Math.max(140, Math.min(320, labelLen * 10 + 44));
 }
 
 export type SpreadsheetColumn = {
