@@ -1,55 +1,16 @@
 /**
- * Kolonun bir kod, numara, barkod, kimlik, fiş no veya yıl gibi ayrık bir değer mi
- * yoksa ölçülebilir bir miktar/tutar metriği mi olduğunu belirler.
- */
-export function isIdentifierColumn(columnName?: string, align?: "left" | "right"): boolean {
-  if (!columnName) return align === "left";
-  const name = columnName.toLowerCase().replace(/[\s_-]+/g, "");
-
-  // Açıkça kimlik / kod / numara / barkod / yıl belirten desenler
-  const idPatterns = [
-    "id", "no", "num", "kod", "code", "barcode", "barkod", "guid",
-    "year", "yil", "phone", "tel", "tc", "ref", "key", "seq", "sira",
-    "line", "fis", "fatura", "order", "siparis", "account", "hesap",
-    "itemno", "itemid", "docno", "batch", "parti", "seri", "serial"
-  ];
-
-  if (idPatterns.some((p) => name === p || name.endsWith(p) || name.startsWith(p))) {
-    return true;
-  }
-
-  // Sola hizalı alanlar miktar/tutar değil, kod veya metindir
-  if (align === "left") {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Kolonun açıkça miktar veya parasal tutar metriği olup olmadığını belirler.
- */
-export function isMetricColumn(columnName?: string): boolean {
-  if (!columnName) return false;
-  const name = columnName.toLowerCase().replace(/[\s_-]+/g, "");
-  const metricPatterns = [
-    "qty", "quantity", "miktar", "adet", "amount", "tutar", "fiyat",
-    "price", "cost", "maliyet", "total", "toplam", "bakiye", "balance",
-    "net", "brut", "gross", "rate", "oran", "iskonto", "discount", "kdv", "vat"
-  ];
-  return metricPatterns.some((p) => name.includes(p));
-}
-
-/**
- * Yula Grid Tablosu Hücre Biçimlendiricisi — DuckDB WASM ham sayısal ve tutar
- * çıktılarını Türkçe yerel ayarlarına (tr-TR) göre biçimlendirir.
- * Kod, ID, Barkod, Fiş No veya genel int alanlarına gereksiz binlik noktası koymaz.
+ * Yula Grid Tablosu Hücre Biçimlendiricisi — Şemadan gelen fiziksel kolon tipine
+ * (DuckDB / Arrow schema) göre hücre değerini biçimlendirir.
+ * Kelime listesi YOKTUR; kontrol doğrudan kolonun şema tipinden gelir.
+ *
+ * - INT / INTEGER / BIGINT vb. tamsayı kolonlar ham değer olarak gösterilir (44577625).
+ * - DECIMAL / NUMERIC / FLOAT / DOUBLE tutar alanları Türkçe yerel ayarlarına göre (1.250,50) biçimlendirilir.
+ * - DATE / TIMESTAMP alanları YYYY-MM-DD olarak gösterilir.
  */
 export function formatGridCellValue(
   val: unknown,
   align?: "left" | "right",
-  columnType?: string,
-  columnName?: string
+  columnType?: string
 ): string {
   if (val === null || val === undefined || val === "") return "";
 
@@ -58,14 +19,27 @@ export function formatGridCellValue(
     return val.toISOString().slice(0, 10);
   }
 
-  // 1. Kolon tipi "date" olarak biliniyorsa (veya adı Date/Tarih içeriyorsa)
-  const isDateColumn = columnType === "date" || (columnName ? /date|tarih/i.test(columnName) : false);
+  const rawType = (columnType || "").toUpperCase();
+  const isDateColumn = rawType === "DATE" || rawType.includes("DATE") || rawType.includes("TIME");
+  const isIntegerType =
+    rawType.includes("INT") ||
+    rawType === "INTEGER" ||
+    rawType === "BIGINT" ||
+    rawType === "SMALLINT" ||
+    rawType === "TINYINT" ||
+    rawType === "HUGEINT";
+  const isDecimalType =
+    rawType.includes("DECIMAL") ||
+    rawType.includes("NUMERIC") ||
+    rawType.includes("FLOAT") ||
+    rawType.includes("DOUBLE") ||
+    rawType.includes("REAL");
 
   if (typeof val === "number" || typeof val === "bigint") {
     const num = Number(val);
     if (!Number.isFinite(num)) return String(val);
 
-    // Eğer tarih kolonuysa ve epoch ms (veya gün sayısı) geldiyse
+    // 1. Tarih kolonu ise ve epoch ms / gün sayısı geldiyse
     if (isDateColumn) {
       // Epoch ms (örn: 1786752000000 -> 2026-08-16)
       if (num > 100000000000) {
@@ -84,7 +58,7 @@ export function formatGridCellValue(
       }
     }
 
-    // Tarih kolonu değilse veya eşleşmediyse ama çok büyük bir epoch ms timestamp'iyse (1.7 trilyon)
+    // Tarih kolonu değilse ama epoch ms timestamp ise
     if (!isDateColumn && num >= 1000000000000 && num <= 2500000000000 && Number.isInteger(num)) {
       const d = new Date(num);
       if (!isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100) {
@@ -92,14 +66,15 @@ export function formatGridCellValue(
       }
     }
 
-    // Tamsayı (int) alanlar: Kod, Barkod, ID, Fiş No, Yıl vb. binlik nokta almaz
-    if (Number.isInteger(num)) {
-      if (isIdentifierColumn(columnName, align) || !isMetricColumn(columnName)) {
+    // 2. Şemada INT (tamsayı) olarak tanımlı alanlar veya herhangi bir tamsayı:
+    // Şema tipi INT ise kesinlikle binlik ayracı almaz, ham değer gösterilir (örn: 44577625)
+    if (isIntegerType || Number.isInteger(num)) {
+      if (!isDecimalType) {
         return String(val);
       }
-      return new Intl.NumberFormat("tr-TR").format(num);
     }
 
+    // 3. Şemada DECIMAL / NUMERIC / FLOAT gibi ondalıklı sayılar:
     return new Intl.NumberFormat("tr-TR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -124,12 +99,12 @@ export function formatGridCellValue(
     }
   }
 
-  // 2. Boolean tipleri (true/false)
+  // 4. Boolean tipleri (true/false)
   if (typeof val === "boolean") {
     return val ? "Evet" : "Hayır";
   }
 
-  // 3. Array ve Nesne (JSON / Struct / List) tipleri
+  // 5. Array ve Nesne (JSON / Struct / List) tipleri
   if (typeof val === "object") {
     if (Array.isArray(val)) {
       return val.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
@@ -137,15 +112,13 @@ export function formatGridCellValue(
     return JSON.stringify(val);
   }
 
-  if (typeof val === "string" && align === "right") {
+  // 6. String olarak gelmiş sayısal değerler (yalnızca DECIMAL / FLOAT şema tipinde veya sağa hizalı ondalıklı sayılarda)
+  if (typeof val === "string" && (isDecimalType || (align === "right" && !isIntegerType))) {
     const trimmed = val.trim();
     if (trimmed !== "" && !isNaN(Number(trimmed))) {
       const num = Number(trimmed);
-      if (Number.isInteger(num)) {
-        if (isIdentifierColumn(columnName, align) || !isMetricColumn(columnName)) {
-          return val;
-        }
-        return new Intl.NumberFormat("tr-TR").format(num);
+      if (Number.isInteger(num) && !isDecimalType) {
+        return val;
       }
       return new Intl.NumberFormat("tr-TR", {
         minimumFractionDigits: 2,

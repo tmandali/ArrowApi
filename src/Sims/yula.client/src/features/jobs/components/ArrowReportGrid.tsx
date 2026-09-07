@@ -175,6 +175,17 @@ export function ArrowReportGrid({
     return map
   }, [metaColumns, discoveredCols, describedCols])
 
+  // Şemadan gelen fiziksel ham DuckDB tipleri (BIGINT, INTEGER, DECIMAL, DATE...)
+  const columnDuckTypes = React.useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    for (const c of metaColumns) if (c.duckType) map[c.name] = c.duckType
+    for (const c of discoveredCols) if (c.duckType) map[c.name] = c.duckType
+    if (describedCols) {
+      for (const c of describedCols) if (c.duckType) map[c.name] = c.duckType
+    }
+    return map
+  }, [metaColumns, discoveredCols, describedCols])
+
   const hasActiveFilters = React.useMemo(
     () => Object.values(filters).some((q) => q.trim().length > 0),
     [filters]
@@ -444,7 +455,11 @@ export function ArrowReportGrid({
           <tr key={index} className="hover:bg-muted/30">
             {effectiveColumns.map((col) => {
               const rawVal = values[col.name]
-              const formattedVal = formatGridCellValue(rawVal, col.align, columnTypes[col.name], col.name)
+              const formattedVal = formatGridCellValue(
+                rawVal,
+                col.align,
+                columnDuckTypes[col.name] ?? columnTypes[col.name]
+              )
               return (
                 <td
                   key={col.name}
