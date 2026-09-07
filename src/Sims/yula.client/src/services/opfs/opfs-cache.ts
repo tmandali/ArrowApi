@@ -148,6 +148,58 @@ class OpfsReportCache {
   }
 
   /**
+   * Belirtilen jobId'ye ait OPFS dizinindeki tüm dosyaları (partlar, _complete vb.),
+   * boyutlarını ve durumunu döner.
+   */
+  async getParquetJobDetail(jobId: string): Promise<OpfsJobParquetDetail> {
+    const emptyResult: OpfsJobParquetDetail = {
+      hasParts: false,
+      isComplete: false,
+      totalSizeBytes: 0,
+      partCount: 0,
+      files: [],
+    }
+    if (!this.isSupported()) return emptyResult
+
+    try {
+      const dir = await this.getParquetDirectory(jobId, false)
+      if (!dir) return emptyResult
+
+      let isComplete = false
+      let totalSizeBytes = 0
+      const files: OpfsParquetFileInfo[] = []
+
+      for await (const [name, handle] of (dir as any).entries()) {
+        if (handle.kind === "file") {
+          const file = await (handle as FileSystemFileHandle).getFile()
+          if (name === "_complete" && file.size > 0) {
+            isComplete = true
+          }
+          files.push({
+            name,
+            sizeBytes: file.size,
+            lastModified: file.lastModified,
+          })
+          totalSizeBytes += file.size
+        }
+      }
+
+      files.sort((a, b) => a.name.localeCompare(b.name))
+      const partCount = files.filter((f) => f.name.endsWith(".parquet")).length
+
+      return {
+        hasParts: partCount > 0,
+        isComplete,
+        totalSizeBytes,
+        partCount,
+        files,
+      }
+    } catch {
+      return emptyResult
+    }
+  }
+
+  /**
    * OPFS diskindeki tüm rapor önbelleğini temizler.
    */
   async clearAll(): Promise<void> {
@@ -160,6 +212,20 @@ class OpfsReportCache {
       // Ignore
     }
   }
+}
+
+export type OpfsParquetFileInfo = {
+  name: string
+  sizeBytes: number
+  lastModified?: number
+}
+
+export type OpfsJobParquetDetail = {
+  hasParts: boolean
+  isComplete: boolean
+  totalSizeBytes: number
+  partCount: number
+  files: OpfsParquetFileInfo[]
 }
 
 export const opfsReportCache = new OpfsReportCache()

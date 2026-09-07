@@ -12,6 +12,9 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
+  HardDrive,
+  FileArchive,
+  CheckCircle2,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -74,7 +77,8 @@ import type { JsonSchemaObject } from "@/features/report-criteria"
 import type { ArrowJobStatus } from "../types"
 import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { cn } from "@/utils/cn"
-import { formatCount } from "@/utils/format"
+import { formatCount, formatBytes } from "@/utils/format"
+import { opfsReportCache, type OpfsJobParquetDetail } from "@/services/opfs/opfs-cache"
 import { ApiError } from "@/services"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { copyToClipboard } from "@/lib/clipboard"
@@ -393,6 +397,9 @@ export function ArrowJobExecutionsPanel({
   const lastRefreshPhaseRef = React.useRef(activeRunPhase)
   const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
   const [refreshing, setRefreshing] = React.useState(false)
+  const [opfsDetail, setOpfsDetail] = React.useState<OpfsJobParquetDetail | null>(null)
+  const [opfsLoadedId, setOpfsLoadedId] = React.useState<string | null>(null)
+  const opfsLoading = Boolean(selectedId && opfsLoadedId !== selectedId)
 
   const onListLoadedRef = React.useRef(onListLoaded)
   const onListErrorRef = React.useRef(onListError)
@@ -556,6 +563,29 @@ export function ArrowJobExecutionsPanel({
     return () => abort.abort()
   }, [selectedId, activeJobId, activeRequestJson, detailRefreshToken])
 
+  // Seçili işe ait OPFS yerel disk dosyalarını yükle
+  React.useEffect(() => {
+    if (!selectedId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const detail = await opfsReportCache.getParquetJobDetail(selectedId)
+        if (!cancelled) {
+          setOpfsDetail(detail)
+          setOpfsLoadedId(selectedId)
+        }
+      } catch {
+        if (!cancelled) {
+          setOpfsDetail(null)
+          setOpfsLoadedId(selectedId)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, detailRefreshToken, selectedJob?.status])
+
   // Load persisted progress for the selected run (skip while watching live active job).
   // Aktif çalışan run için canlı SSE akışı tek güven kaynağıdır; geçmiş yüklenmez.
   const isActiveSelected = sameJobId(selectedId, activeJobId)
@@ -569,6 +599,7 @@ export function ArrowJobExecutionsPanel({
   if (syncedSelectedId !== selectedId) {
     setSyncedSelectedId(selectedId)
     setHubSnapshot(selectedId ? arrowJobEventHub.getSnapshot(selectedId) ?? null : null)
+    setOpfsDetail(null)
   }
 
   React.useEffect(() => {
@@ -1416,6 +1447,86 @@ export function ArrowJobExecutionsPanel({
                       loading={historyLoading && progressEvents.length === 0}
                     />
                   ) : null}
+
+                  {/* OPFS Yerel Disk Önbelleği (Parquet Parçaları) */}
+                  <div className="mt-3 flex min-h-0 flex-col space-y-2">
+                    <Marker variant="separator">
+                      <MarkerContent className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <HardDrive className="size-3 text-primary/80" />
+                        <span>Yerel Disk Dosyaları (OPFS Önbellek)</span>
+                      </MarkerContent>
+                    </Marker>
+
+                    {opfsLoading ? (
+                      <div className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>OPFS disk dosyaları taranıyor…</span>
+                      </div>
+                    ) : opfsDetail && opfsDetail.files.length > 0 ? (
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border/40">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "h-4 px-1 text-[9px] font-medium border",
+                                opfsDetail.isComplete
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              )}
+                            >
+                              {opfsDetail.isComplete ? "Tamamlandı" : "Yazılıyor"}
+                            </Badge>
+                            <span className="truncate font-medium text-foreground">
+                              {opfsDetail.partCount} Parquet parçası
+                            </span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="shrink-0 text-muted-foreground tabular-nums">
+                              {formatBytes(opfsDetail.totalSizeBytes)}
+                            </span>
+                          </div>
+                          {opfsDetail.isComplete ? (
+                            <span
+                              className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 shrink-0"
+                              title="Akış başarıyla tamamlandı ve _complete onay dosyası mevcut"
+                            >
+                              <CheckCircle2 className="size-3" />
+                              <span>Hazır</span>
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-2 max-h-36 overflow-y-auto space-y-1 rounded border border-border/40 bg-background/60 p-1.5 font-mono text-[11px]">
+                          {opfsDetail.files.map((file) => (
+                            <div
+                              key={file.name}
+                              className="flex items-center justify-between gap-2 px-1 py-0.5 rounded transition-colors hover:bg-muted/50"
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                {file.name.endsWith(".parquet") ? (
+                                  <FileArchive className="size-3 text-amber-500/80 shrink-0" />
+                                ) : (
+                                  <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
+                                )}
+                                <span className="truncate" title={file.name}>
+                                  {file.name}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                                {formatBytes(file.sizeBytes)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-border/60 p-2.5 text-xs text-muted-foreground">
+                        {selectedInFlight
+                          ? "Henüz diske yazılan dosya yok (akış hazırlanıyor)…"
+                          : "Bu rapora ait yerel OPFS disk dosyası bulunamadı (henüz açılmamış veya temizlenmiş)."}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-3 flex min-h-0 flex-col space-y-3">
                     <Marker variant="separator">
