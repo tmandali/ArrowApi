@@ -444,7 +444,7 @@ export function ArrowReportGrid({
           <tr key={index} className="hover:bg-muted/30">
             {effectiveColumns.map((col) => {
               const rawVal = values[col.name]
-              const formattedVal = formatGridCellValue(rawVal, col.align, columnTypes[col.name])
+              const formattedVal = formatGridCellValue(rawVal, col.align, columnTypes[col.name], col.name)
               return (
                 <td
                   key={col.name}

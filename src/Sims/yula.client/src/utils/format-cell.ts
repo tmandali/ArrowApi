@@ -1,12 +1,55 @@
 /**
+ * Kolonun bir kod, numara, barkod, kimlik, fiş no veya yıl gibi ayrık bir değer mi
+ * yoksa ölçülebilir bir miktar/tutar metriği mi olduğunu belirler.
+ */
+export function isIdentifierColumn(columnName?: string, align?: "left" | "right"): boolean {
+  if (!columnName) return align === "left";
+  const name = columnName.toLowerCase().replace(/[\s_-]+/g, "");
+
+  // Açıkça kimlik / kod / numara / barkod / yıl belirten desenler
+  const idPatterns = [
+    "id", "no", "num", "kod", "code", "barcode", "barkod", "guid",
+    "year", "yil", "phone", "tel", "tc", "ref", "key", "seq", "sira",
+    "line", "fis", "fatura", "order", "siparis", "account", "hesap",
+    "itemno", "itemid", "docno", "batch", "parti", "seri", "serial"
+  ];
+
+  if (idPatterns.some((p) => name === p || name.endsWith(p) || name.startsWith(p))) {
+    return true;
+  }
+
+  // Sola hizalı alanlar miktar/tutar değil, kod veya metindir
+  if (align === "left") {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Kolonun açıkça miktar veya parasal tutar metriği olup olmadığını belirler.
+ */
+export function isMetricColumn(columnName?: string): boolean {
+  if (!columnName) return false;
+  const name = columnName.toLowerCase().replace(/[\s_-]+/g, "");
+  const metricPatterns = [
+    "qty", "quantity", "miktar", "adet", "amount", "tutar", "fiyat",
+    "price", "cost", "maliyet", "total", "toplam", "bakiye", "balance",
+    "net", "brut", "gross", "rate", "oran", "iskonto", "discount", "kdv", "vat"
+  ];
+  return metricPatterns.some((p) => name.includes(p));
+}
+
+/**
  * Yula Grid Tablosu Hücre Biçimlendiricisi — DuckDB WASM ham sayısal ve tutar
- * çıktılarını Türkçe yerel ayarlarına (tr-TR) göre binlik ayraçlı (1.250.000,50)
- * olarak biçimlendirir.
+ * çıktılarını Türkçe yerel ayarlarına (tr-TR) göre biçimlendirir.
+ * Kod, ID, Barkod, Fiş No veya genel int alanlarına gereksiz binlik noktası koymaz.
  */
 export function formatGridCellValue(
   val: unknown,
   align?: "left" | "right",
-  columnType?: string
+  columnType?: string,
+  columnName?: string
 ): string {
   if (val === null || val === undefined || val === "") return "";
 
@@ -16,7 +59,7 @@ export function formatGridCellValue(
   }
 
   // 1. Kolon tipi "date" olarak biliniyorsa (veya adı Date/Tarih içeriyorsa)
-  const isDateColumn = columnType === "date";
+  const isDateColumn = columnType === "date" || (columnName ? /date|tarih/i.test(columnName) : false);
 
   if (typeof val === "number" || typeof val === "bigint") {
     const num = Number(val);
@@ -49,9 +92,14 @@ export function formatGridCellValue(
       }
     }
 
+    // Tamsayı (int) alanlar: Kod, Barkod, ID, Fiş No, Yıl vb. binlik nokta almaz
     if (Number.isInteger(num)) {
+      if (isIdentifierColumn(columnName, align) || !isMetricColumn(columnName)) {
+        return String(val);
+      }
       return new Intl.NumberFormat("tr-TR").format(num);
     }
+
     return new Intl.NumberFormat("tr-TR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -94,6 +142,9 @@ export function formatGridCellValue(
     if (trimmed !== "" && !isNaN(Number(trimmed))) {
       const num = Number(trimmed);
       if (Number.isInteger(num)) {
+        if (isIdentifierColumn(columnName, align) || !isMetricColumn(columnName)) {
+          return val;
+        }
         return new Intl.NumberFormat("tr-TR").format(num);
       }
       return new Intl.NumberFormat("tr-TR", {

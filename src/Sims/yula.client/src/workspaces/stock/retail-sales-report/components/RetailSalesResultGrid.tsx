@@ -207,7 +207,8 @@ export function RetailSalesResultGrid({
                 {formatGridCellValue(
                   row.values ? row.values[col.name] : (row as unknown as Record<string, unknown>)[col.name],
                   col.align,
-                  col.name.toLowerCase().includes("date") || col.name.toLowerCase().includes("tarih") ? "date" : undefined
+                  col.name.toLowerCase().includes("date") || col.name.toLowerCase().includes("tarih") ? "date" : undefined,
+                  col.name
                 )}
               </div>
             </td>
