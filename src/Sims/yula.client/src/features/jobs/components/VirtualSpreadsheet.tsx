@@ -207,6 +207,11 @@ export type VirtualSpreadsheetProps<T> = {
    * Kalıcı state (localStorage) kullanımını devre dışı bırakır (varsayılan: false).
    */
   disablePersistence?: boolean
+  /**
+   * Solda sabitlenecek (sticky/pinned) kolon sayısı (varsayılan: 1).
+   * 0 verilirse sabitleme devre dışı kalır.
+   */
+  pinnedColumnCount?: number
   /** Sona yaklaşıldığında yükleme sürüyor mu? (skeleton satırları gösterir) */
   loadingMore?: boolean
 }
@@ -249,6 +254,7 @@ export function VirtualSpreadsheet<T>({
   loadingMore = false,
   storageKey,
   disablePersistence = false,
+  pinnedColumnCount = 1,
 }: VirtualSpreadsheetProps<T>) {
   // Kalıcı yerel depolama anahtarı (localStorage)
   const effectiveStorageKey = React.useMemo(() => {
@@ -737,6 +743,26 @@ export function VirtualSpreadsheet<T>({
     }, 0)
   }, [visibleColumns, getColWidth])
 
+  // Solda sabitlenecek (sticky) kolon sayısı — tablonun tamamının sabitlenmesi engellenir (en az 1 kolon scroll edilebilir kalır)
+  const effectivePinnedCount = Math.min(
+    Math.max(0, pinnedColumnCount),
+    visibleColumns.length > 1 ? visibleColumns.length - 1 : 0
+  )
+
+  // Her sabit kolonun soldan piksel mesafesini dinamik hesaplar
+  const getStickyLeftOffset = React.useCallback(
+    (colIndex: number) => {
+      if (colIndex >= effectivePinnedCount) return undefined
+      let left = 0
+      for (let i = 0; i < colIndex; i++) {
+        const w = getColWidth(visibleColumns[i])
+        left += typeof w === "number" ? w : parseFloat(String(w)) || 100
+      }
+      return left
+    },
+    [effectivePinnedCount, visibleColumns, getColWidth]
+  )
+
   /**
    * Çift tıklamayla kolonu içeriğe ve başlığa göre en uygun genişliğe otomatik sığdırır.
    */
@@ -829,11 +855,14 @@ export function VirtualSpreadsheet<T>({
     </colgroup>
   )
 
+  const [isScrolledLeft, setIsScrolledLeft] = React.useState(false)
+  const isScrolledLeftRef = React.useRef(false)
+
   const renderVirtualRow = React.useCallback(
     (item: T, rowIndex: number) => {
       const rendered = renderRow(item, rowIndex, visibleColumns)
       if (
-        React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
+        React.isValidElement<{ children?: React.ReactNode; className?: string }>(rendered) &&
         rendered.type === "tr"
       ) {
         const childrenArray = React.Children.toArray(rendered.props.children)
@@ -855,16 +884,43 @@ export function VirtualSpreadsheet<T>({
           sortedChildren = childrenArray
         }
 
+        const processedChildren = sortedChildren.map((child, colIndex) => {
+          if (!React.isValidElement<{ className?: string; style?: React.CSSProperties }>(child)) {
+            return child
+          }
+          const isPinned = colIndex < effectivePinnedCount
+          const isLastPinned = colIndex === effectivePinnedCount - 1
+          const stickyLeft = getStickyLeftOffset(colIndex)
+
+          if (!isPinned) return child
+
+          return React.cloneElement(child, {
+            className: cn(
+              child.props.className,
+              "sticky z-10 bg-background group-hover/tr:bg-muted/30",
+              isScrolledLeft &&
+                isLastPinned &&
+                "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
+            ),
+            style: {
+              ...child.props.style,
+              left: `${stickyLeft}px`,
+            },
+          })
+        })
+
         return React.cloneElement(
           rendered,
-          undefined,
-          ...sortedChildren,
+          {
+            className: cn(rendered.props.className, "group/tr"),
+          } as React.HTMLAttributes<HTMLTableRowElement>,
+          ...processedChildren,
           <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
         )
       }
       return rendered
     },
-    [renderRow, visibleColumns]
+    [renderRow, visibleColumns, effectivePinnedCount, getStickyLeftOffset, isScrolledLeft]
   )
 
   // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
@@ -924,6 +980,8 @@ export function VirtualSpreadsheet<T>({
     if (headerScrollRef.current) {
       headerScrollRef.current.scrollLeft = 0
     }
+    isScrolledLeftRef.current = false
+    setIsScrolledLeft(false)
   }, [resetKey, reset, activeSortColumn, activeSortDirection])
 
   // Dikey scrollbar genişliğini ölç — başlığın sağ ucunu body scrollbar'ı ile tam hizalar
@@ -951,6 +1009,11 @@ export function VirtualSpreadsheet<T>({
       // Yatay kaydırmayı kolon başlıklarına senkronize et
       if (headerScrollRef.current && headerScrollRef.current.scrollLeft !== el.scrollLeft) {
         headerScrollRef.current.scrollLeft = el.scrollLeft
+      }
+      const scrolled = el.scrollLeft > 2
+      if (scrolled !== isScrolledLeftRef.current) {
+        isScrolledLeftRef.current = scrolled
+        setIsScrolledLeft(scrolled)
       }
       const sw = el.offsetWidth - el.clientWidth
       if (sw !== scrollbarWidth) {
@@ -1198,8 +1261,11 @@ export function VirtualSpreadsheet<T>({
                   {colGroup}
                   <thead>
                     <tr>
-                      {visibleColumns.map((col) => {
+                      {visibleColumns.map((col, colIndex) => {
                         const w = getColWidth(col)
+                        const isPinned = colIndex < effectivePinnedCount
+                        const isLastPinned = colIndex === effectivePinnedCount - 1
+                        const stickyLeft = getStickyLeftOffset(colIndex)
                         const isSorted =
                           activeSortColumn === col.name && activeSortDirection !== null
                         const isAsc = isSorted && activeSortDirection === "asc"
@@ -1236,6 +1302,10 @@ export function VirtualSpreadsheet<T>({
                             className={cn(
                               headClass,
                               "relative overflow-hidden group/th select-none",
+                              isPinned && "sticky z-30 bg-muted/95 backdrop-blur-xs",
+                              isScrolledLeft &&
+                                isLastPinned &&
+                                "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]",
                               canDrag && hoveredSeparatorCol !== col.name && "cursor-grab active:cursor-grabbing",
                               canSort && "hover:bg-muted/70 transition-colors",
                               col.align === "left" ? "text-left" : "text-right",
@@ -1245,7 +1315,10 @@ export function VirtualSpreadsheet<T>({
                               isDropAfter &&
                                 "after:absolute after:inset-y-0 after:right-0 after:w-1 after:bg-primary after:z-20"
                             )}
-                            style={{ width: typeof w === "number" ? `${w}px` : w }}
+                            style={{
+                              width: typeof w === "number" ? `${w}px` : w,
+                              ...(isPinned ? { left: `${stickyLeft}px` } : {}),
+                            }}
                             title={sortTooltip}
                             onClick={() => handleHeaderClick(col)}
                           >
@@ -1321,11 +1394,26 @@ export function VirtualSpreadsheet<T>({
                     </tr>
                     {showFilterRow && renderFilterCell ? (
                       <tr className={filterRowClassName}>
-                        {visibleColumns.map((col, index) => (
-                          <th key={col.name} className={cellClass}>
-                            {renderFilterCell(col, index)}
-                          </th>
-                        ))}
+                        {visibleColumns.map((col, index) => {
+                          const isPinned = index < effectivePinnedCount
+                          const isLastPinned = index === effectivePinnedCount - 1
+                          const stickyLeft = getStickyLeftOffset(index)
+                          return (
+                            <th
+                              key={col.name}
+                              className={cn(
+                                cellClass,
+                                isPinned && "sticky z-30 bg-background",
+                                isScrolledLeft &&
+                                  isLastPinned &&
+                                  "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
+                              )}
+                              style={isPinned ? { left: `${stickyLeft}px` } : undefined}
+                            >
+                              {renderFilterCell(col, index)}
+                            </th>
+                          )
+                        })}
                         <th className={cn(cellClass, "p-0")} aria-hidden />
                       </tr>
                     ) : null}
@@ -1358,29 +1446,39 @@ export function VirtualSpreadsheet<T>({
                 {displayItems.length === 0 && loading ? (
                   Array.from({ length: initialSkeletonCount }, (_, skeletonIndex) => (
                     <tr key={`initial-skeleton-${skeletonIndex}`} aria-hidden>
-                      {visibleColumns.map((col) => (
-                        <td
-                          key={col.name}
-                          className={cn(
-                            cellClass,
-                            col.align === "left" ? "text-left" : "text-right"
-                          )}
-                        >
-                          <div
+                      {visibleColumns.map((col, colIdx) => {
+                        const isPinned = colIdx < effectivePinnedCount
+                        const isLastPinned = colIdx === effectivePinnedCount - 1
+                        const stickyLeft = getStickyLeftOffset(colIdx)
+                        return (
+                          <td
+                            key={col.name}
                             className={cn(
-                              "flex h-7 min-w-0 items-center px-2",
-                              col.align === "right" && "justify-end"
+                              cellClass,
+                              col.align === "left" ? "text-left" : "text-right",
+                              isPinned && "sticky z-10 bg-background",
+                              isScrolledLeft &&
+                                isLastPinned &&
+                                "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
                             )}
+                            style={isPinned ? { left: `${stickyLeft}px` } : undefined}
                           >
-                            <Skeleton
+                            <div
                               className={cn(
-                                "h-3.5",
-                                col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
+                                "flex h-7 min-w-0 items-center px-2",
+                                col.align === "right" && "justify-end"
                               )}
-                            />
-                          </div>
-                        </td>
-                      ))}
+                            >
+                              <Skeleton
+                                className={cn(
+                                  "h-3.5",
+                                  col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
+                                )}
+                              />
+                            </div>
+                          </td>
+                        )
+                      })}
                       <td className={cn(cellClass, "p-0")} aria-hidden />
                     </tr>
                   ))
@@ -1410,29 +1508,39 @@ export function VirtualSpreadsheet<T>({
                     {loadingMore && hasMore
                       ? Array.from({ length: SKELETON_ROWS }, (_, skeletonIndex) => (
                           <tr key={`skeleton-${skeletonIndex}`} aria-hidden>
-                            {visibleColumns.map((col) => (
-                              <td
-                                key={col.name}
-                                className={cn(
-                                  cellClass,
-                                  col.align === "left" ? "text-left" : "text-right"
-                                )}
-                              >
-                                <div
+                            {visibleColumns.map((col, colIdx) => {
+                              const isPinned = colIdx < effectivePinnedCount
+                              const isLastPinned = colIdx === effectivePinnedCount - 1
+                              const stickyLeft = getStickyLeftOffset(colIdx)
+                              return (
+                                <td
+                                  key={col.name}
                                   className={cn(
-                                    "flex h-7 min-w-0 items-center px-2",
-                                    col.align === "right" && "justify-end"
+                                    cellClass,
+                                    col.align === "left" ? "text-left" : "text-right",
+                                    isPinned && "sticky z-10 bg-background",
+                                    isScrolledLeft &&
+                                      isLastPinned &&
+                                      "border-r border-border/80 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)] dark:shadow-[3px_0_5px_-2px_rgba(0,0,0,0.4)]"
                                   )}
+                                  style={isPinned ? { left: `${stickyLeft}px` } : undefined}
                                 >
-                                  <Skeleton
+                                  <div
                                     className={cn(
-                                      "h-3.5",
-                                      col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
+                                      "flex h-7 min-w-0 items-center px-2",
+                                      col.align === "right" && "justify-end"
                                     )}
-                                  />
-                                </div>
-                              </td>
-                            ))}
+                                  >
+                                    <Skeleton
+                                      className={cn(
+                                        "h-3.5",
+                                        col.align === "right" ? "w-16" : "w-24 max-w-[80%]"
+                                      )}
+                                    />
+                                  </div>
+                                </td>
+                              )
+                            })}
                             <td className={cn(cellClass, "p-0")} aria-hidden />
                           </tr>
                         ))
