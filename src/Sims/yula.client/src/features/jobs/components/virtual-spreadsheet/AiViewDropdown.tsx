@@ -17,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -73,7 +72,7 @@ export function AiViewDropdown({
     ? savedMatch.title
     : isCurrentQueryActive
     ? currentQueryTitle || "AI Analizi"
-    : "Ham Veri"
+    : "Tüm Kayıtlar"
 
   // Kaydetme diyalog state'i
   const [isSavingCurrent, setIsSavingCurrent] = React.useState(false)
@@ -164,7 +163,7 @@ export function AiViewDropdown({
                   ? isCurrentQuerySaved
                     ? `Aktif Kayıtlı Görünüm: ${activeTitle}`
                     : `Aktif Geçici AI Görünümü (Kaydedilmedi): ${activeTitle}`
-                  : "Aktif Görünüm: Ham Veri"
+                  : "Aktif Görünüm: Tüm Kayıtlar"
               }
             >
               {isCurrentQueryActive ? (
@@ -225,12 +224,7 @@ export function AiViewDropdown({
               </>
             ) : null}
 
-            <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-              <span>Görünümler</span>
-              <span className="text-[10px] lowercase font-normal">{aiViews.length} kayıtlı</span>
-            </div>
-
-            {/* Ham Veri (Orijinal Tablo) */}
+            {/* Tüm Kayıtlar (Ham Veri) */}
             <DropdownMenuItem
               onClick={() => onSelectAiView?.(null)}
               className={cn(
@@ -240,20 +234,12 @@ export function AiViewDropdown({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <Table2 className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate">Ham Veri (Tüm Kayıtlar)</span>
+                <span className="truncate">Tüm Kayıtlar</span>
               </div>
               {!isCurrentQueryActive ? <Check className="size-3.5 text-primary shrink-0" /> : null}
             </DropdownMenuItem>
 
-            {aiViews.length > 0 ? <DropdownMenuSeparator /> : null}
-
-            {aiViews.length > 0 ? (
-              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Kayıtlı AI Görünümleri
-              </div>
-            ) : null}
-
-            {/* Kayıtlı AI SQL Görünümleri Listesi */}
+            {/* Görünümler Listesi */}
             {aiViews.map((view) => {
               const isSelected = isCurrentQueryActive && savedMatch?.id === view.id
               return (
