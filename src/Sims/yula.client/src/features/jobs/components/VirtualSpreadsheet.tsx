@@ -200,7 +200,29 @@ export function VirtualSpreadsheet<T>({
           />
         )
       })}
+      {/* Sağ taraftaki artan boşluğu emen dolgu kolonu */}
+      <col />
     </colgroup>
+  )
+
+  const renderVirtualRow = React.useCallback(
+    (item: T, rowIndex: number) => {
+      const rendered = renderRow(item, rowIndex)
+      if (
+        React.isValidElement<{ children?: React.ReactNode }>(rendered) &&
+        rendered.type === "tr"
+      ) {
+        const childrenArray = React.Children.toArray(rendered.props.children)
+        return React.cloneElement(
+          rendered,
+          undefined,
+          ...childrenArray,
+          <td key="__col_spacer" className={cn(cellClass, "p-0")} aria-hidden />
+        )
+      }
+      return rendered
+    },
+    [renderRow]
   )
 
   const {
@@ -324,7 +346,7 @@ export function VirtualSpreadsheet<T>({
                 {colGroup}
                 <thead>
                   <tr>
-                    {columns.map((col, colIndex) => {
+                    {columns.map((col) => {
                       const w = getColWidth(col)
                       return (
                         <th
@@ -340,23 +362,23 @@ export function VirtualSpreadsheet<T>({
                           <div className="flex h-full w-full items-center min-w-0 pr-2">
                             <span className="truncate">{col.label}</span>
                           </div>
-                          {colIndex < columns.length - 1 ? (
-                            <span
-                              role="separator"
-                              aria-orientation="vertical"
-                              aria-label={`Resize ${col.label} column`}
-                              className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
-                              onPointerDown={(event) =>
-                                handleResizeStart(event, col)
-                              }
-                              onPointerMove={handleResizeMove}
-                              onPointerUp={handleResizeEnd}
-                              onPointerCancel={handleResizeEnd}
-                            />
-                          ) : null}
+                          <span
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label={`Resize ${col.label} column`}
+                            className="absolute inset-y-0 right-0 z-10 w-4 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border after:opacity-0 hover:after:bg-primary/40 hover:after:opacity-100 active:after:bg-primary/60 active:after:opacity-100"
+                            onPointerDown={(event) =>
+                              handleResizeStart(event, col)
+                            }
+                            onPointerMove={handleResizeMove}
+                            onPointerUp={handleResizeEnd}
+                            onPointerCancel={handleResizeEnd}
+                          />
                         </th>
                       )
                     })}
+                    {/* Sağ taraftaki artan boşluğu emen dolgu başlık hücresi */}
+                    <th className={cn(headClass, "p-0")} aria-hidden />
                   </tr>
                   {showFilterRow && renderFilterCell ? (
                     <tr className={filterRowClassName}>
@@ -365,6 +387,7 @@ export function VirtualSpreadsheet<T>({
                           {renderFilterCell(col, index)}
                         </th>
                       ))}
+                      <th className={cn(cellClass, "p-0")} aria-hidden />
                     </tr>
                   ) : null}
                 </thead>
@@ -403,12 +426,13 @@ export function VirtualSpreadsheet<T>({
                           </div>
                         </td>
                       ))}
+                      <td className={cn(cellClass, "p-0")} aria-hidden />
                     </tr>
                   ))
                 ) : items.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={columns.length}
+                      colSpan={columns.length + 1}
                       className="py-8 text-center text-xs text-muted-foreground"
                     >
                       Kayıt bulunamadı
@@ -422,11 +446,11 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: startIndex * rowHeight }}
                       >
-                        <td colSpan={columns.length} className="p-0 border-0" />
+                        <td colSpan={columns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                     {windowRows.map((row, index) =>
-                      renderRow(row, startIndex + index)
+                      renderVirtualRow(row, startIndex + index)
                     )}
                     {loadingMore && hasMore
                       ? Array.from({ length: SKELETON_ROWS }, (_, skeletonIndex) => (
@@ -454,6 +478,7 @@ export function VirtualSpreadsheet<T>({
                                 </div>
                               </td>
                             ))}
+                            <td className={cn(cellClass, "p-0")} aria-hidden />
                           </tr>
                         ))
                       : null}
@@ -463,7 +488,7 @@ export function VirtualSpreadsheet<T>({
                         className="p-0"
                         style={{ height: (items.length - endIndex) * rowHeight }}
                       >
-                        <td colSpan={columns.length} className="p-0 border-0" />
+                        <td colSpan={columns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
                   </>
