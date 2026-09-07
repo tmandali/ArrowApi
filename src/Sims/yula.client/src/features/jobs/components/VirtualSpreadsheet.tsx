@@ -1034,12 +1034,9 @@ export function VirtualSpreadsheet<T>({
     <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
       <div className={panelHeaderClass}>
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden mr-2">
-          <div className="flex min-w-0 max-w-[160px] sm:max-w-[240px] items-center gap-1.5 shrink">
-            <Table2 className={panelHeaderIconClass} aria-hidden />
-            <span className={panelHeaderTitleClass}>{title}</span>
-          </div>
-          {aiViews && (aiViews.length > 0 || activeAiViewId != null || Boolean(currentQuerySql)) ? (
+          {aiViews !== undefined || activeAiViewId != null || Boolean(currentQuerySql) ? (
             <AiViewDropdown
+              reportTitle={title}
               aiViews={aiViews}
               activeAiViewId={activeAiViewId}
               currentQuerySql={currentQuerySql}
@@ -1049,7 +1046,12 @@ export function VirtualSpreadsheet<T>({
               onRenameAiView={onRenameAiView}
               onDeleteAiView={onDeleteAiView}
             />
-          ) : null}
+          ) : (
+            <div className="flex min-w-0 max-w-[200px] sm:max-w-[320px] items-center gap-1.5 shrink">
+              <Table2 className={panelHeaderIconClass} aria-hidden />
+              <span className={panelHeaderTitleClass}>{title}</span>
+            </div>
+          )}
           {subtitle != null ? (
             <span className={cn(panelHeaderSubtitleClass, "min-w-0 shrink truncate")}>{subtitle}</span>
           ) : null}

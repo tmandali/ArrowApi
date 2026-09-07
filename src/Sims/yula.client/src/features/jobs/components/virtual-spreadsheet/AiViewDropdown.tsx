@@ -4,7 +4,6 @@ import * as React from "react"
 import {
   BookmarkPlus,
   ChevronDown,
-  ChevronRight,
   Code2,
   Copy,
   Check,
@@ -34,6 +33,7 @@ import { cn } from "@/utils/cn"
 import type { AiSqlView } from "./types"
 
 export interface AiViewDropdownProps {
+  reportTitle?: string
   aiViews?: readonly AiSqlView[]
   activeAiViewId?: string | null
   currentQuerySql?: string | null
@@ -46,6 +46,7 @@ export interface AiViewDropdownProps {
 }
 
 export function AiViewDropdown({
+  reportTitle,
   aiViews = [],
   activeAiViewId = null,
   currentQuerySql = null,
@@ -56,8 +57,8 @@ export function AiViewDropdown({
   onDeleteAiView,
   className,
 }: AiViewDropdownProps) {
-  const hasViews = aiViews.length > 0
   const isCurrentQueryActive = Boolean(currentQuerySql)
+  const defaultLabel = reportTitle || "Tüm Kayıtlar"
 
   // Aktif sorgu kayıtlı mı kontrolü
   const savedMatch = isCurrentQueryActive
@@ -73,7 +74,7 @@ export function AiViewDropdown({
     ? savedMatch.title
     : isCurrentQueryActive
     ? currentQueryTitle || "AI Analizi"
-    : "Tüm Kayıtlar"
+    : defaultLabel
 
   // Kaydetme diyalog state'i
   const [isSavingCurrent, setIsSavingCurrent] = React.useState(false)
@@ -143,38 +144,32 @@ export function AiViewDropdown({
     onDeleteAiView?.(viewId)
   }
 
-  if (!hasViews && !isCurrentQueryActive) {
-    return null
-  }
-
   return (
     <>
-      <div className={cn("inline-flex items-center gap-1.5 min-w-0 shrink select-none", className)}>
-        <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" aria-hidden />
-
+      <div className={cn("inline-flex items-center min-w-0 shrink select-none", className)}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               className={cn(
-                "group inline-flex h-6 min-w-0 max-w-44 sm:max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors outline-none shrink",
-                "border focus-visible:ring-1 focus-visible:ring-primary/50",
+                "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold tracking-tight transition-colors outline-none shrink",
+                "focus-visible:ring-1 focus-visible:ring-primary/50",
                 isCurrentQueryActive
-                  ? "bg-amber-500/10 text-amber-900 border-amber-500/30 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:text-amber-200 dark:border-amber-400/25"
-                  : "bg-muted/50 text-foreground border-border/80 hover:bg-muted/80"
+                  ? "text-amber-900 hover:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-400/10"
+                  : "text-primary hover:bg-muted/70 dark:text-sidebar-primary"
               )}
               title={
                 isCurrentQueryActive
                   ? isCurrentQuerySaved
                     ? `Aktif Kayıtlı Görünüm: ${activeTitle}`
                     : `Aktif Geçici AI Görünümü (Kaydedilmedi): ${activeTitle}`
-                  : "Aktif Görünüm: Tüm Kayıtlar"
+                  : `Aktif Görünüm: ${defaultLabel}`
               }
             >
               {isCurrentQueryActive ? (
-                <Sparkles className="size-3 text-amber-700 shrink-0 dark:text-amber-400" />
+                <Sparkles className="size-3.5 text-amber-600 shrink-0 dark:text-amber-400" />
               ) : (
-                <Table2 className="size-3 text-muted-foreground shrink-0" />
+                <Table2 className="size-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/80" />
               )}
               <span className="min-w-0 flex-1 truncate">{activeTitle}</span>
               {isCurrentQueryActive && !isCurrentQuerySaved ? (
@@ -183,7 +178,7 @@ export function AiViewDropdown({
                   title="Kaydedilmedi"
                 />
               ) : null}
-              <ChevronDown className="size-3 text-muted-foreground/60 shrink-0 group-hover:text-foreground transition-colors" />
+              <ChevronDown className="size-3 text-muted-foreground/60 shrink-0 transition-transform group-data-[state=open]:rotate-180 group-hover:text-foreground" />
             </button>
           </DropdownMenuTrigger>
 
@@ -229,7 +224,7 @@ export function AiViewDropdown({
               </>
             ) : null}
 
-            {/* Tüm Kayıtlar (Ham Veri) */}
+            {/* Raporun Kendi Başlığı (Ham Veri / Tüm Kayıtlar) */}
             <DropdownMenuItem
               onClick={() => onSelectAiView?.(null)}
               className={cn(
@@ -238,11 +233,21 @@ export function AiViewDropdown({
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Table2 className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate">Tüm Kayıtlar</span>
+                <Table2 className="size-3.5 text-orange-600/80 dark:text-orange-400/80 shrink-0" />
+                <span className="truncate">{defaultLabel}</span>
               </div>
-              {!isCurrentQueryActive ? <Check className="size-3.5 text-primary shrink-0" /> : null}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] text-muted-foreground font-normal">Tüm Kayıtlar</span>
+                {!isCurrentQueryActive ? <Check className="size-3.5 text-primary shrink-0" /> : null}
+              </div>
             </DropdownMenuItem>
+
+            {aiViews.length === 0 && !isCurrentQueryActive ? (
+              <div className="px-2.5 py-2 text-[11px] text-muted-foreground flex items-center gap-1.5 border-t border-border/60">
+                <Sparkles className="size-3 text-amber-500 shrink-0" />
+                <span>Yula AI ile sorgu ürettiğinizde görünümler burada listelenir.</span>
+              </div>
+            ) : null}
 
             {/* Görünümler Listesi */}
             {aiViews.map((view) => {
