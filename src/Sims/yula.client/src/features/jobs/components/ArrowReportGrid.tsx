@@ -5,7 +5,6 @@ import * as React from "react"
 import {
   RotateCw,
   X,
-  DatabaseIcon,
   TriangleAlert,
   FileSpreadsheet,
   AlertCircle,
@@ -42,7 +41,6 @@ import { exportOpfsMergedParquet } from "@/services/opfs/opfs-parquet-merge"
 
 import { deriveColumnKind } from "../lib/column-type-utils"
 import { computeColumnValuesDigest } from "@/lib/grid-column-values"
-import { resetGridCustomView } from "@/lib/yula-client-tools"
 import { formatGridCellValue, formatColumnLabel } from "@/utils/format-cell"
 import { buildCombinedWhereClause } from "@/services/duckdb/filter-parser"
 import { VirtualSpreadsheet } from "./VirtualSpreadsheet"
@@ -893,23 +891,6 @@ export function ArrowReportGrid({
       headerActions={
         <>
           {headerActions}
-          {customQuerySql ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 max-w-56 shrink-0 gap-1.5 text-xs"
-              onClick={() => void resetGridCustomView()}
-              title={`"${customQueryTitle ?? "Aktif Veri Kümesi"}" görünümündesiniz — kapatıp raporun tam haline dönmek için tıklayın`}
-              aria-label="Aktif görünümü kapat, rapora dön"
-            >
-              <DatabaseIcon className="size-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/80" />
-              <span className="truncate">
-                {customQueryTitle ?? "Aktif Veri Kümesi"}
-              </span>
-              <X className="size-3 shrink-0" />
-            </Button>
-          ) : null}
           {hiddenColumns && hiddenColumns.length > 0 ? (
             <Button
               type="button"
