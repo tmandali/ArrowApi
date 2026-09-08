@@ -141,7 +141,7 @@ export function WorkspaceAiDock({
   centeredIntro = false,
   defaultOpen = false,
 }: WorkspaceAiDockProps) {
-  const { open, setOpen, expanded, setExpanded, sideDockAllowed } =
+  const { open, setOpen, expanded, setExpanded } =
     useWorkspaceAiChat()
   const { open: searchOpen } = useWorkspaceSearch()
   const pathname = usePathname()
@@ -179,7 +179,7 @@ export function WorkspaceAiDock({
     )
   }
 
-  const isMainMode = open && (expanded || !sideDockAllowed || startExpanded)
+  const isMainMode = open && (expanded || startExpanded)
 
   if (isMainMode) {
     return (

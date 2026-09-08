@@ -2,12 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import * as React from "react"
-import { useMediaQuery } from "@/hooks/use-media-query"
 import { isWorkspaceHomePath } from "@/lib/workspace-paths"
 import { useYulaDockStore } from "@/lib/stores/dock"
 import {
   WorkspaceAiChatContext,
-  YULA_SIDE_DOCK_MIN_WIDTH,
   type WorkspaceAiChatContextValue,
 } from "./workspace-ai-chat-context"
 
@@ -16,9 +14,7 @@ export function WorkspaceAiChatProvider({
 }: {
   children: React.ReactNode
 }) {
-  const sideDockAllowed = !useMediaQuery(
-    `(max-width: ${YULA_SIDE_DOCK_MIN_WIDTH - 1}px)`
-  )
+  const sideDockAllowed = true
 
   const open = useYulaDockStore((s) => s.open)
   const setOpenStore = useYulaDockStore((s) => s.setOpen)
@@ -37,24 +33,14 @@ export function WorkspaceAiChatProvider({
     prevIsHomePageRef.current = isHomePage
   }, [isHomePage, setOpenStore, setExpandedStore])
 
-  React.useEffect(() => {
-    if (!sideDockAllowed && open) {
-      setExpandedStore(true)
-    }
-  }, [sideDockAllowed, open, setExpandedStore])
-
   const setOpen = React.useCallback(
     (next: boolean) => {
       setOpenStore(next)
       if (!next) {
         setExpandedStore(false)
-        return
-      }
-      if (!sideDockAllowed) {
-        setExpandedStore(true)
       }
     },
-    [sideDockAllowed, setOpenStore, setExpandedStore]
+    [setOpenStore, setExpandedStore]
   )
 
   const setExpanded = React.useCallback(
@@ -73,7 +59,7 @@ export function WorkspaceAiChatProvider({
       open,
       setOpen,
       toggle: () => setOpen(!open),
-      expanded: open && (!sideDockAllowed || expanded),
+      expanded: open && expanded,
       setExpanded,
       toggleExpanded,
       sideDockAllowed,
