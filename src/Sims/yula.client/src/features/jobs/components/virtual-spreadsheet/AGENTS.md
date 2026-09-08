@@ -20,10 +20,13 @@ src/features/jobs/components/
     ├── column-aggregations.ts            # Bellek ici ve DuckDB tek gecisli SQL alt toplam hesaplama motoru
     └── tests/                            # Otomasyon testleri: npm run test:grid
         ├── filter-parser.test.mjs        # DuckDB WHERE SQL üretimi, istemci arama ve şema formatlama testleri
-        ├── export-formats.test.mjs       # Excel 1M/2M limitleri, ZSTD Parquet ve GZIP CSV kural testleri
-        ├── test-parquet-merge.mjs        # OPFS parça birleştirme ve lazy parquet akış testleri
+        ├── export-formats.test.mjs       # Excel 1M/2M limitleri, GZIP CSV ve özel görünüm dışa aktarım testleri
+        ├── test-parquet-merge.mjs        # OPFS parça birleştirme ve DuckDB Arrow IPC lazy parquet akış testleri
         ├── test-criteria-input-engine.mjs# D365/BC sözdizimi, tarih ve zorunlu alan doğrulama testleri
         ├── test-aggregations.mjs         # Kolon alt toplam (SUM, AVG, DISTINCT) ve SQL üretim testleri
+        ├── test-ai-views.mjs             # AI SQL görünümleri (oto-kayıt yapmama, kaydet, yeniden adlandır, sil) testleri
+        ├── test-multi-sort.mjs           # Çoklu kolon sıralama ve kolon sırasına göre SQL ORDER BY öncelik testleri
+        ├── test-duckdb-views.mjs         # active_view ve saved_views DuckDB senkronizasyon testleri
         └── run-all.mjs                   # Tüm grid testlerini tek komutla koşan test orkestratörü
 ```
 
@@ -80,11 +83,12 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 ### Kural 7: Kolon Alt Toplam / Özet Çubuğu (Footer Aggregations)
 - `<tfoot>` tablonun en altında dikey scroll penceresinde `sticky bottom-0 z-20` olarak yer alır ve dikey kaydırmada daima görünür kalır.
 - Yatay kaydırmada `thead` ve `tbody` ile kusursuz senkronizasyon sağlanır: `getStickyLeftOffset(index)` ile pinned kolonların sol mesafeleri, `isLastPinned && isScrolledLeft` sağ kenar gölgesi birebir korunur.
+- **Varsayılan Görünürlük Kuralı:** Alt toplam / özet satırı varsayılanda **kapalıdır** (`showFooterRow: false`). Kullanıcı üst bardaki `Σ` butonuna basarak isteğe bağlı olarak açar. Kapalıyken DuckDB arka planında gereksiz alt toplam sorguları çalıştırılmaz; açıldığında anında hesaplanır.
 - **İki Kademeli Hesaplama Mimarisi:**
   - **DuckDB SQL Pushdown:** DuckDB WASM üzerinde aktif filtrelerle `buildDuckDbAggregationSql()` tek geçişli SQL sorgusu çalıştırır (1M filtrelenmiş satırda ~15-20 ms).
   - **In-Memory Fallback:** DuckDB henüz hazır değilken veya küçük veri kümelerinde `computeInMemoryAggregations()` ile CPU üzerinde anında hesaplanır.
 - **Desteklenen Metrikler:** Sayısal kolonlar için `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `DISTINCT`; metin/tarih kolonları için `COUNT`, `DISTINCT`; `None` (kapatma).
-- **LocalStorage Kalıcılığı:** Kullanıcının seçtiği kolon metrikleri (`aggregations`) ve çubuk görünürlük durumu (`showFooterSummary`) `GridPersistedState` içine kaydedilir ve "Varsayılana Sıfırla" ile temizlenir.
+- **LocalStorage Kalıcılığı:** Kullanıcının seçtiği kolon metrikleri (`aggregations`) ve çubuk görünürlük durumu (`showFooter`) `GridPersistedState` içine kaydedilir ve "Varsayılana Sıfırla" ile temizlenir (tekrar kapalıya döner).
 
 ### Kural 8: AI SQL Görünümleri ve Açılır Seçici (AI SQL Views Dropdown)
 - Yula AI `set_grid_query` çalıştırdığında veya yeni bir analitik sorgu ürettiğinde, bu sorgu ekranda geçici AI görünümü olarak anında çalıştırılır ve başlık rozetinde (`[ ✦ {title} • ▾ ]`) gösterilir; ancak **otomatik olarak kalıcı listeye kaydedilmez**.
@@ -93,6 +97,15 @@ Bu bileşende değişiklik yaparken aşağıdaki kurallar **asla ihlal edilmemel
 - Kullanıcı tek tıkla `Ham Veri (Tüm Kayıtlar)` ile kayıtlı veya geçici AI SQL analizleri arasında geçiş yapabilir. Ham veriye dönüldüğünde kaydedilmemiş geçici sorgu temizlenir ve kalıcı listeyi kirletmez.
 - Menü üzerinden kayıtlı AI görünümleri **yeniden adlandırılabilir** (`rename`), **silinebilir** (`delete`) ve **SQL sorgusu incelenebilir/kopyalanabilir**.
 - Silinen görünüm aktifse grid otomatik olarak temel `Ham Veri` görünümüne geri döner.
+
+### Kural 9: Sıfır-Bellek (Zero-OOM) Streaming Parquet ve Özel SQL Dışa Aktarımı
+- **Kayıtlı Görünüm & Özel SQL İhracı (Binder Error Koruması):**
+  - Özel SQL görünümleri dışa aktarılırken (Excel, CSV, GZIP) hedef tablo olarak fiziksel tablo yerine `(${cleanCustomSql}) AS __export_source` alt sorgusu kullanılır. Böylece `"Satış Tutarı"`, `"İade Tutarı"` gibi türetilmiş sanal kolonlar DuckDB'de Binder Error vermeden sorunsuz dışa aktarılır.
+  - Kullanıcının gizlediği kolonlar (`hiddenColumns`) dışa aktarım dosyasından otomatik olarak hariç tutulur.
+- **Zero-OOM Streaming Parquet İhracı (`exportQueryToParquetStream`):**
+  - DuckDB WASM'ın 32-bit linear heap bellek sınırını (OOM) aşmamak için, filtrelenmiş veya özel görünümlü Parquet dışa aktarımları C++ `COPY TO PARQUET` yerine **50.000 satırlık kontrollü Arrow IPC chunk'ları** halinde çekilir (`FETCH_ARROW_IPC_CHUNK`).
+  - Gelen IPC akışı `parquet-wasm`'ın `transformParquetStream` motoruna beslenir, her dilimden sonra WASM nesnesi `free()` edilir ve kullanıcıya tek parça `.parquet` dosyası olarak stream halinde indirilir.
+  - Diskte ve RAM'de hiçbir artık/çöp dosya birikmez; tarayıcı bellek kullanımı tablo milyonlarca satır olsa dahi sabit kalır (~60-80 MB).
 
 
 
@@ -135,10 +148,15 @@ Tablonun kolon konfigürasyonu istemci tarafında kalıcı olarak saklanır:
     widths?: Record<string, string | number> // Kolon piksel genişlikleri
     hidden?: string[]                      // Gizlenmiş kolon isimleri
     pinned?: string[]                      // Sabitlenmiş kolon isimleri
+    aggregations?: ColumnAggregationConfig // Kolon alt toplam metrikleri (SUM, AVG...)
+    showFooter?: boolean                   // Alt toplam çubuğu açık/kapalı durumu
+    sortBy?: string | null                 // Tekil sıralama kolonu
+    sortDesc?: boolean                     // Sıralama yönü
+    sortConfigs?: ColumnSortConfigs        // Çoklu kolon sıralama hiyerarşisi
   }
   ```
 - **Sıfırlama Mekanizması (`handleResetColumns`):**
-  - Kullanıcı menüdeki "Varsayılana Sıfırla" (`RotateCcw`) butonuna bastığında gizli kolonlar, özel sıralama, özel genişlikler ve özel sabitlemeler sıfırlanır, `localStorage` girdisi silinir.
+  - Kullanıcı menüdeki "Varsayılana Sıfırla" (`RotateCcw`) butonuna bastığında gizli kolonlar, özel sıralama, özel genişlikler, özel sabitlemeler ve alt toplam çubuğu (`showFooterRow: false`) sıfırlanır, `localStorage` girdisi silinir.
   - Sıfırlama butonu yalnızca kullanıcının varsayılandan farklı bir değişikliği olduğunda aktifleşir (`canResetColumns`).
 
 ---
@@ -165,9 +183,13 @@ Test suite (`src/features/jobs/components/virtual-spreadsheet/tests/`) şunları
   - Şema tabanlı hücre formatlama (`BIGINT`/`INTEGER` asla binlik nokta almaz; `DECIMAL`/`FLOAT` Türkçe formatlanır)
 - **`export-formats.test.mjs`:**
   - DuckDB C++ GZIP CSV sözdizimi (`COMPRESSION GZIP`, `DELIMITER ';'`)
-  - Apache Parquet ihracı: DuckDB WASM 32-bit OOM'u önlemek için OPFS parçaları ve parquet-wasm lazy-stream ile sıfır bellek yüküyle birleştirme (`test-parquet-merge.mjs`)
+  - Apache Parquet ihracı: DuckDB WASM 32-bit OOM'u önlemek için OPFS parçaları ve parquet-wasm lazy-stream ile sıfır bellek yüküyle birleştirme
+  - Özel ve kayıtlı AI görünümlerinin dışa aktarımında Binder Error önleyici `__export_source` alt sorgusu doğrulaması
   - Excel 1.000.000 satır limitini aşan durumlarda otomatik sayfalara (`Sayfa 1`, `Sayfa 2`...) bölme mantığı
   - DuckDB-Wasm Issue #2119 fazladan çöp bayt tespiti ve `PK\x03\x04` imza kırpma doğrulaması
+- **`test-parquet-merge.mjs`:**
+  - OPFS parquet parçalarını lazy-stream ile sıfır bellek yüküyle birleştirme
+  - DuckDB Arrow IPC stream chunk'larından (50.000 satırlık dilimler) `parquet-wasm` ile sıfır-OOM Parquet üretimi doğrulaması
 
 ### 2. Statik Analiz & Derleme:
 - `npm run lint` (oxlint): **0 warnings, 0 errors** olmalı.

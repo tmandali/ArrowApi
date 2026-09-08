@@ -91,7 +91,7 @@ export function VirtualSpreadsheet<T>({
   pinnedColumnCount = 1,
   pinnedColumns,
   onPinnedColumnsChange,
-  showFooterRow = true,
+  showFooterRow = false,
   onToggleFooterRow,
   aggregationConfigs,
   onAggregationConfigsChange,
@@ -729,6 +729,9 @@ export function VirtualSpreadsheet<T>({
               onSortConfigsChange({ [parsed.sortBy]: parsed.sortDesc ? "desc" : "asc" })
             }
           }
+          if (parsed.showFooter !== undefined && onToggleFooterRow) {
+            onToggleFooterRow(Boolean(parsed.showFooter))
+          }
         }
       }
     } catch {
@@ -745,6 +748,7 @@ export function VirtualSpreadsheet<T>({
     onAggregationConfigsChange,
     onSortSettingChange,
     onSortConfigsChange,
+    onToggleFooterRow,
   ])
 
   // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
@@ -766,8 +770,9 @@ export function VirtualSpreadsheet<T>({
       const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
       const hasSortConfigs = Object.keys(activeSortConfigs).length > 0
       const hasSort = Boolean(sortColumn) || hasSortConfigs
+      const hasFooter = Boolean(showFooterRow)
 
-      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations && !hasSort) {
+      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations && !hasSort && !hasFooter) {
         try {
           localStorage.removeItem(effectiveStorageKey)
         } catch {}
@@ -781,6 +786,7 @@ export function VirtualSpreadsheet<T>({
           hidden: hasHidden ? activeHiddenColumns : undefined,
           pinned: hasPinned ? activePinnedColumns : undefined,
           aggregations: hasAggregations ? activeAggregationConfigs : undefined,
+          showFooter: hasFooter ? true : undefined,
           sortBy: hasSort ? (activeSortColumn ?? sortColumn ?? undefined) : undefined,
           sortDesc: hasSort ? (activeSortDirection === "desc") : undefined,
           sortConfigs: hasSortConfigs ? activeSortConfigs : undefined,
@@ -802,6 +808,7 @@ export function VirtualSpreadsheet<T>({
     internalPinnedColumns,
     defaultPinnedColumns,
     activeAggregationConfigs,
+    showFooterRow,
     sortColumn,
     sortDirection,
     activeSortConfigs,
@@ -843,6 +850,9 @@ export function VirtualSpreadsheet<T>({
     }
     setInternalSort({ column: null, direction: null })
     setColWidths(initialColWidths ?? {})
+    if (onToggleFooterRow) {
+      onToggleFooterRow(false)
+    }
     if (effectiveStorageKey && typeof window !== "undefined") {
       try {
         localStorage.removeItem(effectiveStorageKey)
@@ -854,6 +864,7 @@ export function VirtualSpreadsheet<T>({
     onPinnedColumnsChange,
     onSortConfigsChange,
     onSortSettingChange,
+    onToggleFooterRow,
     defaultPinnedColumns,
     initialColWidths,
     effectiveStorageKey,
@@ -872,13 +883,15 @@ export function VirtualSpreadsheet<T>({
       (activePinnedColumns.length !== defaultPinnedColumns.length ||
         activePinnedColumns.some((c, i) => c !== defaultPinnedColumns[i]))
     const hasSort = Boolean(sortColumn) || Object.keys(activeSortConfigs).length > 0
+    const hasFooter = Boolean(showFooterRow)
 
     return (
       hiddenColumnsCount > 0 ||
       Boolean(activeColumnOrder && activeColumnOrder.length > 0) ||
       Object.keys(colWidths).length > 0 ||
       isPinnedModified ||
-      hasSort
+      hasSort ||
+      hasFooter
     )
   }, [
     hiddenColumnsCount,
@@ -890,6 +903,7 @@ export function VirtualSpreadsheet<T>({
     defaultPinnedColumns,
     sortColumn,
     activeSortConfigs,
+    showFooterRow,
   ])
 
   const totalTableWidth = React.useMemo(() => {
@@ -1310,8 +1324,8 @@ export function VirtualSpreadsheet<T>({
               className="size-7 shrink-0"
               disabled={columns.length === 0}
               onClick={() => onToggleFooterRow(!showFooterRow)}
-              title={showFooterRow ? "Hide summary row (Σ)" : "Show summary row (Σ)"}
-              aria-label={showFooterRow ? "Hide summary row (Σ)" : "Show summary row (Σ)"}
+              title={showFooterRow ? "Alt toplam satırını gizle (Σ)" : "Alt toplam satırını göster (Σ)"}
+              aria-label={showFooterRow ? "Alt toplam satırını gizle (Σ)" : "Alt toplam satırını göster (Σ)"}
             >
               <Sigma className="size-3.5" />
             </Button>

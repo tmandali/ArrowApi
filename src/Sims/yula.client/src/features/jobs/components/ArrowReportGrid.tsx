@@ -766,11 +766,11 @@ export function ArrowReportGrid({
 
   const [aggregationConfigs, setAggregationConfigs] = React.useState<ColumnAggregationConfig>({})
   const [duckDbAggregations, setDuckDbAggregations] = React.useState<ColumnAggregationValues | undefined>(undefined)
-  const [showFooterRow, setShowFooterRow] = React.useState(true)
+  const [showFooterRow, setShowFooterRow] = React.useState(false)
 
   // DuckDB üzerinde aktif filtreler ve aggregationConfigs ile alt toplamları hesapla
   React.useEffect(() => {
-    if (!duckTableName || effectiveColumns.length === 0 || isStreaming || isSavingDisk) {
+    if (!showFooterRow || !duckTableName || effectiveColumns.length === 0 || isStreaming || isSavingDisk) {
       return
     }
     const hasAny = Object.values(aggregationConfigs).some((t) => t && t !== "none")
@@ -811,7 +811,7 @@ export function ArrowReportGrid({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [duckTableName, filters, aggregationConfigs, effectiveColumns, numericColumns, isStreaming, isSavingDisk])
+  }, [showFooterRow, duckTableName, filters, aggregationConfigs, effectiveColumns, numericColumns, isStreaming, isSavingDisk])
 
   const [isExporting, setIsExporting] = React.useState(false)
   const [exportWarning, setExportWarning] = React.useState<{
