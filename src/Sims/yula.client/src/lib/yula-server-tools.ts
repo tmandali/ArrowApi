@@ -127,9 +127,9 @@ export const STATIC_TOOLS = {
     }),
     apply_criteria: tool({
       description: [
-        "Önerilen kriterleri (ör. kayitTarihi, durum, tutarMiktar) aktif ekrandaki kriter formuna doldurur; job BAŞLATMAZ.",
-        "YALNIZ açık doldurma/onay niyeti varsa çağır: '1. öneriyi uygula', 'forma doldur', 'forma yaz', 'dünü seç', 'uygula'.",
-        "Yalnız 'geçen hafta', 'dün', 'AKTIF' gibi eksik ifadelerde BU ARACI ÇAĞIRMA — önce 1-2 yula-criteria öneri chip'i sun.",
+        "Önerilen veya istenen kriterleri (tarih aralıkları, filtreler, durum vb.) aktif ekrandaki kriter formuna uygular ve doldurur; job BAŞLATMAZ.",
+        "Kullanıcı kriterleri doldurmak, düzenlemek, güncellemek veya ayarlamak istediğinde bu aracı ÇAĞIR (ör. 'kriterleri geçen haftaya göre düzenle', 'forma doldur', 'tarihi ayarla', '1. öneriyi uygula', 'doldur', 'güncelle', 'uygula', 'update criteria to last week').",
+        "YALNIZCA hiçbir eylem fiili olmayan çıplak değerlerde (kullanıcı sadece tek başına 'geçen hafta' veya 'dün' yazıp başka hiçbir şey demediyse) bu aracı çağırma, öneri chip'i sun.",
         "Form doldurulur, ekranda vurgulanır ve kullanıcı ekrandaki 'Run' butonuna basarak işi kendisi çalıştırabilir.",
       ].join(" "),
       inputSchema: z.object({
