@@ -1,7 +1,7 @@
 import { useYulaGridStore } from "@/lib/stores/grid"
 import { findReport } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
-import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage } from "@/lib/sql-guard";
+import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage, PORTABLE_TABLE_PLACEHOLDER } from "@/lib/sql-guard";
 import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
 import { focusReportExecution, reportExecutionHref } from "@/lib/report-run-bus";
 
@@ -698,15 +698,15 @@ async function setGridQuery(
     return { status: "error", error: guard.error, hint: guard.hint };
   }
 
-  // Sorgu açık tabloya veya active_view'e referans vermeli (tableName yalnız [A-Za-z0-9_])
+  // Sorgu açık tabloya veya PORTABLE_TABLE_PLACEHOLDER'a referans vermeli
   const referencesTable =
     new RegExp(spec.tableName, "i").test(guard.sql) ||
-    /\bactive_view\b/i.test(guard.sql);
+    new RegExp(`\\b${PORTABLE_TABLE_PLACEHOLDER}\\b`, "i").test(guard.sql);
   if (!referencesTable) {
     return {
       status: "error",
-      error: `Query does not reference the open table (${spec.tableName}) or active_view.`,
-      hint: `Use ${spec.tableName} or active_view in FROM/JOIN clauses.`,
+      error: `Query does not reference the open table (${spec.tableName}) or ${PORTABLE_TABLE_PLACEHOLDER}.`,
+      hint: `Use ${spec.tableName} or ${PORTABLE_TABLE_PLACEHOLDER} in FROM/JOIN clauses.`,
     };
   }
 

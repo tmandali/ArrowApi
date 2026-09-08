@@ -134,6 +134,22 @@ export function guardReadOnlySelect(
 }
 
 /**
+ * Kayıtlı sorguların fiziksel DuckDB tablo adı (report_<uuid>) yerine kullandığı
+ * **taşınabilir yer tutucu (portable placeholder)**.
+ *
+ * Bu sabit bir **şablon sistemi (template)** kurar:
+ *   KAYDET  : normalizeQueryForStorage(sql, currentTable)  →  SQL(PLACEHOLDER)
+ *   ÇALIŞTIR: resolveActiveViewReferences(sql, anyTable)   →  SQL(anyTable)
+ *
+ * Böylece tek bir kayıtlı sorgu, farklı iş yürütmelerinde (farklı GUID'ler)
+ * değiştirilmeden çalışabilir. "active_view" seçilmiştir çünkü:
+ *   - DuckDB içinde zaten bu isimli bir VIEW oluşturulur (filtre/sıralama katmanı)
+ *   - AI, bu adı "ekrandaki aktif veri" olarak anlar ve böyle sorgular üretir
+ *   - SQL guard bu adı bilir; referencesTable kontrolünden geçer
+ */
+export const PORTABLE_TABLE_PLACEHOLDER = "active_view" as const
+
+/**
  * DuckDB rapor tablosu adı kalıbı: `report_<uuid-underscored>`
  * Örn: report_5b4db7dd_2bf3_4d86_ac6d_78fde865e32d
  * Hem tırnaksız hem çift tırnaklı biçimi yakalar.
@@ -142,15 +158,15 @@ const REPORT_TABLE_PATTERN =
   /(?:"report_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}"|\breport_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}\b)/gi
 
 /**
- * SQL ifadesi içindeki `active_view` referanslarını ve eski (stale)
- * `report_<uuid>` tablo referanslarını mevcut tablonun adına çözümler.
+ * SQL ifadesi içindeki placeholder ve eski (stale) fiziksel tablo referanslarını
+ * çalışma zamanındaki mevcut tabloya çözümler.
  *
- * İki sorunu aynı anda giderir:
- * 1. **Infinite recursion**: active_view'ün kendi içinden active_view çağırması
- *    (`CREATE OR REPLACE VIEW active_view AS … FROM active_view`)
- * 2. **Catalog Error**: Kayıtlı sorgunun eski iş tablosuna (`report_d56e92aa_…`)
- *    referans vermesi — yeni rapor farklı bir tablo adına sahip olduğundan
- *    `Table does not exist!` hatası oluşur.
+ * Şablon sisteminin ÇALIŞTIRMA tarafı:
+ *   SQL(active_view | report_<old-uuid>) → SQL(currentTable)
+ *
+ * Giderdiği iki hata:
+ * 1. **Infinite recursion** – `CREATE VIEW active_view AS … FROM active_view`
+ * 2. **Catalog Error** – `Table report_<old-uuid> does not exist`
  */
 export function resolveActiveViewReferences(sql: string, targetTable: string): string {
   if (!sql || !targetTable) return sql
@@ -158,32 +174,35 @@ export function resolveActiveViewReferences(sql: string, targetTable: string): s
 
   // 1. Eski/farklı report_<uuid> tablo adlarını mevcut tabloyla değiştir
   let resolved = sql.replace(REPORT_TABLE_PATTERN, (match) => {
-    // Mevcut tabloyla aynıysa dokunma
     const bare = match.replace(/"/g, "")
     return bare === targetTable ? match : escapedTarget
   })
 
-  // 2. active_view referanslarını mevcut tabloyla değiştir
-  resolved = resolved.replace(
-    /(?:"active_view"|'active_view'|\bactive_view\b)/gi,
-    escapedTarget
+  // 2. PORTABLE_TABLE_PLACEHOLDER ("active_view") → mevcut fiziksel tablo
+  const placeholderPattern = new RegExp(
+    `(?:"${PORTABLE_TABLE_PLACEHOLDER}"|'${PORTABLE_TABLE_PLACEHOLDER}'|\\b${PORTABLE_TABLE_PLACEHOLDER}\\b)`,
+    "gi"
   )
+  resolved = resolved.replace(placeholderPattern, escapedTarget)
 
   return resolved
 }
 
 /**
- * Bir sorguyu localStorage'a kaydetmeden önce taşınabilir hale getirir:
- * fiziksel tablo adını `active_view` yer tutucusuyla değiştirir.
- * Bu sayede aynı sorgu farklı iş ID'leriyle (farklı tablo adlarıyla) açıldığında
- * doğru çalışmaya devam eder.
+ * Bir sorguyu depoya (localStorage) kaydetmeden önce **taşınabilir şablona** dönüştürür:
+ * Fiziksel tablo adını (report_<uuid>) PORTABLE_TABLE_PLACEHOLDER ile değiştirir.
+ *
+ * Şablon sisteminin KAYDETME tarafı:
+ *   SQL(report_<any-uuid>) → SQL(active_view)
+ *
+ * Bu sayede aynı sorgu farklı iş yürütmelerinde (farklı GUID'ler ile) açıldığında
+ * resolveActiveViewReferences ile doğru tabloya çözümlenerek çalışmaya devam eder.
  */
 export function normalizeQueryForStorage(sql: string, tableName: string): string {
   if (!sql || !tableName) return sql
-  // Hem tırnaklı hem tırnaksız biçimi yakala
   const escapedTable = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   return sql.replace(
     new RegExp(`(?:"${escapedTable.replace(/"/g, '""')}"|\\b${escapedTable}\\b)`, "gi"),
-    "active_view"
+    PORTABLE_TABLE_PLACEHOLDER
   )
 }
