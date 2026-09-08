@@ -134,7 +134,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           ? orderedColumnNames
           : columns.map((c) => c.name)
 
-      const knownColSet = new Set(columns.map((c) => c.name))
+      // describeTable sonucu henüz React state'e yazılmadan önce de doğru
+      // kolon kümesiyle doğrula (cache açılış yarışı).
+      const knownColSet = new Set(
+        orderedColumnNames && orderedColumnNames.length > 0
+          ? orderedColumnNames
+          : columns.map((c) => c.name)
+      )
       const sortList: SortConfig[] = []
 
       for (const colName of order) {
@@ -429,7 +435,20 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
               if (discovered.length > 0 && !isCustomQueryActive()) {
                 setColumns(discovered)
               }
-              void executeQueryRef.current({}, null, false, 0)
+              // OPFS/cache açılışında localStorage sıralaması çoğu zaman önce
+              // restore edilir; burada null sort ile ezmeyip ref'teki aktif
+              // filtre/sıralamayı kullan (aksi halde ORDER BY kolonları UI'da
+              // görünür ama veri sırasız kalır).
+              void executeQueryRef.current(
+                filtersRef.current,
+                sortByRef.current,
+                sortDescRef.current,
+                0,
+                sortConfigsRef.current,
+                discovered.length > 0
+                  ? discovered.map((c) => c.name)
+                  : undefined
+              )
               // Tablo bu turda hazır olduysa bekleyen özel sorguyu koştur
               if (isCustomQueryActive()) setCustomQueryTick((t) => t + 1)
             })
@@ -439,7 +458,16 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
               if (discovered.length > 0 && !isCustomQueryActive()) {
                 setColumns(discovered)
               }
-              void executeQueryRef.current(filtersRef.current, sortByRef.current, sortDescRef.current, 0)
+              void executeQueryRef.current(
+                filtersRef.current,
+                sortByRef.current,
+                sortDescRef.current,
+                0,
+                sortConfigsRef.current,
+                discovered.length > 0
+                  ? discovered.map((c) => c.name)
+                  : undefined
+              )
             })
           }
         }
@@ -584,6 +612,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
         // Aktif filtre veya sıralama özel sorgu SONUÇLARI üzerinde de çalışsın:
         // SELECT * FROM (<özel sorgu>) AS __custom_view [WHERE ...] [ORDER BY ...]
+        // ÖNEMLİ: sarmalayıcıda da resolvedSql kullan — ham customSql içinde
+        // `active_view` varsa wrap Binder Error verir ve ORDER BY sessizce düşer.
         const activeFilters = filtersRef.current
         const hasActiveFilters = Object.values(activeFilters).some(
           (v) => v && v.trim()
@@ -612,7 +642,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           }
 
           try {
-            const wrappedSql = `SELECT * FROM (${customSql}) AS __custom_view ${where} ${orderClause}`
+            const cleanResolved = resolvedSql.trim().replace(/;+$/, "")
+            const wrappedSql = `SELECT * FROM (${cleanResolved}) AS __custom_view ${where} ${orderClause}`
             const filteredAndSorted = await duckDbClient.executeCustomSql(wrappedSql)
             if (cancelled || seq !== querySeqRef.current) return
             resultRows = (filteredAndSorted as T[]) ?? []
