@@ -1,3 +1,44 @@
+function formatTimestampOrDate(d: Date, forceDateOnly = false): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const dateStr = `${day}.${m}.${y}`;
+
+  if (forceDateOnly) return dateStr;
+
+  const hh = d.getHours();
+  const mm = d.getMinutes();
+  const ss = d.getSeconds();
+
+  if (hh === 0 && mm === 0 && ss === 0) {
+    return dateStr;
+  }
+
+  return `${dateStr} ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+}
+
+function parseAndFormatDateString(val: string): string | null {
+  const trimmed = val.trim();
+  // Zaten "DD.MM.YYYY" veya "DD.MM.YYYY HH:mm:ss" formatındaysa koru
+  if (/^\d{2}\.\d{2}\.\d{4}(?:\s\d{2}:\d{2}(?::\d{2})?)?$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // ISO / SQL DateTime: "2026-09-01T20:18:57", "2026-09-01 20:18:57", "2026-09-01T20:18:57.000Z"
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!match) return null;
+
+  const [, y, m, d, hh, mm, ss] = match;
+  const dateStr = `${d}.${m}.${y}`;
+
+  if (!hh || (hh === "00" && mm === "00" && (!ss || ss === "00"))) {
+    return dateStr;
+  }
+
+  const sec = ss !== undefined ? `:${ss}` : ":00";
+  return `${dateStr} ${hh}:${mm}${sec}`;
+}
+
 /**
  * Yula Grid Tablosu Hücre Biçimlendiricisi — Şemadan gelen fiziksel kolon tipine
  * (DuckDB / Arrow schema) göre hücre değerini biçimlendirir.
@@ -5,7 +46,7 @@
  *
  * - INT / INTEGER / BIGINT vb. tamsayı kolonlar ham değer olarak gösterilir (44577625).
  * - DECIMAL / NUMERIC / FLOAT / DOUBLE tutar alanları Türkçe yerel ayarlarına göre (1.250,50) biçimlendirilir.
- * - DATE / TIMESTAMP alanları YYYY-MM-DD olarak gösterilir.
+ * - DATE alanları DD.MM.YYYY, TIMESTAMP alanları saat bilgisiyle DD.MM.YYYY HH:mm:ss olarak gösterilir.
  */
 export function formatGridCellValue(
   val: unknown,
@@ -14,12 +55,40 @@ export function formatGridCellValue(
 ): string {
   if (val === null || val === undefined || val === "") return "";
 
-  if (val instanceof Date) {
-    if (isNaN(val.getTime())) return "";
-    return val.toISOString().slice(0, 10);
+  // 1. Boolean tipleri (true/false)
+  if (typeof val === "boolean") {
+    return val ? "Evet" : "Hayır";
   }
 
   const rawType = (columnType || "").toUpperCase();
+  const isBoolColumn =
+    rawType === "BOOLEAN" ||
+    rawType === "BOOL" ||
+    rawType === "BIT" ||
+    rawType.includes("BOOL");
+
+  // Kolon tipi şemada BOOL/BIT ise 1 ve 0 değerlerini de standart 'Evet' / 'Hayır' yap
+  if (isBoolColumn) {
+    if (val === 1 || val === "1" || val === true || String(val).toLowerCase() === "true") {
+      return "Evet";
+    }
+    if (val === 0 || val === "0" || val === false || String(val).toLowerCase() === "false") {
+      return "Hayır";
+    }
+  }
+
+  // String olarak "true" / "false" geldiyse
+  if (typeof val === "string") {
+    const sLower = val.trim().toLowerCase();
+    if (sLower === "true") return "Evet";
+    if (sLower === "false") return "Hayır";
+  }
+
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    return formatTimestampOrDate(val);
+  }
+
   const isDateColumn = rawType === "DATE" || rawType.includes("DATE") || rawType.includes("TIME");
   const isIntegerType =
     rawType.includes("INT") ||
@@ -44,17 +113,17 @@ export function formatGridCellValue(
       // Epoch ms (örn: 1786752000000 -> 2026-08-16)
       if (num > 100000000000) {
         const d = new Date(num);
-        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        if (!isNaN(d.getTime())) return formatTimestampOrDate(d);
       }
       // Epoch seconds (örn: 1786752000)
       if (num > 1000000000) {
         const d = new Date(num * 1000);
-        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        if (!isNaN(d.getTime())) return formatTimestampOrDate(d);
       }
       // Epoch days (Date32: 0-100000 gün, 2026 yılı ~ 20681)
       if (num > 0 && num < 100000) {
         const d = new Date(num * 86400000);
-        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        if (!isNaN(d.getTime())) return formatTimestampOrDate(d, true);
       }
     }
 
@@ -62,7 +131,7 @@ export function formatGridCellValue(
     if (!isDateColumn && num >= 1000000000000 && num <= 2500000000000 && Number.isInteger(num)) {
       const d = new Date(num);
       if (!isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100) {
-        return d.toISOString().slice(0, 10);
+        return formatTimestampOrDate(d);
       }
     }
 
@@ -81,10 +150,11 @@ export function formatGridCellValue(
     }).format(num);
   }
 
-  // ISO veya tarih-zaman formatındaki stringleri (örn: "2026-08-16T00:00:00.000Z") temiz "YYYY-MM-DD" yap
+  // ISO veya tarih-zaman formatındaki stringleri formatla
   if (typeof val === "string") {
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
-      return val.slice(0, 10);
+    const formatted = parseAndFormatDateString(val);
+    if (formatted) {
+      return formatted;
     }
 
     // Sayısal string olarak epoch ms geldiyse ("1786752000000")
@@ -93,16 +163,12 @@ export function formatGridCellValue(
       if (num >= 1000000000000 && num <= 2500000000000) {
         const d = new Date(num);
         if (!isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100) {
-          return d.toISOString().slice(0, 10);
+          return formatTimestampOrDate(d);
         }
       }
     }
   }
 
-  // 4. Boolean tipleri (true/false)
-  if (typeof val === "boolean") {
-    return val ? "Evet" : "Hayır";
-  }
 
   // 5. Array ve Nesne (JSON / Struct / List) tipleri
   if (typeof val === "object") {

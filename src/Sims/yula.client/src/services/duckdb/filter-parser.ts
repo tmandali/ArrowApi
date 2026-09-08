@@ -53,7 +53,8 @@ function convertWildcardsToSqlLike(val: string): string {
 function buildSingleColumnCondition(
   col: string,
   rawFilter: string,
-  isNumeric: boolean
+  isNumeric: boolean,
+  isBoolean = false
 ): string | null {
   let trimmed = rawFilter.trim()
   if (!trimmed) return null
@@ -76,6 +77,29 @@ function buildSingleColumnCondition(
   const notEmptyKeywords = /^(?:(?:<>|!=|!)\s*(?:''|""|' '|" ")|dolu|not\s*null)$/i
   if (notEmptyKeywords.test(trimmed)) {
     return `(${col} IS NOT NULL AND ${colTrim} != '')`
+  }
+
+  // 2c. Boolean / Mantıksal Alan Kontrolü: `evet`, `hayır`, `hayir`, `true`, `false`, `1`, `0`
+  const trimmedLower = trimmed.toLowerCase()
+  const isColLikelyBool =
+    isBoolean ||
+    /^(?:is_|has_|[a-z0-9_]+(mi|mu|mı|mü)|aktif|pasif|iptal|kapali|onay|kilitli)$/i.test(
+      col.replace(/"/g, "")
+    )
+
+  const isTrueQuery =
+    /^(?:evet|true|yes|aktif|active)$/i.test(trimmedLower) ||
+    (isColLikelyBool && (trimmed === "1" || trimmedLower === "e" || trimmedLower === "y"))
+  const isFalseQuery =
+    /^(?:hayır|hayir|false|no|pasif|passive|inactive)$/i.test(trimmedLower) ||
+    (isColLikelyBool && (trimmed === "0" || trimmedLower === "h" || trimmedLower === "n"))
+
+  if (isTrueQuery) {
+    return `(TRY_CAST(${col} AS BOOLEAN) = true OR ${colTrim} = '1' OR ${colTrim} ILIKE 'true' OR ${colTrim} ILIKE 'evet')`
+  }
+
+  if (isFalseQuery) {
+    return `(TRY_CAST(${col} AS BOOLEAN) = false OR ${colTrim} = '0' OR ${colTrim} ILIKE 'false' OR ${colTrim} ILIKE 'hayır' OR ${colTrim} ILIKE 'hayir')`
   }
 
   // 3. Dynamics 365 Açık uçlu aralıklar: `..500` veya `..sku-99` veya `..31.12.2026` (<= maxVal)
@@ -258,7 +282,8 @@ function buildSingleColumnCondition(
 function buildAndCondition(
   col: string,
   filterPart: string,
-  isNumeric: boolean
+  isNumeric: boolean,
+  isBoolean = false
 ): string | null {
   const trimmed = filterPart.trim()
   if (!trimmed) return null
@@ -266,7 +291,7 @@ function buildAndCondition(
   if (trimmed.includes("&")) {
     const andParts = trimmed.split("&").map((p) => p.trim()).filter(Boolean)
     const andClauses = andParts
-      .map((part) => buildSingleColumnCondition(col, part, isNumeric))
+      .map((part) => buildSingleColumnCondition(col, part, isNumeric, isBoolean))
       .filter((c): c is string => c !== null)
 
     if (andClauses.length > 0) {
@@ -274,13 +299,14 @@ function buildAndCondition(
     }
   }
 
-  return buildSingleColumnCondition(col, trimmed, isNumeric)
+  return buildSingleColumnCondition(col, trimmed, isNumeric, isBoolean)
 }
 
 export function buildColumnWhereClause(
   columnName: string,
   rawFilter: string,
-  isNumeric: boolean
+  isNumeric: boolean,
+  isBoolean = false
 ): string | null {
   const trimmed = rawFilter.trim()
   if (!trimmed) return null
@@ -291,7 +317,7 @@ export function buildColumnWhereClause(
   if (trimmed.includes("|") || (trimmed.includes(",") && !/^-?\d+,\d+$/.test(trimmed))) {
     const orParts = trimmed.split(/[,|]/).map((p) => p.trim()).filter(Boolean)
     const orClauses = orParts
-      .map((part) => buildAndCondition(col, part, isNumeric))
+      .map((part) => buildAndCondition(col, part, isNumeric, isBoolean))
       .filter((c): c is string => c !== null)
 
     if (orClauses.length > 0) {
@@ -299,19 +325,21 @@ export function buildColumnWhereClause(
     }
   }
 
-  return buildAndCondition(col, trimmed, isNumeric)
+  return buildAndCondition(col, trimmed, isNumeric, isBoolean)
 }
 
 export function buildCombinedWhereClause(
   filters: Record<string, string>,
-  numericColumns: Set<string>
+  numericColumns: Set<string> = new Set(),
+  booleanColumns: Set<string> = new Set()
 ): string {
   const clauses: string[] = []
 
   for (const [colName, val] of Object.entries(filters)) {
     if (!val || !val.trim()) continue
     const isNum = numericColumns.has(colName)
-    const clause = buildColumnWhereClause(colName, val, isNum)
+    const isBool = booleanColumns.has(colName)
+    const clause = buildColumnWhereClause(colName, val, isNum, isBool)
     if (clause) {
       clauses.push(clause)
     }

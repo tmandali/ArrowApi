@@ -66,7 +66,14 @@ function normalizeArrowValue(val: unknown): unknown {
 
   // 1. Date / Timestamp nesneleri
   if (val instanceof Date) {
-    return !isNaN(val.getTime()) ? val.toISOString().slice(0, 10) : ""
+    if (isNaN(val.getTime())) return ""
+    const iso = val.toISOString()
+    // Saat, dakika, saniye 00:00:00 ise salt YYYY-MM-DD dön
+    if (iso.endsWith("T00:00:00.000Z")) {
+      return iso.slice(0, 10)
+    }
+    // Saat/dakika/saniye bilgisi varsa milisaniyeyi temizleyip tam ISO formatında ilet (örn: "2026-09-01T20:18:57")
+    return iso.slice(0, 19)
   }
 
   // 2. BigInt (JS Number'a çevir — Web Worker transfer & JSON serialize için)
@@ -535,9 +542,11 @@ self.onmessage = async (e: MessageEvent) => {
             maxRowsPerSheet = 1_000_000,
             maxTotalRows,
             customSql,
+            columnDuckTypes: clientDuckTypes = {},
           } = payload as {
             tableName: string
             columns?: string[]
+            columnDuckTypes?: Record<string, string>
             whereClause?: string
             orderClause?: string
             fileName?: string
@@ -552,9 +561,47 @@ self.onmessage = async (e: MessageEvent) => {
             ? `(${cleanCustomSql}) AS __export_source`
             : `"${tableName.replace(/"/g, '""')}"`
 
+          // Tablo / View kolon tiplerini belirle (Tarih/Timestamp alanlarını Excel ve CSV için temiz formatlamak amacıyla)
+          const columnDuckTypes: Record<string, string> = { ...clientDuckTypes }
+          try {
+            const descRes = await conn.query(`DESCRIBE SELECT * FROM ${fromTarget} LIMIT 0;`)
+            const descRows = arrowTableToObjects(descRes)
+            for (const r of descRows as any[]) {
+              const cName = String(r.column_name ?? r.name ?? "")
+              const cType = String(r.column_type ?? r.type ?? "").toUpperCase()
+              if (cName) {
+                columnDuckTypes[cName] = cType
+              }
+            }
+          } catch (descErr) {
+            console.warn("[duckdb.worker] EXPORT_TABLE schema describe error:", descErr)
+          }
+
+          const colsToSelect =
+            columns && columns.length > 0 ? columns : Object.keys(columnDuckTypes)
+
           const selectCols =
-            columns && columns.length > 0
-              ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
+            colsToSelect.length > 0
+              ? colsToSelect
+                  .map((c) => {
+                    const escaped = `"${c.replace(/"/g, '""')}"`
+                    const type = (columnDuckTypes[c] || "").toUpperCase()
+                    // Excel (.xlsx) ve CSV/GZ insan tarafından açılan dosyalarda tarih/saat alanlarını formatla
+                    if (preferredFormat !== "parquet") {
+                      if (type.includes("TIMESTAMP")) {
+                        // Saat bilgisi '00:00:00' ise sadece gün (DD.MM.YYYY), aksi halde gün ve saat (DD.MM.YYYY HH:MM:SS)
+                        return `CASE WHEN ${escaped} IS NULL THEN NULL WHEN strftime(${escaped}, '%H:%M:%S') = '00:00:00' THEN strftime(${escaped}, '%d.%m.%Y') ELSE strftime(${escaped}, '%d.%m.%Y %H:%M:%S') END AS ${escaped}`
+                      }
+                      if (type.includes("DATE")) {
+                        return `CASE WHEN ${escaped} IS NULL THEN NULL ELSE strftime(${escaped}, '%d.%m.%Y') END AS ${escaped}`
+                      }
+                      if (type.includes("TIME")) {
+                        return `CASE WHEN ${escaped} IS NULL THEN NULL ELSE strftime(${escaped}, '%H:%M:%S') END AS ${escaped}`
+                      }
+                    }
+                    return escaped
+                  })
+                  .join(", ")
               : "*"
 
           const baseQuery = `SELECT ${selectCols} FROM ${fromTarget} ${whereClause} ${orderClause}`.trim()

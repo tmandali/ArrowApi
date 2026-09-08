@@ -579,6 +579,17 @@ export function ArrowReportGrid({
     return set
   }, [effectiveColumns])
 
+  const booleanColumns = React.useMemo(() => {
+    const set = new Set<string>()
+    for (const col of effectiveColumns) {
+      const type = (columnDuckTypes[col.name] ?? col.duckType ?? "").toUpperCase()
+      if (col.kind === "bool" || type.includes("BOOL") || type === "BIT") {
+        set.add(col.name)
+      }
+    }
+    return set
+  }, [effectiveColumns, columnDuckTypes])
+
   // Helper: Görünüm adını güvenli SQL tanımlayıcısına dönüştürür (örn: "Ege Bölgesi Satışları" -> "view_ege_bolgesi_satislari")
   const sanitizeViewIdentifier = React.useCallback((name: string, id: string): string => {
     const slug = name
@@ -645,7 +656,7 @@ export function ArrowReportGrid({
       }
 
       // 2. Filtre WHERE clause'u
-      const whereClause = buildCombinedWhereClause(filters, numericColumns)
+      const whereClause = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
 
       // 3. SELECT SQL oluşturma
       let selectSql = ""
@@ -675,6 +686,7 @@ export function ArrowReportGrid({
     effectiveColumns,
     filters,
     numericColumns,
+    booleanColumns,
     sortBy,
     sortDesc,
     sortConfigs,
@@ -782,7 +794,7 @@ export function ArrowReportGrid({
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const where = buildCombinedWhereClause(filters, numericColumns)
+        const where = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
         const query = buildDuckDbAggregationSql(duckTableName, where, effectiveColumns, aggregationConfigs)
         if (!query) return
         const rows = await duckDbClient.executeCustomSql(query.sql)
@@ -811,7 +823,7 @@ export function ArrowReportGrid({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [showFooterRow, duckTableName, filters, aggregationConfigs, effectiveColumns, numericColumns, isStreaming, isSavingDisk])
+  }, [showFooterRow, duckTableName, filters, aggregationConfigs, effectiveColumns, numericColumns, booleanColumns, isStreaming, isSavingDisk])
 
   const [isExporting, setIsExporting] = React.useState(false)
   const [exportWarning, setExportWarning] = React.useState<{
@@ -902,10 +914,12 @@ export function ArrowReportGrid({
           fileName,
           filters,
           numericColumns,
+          booleanColumns,
           sortBy,
           sortDesc,
           sortConfigs: sortList,
           columns: exportCols.length > 0 ? exportCols : effectiveColumns.map((c) => c.name),
+          columnDuckTypes,
           preferredFormat: format,
           maxTotalRows,
           customSql: customQuerySql ?? undefined,
@@ -991,6 +1005,8 @@ export function ArrowReportGrid({
       jobId,
       customQuerySql,
       hiddenColumns,
+      columnDuckTypes,
+      booleanColumns,
     ]
   )
 

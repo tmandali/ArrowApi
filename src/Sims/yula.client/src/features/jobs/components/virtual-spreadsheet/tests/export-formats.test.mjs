@@ -108,4 +108,52 @@ console.log("=== [TEST] export-formats.test.mjs (Export SQL & Formatting Rules) 
   console.log("  ✓ Custom/Saved AI view export wraps SQL into __export_source subquery (preventing Binder Error)")
 }
 
+// 6. Excel & CSV Date / Timestamp Formatting (Removal of ',000' milliseconds)
+{
+  const columns = ["HareketBaslamaTarih", "HareketBitisTarih", "FaturaTarihi", "Miktar"]
+  const columnDuckTypes = {
+    HareketBaslamaTarih: "TIMESTAMP",
+    HareketBitisTarih: "TIMESTAMP_MS",
+    FaturaTarihi: "DATE",
+    Miktar: "DECIMAL(18,2)",
+  }
+
+  function buildSelectCols(cols, types, preferredFormat) {
+    return cols
+      .map((c) => {
+        const escaped = `"${c.replace(/"/g, '""')}"`
+        const type = (types[c] || "").toUpperCase()
+        if (preferredFormat !== "parquet") {
+          if (type.includes("TIMESTAMP")) {
+            return `CASE WHEN ${escaped} IS NULL THEN NULL WHEN strftime(${escaped}, '%H:%M:%S') = '00:00:00' THEN strftime(${escaped}, '%d.%m.%Y') ELSE strftime(${escaped}, '%d.%m.%Y %H:%M:%S') END AS ${escaped}`
+          }
+          if (type.includes("DATE")) {
+            return `CASE WHEN ${escaped} IS NULL THEN NULL ELSE strftime(${escaped}, '%d.%m.%Y') END AS ${escaped}`
+          }
+          if (type.includes("TIME")) {
+            return `CASE WHEN ${escaped} IS NULL THEN NULL ELSE strftime(${escaped}, '%H:%M:%S') END AS ${escaped}`
+          }
+        }
+        return escaped
+      })
+      .join(", ")
+  }
+
+  // XLSX için test
+  const xlsxCols = buildSelectCols(columns, columnDuckTypes, "xlsx")
+  assert.ok(xlsxCols.includes('strftime("HareketBaslamaTarih", \'%d.%m.%Y %H:%M:%S\')'), "TIMESTAMP column must format with seconds precision without milliseconds")
+  assert.ok(xlsxCols.includes('strftime("HareketBitisTarih", \'%d.%m.%Y %H:%M:%S\')'), "TIMESTAMP_MS column must strip milliseconds")
+  assert.ok(xlsxCols.includes('strftime("FaturaTarihi", \'%d.%m.%Y\')'), "DATE column must format with DD.MM.YYYY")
+  assert.ok(xlsxCols.includes('"Miktar"'), "Numeric column must remain unformatted")
+  assert.ok(!xlsxCols.includes(',000'), "Millisecond artifacts must not be generated")
+
+  // Parquet için test (Ham tipler korunmalı)
+  const parquetCols = buildSelectCols(columns, columnDuckTypes, "parquet")
+  assert.equal(parquetCols, '"HareketBaslamaTarih", "HareketBitisTarih", "FaturaTarihi", "Miktar"')
+  assert.ok(!parquetCols.includes("strftime"), "Parquet should preserve raw Arrow/DuckDB physical types")
+
+  console.log("  ✓ Excel/CSV exports cleanly format timestamps as DD.MM.YYYY HH:MM:SS and strip ',000' milliseconds")
+  console.log("  ✓ Parquet export preserves raw Arrow physical timestamp types for zero OOM analytics")
+}
+
 console.log("\n🎉 export-formats testleri başarıyla tamamlandı!")

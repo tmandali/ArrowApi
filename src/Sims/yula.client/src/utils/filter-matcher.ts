@@ -116,16 +116,36 @@ function matchSingleCondition(cellValue: unknown, query: string): boolean {
   }
 
   // 2. Boolean (Mantıksal) alan kontrolü (true/false, yes/no, evet/hayır, 1/0)
-  const isCellBool = typeof cellValue === "boolean" || normCellLower === "true" || normCellLower === "false"
-  if (isCellBool) {
-    const isCellTrue = cellValue === true || normCellLower === "true"
-    const trueKeywords = ["true", "yes", "evet", "1", "t", "y", "aktif", "active"]
-    const falseKeywords = ["false", "no", "hayır", "0", "f", "n", "pasif", "passive", "inactive"]
+  const isCellBool =
+    typeof cellValue === "boolean" ||
+    normCellLower === "true" ||
+    normCellLower === "false" ||
+    normCellLower === "evet" ||
+    normCellLower === "hayır" ||
+    normCellLower === "hayir" ||
+    cellValue === 1 ||
+    cellValue === 0 ||
+    normCellStr === "1" ||
+    normCellStr === "0"
 
-    if (trueKeywords.includes(trimmed.toLowerCase())) {
+  const trueKeywords = ["true", "yes", "evet", "1", "t", "y", "aktif", "active"]
+  const falseKeywords = ["false", "no", "hayır", "hayir", "0", "f", "n", "pasif", "passive", "inactive"]
+
+  const trimmedLower = trimmed.toLowerCase()
+  const isQueryBool = trueKeywords.includes(trimmedLower) || falseKeywords.includes(trimmedLower)
+
+  if (isCellBool && isQueryBool) {
+    const isCellTrue =
+      cellValue === true ||
+      cellValue === 1 ||
+      normCellLower === "true" ||
+      normCellLower === "evet" ||
+      normCellStr === "1"
+
+    if (trueKeywords.includes(trimmedLower)) {
       return isCellTrue
     }
-    if (falseKeywords.includes(trimmed.toLowerCase())) {
+    if (falseKeywords.includes(trimmedLower)) {
       return !isCellTrue
     }
   }

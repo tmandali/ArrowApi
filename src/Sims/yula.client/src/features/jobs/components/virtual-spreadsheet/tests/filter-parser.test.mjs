@@ -123,7 +123,57 @@ console.log("\n=== [TEST] formatGridCellValue (Schema-driven Format: INT vs DECI
   assert.equal(formatGridCellValue(1250.5, "right", "DECIMAL(18,2)"), "1.250,50")
   assert.equal(formatGridCellValue(250000, "right", "DOUBLE"), "250.000,00")
   assert.equal(formatGridCellValue(15.75, "right", "FLOAT"), "15,75")
+
+  // DATE ve TIMESTAMP alanları: Saat bilgisi varsa saatli (DD.MM.YYYY HH:mm:ss), yoksa salt gün (DD.MM.YYYY)
+  assert.equal(formatGridCellValue("2026-09-01T20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
+  assert.equal(formatGridCellValue("2026-09-01 20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
+  assert.equal(formatGridCellValue("2026-09-01T20:18:57.000Z", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
+  assert.equal(formatGridCellValue("2026-09-01T00:00:00.000Z", "left", "TIMESTAMP"), "01.09.2026")
+  assert.equal(formatGridCellValue("2026-09-01", "left", "DATE"), "01.09.2026")
+  assert.equal(formatGridCellValue("01.09.2026 20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
+
+  // BOOLEAN alanları: Şema BOOL/BIT olduğunda 1/0 ve true/false standart olarak 'Evet'/'Hayır' basılır
+  assert.equal(formatGridCellValue(true, "left", "BOOLEAN"), "Evet")
+  assert.equal(formatGridCellValue(false, "left", "BOOLEAN"), "Hayır")
+  assert.equal(formatGridCellValue(1, "left", "BOOLEAN"), "Evet")
+  assert.equal(formatGridCellValue(0, "left", "BOOLEAN"), "Hayır")
+  assert.equal(formatGridCellValue(1, "left", "BIT"), "Evet")
+  assert.equal(formatGridCellValue(0, "left", "BIT"), "Hayır")
+  assert.equal(formatGridCellValue("true", "left"), "Evet")
+  assert.equal(formatGridCellValue("false", "left"), "Hayır")
+
   console.log("  ✓ Schema INT vs DECIMAL formatting rules strictly enforced")
+  console.log("  ✓ DATE & TIMESTAMP formatting preserves hours/minutes/seconds in virtual grid cells")
+  console.log("  ✓ BOOLEAN / BIT fields reliably format as 'Evet' / 'Hayır' across all reports")
+}
+
+// 11. Boolean SQL & In-Memory Filter Matcher Parity
+{
+  // SQL WHERE clause doğrulaması
+  const trueSql = buildColumnWhereClause("IsActive", "evet", false, true)
+  assert.ok(trueSql.includes('TRY_CAST("IsActive" AS BOOLEAN) = true'), "True query must cast to boolean")
+  assert.ok(trueSql.includes('"IsActive" AS VARCHAR)) = \'1\''), "True query must match '1'")
+
+  const falseSql = buildColumnWhereClause("IsActive", "hayır", false, true)
+  assert.ok(falseSql.includes('TRY_CAST("IsActive" AS BOOLEAN) = false'), "False query must cast to boolean")
+  assert.ok(falseSql.includes('"IsActive" AS VARCHAR)) = \'0\''), "False query must match '0'")
+
+  // In-memory matcher doğrulaması (true/false, 1/0, Evet/Hayır)
+  assert.equal(matchCellFilter(true, "evet"), true)
+  assert.equal(matchCellFilter(false, "evet"), false)
+  assert.equal(matchCellFilter(1, "evet"), true)
+  assert.equal(matchCellFilter(0, "evet"), false)
+  assert.equal(matchCellFilter("Evet", "evet"), true)
+  assert.equal(matchCellFilter("Hayır", "evet"), false)
+
+  assert.equal(matchCellFilter(false, "hayır"), true)
+  assert.equal(matchCellFilter(true, "hayır"), false)
+  assert.equal(matchCellFilter(0, "hayır"), true)
+  assert.equal(matchCellFilter(1, "hayır"), false)
+  assert.equal(matchCellFilter("Hayır", "hayır"), true)
+  assert.equal(matchCellFilter("Evet", "hayır"), false)
+
+  console.log("  ✓ Boolean filter parsing and in-memory matching fully verified for Evet/Hayır and 1/0")
 }
 
 console.log("\n🎉 filter-parser testleri başarıyla tamamlandı!")

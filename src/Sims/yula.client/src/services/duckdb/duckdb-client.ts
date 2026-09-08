@@ -108,6 +108,7 @@ class DuckDbClient {
     tableName: string
     filters?: Record<string, string>
     numericColumns?: Set<string>
+    booleanColumns?: Set<string>
     sortBy?: string | null
     sortDesc?: boolean
     sortConfigs?: SortConfig[]
@@ -123,6 +124,7 @@ class DuckDbClient {
       tableName,
       filters = {},
       numericColumns = new Set(),
+      booleanColumns = new Set(),
       sortBy,
       sortDesc = false,
       sortConfigs,
@@ -130,7 +132,7 @@ class DuckDbClient {
       offset = 0,
     } = options
 
-    const where = buildCombinedWhereClause(filters, numericColumns)
+    const where = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
     const escapedTable = `"${tableName.replace(/"/g, '""')}"`
 
     // 1. Önce istenen satırları al (LIMIT + 1 ile, hasMore tespiti için)
@@ -291,9 +293,16 @@ class DuckDbClient {
     customSql?: string
     filters?: Record<string, string>
     numericColumns?: Set<string>
+    booleanColumns?: Set<string>
   }): Promise<number> {
-    const { tableName, customSql, filters = {}, numericColumns = new Set() } = options
-    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    const {
+      tableName,
+      customSql,
+      filters = {},
+      numericColumns = new Set(),
+      booleanColumns = new Set(),
+    } = options
+    const whereClause = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
     const res = await this.postMessage<{ id: number; success: boolean; count?: number }>(
       "GET_QUERY_ROW_COUNT",
       { tableName, customSql, whereClause }
@@ -310,6 +319,7 @@ class DuckDbClient {
     columns?: string[]
     filters?: Record<string, string>
     numericColumns?: Set<string>
+    booleanColumns?: Set<string>
     sortBy?: string | null
     sortDesc?: boolean
     sortConfigs?: SortConfig[]
@@ -322,6 +332,7 @@ class DuckDbClient {
       columns,
       filters = {},
       numericColumns = new Set(),
+      booleanColumns = new Set(),
       sortBy,
       sortDesc = false,
       sortConfigs,
@@ -329,7 +340,7 @@ class DuckDbClient {
       offset = 0,
     } = options
 
-    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    const whereClause = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
     let orderClause = ""
     if (sortConfigs && sortConfigs.length > 0) {
       const orderParts = sortConfigs.map(
@@ -371,10 +382,12 @@ class DuckDbClient {
     fileName?: string
     filters?: Record<string, string>
     numericColumns?: Set<string>
+    booleanColumns?: Set<string>
     sortBy?: string | null
     sortDesc?: boolean
     sortConfigs?: SortConfig[]
     columns?: string[]
+    columnDuckTypes?: Record<string, string>
     preferredFormat?: "xlsx" | "csv" | "parquet" | "gz"
     maxRowsPerSheet?: number
     maxTotalRows?: number
@@ -391,17 +404,19 @@ class DuckDbClient {
       fileName = "rapor",
       filters = {},
       numericColumns = new Set(),
+      booleanColumns = new Set(),
       sortBy,
       sortDesc = false,
       sortConfigs,
       columns,
+      columnDuckTypes,
       preferredFormat = "xlsx",
       maxRowsPerSheet = 1_000_000,
       maxTotalRows,
       customSql,
     } = options
 
-    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    const whereClause = buildCombinedWhereClause(filters, numericColumns, booleanColumns)
     let orderClause = ""
     if (sortConfigs && sortConfigs.length > 0) {
       const orderParts = sortConfigs.map(
@@ -416,6 +431,7 @@ class DuckDbClient {
     const res = await this.postMessage<WorkerResponse>("EXPORT_TABLE", {
       tableName,
       columns,
+      columnDuckTypes,
       whereClause,
       orderClause,
       fileName,
