@@ -18,7 +18,7 @@ type UsePagePanelOptions = {
 export function usePagePanel({
   id,
   title,
-  defaultOpen = true,
+  defaultOpen = false,
 }: UsePagePanelOptions) {
   const { register, unregister, setOpen, openById } = usePagePanelContext()
   const storedOpen = openById[id]

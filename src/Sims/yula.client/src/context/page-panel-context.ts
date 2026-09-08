@@ -25,7 +25,7 @@ export interface PagePanelContextValue {
 export const DEFAULT_PAGE_PANEL: RegisteredPagePanel = {
   id: "module-nav",
   title: "Menu",
-  defaultOpen: true,
+  defaultOpen: false,
 };
 
 export const PagePanelContext = React.createContext<PagePanelContextValue | null>(null);

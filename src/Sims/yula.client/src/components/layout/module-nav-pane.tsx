@@ -55,7 +55,7 @@ export function ModuleNavPane({
   const { open: navOpen } = usePagePanel({
     id: "module-nav",
     title: "Menu",
-    defaultOpen: true,
+    defaultOpen: false,
   })
   const { setOpen } = usePagePanelContext()
 
