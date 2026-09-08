@@ -20,6 +20,7 @@ export {
   readJobEndpoint,
 } from "./lib/job-endpoint"
 export { createInitialCriteriaRows } from "./lib/create-initial-criteria-rows"
+export { reconcileCriteriaRowsWithSchema } from "./lib/reconcile-criteria-rows"
 export {
   joinMultiValue,
   splitMultiValue,

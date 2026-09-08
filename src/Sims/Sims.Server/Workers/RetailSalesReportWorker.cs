@@ -6,13 +6,31 @@ using Dapper;
 using FluentValidation;
 using Microsoft.Data.SqlClient;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Sims.Server.Workers;
 
-public sealed record RetailSalesReportParams(DateTime BasTarih, DateTime BitTarih, string SirketKod) : IRequest<IAsyncEnumerable<RecordBatch>>;
+/// <summary>
+/// Wire JSON: <c>from_hareketTarihi</c> / <c>to_hareketTarihi</c> / <c>sirketKod</c>
+/// (kriter <c>hareketTarihi</c> + <c>x-range-split</c>; bitiş hariç üst sınır).
+/// Class + <see cref="JsonPropertyNameAttribute"/> — record positional parametrelerde
+/// camelCase ile <c>from_*</c> anahtarları bağlanmayıp DateTime.MinValue kalıyordu.
+/// </summary>
+public sealed class RetailSalesReportParams : IRequest<IAsyncEnumerable<RecordBatch>>
+{
+    [JsonPropertyName("from_hareketTarihi")]
+    [JsonConverter(typeof(FlexibleDateTimeJsonConverter))]
+    public DateTime BasTarih { get; init; }
+
+    [JsonPropertyName("to_hareketTarihi")]
+    [JsonConverter(typeof(FlexibleDateTimeJsonConverter))]
+    public DateTime BitTarih { get; init; }
+
+    [JsonPropertyName("sirketKod")]
+    public string SirketKod { get; init; } = "";
+}
 
 public sealed class RetailSalesReportWorker(
-    //ILogger<RetailSalesReportWorker> logger,
     IArrowJobExecutionContext context,
     IConfiguration configuration) : IArrowJobWorker<RetailSalesReportParams>
 {
@@ -27,8 +45,6 @@ public sealed class RetailSalesReportWorker(
         await context.PublishInfoAsync("Sunucuya bağlandı", cancellationToken);
 
         var command = new CommandDefinition(
-            // Para kolonları decimal(16,2): istemci Arrow Decimal128'i scale ile
-            // number'a çevirir (utils/arrow-decimal). Float zorunlu değil.
             commandText: "select k.Depo, k.SatisID, b.Islem, b.MusteriNo, cast(b.HareketBaslamaTarih as Date) Tarih,\r\n" +
                          "cast(d.Miktar*i.Etki*-1 as decimal(16,2)) Miktar,\r\n" +
                          "cast((ToplamTutar-GenelIskontoTutar)*i.Etki*-1 as decimal(16,2)) Tutar,\r\n" +
@@ -49,7 +65,7 @@ public sealed class RetailSalesReportWorker(
 
         await foreach (RecordBatch batch in arrowReader.WithCancellation(cancellationToken))
         {
-            yield return batch;         
+            yield return batch;
         }
     }
 }
@@ -58,8 +74,15 @@ public sealed class RetailSalesReportParamsValidator : AbstractValidator<RetailS
 {
     public RetailSalesReportParamsValidator()
     {
-        RuleFor(x => x.BasTarih).NotEmpty().WithMessage("Başlangıç tarihi boş olamaz.");
-        RuleFor(x => x.BitTarih).GreaterThan(x => x.BasTarih).WithMessage("Bitiş tarihi başlangıç tarihinden büyük olmalıdır.");
+        RuleFor(x => x.BasTarih)
+            .Must(d => d > DateTime.MinValue)
+            .WithMessage("Başlangıç tarihi boş veya geçersiz (from_hareketTarihi).");
+        RuleFor(x => x.BitTarih)
+            .Must(d => d > DateTime.MinValue)
+            .WithMessage("Bitiş tarihi boş veya geçersiz (to_hareketTarihi).");
+        RuleFor(x => x.BitTarih)
+            .GreaterThan(x => x.BasTarih)
+            .WithMessage("Bitiş tarihi başlangıç tarihinden büyük olmalıdır.");
         RuleFor(x => x.SirketKod).NotEmpty().WithMessage("Şirket kodu boş olamaz.");
     }
 }

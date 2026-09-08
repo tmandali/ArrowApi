@@ -8,8 +8,9 @@ POST {{Sims.Server_HostAddress}}/api/arrow/jobs/retail-sales-report
 Content-Type: application/json
 
 {
-  "basTarih": "2025-01-01",
-  "bitTarih": "2025-02-01"
+  "from_hareketTarihi": "2025-01-01",
+  "to_hareketTarihi": "2025-02-01",
+  "sirketKod": "TJ01"
 }
 
 

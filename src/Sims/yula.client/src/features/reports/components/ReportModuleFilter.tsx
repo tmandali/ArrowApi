@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { RotateCcw } from "lucide-react"
+import { useAgentCriteriaStore } from "@/hooks/use-agent-criteria-bridge"
 import {
   SchemaCriteriaFilter,
   type JsonSchemaObject,
@@ -12,10 +13,11 @@ import {
   ArrowJobExecutionsPanel,
   ArrowJobResultPanel,
   type ArrowJobExecutionsPanelProps,
-  type ArrowJobStatus,
 } from "@/features/jobs"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
+
+const EMPTY_AI_NAMES: string[] = []
 
 export type ReportModuleJobSession = Pick<
   ArrowJobExecutionsPanelProps,
@@ -41,6 +43,8 @@ export type ReportModuleJobSession = Pick<
 > & {
   /** New / empty list → show criteria grid in the Detail column. */
   composing?: boolean
+  /** Aktif job çalışıyor → kriter gridi + Run/Clear kilitli. */
+  criteriaLocked?: boolean
   onExitCompose?: () => void
   onJobCancelled?: (jobId: string) => void
   onJobDeleted?: (jobId: string) => void
@@ -50,9 +54,11 @@ export type ReportModuleJobSession = Pick<
 export type ReportModuleFilterProps = {
   className?: string
   jobsEndpoint: string
+  /** Registry / şema scope — draft key, AI highlight, job list name. */
   jobName: string
+  /** Result panel & empty-list title (display). */
+  title: string
   schema: JsonSchemaObject
-  draftStorageKey: string
   emptyListHint?: string
   jobSession?: ReportModuleJobSession
   onRun?: () => void
@@ -67,7 +73,7 @@ export const ReportModuleFilter = React.forwardRef<
     schema,
     jobsEndpoint,
     jobName,
-    draftStorageKey,
+    title,
     emptyListHint,
     className,
     jobSession,
@@ -77,28 +83,24 @@ export const ReportModuleFilter = React.forwardRef<
   ref
 ) {
   const composing = Boolean(jobSession?.composing)
+  const criteriaLocked = Boolean(jobSession?.criteriaLocked)
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
-  const { rows, setRows } = useSharedCriteriaDraft(draftStorageKey, schema)
-
-  const reportTitle = React.useMemo(
-    () =>
-      jobName
-        .split(/[-_\s]+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" "),
-    [jobName]
+  const aiFilled = useAgentCriteriaStore(
+    (state) => state.aiFilledCriteria[jobName]
   )
+  const aiFilledNames = aiFilled?.names ?? EMPTY_AI_NAMES
+
+  const { rows, setRows } = useSharedCriteriaDraft(jobName, schema)
 
   const renderResult = React.useCallback(
     (jobId: string) => (
       <ArrowJobResultPanel
         jobId={jobId}
-        title={reportTitle}
+        title={title}
         className="min-h-0 flex-1"
       />
     ),
-    [reportTitle]
+    [title]
   )
 
   React.useImperativeHandle(
@@ -124,14 +126,14 @@ export const ReportModuleFilter = React.forwardRef<
   return (
     <div
       className={cn(
-        "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden px-2 pb-2 pt-0",
+        "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden",
         className
       )}
     >
       <ArrowJobExecutionsPanel
         jobsEndpoint={jobsEndpoint}
         jobName={jobName}
-        emptyListHint={emptyListHint ?? `Past ${jobName} jobs`}
+        emptyListHint={emptyListHint ?? `Past ${title} jobs`}
         activeJobId={jobSession?.activeJobId}
         activeLiveStatus={jobSession?.activeLiveStatus}
         activeRequestJson={jobSession?.activeRequestJson}
@@ -139,9 +141,9 @@ export const ReportModuleFilter = React.forwardRef<
         activeRunPhase={jobSession?.activeRunPhase}
         onOpenJob={jobSession?.onOpenJob}
         openJobHref={jobSession?.openJobHref}
-        onJobSelect={(jobId?: string | null, job?: ArrowJobStatus) => {
+        onJobSelect={(jobId, job) => {
           jobSession?.onExitCompose?.()
-          jobSession?.onJobSelect?.(String(jobId ?? ""), job)
+          jobSession?.onJobSelect?.(jobId, job)
         }}
         onJobCancelled={jobSession?.onJobCancelled}
         onJobDeleted={jobSession?.onJobDeleted}
@@ -161,6 +163,7 @@ export const ReportModuleFilter = React.forwardRef<
           <SchemaCriteriaFilter
             key={`${jobName}-criteria`}
             ref={filterRef}
+            highlightRowNames={aiFilledNames}
             schema={schema}
             rows={rows}
             onRowsChange={setRows}
@@ -176,6 +179,7 @@ export const ReportModuleFilter = React.forwardRef<
               variant="outline"
               size="sm"
               className="h-7 shrink-0 gap-1 px-2.5 text-xs"
+              disabled={criteriaLocked}
               onClick={() => filterRef.current?.clear()}
             >
               <RotateCcw className="size-3.5" />
@@ -185,7 +189,7 @@ export const ReportModuleFilter = React.forwardRef<
               type="button"
               size="sm"
               className="h-7 shrink-0 px-3 text-xs"
-              disabled={runDisabled}
+              disabled={runDisabled || criteriaLocked}
               onClick={() => onRun?.()}
             >
               Run

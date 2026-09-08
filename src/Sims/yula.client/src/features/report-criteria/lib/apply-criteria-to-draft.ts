@@ -39,9 +39,9 @@ export function resolveRelativeDateString(val: string): string {
 }
 
 /**
- * Verilen kriter nesnesini (ör. { kayitTarihi: "dün", durum: ["AKTIF"] })
+ * Verilen kriter nesnesini (ör. { "<dateField>": "dün", durum: ["AKTIF"] })
  * paylaşılan kriter taslağına (useDraftCriteriaStore) yazar ve ekrandaki kriter
- * tablosunu günceller.
+ * tablosunu günceller. Tarih alanları şemadan (`format: "date"` / `x-range-split`) tespit edilir.
  */
 export function applyCriteriaToDraft(
   scope: string,
@@ -54,13 +54,16 @@ export function applyCriteriaToDraft(
 
   const effectiveSchema =
     schema || (findReport(scope)?.fullSchema as JsonSchemaObject | undefined);
+  const parsedFields = effectiveSchema
+    ? parseCriteriaSchema(effectiveSchema).fields
+    : [];
 
   const currentDraft = useDraftCriteriaStore.getState().rowsByScope[scope];
   const initial =
     currentDraft && currentDraft.length > 0
       ? currentDraft
-      : effectiveSchema
-        ? createInitialCriteriaRows(parseCriteriaSchema(effectiveSchema).fields)
+      : parsedFields.length > 0
+        ? createInitialCriteriaRows(parsedFields)
         : [];
 
   const nextRows: CriteriaFilterRow[] = initial.map((r) => ({ ...r }));
@@ -71,20 +74,7 @@ export function applyCriteriaToDraft(
     const key = rawKey.trim();
     if (!key) continue;
 
-    const rawStr = String(rawValue);
-    let stringVal = "";
-    if (key === "kayitTarihi" && typeof rawValue === "string") {
-      stringVal = resolveRelativeDateString(rawValue);
-    } else if (Array.isArray(rawValue)) {
-      stringVal = rawValue.map(String).join(",");
-    } else if (typeof rawValue === "object") {
-      stringVal = JSON.stringify(rawValue);
-    } else {
-      stringVal = rawStr;
-    }
-
     const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const parsedFields = effectiveSchema ? parseCriteriaSchema(effectiveSchema).fields : [];
     const matchedField = parsedFields.find(
       (f) =>
         f.key.toLowerCase() === key.toLowerCase() ||
@@ -93,6 +83,23 @@ export function applyCriteriaToDraft(
         f.title.toLowerCase().replace(/[^a-z0-9]/g, "") === cleanKey
     );
     const rowName = matchedField ? matchedField.key : key;
+
+    // Göreli tarihler: şemadaki date / x-range-split alanlarından türetilir
+    // (rapor alanı adları hardcode edilmez — criteria-input-engine ile aynı kural).
+    const isDateLikeField =
+      matchedField?.format === "date" || Boolean(matchedField?.rangeSplit);
+
+    const rawStr = String(rawValue);
+    let stringVal = "";
+    if (isDateLikeField && typeof rawValue === "string") {
+      stringVal = resolveRelativeDateString(rawValue);
+    } else if (Array.isArray(rawValue)) {
+      stringVal = rawValue.map(String).join(",");
+    } else if (typeof rawValue === "object") {
+      stringVal = JSON.stringify(rawValue);
+    } else {
+      stringVal = rawStr;
+    }
 
     const existingIdx = nextRows.findIndex((r) => {
       const rClean = r.name.toLowerCase().replace(/[^a-z0-9]/g, "");
