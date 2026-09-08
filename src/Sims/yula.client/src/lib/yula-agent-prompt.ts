@@ -116,7 +116,7 @@ const GRID_PRESENT_RULES = [
   "• filter_current_grid: Use for single column filtering or clearing all filters (field: '*').",
   "• reset_grid_layout: Use when user asks to reset grid view, unhide all columns, clear sorting, or restore default layout.",
   "• export_grid_data: Use when user asks to download or export the active grid data (format: 'xlsx' | 'parquet' | 'csv' | 'gz').",
-  "• visualize_grid_data: Use when user requests charts (bar, line, pie), visual trends, or distributions. Provide dimension and metric columns; do not write raw data in text.",
+  "• visualize_grid_data: Use when user requests charts (bar, line, pie), visual trends, or distributions. Provide dimension and metric columns; do not write raw data in text. orderMode: 'ilk N'/'first N'/'store order' → label_asc; grid row order → appearance; 'en yüksek N'/'top N' → value_desc (default).",
   "• analyze_grid_data: Use for fast KPI aggregates (sum, avg, min, max, count, topN) on numeric columns.",
   "• profile_grid_table: Use when user asks for deep data profiling, quality checks, anomaly detection, or statistical distributions.",
   "• run_expert_sql: Use for advanced read-only analytical SQL queries (window functions, ratios, complex joins) that cannot be expressed as grid filters. Exploration queries return at most 10 sample rows to context.",

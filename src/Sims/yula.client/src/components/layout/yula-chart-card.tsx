@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import {
   Area,
   AreaChart,
@@ -21,8 +22,19 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Table } from "lucide-react";
+import { Pin, Table } from "lucide-react";
+import { findReport } from "@/features/reports/report-registry";
+import {
+  buildPinnedChartId,
+  usePinnedCharts,
+  type PinnedChart,
+} from "@/hooks/use-pinned-charts";
 import { useYulaGridStore } from "@/lib/stores/grid";
+import {
+  extractJobIdFromHref,
+  reportExecutionHref,
+  reportExecutionPath,
+} from "@/lib/workspace-paths";
 import { cn } from "@/utils/cn";
 
 /** Yula paleti: marka turuncusu → primary → chart blues (tema token'ları) */
@@ -107,6 +119,30 @@ function parseChartOutput(output: unknown): ParsedChart | null {
   };
 }
 
+function resolveChartSourceContext(pathname: string, search: string) {
+  const screen = useYulaGridStore.getState().screen;
+  const spec = useYulaGridStore.getState().spec;
+  const workspace = screen?.workspaceId?.trim() || "stock";
+  const reportScope = screen?.reportScope ?? spec?.reportScope;
+  const jobId =
+    screen?.jobId?.trim() ||
+    extractJobIdFromHref(`${pathname}${search}`) ||
+    undefined;
+
+  let pagePath = reportExecutionPath(pathname) ?? pathname;
+  if (reportScope) {
+    const meta = findReport(reportScope);
+    if (meta?.pagePath) pagePath = meta.pagePath;
+  }
+
+  const sourceHref =
+    jobId && pagePath
+      ? reportExecutionHref(pagePath, jobId)
+      : pagePath || pathname || "/";
+
+  return { workspace, reportScope, jobId, sourceHref };
+}
+
 /**
  * visualize_grid_data kartı — tek jenerik render yolu.
  * Kontrat: model yalnız { chartType, dimensionX, dimensionY, aggregation }
@@ -116,12 +152,48 @@ function parseChartOutput(output: unknown): ParsedChart | null {
 export function YulaChartCard({
   output,
   className,
+  /** Sohbet kartında pin göster (landing gömülü kullanımda kapatılabilir). */
+  pinEnabled = true,
+  /** Landing’de daha kısa grafik yüksekliği. */
+  compact = false,
+  /** Grid’e yaz butonu (landing’de kapalı). */
+  showGridAction = true,
 }: {
   output: unknown;
   className?: string;
+  pinEnabled?: boolean;
+  compact?: boolean;
+  showGridAction?: boolean;
 }) {
   const parsed = React.useMemo(() => parseChartOutput(output), [output]);
   const uid = React.useId().replace(/:/g, "");
+  const pathname = usePathname() ?? "/";
+  const screen = useYulaGridStore((s) => s.screen);
+  const spec = useYulaGridStore((s) => s.spec);
+  const { isPinned, togglePin } = usePinnedCharts();
+
+  const sourceCtx = React.useMemo(() => {
+    const search =
+      typeof window !== "undefined" ? window.location.search : "";
+    // screen/spec değişince yeniden çöz (jobId kaydı gecikmeli gelebilir)
+    void screen;
+    void spec;
+    return resolveChartSourceContext(pathname, search);
+  }, [pathname, screen, spec]);
+
+  const pinId = React.useMemo(() => {
+    if (!parsed) return null;
+    return buildPinnedChartId({
+      workspace: sourceCtx.workspace,
+      title: parsed.title,
+      chartType: parsed.chartType,
+      dimensionX: parsed.dimensionX,
+      dimensionY: parsed.dimensionY,
+      reportScope: sourceCtx.reportScope,
+    });
+  }, [parsed, sourceCtx]);
+
+  const pinned = pinId ? isPinned(pinId) : false;
 
   // Legend/tooltip etiket sözleşmesi: bar/line → seri adları; pie → dilim adları
   const chartConfig = React.useMemo<ChartConfig>(() => {
@@ -160,6 +232,35 @@ export function YulaChartCard({
     useYulaGridStore.getState().setCustomQuerySql(parsed.sql, parsed.title);
   }, [parsed]);
 
+  const handleTogglePin = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!parsed || !pinId) return;
+      const search =
+        typeof window !== "undefined" ? window.location.search : "";
+      const fresh = resolveChartSourceContext(pathname, search);
+      const item: PinnedChart = {
+        id: pinId,
+        workspace: fresh.workspace,
+        title: parsed.title,
+        chartType: parsed.chartType,
+        description: parsed.description,
+        takeaway: parsed.takeaway,
+        dimensionX: parsed.dimensionX,
+        dimensionY: parsed.dimensionY,
+        rows: parsed.rows,
+        sql: parsed.sql,
+        sourceHref: fresh.sourceHref,
+        reportScope: fresh.reportScope,
+        jobId: fresh.jobId,
+        pinnedAt: Date.now(),
+      };
+      togglePin(item);
+    },
+    [parsed, pinId, pathname, togglePin],
+  );
+
   if (!parsed) return null;
   const { chartType, title, description, takeaway, dimensionY, rows } = parsed;
   const multiSeries = dimensionY.length > 1;
@@ -170,8 +271,11 @@ export function YulaChartCard({
     Math.max(0.35, 1 - originalIndex * toneStep);
 
   // Yatay barda bar sayısına göre dinamik yükseklik (30 kategoriye kadar okunur)
-  const chartHeight =
-    chartType === "bar"
+  const chartHeight = compact
+    ? chartType === "bar"
+      ? Math.min(220, Math.max(140, rows.length * 18 + 36))
+      : 160
+    : chartType === "bar"
       ? Math.min(420, Math.max(180, rows.length * 26 + 48))
       : 224;
 
@@ -191,18 +295,42 @@ export function YulaChartCard({
         className,
       )}
     >
-      <div className="group/header flex h-7 items-center justify-between border-b bg-muted/40 px-3">
-        <p className="text-[11px] font-medium leading-none">{title}</p>
-        {parsed.sql ? (
-          <button
-            type="button"
-            onClick={handleShowInGrid}
-            title="Grafik sorgusu sonucunu ekrandaki gridte göster"
-            className="flex cursor-pointer items-center justify-center p-0.5 text-muted-foreground/70 transition-colors hover:text-orange-600 dark:hover:text-orange-400"
-          >
-            <Table className="size-3.5" />
-          </button>
-        ) : null}
+      <div className="group/header flex h-7 items-center justify-between gap-2 border-b bg-muted/40 px-3">
+        <p className="min-w-0 truncate text-[11px] font-medium leading-none">
+          {title}
+        </p>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {pinEnabled ? (
+            <button
+              type="button"
+              onClick={handleTogglePin}
+              title={
+                pinned
+                  ? "Workspace ana sayfasından kaldır"
+                  : "Workspace ana sayfasına sabitle"
+              }
+              aria-pressed={pinned}
+              className={cn(
+                "flex cursor-pointer items-center justify-center rounded p-0.5 transition-colors",
+                pinned
+                  ? "text-amber-500 hover:text-amber-600"
+                  : "text-muted-foreground/70 hover:text-amber-500",
+              )}
+            >
+              <Pin className={cn("size-3.5", pinned && "fill-current")} />
+            </button>
+          ) : null}
+          {showGridAction && parsed.sql ? (
+            <button
+              type="button"
+              onClick={handleShowInGrid}
+              title="Grafik sorgusu sonucunu ekrandaki gridte göster"
+              className="flex cursor-pointer items-center justify-center p-0.5 text-muted-foreground/70 transition-colors hover:text-orange-600 dark:hover:text-orange-400"
+            >
+              <Table className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
       </div>
       {description ? (
         <div className="px-3 pt-1.5">

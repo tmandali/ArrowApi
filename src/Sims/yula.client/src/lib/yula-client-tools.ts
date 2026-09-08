@@ -4,6 +4,11 @@ import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-me
 import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage, PORTABLE_TABLE_PLACEHOLDER } from "@/lib/sql-guard";
 import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
 import { focusReportExecution, reportExecutionHref } from "@/lib/report-run-bus";
+import {
+  buildChartQuery,
+  inferChartOrderMode,
+  type ChartOrderMode,
+} from "@/lib/chart-query";
 
 /**
  * İstemci tarafı araç yürütücüleri — kullanıcının etkileşimiyle ya da
@@ -826,13 +831,47 @@ async function visualizeGrid(
       ? ["Records"]
       : valueKeys;
 
-  const { buildChartQuery } = await import("@/lib/chart-query");
+  const titleHint =
+    typeof input.title === "string" ? input.title : undefined;
+  const descriptionHint =
+    typeof input.description === "string" ? input.description : undefined;
+  const takeawayHint =
+    typeof input.takeaway === "string" ? input.takeaway : undefined;
+  const orderMode: ChartOrderMode = inferChartOrderMode(
+    typeof input.orderMode === "string" ? input.orderMode : undefined,
+    {
+      title: titleHint,
+      description: descriptionHint,
+      takeaway: takeawayHint,
+    },
+  );
+
+  // Aktif grid sırası — "ilk N" (appearance) dilimlerini grid ORDER BY ile hizala.
+  // Sıralama yoksa appearanceOrderBy boş bırakılır; ROW_NUMBER kaynak/tarama
+  // sırasını (active_view) kullanır — alfabetik dayatma yok.
+  let appearanceOrderBy: string | undefined;
+  if (orderMode === "appearance") {
+    const snap = useYulaGridStore.getState().runtimeApi?.getGridState?.();
+    if (snap?.sortBy && ds.columns.includes(snap.sortBy)) {
+      appearanceOrderBy = `${sqlSafeId(snap.sortBy)} ${snap.sortDesc ? "DESC" : "ASC"}`;
+    }
+  }
+
+  // Mümkünse süzülmüş/sıralı active_view üzerinden çiz (ham tablo değil)
+  let fromExpr = ds.from;
+  const viewName = useYulaGridStore.getState().spec?.activeViewName?.trim();
+  if (viewName && !ds.isCustom) {
+    fromExpr = sqlSafeId(viewName);
+  }
+
   const sql = buildChartQuery({
-    fromExpr: ds.from,
+    fromExpr,
     labelKey,
     valueKeys: aggregation === "count" ? [] : valueKeys,
     aggregation,
     limit: typeof input.limit === "number" ? input.limit : undefined,
+    orderMode,
+    appearanceOrderBy,
   });
   if (!sql) {
     return { status: "error", error: "Failed to generate chart query." };
@@ -840,7 +879,27 @@ async function visualizeGrid(
 
   try {
     const { duckDbClient } = await import("@/services/duckdb");
-    const rows = await duckDbClient.executeCustomSql(sql);
+    let rows: Record<string, unknown>[];
+    try {
+      rows = await duckDbClient.executeCustomSql(sql);
+    } catch (viewErr) {
+      // active_view henüz yoksa temel FROM'a düş
+      if (fromExpr !== ds.from) {
+        const fallbackSql = buildChartQuery({
+          fromExpr: ds.from,
+          labelKey,
+          valueKeys: aggregation === "count" ? [] : valueKeys,
+          aggregation,
+          limit: typeof input.limit === "number" ? input.limit : undefined,
+          orderMode,
+          appearanceOrderBy,
+        });
+        if (!fallbackSql) throw viewErr;
+        rows = await duckDbClient.executeCustomSql(fallbackSql);
+      } else {
+        throw viewErr;
+      }
+    }
     if (rows.length === 0) {
       return {
         status: "error",
@@ -863,6 +922,7 @@ async function visualizeGrid(
         dimensionX: labelKey,
         dimensionY: seriesNames,
         aggregation,
+        orderMode,
       },
       rowCount: rows.length,
       rows,

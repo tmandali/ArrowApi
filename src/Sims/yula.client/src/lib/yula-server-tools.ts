@@ -483,6 +483,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
         "Açık tabloyu GRAFİK olarak görselleştirir; 'grafikle göster/pasta çiz/dağılımı göster' isteklerinde ÇAĞIR.",
         "Yalnız BOYUTLARI bildir: veri DuckDB'den hesaplanır, kart otomatik çizilir; satır verisini ASLA metinde yazma.",
         "bar yatay çizilir (kategori adı solda okunur). Id gibi benzersiz kimlik kolonları kategori OLAMAZ. title + takeaway mutlaka doldur.",
+        "SIRALAMA: 'ilk N' / 'first N' / 'mağaza sırasında' / 'depo sırasında' → orderMode:'label_asc'. Grid satır sırasındaki ilk N → 'appearance'. 'en yüksek N' / 'top N' / 'en çok' → orderMode:'value_desc' (varsayılan). 'en düşük' → value_asc.",
       ].join(" "),
       inputSchema: jsonSchema<{
         title?: string;
@@ -493,6 +494,12 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
         dimensionY: string[];
         aggregation?: "sum" | "avg" | "min" | "max" | "count";
         limit?: number;
+        orderMode?:
+          | "value_desc"
+          | "value_asc"
+          | "label_asc"
+          | "label_desc"
+          | "appearance";
       }>({
         type: "object",
         properties: {
@@ -537,6 +544,18 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
           limit: {
             type: "number",
             description: "Gösterilecek maksimum grup sayısı. Kullanıcı 'ilk N', 'en yüksek 5', 'top 10' gibi bir sınır belirttiğinde veya sohbet bağlamında N adet istendiyse limit: N parametresini MUTLAKA yaz (varsayılan 30'a bırakma).",
+          },
+          orderMode: {
+            type: "string",
+            enum: [
+              "value_desc",
+              "value_asc",
+              "label_asc",
+              "label_desc",
+              "appearance",
+            ],
+            description:
+              "Dilim/çubuk sırası. 'ilk 5 mağaza' / mağaza sırasında → label_asc. Grid sırası → appearance. 'en yüksek 5' → value_desc. Varsayılan value_desc.",
           },
         },
         required: ["chartType", "dimensionX", "dimensionY"],

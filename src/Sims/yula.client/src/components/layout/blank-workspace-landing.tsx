@@ -16,7 +16,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
+import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
+import {
+  pinnedChartToOutput,
+  usePinnedCharts,
+} from "@/hooks/use-pinned-charts";
 import { getWorkspaceForPath, getWorkspace } from "@/lib/workspace-registry";
 import {
   type WorkspaceLandingData,
@@ -98,6 +103,7 @@ export function WorkspaceLandingTemplate({
 
   const activeId: WorkspaceId = detectedDef.id;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(activeId);
+  const { pinnedCharts, unpinChart } = usePinnedCharts(activeId);
 
   const rawData = React.useMemo(() => {
     return getWorkspaceLandingData(activeId);
@@ -176,6 +182,61 @@ export function WorkspaceLandingTemplate({
               <span>Henüz sabitlenen menü yok.</span>
               <span className="text-[11px] text-muted-foreground/50">
                 (Üst arama çubuğundaki menülerin yanındaki raptiye ile buraya ekleyebilirsiniz)
+              </span>
+            </div>
+          )}
+        </section>
+
+        {/* 2b. Sabitlenen Grafikler — Yula chart pin’leri; tıklayınca kaynak rapora gider */}
+        <section className="space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
+            <Pin className="size-3 text-amber-500/80" />
+            <span>Sabitlenen Grafikler</span>
+            {pinnedCharts.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/60">
+                ({pinnedCharts.length})
+              </span>
+            )}
+          </div>
+
+          {pinnedCharts.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {pinnedCharts.map((chart) => (
+                <div key={chart.id} className="group relative">
+                  <Link
+                    href={chart.sourceHref}
+                    className="block rounded-md outline-none transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-primary/40"
+                    title="Kaynak rapora git"
+                  >
+                    <YulaChartCard
+                      output={pinnedChartToOutput(chart)}
+                      compact
+                      pinEnabled={false}
+                      showGridAction={false}
+                      className="transition-shadow group-hover:shadow-sm"
+                    />
+                  </Link>
+                  <button
+                    type="button"
+                    title="İğneyi Kaldır"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unpinChart(chart.id);
+                    }}
+                    className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
+                  >
+                    <PinOff className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70">
+              <span>Henüz sabitlenen grafik yok.</span>
+              <span className="text-[11px] text-muted-foreground/50">
+                (Rapor sonucundaki Yula grafik başlığındaki raptiye ile buraya
+                ekleyebilirsiniz)
               </span>
             </div>
           )}
