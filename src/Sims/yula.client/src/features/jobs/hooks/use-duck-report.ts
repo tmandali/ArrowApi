@@ -1,6 +1,7 @@
 import * as React from "react"
 import { duckDbClient, type SortConfig } from "@/services/duckdb"
 import { useYulaGridStore } from "@/lib/stores/grid"
+import { resolveActiveViewReferences } from "@/lib/sql-guard"
 import { duckStreamManager } from "../services/duck-stream-manager"
 import type { ColumnSortConfigs } from "../components/virtual-spreadsheet/types"
 
@@ -543,7 +544,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     const runCustomSql = async () => {
       setIsLoadingQuery(true)
       try {
-        const result = await duckDbClient.executeCustomSql(customSql)
+        const resolvedSql = resolveActiveViewReferences(customSql, tableName)
+        const result = await duckDbClient.executeCustomSql(resolvedSql)
         if (cancelled || seq !== querySeqRef.current) return
         markTableReady(true)
         let resultRows = (result as T[]) ?? []

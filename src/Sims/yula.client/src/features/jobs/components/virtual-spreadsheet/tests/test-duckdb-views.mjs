@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { guardReadOnlySelect } from "../../../../../lib/sql-guard.ts"
+import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage } from "../../../../../lib/sql-guard.ts"
 
 console.log("🧪 Test: DuckDB Views Synchronization & AI Grounding (active_view & saved_views)")
 
@@ -41,7 +41,8 @@ function buildActiveViewSql(options) {
   }
 
   if (customQuerySql) {
-    const clean = customQuerySql.trim().replace(/;+$/, "")
+    const resolved = resolveActiveViewReferences(customQuerySql, tableName)
+    const clean = resolved.trim().replace(/;+$/, "")
     return `SELECT * FROM (${clean}) AS __active_base ${whereClause} ${orderClause}`.trim()
   }
 
@@ -116,6 +117,98 @@ function buildActiveViewSql(options) {
   const ddl = `CREATE OR REPLACE VIEW ${escapedView} AS ${selectSql};`
   assert.equal(ddl, 'CREATE OR REPLACE VIEW "active_view" AS SELECT * FROM report_123 WHERE "Qty" > 0;')
   console.log("  ✓ CREATE OR REPLACE VIEW DDL conforms to DuckDB WASM specifications")
+}
+
+// Test 6: resolveActiveViewReferences - Farklı sözdizimleri ve kelime sınırları testi
+{
+  const baseTable = "report_retail_sales_xyz"
+  
+  // Yalın active_view
+  assert.equal(
+    resolveActiveViewReferences("SELECT * FROM active_view", baseTable),
+    'SELECT * FROM "report_retail_sales_xyz"'
+  )
+
+  // Çift tırnaklı "active_view"
+  assert.equal(
+    resolveActiveViewReferences('SELECT * FROM "active_view" WHERE "Total" > 100', baseTable),
+    'SELECT * FROM "report_retail_sales_xyz" WHERE "Total" > 100'
+  )
+
+  // Tek tırnaklı 'active_view'
+  assert.equal(
+    resolveActiveViewReferences("SELECT * FROM 'active_view'", baseTable),
+    'SELECT * FROM "report_retail_sales_xyz"'
+  )
+
+  // Benzer kolon veya tablo adlarına dokunulmamalı (my_active_view, active_view_status vb.)
+  assert.equal(
+    resolveActiveViewReferences('SELECT active_view_name FROM my_active_view', baseTable),
+    'SELECT active_view_name FROM my_active_view'
+  )
+  console.log("  ✓ resolveActiveViewReferences replaces only genuine active_view tokens with base table")
+}
+
+// Test 7: Infinite recursion prevention - Saved view ve active_view döngü kırıcı testi
+{
+  const baseTable = "report_5b4db7dd_2bf3_4d86_ac6d_78fde865e32d"
+  const savedQueryWithActiveView = `SELECT date_trunc('day', "HareketBaslamaTarih") AS "Gün", COUNT(*) AS "Satış Adedi", SUM("ToplamTutar") AS "Toplam Tutar" FROM active_view GROUP BY date_trunc('day', "HareketBaslamaTarih") ORDER BY "Gün" ASC;`
+
+  // 1. Saved view DDL için çözümleme:
+  const resolvedSavedSql = resolveActiveViewReferences(savedQueryWithActiveView, baseTable)
+  assert.equal(
+    resolvedSavedSql.includes("active_view"),
+    false,
+    "Saved view DDL must NOT contain active_view"
+  )
+  assert.equal(
+    resolvedSavedSql.includes(`"${baseTable}"`),
+    true,
+    "Saved view DDL must directly reference base table"
+  )
+
+  // 2. Active view DDL için çözümleme:
+  const activeViewSql = buildActiveViewSql({
+    tableName: baseTable,
+    columns: ["Gün", "Satış Adedi", "Toplam Tutar"],
+    customQuerySql: savedQueryWithActiveView,
+  })
+  assert.equal(
+    activeViewSql.includes("active_view"),
+    false,
+    "active_view definition must NOT reference active_view (infinite recursion prevention)"
+  )
+  assert.equal(
+    activeViewSql.includes(`"${baseTable}"`),
+    true,
+    "active_view definition must directly reference base table"
+  )
+  console.log("  ✓ Saved views & active_view DDL completely eliminate infinite recursion cycles")
+}
+
+// Test 8: Eski (stale) report_<uuid> tablo adı çözümlemesi (Catalog Error prevention)
+{
+  const oldTable = "report_d56e92aa_f33e_4468_891b_e6035b897a7a"
+  const newTable = "report_5b4db7dd_2bf3_4d86_ac6d_78fde865e32d"
+
+  const savedSql = `SELECT "Depo", SUM(CASE WHEN "HareketTipi" = 40 THEN "ToplamTutar" ELSE 0 END) AS "Net Satış Tutarı" FROM ${oldTable} GROUP BY "Depo"`
+
+  // resolveActiveViewReferences — eski tablo → mevcut tablo (Catalog Error önleme)
+  const resolved = resolveActiveViewReferences(savedSql, newTable)
+  assert.equal(resolved.includes(oldTable), false, "Stale table must be replaced")
+  assert.equal(resolved.includes(`"${newTable}"`), true, "Current table must appear in resolved SQL")
+
+  // normalizeQueryForStorage — fiziksel tablo → active_view (taşınabilir depolama)
+  const portable = normalizeQueryForStorage(savedSql, oldTable)
+  assert.equal(portable.includes(oldTable), false, "Physical table must be replaced with active_view")
+  assert.equal(portable.includes("active_view"), true, "active_view placeholder must appear")
+
+  // Çift yönlü dönüşüm tamamlanıyor: portable → resolved
+  const roundTripped = resolveActiveViewReferences(portable, newTable)
+  assert.equal(roundTripped.includes("active_view"), false, "active_view must be resolved back")
+  assert.equal(roundTripped.includes(`"${newTable}"`), true, "Final SQL must reference current table")
+
+  console.log("  ✓ Stale report table references resolved; normalizeQueryForStorage round-trips correctly")
 }
 
 console.log("✅ All DuckDB Views & AI Grounding tests PASSED successfully!\n")

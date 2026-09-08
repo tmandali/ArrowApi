@@ -132,3 +132,58 @@ export function guardReadOnlySelect(
   const sql = shouldAddLimit ? `${body} LIMIT ${rowLimit}` : body;
   return { ok: true, sql, limited: shouldAddLimit };
 }
+
+/**
+ * DuckDB rapor tablosu adı kalıbı: `report_<uuid-underscored>`
+ * Örn: report_5b4db7dd_2bf3_4d86_ac6d_78fde865e32d
+ * Hem tırnaksız hem çift tırnaklı biçimi yakalar.
+ */
+const REPORT_TABLE_PATTERN =
+  /(?:"report_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}"|\breport_[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}\b)/gi
+
+/**
+ * SQL ifadesi içindeki `active_view` referanslarını ve eski (stale)
+ * `report_<uuid>` tablo referanslarını mevcut tablonun adına çözümler.
+ *
+ * İki sorunu aynı anda giderir:
+ * 1. **Infinite recursion**: active_view'ün kendi içinden active_view çağırması
+ *    (`CREATE OR REPLACE VIEW active_view AS … FROM active_view`)
+ * 2. **Catalog Error**: Kayıtlı sorgunun eski iş tablosuna (`report_d56e92aa_…`)
+ *    referans vermesi — yeni rapor farklı bir tablo adına sahip olduğundan
+ *    `Table does not exist!` hatası oluşur.
+ */
+export function resolveActiveViewReferences(sql: string, targetTable: string): string {
+  if (!sql || !targetTable) return sql
+  const escapedTarget = `"${targetTable.replace(/"/g, '""')}"`
+
+  // 1. Eski/farklı report_<uuid> tablo adlarını mevcut tabloyla değiştir
+  let resolved = sql.replace(REPORT_TABLE_PATTERN, (match) => {
+    // Mevcut tabloyla aynıysa dokunma
+    const bare = match.replace(/"/g, "")
+    return bare === targetTable ? match : escapedTarget
+  })
+
+  // 2. active_view referanslarını mevcut tabloyla değiştir
+  resolved = resolved.replace(
+    /(?:"active_view"|'active_view'|\bactive_view\b)/gi,
+    escapedTarget
+  )
+
+  return resolved
+}
+
+/**
+ * Bir sorguyu localStorage'a kaydetmeden önce taşınabilir hale getirir:
+ * fiziksel tablo adını `active_view` yer tutucusuyla değiştirir.
+ * Bu sayede aynı sorgu farklı iş ID'leriyle (farklı tablo adlarıyla) açıldığında
+ * doğru çalışmaya devam eder.
+ */
+export function normalizeQueryForStorage(sql: string, tableName: string): string {
+  if (!sql || !tableName) return sql
+  // Hem tırnaklı hem tırnaksız biçimi yakala
+  const escapedTable = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return sql.replace(
+    new RegExp(`(?:"${escapedTable.replace(/"/g, '""')}"|\\b${escapedTable}\\b)`, "gi"),
+    "active_view"
+  )
+}

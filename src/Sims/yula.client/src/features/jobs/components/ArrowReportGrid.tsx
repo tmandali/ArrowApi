@@ -44,6 +44,7 @@ import {
 
 import { deriveColumnKind } from "../lib/column-type-utils"
 import { computeColumnValuesDigest } from "@/lib/grid-column-values"
+import { resolveActiveViewReferences } from "@/lib/sql-guard"
 import { formatGridCellValue, formatColumnLabel } from "@/utils/format-cell"
 import { buildCombinedWhereClause } from "@/services/duckdb/filter-parser"
 import { VirtualSpreadsheet } from "./VirtualSpreadsheet"
@@ -620,10 +621,13 @@ export function ArrowReportGrid({
   React.useEffect(() => {
     if (!duckTableName || isStreaming || isSavingDisk) return
     for (const v of savedViewSpecs) {
+      // Kayıtlı görünüm SQL'i 'active_view' içeriyorsa döngüsel bağımlılığı (infinite recursion)
+      // önlemek için temel tablo adına çözümlenir
+      const resolvedSql = resolveActiveViewReferences(v.sql, duckTableName)
       void duckDbClient
         .createOrReplaceView({
           viewName: v.name,
-          selectSql: v.sql,
+          selectSql: resolvedSql,
         })
         .catch((err) => {
           console.warn(`[ArrowReportGrid] Kayıtlı görünüm (${v.name}) DuckDB view senkronizasyon hatası:`, err)
@@ -661,7 +665,11 @@ export function ArrowReportGrid({
       // 3. SELECT SQL oluşturma
       let selectSql = ""
       if (customQuerySql) {
-        const cleanQuery = customQuerySql.trim().replace(/;+$/, "")
+        // active_view tanımlanırken kendi içine 'active_view' yazılması özyinelemeli döngü
+        // ("infinite recursion detected: attempting to recursively bind view active_view") üretir.
+        // Bu nedenle sorgu içindeki 'active_view' referansları fiziksel temel tabloya çözülür.
+        const resolvedQuery = resolveActiveViewReferences(customQuerySql, duckTableName)
+        const cleanQuery = resolvedQuery.trim().replace(/;+$/, "")
         selectSql = `SELECT * FROM (${cleanQuery}) AS __active_base ${whereClause} ${orderClause}`
       } else {
         const selectCols = effectiveColumns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(", ")

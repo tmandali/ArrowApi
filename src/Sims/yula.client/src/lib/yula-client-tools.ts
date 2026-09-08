@@ -1,7 +1,7 @@
 import { useYulaGridStore } from "@/lib/stores/grid"
 import { findReport } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
-import { guardReadOnlySelect } from "@/lib/sql-guard";
+import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage } from "@/lib/sql-guard";
 import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
 import { focusReportExecution, reportExecutionHref } from "@/lib/report-run-bus";
 
@@ -53,7 +53,8 @@ async function resolveActiveDataset(): Promise<ActiveDataset | null> {
     };
   }
 
-  const from = `(${customSql}) AS __yula_active_view`;
+  const resolvedCustomSql = resolveActiveViewReferences(customSql, spec.tableName);
+  const from = `(${resolvedCustomSql}) AS __yula_active_view`;
   let numeric = new Set<string>();
   try {
     const probe = await duckDbClient.executeCustomSql(
@@ -711,20 +712,25 @@ async function setGridQuery(
 
   try {
     const { duckDbClient } = await import("@/services/duckdb");
-    const rows = await duckDbClient.executeCustomSql(guard.sql);
+    const resolvedSql = resolveActiveViewReferences(guard.sql, spec.tableName);
+    const rows = await duckDbClient.executeCustomSql(resolvedSql);
     const first = rows[0] as Record<string, unknown> | undefined;
     const columns = first ? Object.keys(first) : [];
     const title = typeof input.title === "string" && input.title.trim()
       ? input.title.trim()
       : null;
-    store.setCustomQuerySql(guard.sql, title);
+    // Fiziksel tablo adını 'active_view' yer tutucusuyla normalize ederek sakla.
+    // Bu sayede aynı sorgu farklı iş ID'leri (farklı tablo adları) ile açıldığında
+    // Catalog Error vermeden çalışmaya devam eder.
+    const portableSql = normalizeQueryForStorage(guard.sql, spec.tableName);
+    store.setCustomQuerySql(portableSql, title);
     // Bağlam zarfı ve sonraki araç çağrıları türetilmiş kolonları görsün
     if (columns.length > 0) {
       store.register({ ...spec, title: title ?? spec.title, columns });
     }
     return {
       status: "ok",
-      sql: guard.sql,
+      sql: portableSql,
       title: title ?? spec.title,
       rowCount: rows.length,
       columns,
