@@ -697,12 +697,15 @@ async function setGridQuery(
     return { status: "error", error: guard.error, hint: guard.hint };
   }
 
-  // Sorgu açık tabloya referans vermeli (tableName yalnız [A-Za-z0-9_])
-  if (!new RegExp(spec.tableName, "i").test(guard.sql)) {
+  // Sorgu açık tabloya veya active_view'e referans vermeli (tableName yalnız [A-Za-z0-9_])
+  const referencesTable =
+    new RegExp(spec.tableName, "i").test(guard.sql) ||
+    /\bactive_view\b/i.test(guard.sql);
+  if (!referencesTable) {
     return {
       status: "error",
-      error: `Query does not reference the open table (${spec.tableName}).`,
-      hint: `Use ${spec.tableName} in FROM or JOIN clauses.`,
+      error: `Query does not reference the open table (${spec.tableName}) or active_view.`,
+      hint: `Use ${spec.tableName} or active_view in FROM/JOIN clauses.`,
     };
   }
 
