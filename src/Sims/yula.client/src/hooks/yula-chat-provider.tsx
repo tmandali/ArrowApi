@@ -18,7 +18,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { executeClientTool, resetGridCustomView } from "@/lib/yula-client-tools";
 import {
   blockedIncompleteIntent,
-  hasExplicitCriteriaApplyIntent,
   hasExplicitReportRunIntent,
 } from "@/lib/report-run-intent";
 import {
@@ -589,16 +588,11 @@ function ChatInstance({
         const gatedRun =
           (part.toolName === "run_job" || part.toolName === "run_report") &&
           !hasExplicitReportRunIntent(userText);
-        const gatedApply =
-          part.toolName === "apply_criteria" &&
-          !hasExplicitCriteriaApplyIntent(userText);
 
         if (gatedRun) {
           output = blockedIncompleteIntent(
             part.toolName === "run_report" ? "run_report" : "run_job",
           );
-        } else if (gatedApply) {
-          output = blockedIncompleteIntent("apply_criteria");
         } else {
           const timeoutMs =
             part.toolName === "profile_grid_table" ||

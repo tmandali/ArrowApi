@@ -7,7 +7,7 @@ const RUN_INTENT_RE =
   /(?:^|[^\p{L}\p{N}])(?:çalıştır(?:ın|ma|mayı)?|calistir(?:in|ma|mayı)?|run(?:\s+et(?:sin|tir)?)?|execute|job\s+başlat|job\s+baslat)(?:$|[^\p{L}\p{N}])/iu;
 
 const APPLY_INTENT_RE =
-  /(?:^|[^\p{L}\p{N}])(?:(?:\d+\.?\s*)?öneriyi\s+uygula|forma\s+doldur|forma\s+yaz|uygula|dünü\s+seç|dunu\s+sec|bugünü\s+seç|bugunu\s+sec|(?:tarih(?:i)?|kriter(?:leri)?|öneri(?:yi)?)\s+seç)(?:$|[^\p{L}\p{N}])/iu;
+  /(?:^|[^\p{L}\p{N}])(?:(?:\d+\.?\s*)?öneriyi\s+uygula|forma\s+yaz|doldur(?:un|unuz|ur\s+musun(?:uz)?|abilir\s+misin(?:iz)?)?|uygula(?:yın|yınız|r\s+mısın(?:ız)?|yabilir\s+misin(?:iz)?)?|ayarla(?:yın|yınız|r\s+mısın(?:ız)?|yabilir\s+misin(?:iz)?)?|aktar(?:ın|ınız|ır\s+mısın(?:ız)?|abilir\s+misin(?:iz)?)?|seç(?:in|iniz|er\s+misin(?:iz)?|ebilir\s+misin(?:iz)?)?|sec(?:in|iniz|er\s+misin(?:iz)?|ebilir\s+misin(?:iz)?)?)(?:$|[^\p{L}\p{N}])/iu;
 
 export const INCOMPLETE_INTENT_HINT =
   "Niyet tamamlanmadı. Formu doldurmadan ve job başlatmadan kullanıcıya 1-2 yula-criteria öneri chip'i sun; onay ('forma doldur' / 'uygula') veya açık çalıştırma fiili ('raporu çalıştır') bekle.";

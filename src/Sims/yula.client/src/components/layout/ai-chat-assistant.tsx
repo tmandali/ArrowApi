@@ -272,12 +272,7 @@ function AIChatPanelSession({
   const isProcessing = yula.busy
   const { messages } = yula
 
-  // Panel teşhisi: sohbet geçişi sonrası panelin gördüğü durum
-  React.useEffect(() => {
-    console.info(
-      `🤖 [Yula Panel] activeId=${yula.activeId} · mesaj=${messages.length} · history=${isHistoryOpen || isSearchingHistory} · path=${window.location.pathname}`,
-    )
-  }, [messages.length, yula.activeId, isHistoryOpen, isSearchingHistory])
+
 
   const [queuedPrompt, setQueuedPrompt] = React.useState(peekQueuedYulaPrompt)
   React.useEffect(() => subscribeQueuedYulaPrompt(() => setQueuedPrompt(peekQueuedYulaPrompt())), [])

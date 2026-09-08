@@ -38,14 +38,24 @@ describe("hasExplicitCriteriaApplyIntent", () => {
     assert.equal(hasExplicitCriteriaApplyIntent("geçen hafta"), false);
     assert.equal(hasExplicitCriteriaApplyIntent("dün"), false);
     assert.equal(hasExplicitCriteriaApplyIntent("raporu çalıştır"), false);
+    assert.equal(hasExplicitCriteriaApplyIntent("seçenekleri göster"), false);
+    assert.equal(hasExplicitCriteriaApplyIntent("seçim yap"), false);
   });
 
   it("accepts apply/confirm verbs", () => {
     assert.equal(hasExplicitCriteriaApplyIntent("1. öneriyi uygula"), true);
     assert.equal(hasExplicitCriteriaApplyIntent("forma doldur"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("kriterleri doldur"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("kriterleri geçen ay için doldur"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("doldur"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("doldurur musun"), true);
     assert.equal(hasExplicitCriteriaApplyIntent("forma yaz"), true);
     assert.equal(hasExplicitCriteriaApplyIntent("uygula"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("uygular mısın"), true);
     assert.equal(hasExplicitCriteriaApplyIntent("dünü seç"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("geçen ayı seç"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("kriterleri ayarla"), true);
+    assert.equal(hasExplicitCriteriaApplyIntent("forma aktar"), true);
   });
 });
 
