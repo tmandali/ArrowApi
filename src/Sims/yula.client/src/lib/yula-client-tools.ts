@@ -223,10 +223,10 @@ async function analyzeGrid(
     if (!column || !ds.columns.includes(column)) {
       return {
         status: "error",
-        error: `Geçersiz kolon: ${String(column)}`,
+        error: `Invalid column: ${String(column)}`,
         availableColumns: ds.columns,
         numericColumns: [...ds.numeric],
-        hint: "availableColumns içinden bir kolon seç; toplama/ortalama için numericColumns gerekir.",
+        hint: "Select a column from availableColumns; numericColumns required for sum/avg.",
       };
     }
 
@@ -251,9 +251,9 @@ async function analyzeGrid(
       }
       return {
         status: "error",
-        error: `"${column}" sayısal bir kolon değil; SUM/AVG işlemi uygulanamaz.`,
+        error: `"${column}" is not a numeric column; SUM/AVG cannot be applied.`,
         numericColumns: [...ds.numeric],
-        hint: "Aynı aracı numericColumns listesinden bir column ile tekrar çağır.",
+        hint: "Retry calling this tool with a column from numericColumns.",
       };
     }
     const col = sqlSafeId(column);
@@ -327,7 +327,7 @@ async function analyzeGrid(
       error: err instanceof Error ? err.message : String(err),
       availableColumns: ds.columns,
       numericColumns: [...ds.numeric],
-      hint: "Sorguyu bu kolon listesine göre düzeltip aynı aracı tekrar çağır.",
+      hint: "Fix the query using this column list and retry.",
     };
   }
 }
@@ -363,8 +363,8 @@ async function profileGrid(): Promise<unknown> {
   if (!ds) {
     return {
       status: "error",
-      error: "Açık tablo yok.",
-      hint: "Sonuç tablosu henüz yüklenmedi; birkaç saniye sonra tekrar deneyin.",
+      error: "No active table found.",
+      hint: "Results table is not ready yet; please wait a moment and try again.",
     }
   }
 
@@ -372,8 +372,8 @@ async function profileGrid(): Promise<unknown> {
     if (await gridStillStreaming(ds.tableName)) {
       return {
         status: "error",
-        error: "Rapor hâlâ DuckDB'ye yükleniyor.",
-        hint: "Yükleme bitince 'analiz et'i tekrar gönder; aksi halde profil sorgusu kuyrukta bekler.",
+        error: "Report data is still streaming to DuckDB.",
+        hint: "Wait until loading finishes and retry.",
       }
     }
 
@@ -477,7 +477,7 @@ async function profileGrid(): Promise<unknown> {
       rowCount: Number(agg.__row_count ?? 0),
       filtersApplied: filterSummary,
       columns,
-      note: "Tablo profil sonuçları yukarıdadır (kardinalite yaklaşık; top-değerler örneklemdendir). Lütfen veriyi detaylıca inceleyip kullanıcıya doğrudan Türkçe markdown ile açıklayıcı ve net analiz sun. Başka bir araç çağırma.",
+      note: "Table profiling results above (cardinality approximate; top values sampled). Provide a clear and comprehensive summary in the user's language based on these findings. Do not call another tool.",
     }
   } catch (err) {
     return {
@@ -505,8 +505,8 @@ async function getReportSchema(): Promise<unknown> {
   if (!report) {
     return {
       status: "error",
-      error: "Aktif rapor şeması bulunamadı.",
-      hint: "Bir rapor sonuç ekranı veya kriter ekranı açıkken tekrar deneyin.",
+      error: "Active report schema not found.",
+      hint: "Try again when a report criteria or results screen is open.",
     }
   }
 
@@ -557,8 +557,8 @@ async function getReportSchema(): Promise<unknown> {
     columnDescriptions: meta.columnDescriptions,
     aliases: meta.aliases,
     directive: isGuidPath
-      ? "Kullanıcı GUID sonuç ekranındadır (View Modu). 'Bu rapor hakkında bilgi ver' veya benzeri sorular sorulduğunda öncelikle aktif sonuç tablosunun kolonlarını, satır sayısını ve veri içeriğini açıkla; kriter listesini yalnızca kullanıcı yeni rapor çalıştırmak isterse ikincil olarak sun."
-      : "Kullanıcı rapor kriter ekranındadır (Criteria Modu). Raporun amacını ve çalıştırılabilir kriter alanlarını markdown tablo ile özetle.",
+      ? "User is viewing execution results. When asked about this report, primarily explain the active results table, its columns, row count, and data content. Only mention criteria options if the user asks to run a new report."
+      : "User is on the report criteria screen. Summarize the purpose of the report and its configurable criteria fields in a markdown table.",
   }
 }
 
@@ -573,8 +573,8 @@ async function runExpertSql(
   if (!spec || spec.columns.length === 0) {
     return {
       status: "error",
-      error: "Açık tablo yok.",
-      hint: "Sonuç tablosu henüz yüklenmedi; birkaç saniye sonra tekrar deneyin.",
+      error: "No active table found.",
+      hint: "Results table is not ready yet; please wait a moment and try again.",
     }
   }
 
@@ -594,15 +594,15 @@ async function runExpertSql(
       status: "ok",
       rowCount: rows.length,
       note: guard.limited
-        ? `LIMIT 200 otomatik eklendi; çıktı ilk ${MAX_OUTPUT_ROWS} satırla döndürüldü.`
-        : `Çıktı ilk ${MAX_OUTPUT_ROWS} satırla döndürüldü.`,
+        ? `LIMIT 200 was automatically applied; returning first ${MAX_OUTPUT_ROWS} rows.`
+        : `Returning first ${MAX_OUTPUT_ROWS} rows.`,
       rows: rows.slice(0, MAX_OUTPUT_ROWS),
     }
   } catch (err) {
     return {
       status: "error",
       error: err instanceof Error ? err.message : String(err),
-      hint: `SQL sözdizimini ve kolon adlarını kontrol et. Kolonlar: ${spec.columns.join(", ")}`,
+      hint: `Check SQL syntax and column names. Available columns: ${spec.columns.join(", ")}`,
     }
   }
 }
@@ -662,8 +662,8 @@ async function setGridQuery(
   if (!spec || spec.columns.length === 0) {
     return {
       status: "error",
-      error: "Açık tablo yok.",
-      hint: "Sonuç tablosu henüz yüklenmedi; birkaç saniye sonra tekrar deneyin.",
+      error: "No active table found.",
+      hint: "Results table is not ready yet; please wait a moment and try again.",
     };
   }
 
@@ -679,13 +679,13 @@ async function setGridQuery(
       return {
         status: "ok",
         reset: true,
-        message: "Özel sorgu kaldırıldı; temel tablo görünümüne dönüldü.",
+        message: "Custom query removed; restored base table view.",
       };
     }
     return {
       status: "error",
-      error: "set_grid_query için sql gerekli.",
-      hint: 'Yeni görünüm için sql gönder; yalnız temel görüne dönmek için {"reset": true}.',
+      error: "SQL query is required for set_grid_query.",
+      hint: 'Provide an SQL query for the new view, or {"reset": true} to return to base table.',
     };
   }
 
@@ -701,8 +701,8 @@ async function setGridQuery(
   if (!new RegExp(spec.tableName, "i").test(guard.sql)) {
     return {
       status: "error",
-      error: `Sorgu açık tabloya (${spec.tableName}) referans vermiyor.`,
-      hint: `FROM ya da JOIN ile ${spec.tableName} tablosunu kullan.`,
+      error: `Query does not reference the open table (${spec.tableName}).`,
+      hint: `Use ${spec.tableName} in FROM or JOIN clauses.`,
     };
   }
 
@@ -725,13 +725,13 @@ async function setGridQuery(
       title: title ?? spec.title,
       rowCount: rows.length,
       columns,
-      message: `Grid "${title ?? spec.title}" görünümüyle yenilendi (${rows.length} satır).`,
+      message: `Grid view updated to "${title ?? spec.title}" (${rows.length} rows).`,
     };
   } catch (err) {
     return {
       status: "error",
       error: err instanceof Error ? err.message : String(err),
-      hint: `SQL sözdizimini ve kolon adlarını kontrol et. Kolonlar: ${spec.columns.join(", ")}`,
+      hint: `Check SQL syntax and column names. Available columns: ${spec.columns.join(", ")}`,
     };
   }
 }
@@ -748,8 +748,8 @@ async function visualizeGrid(
   if (!ds) {
     return {
       status: "error",
-      error: "Açık tablo yok.",
-      hint: "Sonuç tablosu henüz yüklenmedi; birkaç saniye sonra tekrar deneyin.",
+      error: "No active table found.",
+      hint: "Results table is not ready yet; please wait a moment and try again.",
     };
   }
 
@@ -757,8 +757,8 @@ async function visualizeGrid(
   if (!["bar", "line", "pie"].includes(chartType)) {
     return {
       status: "error",
-      error: `Geçersiz grafik tipi: ${chartType}`,
-      hint: "chartType bar | line | pie olmalı.",
+      error: `Invalid chart type: ${chartType}`,
+      hint: "chartType must be bar | line | pie.",
     };
   }
 
@@ -783,9 +783,9 @@ async function visualizeGrid(
   if (!labelKey || !ds.columns.includes(labelKey)) {
     return {
       status: "error",
-      error: `Geçersiz kategori kolonu: ${labelKey}`,
+      error: `Invalid category column: ${labelKey}`,
       availableColumns: ds.columns,
-      hint: "dimensionX, availableColumns içinden bir metin kolonu olmalı.",
+      hint: "dimensionX must be a text column from availableColumns.",
     };
   }
 
@@ -795,26 +795,26 @@ async function visualizeGrid(
       status: "error",
       error:
         invalid.length > 0
-          ? `Geçersiz ölçü kolonları: ${invalid.join(", ")}`
-          : "dimensionY boş olamaz.",
+          ? `Invalid metric column(s): ${invalid.join(", ")}`
+          : "dimensionY cannot be empty.",
       numericColumns: [...ds.numeric],
-      hint: "dimensionY, numericColumns içinden sayısal kolonlar olmalı.",
+      hint: "dimensionY must be numeric column(s) from numericColumns.",
     };
   }
   const nonNumeric = valueKeys.filter((k) => !ds.numeric.has(k));
   if (nonNumeric.length > 0) {
     return {
       status: "error",
-      error: `Sayısal olmayan ölçü kolonları: ${nonNumeric.join(", ")}`,
+      error: `Non-numeric metric column(s): ${nonNumeric.join(", ")}`,
       numericColumns: [...ds.numeric],
-      hint: "Aynı aracı numericColumns içinden kolonlarla tekrar çağır.",
+      hint: "Retry calling this tool with columns from numericColumns.",
     };
   }
 
   // count → ölçü kolonu gerekmez; kart tek "Kayıt" serisi görür
   const seriesNames =
     aggregation === "count" && valueKeys.length === 0
-      ? ["Kayıt"]
+      ? ["Records"]
       : valueKeys;
 
   const { buildChartQuery } = await import("@/lib/chart-query");
@@ -826,7 +826,7 @@ async function visualizeGrid(
     limit: typeof input.limit === "number" ? input.limit : undefined,
   });
   if (!sql) {
-    return { status: "error", error: "Grafik sorgusu üretilemedi." };
+    return { status: "error", error: "Failed to generate chart query." };
   }
 
   try {
@@ -835,7 +835,7 @@ async function visualizeGrid(
     if (rows.length === 0) {
       return {
         status: "error",
-        error: "Sorgu boş sonuç döndürdü; farklı kolonlarla deneyin.",
+        error: "Query returned empty results; try different columns.",
       };
     }
     return {
@@ -846,7 +846,7 @@ async function visualizeGrid(
         title:
           typeof input.title === "string" && input.title.trim()
             ? input.title.trim()
-            : `${labelKey} bazlı grafik`,
+            : `${labelKey} chart`,
         description:
           typeof input.description === "string" ? input.description : undefined,
         takeaway:
@@ -862,7 +862,7 @@ async function visualizeGrid(
     return {
       status: "error",
       error: err instanceof Error ? err.message : String(err),
-      hint: "Kolon tiplerini kontrol et; sayısal ölçü kolonları kullan.",
+      hint: "Check column types; use numeric metric columns.",
     };
   }
 }
@@ -999,13 +999,13 @@ async function sortCurrentGrid(
   const store = useYulaGridStore.getState();
   const spec = await ensureGridSpec();
   if (!spec) {
-    return { status: "error", error: "Açık tablo yok." };
+    return { status: "error", error: "No active table found." };
   }
   const resolved = resolveFieldLoose(column, spec.columns);
   if (!resolved) {
     return {
       status: "error",
-      error: `Sıralama için geçersiz kolon: ${column}`,
+      error: `Invalid column for sorting: ${column}`,
       availableColumns: spec.columns,
     };
   }
@@ -1013,8 +1013,8 @@ async function sortCurrentGrid(
   if (!runtimeApi) {
     return {
       status: "error",
-      error: "Açık grid bulunamadı; sıralama uygulanamadı.",
-      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+      error: "Active grid not found; could not apply sort.",
+      hint: "Try again when report results are open.",
     };
   }
   const dir = direction === "none" ? null : direction;
@@ -1025,8 +1025,8 @@ async function sortCurrentGrid(
     direction,
     message:
       direction === "none"
-        ? `${resolved} sıralaması kaldırıldı; doğal sıraya dönüldü.`
-        : `${resolved} kolonuna göre ${direction === "asc" ? "artan (A-Z / küçükten büyüğe)" : "azalan (Z-A / büyükten küçüğe)"} sıralandı.`,
+        ? `Sort cleared for ${resolved}; restored natural order.`
+        : `Sorted by ${resolved} in ${direction === "asc" ? "ascending" : "descending"} order.`,
   };
 }
 
@@ -1038,14 +1038,14 @@ async function configureGridColumns(args: {
   const store = useYulaGridStore.getState();
   const spec = await ensureGridSpec();
   if (!spec) {
-    return { status: "error", error: "Açık tablo yok." };
+    return { status: "error", error: "No active table found." };
   }
   const runtimeApi = store.runtimeApi;
   if (!runtimeApi) {
     return {
       status: "error",
-      error: "Açık grid bulunamadı.",
-      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+      error: "Active grid not found.",
+      hint: "Try again when report results are open.",
     };
   }
 
@@ -1057,7 +1057,7 @@ async function configureGridColumns(args: {
     if (resolvedVisible.length === 0) {
       return {
         status: "error",
-        error: "Belirtilen kolonların hiçbiri tabloda bulunamadı.",
+        error: "None of the specified columns were found in the table.",
         availableColumns: spec.columns,
       };
     }
@@ -1066,7 +1066,7 @@ async function configureGridColumns(args: {
       status: "ok",
       visibleColumns: resolvedVisible,
       hiddenCount: spec.columns.length - resolvedVisible.length,
-      message: `${resolvedVisible.length} kolon gösteriliyor (${spec.columns.length - resolvedVisible.length} kolon gizlendi).`,
+      message: `${resolvedVisible.length} column(s) displayed (${spec.columns.length - resolvedVisible.length} hidden).`,
     };
   }
 
@@ -1079,7 +1079,7 @@ async function configureGridColumns(args: {
     return {
       status: "ok",
       hiddenColumns: resolvedHidden,
-      message: `${resolvedHidden.length} kolon gizlendi (${resolvedHidden.join(", ")}).`,
+      message: `${resolvedHidden.length} column(s) hidden (${resolvedHidden.join(", ")}).`,
     };
   }
 
@@ -1092,13 +1092,13 @@ async function configureGridColumns(args: {
     return {
       status: "ok",
       order: resolvedOrder,
-      message: "Kolon gösterim sırası düzenlendi.",
+      message: "Column display order updated.",
     };
   }
 
   return {
     status: "ok",
-    message: "Değişiklik yapılmadı (visibleColumns, hiddenColumns veya order belirtilmedi).",
+    message: "No changes made (visibleColumns, hiddenColumns, or order not specified).",
   };
 }
 
@@ -1106,14 +1106,14 @@ async function pinGridColumns(columns: string[]): Promise<unknown> {
   const store = useYulaGridStore.getState();
   const spec = await ensureGridSpec();
   if (!spec) {
-    return { status: "error", error: "Açık tablo yok." };
+    return { status: "error", error: "No active table found." };
   }
   const runtimeApi = store.runtimeApi;
   if (!runtimeApi) {
     return {
       status: "error",
-      error: "Açık grid bulunamadı.",
-      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+      error: "Active grid not found.",
+      hint: "Try again when report results are open.",
     };
   }
   const resolved = columns
@@ -1122,7 +1122,7 @@ async function pinGridColumns(columns: string[]): Promise<unknown> {
   if (resolved.length === 0) {
     return {
       status: "error",
-      error: "Sabitlenecek kolonlar tabloda bulunamadı.",
+      error: "Columns to pin were not found in the table.",
       availableColumns: spec.columns,
     };
   }
@@ -1130,7 +1130,7 @@ async function pinGridColumns(columns: string[]): Promise<unknown> {
   return {
     status: "ok",
     pinnedColumns: resolved,
-    message: `${resolved.join(", ")} sola sabitlendi (sticky).`,
+    message: `Columns pinned to the left: ${resolved.join(", ")}.`,
   };
 }
 
@@ -1141,14 +1141,14 @@ async function applyGridFiltersMulti(
   const store = useYulaGridStore.getState();
   const spec = await ensureGridSpec();
   if (!spec) {
-    return { status: "error", error: "Açık tablo yok." };
+    return { status: "error", error: "No active table found." };
   }
   const runtimeApi = store.runtimeApi;
   if (!runtimeApi) {
     return {
       status: "error",
-      error: "Açık grid bulunamadı.",
-      hint: "Rapor sonuç ekranı açıkken tekrar deneyin.",
+      error: "Active grid not found.",
+      hint: "Try again when report results are open.",
     };
   }
 
@@ -1167,7 +1167,7 @@ async function applyGridFiltersMulti(
   if (Object.keys(resolvedFilters).length === 0) {
     return {
       status: "error",
-      error: "Filtre uygulanacak geçerli kolon bulunamadı.",
+      error: "No valid columns found to apply filters.",
       notFound,
       availableColumns: spec.columns,
     };
@@ -1186,7 +1186,7 @@ async function applyGridFiltersMulti(
     status: "ok",
     appliedFilters: resolvedFilters,
     notFound: notFound.length > 0 ? notFound : undefined,
-    message: `Filtreler uygulandı: ${appliedList}`,
+    message: `Filters applied: ${appliedList}`,
   };
 }
 
@@ -1215,7 +1215,7 @@ async function resetGridLayout(options?: {
   return {
     status: "ok",
     reset: opt,
-    message: "Grid görünümü ve düzeni varsayılan ayarlara döndürüldü.",
+    message: "Grid layout and filters reset to default settings.",
   };
 }
 
@@ -1227,20 +1227,14 @@ async function exportGridData(
   if (!runtimeApi || !runtimeApi.exportGrid) {
     return {
       status: "error",
-      error: "Grid dışa aktarma servisi bağlı değil.",
+      error: "Grid export service is not attached.",
     };
   }
   await runtimeApi.exportGrid(format);
-  const labels: Record<string, string> = {
-    xlsx: "Excel (.xlsx)",
-    parquet: "Apache Parquet (.parquet)",
-    csv: "CSV (.csv)",
-    gz: "Sıkıştırılmış CSV (.csv.gz)",
-  };
   return {
     status: "ok",
     format,
-    message: `${labels[format] || format} formatında dosya indirme işlemi başlatıldı.`,
+    message: `File export initiated in ${format.toUpperCase()} format.`,
   };
 }
 
@@ -1253,7 +1247,7 @@ export async function executeClientTool(
     case "prepare_report_criteria":
       // Kart katmanı kaldırıldı — eski konuşmalardaki bekleyen çağrılar
       // sessizce kapatılır.
-      return { status: "skipped", message: "Kriter kartı akışı kaldırıldı." };
+      return { status: "skipped", message: "Criteria card flow has been removed." };
     case "run_report":
     case "run_job": {
       const scope = String(args.report ?? "stock-balance");
@@ -1262,7 +1256,7 @@ export async function executeClientTool(
           await import("@/features/reports/report-registry")
         ).findReport(scope);
       if (!meta) {
-        return { status: "error", error: `Bilinmeyen rapor: ${scope}` };
+        return { status: "error", error: `Unknown report: ${scope}` };
       }
       try {
         const { applyCriteriaToDraft, resolveRelativeDateString } =
@@ -1307,11 +1301,11 @@ export async function executeClientTool(
           return {
             status: "validation-error",
             errors: result.errors.map((e) => e.message).slice(0, 5),
-            hint: "Kriter formuyla düzeltin veya criteria alanlarını tamamlayın.",
+            hint: "Correct via criteria form or provide valid criteria fields.",
           };
         }
         if (!result.jobEndpoint) {
-          return { status: "error", error: "Şemada x-job-endpoint yok." };
+          return { status: "error", error: "Missing x-job-endpoint in schema." };
         }
         const { createArrowJob } = await import(
           "@/features/jobs/arrow-job-client"
@@ -1349,8 +1343,8 @@ export async function executeClientTool(
           navigateTo: reportExecutionHref(meta.pagePath, job.id),
           presetTitle: preset,
           message: preset
-            ? `"${preset}" job'ı başlatıldı (${job.id}). Execution ekranında seçildi.`
-            : `Job başlatıldı (${job.id}). Execution ekranında çalışıyor olarak seçildi.`,
+            ? `Job started (${job.id}) for preset "${preset}". Selected on execution screen.`
+            : `Job started (${job.id}). Running on execution screen.`,
         };
       } catch (err) {
         return {
@@ -1372,8 +1366,8 @@ export async function executeClientTool(
           status: "ok",
           updatedKeys: res.updatedKeys,
           message: preset
-            ? `"${preset}" kriterleri ekrandaki tabloya dolduruldu ve vurgulandı. Ekrandaki 'Run' butonuna basarak raporu başlatabilirsiniz.`
-            : "Önerilen kriterler ekrandaki tabloya dolduruldu ve vurgulandı. Ekrandaki 'Run' butonuna basarak raporu başlatabilirsiniz.",
+            ? `"${preset}" criteria applied to the draft form. User can run the report.`
+            : "Criteria applied to the draft form. User can run the report.",
         };
       } catch (err) {
         return {
@@ -1387,7 +1381,7 @@ export async function executeClientTool(
       if (!targetPath) {
         return {
           status: "error",
-          message: "Yönlendirilecek sayfa yolu belirtilmedi.",
+          message: "Target page path was not specified.",
         };
       }
       const currentPath =
@@ -1396,7 +1390,7 @@ export async function executeClientTool(
         return {
           status: "already_on_page",
           navigateTo: targetPath,
-          message: `Zaten ${targetPath} sayfasındasınız.`,
+          message: `Already on ${targetPath}.`,
         };
       }
       const title =
@@ -1404,7 +1398,7 @@ export async function executeClientTool(
       return {
         status: "navigated",
         navigateTo: targetPath,
-        message: `"${title}" sayfasına yönlendiriliyorsunuz.`,
+        message: `Navigating to "${title}".`,
       };
     }
     case "open_last_report": {
@@ -1467,14 +1461,14 @@ export async function executeClientTool(
           return {
             status: "not_found",
             message:
-              "Kayıtlı rapor job'ı bulunamadı. Kullanıcıya run_report ile yeni bir rapor çalıştırmayı önerebilirsin.",
+              "No report execution found. You may suggest running a new report with run_report.",
           };
         }
         return {
           status: "navigated",
           jobId: lastJob.jobId,
           navigateTo: lastJob.href,
-          message: `Son çalışan rapor açıldı: ${lastJob.title} (job ${lastJob.jobId.slice(0, 8)}, ${lastJob.status}).`,
+          message: `Opened last report: ${lastJob.title} (job ${lastJob.jobId.slice(0, 8)}, ${lastJob.status}).`,
         };
       } catch (err) {
         return { status: "error", error: err instanceof Error ? err.message : String(err) };
@@ -1495,7 +1489,7 @@ export async function executeClientTool(
     case "request_user_confirmation":
       return {
         confirmed: false,
-        message: "İnsan onayı kartı bekleniyor.",
+        message: "Waiting for user confirmation response.",
       };
     case "filter_current_grid": {
       const field = String(args.field ?? "");
@@ -1551,8 +1545,8 @@ export async function executeClientTool(
           valid: false,
           scope,
           reportTitle: scope,
-          summary: `Bilinmeyen rapor: '${scope}'`,
-          errors: [{ field: "report", fieldTitle: "Rapor", message: `Bilinmeyen rapor: '${scope}'` }],
+          summary: `Unknown report: '${scope}'`,
+          errors: [{ field: "report", fieldTitle: "Report", message: `Unknown report: '${scope}'` }],
           warnings: [],
         };
       }
@@ -1611,7 +1605,7 @@ export async function executeClientTool(
         return {
           status: "ok",
           executions,
-          message: `${executions.length} adet çalıştırma geçmişi listelendi.`,
+          message: `Listed ${executions.length} report execution(s).`,
         };
       } catch (err) {
         return {
@@ -1624,7 +1618,7 @@ export async function executeClientTool(
     case "cancel_job": {
       const jobId = String(args.jobId ?? "").trim();
       if (!jobId) {
-        return { status: "error", jobId: "", message: "İptal edilecek job GUID belirtilmedi." };
+        return { status: "error", jobId: "", message: "Job GUID to cancel was not specified." };
       }
       try {
         const { cancelArrowJob } = await import("@/features/jobs/arrow-job-client");
@@ -1634,7 +1628,7 @@ export async function executeClientTool(
         return {
           status: "ok",
           jobId,
-          message: `İş başarıyla iptal edildi (${jobId}).`,
+          message: `Job successfully cancelled (${jobId}).`,
         };
       } catch (err) {
         return {

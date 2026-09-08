@@ -76,15 +76,15 @@ export function guardReadOnlySelect(
   if (!trimmed) {
     return {
       ok: false,
-      error: "SQL boş.",
-      hint: "Çalıştırılacak bir SELECT sorgusu yaz.",
+      error: "SQL query is empty.",
+      hint: "Provide a SELECT query to execute.",
     }
   }
   if (trimmed.length > MAX_SQL_LENGTH) {
     return {
       ok: false,
-      error: `SQL çok uzun (${trimmed.length} karakter).`,
-      hint: `Sorguyu ${MAX_SQL_LENGTH} karakterin altında tut.`,
+      error: `SQL query is too long (${trimmed.length} characters).`,
+      hint: `Keep the query under ${MAX_SQL_LENGTH} characters.`,
     }
   }
 
@@ -92,16 +92,16 @@ export function guardReadOnlySelect(
   if (body.includes(";")) {
     return {
       ok: false,
-      error: "Çoklu statement algılandı.",
-      hint: "Yalnız TEK bir SELECT gönder; ';' ile ayırma.",
+      error: "Multiple statements detected.",
+      hint: "Submit only a single SELECT query without semicolons.",
     }
   }
 
   if (!/^(select|with)\b/i.test(body)) {
     return {
       ok: false,
-      error: "Yalnızca SELECT veya WITH (CTE) sorguları çalıştırılabilir.",
-      hint: "Sorguyu SELECT ... ya da WITH ... SELECT ... olarak yaz.",
+      error: "Only SELECT or WITH (CTE) queries can be executed.",
+      hint: "Write query starting with SELECT or WITH.",
     }
   }
 
@@ -114,8 +114,8 @@ export function guardReadOnlySelect(
   if (forbidden) {
     return {
       ok: false,
-      error: `Salt-okunur guard: '${forbidden.toUpperCase()}' kullanılamaz.`,
-      hint: "Veriyi yalnız SELECT ile oku; yazma/şema komutları yasaktır.",
+      error: `Read-only guard: '${forbidden.toUpperCase()}' is forbidden.`,
+      hint: "Only read data using SELECT; DDL and mutation statements are forbidden.",
     }
   }
 
@@ -123,8 +123,8 @@ export function guardReadOnlySelect(
   if (forbiddenFn) {
     return {
       ok: false,
-      error: "Salt-okunur guard: dosya okuma fonksiyonları yasaktır.",
-      hint: "Yalnızca açık rapor tablosunu (FROM/JOIN) sorgula.",
+      error: "Read-only guard: file reading functions are forbidden.",
+      hint: "Only query the active report table in FROM/JOIN clauses.",
     }
   }
 

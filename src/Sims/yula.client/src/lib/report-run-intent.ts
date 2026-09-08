@@ -4,15 +4,15 @@
  */
 
 const RUN_INTENT_RE =
-  /(?:^|[^\p{L}\p{N}])(?:çalıştır(?:ın|ma|mayı)?|calistir(?:in|ma|mayı)?|run(?:\s+et(?:sin|tir)?)?|execute|job\s+başlat|job\s+baslat)(?:$|[^\p{L}\p{N}])/iu;
+  /(?:^|[^\p{L}\p{N}])(?:çalıştır(?:ın|ma|mayı)?|calistir(?:in|ma|mayı)?|run(?:\s+et(?:sin|tir)?)?|execute|start(?:\s+the)?\s+(?:job|report)?|launch(?:\s+the)?\s+(?:job|report)?|job\s+başlat|job\s+baslat)(?:$|[^\p{L}\p{N}])/iu;
 
 const APPLY_INTENT_RE =
   /(?:^|[^\p{L}\p{N}])(?:(?:\d+\.?\s*)?öneriyi\s+uygula|forma\s+yaz|doldur(?:un|unuz|ur\s+musun(?:uz)?|abilir\s+misin(?:iz)?)?|uygula(?:yın|yınız|r\s+mısın(?:ız)?|yabilir\s+misin(?:iz)?)?|ayarla(?:yın|yınız|r\s+mısın(?:ız)?|yabilir\s+misin(?:iz)?)?|aktar(?:ın|ınız|ır\s+mısın(?:ız)?|abilir\s+misin(?:iz)?)?|seç(?:in|iniz|er\s+misin(?:iz)?|ebilir\s+misin(?:iz)?)?|sec(?:in|iniz|er\s+misin(?:iz)?|ebilir\s+misin(?:iz)?)?)(?:$|[^\p{L}\p{N}])/iu;
 
 export const INCOMPLETE_INTENT_HINT =
-  "Niyet tamamlanmadı. Formu doldurmadan ve job başlatmadan kullanıcıya 1-2 yula-criteria öneri chip'i sun; onay ('forma doldur' / 'uygula') veya açık çalıştırma fiili ('raporu çalıştır') bekle.";
+  "Intent incomplete. Do not start a background report job. Present 1-2 criteria suggestion chips to the user in their active language and wait for explicit confirmation or a run verb (e.g. 'run', 'execute', 'çalıştır').";
 
-/** Açık çalıştırma fiili: çalıştır / run / execute / job başlat (çalışan eşleşmez). */
+/** Açık çalıştırma fiili: çalıştır / run / execute / start / launch / job başlat. */
 export function hasExplicitReportRunIntent(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
@@ -38,12 +38,12 @@ export function blockedIncompleteIntent(
 ): IncompleteIntentBlocked {
   const action =
     toolName === "apply_criteria"
-      ? "kriter formu doldurulmadı"
-      : "job başlatılmadı";
+      ? "criteria form was not applied"
+      : "report job was not started";
   return {
     status: "blocked",
     reason: "incomplete-intent",
     hint: INCOMPLETE_INTENT_HINT,
-    message: `Eksik niyet: ${action}. ${INCOMPLETE_INTENT_HINT}`,
+    message: `Incomplete intent: ${action}. ${INCOMPLETE_INTENT_HINT}`,
   };
 }
