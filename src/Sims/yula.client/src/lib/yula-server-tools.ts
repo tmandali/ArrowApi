@@ -406,7 +406,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
           },
           topN: {
             type: "number",
-            description: "top için grup sayısı (varsayılan 5)",
+            description: "top için grup sayısı (varsayılan 5, en fazla 10)",
           },
         },
         required: ["operation"],
@@ -424,7 +424,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
     }),
     run_expert_sql: dynamicTool({
       description: [
-        "SQL uzmanının yazdığı TEK salt-okunur SELECT'i çalıştırır; ilk 50 satırı MODELE döner (grid DEĞİŞTİRMEZ).",
+        "SQL uzmanının yazdığı TEK salt-okunur SELECT'i çalıştırır; ilk 10 satırı MODELE döner (grid DEĞİŞTİRMEZ).",
         "KAPSAM: yalnız gridin ifade EDEMEYECEĞİ sorgular — aggregate, karşılaştırmalı kolonlar (Qty > UnitPrice), oran/hesap, window.",
         "DUCKDB VIEW: Ekrandaki süzülmüş/aktif görünümü sorgulamak için 'FROM active_view', ham tablonun tümünü sorgulamak için aktif tablo adını kullanabilirsiniz.",
         "Basit kolon filtreleri (değer/aralık/boş-dolu) için BU ARACI KULLANMA — filter_current_grid ile filtrele; aksi halde grid hücreleri ve tablo senkron dışı kalır.",

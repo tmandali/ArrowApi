@@ -234,7 +234,7 @@ async function analyzeGrid(
     if (!ds.numeric.has(column)) {
       if (op === "top") {
         const col = sqlSafeId(column);
-        const limitN = Math.max(1, Math.min(50, topN));
+        const limitN = Math.max(1, Math.min(10, topN));
         const rows = await duckDbClient.executeCustomSql(
           `SELECT ${col} AS label, COUNT(*) AS value FROM ${ds.from} GROUP BY ${col} ORDER BY value DESC LIMIT ${limitN}`,
         );
@@ -263,7 +263,7 @@ async function analyzeGrid(
       if (byColumn && ds.columns.includes(byColumn)) {
         const gcol = sqlSafeId(byColumn);
         const rows = await duckDbClient.executeCustomSql(
-          `SELECT ${gcol} AS label, ROUND(${op.toUpperCase()}(${col}), 2) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(20, topN))}`,
+          `SELECT ${gcol} AS label, ROUND(${op.toUpperCase()}(${col}), 2) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(10, topN))}`,
         );
         return {
           status: "ok",
@@ -308,7 +308,7 @@ async function analyzeGrid(
           column;
     const gcol = sqlSafeId(groupCol);
     const rows = await duckDbClient.executeCustomSql(
-      `SELECT ${gcol} AS label, SUM(${col}) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(20, topN))}`,
+      `SELECT ${gcol} AS label, SUM(${col}) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(10, topN))}`,
     );
     return {
       status: "ok",
@@ -549,7 +549,7 @@ async function getReportSchema(): Promise<unknown> {
           columns: spec.columns,
           rowCount: spec.rowCount,
           columnTypes: spec.columnTypes,
-          sampleRows: spec.sampleRows,
+          sampleRows: spec.sampleRows ? spec.sampleRows.slice(0, 10) : undefined,
           columnValues: spec.columnValues,
         }
       : undefined,
@@ -564,7 +564,7 @@ async function getReportSchema(): Promise<unknown> {
 
 /**
  * SQL Expert sorgu yürütme — modelin yazdığı TEK salt-okunur SELECT'i
- * guard'dan geçirip DuckDB'de çalıştırır; ilk 50 satırı modele döner.
+ * guard'dan geçirip DuckDB'de çalıştırır; ilk 10 satırı modele döner.
  */
 async function runExpertSql(
   input: Record<string, unknown>
@@ -587,15 +587,15 @@ async function runExpertSql(
   try {
     const { duckDbClient } = await import("@/services/duckdb")
     const rows = await duckDbClient.executeCustomSql(guard.sql)
-    const MAX_OUTPUT_ROWS = 50
+    const MAX_OUTPUT_ROWS = 10
     // silent = keşif/doğrulama sorgusu: ekrana tablo kartı basılmaz,
     // çıktı yine de MODELE tam döner.
     return {
       status: "ok",
       rowCount: rows.length,
       note: guard.limited
-        ? `LIMIT 200 was automatically applied; returning first ${MAX_OUTPUT_ROWS} rows.`
-        : `Returning first ${MAX_OUTPUT_ROWS} rows.`,
+        ? `LIMIT was automatically applied; returning first ${MAX_OUTPUT_ROWS} sample rows to context.`
+        : `Returning first ${MAX_OUTPUT_ROWS} sample rows to context.`,
       rows: rows.slice(0, MAX_OUTPUT_ROWS),
     }
   } catch (err) {
@@ -1585,7 +1585,10 @@ export async function executeClientTool(
     }
     case "list_report_executions": {
       const scope = String(args.report ?? "stock-balance");
-      const limit = typeof args.limit === "number" ? args.limit : 10;
+      const limit =
+        typeof args.limit === "number"
+          ? Math.min(10, Math.max(1, args.limit))
+          : 10;
       try {
         const { findReport } = await import("@/features/reports/report-registry");
         const meta = findReport(scope);

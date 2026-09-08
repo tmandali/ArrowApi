@@ -78,6 +78,7 @@ Projeye yeni bir rapor veya ajan yeteneği eklendiğinde aşağıdaki adımlar e
   - Araç çıktılarına asla *"doğrudan Türkçe sun"* vb. tek bir dili dayatan yönergeler yazılamaz; aksi takdirde model kullanıcının konuştuğu dili yansıtamaz ve bağlam zehirlenmesi (context poisoning) oluşur. Yanıt dilini daima kullanıcının konuşma dili ve LLM'in doğal dil yeteneği belirler.
   - İstemci tarafında `apply_criteria` vb. araç çağrılarının önüne yapay Türkçe fiil regex kapıları (`gatedApply`) konulmaz; çok dilli ortamda modelin niyet doğrulamasına ve Criteria Input Engine'in şema kurallarına güvenilir.
 - **Yula AI Panel (Side Dock) Davranışı**: Yula AI paneli mobil veya küçük ekranlarda zorunlu tam ekrana geçmez (`isAutoFullscreen` kaldırılmıştır); tüm çözünürlüklerde yan çekmece (side dock / sheet) formunu ve genişlik kontrolünü korur.
+- **Keşif ve Örneklem Sınırı (Max 10 Kayıt Kuralı)**: Yula AI'ın çalıştırdığı keşif sorgularında (`run_expert_sql`, `analyze_grid_data`), şema örneklemlerinde (`get_report_schema`, `sampleRows`) veya iş geçmişi listelerinde (`list_report_executions`) modele/bağlama (context) **asla 10 kaydın üzerinde veri dönülemez**. Bu kural bağlamın şişmesini, token israfını ve modelin halüsinasyon yapmasını önler.
 
 ## 🤖 Yula AI Agent Core: 3 Katmanlı Araç Mimarisi
 

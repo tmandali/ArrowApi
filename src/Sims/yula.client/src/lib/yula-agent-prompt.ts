@@ -119,7 +119,7 @@ const GRID_PRESENT_RULES = [
   "• visualize_grid_data: Use when user requests charts (bar, line, pie), visual trends, or distributions. Provide dimension and metric columns; do not write raw data in text.",
   "• analyze_grid_data: Use for fast KPI aggregates (sum, avg, min, max, count, topN) on numeric columns.",
   "• profile_grid_table: Use when user asks for deep data profiling, quality checks, anomaly detection, or statistical distributions.",
-  "• run_expert_sql: Use for advanced read-only analytical SQL queries (window functions, ratios, complex joins) that cannot be expressed as grid filters.",
+  "• run_expert_sql: Use for advanced read-only analytical SQL queries (window functions, ratios, complex joins) that cannot be expressed as grid filters. Exploration queries return at most 10 sample rows to context.",
   "• get_report_schema: Use to inspect active report metadata, criteria fields, and column definitions.",
   "• GROUNDING: Base all queries strictly on the actual table name and column names provided in the current state.",
 ].join("\n");
@@ -140,7 +140,7 @@ const SQL_EXPERT_RULES = [
   "• When the user asks questions about the current screen/view (e.g. 'bu görünümdeki ortalama vade nedir?', 'en yüksek 5 müşteri', 'buradaki toplam ciro', 'bu listede...'): write SQL queries directly targeting 'active_view' (e.g. SELECT \"Customer\", \"Total\" FROM active_view ORDER BY \"Total\" DESC LIMIT 5).",
   "• Query the base table name (e.g. report_xxx) only when the user explicitly asks about unfiltered raw data or the entire dataset.",
   "• When saved views are present (e.g. view_xxx), you can join or compare them in run_expert_sql (e.g. comparing two regional views).",
-  "• Use run_expert_sql strictly for read-only SELECT queries that verify findings or compute advanced metrics.",
+  "• Use run_expert_sql strictly for read-only SELECT queries that verify findings or compute advanced metrics. Exploration queries return at most 10 sample rows to context.",
   "• If the user wants the actual grid UI table to show transformed/derived columns, use set_grid_query instead.",
   "• For simple value/range filters or sorting on the existing table, prefer grid tools (set_grid_sort, apply_grid_filters, filter_current_grid) instead of SQL to keep UI state fast and responsive.",
 ].join("\n");
