@@ -105,6 +105,7 @@ export function VirtualSpreadsheet<T>({
   onSaveCurrentAiView,
   onRenameAiView,
   onDeleteAiView,
+  isViewLoading,
   onSortSettingChange,
   sortConfigs,
   onSortConfigsChange,
@@ -1269,6 +1270,7 @@ export function VirtualSpreadsheet<T>({
               onSaveCurrentAiView={onSaveCurrentAiView}
               onRenameAiView={onRenameAiView}
               onDeleteAiView={onDeleteAiView}
+              isViewLoading={isViewLoading}
             />
           ) : (
             <div className="flex min-w-0 max-w-[200px] sm:max-w-[320px] items-center gap-1.5 shrink">

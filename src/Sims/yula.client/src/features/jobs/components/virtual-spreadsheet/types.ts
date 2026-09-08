@@ -172,6 +172,8 @@ export type VirtualSpreadsheetProps<T> = {
   onRenameAiView?: (viewId: string, nextTitle: string) => void
   /** AI görünümü silindiğinde çağrılır */
   onDeleteAiView?: (viewId: string) => void
+  /** AI görünümü sorgusu çalışıyor mu? (Dropdown trigger'da spinner gösterilir) */
+  isViewLoading?: boolean
   /** Sıralama ayarı (kolon ve yön) localStorage'dan yüklendiğinde çağrılır */
   onSortSettingChange?: (sortBy: string | null, sortDesc: boolean) => void
   /** Çoklu kolon sıralama haritası (örn: { "City": "asc", "Total": "desc" }) */

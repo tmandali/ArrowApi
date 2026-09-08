@@ -1079,6 +1079,10 @@ export function ArrowReportGrid({
       onSaveCurrentAiView={handleSaveCurrentAiView}
       onRenameAiView={handleRenameAiView}
       onDeleteAiView={handleDeleteAiView}
+      isViewLoading={
+        isLoadingQuery &&
+        (!!customQuerySql || (displayRows.length === 0 && !!activeAiViewId))
+      }
       hiddenColumns={hiddenColumns}
       onHiddenColumnsChange={setHiddenColumns}
       pinnedColumns={pinnedColumns}

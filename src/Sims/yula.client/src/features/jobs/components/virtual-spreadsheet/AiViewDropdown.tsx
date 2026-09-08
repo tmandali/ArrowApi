@@ -7,6 +7,7 @@ import {
   Code2,
   Copy,
   Check,
+  Loader2,
   Pencil,
   Sparkles,
   Table2,
@@ -41,6 +42,8 @@ export interface AiViewDropdownProps {
   onSaveCurrentAiView?: (title: string) => void
   onRenameAiView?: (viewId: string, nextTitle: string) => void
   onDeleteAiView?: (viewId: string) => void
+  /** Görünüm sorgusu yürütülüyor mu? (trigger'da dönen spinner gösterilir) */
+  isViewLoading?: boolean
   className?: string
 }
 
@@ -54,6 +57,7 @@ export function AiViewDropdown({
   onSaveCurrentAiView,
   onRenameAiView,
   onDeleteAiView,
+  isViewLoading = false,
   className,
 }: AiViewDropdownProps) {
   const isCurrentQueryActive = Boolean(currentQuerySql)
@@ -140,6 +144,7 @@ export function AiViewDropdown({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
+              aria-busy={isViewLoading || undefined}
               className={cn(
                 "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold tracking-tight transition-colors outline-none shrink",
                 "focus-visible:ring-1 focus-visible:ring-primary/50",
@@ -148,20 +153,29 @@ export function AiViewDropdown({
                   : "text-primary hover:bg-muted/70 dark:text-sidebar-primary"
               )}
               title={
-                isCurrentQueryActive
+                isViewLoading
+                  ? `Yükleniyor: ${activeTitle}`
+                  : isCurrentQueryActive
                   ? isCurrentQuerySaved
                     ? `Aktif Kayıtlı Görünüm: ${activeTitle}`
                     : `Aktif Geçici AI Görünümü (Kaydedilmedi): ${activeTitle}`
                   : `Aktif Görünüm: ${defaultLabel}`
               }
             >
-              {isCurrentQueryActive ? (
+              {isViewLoading ? (
+                <Loader2
+                  className="size-3.5 shrink-0 animate-spin text-amber-600 dark:text-amber-400"
+                  aria-hidden
+                />
+              ) : isCurrentQueryActive ? (
                 <Sparkles className="size-3.5 text-amber-600 shrink-0 dark:text-amber-400" />
               ) : (
                 <Table2 className="size-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/80" />
               )}
-              <span className="min-w-0 flex-1 truncate">{activeTitle}</span>
-              {isCurrentQueryActive && !isCurrentQuerySaved ? (
+              <span className={cn("min-w-0 flex-1 truncate", isViewLoading && "opacity-60")}>
+                {activeTitle}
+              </span>
+              {isCurrentQueryActive && !isCurrentQuerySaved && !isViewLoading ? (
                 <span
                   className="size-1.5 rounded-full bg-amber-500 shrink-0"
                   title="Kaydedilmedi"
