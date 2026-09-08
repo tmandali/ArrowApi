@@ -37,7 +37,10 @@ import {
 import { useDuckReport, type ReportColumnMeta } from "../hooks/use-duck-report"
 import { duckDbClient } from "@/services/duckdb"
 import { opfsReportCache } from "@/services/opfs/opfs-cache"
-import { exportOpfsMergedParquet } from "@/services/opfs/opfs-parquet-merge"
+import {
+  exportOpfsMergedParquet,
+  exportQueryToParquetStream,
+} from "@/services/opfs/opfs-parquet-merge"
 
 import { deriveColumnKind } from "../lib/column-type-utils"
 import { computeColumnValuesDigest } from "@/lib/grid-column-values"
@@ -869,6 +872,31 @@ export function ArrowReportGrid({
           sortList.push({ column: sortBy, desc: sortDesc })
         }
 
+        const exportCols = effectiveColumns
+          .filter((c) => !hiddenColumns?.includes(c.name))
+          .map((c) => c.name)
+
+        // PARQUET: Filtrelenmiş veya özel görünüm sorgusu için 32-bit OOM'u önleyen lazy-stream ihracı
+        if (format === "parquet") {
+          const result = await exportQueryToParquetStream({
+            tableName: duckTableName,
+            customSql: customQuerySql ?? undefined,
+            columns: exportCols.length > 0 ? exportCols : effectiveColumns.map((c) => c.name),
+            filters,
+            numericColumns,
+            sortBy,
+            sortDesc,
+            sortConfigs: sortList,
+            fileName,
+          })
+          const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
+          toast.success(
+            `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            { id: exportToastId }
+          )
+          return
+        }
+
         const result = await duckDbClient.exportReportTable({
           tableName: duckTableName,
           fileName,
@@ -877,9 +905,10 @@ export function ArrowReportGrid({
           sortBy,
           sortDesc,
           sortConfigs: sortList,
-          columns: effectiveColumns.map((c) => c.name),
+          columns: exportCols.length > 0 ? exportCols : effectiveColumns.map((c) => c.name),
           preferredFormat: format,
           maxTotalRows,
+          customSql: customQuerySql ?? undefined,
         })
 
         if (result.format === "xlsx") {
@@ -961,6 +990,7 @@ export function ArrowReportGrid({
       sortConfigs,
       jobId,
       customQuerySql,
+      hiddenColumns,
     ]
   )
 

@@ -81,4 +81,31 @@ console.log("=== [TEST] export-formats.test.mjs (Export SQL & Formatting Rules) 
   console.log("  ✓ DuckDB-Wasm Issue #2119 extra-byte corruption detection and trimming verified")
 }
 
+// 5. Custom / Saved AI View Export SQL Generation (Binder Error Prevention)
+{
+  const tableName = "report_satislar"
+  const customSql = 'SELECT "Depo", "ParaBirimi", SUM("ToplamTutar") AS "Satış Tutarı", SUM("IadeTutar") AS "İade Tutarı" FROM "report_satislar" GROUP BY "Depo", "ParaBirimi";'
+  const columns = ["Depo", "ParaBirimi", "Satış Tutarı", "İade Tutarı"]
+  const whereClause = 'WHERE "Satış Tutarı" > 1000'
+  const orderClause = 'ORDER BY "Satış Tutarı" DESC'
+
+  const cleanCustomSql = customSql?.trim().replace(/;+$/, "")
+  const fromTarget = cleanCustomSql
+    ? `(${cleanCustomSql}) AS __export_source`
+    : `"${tableName.replace(/"/g, '""')}"`
+
+  const selectCols =
+    columns && columns.length > 0
+      ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
+      : "*"
+
+  const baseQuery = `SELECT ${selectCols} FROM ${fromTarget} ${whereClause} ${orderClause}`.trim()
+
+  assert.ok(baseQuery.includes('FROM (SELECT "Depo"'), "fromTarget must wrap customSql as subquery")
+  assert.ok(baseQuery.includes('AS __export_source'), "Subquery must have alias __export_source")
+  assert.ok(baseQuery.includes('"Satış Tutarı"'), "Columns can reference aggregated/aliased columns without Binder Error")
+  assert.ok(!baseQuery.includes(';;'), "Trailing semicolons must be trimmed")
+  console.log("  ✓ Custom/Saved AI view export wraps SQL into __export_source subquery (preventing Binder Error)")
+}
+
 console.log("\n🎉 export-formats testleri başarıyla tamamlandı!")

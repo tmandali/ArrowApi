@@ -73,4 +73,61 @@ assert.strictEqual(verifyStreamArrow.get(0)?.id, 1)
 assert.strictEqual(verifyStreamArrow.get(5)?.id, 6)
 console.log("  ✓ Lazy pull-stream merged chunks into valid single Parquet file (6 rows verified)")
 
+// 4. DuckDB Arrow IPC Chunk Stream -> Parquet (Zero-OOM Query Streaming)
+{
+  const colA = arrow.vectorFromArray([10, 20, 30], new arrow.Int32())
+  const colB = arrow.vectorFromArray(["Depo 1", "Depo 2", "Depo 3"], new arrow.Utf8())
+  const chunkTable1 = new arrow.Table({ id: colA, depo: colB })
+
+  const colC = arrow.vectorFromArray([40, 50], new arrow.Int32())
+  const colD = arrow.vectorFromArray(["Depo 4", "Depo 5"], new arrow.Utf8())
+  const chunkTable2 = new arrow.Table({ id: colC, depo: colD })
+
+  // Tıpkı duckdb.worker.ts'in ürettiği IPC stream baytları gibi:
+  const ipcChunk1 = arrow.tableToIPC(chunkTable1, "stream")
+  const ipcChunk2 = arrow.tableToIPC(chunkTable2, "stream")
+
+  const ipcChunks = [ipcChunk1, ipcChunk2]
+  let idx = 0
+
+  const queryStream = new ReadableStream({
+    async pull(controller) {
+      if (idx >= ipcChunks.length) {
+        controller.close()
+        return
+      }
+      const rawIpc = ipcChunks[idx++]
+      const wasmTable = parquetWasm.Table.fromIPCStream(rawIpc)
+      const batches = wasmTable.recordBatches()
+      for (const b of batches) {
+        controller.enqueue(b)
+      }
+    }
+  })
+
+  const streamedParquet = await parquetWasm.transformParquetStream(queryStream, writerProps)
+  const reader = streamedParquet.getReader()
+  const outBytes = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) outBytes.push(value)
+  }
+
+  const fullLen = outBytes.reduce((acc, c) => acc + c.byteLength, 0)
+  const fullBytes = new Uint8Array(fullLen)
+  let pos = 0
+  for (const c of outBytes) {
+    fullBytes.set(c, pos)
+    pos += c.byteLength
+  }
+
+  const parsedWasm = parquetWasm.readParquet(fullBytes)
+  const parsedArrow = arrow.tableFromIPC(parsedWasm.intoIPCStream())
+  assert.strictEqual(parsedArrow.numRows, 5, "Streamed query parquet must contain exactly 5 rows")
+  assert.strictEqual(parsedArrow.get(0)?.depo, "Depo 1")
+  assert.strictEqual(parsedArrow.get(4)?.depo, "Depo 5")
+  console.log("  ✓ DuckDB Arrow IPC chunk-to-Parquet lazy stream verified (Zero-OOM, 5 rows)")
+}
+
 console.log("\n🎉 Parquet chunk merge testleri başarıyla tamamlandı!")

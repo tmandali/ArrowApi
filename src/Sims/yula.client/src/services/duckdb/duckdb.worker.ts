@@ -1,4 +1,5 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
+import { tableToIPC } from "apache-arrow"
 
 // Next.js DuckDB Worker - self-hosted WASM bundles
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
@@ -452,6 +453,77 @@ self.onmessage = async (e: MessageEvent) => {
           break
         }
 
+        case "GET_QUERY_ROW_COUNT": {
+          const {
+            tableName,
+            whereClause = "",
+            customSql,
+          } = payload as {
+            tableName: string
+            whereClause?: string
+            customSql?: string
+          }
+
+          const cleanCustomSql = customSql?.trim().replace(/;+$/, "")
+          const fromTarget = cleanCustomSql
+            ? `(${cleanCustomSql}) AS __export_source`
+            : `"${tableName.replace(/"/g, '""')}"`
+
+          let count = 0
+          try {
+            const countRes = await conn.query(
+              `SELECT COUNT(*)::BIGINT as cnt FROM ${fromTarget} ${whereClause};`
+            )
+            const countRows = arrowTableToObjects(countRes)
+            count = Number(countRows[0]?.cnt ?? 0)
+          } catch {
+            count = 0
+          }
+
+          self.postMessage({ id, success: true, count })
+          break
+        }
+
+        case "FETCH_ARROW_IPC_CHUNK": {
+          const {
+            tableName,
+            columns,
+            whereClause = "",
+            orderClause = "",
+            customSql,
+            limit = 50_000,
+            offset = 0,
+          } = payload as {
+            tableName: string
+            columns?: string[]
+            whereClause?: string
+            orderClause?: string
+            customSql?: string
+            limit?: number
+            offset?: number
+          }
+
+          const cleanCustomSql = customSql?.trim().replace(/;+$/, "")
+          const fromTarget = cleanCustomSql
+            ? `(${cleanCustomSql}) AS __export_source`
+            : `"${tableName.replace(/"/g, '""')}"`
+
+          const selectCols =
+            columns && columns.length > 0
+              ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
+              : "*"
+
+          const chunkSql = `SELECT ${selectCols} FROM ${fromTarget} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`.trim()
+          const arrowTable = await conn.query(chunkSql)
+          const ipcBytes = tableToIPC(arrowTable as any, "stream")
+
+          ;(self as any).postMessage(
+            { id, success: true, ipcBytes, rowCount: arrowTable.numRows },
+            [ipcBytes.buffer]
+          )
+          break
+        }
+
         case "EXPORT_TABLE": {
           const {
             tableName,
@@ -462,6 +534,7 @@ self.onmessage = async (e: MessageEvent) => {
             preferredFormat = "xlsx",
             maxRowsPerSheet = 1_000_000,
             maxTotalRows,
+            customSql,
           } = payload as {
             tableName: string
             columns?: string[]
@@ -471,21 +544,26 @@ self.onmessage = async (e: MessageEvent) => {
             preferredFormat?: "xlsx" | "csv" | "parquet" | "gz"
             maxRowsPerSheet?: number
             maxTotalRows?: number
+            customSql?: string
           }
 
-          const escapedTable = `"${tableName.replace(/"/g, '""')}"`
+          const cleanCustomSql = customSql?.trim().replace(/;+$/, "")
+          const fromTarget = cleanCustomSql
+            ? `(${cleanCustomSql}) AS __export_source`
+            : `"${tableName.replace(/"/g, '""')}"`
+
           const selectCols =
             columns && columns.length > 0
               ? columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")
               : "*"
 
-          const baseQuery = `SELECT ${selectCols} FROM ${escapedTable} ${whereClause} ${orderClause}`.trim()
+          const baseQuery = `SELECT ${selectCols} FROM ${fromTarget} ${whereClause} ${orderClause}`.trim()
 
           // Filtrelenmiş toplam satır sayısını al
           let totalRowsToExport = 0
           try {
             const countRes = await conn.query(
-              `SELECT COUNT(*)::BIGINT as cnt FROM ${escapedTable} ${whereClause};`
+              `SELECT COUNT(*)::BIGINT as cnt FROM ${fromTarget} ${whereClause};`
             )
             const countRows = arrowTableToObjects(countRes)
             totalRowsToExport = Number(countRows[0]?.cnt ?? 0)

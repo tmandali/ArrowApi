@@ -1,6 +1,8 @@
 import { opfsReportCache } from "@/services/opfs/opfs-cache"
+import { duckDbClient } from "@/services/duckdb/duckdb-client"
 import initParquetWasm, {
   readParquet,
+  Table as ParquetWasmTable,
   transformParquetStream,
   WriterPropertiesBuilder,
   Compression,
@@ -152,3 +154,139 @@ export async function exportOpfsMergedParquet(options: {
     totalRows: totalRowCount,
   }
 }
+
+/**
+ * DuckDB'deki özel SQL sorgusu veya filtrelenmiş tabloyu,
+ * DuckDB WASM'ın 32-bit bellek sınırını (OOM) tamamen baypas edecek şekilde
+ * 50.000 satırlık kontrollü Arrow IPC chunk'ları ve parquet-wasm lazy stream
+ * mimarisiyle tek bir Apache Parquet dosyası olarak tarayıcıda doğrudan indirir.
+ */
+export async function exportQueryToParquetStream(options: {
+  tableName: string
+  customSql?: string
+  columns?: string[]
+  filters?: Record<string, string>
+  numericColumns?: Set<string>
+  sortBy?: string | null
+  sortDesc?: boolean
+  sortConfigs?: { column: string; desc: boolean }[]
+  fileName?: string
+  chunkSize?: number
+  onProgress?: (processed: number, total: number) => void
+}): Promise<{
+  format: "parquet"
+  fileName: string
+  sizeBytes: number
+  totalRows: number
+}> {
+  const {
+    tableName,
+    customSql,
+    columns,
+    filters = {},
+    numericColumns = new Set(),
+    sortBy,
+    sortDesc = false,
+    sortConfigs,
+    fileName = "rapor",
+    chunkSize = 50_000,
+    onProgress,
+  } = options
+
+  const finalFileName = fileName.endsWith(".parquet") ? fileName : `${fileName}.parquet`
+
+  // 1. Toplam satır sayısını al
+  const totalRows = await duckDbClient.getQueryRowCount({
+    tableName,
+    customSql,
+    filters,
+    numericColumns,
+  })
+
+  if (totalRows === 0) {
+    throw new Error("Dışa aktarılacak satır bulunamadı.")
+  }
+
+  // 2. parquet-wasm motorunu hazırla
+  await ensureParquetWasm()
+
+  const writerProps = new WriterPropertiesBuilder()
+    .setCompression(Compression.SNAPPY)
+    .build()
+
+  let currentOffset = 0
+  let totalProcessed = 0
+
+  // 3. DuckDB'den parça parça çekip parquet-wasm'a akıtan lazy stream
+  const lazyRecordBatchStream = new ReadableStream({
+    async pull(controller) {
+      if (currentOffset >= totalRows) {
+        controller.close()
+        return
+      }
+
+      const limit = Math.min(chunkSize, totalRows - currentOffset)
+      try {
+        const { ipcBytes, rowCount } = await duckDbClient.fetchArrowIpcChunk({
+          tableName,
+          customSql,
+          columns,
+          filters,
+          numericColumns,
+          sortBy,
+          sortDesc,
+          sortConfigs,
+          limit,
+          offset: currentOffset,
+        })
+
+        if (rowCount === 0 || ipcBytes.byteLength === 0) {
+          controller.close()
+          return
+        }
+
+        currentOffset += rowCount
+        totalProcessed += rowCount
+        onProgress?.(totalProcessed, totalRows)
+
+        const wasmTable = ParquetWasmTable.fromIPCStream(ipcBytes)
+        const batches = wasmTable.recordBatches()
+        for (const batch of batches) {
+          controller.enqueue(batch)
+        }
+        // WASM belleğini temizle
+        try {
+          wasmTable.free()
+        } catch {
+          // ignore
+        }
+      } catch (err) {
+        controller.error(err)
+      }
+    },
+  })
+
+  // 4. RecordBatch akışını Snappy Parquet bayt akışına dönüştür
+  const parquetOutputStream = await transformParquetStream(lazyRecordBatchStream, writerProps)
+  const reader = parquetOutputStream.getReader()
+  const outputChunks: BlobPart[] = []
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) {
+      outputChunks.push(value as unknown as BlobPart)
+    }
+  }
+
+  const mergedBlob = new Blob(outputChunks, { type: "application/vnd.apache.parquet" })
+  triggerDownload(mergedBlob, finalFileName)
+
+  return {
+    format: "parquet",
+    fileName: finalFileName,
+    sizeBytes: mergedBlob.size,
+    totalRows: totalProcessed,
+  }
+}
+

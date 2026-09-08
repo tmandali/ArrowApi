@@ -284,6 +284,85 @@ class DuckDbClient {
   }
 
   /**
+   * Özel görünüm veya filtreli tablo için toplam satır sayısını öğrenir.
+   */
+  async getQueryRowCount(options: {
+    tableName: string
+    customSql?: string
+    filters?: Record<string, string>
+    numericColumns?: Set<string>
+  }): Promise<number> {
+    const { tableName, customSql, filters = {}, numericColumns = new Set() } = options
+    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    const res = await this.postMessage<{ id: number; success: boolean; count?: number }>(
+      "GET_QUERY_ROW_COUNT",
+      { tableName, customSql, whereClause }
+    )
+    return res?.count ?? 0
+  }
+
+  /**
+   * DuckDB'den belirtilen sorgu aralığını Arrow IPC Stream (Uint8Array) olarak çeker.
+   */
+  async fetchArrowIpcChunk(options: {
+    tableName: string
+    customSql?: string
+    columns?: string[]
+    filters?: Record<string, string>
+    numericColumns?: Set<string>
+    sortBy?: string | null
+    sortDesc?: boolean
+    sortConfigs?: SortConfig[]
+    limit?: number
+    offset?: number
+  }): Promise<{ ipcBytes: Uint8Array; rowCount: number }> {
+    const {
+      tableName,
+      customSql,
+      columns,
+      filters = {},
+      numericColumns = new Set(),
+      sortBy,
+      sortDesc = false,
+      sortConfigs,
+      limit = 50_000,
+      offset = 0,
+    } = options
+
+    const whereClause = buildCombinedWhereClause(filters, numericColumns)
+    let orderClause = ""
+    if (sortConfigs && sortConfigs.length > 0) {
+      const orderParts = sortConfigs.map(
+        (s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`
+      )
+      orderClause = `ORDER BY ${orderParts.join(", ")}`
+    } else if (sortBy) {
+      const escapedSort = `"${sortBy.replace(/"/g, '""')}"`
+      orderClause = `ORDER BY ${escapedSort} ${sortDesc ? "DESC" : "ASC"}`
+    }
+
+    const res = await this.postMessage<{
+      id: number
+      success: boolean
+      ipcBytes?: Uint8Array
+      rowCount?: number
+    }>("FETCH_ARROW_IPC_CHUNK", {
+      tableName,
+      customSql,
+      columns,
+      whereClause,
+      orderClause,
+      limit,
+      offset,
+    })
+
+    if (!res?.ipcBytes) {
+      throw new Error("Arrow IPC parça tamponu boş döndü.")
+    }
+    return { ipcBytes: res.ipcBytes, rowCount: res.rowCount ?? 0 }
+  }
+
+  /**
    * Rapor tablosunu DuckDB WASM motoru üzerinden Excel (.xlsx) veya
    * UTF-8 BOM CSV olarak dışa aktarır ve tarayıcıda doğrudan indirme başlatır.
    */
@@ -299,6 +378,7 @@ class DuckDbClient {
     preferredFormat?: "xlsx" | "csv" | "parquet" | "gz"
     maxRowsPerSheet?: number
     maxTotalRows?: number
+    customSql?: string
   }): Promise<{
     format: "xlsx" | "csv" | "parquet" | "gz"
     fileName: string
@@ -318,6 +398,7 @@ class DuckDbClient {
       preferredFormat = "xlsx",
       maxRowsPerSheet = 1_000_000,
       maxTotalRows,
+      customSql,
     } = options
 
     const whereClause = buildCombinedWhereClause(filters, numericColumns)
@@ -341,6 +422,7 @@ class DuckDbClient {
       preferredFormat,
       maxRowsPerSheet,
       maxTotalRows,
+      customSql,
     })
 
     if (!res.buffer) {
