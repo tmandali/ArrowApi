@@ -1,5 +1,13 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
 import { tableToIPC } from "apache-arrow"
+import {
+  formatTimeOfDayValue,
+  isArrowBigNum,
+  isTimeOnlyType,
+  isUuidBinaryType,
+  normalizeArrowCellValue,
+  readDecimalScale,
+} from "../../utils/arrow-decimal"
 
 // Next.js DuckDB Worker - self-hosted WASM bundles
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
@@ -61,43 +69,82 @@ async function getDuckDb(): Promise<{
   return { db: db!, conn: conn! }
 }
 
-function normalizeArrowValue(val: unknown): unknown {
+function isDateOnlyArrowType(
+  fieldType?: { toString?: () => string; typeId?: number } | string | null
+): boolean {
+  if (fieldType == null) return false
+  const t = String(
+    typeof fieldType === "object" ? (fieldType.toString?.() ?? fieldType) : fieldType
+  ).toLowerCase()
+  if (t.includes("time")) return false
+  return (
+    t === "date" ||
+    t.includes("date32") ||
+    t.includes("date64") ||
+    (t.includes("date") && !t.includes("timestamp"))
+  )
+}
+
+function normalizeArrowValue(
+  val: unknown,
+  fieldType?: { scale?: number; toString?: () => string } | string | null
+): unknown {
   if (val === null || val === undefined) return null
 
   // 1. Date / Timestamp nesneleri
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return ""
-    const iso = val.toISOString()
-    // Saat, dakika, saniye 00:00:00 ise salt YYYY-MM-DD dön
-    if (iso.endsWith("T00:00:00.000Z")) {
-      return iso.slice(0, 10)
+    const utcMidnight =
+      val.getUTCHours() === 0 &&
+      val.getUTCMinutes() === 0 &&
+      val.getUTCSeconds() === 0 &&
+      val.getUTCMilliseconds() === 0
+    // SQL DATE / Date32 veya UTC gece yarısı → salt YYYY-MM-DD
+    // (aksi halde TR UTC+3'te 03:00:00 görünür)
+    if (isDateOnlyArrowType(fieldType) || utcMidnight) {
+      return val.toISOString().slice(0, 10)
     }
-    // Saat/dakika/saniye bilgisi varsa milisaniyeyi temizleyip tam ISO formatında ilet (örn: "2026-09-01T20:18:57")
-    return iso.slice(0, 19)
+    return val.toISOString().slice(0, 19)
+  }
+
+  // 1b. TIME / Time64 — gün içi saat (tarih epoch yoluna düşmesin)
+  if (isTimeOnlyType(fieldType)) {
+    const time = formatTimeOfDayValue(val)
+    if (time != null) return time
   }
 
   // 2. BigInt (JS Number'a çevir — Web Worker transfer & JSON serialize için)
   if (typeof val === "bigint") {
+    const scale = readDecimalScale(fieldType)
+    if (scale > 0) {
+      return normalizeArrowCellValue(val, fieldType)
+    }
     const num = Number(val)
     return Number.isSafeInteger(num) ? num : val.toString()
   }
 
-  // 3. Uint8Array / Buffer / Binary (Hex veya Base64 stringe çevir)
+  // 3. Arrow Decimal128 / DecimalBigNum — Uint32Array alt sınıfı; GUID yolundan ÖNCE yakala.
+  //    toJSON() tırnaklı mantissa (`"10401"`) üretir; scale ile valueOf kullan.
+  if (isArrowBigNum(val)) {
+    return normalizeArrowCellValue(val, fieldType)
+  }
+
+  // 4. Uint8Array / Buffer / Binary
+  //    16 bayt → UUID yalnızca FixedSizeBinary/uniqueidentifier; düz varbinary → hex
   if (val instanceof Uint8Array || (typeof Buffer !== "undefined" && Buffer.isBuffer?.(val))) {
     try {
       const u8 = val instanceof Uint8Array ? val : new Uint8Array(val as ArrayBuffer)
-      if (u8.length === 16) {
-        // Guid / UUID (16 byte)
-        const hex = Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("")
+      const hex = Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("")
+      if (u8.length === 16 && isUuidBinaryType(fieldType)) {
         return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
       }
-      return Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("")
+      return hex
     } catch {
       return ""
     }
   }
 
-  // 4. Custom Arrow Struct / Object / Map / HugeInt (Int128)
+  // 5. Custom Arrow Struct / Object / Map / HugeInt (Int128)
   if (typeof val === "object" && val !== null) {
     if ("low" in (val as any) && "high" in (val as any)) {
       const low = BigInt((val as any).low >>> 0)
@@ -110,11 +157,11 @@ function normalizeArrowValue(val: unknown): unknown {
       return (val as any).toJSON()
     }
     if (Array.isArray(val)) {
-      return val.map(normalizeArrowValue)
+      return val.map((item) => normalizeArrowValue(item, fieldType))
     }
   }
 
-  return val
+  return normalizeArrowCellValue(val, fieldType)
 }
 
 function arrowTableToObjects(table: any): Record<string, unknown>[] {
@@ -123,7 +170,10 @@ function arrowTableToObjects(table: any): Record<string, unknown>[] {
   const numRows = table?.numRows ?? 0
   if (!schema || numRows === 0) return rows
 
-  const fields: string[] = schema.fields.map((f: any) => f.name)
+  const schemaFields: { name: string; type?: unknown }[] = schema.fields.map(
+    (f: { name: string; type?: unknown }) => ({ name: f.name, type: f.type })
+  )
+  const fields = schemaFields.map((f) => f.name)
   const columns = fields.map((name, index) =>
     typeof table.getChildAt === "function"
       ? table.getChildAt(index)
@@ -134,7 +184,7 @@ function arrowTableToObjects(table: any): Record<string, unknown>[] {
     const row: Record<string, unknown> = {}
     for (let j = 0; j < fields.length; j++) {
       const val = columns[j]?.get(i)
-      row[fields[j]] = normalizeArrowValue(val)
+      row[fields[j]] = normalizeArrowValue(val, schemaFields[j]?.type)
     }
     rows.push(row)
   }

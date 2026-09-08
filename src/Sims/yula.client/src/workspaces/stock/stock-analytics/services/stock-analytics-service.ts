@@ -3,6 +3,7 @@ import { ApiError } from "@/services"
 import { getCompanyHeaders } from "@/lib/company-headers"
 import { resolveApiUrl } from "@/lib/api-url"
 import { readJobSseEvents, streamArrowRecordBatches } from "@/features/jobs/arrow-job-client"
+import { arrowDecimalToNumber, readDecimalScale } from "@/utils/arrow-decimal"
 import type {
   ArrowJobEvent,
   ArrowJobStatus,
@@ -55,28 +56,12 @@ function formatMoney(value: number, currencyCode: string): string {
 }
 
 function cellToNumber(value: unknown, scale = 0): number {
-  if (value == null) return 0
-  if (typeof value === "number") return value
-  if (typeof value === "bigint") {
-    return scale > 0 ? Number(value) / 10 ** scale : Number(value)
-  }
-  if (typeof value === "string") {
-    const n = Number(value)
-    if (!Number.isFinite(n)) return 0
-    return scale > 0 ? n / 10 ** scale : n
-  }
-  // apache-arrow Decimal128 → DecimalBigNum; String() unscaled mantissa döner
-  if (typeof value === "object") {
-    const raw = String(value)
-    const n = Number(raw)
-    if (!Number.isFinite(n)) return 0
-    return scale > 0 ? n / 10 ** scale : n
-  }
-  return 0
+  const n = arrowDecimalToNumber(value, scale)
+  return n ?? 0
 }
 
 function fieldScale(type: { scale?: number } | null | undefined): number {
-  return typeof type?.scale === "number" ? type.scale : 0
+  return readDecimalScale(type)
 }
 
 function humanizeField(name: string): string {

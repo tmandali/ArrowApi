@@ -1,5 +1,10 @@
 import { type RecordBatch, type Schema } from "apache-arrow"
 import { streamArrowRecordBatches } from "@/features/jobs/arrow-job-client"
+import {
+  arrowDecimalToNumber,
+  isArrowBigNum,
+  readDecimalScale,
+} from "@/utils/arrow-decimal"
 
 export type StockBalanceColumn = {
   name: string
@@ -22,17 +27,24 @@ function humanizeField(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, "$1 $2")
 }
 
-function cellToDisplay(value: unknown): string {
+function cellToDisplay(
+  value: unknown,
+  fieldType?: { scale?: number; toString?: () => string } | null
+): string {
   if (value == null) return ""
   if (value instanceof Date) {
     if (isNaN(value.getTime())) return ""
     return value.toISOString().slice(0, 10)
   }
+  if (isArrowBigNum(value) || typeof value === "bigint") {
+    const scale = readDecimalScale(fieldType)
+    const n = arrowDecimalToNumber(value, scale)
+    return n == null ? "" : String(n)
+  }
   if (typeof value === "string") return value
   if (typeof value === "number") {
     return Number.isFinite(value) ? String(value) : ""
   }
-  if (typeof value === "bigint") return String(value)
   if (typeof value === "boolean") return value ? "true" : "false"
   return String(value)
 }
@@ -67,7 +79,11 @@ function rowsFromBatch(
     const id = String(idChild?.get(i) ?? i)
     const values: Record<string, string> = {}
     for (const col of columns) {
-      values[col.name] = cellToDisplay(batch.getChild(col.name)?.get(i))
+      const child = batch.getChild(col.name)
+      values[col.name] = cellToDisplay(
+        child?.get(i),
+        child?.type as { scale?: number } | undefined
+      )
     }
     rows.push({ id, values })
   }

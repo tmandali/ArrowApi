@@ -6,10 +6,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const filterParserPath = pathToFileURL(path.resolve(__dirname, "../../../../../services/duckdb/filter-parser.ts")).href
 const filterMatcherPath = pathToFileURL(path.resolve(__dirname, "../../../../../utils/filter-matcher.ts")).href
 const formatCellPath = pathToFileURL(path.resolve(__dirname, "../../../../../utils/format-cell.ts")).href
+const arrowDecimalPath = pathToFileURL(path.resolve(__dirname, "../../../../../utils/arrow-decimal.ts")).href
 
 const { buildColumnWhereClause } = await import(filterParserPath)
 const { matchCellFilter } = await import(filterMatcherPath)
 const { formatGridCellValue } = await import(formatCellPath)
+const {
+  arrowDecimalToNumber,
+  formatTimeOfDayValue,
+  isTimeOnlyType,
+  isUuidBinaryType,
+  normalizeArrowCellValue,
+  readDecimalScale,
+} = await import(arrowDecimalPath)
 
 console.log("=== [TEST] filter-parser.ts (DuckDB SQL Generation) ===")
 
@@ -124,6 +133,11 @@ console.log("\n=== [TEST] formatGridCellValue (Schema-driven Format: INT vs DECI
   assert.equal(formatGridCellValue(250000, "right", "DOUBLE"), "250.000,00")
   assert.equal(formatGridCellValue(15.75, "right", "FLOAT"), "15,75")
 
+  // Arrow DecimalBigNum.toJSON artifact (`"10401"`) + DECIMAL(16,2) scale → 104.01
+  assert.equal(formatGridCellValue('"10401"', "right", "DECIMAL(16,2)"), "104,01")
+  // Düz sayısal string scale uygulanmaz (gerçek 10401 değeri)
+  assert.equal(formatGridCellValue(10401, "right", "DECIMAL(16,2)"), "10.401,00")
+
   // DATE ve TIMESTAMP alanları: Saat bilgisi varsa saatli (DD.MM.YYYY HH:mm:ss), yoksa salt gün (DD.MM.YYYY)
   assert.equal(formatGridCellValue("2026-09-01T20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
   assert.equal(formatGridCellValue("2026-09-01 20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
@@ -131,6 +145,28 @@ console.log("\n=== [TEST] formatGridCellValue (Schema-driven Format: INT vs DECI
   assert.equal(formatGridCellValue("2026-09-01T00:00:00.000Z", "left", "TIMESTAMP"), "01.09.2026")
   assert.equal(formatGridCellValue("2026-09-01", "left", "DATE"), "01.09.2026")
   assert.equal(formatGridCellValue("01.09.2026 20:18:57", "left", "TIMESTAMP"), "01.09.2026 20:18:57")
+  // UTC gece yarısı Date — TR yerel saatte 03:00 olsa bile DATE kolonunda saat yok
+  assert.equal(
+    formatGridCellValue(new Date("2026-09-01T00:00:00.000Z"), "left", "DATE"),
+    "01.09.2026"
+  )
+  assert.equal(
+    formatGridCellValue(new Date("2026-09-01T00:00:00.000Z"), "left", "TIMESTAMP"),
+    "01.09.2026"
+  )
+
+  // TIME — tarih epoch sanılmamalı
+  assert.equal(formatGridCellValue("14:30:05", "left", "TIME"), "14:30:05")
+  assert.equal(formatGridCellValue(14 * 3600 + 30 * 60 + 5, "left", "TIME"), "14:30:05")
+  // Time64 nanoseconds since midnight
+  assert.equal(
+    formatGridCellValue(BigInt((14 * 3600 + 30 * 60 + 5) * 1_000_000_000), "left", "TIME"),
+    "14:30:05"
+  )
+
+  // money / DECIMAL scale
+  assert.equal(formatGridCellValue(12.3456, "right", "DECIMAL(19,4)"), "12,3456")
+  assert.equal(formatGridCellValue(12.34, "right", "FLOAT"), "12,34")
 
   // BOOLEAN alanları: Şema BOOL/BIT olduğunda 1/0 ve true/false standart olarak 'Evet'/'Hayır' basılır
   assert.equal(formatGridCellValue(true, "left", "BOOLEAN"), "Evet")
@@ -174,6 +210,23 @@ console.log("\n=== [TEST] formatGridCellValue (Schema-driven Format: INT vs DECI
   assert.equal(matchCellFilter("Evet", "hayır"), false)
 
   console.log("  ✓ Boolean filter parsing and in-memory matching fully verified for Evet/Hayır and 1/0")
+}
+
+console.log("\n=== [TEST] arrow-decimal (Decimal128 scale + TIME/UUID helpers) ===")
+{
+  assert.equal(readDecimalScale("DECIMAL(16,2)"), 2)
+  assert.equal(readDecimalScale("Decimal[16e+2]"), 2)
+  assert.equal(readDecimalScale({ scale: 4 }), 4)
+  assert.equal(arrowDecimalToNumber('"10401"', 2), 104.01)
+  assert.equal(normalizeArrowCellValue('"10401"', "DECIMAL(16,2)"), 104.01)
+  assert.equal(arrowDecimalToNumber(10401n, 2), 104.01)
+  assert.equal(formatTimeOfDayValue(14 * 3600 + 30 * 60), "14:30:00")
+  assert.equal(formatTimeOfDayValue("9:05:01"), "09:05:01")
+  assert.equal(isTimeOnlyType("TIME"), true)
+  assert.equal(isTimeOnlyType("TIMESTAMP"), false)
+  assert.equal(isUuidBinaryType("FixedSizeBinary[16]"), true)
+  assert.equal(isUuidBinaryType("BLOB"), false)
+  console.log("  ✓ Decimal scale parse + TIME/UUID type helpers")
 }
 
 console.log("\n🎉 filter-parser testleri başarıyla tamamlandı!")

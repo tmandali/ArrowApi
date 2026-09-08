@@ -494,6 +494,8 @@ internal static class ArrowExporter
         {
             "uniqueidentifier" or "uuid" => new FixedSizeBinaryType(16),
             "money" or "smallmoney" => new Decimal128Type(19, 4),
+            "int" or "integer" or "mediumint" => Int32Type.Default,
+            "bigint" => Int64Type.Default,
             "smallint" => Int16Type.Default,
             "tinyint" => UInt8Type.Default,
             "bit" => BooleanType.Default,
@@ -504,12 +506,14 @@ internal static class ArrowExporter
             "date" => Date32Type.Default,
             "time" or "interval day to second" => Time64Type.Default,
             "rowversion" or "timestamp" when col.DataType == typeof(byte[]) => new FixedSizeBinaryType(8),
+            "char" or "varchar" or "nchar" or "nvarchar" or "sysname" or "character" or "character varying"
+                => options.UseLargeBinaryAndString ? LargeStringType.Default : StringType.Default,
             "xml" or "json" or "jsonb" or "text" or "ntext" or "mediumtext" or "longtext" or "clob" or "nclob" or "sql_variant" or "jsonpath" or "geography" or "geometry" or "hierarchyid"
                 => options.UseLargeBinaryAndString ? LargeStringType.Default : StringType.Default,
-            "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" or "varbinary" or "raw" or "long raw"
+            "binary" or "image" or "bytea" or "blob" or "longblob" or "mediumblob" or "tinyblob" or "varbinary" or "raw" or "long raw"
                 => options.UseLargeBinaryAndString ? LargeBinaryType.Default : BinaryType.Default,
             "inet" or "cidr" or "oid" or "macaddr" or "macaddr8" or "varbit" or "set" or "enum" => StringType.Default,
-            "numeric" => col.NumericPrecision.HasValue && col.NumericPrecision.Value > 38
+            "numeric" or "decimal" or "dec" => col.NumericPrecision.HasValue && col.NumericPrecision.Value > 38
                 ? new Decimal256Type(col.NumericPrecision.Value, col.NumericScale ?? 10)
                 : new Decimal128Type(col.NumericPrecision ?? 38, col.NumericScale ?? 10),
             "year" => Int16Type.Default,

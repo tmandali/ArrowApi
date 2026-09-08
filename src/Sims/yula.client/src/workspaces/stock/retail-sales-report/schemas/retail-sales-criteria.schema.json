@@ -35,7 +35,7 @@
       "kasa satış",
       "retail sales kriterleri"
     ],
-    "directive": "Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap (basTarih = 30 gün önce, bitTarih = yarın) ve 'son 7 gün' veya 'bu ay' seçeneklerini öner. bitTarih, basTarih'ten büyük olmalıdır (üst sınır hariç: HareketBaslamaTarih < bitTarih). Tutar sorularında ToplamTutar; lokasyon için Depo; personel için Kasiyer kolonunu kullan.",
+    "directive": "sirketKodu zorunlu alandır; kullanıcı belirtmemişse mutlaka sor. Kullanıcı tarih aralığı belirtmediğinde son 30 günü varsayılan yap (basTarih = 30 gün önce, bitTarih = yarın) ve 'son 7 gün' veya 'bu ay' seçeneklerini öner. bitTarih, basTarih'ten büyük olmalıdır (üst sınır hariç: HareketBaslamaTarih < bitTarih). Tutar sorularında ToplamTutar; lokasyon için Depo; personel için Kasiyer kolonunu kullan.",
     "quickPrompts": [
       "Son 30 günü öner",
       "Son 7 günü öner",
@@ -140,6 +140,15 @@
         "müşteri no",
         "customer",
         "cari"
+      ],
+      "SirketKod": [
+        "şirket",
+        "şirket kodu",
+        "firma",
+        "company",
+        "company code",
+        "ax şirket",
+        "sirket"
       ]
     }
   },
@@ -190,10 +199,22 @@
         ],
         "directive": "Zorunlu alandır. Backend sorgusu HareketBaslamaTarih < bitTarih kullandığı için bitTarih üst sınırdır (hariç). Kullanıcı '31 Ocak dahil' derse bitTarih = 1 Şubat yaz."
       }
+    },
+    "sirketKod": {
+      "type": "string",
+      "title": "Şirket Kodu",
+      "description": "Perakende satışı raporlanacak şirketin kodu (örn: TJ01, TJ02).",
+      "x-ai": {
+        "intent": "company_code",
+        "priority": 90,
+        "columnHints": ["AXSirketKodu", "ŞirketKodu", "sirketKod"],
+        "directive": "Zorunlu alandır. Kullanıcı şirket kodu belirtmemişse mevcut şirket kodlarını sor veya kullanıcının önceki sohbet bağlamından çıkar. Kodu küçük harfe dönüştürmeden olduğu gibi ilet."
+      }
     }
   },
   "required": [
     "basTarih",
-    "bitTarih"
+    "bitTarih",
+    "sirketKod"
   ]
 }
