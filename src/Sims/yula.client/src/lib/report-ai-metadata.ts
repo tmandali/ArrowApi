@@ -3,6 +3,7 @@ import type {
   JsonSchemaObject,
   JsonSchemaProperty,
   ReportAiMetadata,
+  ReportAnalysisTopic,
 } from "@/features/report-criteria"
 
 function asStringArray(value: unknown): string[] | undefined {
@@ -27,6 +28,28 @@ function asDescriptionMap(value: unknown): Record<string, string> | undefined {
   return Object.keys(out).length > 0 ? out : undefined
 }
 
+function asAnalysisTopics(value: unknown): ReportAnalysisTopic[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const out: ReportAnalysisTopic[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue
+    const r = entry as Record<string, unknown>
+    if (typeof r.id !== "string" || typeof r.title !== "string" || typeof r.goal !== "string") continue
+    if (r.tool !== "analyze" && r.tool !== "sql" && r.tool !== "visualize" && r.tool !== "filter") continue
+    out.push({
+      id: r.id,
+      title: r.title,
+      goal: r.goal,
+      tool: r.tool,
+      columns: Array.isArray(r.columns)
+        ? r.columns.filter((c): c is string => typeof c === "string")
+        : undefined,
+      followUp: typeof r.followUp === "string" ? r.followUp : undefined,
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
 /** Reads the structured `x-ai` contract from the schema. */
 export function readReportAiMetadata(schema: JsonSchemaObject): ReportAiMetadata {
   const ai = asRecord(schema["x-ai"])
@@ -38,6 +61,7 @@ export function readReportAiMetadata(schema: JsonSchemaObject): ReportAiMetadata
     quickPrompts: asStringArray(ai?.quickPrompts),
     resultsPrompts: asStringArray(ai?.resultsPrompts),
     columnDescriptions: asDescriptionMap(ai?.columnDescriptions),
+    analysisTopics: asAnalysisTopics(ai?.analysisTopics),
   }
 }
 

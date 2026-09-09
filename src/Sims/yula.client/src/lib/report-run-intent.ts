@@ -24,7 +24,7 @@ export type IncompleteIntentBlocked = {
 };
 
 export function blockedIncompleteIntent(
-  toolName: "run_job" | "run_report",
+  toolName: "run_job",
 ): IncompleteIntentBlocked {
   const target = toolName === "run_job" ? "Job" : "Report";
   return {

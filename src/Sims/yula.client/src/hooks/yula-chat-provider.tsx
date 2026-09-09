@@ -38,7 +38,14 @@ import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-t
 import { isYulaGridSlashPrompt } from "@/components/layout/yula-commands";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { useYulaDockStore } from "@/lib/stores/dock";
+import { useActiveJobsStore } from "@/store/slices/active-jobs-store";
+import { useDraftCriteriaStore } from "@/store/slices/draft-criteria-store";
 import { slimMessagesForTransport } from "@/lib/context-slim";
+import {
+  snapshotScreenState,
+  diffScreenSnapshots,
+  type ScreenSnapshot,
+} from "@/lib/screen-snapshot";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-steps";
 import { readYulaClientAiConfig, yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
 
@@ -143,18 +150,19 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   // Ekran güncelleyen/görselleştiren nihai araçlar YALNIZCA BAŞARILI OLDUĞUNDA durur:
   // Araç hata aldıysa (örn: Binder Error), modelin hata mesajını ve hint'i okuyup
   // kendini düzeltmesi için (Self-Correction Turn) otomatik olarak 2. tur tetiklenir!
+  // ask_user_question her durumda terminaldir: cevap yeni kullanıcı mesajıyla gelir.
   const hasSuccessfulTerminalScreenTool = toolInfos.some(
     (i) =>
       [
         "filter_current_grid",
         "set_grid_query",
-        "run_report",
         "run_job",
         "apply_criteria",
         "navigate_to_page",
         "open_last_report",
         "visualize_grid_data",
-      ].includes(i.toolName) && !isFailedToolInfo(i),
+        "ask_user_question",
+      ].includes(i.toolName) && (!isFailedToolInfo(i) || i.toolName === "ask_user_question"),
   );
   if (hasSuccessfulTerminalScreenTool) return false;
 
@@ -200,6 +208,9 @@ function markRequestStart() {
 
 /** Aktif sohbet kimliği — transport kapanışları ref yerine erişimci okur. */
 let activeConversationId = "";
+
+/** Son gönderilen ekran snapshot'ı (sohbet başına) — turlar arası diff için. */
+const lastScreenSnapshots = new Map<string, ScreenSnapshot>();
 
 function getActiveConversationId() {
   return activeConversationId
@@ -343,14 +354,17 @@ function ChatInstance({
                 ? "results-loading"
                 : "workspace";
 
-          // WASM Vector RAG araması (all-minilm + array_cosine_distance)
+          // WASM Vector RAG araması (katmanlı: aktif workspace + global)
           let ragContext: Array<{ scope: string; content: string; metadata?: Record<string, unknown>; distance?: number }> = [];
           const lastUserMsg = messages.filter((m) => m.role === "user").pop();
           const lastTextPart = lastUserMsg?.parts.find((p) => p.type === "text") as { text?: string } | undefined;
           if (lastTextPart?.text) {
             try {
               const { searchVectorContext } = await import("@/services/duckdb-vector");
-              ragContext = await searchVectorContext(lastTextPart.text, 3);
+              const ragWorkspace = workspaceIdFromPath(href.split("?")[0] || "/");
+              ragContext = await searchVectorContext(lastTextPart.text, 3, {
+                workspace: ragWorkspace === "system" ? undefined : ragWorkspace,
+              });
             } catch (err) {
               console.warn("[Yula RAG] Vector search error:", err);
             }
@@ -368,6 +382,47 @@ function ChatInstance({
           const gridPrompt = isYulaGridSlashPrompt(lastText);
           const phaseBreak = gridPrompt && phase !== "results";
           const specCols = spec?.columns?.length ?? 0;
+
+          // Canlı ekran snapshot'ı + önceki turdan beri diff (screen-snapshot).
+          // Model ek araç adımı harcamadan güncel zemini görür.
+          const screenReg = useYulaGridStore.getState().screen as
+            | {
+                reportScope?: string;
+                stateLegend?: Record<string, string>;
+                stateExtra?: Record<string, unknown>;
+              }
+            | null
+            | undefined;
+          const snapshotScope = screenReg?.reportScope || undefined;
+          const draftRows = (
+            snapshotScope
+              ? (useDraftCriteriaStore.getState().rowsByScope as Record<
+                  string,
+                  Array<{ name: string; value: string }> | undefined
+                >)[snapshotScope]
+              : undefined
+          ) as Array<{ name: string; value: string }> | undefined;
+          const trackedJobs = Object.values(useActiveJobsStore.getState().jobs).map(
+            (j) => ({ id: j.id, status: j.status, createdAt: j.createdAt }),
+          );
+          const screenSnapshot = snapshotScreenState({
+            scope: snapshotScope,
+            draftRows,
+            focusedJobId: jobIdSeg || undefined,
+            focusedJobStatus: jobIdSeg
+              ? useActiveJobsStore.getState().jobs[jobIdSeg]?.status
+              : undefined,
+            trackedJobs,
+            gridFilters: useYulaGridStore.getState().filters,
+            extra: screenReg?.stateExtra,
+            phase,
+            pathname: pathOnly,
+          });
+          const screenDiff = diffScreenSnapshots(
+            lastScreenSnapshots.get(getActiveConversationId()) ?? null,
+            screenSnapshot,
+          );
+          lastScreenSnapshots.set(getActiveConversationId(), screenSnapshot);
 
           if (specMatchesJob && expectedTable) {
             upsertTurnTrace(getActiveConversationId(), {
@@ -463,6 +518,9 @@ function ChatInstance({
                     : null,
                 screen: useYulaGridStore.getState().screen,
                 ragContext,
+                screenState: screenSnapshot,
+                screenDiff,
+                stateLegend: screenReg?.stateLegend,
               },
             },
           };
@@ -586,13 +644,10 @@ function ChatInstance({
       try {
         const userText = lastUserTextFromMessages(chat.messages);
         const gatedRun =
-          (part.toolName === "run_job" || part.toolName === "run_report") &&
-          !hasExplicitReportRunIntent(userText);
+          part.toolName === "run_job" && !hasExplicitReportRunIntent(userText);
 
         if (gatedRun) {
-          output = blockedIncompleteIntent(
-            part.toolName === "run_report" ? "run_report" : "run_job",
-          );
+          output = blockedIncompleteIntent("run_job");
         } else {
           const timeoutMs =
             part.toolName === "profile_grid_table" ||
@@ -619,13 +674,13 @@ function ChatInstance({
       }
       executedCallsRef.current.set(callSignature, "");
 
-      if (part.toolName === "run_report" || part.toolName === "run_job") {
+      if (part.toolName === "run_job") {
         // Statik araç → outputSchema tipiyle birebir (cast yok)
         chat.addToolOutput({
           tool: part.toolName as keyof YulaTools,
           toolCallId: part.toolCallId,
           state: "output-available",
-          output: output as YulaTools["run_report"]["output"],
+          output: output as YulaTools["run_job"]["output"],
         });
       } else if (part.toolName === "apply_criteria") {
         chat.addToolOutput({
@@ -680,7 +735,7 @@ function ChatInstance({
 
   // İstemci-tarafı araç döngüsü (cookbook "client tools"):
   // asistan turu bittiğinde bekleyen YÜRÜTÜLEBİLİR araç varsa otomatik koştur.
-  // Kriter kartı katmanı kaldırıldı; rapor çalıştırma yalnız run_report ile.
+  // Kriter kartı katmanı kaldırıldı; rapor çalıştırma yalnız run_job ile.
   const handledToolsRef = React.useRef<Set<string>>(new Set());
   const [isExecutingTools, setIsExecutingTools] = React.useState(false);
 

@@ -2,15 +2,11 @@ import { load } from "js-yaml";
 import {
   SquarePen,
   Paperclip,
-  FileText,
   BarChart2,
-  Database,
   RotateCcw,
   Package,
   ShieldAlert,
   HelpCircle,
-  ArrowUpDown,
-  Columns,
   Download,
   type LucideIcon,
 } from "lucide-react";
@@ -50,14 +46,10 @@ export type YulaCommandYamlManifest = {
 const ICON_MAP: Record<string, LucideIcon> = {
   SquarePen,
   Paperclip,
-  FileText,
   BarChart2,
-  Database,
   RotateCcw,
   Package,
   ShieldAlert,
-  ArrowUpDown,
-  Columns,
   Download,
 };
 

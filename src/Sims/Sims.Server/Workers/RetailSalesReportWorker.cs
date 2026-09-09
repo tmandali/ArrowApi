@@ -56,6 +56,7 @@ public sealed class RetailSalesReportWorker(
                          "left join tb_SatisBaslik b (nolock) on b.Depo = k.Depo and b.SatisID=k.SatisID\r\n" +
                          "left join vw_Islem i (nolock) on i.Kod=b.Islem\r\n" +
                          "cross apply (select sum(Miktar) Miktar from tb_SatisDetay d (nolock) where d.Depo = k.Depo and d.SatisID=k.SatisID) d",
+            commandTimeout: 0,
             parameters: request,
             cancellationToken: cancellationToken
         );

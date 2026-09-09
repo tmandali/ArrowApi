@@ -114,6 +114,9 @@ export function extractWorkedSteps(
   message.parts.forEach((part, index) => {
     if (part.type === "reasoning") {
       const raw = part.text ?? "";
+      // Boş reasoning part'ı gürültü adımı üretmez (bazı sağlayıcılar
+      // düşünce metni olmadan reasoning çerçevesi akıtır).
+      if (!raw.trim()) return;
       const text = sanitizeAssistantText(raw);
       const meta = (part as { meta?: string }).meta;
       const isThinking = !meta || meta === "thinking";
@@ -196,7 +199,6 @@ export function extractWorkedSteps(
         : {};
 
     switch (info.toolName) {
-      case "prepare_report_criteria":
       case "get_report_schema": {
         pushStep({
           id: info.toolCallId,
@@ -431,7 +433,6 @@ export function extractWorkedSteps(
         });
         break;
       }
-      case "run_report":
       case "run_job": {
         const report = typeof inputObj.report === "string" ? inputObj.report : "Stock Balance";
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
@@ -516,6 +517,18 @@ export function extractWorkedSteps(
         });
         break;
       }
+      case "find_matching_report": {
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: "Checked for matching report",
+          subLabel: isPending ? "Comparing criteria with past executions..." : "Matching check done",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
       case "request_user_confirmation": {
         const title = typeof inputObj.title === "string" ? inputObj.title : "User approval";
         pushStep({
@@ -523,6 +536,31 @@ export function extractWorkedSteps(
           kind: "confirmation",
           label: `Confirmation: ${title}`,
           subLabel: isPending ? "Waiting for user confirmation..." : "User confirmation",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "ask_user_question": {
+        const raw = (inputObj as { questions?: unknown }).questions;
+        const first =
+          Array.isArray(raw) && raw.length > 0
+            ? (raw[0] as { prompt?: unknown }).prompt
+            : undefined;
+        const count = Array.isArray(raw) ? raw.length : 0;
+        pushStep({
+          id: info.toolCallId,
+          kind: "confirmation",
+          label:
+            typeof first === "string" && first
+              ? `Asked user: ${first}`
+              : "Asked user questions",
+          subLabel: isPending
+            ? "Waiting for user answers..."
+            : count > 1
+              ? `${count} questions answered`
+              : "User answers",
           isLive: isPending,
           isError,
           info,

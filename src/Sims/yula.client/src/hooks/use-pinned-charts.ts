@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+import { createAiChannel } from "@/lib/ai-channel";
+
 export type PinnedChartType = "bar" | "line" | "pie";
 
 /** Workspace ana sayfasına sabitlenen Yula grafik anlık görüntüsü. */
@@ -23,10 +25,42 @@ export interface PinnedChart {
   pinnedAt: number;
 }
 
-export const PINNED_CHART_VIEW_PARAM = "aiView";
-
 export function getPinnedChartViewId(chart: Pick<PinnedChart, "id">) {
   return `pinned_chart_${chart.id}`;
+}
+
+/**
+ * Uygulama-içi AI görünüm isteği: landing'ten rapora geçişte görünüm kimliği
+ * URL'ye yazılmadan React içinden taşınır (`createAiChannel` standardı).
+ */
+export interface AiViewRequest {
+  viewId: string;
+  scope?: string;
+}
+
+const aiViewChannel = createAiChannel<AiViewRequest>({
+  name: "yula:request-ai-view",
+  scopeOf: (request) => request.scope,
+});
+
+/** Rapor grid'inin tek seferlik tüketmesi için görünüm isteği kuyrukla. */
+export function requestAiView(viewId: string, scope?: string): void {
+  aiViewChannel.request({ viewId, scope });
+}
+
+/** Kuyruktaki isteği scope eşleşirse al ve temizle (tek atış). */
+export function takePendingAiView(scope?: string): AiViewRequest | null {
+  return aiViewChannel.take(scope);
+}
+
+/** Aynı sayfada grid zaten monteliyken gelen istekleri dinle. */
+export function subscribeAiView(
+  handler: (request: AiViewRequest) => void,
+): () => void {
+  return aiViewChannel.subscribe((request) => {
+    if (!request?.viewId) return;
+    handler(request);
+  });
 }
 
 export function savePinnedChartAsAiView(chart: PinnedChart) {

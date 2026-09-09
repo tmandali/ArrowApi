@@ -12,10 +12,10 @@ export function useYulaChat() {
 }
 
 /**
- * Atmayan (throw etmeyen) varyant: sohbet oturumu henüz hazır olmadığında
+ * Throw etmeyen varyant: sohbet oturumu henüz hazır olmadığında
  * null döner. Uygulama kabuğu artık provider'a bağımsız render edildiği için
  * panel bileşenleri (AIChatPanel) oturum bekleme durumunu böyle algılar.
  */
-export function useYulaChatOrNull() {
+export function useOptionalYulaChat() {
   return React.useContext(YulaChatContext);
 }

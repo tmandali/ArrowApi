@@ -53,9 +53,6 @@ export const REGISTERED_REPORTS: YulaReportMeta[] = [
   },
 ];
 
-// Geriye dönük takma ad (alias)
-export const DEMO_REPORTS = REGISTERED_REPORTS;
-
 export function findReport(scope: string): YulaReportMeta | undefined {
   return REGISTERED_REPORTS.find((r) => r.scope === scope);
 }

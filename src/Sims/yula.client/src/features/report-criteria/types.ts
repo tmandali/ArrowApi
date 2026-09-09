@@ -9,6 +9,21 @@ export type CriteriaAiMetadata = {
   suggestions?: string[]
 }
 
+export type ReportAnalysisTopic = {
+  /** Sabit id (örn: "depo-dagilimi") */
+  id: string
+  /** Kullanıcıya gösterilen başlık */
+  title: string
+  /** Bu konuda ne araştırılır (tek cümle) */
+  goal: string
+  /** Önerilen araç: analyze | sql | visualize | filter */
+  tool: "analyze" | "sql" | "visualize" | "filter"
+  /** İlgili gerçek kolon adları */
+  columns?: string[]
+  /** Bulgudan sonra önerilecek devam adımı */
+  followUp?: string
+}
+
 export type ReportAiMetadata = {
   schemaVersion?: number
   aliases?: string[]
@@ -17,6 +32,8 @@ export type ReportAiMetadata = {
   resultsPrompts?: string[]
   /** Sonuç kolonlarının yetkili semantik tanımı — rapor sahibi yazar, model tahmin etmez */
   columnDescriptions?: Record<string, string>
+  /** Domain analiz playbook'u: iteratif inceleme konuları — rapor sahibi yazar */
+  analysisTopics?: ReportAnalysisTopic[]
 }
 
 export type JsonSchemaObject = {

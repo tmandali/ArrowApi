@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useRouter } from "next/navigation";import { useJobSync } from "@/context/job-sync-context"
+import { useRouter, useSearchParams } from "next/navigation";import { useJobSync } from "@/context/job-sync-context"
 import {
   fetchJobRequest,
   fetchJobStatus,
@@ -76,7 +76,7 @@ export function formatErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-function sameJobId(a: string | null | undefined, b: string | null | undefined) {
+export function sameJobId(a: string | null | undefined, b: string | null | undefined) {
   if (!a || !b) return false
   return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0
 }
@@ -96,6 +96,10 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
   } = options
 
   const router = useRouter();
+  const searchParams = useSearchParams()
+  // Reaktif query: aynı sayfada router.push ile ?jobId= değişirse remount
+  // olmadan focus güncellenir (önceki davranış yalnız mount'ta okurdu).
+  const queryJobIdParam = searchParams.get("jobId") || searchParams.get("job")
   const navigate = React.useCallback(
     (to: string | number) => {
       if (typeof to === "number") router.back();
@@ -386,57 +390,60 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     applyExecutionFocusRef.current = applyExecutionFocus
   })
 
+  const focusJobIdFromQuery = React.useCallback((queryJobId: string) => {
+    const tracked = useActiveJobsStore.getState().jobs[queryJobId]
+    if (tracked?.status) {
+      applyExecutionFocusRef.current(
+        {
+          id: queryJobId,
+          status: tracked.status,
+          eventsUrl: tracked.eventsUrl ?? "",
+          jobUrl: tracked.jobUrl ?? "",
+          createdAt: tracked.createdAt,
+          name: tracked.name,
+        },
+        tracked.payload,
+      )
+    } else {
+      // Sayfa ilk defa URL query param ile açıldığında işin durumu henüz bilinmiyor.
+      // "Completed" varsaymak yerine önce boş geçilir; fetchJobStatus ile gerçek durum öğrenilir.
+      applyExecutionFocusRef.current({
+        id: queryJobId,
+        status: "",
+        jobUrl: "",
+        eventsUrl: "",
+      })
+      void fetchJobStatus(queryJobId).then((st) => {
+        if (st) {
+          applyExecutionFocusRef.current({
+            id: queryJobId,
+            status: st.status,
+            jobUrl: st.jobUrl,
+            eventsUrl: st.eventsUrl,
+            createdAt: st.createdAt,
+            name: st.name,
+            totalRows: st.totalRows ?? undefined,
+            batchCount: st.batchCount ?? undefined,
+          })
+        }
+      })
+    }
+  }, [])
+
   React.useEffect(() => {
     const pending = takePendingExecutionFocus(jobName)
     if (pending) {
       applyExecutionFocusRef.current(pending.job, pending.request)
-    } else if (typeof window !== "undefined") {
-      const search = new URLSearchParams(window.location.search)
-      const queryJobId = search.get("jobId") || search.get("job")
-      if (queryJobId) {
-        const tracked = useActiveJobsStore.getState().jobs[queryJobId]
-        if (tracked?.status) {
-          applyExecutionFocusRef.current(
-            {
-              id: queryJobId,
-              status: tracked.status,
-              eventsUrl: tracked.eventsUrl ?? "",
-              jobUrl: tracked.jobUrl ?? "",
-              createdAt: tracked.createdAt,
-              name: tracked.name,
-            },
-            tracked.payload,
-          )
-        } else {
-          // Sayfa ilk defa URL query param ile açıldığında işin durumu henüz bilinmiyor.
-          // "Completed" varsaymak yerine önce boş geçilir; fetchJobStatus ile gerçek durum öğrenilir.
-          applyExecutionFocusRef.current({
-            id: queryJobId,
-            status: "",
-            jobUrl: "",
-            eventsUrl: "",
-          })
-          void fetchJobStatus(queryJobId).then((st) => {
-            if (st) {
-              applyExecutionFocusRef.current({
-                id: queryJobId,
-                status: st.status,
-                jobUrl: st.jobUrl,
-                eventsUrl: st.eventsUrl,
-                createdAt: st.createdAt,
-                name: st.name,
-                totalRows: st.totalRows ?? undefined,
-                batchCount: st.batchCount ?? undefined,
-              })
-            }
-          })
-        }
+    } else if (queryJobIdParam) {
+      // Aynı job zaten odaktaysa tekrar dokunma (gereksiz fetch/odak sıfırlama yok).
+      if (!sameJobId(focusJobIdRef.current, queryJobIdParam)) {
+        focusJobIdFromQuery(queryJobIdParam)
       }
     }
     return subscribeExecutionFocus(jobName, (focus) => {
       applyExecutionFocusRef.current(focus.job, focus.request)
     })
-  }, [jobName])
+  }, [jobName, queryJobIdParam, focusJobIdFromQuery])
 
   const handleJobCancelled = React.useCallback(
     (jobId: string) => {

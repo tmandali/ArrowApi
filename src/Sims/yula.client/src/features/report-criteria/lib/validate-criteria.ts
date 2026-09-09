@@ -234,7 +234,7 @@ export function validateCriteria(
   if (Array.isArray(rowsOrInstance)) {
     instance = rowsToCriteriaInstance(rowsOrInstance, resolvedFields)
   } else {
-    // Nesne olarak gönderilen kriterleri (run_job / run_report criteria objesi)
+    // Nesne olarak gönderilen kriterleri (run_job criteria objesi)
     // rowsToCriteriaInstance ile rangeSplit (from_/to_) ve array tiplerine dönüştür
     const syntheticRows: CriteriaFilterRow[] = Object.entries(rowsOrInstance).map(
       ([name, value], idx) => ({

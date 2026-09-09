@@ -5,7 +5,7 @@ import {
   type ToolSet,
 } from "ai";
 import { z } from "zod";
-import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
+import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { looksLikeIdentifierValues } from "@/lib/grid-column-values";
 
 export interface YulaGridToolContext {
@@ -34,10 +34,10 @@ export interface YulaGridToolContext {
  */
 const reportSchemaTool = tool({
   description: [
-    "Aktif raporun JSON şemasını döndürür: kriter alanları (ad, tip, zorunluluk, seçenekler),",
-    "kolon tanımları (rapor sahibi açıklamaları) ve rapor üstverisi.",
-    "Kullanıcı 'şema', 'hangi kriterler', 'rapor tanımı', 'kolonlar ne anlama gelir' derse ÇAĞIR.",
-    "Çıktıyı kullanıcıya markdown tablo ile özetle; kriter alan adlarını run_report criteria'sında aynen kullan.",
+    "Return the active report's JSON schema: criteria fields (name, type, required, options),",
+    "column definitions (owner descriptions) and report metadata.",
+    "Call when the user asks about schema, available criteria, report definition, or column meanings.",
+    "Summarize the output as a markdown table; use criteria field names verbatim in run_job criteria.",
   ].join(" "),
   inputSchema: z.object({}),
   outputSchema: z.object({
@@ -83,79 +83,122 @@ const reportSchemaTool = tool({
   }),
 })
 
+/** Per-request tool context (SDK: description functions + toolsContext).
+ *  Resolved in the chat route from the active screen/report scope. */
+export const reportToolContextSchema = z.object({
+  reportScope: z.string(),
+  reportTitle: z.string(),
+  requiredFields: z.array(z.string()),
+  availableReports: z.string(),
+});
+
+export type ReportToolContext = z.infer<typeof reportToolContextSchema>;
+
+const FALLBACK_TOOL_CONTEXT: ReportToolContext = {
+  reportScope: "stock-balance",
+  reportTitle: "report",
+  requiredFields: [],
+  availableReports: "",
+};
+
+function toolContextOf(options?: {
+  context?: ReportToolContext | unknown;
+}): ReportToolContext {
+  const c = options?.context as Partial<ReportToolContext> | undefined;
+  return {
+    reportScope:
+      typeof c?.reportScope === "string" && c.reportScope
+        ? c.reportScope
+        : FALLBACK_TOOL_CONTEXT.reportScope,
+    reportTitle:
+      typeof c?.reportTitle === "string" && c.reportTitle
+        ? c.reportTitle
+        : FALLBACK_TOOL_CONTEXT.reportTitle,
+    requiredFields: Array.isArray(c?.requiredFields)
+      ? (c.requiredFields as string[])
+      : [],
+    availableReports:
+      typeof c?.availableReports === "string" ? c.availableReports : "",
+  };
+}
+
+/**
+ * ask_user_question — human-in-the-loop structured questions with options.
+ * Client executes headlessly (yula-client-tools); the question card renders
+ * in the chat turn (YulaQuestionnaireCard). Answers arrive as a new user
+ * message. Shared between STATIC_TOOLS and grid tools so questions can be
+ * asked in both criteria and results phases.
+ */
+const askUserQuestionTool = tool({
+  description: [
+    "Ask the user STRUCTURED QUESTIONS with options (human-in-the-loop) when information is missing or ambiguous.",
+    "Call when criteria are incomplete, the intent is ambiguous, or there is a fork in the road (e.g. missing required fields, unclear date range, which follow-up analysis to run).",
+    "Ask at most 3 questions per call; every question always offers a freeform answer field.",
+    "If the user skips a required question, continue with its defaultValue — never ask the same question again.",
+    "For single destructive-operation approvals use 'request_user_confirmation' instead.",
+    "The user's answers arrive as a new user message; read them and continue the task.",
+  ].join(" "),
+  inputSchema: z.object({
+    questions: z
+      .array(
+        z.object({
+          id: z.string().describe("Stable question id (e.g. 'dateRange')"),
+          prompt: z.string().describe("Question text in the user's language"),
+          description: z.string().optional().describe("Optional helper text"),
+          required: z.boolean().default(false),
+          multiple: z.boolean().default(false).describe("Allow selecting more than one choice"),
+          defaultValue: z.string().optional().describe("Value to continue with when the user skips this question"),
+          choices: z
+            .array(
+              z.object({
+                value: z.string(),
+                label: z.string(),
+                description: z.string().optional(),
+              }),
+            )
+            .min(1)
+            .describe("Fixed answer options"),
+        }),
+      )
+      .min(1)
+      .max(3)
+      .describe("At most 3 questions per call"),
+  }),
+  outputSchema: z.object({
+    status: z.literal("awaiting_user"),
+    message: z.string(),
+  }),
+});
+
 /** STATİK istemci-yürütülebilir araç seti (tipli parça üretir). */
 export const STATIC_TOOLS = {
     get_report_schema: reportSchemaTool,
-    run_report: tool({
-      description: [
-        "Bir raporu GERÇEKLEŞTİRİR (backend job başlatır) ve execution ekranında yeni job'ı seçili/çalışır gösterir.",
-        `Kullanılabilir raporlar: ${DEMO_REPORTS.map((r) => r.scope).join(", ")}.`,
-        "YALNIZ açık çalıştırma fiili varsa çağır: 'raporu çalıştır', 'çalıştır', 'calistir', 'run', 'execute', 'job başlat' (örn: 'geçen hafta için çalıştır').",
-        "'hazırla', 'göster', 'getir', yalnız 'geçen hafta' / 'dün' gibi slot ifadeleri YETERLİ DEĞİLDİR — bu aracı ÇAĞIRMA; öneri sun veya apply_criteria için onay bekle.",
-        "MEVCUT bir job'ı/sonuçları GÖRME isteklerinde (örn: 'son çalışan raporu aç', 'son sonuçlar', 'en son job') BU ARACI ÇAĞIRMA — 'open_last_report' aracını kullan.",
-        "YALNIZ yeni rapor çalıştırma isteğinde kullan; açık tabloyu süzme istekleri için DEĞİL.",
-      ].join(" "),
+    run_job: tool({
+      contextSchema: reportToolContextSchema,
+      description: ({ context }) => {
+        const ctx = toolContextOf({ context });
+        const required =
+          ctx.requiredFields.length > 0
+            ? ` Required criteria for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
+            : "";
+        return [
+          `EXECUTE a report: start a backend job and select the new job as running on the execution screen. Active report: '${ctx.reportScope}'.`,
+          ctx.availableReports ? `Available reports: ${ctx.availableReports}.` : undefined,
+          "Call ONLY on an explicit run request: 'run the report', 'run', 'execute', 'start the job' (e.g. 'run for last week').",
+          "Bare slots such as 'prepare', 'show', 'fetch' or a lone date/status ('last week' / 'yesterday') are NOT enough — do NOT call this tool; offer suggestions or wait for approval for apply_criteria.",
+          "For existing-report checks ('prepare', 'any existing', 'same criteria') do NOT call this tool — use 'find_matching_report'.",
+          "For VIEWING an existing job/results (e.g. 'open the last report', 'latest results', 'most recent job') do NOT call this tool — use 'open_last_report'.",
+          `Use only for new report executions; never for filtering the open table.${required}`,
+        ]
+          .filter(Boolean)
+          .join(" ");
+      },
       inputSchema: z.object({
-        report: z.enum(DEMO_REPORTS.map((r) => r.scope) as [string, ...string[]]),
-        criteria: z
-          .record(z.string(), z.unknown())
-          .optional()
-          .describe("Rapora özgü kriter alanları (schema anahtarlarıyla)"),
+        report: z.enum(REGISTERED_REPORTS.map((r) => r.scope) as [string, ...string[]]).default("stock-balance").describe("Report scope"),
+        criteria: z.record(z.string(), z.unknown()).default({}).describe("Report criteria (e.g. kayitTarihi, durum)"),
+        presetTitle: z.string().optional().describe("Executed suggestion / preset title"),
       }),
       // İstemci yürütür; çıktı tipi SDK zincirine buradan akar.
-      outputSchema: z.discriminatedUnion("status", [
-        z.object({
-          status: z.literal("executed"),
-          jobId: z.string(),
-          jobStatus: z.string(),
-          navigateTo: z.string(),
-          message: z.string().optional(),
-        }),
-        z.object({
-          status: z.literal("validation-error"),
-          errors: z.array(z.string()),
-          hint: z.string().optional(),
-        }),
-        z.object({
-          status: z.literal("blocked"),
-          reason: z.literal("incomplete-intent"),
-          hint: z.string(),
-          message: z.string().optional(),
-        }),
-        z.object({ status: z.literal("error"), error: z.string() }),
-      ]),
-    }),
-    apply_criteria: tool({
-      description: [
-        "Önerilen veya istenen kriterleri (tarih aralıkları, filtreler, durum vb.) aktif ekrandaki kriter formuna uygular ve doldurur; job BAŞLATMAZ.",
-        "Kullanıcı kriterleri doldurmak, düzenlemek, güncellemek veya ayarlamak istediğinde bu aracı ÇAĞIR (ör. 'kriterleri geçen haftaya göre düzenle', 'forma doldur', 'tarihi ayarla', '1. öneriyi uygula', 'doldur', 'güncelle', 'uygula', 'update criteria to last week').",
-        "YALNIZCA hiçbir eylem fiili olmayan çıplak değerlerde (kullanıcı sadece tek başına 'geçen hafta' veya 'dün' yazıp başka hiçbir şey demediyse) bu aracı çağırma, öneri chip'i sun.",
-        "Form doldurulur, ekranda vurgulanır ve kullanıcı ekrandaki 'Run' butonuna basarak işi kendisi çalıştırabilir.",
-      ].join(" "),
-      inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
-        criteria: z.record(z.string(), z.unknown()).describe("Forma doldurulacak kriterler"),
-        presetTitle: z.string().optional().describe("Uygulanan öneri başlığı"),
-      }),
-      outputSchema: z.object({
-        status: z.string(),
-        updatedKeys: z.array(z.string()).optional(),
-        message: z.string().optional(),
-        reason: z.string().optional(),
-        hint: z.string().optional(),
-      }),
-    }),
-    run_job: tool({
-      description: [
-        "Aktif rapor için backend job başlatır ve execution ekranında yeni job'ı seçer (GUID sonuç sayfasına atlama).",
-        "YALNIZ açık çalıştırma fiili varsa çağır: 'raporu çalıştır', 'çalıştır', 'calistir', 'run', 'execute', 'job başlat'.",
-        "'hazırla' / 'göster' / 'getir' veya yalnız tarih/durum slotu (örn: 'geçen hafta') YETERLİ DEĞİLDİR — job başlatma; öneri sun.",
-      ].join(" "),
-      inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
-        criteria: z.record(z.string(), z.unknown()).default({}).describe("Rapor kriterleri (örn. kayitTarihi, durum)"),
-        presetTitle: z.string().optional().describe("Çalıştırılan öneri / preset başlığı"),
-      }),
       outputSchema: z.discriminatedUnion("status", [
         z.object({
           status: z.literal("executed"),
@@ -179,17 +222,47 @@ export const STATIC_TOOLS = {
         z.object({ status: z.literal("error"), error: z.string() }),
       ]),
     }),
+    apply_criteria: tool({
+      contextSchema: reportToolContextSchema,
+      description: ({ context }) => {
+        const ctx = toolContextOf({ context });
+        const required =
+          ctx.requiredFields.length > 0
+            ? ` Required fields for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
+            : "";
+        return [
+          "Apply the requested or suggested criteria (date ranges, filters, status, etc.) to the criteria form on the active screen; does NOT start a job.",
+          "Call when the user wants to fill, edit, update, or adjust criteria (e.g. 'update criteria to last week', 'fill the form', 'set the date', 'apply suggestion 1', 'set yesterday').",
+          `Always send the COMPLETE criteria set including all required schema fields: first read the live draft via 'get_current_criteria', preserve values the user already set, then apply the merged object. Never send a partial object that drops required fields.${required}`,
+          "Do NOT call on bare values with no action verb (user typed only 'last week' or 'yesterday' alone); offer suggestion chips instead.",
+          "The form is filled and highlighted on screen; the user can then run the report with the 'Run' button.",
+        ].join(" ");
+      },
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        criteria: z.record(z.string(), z.unknown()).describe("Criteria to fill into the form"),
+        presetTitle: z.string().optional().describe("Applied suggestion title"),
+      }),
+      outputSchema: z.object({
+        status: z.string(),
+        updatedKeys: z.array(z.string()).optional(),
+        missingRequired: z.array(z.string()).optional(),
+        message: z.string().optional(),
+        reason: z.string().optional(),
+        hint: z.string().optional(),
+      }),
+    }),
     request_user_confirmation: tool({
       description: [
-        "Kritik, yüksek maliyetli veya veri değiştiren işlemler öncesinde kullanıcıdan İNSAN ONAYI (Human-in-the-Loop) ister.",
-        "Kullanıcı 'toplu güncelle', 'sil', 'yüksek hacimli sorgu', '%... indirim uygula', 'stok düzeltme' derse veya işlem onay gerektiriyorsa ÇAĞIR.",
-        "Arayüzde etkileşimli [Onayla] / [İptal] onay kartı açılır. Kullanıcı yanıt verene kadar işlem yürütülmez.",
+        "Ask the user for HUMAN APPROVAL (human-in-the-loop) before critical, high-cost, or data-changing operations.",
+        "Call when the user asks for bulk updates, deletions, heavy queries, discount operations, stock adjustments, or the operation requires approval.",
+        "Opens an interactive [Approve] / [Cancel] card. The operation does not execute until the user responds.",
       ].join(" "),
       inputSchema: z.object({
-        title: z.string().describe("Onay kartının kısa başlığı (örn: 'Toplu İndirim İşlemi')"),
-        message: z.string().describe("Yapılacak işlemin detaylı açıklaması ve etki özeti"),
-        actionType: z.enum(["mutation", "heavy_query", "bulk_update", "general"]).default("general").describe("İşlemin önem ve risk türü"),
-        details: z.record(z.string(), z.unknown()).optional().describe("İşleme özgü detay parametreleri"),
+        title: z.string().describe("Short card title (e.g. 'Bulk Discount Operation')"),
+        message: z.string().describe("Detailed description of the operation and impact summary"),
+        actionType: z.enum(["mutation", "heavy_query", "bulk_update", "general"]).default("general").describe("Operation severity and risk type"),
+        details: z.record(z.string(), z.unknown()).optional().describe("Operation-specific detail parameters"),
       }),
       outputSchema: z.object({
         confirmed: z.boolean(),
@@ -197,16 +270,17 @@ export const STATIC_TOOLS = {
         userNote: z.string().optional(),
       }),
     }),
+    ask_user_question: askUserQuestionTool,
     navigate_to_page: tool({
       description: [
-        "Uygulama içinde belirtilen bir sayfaya, çalışma alanına (workspace) veya rapora yönlendirir (In-App Client Navigation).",
-        "Kullanıcı '... ekranını aç', '... sayfasına git', 'beni ... raporuna götür' dediğinde veya aktif ekranda bulunmayan bir rapor/sayfa istendiğinde BU ARACI ÇAĞIR.",
-        "Kullanılabilir standart rotalar: '/stock/stock-balance' (Stok Bakiye Raporu), '/stock/stock-analytics' (Stok Analiz Raporu), '/stock' (Stok Modülü), '/accounting' (Muhasebe), '/selling' (Satış), '/manufacturing' (Üretim).",
+        "Navigate to a page, workspace, or report inside the app (in-app client navigation).",
+        "Call when the user asks to open or go to a screen ('open the ... screen', 'go to ...', 'take me to the ... report') or requests a report/page outside the active screen.",
+        "Available standard routes: '/stock/stock-balance' (stock balance report), '/stock/stock-analytics' (stock analytics report), '/stock' (stock module), '/accounting', '/selling', '/manufacturing'.",
       ].join(" "),
       inputSchema: z.object({
-        path: z.string().describe("Hedef sayfa yolu (örn: '/stock/stock-balance', '/stock', '/accounting')"),
-        title: z.string().optional().describe("Hedef sayfa veya rapor adı"),
-        reason: z.string().optional().describe("Yönlendirme nedeni"),
+        path: z.string().describe("Target page path (e.g. '/stock/stock-balance', '/stock', '/accounting')"),
+        title: z.string().optional().describe("Target page or report name"),
+        reason: z.string().optional().describe("Navigation reason"),
       }),
       outputSchema: z.object({
         status: z.enum(["navigated", "already_on_page", "error"]),
@@ -215,13 +289,17 @@ export const STATIC_TOOLS = {
       }),
     }),
     open_last_report: tool({
-      description: [
-        "Kullanıcının EN SON çalıştırdığı rapor job'ını YENİDEN ÇALIŞTIRMADAN açar: kayıtlı job bulunur ve sonuç tablosuna yönlendirilir.",
-        "Kullanıcı 'son çalışan raporu aç', 'son raporu göster', 'son sonuçlar', 'en son job', 'önceki rapor' gibi isteklerde BU ARACI ÇAĞIR.",
-        "Bu araç YENİ JOB BAŞLATMAZ — mevcut job'ın sonuç ekranına gider. Yeni çalıştırma isteniyorsa run_report kullanılır.",
-      ].join(" "),
+      contextSchema: reportToolContextSchema,
+      description: ({ context }) => {
+        const ctx = toolContextOf({ context });
+        return [
+          "Open the user's MOST RECENT report job WITHOUT re-running it: locate the stored job and navigate to its result table.",
+          "Call for requests like 'open the last report', 'show the latest report', 'last results', 'most recent job', 'previous report'.",
+          `This tool never starts a new job — it navigates to an existing job's result screen (active report: '${ctx.reportScope}'). Use run_job for new executions.`,
+        ].join(" ");
+      },
       inputSchema: z.object({
-        report: z.string().optional().describe("Rapor scope'u (örn: stock-balance); verilmezse en son job seçilir"),
+        report: z.string().optional().describe("Report scope (e.g. stock-balance); selects the latest job when omitted"),
       }),
       outputSchema: z.discriminatedUnion("status", [
         z.object({
@@ -239,15 +317,15 @@ export const STATIC_TOOLS = {
     }),
     validate_criteria_input: tool({
       description: [
-        "Kullanıcının belirttiği veya formdaki kriterleri şemaya ve D365/BC kurallarına göre doğrular (Criteria Input Engine).",
-        "Tarih ve sayı aralıkları ('..', '10..20', '2026-01-01..2026-08-31'), göreli tarihler ('dün', 'bugün', 'geçen hafta'),",
-        "seçenekler (enum) ve zorunlu alan kontrolü yapar. Hata, uyarı ve önerileri döner.",
-        "Kullanıcı kriter girdiğinde, 'doğrula', 'kontrol et', 'bu kriter doğru mu?' dediğinde veya çalıştırmadan önce denetlemek için ÇAĞIR.",
+        "Validate user-provided or form criteria against the schema and D365/BC rules (Criteria Input Engine).",
+        "Checks date and number ranges ('..', '10..20', '2026-01-01..2026-08-31'), relative dates ('dün', 'bugün', 'geçen hafta'),",
+        "options (enum) and required fields. Returns errors, warnings, and suggestions.",
+        "Call when the user provides criteria, asks to validate them ('is this valid?', 'is this criteria correct?'), or before execution for verification.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
-        criteria: z.record(z.string(), z.unknown()).default({}).describe("Doğrulanacak kriterler"),
-        partial: z.boolean().default(false).describe("Yalnız girilen alanları kontrol et (zorunlu alan eksikliklerini hata sayma)"),
+        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        criteria: z.record(z.string(), z.unknown()).default({}).describe("Criteria to validate"),
+        partial: z.boolean().default(false).describe("Check only provided fields (do not treat missing required fields as errors)"),
       }),
       outputSchema: z.object({
         valid: z.boolean(),
@@ -275,12 +353,12 @@ export const STATIC_TOOLS = {
     }),
     get_current_criteria: tool({
       description: [
-        "Aktif raporun ekranındaki canlı kriter formu taslağını (current draft criteria) okur ve doğrulama durumunu döner.",
-        "Kullanıcı 'formda ne var?', 'ekrandaki kriterler neler?', 'kriterleri kontrol et', 'şu anki form geçerli mi?' dediğinde ÇAĞIR.",
-        "Kullanıcıya formdaki mevcut değerleri, eksik zorunlu alanları ve format hatalarını bildir.",
+        "Read the live criteria form draft (current draft criteria) of the active report and return its validation state.",
+        "Call when the user asks about the live form ('what is in the form?', 'current criteria?', 'is the current form valid?').",
+        "Report the form's current values, missing required fields, and format errors.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
+        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
       }),
       outputSchema: z.object({
         status: z.string(),
@@ -309,12 +387,13 @@ export const STATIC_TOOLS = {
     }),
     list_report_executions: tool({
       description: [
-        "Aktif veya belirtilen raporun geçmiş ve çalışan işlerini (job execution history) listeler.",
-        "Kullanıcı 'önceki çalıştırmalar', 'çalışan işler', 'iş listesi', 'hangi raporlar çalıştı' dediğinde ÇAĞIR.",
+        "List past and running jobs (job execution history) of the active or specified report.",
+        "Call when the user asks for past executions ('previous runs', 'running jobs', 'job list', 'which reports ran').",
+        "Does not compare criteria; use 'find_matching_report' to check for an existing report with the same criteria.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Rapor scope'u (örn: stock-balance)"),
-        limit: z.number().default(10).describe("Maksimum listelenecek iş adedi"),
+        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        limit: z.number().default(10).describe("Maximum number of jobs to list"),
       }),
       outputSchema: z.object({
         status: z.string(),
@@ -330,14 +409,66 @@ export const STATIC_TOOLS = {
         message: z.string().optional(),
       }),
     }),
+    find_matching_report: tool({
+      contextSchema: reportToolContextSchema,
+      description: ({ context }) => {
+        const ctx = toolContextOf({ context });
+        const required =
+          ctx.requiredFields.length > 0
+            ? ` Required fields for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
+            : "";
+        return [
+          "Check whether a completed or running job with the SAME normalized criteria already exists; never starts a job.",
+          "Call FIRST on prepare-type requests ('prepare the report', check existing, same criteria) — before filling any form or asking the user. Merge user-provided values with the live draft from 'get_current_criteria' so required fields are complete.",
+          "If matched and completed, open it via returned navigateTo. If no match, fill the form via 'apply_criteria' and ask for confirmation before run_job.",
+          `Use 'open_last_report' for latest job regardless of criteria, 'run_job' only for explicit new runs.${required}`,
+        ].join(" ");
+      },
+      inputSchema: z.object({
+        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        criteria: z
+          .record(z.string(), z.unknown())
+          .default({})
+          .describe("Criteria to check (schema keys)"),
+      }),
+      outputSchema: z.discriminatedUnion("status", [
+        z.object({
+          status: z.literal("matched"),
+          jobId: z.string(),
+          jobStatus: z.string(),
+          navigateTo: z.string(),
+          message: z.string().optional(),
+        }),
+        z.object({
+          status: z.literal("running"),
+          jobId: z.string(),
+          jobStatus: z.string(),
+          navigateTo: z.string().optional(),
+          message: z.string().optional(),
+        }),
+        z.object({
+          status: z.literal("no_match"),
+          suggestedCriteria: z.record(z.string(), z.unknown()).optional(),
+          hint: z.string().optional(),
+          message: z.string().optional(),
+        }),
+        z.object({
+          status: z.literal("needs_criteria"),
+          missing: z.array(z.string()).optional(),
+          hint: z.string().optional(),
+          message: z.string().optional(),
+        }),
+        z.object({ status: z.literal("error"), error: z.string() }),
+      ]),
+    }),
     cancel_job: tool({
       description: [
-        "Çalışmakta olan bir backend rapor işini (running job) iptal eder.",
-        "Kullanıcı 'işi durdur', 'iptal et', 'job'ı kes', 'raporu durdur' dediğinde ÇAĞIR.",
+        "Cancel a running backend report job.",
+        "Call when the user asks to stop a job ('stop the job', 'cancel', 'cancel the report').",
       ].join(" "),
       inputSchema: z.object({
-        jobId: z.string().describe("İptal edilecek iş GUID'i"),
-        report: z.string().optional().describe("Rapor scope'u"),
+        jobId: z.string().describe("GUID of the job to cancel"),
+        report: z.string().optional().describe("Report scope"),
       }),
       outputSchema: z.object({
         status: z.string(),
@@ -374,6 +505,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
 
   return {
     get_report_schema: reportSchemaTool,
+    ask_user_question: askUserQuestionTool,
     analyze_grid_data: dynamicTool({
       description: [
         "Açık veri kümesinde analizi çalıştırır (KPI/toplam/grup).",
@@ -739,10 +871,15 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
  *  - Grid açık (Sonuç evresi) → yalnız grid araçları; kriter/run araçları
  *    modelin eline hiç verilmez (yanlış evreye sapma imkânsızlaşır).
  *  - Grid yok (Kriter evresi) → yalnız rapor hazırlama/çalıştırma araçları.
+ *
+ * Overload'lar literal tool tiplerini korur; böylece AI SDK `toolsContext`
+ * (contextSchema'lı araçlar) ve `prepareStep.activeTools` tip-güvenli kalır.
  */
+export function buildServerTools(grid: YulaGridToolContext): ToolSet;
+export function buildServerTools(grid?: null | undefined): typeof STATIC_TOOLS;
 export function buildServerTools(
   grid?: YulaGridToolContext | null,
-): ToolSet {
+): typeof STATIC_TOOLS | ToolSet {
   if (!grid || grid.columns.length === 0) return STATIC_TOOLS;
   return gridTools(grid);
 }

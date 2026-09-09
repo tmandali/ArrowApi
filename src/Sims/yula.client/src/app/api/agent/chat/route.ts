@@ -1,15 +1,20 @@
 import {
   convertToModelMessages,
+  createUIMessageStreamResponse,
   extractReasoningMiddleware,
   hasToolCall,
   isStepCount,
+  pruneMessages,
+  toUIMessageStream,
   type InferUITools,
+  type LanguageModelUsage,
   type UIDataTypes,
   type UIMessage,
   streamText,
   wrapLanguageModel,
 } from "ai";
-import { type YulaStaticTools } from "@/lib/yula-server-tools";
+import { type YulaStaticTools, type ReportToolContext } from "@/lib/yula-server-tools";
+import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { buildServerTools } from "@/lib/yula-server-tools";
@@ -30,9 +35,29 @@ export const dynamic = "force-dynamic";
  * `dynamic-tool` olarak akar ve istemci ikisini de destekler.
  */
 export type YulaTools = InferUITools<YulaStaticTools>;
-export type YulaMessage = UIMessage<never, UIDataTypes, YulaTools>;
+/** Per-message metadata: token usage attached at step finish (SDK recipe). */
+export type YulaMessageMetadata = { usage?: LanguageModelUsage };
+export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
 
 export const DEFAULT_MODEL = getDefaultModel();
+
+/**
+ * Context compaction (SDK recipe: track-agent-token-usage).
+ * Rough token estimate; when the loop's message state exceeds the budget,
+ * old tool I/O and reasoning are pruned while the last task turns stay intact.
+ */
+const COMPACTION_TOKEN_BUDGET =
+  Number(process.env.YULA_COMPACTION_TOKENS) > 0
+    ? Number(process.env.YULA_COMPACTION_TOKENS)
+    : 50_000;
+
+function estimateMessagesTokens(messages: unknown): number {
+  try {
+    return Math.ceil(JSON.stringify(messages).length / 4);
+  } catch {
+    return 0;
+  }
+}
 
 async function resolveModel(
   requested: string | undefined,
@@ -164,20 +189,47 @@ export async function POST(req: Request) {
       return Response.json({ error: "messages required" }, { status: 400 });
     }
 
-    // EVRE KAPISI — istemci phase bildirir; sunucu çift kontrol yapar:
-    //   results          → yalnız grid araçları (columns doluysa)
-    //   results-loading  → HİÇBİR araç (tablo hazır değil; run_report dahil yasak)
-    //   workspace        → hazırla/çalıştır araçları
+    // PHASE WALL (SDK-native): full set built once, prepareStep locks
+    // per-step tools —
+    //   results          → grid tools only (columns present)
+    //   results-loading  → no tools (table not ready; run_job forbidden)
+    //   workspace        → criteria/run tools only
     const phase = context?.phase ?? "workspace";
     const grid = context?.grid ?? null;
-    let tools: ReturnType<typeof buildServerTools>;
-    if (phase === "results" && grid && grid.columns.length > 0) {
-      tools = buildServerTools(grid);
-    } else if (phase === "results-loading") {
-      tools = {};
-    } else {
-      tools = buildServerTools(null);
-    }
+    const criteriaTools = buildServerTools(null);
+    const gridTools =
+      grid && grid.columns.length > 0 ? buildServerTools(grid) : null;
+    const tools = { ...criteriaTools, ...(gridTools ?? {}) };
+    const criteriaToolNames = Object.keys(criteriaTools);
+    const gridToolNames = gridTools ? Object.keys(gridTools) : [];
+
+    // Dynamic tool descriptions (SDK toolsContext): inject the active
+    // report scope, title, and required criteria fields so the model
+    // grounds tool choice without hardcoded report lists.
+    const pathname = context?.pathname ?? "";
+    const activeReport =
+      REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ??
+      (context?.screen?.reportScope
+        ? findReport(context.screen.reportScope)
+        : undefined);
+    const schemaRequired = (activeReport?.fullSchema as { required?: unknown })
+      ?.required;
+    const toolContext: ReportToolContext = {
+      reportScope: activeReport?.scope ?? "stock-balance",
+      reportTitle: activeReport?.title ?? "report",
+      requiredFields: Array.isArray(schemaRequired)
+        ? (schemaRequired as unknown[]).filter(
+            (f): f is string => typeof f === "string",
+          )
+        : [],
+      availableReports: REGISTERED_REPORTS.map((r) => r.scope).join(", "),
+    };
+    const toolsContext = {
+      run_job: toolContext,
+      apply_criteria: toolContext,
+      open_last_report: toolContext,
+      find_matching_report: toolContext,
+    };
 
     const isThinking = thinkingEnabled !== false;
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
@@ -207,7 +259,13 @@ export async function POST(req: Request) {
       (m) => Array.isArray(m.content) && m.content.some((p) => p.type === "image"),
     );
 
-    const activeTools = hasImageInMessages ? {} : tools;
+    // SDK-native phase lock: only the current phase's tools are callable.
+    const phaseToolNames =
+      hasImageInMessages || phase === "results-loading"
+        ? []
+        : phase === "results" && gridToolNames.length > 0
+          ? gridToolNames
+          : criteriaToolNames;
 
     const result = streamText({
       model: wrapLanguageModel({
@@ -219,7 +277,29 @@ export async function POST(req: Request) {
       },
       system: systemPrompt,
       messages: modelMessages,
-      tools: activeTools,
+      tools,
+      toolsContext,
+      prepareStep: async ({ messages, stepNumber }) => {
+        const activeTools = phaseToolNames as Extract<
+          keyof typeof tools,
+          string
+        >[];
+        if (estimateMessagesTokens(messages) <= COMPACTION_TOKEN_BUDGET) {
+          return { activeTools };
+        }
+        const compacted = pruneMessages({
+          messages,
+          reasoning: "all",
+          toolCalls: "before-last-3-messages",
+          emptyMessages: "remove",
+        });
+        console.info(
+          `🤖 [Yula Compaction]: step ${stepNumber} over budget ` +
+            `(~${estimateMessagesTokens(messages)} tok > ${COMPACTION_TOKEN_BUDGET}); ` +
+            `pruned to ~${estimateMessagesTokens(compacted)} tok.`,
+        );
+        return { activeTools, messages: compacted };
+      },
       onError({ error }) {
         console.error("🤖 [Yula AI Engine Error Details]:", error);
       },
@@ -250,7 +330,6 @@ export async function POST(req: Request) {
           "reset_grid_layout",
           "export_grid_data",
           "visualize_grid_data",
-          "run_report",
           "run_job",
           "apply_criteria",
           "navigate_to_page",
@@ -259,18 +338,26 @@ export async function POST(req: Request) {
           "analyze_grid_data",
           "run_expert_sql",
           "get_report_schema",
-          "prepare_report_criteria",
           "request_user_confirmation",
+          "ask_user_question",
         ),
       ],
     });
 
-    return result.toUIMessageStreamResponse({
+    const uiStream = toUIMessageStream<typeof tools, YulaMessage>({
+      stream: result.stream,
       onError(error) {
         console.error("🤖 [Yula Stream Serialization Error Details]:", error);
         return error instanceof Error ? error.message : "AI Stream Error";
       },
+      messageMetadata: ({ part }) => {
+        if (part.type === "finish-step") {
+          return { usage: part.usage };
+        }
+      },
     });
+
+    return createUIMessageStreamResponse({ stream: uiStream });
   } catch (error) {
     console.error("🤖 [Yula API Route Unhandled Error]:", error);
     return Response.json(

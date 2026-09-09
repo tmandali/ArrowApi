@@ -5,6 +5,11 @@ import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStor
 import { extractJobIdFromHref, isReportResultPath, isReportResultView } from "@/lib/workspace-paths";
 import { focusReportExecution, reportExecutionHref } from "@/lib/report-run-bus";
 import {
+  isCriteriaMatch,
+  normalizeCriteria,
+  normalizeCriteriaValue,
+} from "@/lib/criteria-match";
+import {
   buildChartQuery,
   inferChartOrderMode,
   type ChartOrderMode,
@@ -496,7 +501,7 @@ async function profileGrid(): Promise<unknown> {
 /**
  * get_report_schema — aktif raporun JSON şemasını yetkili kaynaktan döndürür
  * (kriter alanları + kolon tanımları + üstveri). Model çıktıyı markdown tablo
- * olarak özetler; kriter alan adları run_report criteria'sında aynen kullanılır.
+ * olarak özetler; kriter alan adları run_job criteria'sında aynen kullanılır.
  */
 async function getReportSchema(): Promise<unknown> {
   const storeState = useYulaGridStore.getState()
@@ -1313,11 +1318,6 @@ export async function executeClientTool(
 ): Promise<unknown> {
   const args = (input ?? {}) as Record<string, unknown>;
   switch (toolName) {
-    case "prepare_report_criteria":
-      // Kart katmanı kaldırıldı — eski konuşmalardaki bekleyen çağrılar
-      // sessizce kapatılır.
-      return { status: "skipped", message: "Criteria card flow has been removed." };
-    case "run_report":
     case "run_job": {
       const scope = String(args.report ?? "stock-balance");
       const meta =
@@ -1334,7 +1334,18 @@ export async function executeClientTool(
           await import("@/features/report-criteria/lib/validate-criteria");
         const criteriaObj = { ...((args.criteria ?? {}) as Record<string, unknown>) };
 
-        // Relative date synthesizer & default fallback for date criteria
+        // Relative date synthesizer & default fallback for date criteria.
+        // The date field is resolved from the schema (first date/range field),
+        // never hardcoded per report.
+        const { parseCriteriaSchema } = await import(
+          "@/features/report-criteria/lib/parse-criteria-schema"
+        );
+        const schemaFields = parseCriteriaSchema(meta.fullSchema).fields;
+        const dateFieldKey = schemaFields.find(
+          (f) =>
+            (f as { format?: string }).format === "date" ||
+            Boolean((f as { rangeSplit?: string }).rangeSplit),
+        )?.key;
         const resolveDate =
           typeof resolveRelativeDateString === "function"
             ? resolveRelativeDateString
@@ -1351,12 +1362,16 @@ export async function executeClientTool(
                 return val;
               };
 
-        if (!criteriaObj.kayitTarihi) {
-          const dun = new Date();
-          dun.setDate(dun.getDate() - 1);
-          criteriaObj.kayitTarihi = dun.toISOString().slice(0, 10);
-        } else if (typeof criteriaObj.kayitTarihi === "string") {
-          criteriaObj.kayitTarihi = resolveDate(criteriaObj.kayitTarihi);
+        if (dateFieldKey) {
+          if (!criteriaObj[dateFieldKey]) {
+            const dun = new Date();
+            dun.setDate(dun.getDate() - 1);
+            criteriaObj[dateFieldKey] = dun.toISOString().slice(0, 10);
+          } else if (typeof criteriaObj[dateFieldKey] === "string") {
+            criteriaObj[dateFieldKey] = resolveDate(
+              criteriaObj[dateFieldKey] as string,
+            );
+          }
         }
 
         // Form taslağına da uygula (ekrandaki kriter tablosu eşzamanlı güncellensin)
@@ -1412,8 +1427,8 @@ export async function executeClientTool(
           navigateTo: reportExecutionHref(meta.pagePath, job.id),
           presetTitle: preset,
           message: preset
-            ? `Job started (${job.id}) for preset "${preset}". Selected on execution screen.`
-            : `Job started (${job.id}). Running on execution screen.`,
+            ? `Job accepted and queued (${job.id}) for preset "${preset}". Terminal outcome unknown — track on execution screen.`
+            : `Job accepted and queued (${job.id}). Terminal outcome unknown — track on execution screen.`,
         };
       } catch (err) {
         return {
@@ -1431,12 +1446,33 @@ export async function executeClientTool(
         );
         const res = applyCriteriaToDraft(scope, criteriaObj);
         const preset = typeof args.presetTitle === "string" ? args.presetTitle : "";
+        // Deterministic completeness check: required schema fields still empty
+        // in the draft, so the model asks for them explicitly instead of
+        // claiming the report is runnable.
+        const schemaRequired = (
+          findReport(scope)?.fullSchema as { required?: unknown } | undefined
+        )?.required;
+        const requiredFields = Array.isArray(schemaRequired)
+          ? (schemaRequired as unknown[]).filter(
+              (f): f is string => typeof f === "string",
+            )
+          : [];
+        const missingRequired = requiredFields.filter((f) => {
+          const row = res.rows.find(
+            (r) => r.name === f || r.name.toLowerCase() === f.toLowerCase(),
+          );
+          return !row || !row.value.trim();
+        });
         return {
           status: "ok",
           updatedKeys: res.updatedKeys,
-          message: preset
-            ? `"${preset}" criteria applied to the draft form. User can run the report.`
-            : "Criteria applied to the draft form. User can run the report.",
+          missingRequired,
+          message:
+            missingRequired.length > 0
+              ? `Criteria applied to the draft form. Still missing required criteria: ${missingRequired.join(", ")}. Ask the user for them explicitly before running.`
+              : preset
+                ? `"${preset}" criteria applied to the draft form. All required criteria are filled; user can run the report.`
+                : "Criteria applied to the draft form. All required criteria are filled; user can run the report.",
         };
       } catch (err) {
         return {
@@ -1530,7 +1566,7 @@ export async function executeClientTool(
           return {
             status: "not_found",
             message:
-              "No report execution found. You may suggest running a new report with run_report.",
+              "No report execution found. You may suggest running a new report with run_job.",
           };
         }
         return {
@@ -1560,6 +1596,15 @@ export async function executeClientTool(
         confirmed: false,
         message: "Waiting for user confirmation response.",
       };
+    case "ask_user_question": {
+      const raw = (args as { questions?: unknown }).questions;
+      const questions = Array.isArray(raw) ? raw.slice(0, 3) : [];
+      return {
+        status: "awaiting_user",
+        questions,
+        message: "Questions presented to the user. Wait for their answers, which arrive as a new user message.",
+      };
+    }
     case "filter_current_grid": {
       const field = String(args.field ?? "");
       const value = String(args.value ?? "");
@@ -1649,6 +1694,125 @@ export async function executeClientTool(
           instance: {},
           errors: [{ field: "form", fieldTitle: "Form", message: String(err) }],
           warnings: [],
+        };
+      }
+    }
+    case "find_matching_report": {
+      const scope = String(args.report ?? "stock-balance");
+      const rawCriteria = { ...((args.criteria ?? {}) as Record<string, unknown>) };
+      try {
+        const { findReport } = await import("@/features/reports/report-registry");
+        const meta = findReport(scope);
+        if (!meta) {
+          return { status: "error", error: `Unknown report: ${scope}` };
+        }
+        const { resolveRelativeDateString } = await import(
+          "@/features/report-criteria/lib/apply-criteria-to-draft"
+        );
+        const { validateCriteria } = await import(
+          "@/features/report-criteria/lib/validate-criteria"
+        );
+        const resolveDate =
+          typeof resolveRelativeDateString === "function"
+            ? resolveRelativeDateString
+            : undefined;
+        // Resolve relative dates on raw input before validation.
+        for (const [k, v] of Object.entries(rawCriteria)) {
+          if (typeof v === "string") {
+            rawCriteria[k] = normalizeCriteriaValue(v, resolveDate);
+          }
+        }
+        const result = validateCriteria(meta.fullSchema, rawCriteria);
+        const required = Array.isArray(
+          (meta.fullSchema as { required?: unknown })?.required,
+        )
+          ? ((meta.fullSchema as { required?: string[] }).required ?? [])
+          : [];
+        const missing = required.filter((f) => {
+          const v = (result.instance as Record<string, unknown>)?.[f];
+          return v === undefined || v === null || String(v).trim() === "";
+        });
+        if (missing.length > 0) {
+          return {
+            status: "needs_criteria",
+            missing,
+            hint: "Ask user for missing required criteria before starting a job.",
+            message: `Missing required criteria: ${missing.join(", ")}.`,
+          };
+        }
+        const requested = normalizeCriteria(
+          result.instance as Record<string, unknown>,
+          undefined,
+        );
+        const endpoint =
+          typeof meta?.fullSchema?.["x-job-endpoint"] === "string"
+            ? (meta.fullSchema["x-job-endpoint"] as string)
+            : "/api/arrow/jobs";
+        const { listArrowJobs, fetchJobRequest } = await import(
+          "@/features/jobs/arrow-job-client"
+        );
+        const res = await listArrowJobs(endpoint, { take: 10 });
+        const items = (res.items || []).slice(0, 10);
+        const withRequests = await Promise.allSettled(
+          items.map(async (j) => ({
+            job: j,
+            request: await fetchJobRequest(j.id),
+          })),
+        );
+        const candidates: Array<{
+          jobId: string;
+          status: string;
+          createdAt: string;
+          request: Record<string, unknown>;
+        }> = [];
+        for (const r of withRequests) {
+          if (r.status !== "fulfilled" || !r.value.request) continue;
+          candidates.push({
+            jobId: r.value.job.id,
+            status: r.value.job.status,
+            createdAt: r.value.job.createdAt ?? "",
+            request: normalizeCriteria(
+              r.value.request as Record<string, unknown>,
+              undefined,
+            ),
+          });
+        }
+        const isActive = (s: string) => s === "Queued" || s === "Running";
+        const activeMatch = candidates.find(
+          (c) => isActive(c.status) && isCriteriaMatch(requested, c.request),
+        );
+        if (activeMatch) {
+          return {
+            status: "running",
+            jobId: activeMatch.jobId,
+            jobStatus: activeMatch.status,
+            navigateTo: reportExecutionHref(meta.pagePath, activeMatch.jobId),
+            message: `Matching job is still running (${activeMatch.jobId}).`,
+          };
+        }
+        const completedMatch = candidates
+          .filter((c) => c.status === "Completed")
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .find((c) => isCriteriaMatch(requested, c.request));
+        if (completedMatch) {
+          return {
+            status: "matched",
+            jobId: completedMatch.jobId,
+            jobStatus: completedMatch.status,
+            navigateTo: reportExecutionHref(meta.pagePath, completedMatch.jobId),
+            message: `Opened matching completed report (job ${completedMatch.jobId}).`,
+          };
+        }
+        return {
+          status: "no_match",
+          suggestedCriteria: result.instance as Record<string, unknown>,
+          hint: "No completed job matches these criteria. Ask for confirmation before calling run_job.",
+          message: "No completed job matches these criteria.",
+        };
+      } catch (err) {
+        return {
+          status: "error",
+          error: err instanceof Error ? err.message : String(err),
         };
       }
     }

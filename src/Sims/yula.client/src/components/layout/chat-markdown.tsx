@@ -342,7 +342,7 @@ function renderPlainBullet(
   // Standart düz madde: Eğer öneri/aksiyon cümlesiyse tıklanabilir aksiyon düğmesi yap
   const isActionLike =
     isPromptSentenceLike(cleanBulletText) ||
-    /(?:filtrele|özetle|çıkar|analiz|grafik|hesapla|göster|listele|hazırla|yap|incele|sorgula)/i.test(cleanBulletText)
+    /(?:filtrele|özetle|çıkar|analiz|grafik|hesapla|göster|listele|hazırla|yap|incele|sorgula|çalıştır|calistir|run|execute|başlat)/i.test(cleanBulletText)
 
   if (isActionLike && cb?.onPrompt) {
     return (

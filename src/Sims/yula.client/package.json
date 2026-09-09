@@ -20,6 +20,7 @@
     "@base-ui/react": "^1.7.0",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@react-pdf/renderer": "^4.9.0",
+    "@shadcn/react": "^0.3.1",
     "@types/js-yaml": "^4.0.9",
     "ai": "^7.0.83",
     "apache-arrow": "^21.2.0",

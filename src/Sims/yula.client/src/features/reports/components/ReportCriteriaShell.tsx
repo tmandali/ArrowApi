@@ -66,7 +66,7 @@ export type ReportCriteriaShellProps = {
 
 /**
  * Workspace-agnostik rapor kriter ekranı kabuğu: New aksiyonu, banner'lar,
- * job oluşturma (createArrowJob), AI run_report otobüsü ve screen agent
+ * job oluşturma (createArrowJob), AI run_job otobüsü ve screen agent
  * context. Filtre bileşeni `renderFilter` ile enjekte edilir.
  */
 export function ReportCriteriaShell({
@@ -113,6 +113,10 @@ export function ReportCriteriaShell({
       {
         name: "apply_criteria",
         description: "Şemayı ve zorunlu alanları gözeterek önerilen kriterleri ekrandaki forma doldurur.",
+      },
+      {
+        name: "find_matching_report",
+        description: "Aynı normalize kriterde tamamlanmış/çalışan iş var mı kontrol eder; job başlatmaz.",
       },
       {
         name: "run_job",
@@ -208,7 +212,7 @@ export function ReportCriteriaShell({
     onJobCreated,
   ])
 
-  // Run tuşunun aynısını AI'a aç: jenerik run_report aracı bu otobüsü tetikler.
+  // Run tuşunun aynısını AI'a aç: jenerik run_job aracı bu otobüsü tetikler.
   // En güncel handleCriteriaSubmit'i görmek için her değişimde yeniden kaydolur.
   React.useEffect(() => {
     return registerReportRunner(mode, () => void handleCriteriaSubmit());

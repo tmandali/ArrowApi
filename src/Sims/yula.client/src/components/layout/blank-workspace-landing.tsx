@@ -20,8 +20,8 @@ import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import {
   getPinnedChartViewId,
-  PINNED_CHART_VIEW_PARAM,
   pinnedChartToOutput,
+  requestAiView,
   savePinnedChartAsAiView,
   usePinnedCharts,
 } from "@/hooks/use-pinned-charts";
@@ -196,11 +196,15 @@ export function WorkspaceLandingTemplate({
               {pinnedCharts.map((chart) => (
                 <div key={chart.id} className="group relative">
                   <Link
-                    href={`${chart.sourceHref}${chart.sourceHref.includes("?") ? "&" : "?"}${PINNED_CHART_VIEW_PARAM}=${encodeURIComponent(getPinnedChartViewId(chart))}`}
+                    href={chart.sourceHref}
                     className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
                     title="Kaynak raporu grafik sorgusuyla aç"
                     onClick={() => {
                       savePinnedChartAsAiView(chart);
+                      requestAiView(
+                        getPinnedChartViewId(chart),
+                        chart.reportScope,
+                      );
                     }}
                   >
                     <YulaChartCard

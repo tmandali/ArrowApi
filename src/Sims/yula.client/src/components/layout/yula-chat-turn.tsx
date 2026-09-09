@@ -5,6 +5,8 @@ import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
+import { YulaQuestionnaireCard } from "@/components/layout/yula-questionnaire-card";
+import { YulaJobStartedCard } from "@/components/layout/yula-job-started-card";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import {
   yulaToolPartInfo,
@@ -29,13 +31,18 @@ const SCREEN_TOOLS = new Set([
   "reset_grid_layout",
   "export_grid_data",
   "set_grid_query",
-  "run_report",
   "run_job",
   "apply_criteria",
   "navigate_to_page",
   "open_last_report",
+  "find_matching_report",
   "visualize_grid_data",
 ]);
+
+function formatTokenCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return `${n}`;
+}
 
 function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
   const pending = toolParts.find(
@@ -50,6 +57,8 @@ function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
       return "SQL sorgusu çalışıyor…";
     case "visualize_grid_data":
       return "Grafik hazırlanıyor…";
+    case "ask_user_question":
+      return "Sorular hazırlanıyor…";
     case "filter_current_grid":
     case "apply_grid_filters":
       return "Filtre uygulanıyor…";
@@ -116,6 +125,11 @@ export interface YulaChatTurnProps {
   isLive?: boolean;
   durationSec?: number;
   llmStepCount?: number;
+  tokenUsage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
   recoveredToolCallIds?: Set<string>;
   onUndo?: (text: string) => void;
   /** Worker izleri yalnız aktif turda */
@@ -128,6 +142,7 @@ export function YulaChatTurn({
   isLive = false,
   durationSec,
   llmStepCount,
+  tokenUsage,
   recoveredToolCallIds = new Set(),
   onUndo,
   conversationId,
@@ -179,8 +194,7 @@ export function YulaChatTurn({
     return assistantMessage.parts
       .map((p) => yulaToolPartInfo(p))
       .filter(
-        (info): info is NonNullable<typeof info> =>
-          info !== null && info.toolName !== "prepare_report_criteria"
+        (info): info is NonNullable<typeof info> => info !== null
       );
   }, [assistantMessage]);
 
@@ -324,6 +338,33 @@ export function YulaChatTurn({
               info.state === "output-available" ? (
                 <YulaChartCard output={info.output} />
               ) : null}
+              {info.toolName === "ask_user_question" &&
+              !isError &&
+              (info.state === "output-available" ||
+                info.state === "input-available") ? (
+                <YulaQuestionnaireCard
+                  messageId={assistantMessage?.id}
+                  input={info.input}
+                  output={info.state === "output-available" ? info.output : undefined}
+                />
+              ) : null}
+              {info.toolName === "run_job" &&
+              !isError &&
+              info.state === "output-available" &&
+              typeof info.output === "object" &&
+              info.output !== null &&
+              (info.output as { status?: unknown }).status === "executed" &&
+              typeof (info.output as { navigateTo?: unknown }).navigateTo ===
+                "string" ? (
+                <YulaJobStartedCard
+                  jobId={
+                    typeof (info.output as { jobId?: unknown }).jobId === "string"
+                      ? (info.output as { jobId: string }).jobId
+                      : undefined
+                  }
+                  navigateTo={(info.output as { navigateTo: string }).navigateTo}
+                />
+              ) : null}
             </React.Fragment>
           );
         })}
@@ -355,6 +396,7 @@ export function YulaChatTurn({
         {!isLive && durationSec ? (
           <div className="mt-0.5 flex justify-end text-[10.5px] font-mono text-muted-foreground/40 select-none">
             {llmStepCount && llmStepCount > 1 ? `${llmStepCount} tur · ` : ""}
+            {tokenUsage?.totalTokens ? `${formatTokenCount(tokenUsage.totalTokens)} tok · ` : ""}
             {durationSec}s
           </div>
         ) : null}

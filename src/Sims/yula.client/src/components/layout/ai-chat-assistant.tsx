@@ -25,7 +25,7 @@ import {
 import { useChatsStore } from "@/lib/stores/chats"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
-import { useYulaChat, useYulaChatOrNull } from "@/hooks/use-yula-chat"
+import { useYulaChat, useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { yulaToolPartInfo } from "@/lib/yula-tool-info"
 import type { YulaMessage } from "@/app/api/agent/chat/route"
 import { formatPathnameLabel, isWorkspaceHomePath, workspaceIdFromPath, workspaceLabelFromPath, extractJobIdFromHref, extractJobIdFromPath, isReportResultPath } from "@/lib/workspace-paths"
@@ -68,7 +68,7 @@ export function AIChatAssistant({
   // Araç çubuğu uygulama kabuğunda yaşar; oturum henüz hazır değilken de
   // render edilir. newConversation yalnız tıklamada çağrılır — o ana kadar
   // oturum çoktan hazırdır, yine de null-güvenli tutulur.
-  const { newConversation } = useYulaChatOrNull() ?? {}
+  const { newConversation } = useOptionalYulaChat() ?? {}
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname)
   const toolbarRef = React.useRef<HTMLDivElement>(null)
@@ -253,7 +253,7 @@ function ChatSessionFallback() {
 
 /** Docked or main screen panel body — avatar-free chat box with attach + slash commands. */
 export function AIChatPanel(props: AIChatPanelProps = {}) {
-  const session = useYulaChatOrNull()
+  const session = useOptionalYulaChat()
   if (!session) {
     return <ChatSessionFallback />
   }
@@ -918,6 +918,7 @@ function AIChatPanelSession({
                       isLive={isLiveTurn}
                       durationSec={durationSec}
                       llmStepCount={llmStepCount}
+                      tokenUsage={turn.assistantMessage?.metadata?.usage}
                       recoveredToolCallIds={recoveredToolCallIds}
                       onUndo={handleUndo}
                       conversationId={

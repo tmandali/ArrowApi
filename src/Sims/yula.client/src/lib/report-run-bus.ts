@@ -1,10 +1,11 @@
 /**
  * Rapor çalıştırma otobüsü: kriter ekranı sahibi (örn. ReportCriteriaShell) aktif raporun
- * "Çalıştır" akışını buraya kaydeder; jenerik run_report aracı bunu tetikler.
+ * "Çalıştır" akışını buraya kaydeder; jenerik run_job aracı bunu tetikler.
  * Böylece rapor başına araç yazmak yerine TEK jenerik araç yeterlidir.
  */
 
 import type { ArrowJobStatus } from "@/features/jobs/types"
+import { createAiChannel } from "@/lib/ai-channel"
 
 export { reportExecutionHref } from "@/lib/workspace-paths"
 
@@ -42,35 +43,27 @@ export type ExecutionJobFocus = {
   request?: Record<string, unknown>
 }
 
-let pendingExecutionFocus: ExecutionJobFocus | null = null
+const executionFocusChannel = createAiChannel<ExecutionJobFocus>({
+  name: EXECUTION_FOCUS_EVENT,
+  scopeOf: (focus) => norm(focus.scope),
+})
 
 /** Yeni job'ı execution ekranında seçili/çalışır durumda göstermek için kuyruğa alır. */
 export function focusReportExecution(focus: ExecutionJobFocus): void {
-  pendingExecutionFocus = focus
-  if (typeof window === "undefined") return
-  window.dispatchEvent(new CustomEvent(EXECUTION_FOCUS_EVENT, { detail: focus }))
+  executionFocusChannel.request(focus)
 }
 
 export function takePendingExecutionFocus(scope: string): ExecutionJobFocus | null {
-  if (!pendingExecutionFocus) return null
-  if (norm(pendingExecutionFocus.scope) !== norm(scope)) return null
-  const next = pendingExecutionFocus
-  pendingExecutionFocus = null
-  return next
+  return executionFocusChannel.take(norm(scope))
 }
 
 export function subscribeExecutionFocus(
   scope: string,
   handler: (focus: ExecutionJobFocus) => void,
 ): () => void {
-  if (typeof window === "undefined") return () => {}
-  const onEvent = (event: Event) => {
-    const detail = (event as CustomEvent<ExecutionJobFocus>).detail
-    if (!detail?.job?.id) return
-    if (norm(detail.scope) !== norm(scope)) return
-    pendingExecutionFocus = null
-    handler(detail)
-  }
-  window.addEventListener(EXECUTION_FOCUS_EVENT, onEvent)
-  return () => window.removeEventListener(EXECUTION_FOCUS_EVENT, onEvent)
+  return executionFocusChannel.subscribe((focus) => {
+    if (!focus?.job?.id) return
+    if (norm(focus.scope) !== norm(scope)) return
+    handler(focus)
+  })
 }

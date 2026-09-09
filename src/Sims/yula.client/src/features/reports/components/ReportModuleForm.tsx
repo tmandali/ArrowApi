@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { Ban, FileText, Loader2, Table2, Trash2 } from "lucide-react"
-import { useArrowJobRunner, type ArrowJobStatus } from "@/features/jobs"
+import { sameJobId, useArrowJobRunner, type ArrowJobStatus } from "@/features/jobs"
 import {
   selectPendingJobByName,
   type TrackedJob,
@@ -117,6 +118,28 @@ export function ReportModuleForm({
     },
     [setComposing, handleSelectJob]
   )
+
+  // ?jobId= ile gelinirse satır tıklamasıyla BİREBİR aynı yol işletilir
+  // (compose kapat + result görünümü + seç). Query başına tek atış; kullanıcı
+  // başka satıra geçerse geri çekilmez.
+  const searchParams = useSearchParams()
+  const queryJobId = searchParams.get("jobId") || searchParams.get("job")
+  const autoQuerySelectRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!queryJobId) return
+    if (
+      autoQuerySelectRef.current &&
+      sameJobId(autoQuerySelectRef.current, queryJobId)
+    ) {
+      return
+    }
+    if (sameJobId(activeJobId, queryJobId)) {
+      autoQuerySelectRef.current = queryJobId
+      return
+    }
+    autoQuerySelectRef.current = queryJobId
+    handleJobSelect(queryJobId)
+  }, [queryJobId, activeJobId, handleJobSelect])
 
   const handleExitCompose = React.useCallback(() => {
     setComposing(false)

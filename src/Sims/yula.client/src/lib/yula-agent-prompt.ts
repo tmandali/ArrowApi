@@ -54,12 +54,20 @@ export interface YulaScreenContext {
   screen?: import("@/lib/stores/grid").YulaScreenRegistration | null;
   /** WASM + All-MiniLM RAG Vektör arama sonuçları */
   ragContext?: YulaRagContextItem[];
+  /** İstemcinin her tur gönderdiği canlı ekran snapshot'ı */
+  screenState?: import("./screen-snapshot").ScreenSnapshot | null;
+  /** Önceki turdan beri ekrandaki yapısal farklar (boşsa değişim yok) */
+  screenDiff?: string[];
+  /** Ekran-bazlı durum sözlüğü: state alanı → anlamı (ekran kendini tarif eder) */
+  stateLegend?: Record<string, string>;
 }
 
 import {
-  REGISTERED_REPORTS as DEMO_REPORTS,
+  REGISTERED_REPORTS,
   findReport,
 } from "@/features/reports/report-registry";
+import { readReportAiMetadata } from "@/lib/report-ai-metadata";
+import { parseCriteriaSchema } from "@/features/report-criteria/lib/parse-criteria-schema";
 import {
   isWorkspaceHomePath,
   workspaceIdFromPath,
@@ -73,30 +81,35 @@ const BASE_PROMPT = [
   "Provide concise, accurate, and actionable responses. Use Markdown formatting when helpful.",
   "",
   "LANGUAGE DIRECTIVE:",
-  "• You MUST write all user-facing conversational answers, findings, and explanations strictly in natural, professional TURKISH (Türkçe).",
-  "• CHAT BUBBLE BUDGET (narrow dock): Keep user-visible replies SHORT. Prefer 1–3 short sentences, then at most 4 titled bullets. Do not write essays, first-person plans ('hesaplarım', 'analiz ederim', 'görselleştiririm'), or restating the user's request.",
+  "• Always write user-facing conversational answers, findings, and explanations in the user's active language (mirror the language of their latest message). Never force a single response language.",
+  "• CHAT BUBBLE BUDGET (narrow dock): Keep user-visible replies SHORT. Prefer 1–3 short sentences, then at most 4 titled bullets. Do not write essays, first-person plans, or restatements of the user's request.",
   "",
   "TOOL EXECUTION PRINCIPLES:",
-  "• Greeting, thanks, or small talk (e.g. merhaba, selam, nasılsın): reply in Turkish immediately. Do not call any tool.",
+  "• Greeting, thanks, or small talk: reply in the user's language immediately. Do not call any tool.",
   "• The tools provided in each turn represent your complete capabilities for the active screen. Use them whenever an action or data query is requested.",
-  "• Do NOT announce tool execution in conversational text (e.g. avoid 'Starting query now...'). Call the tool; after results, answer in Turkish.",
+  "• Do NOT announce tool execution in conversational text. Call the tool; after results, answer in the user's language.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
   "",
   "RECOMMENDATIONS & NEXT STEPS FORMATTING PROTOCOL:",
   "• When suggesting next steps or recommendations (e.g. 'İsterseniz şunları yapabilirim:'), NEVER output plain sentence fragments, orphaned sub-bullets, or multi-level indented lists without titles.",
-  "• ALWAYS format EVERY suggestion as a single-level bold-titled bullet: '• **<Kısa Başlık>**: <en fazla ~8 kelime>'.",
-  "• Title: max ~40 characters, imperative or noun phrase (e.g. 'Depo dağılımı', 'Grafik ile göster'). Description: one short clause, third person / impersonal — NOT '…çıkarırım / hesaplarım'.",
-  "• Examples:",
-  "  - '• **Boş partileri listele**: Parti numarası boş satırlar.'",
-  "  - '• **Depo dağılımı**: Depo bazında Qty toplamı.'",
-  "  - '• **Grafik**: Depo çubuk grafik.'",
+  "• ALWAYS format EVERY suggestion as a single-level bold-titled bullet: '• **<Short Title>**: <max ~8 words>'.",
+  "• Title: max ~40 characters, imperative or noun phrase (e.g. 'Branch summary', 'Show as chart'). Description: one short clause, third person / impersonal.",
+  "• Examples (format only — never reuse these domain words):",
+  "  - '• **List empty batches**: rows with an empty batch number.'",
+  "  - '• **Branch summary**: totals grouped by branch.'",
+  "  - '• **Chart**: branch bar chart.'",
   "",
   "HUMAN-IN-THE-LOOP (HITL) CONFIRMATION:",
   "• For destructive, bulk-modifying, or critical operations, use 'request_user_confirmation' before proceeding.",
+  "• STRUCTURED QUESTIONS: when information is missing or ambiguous (incomplete criteria, unclear date range, fork in the road), call 'ask_user_question' with at most 3 questions instead of a plain-text question.",
+  "• Question texts must be in the user's language; each question always shows a freeform answer field.",
+  "• If the user skips a required question, continue with its defaultValue — never ask the same question again.",
+  "• Single destructive-operation approvals still use 'request_user_confirmation'.",
+  "• After run_job returns executed, write one short success line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically, do not paste job IDs or URLs.",
 ].join("\n");
 
-const REPORTS_DIGEST_LINES = DEMO_REPORTS.map((r) => {
+const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
   const fields = Object.entries(r.criteriaSchema.properties)
     .map(
       ([key, prop]) =>
@@ -126,9 +139,9 @@ const GRID_PRESENT_RULES = [
 
 const GRID_ABSENT_RULES = [
   "REPORT CATALOG & NAVIGATION:",
-  "• When the user names a report or says 'hazırla' without an explicit run verb (e.g. 'Stok Bakiye Raporu', 'stok bakiyesi hazırla'), call navigate_to_page to the report criteria screen — do NOT call run_report/run_job yet.",
-  "• Only call run_report/run_job when the user explicitly says çalıştır / calistir / run / execute / job başlat (e.g. 'raporu çalıştır', 'geçen hafta için çalıştır').",
-  "• After run_report/run_job the client opens the report EXECUTION screen and selects the new running job — do not tell the user a GUID results table opened.",
+  "• When the user names a report or says 'hazırla' without an explicit run verb (e.g. 'Stok Bakiye Raporu', 'stok bakiyesi hazırla'), call navigate_to_page to the report criteria screen — do NOT call run_job yet.",
+  "• Only call run_job when the user explicitly says çalıştır / calistir / run / execute / job başlat (e.g. 'raporu çalıştır', 'geçen hafta için çalıştır').",
+  "• After run_job the client opens the report EXECUTION screen and selects the new running job — do not tell the user a GUID results table opened.",
   "• Incomplete criteria fragments alone (e.g. 'geçen hafta', 'dün', 'AKTIF') are NOT actions — suggest options; do not fill the form or start a job.",
   "• Available reports in catalog:",
   REPORTS_DIGEST_LINES,
@@ -155,16 +168,11 @@ const DATA_QUALITY_ANALYSIS_RULES = [
   "DATA QUALITY, ANOMALY DETECTION & /ANALIZ PROTOCOL:",
   "• When the user triggers '/analiz', asks to inspect data problems, or requests table anomaly analysis:",
   "  1. Call profile_grid_table FIRST to inspect null counts, distinct values, min/max metrics, and anomalies across all columns.",
-  "  2. Provide a structured, clean Turkish summary with 2 main sections:",
-  "     - 📊 **Genel Tablo Özeti**: Toplam satır sayısı, özet metrikler ve genel veri sağlığı değerlendirmesi.",
-  "     - ⚠️ **Tespit Edilen Veri Problemleri**: En fazla 4 madde; her madde '• **Kısa Başlık**: kısa sonuç' (ör. '• **Negatif Qty**: 4 satır.').",
-  "  3. Standard bulleted finding formats (simple filters & complex SQL-level anomalies):",
-  "     - '• **Negatif Stok Miktarları (Quantity < 0)**: Tabloda 4 satırda negatif miktar tespit edildi.'",
-  "     - '• **Boş Ambar Kodları (Warehouse boş)**: 12 satırda ambar tanımı eksik (NULL).'",
-  "     - '• **Sıfır Birim Fiyatlı Kayıtlar (UnitPrice = 0)**: 5 satırda birim fiyat girilmemiş.'",
-  "     - '• **Mükerrer Ürün Kayıtları (ItemCode tekrar edenler)**: Birden fazla ambarda aynı kodla mükerrer açılmış kayıtlar mevcut.'",
-  "     - '• **Yüksek Değerli Stok Anomalileri (Quantity * UnitPrice > 100.000)**: Aşırı yüksek bakiye tutarına sahip uç kayıtlar.'",
-  "     - '• **Depo Bazında Negatif Dağılım (Warehouse gruplu)**: Toplam miktarı eksiye düşen ambarlar tespit edildi.'",
+  "  2. Verify borderline findings with run_expert_sql before reporting them as facts; report only what the data confirms.",
+  "  3. Provide a structured summary in the user's language with 2 main sections:",
+  "     - 📊 Overview: total row count, summary metrics, overall data health assessment.",
+  "     - ⚠️ Detected Data Issues: at most 4 items, each as a clickable bold bullet '• **Short Title**: one-line result'.",
+  "  4. GROUNDING: use ONLY the actual column names from the grid context above. Never invent column names from examples — every finding must reference a real column (with the filter or SQL expression in parentheses).",
 ].join("\n");
 
 /** Hücre değerini prompt-uyumlu kısaltır (uzun metinler bağlamı şişirmesin). */
@@ -235,7 +243,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     `• Current Local Date: ${todayStr} (Use for expanding relative date terms like bugün, dün, bu ay)`,
     `• Execution Mode: ${mode === "main" ? "MAIN SCREEN MODE (Full-Screen AI Workspace)" : "SIDE DOCK MODE (Page Copilot Panel)"}`,
     `• Main Mode Rule: In MAIN SCREEN MODE, navigate to the requested report/page promptly. Do not start jobs or fill criteria forms until the user explicitly confirms (apply) or says çalıştır/run.`,
-    `• Language Rule: Generate all conversational text strictly in natural TURKISH. Keep it short so the chat transcript stays readable in the dock.`,
+    `• Language Rule: Always respond in the user's active language (mirror the language of their latest message). Keep it short so the chat transcript stays readable in the dock. Never force a single response language.`,
     "",
     "=== LEVEL 2: WORKSPACE SCOPE ===",
     `• Active Workspace: ${wsLabel} (ID: ${wsId})`,
@@ -246,24 +254,24 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     `• Screen Phase: ${phase.toUpperCase()} (${phase === "results" ? "Active Job Data Table Open" : phase === "results-loading" ? "Table Loading" : "Criteria / Form / Home Workspace"})`,
     jobId ? `• Active Job Id (GUID): ${jobId}` : "• Active Job Id: none (criteria / catalog screen)",
     "• PHASE WALL (do not mix these jobs):",
-    "  - RESULTS (URL has a job GUID or ?job= and the table is loaded): Analyze ONLY the open table. Never call run_job, run_report, apply_criteria, or prepare_report_criteria. Never offer to start a new report job.",
+    "  - RESULTS (URL has a job GUID or ?job= and the table is loaded): Analyze ONLY the open table. Never call run_job or apply_criteria. Never offer to start a new report job.",
     "  - WORKSPACE / CRITERIA (no selected job): User is filling criteria to CREATE a job. Never filter/analyze a grid as if results were open. Use apply_criteria / run_job / get_report_schema only.",
     "  - RESULTS-LOADING: Table not ready. Do not call grid or run_job tools; tell the user to wait.",
     "• APPLICATION IN-APP NAVIGATION (navigate_to_page):",
-    "  - Uygulama içi istemci yönlendirmesi için 'navigate_to_page' aracına sahipsin.",
-    "  - MEVCUT RAPOR JOB'I GÖRÜNTÜLEME ('son çalışan raporu aç', 'son sonuçlar', 'en son job', 'önceki raporu göster'): YENİ JOB BAŞLATMA — 'open_last_report' aracını çağır. 'run_report'/'run_job' yalnız YENİ ÇALIŞTIRMA niyeti içindir.",
-    "  - Standart Rotalar:",
-    "    • Stok Bakiye Raporu (execution): '/stock/stock-balance'",
-    "    • Stok Analiz Raporu (execution): '/stock/stock-analytics'",
-    "    • Stok Ana Sayfa / Modülü: '/stock'",
-    "    • Muhasebe Modülü: '/accounting'",
-    "    • Satış Modülü: '/selling'",
-    "    • Üretim Modülü: '/manufacturing'",
-    "  - KULLANICI BAŞKA BİR EKRANDAYKEN (Current Page Path hedef rota ile eşleşmiyorsa):",
-    "    • Kullanıcı 'stok bakiye', 'stok raporu', 'stok analiz', 'muhasebeye git' gibi bir rapor veya modül istediğinde:",
-    "      1. DERHAL 'navigate_to_page' aracını ilgili path ve title ile çağır (örn: path: '/stock/stock-balance', title: 'Stok Bakiye Raporu').",
-    "      2. Yanıtında kullanıcıya sayfaya yönlendirildiğini, açılan ekranda kriterleri belirleyip 'Run' ile çalıştırabileceğini belirt.",
-    "      3. Yanıtında [Stok Bakiye Raporu](/stock/stock-balance) linkini de sun.",
+    "  - You have the 'navigate_to_page' tool for in-app client navigation.",
+    "  - VIEWING AN EXISTING REPORT JOB ('son çalışan raporu aç', 'son sonuçlar', 'en son job', 'önceki raporu göster'): do NOT start a new job — call 'open_last_report'. 'run_job' is only for NEW execution intent.",
+    "  - Standard Routes:",
+    "    • Stock Balance Report (execution): '/stock/stock-balance'",
+    "    • Stock Analytics Report (execution): '/stock/stock-analytics'",
+    "    • Stock Home / Module: '/stock'",
+    "    • Accounting Module: '/accounting'",
+    "    • Sales Module: '/selling'",
+    "    • Manufacturing Module: '/manufacturing'",
+    "  - WHEN THE USER IS ON ANOTHER SCREEN (Current Page Path does not match the target route):",
+    "    • When the user requests a report or module ('stok bakiye', 'stok raporu', 'stok analiz', 'muhasebeye git'):",
+    "      1. IMMEDIATELY call the 'navigate_to_page' tool with the relevant path and title (e.g. path: '/stock/stock-balance', title: 'Stok Bakiye Raporu').",
+    "      2. In your reply, tell the user they were redirected and can set criteria on the opened screen and run it with 'Run'.",
+    "      3. Also include the [Stok Bakiye Raporu](/stock/stock-balance) link in your reply.",
   );
 
   if (phase === "results-loading") {
@@ -272,41 +280,153 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     );
   }
 
+  // Canlı ekran zemini: istemci her tur snapshot gönderir — model alet
+  // çağırmadan güncel formu, seçili işi ve filtreleri görür.
+  // FIELD GUIDE (evrensel, ekran bağımsız): state alanları ne demek.
+  lines.push(
+    "SCREEN STATE FIELD GUIDE:",
+    "• scope = active screen/report id; criteria = live form draft (key = schema field);",
+    "• focusedJob = currently selected execution (shortId + status); executions = recent jobs, newest first;",
+    "• gridFilters = active table filters; custom = screen-defined extra values (see legend).",
+  );
+  const screenLegend = context?.stateLegend;
+  if (screenLegend && Object.keys(screenLegend).length > 0) {
+    lines.push(
+      "SCREEN LEGEND (this screen defines its own fields):",
+      ...Object.entries(screenLegend).map(([k, v]) => `• ${k}: ${v}`),
+    );
+  }
+  // Kriter anahtar → başlık eşlemesi (digest varsa): ham anahtarlar anlam kazanır.
+  const digestTitles = new Map<string, string>();
+  const digest = context?.screen?.criteriaDigest;
+  if (Array.isArray(digest)) {
+    for (const entry of digest) {
+      if (
+        entry &&
+        typeof entry === "object" &&
+        typeof (entry as Record<string, unknown>).key === "string"
+      ) {
+        const rec = entry as Record<string, unknown>;
+        const title =
+          typeof rec.title === "string" && rec.title ? rec.title : String(rec.key);
+        digestTitles.set(String(rec.key), title);
+      }
+    }
+  }
+  const liveState = context?.screenState;
+  if (liveState && typeof liveState === "object") {
+    const bits: string[] = [];
+    if (liveState.scope) bits.push(`scope=${liveState.scope}`);
+    if (liveState.phase) bits.push(`phase=${liveState.phase}`);
+    if (liveState.criteria && Object.keys(liveState.criteria).length > 0) {
+      bits.push(
+        `criteria={${Object.entries(liveState.criteria)
+          .map(([k, v]) => {
+            const title = digestTitles.get(k);
+            return title && title !== k ? `${k} ("${title}"): "${v}"` : `${k}: "${v}"`;
+          })
+          .join(", ")}}`,
+      );
+    }
+    if (liveState.focusedJob) {
+      bits.push(`focusedJob=${liveState.focusedJob.id}(${liveState.focusedJob.status})`);
+    }
+    if (liveState.executions && liveState.executions.length > 0) {
+      bits.push(
+        `executions=[${liveState.executions.map((e) => `${e.id}(${e.status})`).join(", ")}]`,
+      );
+    }
+    if (liveState.gridFilters && Object.keys(liveState.gridFilters).length > 0) {
+      bits.push(
+        `gridFilters={${Object.entries(liveState.gridFilters).map(([k, v]) => `${k}: "${v}"`).join(", ")}}`,
+      );
+    }
+    if (liveState.custom && Object.keys(liveState.custom).length > 0) {
+      bits.push(
+        `custom={${Object.entries(liveState.custom).map(([k, v]) => `${k}: "${v}"`).join(", ")}}`,
+      );
+    }
+    if (bits.length > 0) {
+      lines.push(`LIVE SCREEN STATE: ${bits.join(" · ")}`);
+    }
+  }
+  if (context?.screenDiff && context.screenDiff.length > 0) {
+    lines.push(
+      "SINCE LAST TURN (user changed the screen):",
+      ...context.screenDiff.map((d) => `• ${d}`),
+    );
+  }
+
   const activeReportMeta =
-    DEMO_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
+    REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
     (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
 
   if (activeReportMeta && phase === "workspace") {
     const reportTitle = activeReportMeta.title;
     const scope = activeReportMeta.scope;
+    // Tier-2 suggestion chips are built from THIS report's real schema fields
+    // (never hardcoded field names): date field → last-7-days range chip,
+    // first enum field → first-option chip.
+    const chipFields = parseCriteriaSchema(activeReportMeta.fullSchema).fields;
+    const chipDateKey = chipFields.find(
+      (f) => f.format === "date" || Boolean(f.rangeSplit),
+    )?.key;
+    const chipEnumField = chipFields.find(
+      (f) => (f.enumValues ?? []).length > 0,
+    );
+    const weekAgoStr = (() => {
+      const d = new Date(`${todayStr}T00:00:00Z`);
+      if (Number.isNaN(d.getTime())) return todayStr;
+      d.setUTCDate(d.getUTCDate() - 7);
+      return d.toISOString().slice(0, 10);
+    })();
+    const chipLines =
+      chipDateKey && chipEnumField && (chipEnumField.enumValues ?? []).length > 0
+        ? [
+            `       • [Last 7 days](yula-criteria:${scope}?${chipDateKey}=${weekAgoStr}..${todayStr})`,
+            `       • [${chipEnumField.title}: ${(chipEnumField.enumValues ?? [])[0]}](yula-criteria:${scope}?${chipDateKey}=${weekAgoStr}..${todayStr}&${chipEnumField.key}=${encodeURIComponent((chipEnumField.enumValues ?? [])[0])})`,
+          ]
+        : chipDateKey
+          ? [
+              `       • [Last 7 days](yula-criteria:${scope}?${chipDateKey}=${weekAgoStr}..${todayStr})`,
+              `       • [Today](yula-criteria:${scope}?${chipDateKey}=${todayStr})`,
+            ]
+          : [];
     lines.push(
       "",
       `=== REPORT CRITERIA & EXECUTION SCREEN: ${reportTitle.toUpperCase()} (${activeReportMeta.pagePath}) ===`,
-      `• Bu ekran ${reportTitle} ana çalıştırma ve kriter ekranıdır (önceki çalıştırmalar ve kriter formu listelenir).`,
-      `• Aktif Rapor Scope: '${scope}'`,
-      "• Ekranda Kayıtlı Araçlar: 'validate_criteria_input', 'get_current_criteria', 'apply_criteria', 'run_job', 'get_report_schema', 'list_report_executions', 'cancel_job'.",
-      "• KRİTER DENETİMİ & DOĞRULAMA (Criteria Input Engine):",
-      "  - Kullanıcı ekrandaki formu sorduysa ('kriterleri kontrol et', 'formda ne var?', 'hatalı alan var mı?'): 'get_current_criteria' aracını çağır.",
-      "  - Kullanıcı yeni kriterler verip doğruluk kontrolü istediyse ('MERKEZ* geçerli mi?', 'tarih 10..20 olur mu?', 'kriterleri doğrula'): 'validate_criteria_input' aracını çağır.",
-      "  - Doğrulama sonuçlarını kullanıcıya açık ve profesyonel Türkçe ile sun (✅ Geçerli Alanlar, ❌ Hatalar, ⚠️ Uyarılar, 💡 Düzeltme Önerileri).",
-      "• İŞ YAŞAM DÖNGÜSÜ:",
-      "  - Kullanıcı geçmiş işleri sorduğunda ('hangi raporlar çalıştı', 'önceki çalıştırmalar'): 'list_report_executions' çağır.",
-      "  - Kullanıcı çalışan işi iptal etmek istediğinde ('işi durdur', 'iptal et'): 'cancel_job' çağır.",
-      "• KRİTER FORMU DOLDURMA VE ÇALIŞTIRMA PROTOKOLÜ (3 Kademe):",
-      "  1. AÇIK DOLDURMA / GÜNCELLEME / DÜZENLEME TALİMATI (apply_criteria ÇAĞIR):",
-      "     - Kullanıcı kriterleri doldurmayı, güncellemeyi veya ayarlamayı açıkça istiyorsa (ör. 'kriterleri geçen haftaya göre düzenle', 'kriterleri doldur', 'forma yaz', 'tarihi geçen ay yap', 'kriterleri ayarla', '1. öneriyi uygula', 'dünü seç', 'güncelle', 'update criteria to last week', 'set date to yesterday'):",
-      `     - Bu bir eksik niyet DEĞİLDİR, açık bir form doldurma talimatıdır. DERHAL 'apply_criteria' aracını report: '${scope}' ve uygun criteria nesnesi ile ÇAĞIR.`,
-      "     - Form ekranda güncellenir ve vurgulanır. Job BAŞLATMA; kullanıcıya kriterlerin forma yazıldığını ve 'Run' (Çalıştır) butonuyla raporu çalıştırabileceğini belirt.",
-      "  2. YALNIZCA ÇIPLAK DEĞER / EKSİK NİYET (Hiçbir eylem veya fiil yoksa; ör. kullanıcı SADECE tek başına 'geçen hafta', 'dün', 'AKTIF' veya 'ne önerirsin' yazdıysa):",
-      "     - Eylem fiili olmadığı için formu doldurma ve job başlatma.",
-      "     - 1-2 somut yula-criteria öneri chip'i sun:",
-      `       • [Öneri 1: Dün İtibarıyla Aktif Kayıtlar](yula-criteria:${scope}?kayitTarihi=dun&durum=AKTIF)`,
-      `       • [Öneri 2: Geçen Hafta](yula-criteria:${scope}?kayitTarihi=gecen_hafta)`,
-      "     - Chip tıklanınca form dolar; kullanıcı 'Run' ile kendisi çalıştırır.",
-      "  3. AÇIK ÇALIŞTIRMA TALİMATI (run_job ÇAĞIR):",
-      "     - Yalnız açık çalıştırma fiillerinde: çalıştır, calistir, run, execute, start, launch, job başlat (ör. 'raporu çalıştır', 'geçen hafta için çalıştır'):",
-      `     - 'run_job' aracını report: '${scope}' ve criteria ile ÇAĞIR.`,
-      "     - 'hazırla' / 'göster' / 'getir' çalıştırma değildir; job başlatma.",
+      `• This screen is the main run and criteria screen for ${reportTitle} (lists past executions and the criteria form).`,
+      `• Active Report Scope: '${scope}'`,
+      "• Registered Screen Tools: 'validate_criteria_input', 'get_current_criteria', 'apply_criteria', 'run_job', 'find_matching_report', 'open_last_report', 'get_report_schema', 'list_report_executions', 'cancel_job'.",
+      "• INTENT ROUTING (first extract scope + criteria, then pick exactly one tool):",
+      "  - Prepare-type requests ('hazırla', 'prepare', 'same criteria'): NEVER ask the user whether to proceed. Chain: 1) read the live draft with 'get_current_criteria', 2) merge user values over draft values, 3) call 'find_matching_report' with the merged set. On 'matched/running' open via navigateTo; on 'no_match' fill the form via 'apply_criteria' and present the run confirmation bullet; on 'needs_criteria' ask only for the missing field.",
+      "  - Latest job regardless of criteria ('son raporu aç', 'son sonuçlar'): call 'open_last_report'.",
+      "  - New execution intent ('çalıştır', 'run', 'execute'): call 'run_job'.",
+      "  - If 'find_matching_report' returns 'matched/running', open via navigateTo; on 'no_match' do not call 'run_job' without confirmation; on 'needs_criteria' ask for the missing field.",
+      "• CRITERIA VERIFICATION (Criteria Input Engine):",
+      "  - If the user asks about the on-screen form ('kriterleri kontrol et', 'formda ne var?', 'hatalı alan var mı?'): call 'get_current_criteria'.",
+      "  - If the user provides new criteria and asks about validity ('MERKEZ* geçerli mi?', 'tarih 10..20 olur mu?', 'kriterleri doğrula'): call 'validate_criteria_input'.",
+      "  - Present verification results in the user's language with clear sections (valid fields, errors, warnings, fix suggestions).",
+      "• JOB LIFECYCLE:",
+      "  - When the user asks about past jobs ('hangi raporlar çalıştı', 'önceki çalıştırmalar'): call 'list_report_executions'.",
+      "  - When the user wants to cancel a running job ('işi durdur', 'iptal et'): call 'cancel_job'.",
+      "• CRITERIA FILL AND RUN PROTOCOL (3 tiers):",
+      "  1. EXPLICIT FILL / UPDATE / EDIT INSTRUCTION (call apply_criteria):",
+      "     - When the user explicitly asks to fill, update, or adjust criteria (e.g. 'kriterleri geçen haftaya göre düzenle', 'kriterleri doldur', 'forma yaz', 'tarihi geçen ay yap', 'kriterleri ayarla', '1. öneriyi uygula', 'dünü seç', 'güncelle', 'update criteria to last week', 'set date to yesterday'):",
+      `     - This is NOT an incomplete intent; it is an explicit form-fill instruction. First read the live draft with 'get_current_criteria', merge the requested change while preserving values the user already set, then IMMEDIATELY call 'apply_criteria' with report: '${scope}' and the COMPLETE merged criteria object (all required schema fields included).`,
+      "     - The form is updated and highlighted on screen. If the tool output lists 'missingRequired', ask the user explicitly for those fields (name each field with an example value). Only point to the 'Run' button when nothing is missing.",
+      "  2. BARE VALUE ONLY / INCOMPLETE INTENT (no action verb at all; e.g. the user typed only 'geçen hafta', 'dün', 'AKTIF' or 'ne önerirsin' alone):",
+      "     - With no action verb, do not fill the form and do not start a job.",
+      "     - Offer 1-2 concrete yula-criteria suggestion chips built from this report's real criteria fields:",
+      ...chipLines,
+      "     - Clicking a chip fills the form; the user runs it with 'Run'.",
+      "  3. EXPLICIT RUN INSTRUCTION (call run_job):",
+      "     - Only on explicit run verbs: çalıştır, calistir, run, execute, start, launch, job başlat (e.g. 'raporu çalıştır', 'geçen hafta için çalıştır'):",
+      `     - Call the 'run_job' tool with report: '${scope}' and criteria.`,
+      "     - 'hazırla' / 'göster' / 'getir' are not run verbs; do not start a job.",
+      "  - RUN CONFIRMATION FORMAT: when criteria are ready and you need the user's go-ahead, present the confirmation as a separate bold bullet on its own line (e.g. '• **Raporu çalıştır**'). Bold bullets are clickable and send the text back as a new user message. Never bury the confirmation inside a body sentence.",
+      "  - AFTER run_job: 'executed' means the job was ACCEPTED AND QUEUED, not completed. Never claim success, loaded results, or 'no error'. Say the job is queued and point to the execution screen for live progress.",
+      "  - If the user reports a failure, do not contradict them: check 'list_report_executions' for the job status and read the 'Failed' error text (or ask for the execution panel error) before responding.",
     );
   }
 
@@ -314,6 +434,33 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     lines.push(GRID_PRESENT_RULES);
     lines.push(SQL_EXPERT_RULES);
     lines.push(DATA_QUALITY_ANALYSIS_RULES);
+    const playbookScope =
+      context?.screen?.reportScope ??
+      (context?.screen as { activeReportScope?: string } | null | undefined)
+        ?.activeReportScope;
+    const playbookMeta = playbookScope ? findReport(playbookScope) : undefined;
+    const playbookTopics = playbookMeta
+      ? readReportAiMetadata(playbookMeta.fullSchema).analysisTopics
+      : undefined;
+    if (playbookTopics && playbookTopics.length > 0) {
+      lines.push(
+        `DOMAIN ANALYSIS PLAYBOOK (${playbookMeta?.title ?? playbookScope}):`,
+        ...playbookTopics.map(
+          (t) =>
+            `• [${t.id}] ${t.title}: ${t.goal} (tool: ${t.tool}${t.columns?.length ? `, columns: ${t.columns.join(", ")}` : ""}${t.followUp ? `; next: ${t.followUp}` : ""})`,
+        ),
+        "ITERATIVE ANALYSIS PROTOCOL (not one-shot):",
+        "• First call profile_grid_table, then offer 2-3 topics as clickable bold bullets — prefer playbook topics matching observed signals, then data-driven signals.",
+        "• When the user picks a topic (or chip), run its prescribed tool with the REAL column names above, report findings, then propose the follow-up as the next clickable bullet. Repeat until the user stops.",
+        "• Without a playbook, derive topics from profile signals (nulls, negatives, skew, single-value columns) using the same bullet loop.",
+      );
+    } else {
+      lines.push(
+        "ITERATIVE ANALYSIS PROTOCOL (not one-shot):",
+        "• First call profile_grid_table, then offer 2-3 investigation topics as clickable bold bullets derived from observed signals (nulls, negatives, skew, single-value columns).",
+        "• When the user picks a topic, investigate with the matching tool, report findings, then propose the next step as a clickable bullet. Repeat until the user stops.",
+      );
+    }
     lines.push(SMART_SQL_QUERY_RULES);
     lines.push(DUCKDB_RULES);
     const isCustomActive = Boolean(context.grid.customQuerySql);
@@ -387,6 +534,12 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   }
 
   if (context?.ragContext && context.ragContext.length > 0) {
+    const hasRouterHit = context.ragContext.some(
+      (item) =>
+        typeof item.metadata === "object" &&
+        item.metadata !== null &&
+        (item.metadata as Record<string, unknown>).type === "report_router",
+    );
     lines.push(
       "\nRELEVANT VECTOR RAG CONTEXT (Retrieved via WASM + All-MiniLM Vector Search):",
       ...context.ragContext.map(
@@ -394,10 +547,15 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
           ` • ${item.content}${item.distance != null ? ` (distance: ${item.distance.toFixed(3)})` : ""}`,
       ),
     );
+    if (hasRouterHit) {
+      lines.push(
+        "ROUTING RULE: if a retrieved report-routing entry above matches the user's request better than the current screen, navigate there with 'navigate_to_page' (mention the redirect) instead of answering here.",
+      );
+    }
   }
 
   lines.push(
-    "\nFINAL REMINDER: Write your final response text to the user strictly in natural TURKISH.",
+    "\nFINAL REMINDER: Write your final response text to the user in the user's active language.",
   );
 
   return lines.join("\n");

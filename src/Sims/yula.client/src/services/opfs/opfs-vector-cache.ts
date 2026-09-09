@@ -67,6 +67,18 @@ export class OpfsVectorCache {
       console.warn("[OpfsVectorCache] Vektör önbelleği diske yazılamadı:", err)
     }
   }
+
+  /** Korpus sürümü değiştiğinde stale vektörleri temizler. */
+  async clear(): Promise<void> {
+    this.memoryCache = new Map()
+    if (!this.isSupported()) return
+    try {
+      const root = await navigator.storage.getDirectory()
+      await root.removeEntry(OPFS_VECTOR_CACHE_FILE)
+    } catch {
+      // dosya yoksa sorun değil
+    }
+  }
 }
 
 export const opfsVectorCache = new OpfsVectorCache()

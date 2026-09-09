@@ -12,6 +12,7 @@ export type {
   JsonSchemaProperty,
   ParsedCriteriaSchema,
   ReportAiMetadata,
+  ReportAnalysisTopic,
 } from "./types"
 
 export { parseCriteriaSchema } from "./lib/parse-criteria-schema"

@@ -7,7 +7,7 @@ import { ChatMarkdown } from "./chat-markdown";
 import { cn } from "@/utils/cn";
 
 /**
- * Kartı olmayan araçların (profile_grid_table, analyze_grid_data, run_report…)
+ * Kartı olmayan araçların (profile_grid_table, analyze_grid_data, run_job…)
  * teknik detay katmanı — İstek/Yanıt ayrımı olmadan birleşik Markdown kod bloğu
  * ve Shiki renklendirmeli kopyalanabilir görünüm sunar.
  */

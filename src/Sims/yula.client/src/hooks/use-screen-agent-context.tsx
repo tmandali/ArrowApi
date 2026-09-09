@@ -66,6 +66,8 @@ export function useScreenAgentContext(input: {
     const isViewingResults = Boolean(currentSummary?.isViewingResults);
     const quickPrompts = (current.quickPrompts as string[]) || [];
     const criteriaDigest = (current.criteriaDigest as Array<Record<string, unknown>>) || [];
+    const stateLegend = (current.stateLegend as Record<string, string> | undefined) || undefined;
+    const stateExtra = (current.stateExtra as Record<string, unknown> | undefined) || undefined;
     const tools = (current.tools as Array<{ name: string; description?: string }>) || [
       {
         name: "apply_criteria",
@@ -87,6 +89,8 @@ export function useScreenAgentContext(input: {
       quickPrompts,
       criteriaDigest,
       jobId: currentSummary?.jobId as string | undefined,
+      ...(stateLegend ? { stateLegend } : {}),
+      ...(stateExtra ? { stateExtra } : {}),
     });
 
     return () => {

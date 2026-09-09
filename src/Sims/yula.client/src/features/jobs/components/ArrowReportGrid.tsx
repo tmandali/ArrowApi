@@ -1,7 +1,6 @@
 "use client";
 
 import { useYulaGridStore } from "@/lib/stores/grid";
-import { useSearchParams } from "next/navigation";
 import * as React from "react"
 import {
   RotateCw,
@@ -63,7 +62,10 @@ import {
 } from "./virtual-spreadsheet"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
-import { PINNED_CHART_VIEW_PARAM } from "@/hooks/use-pinned-charts"
+import {
+  subscribeAiView,
+  takePendingAiView,
+} from "@/hooks/use-pinned-charts"
 
 export type ArrowReportGridProps = {
   title?: string
@@ -110,8 +112,24 @@ export function ArrowReportGrid({
   headerActions,
   onError,
 }: ArrowReportGridProps) {
-  const searchParams = useSearchParams()
-  const requestedAiViewId = searchParams.get(PINNED_CHART_VIEW_PARAM)
+  // Uygulama-içi görünüm isteği React içinden taşınır; URL temiz kalır.
+  const [pendingAiViewId, setPendingAiViewId] = React.useState<string | null>(
+    () => takePendingAiView(reportScope)?.viewId ?? null,
+  )
+  React.useEffect(() => {
+    return subscribeAiView((request) => {
+      const scope = reportScope
+      if (
+        scope &&
+        request.scope &&
+        scope.trim().toLowerCase() !== request.scope.trim().toLowerCase()
+      ) {
+        return
+      }
+      setPendingAiViewId(request.viewId)
+    })
+  }, [reportScope])
+  const requestedAiViewId = pendingAiViewId
   const metaColumns = React.useMemo<ReportColumnMeta[]>(
     () =>
       columns.map((col) => ({

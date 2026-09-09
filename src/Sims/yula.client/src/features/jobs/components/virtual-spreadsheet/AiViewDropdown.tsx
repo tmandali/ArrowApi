@@ -146,11 +146,10 @@ export function AiViewDropdown({
               type="button"
               aria-busy={isViewLoading || undefined}
               className={cn(
-                "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold tracking-tight transition-colors outline-none shrink",
-                "focus-visible:ring-1 focus-visible:ring-primary/50",
+                "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold tracking-tight transition-colors outline-none ring-0 shrink focus-visible:bg-amber-500/10",
                 isCurrentQueryActive
                   ? "text-amber-900 hover:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-400/10"
-                  : "text-primary hover:bg-muted/70 dark:text-sidebar-primary"
+                  : "text-foreground hover:bg-muted/70"
               )}
               title={
                 isViewLoading
@@ -233,7 +232,7 @@ export function AiViewDropdown({
               onClick={() => onSelectAiView?.(null)}
               className={cn(
                 "cursor-pointer flex items-center justify-between py-1.5",
-                !isCurrentQueryActive && "font-semibold text-primary bg-primary/5"
+                !isCurrentQueryActive && "font-semibold"
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -242,7 +241,7 @@ export function AiViewDropdown({
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[10px] text-muted-foreground font-normal">Tüm Kayıtlar</span>
-                {!isCurrentQueryActive ? <Check className="size-3.5 text-primary shrink-0" /> : null}
+                {!isCurrentQueryActive ? <Check className="size-3.5 text-orange-600 dark:text-orange-400 shrink-0" /> : null}
               </div>
             </DropdownMenuItem>
 
@@ -262,7 +261,7 @@ export function AiViewDropdown({
                 return (
                   <div
                     key={view.id}
-                    className="flex items-center gap-1.5 py-1 px-2 w-full bg-muted/70 rounded-md my-0.5 border border-primary/40"
+                    className="flex items-center gap-1.5 py-1 px-2 w-full bg-muted/70 rounded-md my-0.5 border border-orange-500/40"
                     onClick={(e) => {
                       e.stopPropagation()
                       e.preventDefault()
@@ -288,7 +287,7 @@ export function AiViewDropdown({
                       }}
                       autoFocus
                       onFocus={(e) => e.currentTarget.select()}
-                      className="h-6 flex-1 min-w-0 px-1.5 text-xs bg-background border border-border/80 rounded outline-none focus:border-primary text-foreground"
+                      className="h-6 flex-1 min-w-0 px-1.5 text-xs bg-background border border-border/80 rounded outline-none focus:border-orange-500 text-foreground"
                     />
                     <button
                       type="button"
@@ -297,7 +296,7 @@ export function AiViewDropdown({
                         e.preventDefault()
                         handleConfirmRename(view.id)
                       }}
-                      className="p-1 rounded text-primary hover:bg-primary/10 transition-colors"
+                      className="p-1 rounded text-orange-600 hover:bg-orange-500/10 dark:text-orange-400 transition-colors"
                       title="Kaydet (Enter)"
                       aria-label="Kaydet"
                     >

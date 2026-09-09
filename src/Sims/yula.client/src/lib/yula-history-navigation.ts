@@ -26,7 +26,7 @@ function jobIdFromMessages(messages?: YulaMessage[]): string | undefined {
         (typeof row.type === "string" && row.type.startsWith("tool-")
           ? row.type.slice("tool-".length)
           : "")
-      if (toolName !== "run_report" && toolName !== "run_job") continue
+      if (toolName !== "run_job") continue
       const output = row.output
       if (!output || typeof output !== "object") continue
       if (typeof output.jobId === "string" && isGuidString(output.jobId)) {
@@ -105,7 +105,7 @@ export function navigateToConversationScreen(
   if (here !== dest) push(href)
 }
 
-const NAV_TOOL_NAMES = new Set(["navigate_to_page", "run_report", "run_job"])
+const NAV_TOOL_NAMES = new Set(["navigate_to_page", "run_job"])
 
 /** Mesajlardaki SON navigasyon aracının hedef sayfası (yoksa null). */
 function lastNavigateTargetFromMessages(messages?: YulaMessage[]): string | null {

@@ -42,6 +42,48 @@
       "İşlem tipine göre özet",
       "Filtreleri Temizle"
     ],
+    "analysisTopics": [
+      {
+        "id": "ciro-kdv-ozeti",
+        "title": "Ciro & KDV özeti",
+        "goal": "Dönem toplam ciro ve KDV yükünü çıkar",
+        "tool": "analyze",
+        "columns": ["Tutar", "Kdv"],
+        "followUp": "Depo bazlı dağılım"
+      },
+      {
+        "id": "iade-orani",
+        "title": "İade oranı",
+        "goal": "Negatif işaretli fişlerin (iade) ciro ve adet içindeki payını bul",
+        "tool": "sql",
+        "columns": ["Islem", "Tutar", "Miktar"],
+        "followUp": "İadenin yoğunlaştığı depo"
+      },
+      {
+        "id": "depo-dagilimi",
+        "title": "Mağaza dağılımı",
+        "goal": "Cironun mağazalar arası dağılımını ve aykırı mağazayı tespit et",
+        "tool": "visualize",
+        "columns": ["Depo", "Tutar"],
+        "followUp": "En düşük mağazanın işlem tipi kırılımı"
+      },
+      {
+        "id": "anonim-musteri",
+        "title": "Anonim müşteri payı",
+        "goal": "Müşterisiz (0/boş) fişlerin payını ve tutar etkisini ölç",
+        "tool": "analyze",
+        "columns": ["MusteriNo", "Tutar"],
+        "followUp": "Kayıtlı müşterilerin fiş ortalaması"
+      },
+      {
+        "id": "para-birimi",
+        "title": "Para birimi karışımı",
+        "goal": "Fişlerin para birimi dağılımını çıkar, tekil dışı birimleri işaretle",
+        "tool": "analyze",
+        "columns": ["ParaBirimi", "Tutar"],
+        "followUp": "Dövizli fişlerin depo dağılımı"
+      }
+    ],
     "columnAliases": {
       "Depo": [
         "depo",

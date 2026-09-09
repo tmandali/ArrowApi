@@ -19,7 +19,7 @@ import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-pan
 import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
-import { useYulaChatOrNull } from "@/hooks/use-yula-chat"
+import { useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { cn } from "@/utils/cn"
 import { History, SquarePen } from "lucide-react"
@@ -42,7 +42,7 @@ type WorkspaceAiDockProps = {
 function YulaNewChatButton() {
   // Dock başlığı oturum hazır olmadan da mount olabilir (defaultOpen) —
   // tıklama anında oturum hazırdır; yine de null-güvenli tutulur.
-  const { newConversation } = useYulaChatOrNull() ?? {}
+  const { newConversation } = useOptionalYulaChat() ?? {}
   const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen)
   const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory)
 

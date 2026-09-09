@@ -35,6 +35,13 @@ export interface YulaScreenRegistration {
   quickPrompts?: string[];
   criteriaDigest?: Array<Record<string, unknown>>;
   jobId?: string;
+  /**
+   * Ekran-bazlı durum sözlüğü: state alanı → anlamı (örn. { sirketKod: "Company code" }).
+   * Ekran kendini tarif eder; prompt kuralı yazılmaz.
+   */
+  stateLegend?: Record<string, string>;
+  /** Ekranın state'e düşürdüğü ek değerler (jenerik, ekran-tanımlı). */
+  stateExtra?: Record<string, unknown>;
 }
 
 interface GridState {

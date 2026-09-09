@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart2, RotateCcw, AlertTriangle, Package, Database, FileText } from "lucide-react";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import { PromptChipsRow } from "./prompt-chips";
-import { REGISTERED_REPORTS as DEMO_REPORTS } from "@/features/reports/report-registry";
+import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { extractJobIdFromHref, isReportResultPath } from "@/lib/workspace-paths";
 
 export interface QuickChip {
@@ -35,7 +35,7 @@ export function YulaQuickActionChips() {
   const chips = React.useMemo<QuickChip[]>(() => {
     if (isViewingResults) return RESULT_CHIPS;
     const path = (pathname ?? "/").split("?")[0] || "/";
-    return DEMO_REPORTS.filter(
+    return REGISTERED_REPORTS.filter(
       (r) => path !== r.pagePath && !path.startsWith(`${r.pagePath}/`),
     ).map<QuickChip>((r) => ({
       label: r.title,
