@@ -1,6 +1,7 @@
 "use client";
 
 import { useYulaGridStore } from "@/lib/stores/grid";
+import { useSearchParams } from "next/navigation";
 import * as React from "react"
 import {
   RotateCw,
@@ -62,6 +63,7 @@ import {
 } from "./virtual-spreadsheet"
 import { cn } from "@/utils/cn"
 import { formatCount } from "@/utils/format"
+import { PINNED_CHART_VIEW_PARAM } from "@/hooks/use-pinned-charts"
 
 export type ArrowReportGridProps = {
   title?: string
@@ -108,6 +110,8 @@ export function ArrowReportGrid({
   headerActions,
   onError,
 }: ArrowReportGridProps) {
+  const searchParams = useSearchParams()
+  const requestedAiViewId = searchParams.get(PINNED_CHART_VIEW_PARAM)
   const metaColumns = React.useMemo<ReportColumnMeta[]>(
     () =>
       columns.map((col) => ({
@@ -144,6 +148,7 @@ export function ArrowReportGrid({
     isSavingDisk,
     isPartial,
     isFromCache,
+    isTableReady,
     isLoadingQuery,
     isLoadingMore,
     refresh,
@@ -274,6 +279,16 @@ export function ArrowReportGrid({
       // ignore
     }
   }, [storageKey])
+
+  React.useEffect(() => {
+    if (!requestedAiViewId) return
+    const requestedView = aiViews.find((view) => view.id === requestedAiViewId)
+    if (requestedView) {
+      useYulaGridStore
+        .getState()
+        .setCustomQuerySql(requestedView.sql, requestedView.title)
+    }
+  }, [requestedAiViewId, aiViews])
 
   // customQuerySql değiştiğinde kayıtlı görünümler içinde var mı kontrol et (oto-kayıt YAPMAZ)
   React.useEffect(() => {
@@ -619,7 +634,7 @@ export function ArrowReportGrid({
 
   // Kayıtlı görünümleri DuckDB içinde SQL VIEW olarak senkronize et
   React.useEffect(() => {
-    if (!duckTableName || isStreaming || isSavingDisk) return
+    if (!duckTableName || !isTableReady || isStreaming || isSavingDisk) return
     for (const v of savedViewSpecs) {
       // Kayıtlı görünüm SQL'i 'active_view' içeriyorsa döngüsel bağımlılığı (infinite recursion)
       // önlemek için temel tablo adına çözümlenir
@@ -633,11 +648,11 @@ export function ArrowReportGrid({
           console.warn(`[ArrowReportGrid] Kayıtlı görünüm (${v.name}) DuckDB view senkronizasyon hatası:`, err)
         })
     }
-  }, [duckTableName, isStreaming, isSavingDisk, savedViewSpecs])
+  }, [duckTableName, isTableReady, isStreaming, isSavingDisk, savedViewSpecs])
 
   // Canlı aktif görünümü ("active_view") DuckDB VIEW olarak 300ms debounce ile senkronize et
   React.useEffect(() => {
-    if (!duckTableName || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
+    if (!duckTableName || !isTableReady || isStreaming || isSavingDisk || effectiveColumns.length === 0) return
 
     const timer = setTimeout(() => {
       // 1. Sıralama clause'u (soldan sağa çoklu sıralama)
@@ -689,6 +704,7 @@ export function ArrowReportGrid({
     return () => clearTimeout(timer)
   }, [
     duckTableName,
+    isTableReady,
     isStreaming,
     isSavingDisk,
     effectiveColumns,

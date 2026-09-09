@@ -23,6 +23,39 @@ export interface PinnedChart {
   pinnedAt: number;
 }
 
+export const PINNED_CHART_VIEW_PARAM = "aiView";
+
+export function getPinnedChartViewId(chart: Pick<PinnedChart, "id">) {
+  return `pinned_chart_${chart.id}`;
+}
+
+export function savePinnedChartAsAiView(chart: PinnedChart) {
+  if (typeof window === "undefined" || !chart.reportScope || !chart.sql) {
+    return null;
+  }
+
+  const storageKey = `arrow_grid_${chart.reportScope}_ai_views`;
+  const viewId = getPinnedChartViewId(chart);
+  const view = {
+    id: viewId,
+    title: chart.title,
+    sql: chart.sql,
+    createdAt: chart.pinnedAt,
+  };
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const existing = raw ? JSON.parse(raw) : [];
+    const views = Array.isArray(existing) ? existing : [];
+    const next = [...views.filter((item) => item?.id !== viewId), view];
+    localStorage.setItem(storageKey, JSON.stringify(next));
+    return viewId;
+  } catch (error) {
+    console.warn("[usePinnedCharts] Error saving chart view:", error);
+    return null;
+  }
+}
+
 const STORAGE_KEY = "yula_pinned_charts";
 const CHANGE_EVENT = "yula-pinned-charts-change";
 

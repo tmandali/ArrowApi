@@ -19,10 +19,12 @@ import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import {
+  getPinnedChartViewId,
+  PINNED_CHART_VIEW_PARAM,
   pinnedChartToOutput,
+  savePinnedChartAsAiView,
   usePinnedCharts,
 } from "@/hooks/use-pinned-charts";
-import { useYulaGridStore } from "@/lib/stores/grid";
 import { getWorkspaceForPath, getWorkspace } from "@/lib/workspace-registry";
 import {
   type WorkspaceLandingData,
@@ -132,16 +134,14 @@ export function WorkspaceLandingTemplate({
         </div>
 
         {/* 2. Sabitlenen Menüler (Pinned Items) - Sade pill & hafif chip görünümü */}
-        <section className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
-            <Pin className="size-3 text-amber-500/80" />
-            <span>Sabitlenen Menüler</span>
-            {pinnedItems.length > 0 && (
+        {pinnedItems.length > 0 ? (
+          <section className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
+              <Pin className="size-3 text-amber-500/80" />
+              <span>Sabitlenen Menüler</span>
               <span className="text-[10px] text-muted-foreground/60">({pinnedItems.length})</span>
-            )}
-          </div>
+            </div>
 
-          {pinnedItems.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {pinnedItems.map((item) => (
                 <div
@@ -178,42 +178,29 @@ export function WorkspaceLandingTemplate({
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground/70 py-1">
-              <span>Henüz sabitlenen menü yok.</span>
-              <span className="text-[11px] text-muted-foreground/50">
-                (Üst arama çubuğundaki menülerin yanındaki raptiye ile buraya ekleyebilirsiniz)
-              </span>
-            </div>
-          )}
-        </section>
+          </section>
+        ) : null}
 
         {/* 2b. Sabitlenen Grafikler — Yula chart pin’leri; tıklayınca kaynak rapora gider */}
-        <section className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
-            <Pin className="size-3 text-amber-500/80" />
-            <span>Sabitlenen Grafikler</span>
-            {pinnedCharts.length > 0 && (
+        {pinnedCharts.length > 0 ? (
+          <section className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
+              <Pin className="size-3 text-amber-500/80" />
+              <span>Sabitlenen Grafikler</span>
               <span className="text-[10px] text-muted-foreground/60">
                 ({pinnedCharts.length})
               </span>
-            )}
-          </div>
+            </div>
 
-          {pinnedCharts.length > 0 ? (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {pinnedCharts.map((chart) => (
                 <div key={chart.id} className="group relative">
                   <Link
-                    href={chart.sourceHref}
+                    href={`${chart.sourceHref}${chart.sourceHref.includes("?") ? "&" : "?"}${PINNED_CHART_VIEW_PARAM}=${encodeURIComponent(getPinnedChartViewId(chart))}`}
                     className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
                     title="Kaynak raporu grafik sorgusuyla aç"
                     onClick={() => {
-                      if (chart.sql) {
-                        useYulaGridStore
-                          .getState()
-                          .setCustomQuerySql(chart.sql, chart.title);
-                      }
+                      savePinnedChartAsAiView(chart);
                     }}
                   >
                     <YulaChartCard
@@ -240,16 +227,8 @@ export function WorkspaceLandingTemplate({
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground/70">
-              <span>Henüz sabitlenen grafik yok.</span>
-              <span className="text-[11px] text-muted-foreground/50">
-                (Rapor sonucundaki Yula grafik başlığındaki raptiye ile buraya
-                ekleyebilirsiniz)
-              </span>
-            </div>
-          )}
-        </section>
+          </section>
+        ) : null}
 
         {/* 3. Soft KPI Alanı - Bordersız, sade, nefes alan metrikler */}
         <section className="space-y-2">

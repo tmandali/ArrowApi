@@ -7,6 +7,7 @@ import {
   isUuidBinaryType,
   normalizeArrowCellValue,
   readDecimalScale,
+  type ArrowTypeLike,
 } from "../../utils/arrow-decimal"
 
 // Next.js DuckDB Worker - self-hosted WASM bundles
@@ -170,8 +171,15 @@ function arrowTableToObjects(table: any): Record<string, unknown>[] {
   const numRows = table?.numRows ?? 0
   if (!schema || numRows === 0) return rows
 
-  const schemaFields: { name: string; type?: unknown }[] = schema.fields.map(
-    (f: { name: string; type?: unknown }) => ({ name: f.name, type: f.type })
+  const schemaFields: { name: string; type?: ArrowTypeLike | string }[] = schema.fields.map(
+    (f: { name: string; type?: unknown }) => ({
+      name: f.name,
+      type:
+        typeof f.type === "string" ||
+        (typeof f.type === "object" && f.type !== null)
+          ? (f.type as ArrowTypeLike)
+          : undefined,
+    })
   )
   const fields = schemaFields.map((f) => f.name)
   const columns = fields.map((name, index) =>

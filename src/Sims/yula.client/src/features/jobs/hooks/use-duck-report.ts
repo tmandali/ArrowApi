@@ -86,9 +86,11 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
   const queryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableReadyRef = React.useRef(false)
+  const [isTableReady, setIsTableReady] = React.useState(false)
   const prevCompleteRef = React.useRef(false)
   const markTableReady = React.useCallback((v: boolean) => {
     tableReadyRef.current = v
+    setIsTableReady(v)
   }, [])
   // Akış ilerlemesinin en güncel değerleri — callback'ler ref okur
   const latestStreamedRef = React.useRef(streamedRows)
@@ -391,6 +393,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   // Arka plan akış yöneticisine abone ol (Kullanıcı sayfa değiştirse dahi akış kesilmez)
   React.useEffect(() => {
     const resetStreamState = () => {
+      markTableReady(false)
       setRows([])
       setTotalRows(0)
       setTotalFiltered(0)
@@ -567,6 +570,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       }
     }
 
+    if (!tableReadyRef.current) return
+
     const seq = ++querySeqRef.current
     let cancelled = false
     const runCustomSql = async () => {
@@ -726,6 +731,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     isStreaming,
     isSavingDisk,
     isFromCache,
+    isTableReady,
     isPartial,
     isLoadingQuery,
     isLoadingMore,
