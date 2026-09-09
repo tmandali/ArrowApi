@@ -8,11 +8,16 @@ import {
   ShieldAlert,
   HelpCircle,
   Download,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import systemCommandsYaml from "@/features/system/agents/system.agent.yaml";
 import gridCommandsYaml from "@/features/reports/agents/grid.agent.yaml";
 import reportCommandsYaml from "@/workspaces/stock/agents/report.agent.yaml";
+import { useUserSkillsStore } from "@/lib/stores/user-skills";
+import type { UserSkill } from "@/lib/stores/user-skills";
+import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
+import { getEffectiveUserSkills } from "@/lib/yula-user-skill";
 
 export type YulaCommand = {
   id: string;
@@ -25,6 +30,8 @@ export type YulaCommand = {
   icon: LucideIcon;
   /** Bu raporu zaten açıkken slash paletinden gizlenir (kriter evresi). */
   pagePath?: string;
+  /** Kullanıcı skill'i ise "user" — gönderimde {{input}} şablonu uygulanır. */
+  source?: "user";
 };
 
 export type YulaCommandYamlItem = {
@@ -89,27 +96,61 @@ export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(reportCommandsYa
  * Slash paleti yalnızca eylem komutlarıdır (rapor adı değil).
  * - Sonuç (GUID / grid) → /analiz, /top5, /sorgu, /kolonlar, /temizle
  * - Kriter / workspace → /run-job ve sistem komutları
+ * Kullanıcı skill'leri (`extra`) her iki evrede de listelenir (global kapsam).
  */
 export function getAllYulaCommands(
   isViewingResults = false,
   pathname = "/",
+  extra: YulaCommand[] = [],
 ): YulaCommand[] {
   if (isViewingResults) {
-    return [...SYSTEM_COMMANDS, ...GRID_COMMANDS];
+    return [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...extra];
   }
   const path = pathname.split("?")[0] || "/";
   const reportCommands = REPORT_COMMANDS.filter((cmd) => {
     if (!cmd.pagePath) return true;
     return path !== cmd.pagePath && !path.startsWith(`${cmd.pagePath}/`);
   });
-  return [...SYSTEM_COMMANDS, ...reportCommands];
+  return [...SYSTEM_COMMANDS, ...reportCommands, ...extra];
+}
+
+/** Kullanıcı skill'lerini YulaCommand borusuna dönüştürür (yerleşikler dahil). */
+export function userSkillsToCommands(
+  skills: UserSkill[],
+  workspaceId?: string | null,
+): YulaCommand[] {
+  const inScope = getEffectiveUserSkills(
+    skills,
+    BUILT_IN_USER_SKILLS,
+    workspaceId,
+  );
+  return inScope.map((s) => ({
+    id: s.id,
+    slash: s.slash,
+    label: s.label,
+    description: s.description || "Kullanıcı skill'i",
+    prompt: s.prompt,
+    icon: Sparkles,
+    source: "user" as const,
+  }));
+}
+
+/** Cihaz-içi skill anlık görüntüsü (hook'suz; saf resolver'lar için). */
+export function getUserSkillCommandsSnapshot(): YulaCommand[] {
+  try {
+    return userSkillsToCommands(useUserSkillsStore.getState().skills);
+  } catch {
+    return [];
+  }
 }
 
 /** Manifestteki tüm slash komutları (evre karışık; tam eşleşme için). */
-export function getRegisteredYulaCommands(): YulaCommand[] {
+export function getRegisteredYulaCommands(
+  extra: YulaCommand[] = getUserSkillCommandsSnapshot(),
+): YulaCommand[] {
   const seen = new Set<string>();
   const out: YulaCommand[] = [];
-  for (const cmd of [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...REPORT_COMMANDS]) {
+  for (const cmd of [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...REPORT_COMMANDS, ...extra]) {
     const key = cmd.slash.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

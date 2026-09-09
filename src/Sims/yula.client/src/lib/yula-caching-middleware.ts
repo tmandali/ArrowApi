@@ -37,6 +37,18 @@ function fastHash(str: string): string {
   return (hash >>> 0).toString(36);
 }
 
+/** Araç etkinliği taşıyan parça tipleri (tool-input-*, tool-call,
+ *  tool-output-*, dynamic-tool) — replay'i yan etki doğurur. */
+function hasToolActivity(parts: unknown[]): boolean {
+  return parts.some((p) => {
+    const t =
+      typeof p === "object" && p !== null && "type" in p
+        ? (p as { type?: unknown }).type
+        : undefined;
+    return typeof t === "string" && (t === "dynamic-tool" || t.startsWith("tool"));
+  });
+}
+
 /** `params` nesnesinden kararlı cache key türetir. */
 function generateCacheKey(params: unknown): string {
   if (!params || typeof params !== "object") return fastHash(String(params));
@@ -178,6 +190,16 @@ export function yulaCachingMiddleware(
             controller.enqueue(chunk);
           },
           flush() {
+            // Araç çağrısı içeren adım önbelleğe alınmaz: replay, bayat
+            // tool-call parçalarını istemciye yeniden akıtır ve yan etkili
+            // araçları (örn. run_job) mükerrer yürütür. Salt-metin final
+            // adımları önbelleğe alınmaya devam eder.
+            if (hasToolActivity(recordedParts)) {
+              console.info(
+                `🤖 [Yula Local Cache] SKIP (tool activity) key: ${key} · ${recordedParts.length} chunks not cached`,
+              );
+              return;
+            }
             if (cache.size >= maxEntries) purgeExpired();
             cache.set(key, {
               type: "stream",

@@ -7,18 +7,25 @@ import {
   Loader2,
   Copy,
   Check,
+  TriangleAlert,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { subscribeTurnTrace } from "@/lib/yula-turn-trace";
 import {
   extractWorkedSteps,
+  groupStepsByPhase,
   type WorkedStepItem,
 } from "./yula-worked-steps";
 
@@ -45,6 +52,8 @@ export function YulaWorkedAccordion({
   const [liveTimer, setLiveTimer] = React.useState(0);
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
   const [copiedAnswer, setCopiedAnswer] = React.useState(false);
+  /** Kullanıcının kapattığı fazlar — tüm fazlar varsayılan açık (şeffaf iz) */
+  const [collapsedPhases, setCollapsedPhases] = React.useState<Set<number>>(new Set());
 
   /** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
   const stepPayload = (step: WorkedStepItem): string | null => {
@@ -146,12 +155,40 @@ export function YulaWorkedAccordion({
     return extractWorkedSteps(message, isLive, userMessage, conversationId);
   }, [message, isLive, userMessage, conversationId, traceRev]);
 
+  // groupStepsByPhase O(n) ve ucuz — memo'suz hesaplanır (React Compiler uyumu)
+  const phases = groupStepsByPhase(steps);
+
+  /** Yeni adım eklendiğinde (yalnızca canlı akışta) son adıma yumuşak kaydır */
+  const lastStepRef = React.useRef<HTMLDivElement | null>(null);
+  const prevStepCountRef = React.useRef(0);
+  React.useEffect(() => {
+    const count = steps.length;
+    const grew = count > prevStepCountRef.current;
+    prevStepCountRef.current = count;
+    if (grew && isLive && open) {
+      lastStepRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [steps.length, isLive, open]);
+
+  /** Hover tooltip: subLabel + araç durumu + detay önizlemesi */
+  const stepTooltip = (step: WorkedStepItem): string | null => {
+    const bits: string[] = [];
+    if (step.subLabel) bits.push(step.subLabel);
+    if (step.info) bits.push(`${step.info.toolName} · ${step.info.state}`);
+    const preview = (step.detailText ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    if (preview) bits.push(preview);
+    return bits.length > 0 ? bits.join("\n") : null;
+  };
+
   React.useEffect(() => {
     const syncOpen = () => {
       if (userToggled) return;
-      // Yanıt bitince (canlı akış yok, cevap metni var, hata yok) akordeon
-      // kendini kapatır; isLive tüm tur (araç yürütmeleri dahil) süresince açık tutar.
-      const keepOpen = isLive || !hasTextContent || steps.some((s) => s.isError);
+      // Yanıt bitince (canlı akış yok, cevap metni var, gerçek araç hatası yok)
+      // akordeon kendini kapatır; isLive tüm tur (araç yürütmeleri dahil) süresince açık tutar.
+      // Sanitizer gürültüsü (kind: "thought" gizli metinler) açık tutmaz — yalnızca
+      // gerçek araç hataları (ran/edited/explored/confirmation) açık tutar.
+      const keepOpen =
+        isLive || !hasTextContent || steps.some((s) => s.isError && s.kind !== "thought");
       setOpen(keepOpen);
     };
     syncOpen();
@@ -228,30 +265,73 @@ export function YulaWorkedAccordion({
       {/* Gemini Stili Adım Adım Çalıştırma ve Düşünme Çizelgesi */}
       {hasExpandableContent ? (
         <CollapsibleContent className="mt-1.5 space-y-1.5 pl-1">
-          <div className="flex flex-col gap-1.5 text-[12.5px] font-sans text-muted-foreground/90">
-            {steps.map((step) => {
-              // Düşünme adımları varsayılan olarak açık başlar (Gemini stili)
-              const isThought = step.kind === "thought";
-              const autoOpen = isThought || Boolean(step.isError);
-              const isManuallyToggled = expandedStepId === step.id;
-              const isExpanded = autoOpen
-                ? expandedStepId === null || expandedStepId === step.id
-                : isManuallyToggled;
-
-              const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
-              const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
-              // step-start sonrası parçalar kendi adım seviyesinde girintili görünür
-              const indent = step.stepIndex == null ? 0 : 16;
-
+          <div className="flex flex-col gap-2 text-[12.5px] font-sans text-muted-foreground/90">
+            {phases.map((phase, phasePos) => {
+              const phaseOpen = !collapsedPhases.has(phase.phaseIndex);
+              const isLastPhase = phasePos === phases.length - 1;
               return (
-                <div
-                  key={step.id}
-                  style={indent ? { marginLeft: indent } : undefined}
-                  className="flex flex-col gap-1"
-                >
-                  {/* Adım Başlığı Satırı */}
+                <div key={`phase-${phase.phaseIndex}`} className="flex flex-col gap-1">
+                  {/* Faz Başlığı */}
                   <div
                     onClick={() => {
+                      setCollapsedPhases((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(phase.phaseIndex)) next.delete(phase.phaseIndex);
+                        else next.add(phase.phaseIndex);
+                        return next;
+                      });
+                    }}
+                    className="group/phase flex cursor-pointer items-center gap-1.5 py-0.5 select-none"
+                  >
+                    {phase.isLive ? (
+                      <Loader2 className="size-3 animate-spin text-orange-500" />
+                    ) : phase.hasError ? (
+                      <TriangleAlert className="size-3 text-red-500" />
+                    ) : (
+                      <Check className="size-3 text-emerald-500" />
+                    )}
+                    <span className="font-sans text-[12.5px] font-medium text-foreground/90">
+                      {phase.label}
+                    </span>
+                    <span className="font-mono text-[10.5px] text-muted-foreground/70">
+                      {phase.steps.length} {phase.steps.length === 1 ? "step" : "steps"}
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "size-3.5 text-muted-foreground/50 transition-transform duration-200 group-hover/phase:text-foreground/70",
+                        phaseOpen && "rotate-90 text-foreground/70"
+                      )}
+                    />
+                  </div>
+
+                  {/* Faz İçi Adımlar */}
+                  {phaseOpen ? (
+                    <div className="ml-[5px] flex flex-col gap-1.5 border-l border-border/40 pl-2.5">
+                      {phase.steps.map((step, stepPos) => {
+                        // Düşünme adımları varsayılan olarak açık başlar (Gemini stili)
+                        const isThought = step.kind === "thought";
+                        const autoOpen = isThought || Boolean(step.isError);
+                        const isManuallyToggled = expandedStepId === step.id;
+                        const isExpanded = autoOpen
+                          ? expandedStepId === null || expandedStepId === step.id
+                          : isManuallyToggled;
+
+                        const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
+                        const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
+                        const isLastStep = isLastPhase && stepPos === phase.steps.length - 1;
+                        const tooltip = stepTooltip(step);
+
+                        return (
+                          <div
+                            key={step.id}
+                            ref={isLastStep ? lastStepRef : undefined}
+                            className="animate-in fade-in-0 slide-in-from-left-2 flex flex-col gap-1 duration-200"
+                          >
+                            {/* Adım Başlığı Satırı — hover tooltip + click expand */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  onClick={() => {
                       if (hasDetails) {
                         setExpandedStepId(isExpanded ? `closed-${step.id}` : step.id);
                       }
@@ -300,7 +380,14 @@ export function YulaWorkedAccordion({
                         )}
                       />
                     ) : null}
-                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              {tooltip ? (
+                                <TooltipContent side="top" align="start" className="whitespace-pre-line">
+                                  {tooltip}
+                                </TooltipContent>
+                              ) : null}
+                            </Tooltip>
 
                   {/* Gemini Stili Doğrudan İçe Girintili Düşünme / Detay Metni */}
                   {isExpanded && hasDetails ? (
@@ -344,6 +431,11 @@ export function YulaWorkedAccordion({
                         ) : null}
                       </div>
                     )
+                  ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : null}
                 </div>
               );

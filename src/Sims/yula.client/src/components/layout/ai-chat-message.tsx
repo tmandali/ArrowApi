@@ -9,6 +9,8 @@ import { cn } from "@/utils/cn";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { ChatMarkdown, FileOpenChip } from "./chat-markdown";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+import { yulaToolPartInfo } from "@/lib/yula-tool-info";
+import { extractSourceTable } from "@/lib/yula-source-table";
 
 type AiChatMessageProps = {
   message: YulaMessage;
@@ -37,6 +39,18 @@ function FormattedAssistantText({
   };
 
   const { sendMessageText: sendPrompt } = useYulaChat()
+
+  // Turun analizinin üretildiği kaynak tablo (bulgu tıklamaları aktif
+  // view'a değil buraya gider) — run_expert_sql FROM izlerinden çıkarılır.
+  const sourceTable = React.useMemo(() => {
+    if (!message || message.role !== "assistant") return null
+    const infos = (message.parts ?? [])
+      .map((p) => yulaToolPartInfo(p))
+      .filter(
+        (info): info is NonNullable<typeof info> => info !== null,
+      )
+    return extractSourceTable(infos)
+  }, [message])
 
   // Mesajın tüm parçalarını (reasoning + text) ve tool verilerini birleştirerek kontrol et.
   // DİKKAT: injected reasoning detayları ("Sonuç:\n{...}") onay tespitini kirletir → dışlanır.
@@ -147,6 +161,7 @@ function FormattedAssistantText({
         text={text}
         isExecutionConfirmation={isExecutionConfirmation}
         columns={columns}
+        sourceTable={sourceTable}
         onPrompt={sendPrompt}
         onNavigateReport={navigateToReportOrJob}
       />

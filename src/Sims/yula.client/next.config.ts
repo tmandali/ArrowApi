@@ -60,11 +60,20 @@ const nextConfig: NextConfig = {
         loaders: [require.resolve("raw-loader")],
         as: "*.js",
       },
+      // Standart Agent Skills dizini (skills/*/SKILL.md) ham metin gömülür
+      "*.md": {
+        loaders: [require.resolve("raw-loader")],
+        as: "*.js",
+      },
     },
   },
   webpack(config) {
     config.module.rules.push({
       test: /\.yaml$/,
+      type: "asset/source",
+    });
+    config.module.rules.push({
+      test: /\.md$/,
       type: "asset/source",
     });
     return config;

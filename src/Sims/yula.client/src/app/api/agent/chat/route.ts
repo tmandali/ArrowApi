@@ -16,6 +16,7 @@ import {
 import { type YulaStaticTools, type ReportToolContext } from "@/lib/yula-server-tools";
 import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
+import { filterActiveToolsByAgent } from "@/lib/yula-user-agent";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { buildServerTools } from "@/lib/yula-server-tools";
 import { slimMessagesForTransport } from "@/lib/context-slim";
@@ -24,7 +25,7 @@ import {
   getYulaProviderInfo,
   getAvailableProviderModels,
 } from "@/lib/yula-provider";
-import { getDefaultModel, resolveProvider } from "@/lib/yula-config";
+import { getDefaultModel, resolveProvider, resolveThinkingEnabled } from "@/lib/yula-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -181,7 +182,9 @@ export async function POST(req: Request) {
         provider?: string;
         endpoint?: string;
       };
-    const provider = resolveProvider(requestedProvider);
+    const provider = resolveProvider(
+      context?.agent?.provider || requestedProvider,
+    );
     const baseUrl =
       typeof endpoint === "string" && endpoint.length > 0 ? endpoint : undefined;
 
@@ -231,12 +234,18 @@ export async function POST(req: Request) {
       find_matching_report: toolContext,
     };
 
-    const isThinking = thinkingEnabled !== false;
+    const isThinking = resolveThinkingEnabled(thinkingEnabled);
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
     // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
     const systemPrompt = buildSystemPrompt(context);
 
-    const activeModel = await resolveModel(model, provider, baseUrl);
+    // Çıkarım önceliği: ajan sabiti > sohbet modeli > sağlayıcı varsayılanı.
+    // resolveModel listede bulamazsa sağlayıcı varsayılanına düşer.
+    const activeModel = await resolveModel(
+      context?.agent?.model || model,
+      provider,
+      baseUrl,
+    );
     const providerInfo = getYulaProviderInfo(provider);
     const languageModel = getYulaLanguageModel(activeModel, {
       provider,
@@ -280,7 +289,14 @@ export async function POST(req: Request) {
       tools,
       toolsContext,
       prepareStep: async ({ messages, stepNumber }) => {
-        const activeTools = phaseToolNames as Extract<
+        // Ajan kapısı (Step 5/6 karşılığı): seçili ajan allowlist verdiyse
+        // faz araçları onunla kesiştirilir; boş = tüm faz araçları.
+        const agentTools = context?.agent?.tools;
+        const gatedTools =
+          agentTools && agentTools.length > 0
+            ? filterActiveToolsByAgent(phaseToolNames, gridToolNames, agentTools)
+            : phaseToolNames;
+        const activeTools = gatedTools as Extract<
           keyof typeof tools,
           string
         >[];

@@ -1,4 +1,7 @@
 import { useYulaGridStore } from "@/lib/stores/grid"
+import { useUserSkillsStore } from "@/lib/stores/user-skills"
+import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills"
+import { buildUserSkillPrompt } from "@/lib/yula-user-skill"
 import { findReport } from "@/features/reports/report-registry"
 import { readReportAiMetadata, readCriteriaAiMetadata } from "@/lib/report-ai-metadata";
 import { guardReadOnlySelect, resolveActiveViewReferences, normalizeQueryForStorage, PORTABLE_TABLE_PLACEHOLDER } from "@/lib/sql-guard";
@@ -1603,6 +1606,65 @@ export async function executeClientTool(
         status: "awaiting_user",
         questions,
         message: "Questions presented to the user. Wait for their answers, which arrive as a new user message.",
+      };
+    }
+    case "run_user_skill": {
+      const slash = String(
+        (args as { skill?: unknown }).skill ?? "",
+      ).toLowerCase();
+      const skill = [
+        ...useUserSkillsStore.getState().skills,
+        ...BUILT_IN_USER_SKILLS,
+      ].find((s) => s.slash.toLowerCase() === slash);
+      if (!skill) {
+        return {
+          status: "not-found",
+          message: `Skill '/${slash}' not found on this device. Use only the USER SKILLS listed in the system prompt.`,
+        };
+      }
+      const prompt = buildUserSkillPrompt(
+        skill,
+        String((args as { input?: unknown }).input ?? ""),
+      );
+      const files = (skill.files ?? []).map((f) => ({
+        name: f.name,
+        chars: f.content.length,
+      }));
+      return {
+        status: "loaded",
+        skill: skill.slash,
+        prompt,
+        ...(files.length > 0 ? { files } : {}),
+        message:
+          files.length > 0
+            ? `Skill '/${skill.slash}' instructions loaded (${files.length} attached file(s): ${files.map((f) => f.name).join(", ")} — read with read_user_file when referenced). Follow them with your tools.`
+            : `Skill '/${skill.slash}' instructions loaded. Follow them with your tools.`,
+      };
+    }
+    case "read_user_file": {
+      const slash = String(
+        (args as { skill?: unknown }).skill ?? "",
+      ).toLowerCase();
+      const name = String((args as { file?: unknown }).file ?? "").toLowerCase();
+      const skill = [
+        ...useUserSkillsStore.getState().skills,
+        ...BUILT_IN_USER_SKILLS,
+      ].find((s) => s.slash.toLowerCase() === slash);
+      // Yerleşik paket dosyaları sunucu tarafındadır (read_skill_file);
+      // burada yalnızca kullanıcı ekli dosyalar okunur.
+      const file = skill?.files?.find((f) => f.name.toLowerCase() === name);
+      if (!skill || !file) {
+        return {
+          status: "not-found",
+          message: `File '${(args as { file?: unknown }).file ?? ""}' not found in skill '/${slash}'.`,
+        };
+      }
+      return {
+        status: "ok",
+        skill: skill.slash,
+        file: file.name,
+        content: file.content,
+        message: `File '${file.name}' loaded (${file.content.length} chars).`,
       };
     }
     case "filter_current_grid": {

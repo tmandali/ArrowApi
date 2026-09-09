@@ -60,6 +60,24 @@ export interface YulaScreenContext {
   screenDiff?: string[];
   /** Ekran-bazlı durum sözlüğü: state alanı → anlamı (ekran kendini tarif eder) */
   stateLegend?: Record<string, string>;
+  /**
+   * Kullanıcının cihaz-içi skill envanteri (yalnızca isim/açıklama —
+   * progressive disclosure; tam talimatlar run_user_skill ile yüklenir).
+   * Kapsama göre istemcide filtrelenmiş gelir.
+   */
+  userSkills?: Array<{ slash: string; label: string; description: string }>;
+  /**
+   * Seçili kullanıcı ajanı (persona) — istemcide çözülmüş gelir.
+   * instructions LEVEL 0'a eklenir; tools prepareStep'te kesiştirilir.
+   */
+  agent?: {
+    name: string;
+    instructions: string;
+    tools: string[];
+    skills: string[];
+    provider?: string;
+    model?: string;
+  } | null;
 }
 
 import {
@@ -106,6 +124,7 @@ const BASE_PROMPT = [
   "• Question texts must be in the user's language; each question always shows a freeform answer field.",
   "• If the user skips a required question, continue with its defaultValue — never ask the same question again.",
   "• Single destructive-operation approvals still use 'request_user_confirmation'.",
+  "• When 'request_user_confirmation' returns confirmed:false, do NOT call it again for the same operation — inform the user the action was not performed.",
   "• After run_job returns executed, write one short success line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically, do not paste job IDs or URLs.",
 ].join("\n");
 
@@ -156,6 +175,7 @@ const SQL_EXPERT_RULES = [
   "• Use run_expert_sql strictly for read-only SELECT queries that verify findings or compute advanced metrics. Exploration queries return at most 10 sample rows to context.",
   "• If the user wants the actual grid UI table to show transformed/derived columns, use set_grid_query instead.",
   "• For simple value/range filters or sorting on the existing table, prefer grid tools (set_grid_sort, apply_grid_filters, filter_current_grid) instead of SQL to keep UI state fast and responsive.",
+  "• RESULT PRESENTATION: the result card renders automatically with the real rows — never paste the SQL query or the raw rows into your reply. For single-row aggregates write a short markdown summary (bold metric: value lines, 2-5 lines); for multi-row results give a one-line summary and let the card show the rows.",
 ].join("\n");
 
 const DUCKDB_RULES = [
@@ -226,6 +246,16 @@ const SMART_SQL_QUERY_RULES = [
 
 export function buildSystemPrompt(context?: YulaScreenContext): string {
   const lines: string[] = [BASE_PROMPT];
+
+  // LEVEL 0: seçili kullanıcı ajanı (persona) — diğer tüm katmanlardan önce.
+  if (context?.agent) {
+    lines.push(
+      "",
+      `=== LEVEL 0: ACTIVE AGENT PERSONA (${context.agent.name}) ===`,
+      context.agent.instructions,
+      "Follow this persona on top of all workspace rules below. Keep the persona's tone and priorities in every reply.",
+    );
+  }
 
   const href = context?.pathname ?? "/";
   const pathname = href.split("?")[0] || "/";
@@ -425,6 +455,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       `     - Call the 'run_job' tool with report: '${scope}' and criteria.`,
       "     - 'hazırla' / 'göster' / 'getir' are not run verbs; do not start a job.",
       "  - RUN CONFIRMATION FORMAT: when criteria are ready and you need the user's go-ahead, present the confirmation as a separate bold bullet on its own line (e.g. '• **Raporu çalıştır**'). Bold bullets are clickable and send the text back as a new user message. Never bury the confirmation inside a body sentence.",
+  "  - CLICK CONTEXT: a user message starting with '[Analysis finding clicked]' or '[Analiz bulgusuna tıklandı]' means the user clicked an analysis finding — generate the SQL query that detects it (grounded in the REAL columns above), run it with 'run_expert_sql', and briefly explain the result. Never ask for clarification. If the click message names a source table, query THAT table (it overrides the active_view preference).",
       "  - AFTER run_job: 'executed' means the job was ACCEPTED AND QUEUED, not completed. Never claim success, loaded results, or 'no error'. Say the job is queued and point to the execution screen for live progress.",
       "  - If the user reports a failure, do not contradict them: check 'list_report_executions' for the job status and read the 'Failed' error text (or ask for the execution panel error) before responding.",
     );
@@ -552,6 +583,16 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
         "ROUTING RULE: if a retrieved report-routing entry above matches the user's request better than the current screen, navigate there with 'navigate_to_page' (mention the redirect) instead of answering here.",
       );
     }
+  }
+
+  if (context?.userSkills && context.userSkills.length > 0) {
+    lines.push(
+      "\nUSER SKILLS (on-device slash commands defined by this user):",
+      ...context.userSkills.map(
+        (s) => ` • /${s.slash}: ${s.description || s.label}`,
+      ),
+      "To run one, call the 'run_user_skill' tool with its slash name and optional input. The tool returns the skill's full instructions — follow them with your tools. Never invent skill names; use only this list. When the user types /<name> explicitly, its instructions arrive as their message instead.",
+    );
   }
 
   lines.push(

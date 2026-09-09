@@ -424,3 +424,31 @@ export function YulaModelSelector({ className }: { className?: string }) {
     </Popover>
   );
 }
+
+/** Yalnızca düşünme anahtarı (ajan seçiminin yanına; model seçicisiz toolbar için) */
+export function YulaThinkingToggle({ className }: { className?: string }) {
+  const { isThinkingEnabled, setThinkingEnabled } = useYulaChat();
+  return (
+    <span className={cn("inline-flex items-center gap-1", className)}>
+      <Brain className="size-3.5 text-primary shrink-0" />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isThinkingEnabled}
+        onClick={() => setThinkingEnabled(!isThinkingEnabled)}
+        className={cn(
+          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+          isThinkingEnabled ? "bg-primary" : "bg-muted-foreground/30"
+        )}
+        title={isThinkingEnabled ? "Düşünme Modu Açık" : "Düşünme Modu Kapalı"}
+      >
+        <span
+          className={cn(
+            "pointer-events-none inline-block size-3 transform rounded-full bg-background shadow-md ring-0 transition duration-200 ease-in-out",
+            isThinkingEnabled ? "translate-x-3" : "translate-x-0"
+          )}
+        />
+      </button>
+    </span>
+  );
+}

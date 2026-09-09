@@ -118,3 +118,15 @@ export function getVectorDimension(provider: AIProviderType = getActiveProvider(
 
 export const DEFAULT_YULA_MODEL = getDefaultModel();
 export const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
+
+/** Düşünme bayrağı önceliği: YULA_THINKING set ise env kazanır
+ *  (dağıtım politikası), yoksa istek gövdesi (varsayılan açık). */
+export function resolveThinkingEnabled(bodyValue?: boolean): boolean {
+  const env = process.env.YULA_THINKING;
+  if (env !== undefined) {
+    const v = env.trim().toLowerCase();
+    if (["0", "false", "no", "off"].includes(v)) return false;
+    if (["1", "true", "yes", "on"].includes(v)) return true;
+  }
+  return bodyValue !== false;
+}

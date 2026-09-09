@@ -19,7 +19,7 @@ function getHighlighter() {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
       themes: ["dark-plus", "light-plus"],
-      langs: ["json", "sql", "xml", "bash", "typescript", "javascript", "html", "css"],
+      langs: ["json", "sql", "xml", "bash", "typescript", "javascript", "html", "css", "markdown"],
     })
   }
   return highlighterPromise

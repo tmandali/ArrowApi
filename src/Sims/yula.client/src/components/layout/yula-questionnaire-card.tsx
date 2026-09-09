@@ -19,6 +19,10 @@ import {
 } from "@/components/ui/questionnaire";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import { cn } from "@/utils/cn";
+import {
+  detectUserLanguage,
+  pickLang,
+} from "@/lib/yula-lang";
 import { MessageCircleQuestionMark, Check } from "lucide-react";
 
 export interface YulaQuestionChoice {
@@ -92,6 +96,23 @@ export function YulaQuestionnaireCard({
   const [freeform, setFreeform] = React.useState<Record<string, string>>({});
   const [picked, setPicked] = React.useState<Record<string, string[]>>({});
 
+  // Kart dili: asistandan önceki son kullanıcı mesajına göre
+  const cardLang = React.useMemo(() => {
+    const idx = messageId
+      ? yula.messages.findIndex((m) => m.id === messageId)
+      : -1;
+    const pool = idx >= 0 ? yula.messages.slice(0, idx) : yula.messages;
+    const lastUser = [...pool]
+      .reverse()
+      .find((m) => m.role === "user");
+    const text = lastUser?.parts
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text?: string }).text ?? "")
+      .join("\n");
+    return detectUserLanguage(text);
+  }, [yula.messages, messageId]);
+  const L = (tr: string, en: string) => pickLang(cardLang, tr, en);
+
   // Bu turdan sonra gelen bir kullanıcı mesajı varsa soru cevaplanmış sayılır
   const answeredByFollowUp = React.useMemo(() => {
     if (!messageId) return false;
@@ -99,6 +120,35 @@ export function YulaQuestionnaireCard({
     if (idx < 0) return false;
     return yula.messages.slice(idx + 1).some((m) => m.role === "user");
   }, [yula.messages, messageId]);
+
+  // Takip mesajındaki gerçek cevap metni (kart kullanılmadan yazıldıysa veya
+  // reload sonrası kart state'i kaybolduysa "(cevaplandı)" yerine bunu göster)
+  const followUpText = React.useMemo(() => {
+    if (!messageId) return "";
+    const idx = yula.messages.findIndex((m) => m.id === messageId);
+    if (idx < 0) return "";
+    return yula.messages
+      .slice(idx + 1)
+      .filter((m) => m.role === "user")
+      .map((m) =>
+        m.parts
+          .filter((p) => p.type === "text")
+          .map((p) => (p as { text?: string }).text ?? "")
+          .join("\n"),
+      )
+      .join("\n")
+      .trim();
+  }, [yula.messages, messageId]);
+
+  // Kart formatındaki "• soru: cevap" satırlarını soru bazında eşleştir
+  const followUpByPrompt = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const line of followUpText.split("\n")) {
+      const m = line.match(/^•\s*(.*?):\s*(.+)$/);
+      if (m) map.set(m[1].trim(), m[2].trim());
+    }
+    return map;
+  }, [followUpText]);
 
   const answered = submitted !== null || answeredByFollowUp;
 
@@ -167,7 +217,7 @@ export function YulaQuestionnaireCard({
       <div className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
           <Check className="size-3.5 text-emerald-500" />
-          Cevaplanan sorular
+          {L("Cevaplanan sorular", "Answered questions")}
         </div>
         {questions.map((q) => {
           const vals = submitted?.answers[q.id] ?? [];
@@ -178,18 +228,30 @@ export function YulaQuestionnaireCard({
           if (free) labels.push(free);
           const wasSkipped =
             submitted != null && submitted.skipped.includes(q.id);
+          // Kart state'i yoksa takip mesajındaki gerçek cevabı göster:
+          // önce "• soru: cevap" satır eşleşmesi, tek soruda ham metin.
+          const followUpAnswer =
+            submitted == null
+              ? (followUpByPrompt.get(q.prompt) ??
+                (questions.length === 1 && followUpText ? followUpText : null))
+              : null;
+          const answerText =
+            labels.length > 0
+              ? labels.join(", ")
+              : wasSkipped
+                ? q.defaultValue
+                  ? L(
+                      `(atlandı → varsayılan: ${q.defaultValue})`,
+                      `(skipped → default: ${q.defaultValue})`,
+                    )
+                  : L("(atlandı)", "(skipped)")
+                : (followUpAnswer ?? L("(cevaplandı)", "(answered)"));
           return (
             <div key={q.id} className="text-[12px] leading-relaxed">
               <span className="font-medium text-foreground">{q.prompt}</span>
               <span className="text-muted-foreground">
                 {" — "}
-                {labels.length > 0
-                  ? labels.join(", ")
-                  : wasSkipped
-                    ? q.defaultValue
-                      ? `(atlandı → varsayılan: ${q.defaultValue})`
-                      : "(atlandı)"
-                    : "(cevaplandı)"}
+                {answerText}
               </span>
             </div>
           );
@@ -207,7 +269,7 @@ export function YulaQuestionnaireCard({
     >
       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-900 dark:text-amber-200">
         <MessageCircleQuestionMark className="size-3.5 shrink-0" />
-        Devam etmek için cevabınız gerekiyor
+        {L("Devam etmek için cevabınız gerekiyor", "Your answer is needed to continue")}
       </div>
       <Questionnaire
         items={questions.map((q) => ({ name: q.id, required: q.required ?? false }))}
@@ -240,8 +302,8 @@ export function YulaQuestionnaireCard({
                 </QuestionnaireChoice>
               ))}
               <QuestionnaireInput
-                aria-label="Kendi cevabınız"
-                placeholder="Kendi cevabınızı yazın…"
+                aria-label={L("Kendi cevabınız", "Your own answer")}
+                placeholder={L("Kendi cevabınızı yazın…", "Type your own answer…")}
                 value={freeform[q.id] ?? ""}
                 onChange={(e) =>
                   setFreeform((prev) => ({ ...prev, [q.id]: e.target.value }))
@@ -256,7 +318,7 @@ export function YulaQuestionnaireCard({
           <QuestionnaireSkip />
           <QuestionnaireNext />
           <span className="flex-1" />
-          <QuestionnaireSubmit>Gönder</QuestionnaireSubmit>
+          <QuestionnaireSubmit>{L("Gönder", "Send")}</QuestionnaireSubmit>
         </QuestionnaireActions>
       </Questionnaire>
     </div>

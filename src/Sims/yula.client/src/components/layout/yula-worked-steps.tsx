@@ -26,6 +26,46 @@ export interface WorkedStepItem {
   stepIndex?: number;
 }
 
+export interface WorkedStepPhase {
+  phaseIndex: number;
+  label: string;
+  steps: WorkedStepItem[];
+  hasError: boolean;
+  isLive: boolean;
+}
+
+const PHASE_LABEL_BY_KIND: Record<WorkedStepItem["kind"], string> = {
+  explored: "Exploration",
+  edited: "Updates",
+  ran: "Execution",
+  confirmation: "Confirmation",
+  thought: "Thinking",
+};
+
+/** Düz adım listesini stepIndex (step-start sınırı) bazında fazlara böler.
+ *  Faz etiketi, fazdaki ilk düşünce-dışı adımın türünden türetilir (İngilizce). */
+export function groupStepsByPhase(steps: WorkedStepItem[]): WorkedStepPhase[] {
+  const buckets = new Map<number, WorkedStepItem[]>();
+  for (const step of steps) {
+    const key = step.stepIndex ?? 0;
+    const list = buckets.get(key);
+    if (list) list.push(step);
+    else buckets.set(key, [step]);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([phaseIndex, phaseSteps]) => {
+      const anchor = phaseSteps.find((s) => s.kind !== "thought") ?? phaseSteps[0];
+      return {
+        phaseIndex,
+        label: anchor ? PHASE_LABEL_BY_KIND[anchor.kind] : "Thinking",
+        steps: phaseSteps,
+        hasError: phaseSteps.some((s) => s.isError),
+        isLive: phaseSteps.some((s) => s.isLive),
+      };
+    });
+}
+
 function traceToWorkedStep(step: TurnTraceStep): WorkedStepItem {
   const pending = Boolean(step.isLive);
   return {
@@ -561,6 +601,78 @@ export function extractWorkedSteps(
             : count > 1
               ? `${count} questions answered`
               : "User answers",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "run_user_skill": {
+        const slash =
+          typeof inputObj.skill === "string" && inputObj.skill
+            ? inputObj.skill
+            : "skill";
+        const loaded =
+          info.output && typeof info.output === "object"
+            ? (info.output as { status?: string }).status === "loaded"
+            : false;
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Loaded skill: /${slash}`,
+          subLabel: isPending
+            ? "Loading skill instructions..."
+            : loaded
+              ? "Skill instructions"
+              : "Skill not found",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "run_skill_script": {
+        const script =
+          typeof inputObj.script === "string" && inputObj.script
+            ? inputObj.script.split("/").pop()
+            : "script";
+        pushStep({
+          id: info.toolCallId,
+          kind: "ran",
+          label: `Ran script: ${script}`,
+          subLabel: isPending ? "Executing skill script..." : "Script output",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "read_skill_file": {
+        const file =
+          typeof inputObj.path === "string" && inputObj.path
+            ? inputObj.path.split("/").pop()
+            : "file";
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Read skill file: ${file}`,
+          subLabel: isPending ? "Reading bundled reference..." : "Reference loaded",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "read_user_file": {
+        const file =
+          typeof inputObj.file === "string" && inputObj.file
+            ? inputObj.file
+            : "file";
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Read user file: ${file}`,
+          subLabel: isPending ? "Reading attached reference..." : "Reference loaded",
           isLive: isPending,
           isError,
           info,

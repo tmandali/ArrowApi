@@ -2,6 +2,8 @@ import {
   HomeIcon,
   Settings2Icon,
   UserCheckIcon,
+  BotIcon,
+  SparklesIcon,
 } from "lucide-react";
 import type { WorkspaceNavItem } from "@/types";
 
@@ -22,5 +24,15 @@ export const systemNav: WorkspaceNavItem[] = [
     title: "Tüm Kullanıcılar (Admin)",
     url: "/system/users",
     icon: UserCheckIcon,
+  },
+  {
+    title: "Ajanlar",
+    url: "/system/agents",
+    icon: BotIcon,
+  },
+  {
+    title: "Skill'ler",
+    url: "/system/skills",
+    icon: SparklesIcon,
   },
 ];

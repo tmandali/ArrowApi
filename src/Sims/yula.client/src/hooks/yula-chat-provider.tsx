@@ -8,6 +8,7 @@ import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route";
 import {
   yulaToolPartInfo,
   isFailedToolInfo,
+  SERVER_EXECUTED_TOOLS,
 } from "@/lib/yula-tool-info";
 import {
   YulaChatContext,
@@ -32,6 +33,11 @@ import {
 import {
   useChatsStore,
 } from "@/lib/stores/chats";
+import { useUserSkillsStore } from "@/lib/stores/user-skills";
+import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
+import { getEffectiveUserSkills } from "@/lib/yula-user-skill";
+import { useUserAgentsStore } from "@/lib/stores/user-agents";
+import { filterAgentsByScope } from "@/lib/yula-user-agent";
 import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
 import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
 import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
@@ -151,6 +157,11 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   // Araç hata aldıysa (örn: Binder Error), modelin hata mesajını ve hint'i okuyup
   // kendini düzeltmesi için (Self-Correction Turn) otomatik olarak 2. tur tetiklenir!
   // ask_user_question her durumda terminaldir: cevap yeni kullanıcı mesajıyla gelir.
+  // navigate_to_page BİLEREK terminal DEĞİLDİR: sunucu stopWhen akışı bitirir,
+  // istemci taze ekran bağlamıyla resubmit eder (araç seti refresh) ve
+  // "aç + doldur + çalıştır" zinciri sürer. Yalın navigasyonlar döngüye girmez:
+  // resubmit sonrası yeni araç çağrısı yoksa (toolInfos boş) veya model esaslı
+  // cevap yazdıysa aşağıdaki kapılar durur; tekrar navigasyon dedupe'a takılır.
   const hasSuccessfulTerminalScreenTool = toolInfos.some(
     (i) =>
       [
@@ -158,7 +169,6 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
         "set_grid_query",
         "run_job",
         "apply_criteria",
-        "navigate_to_page",
         "open_last_report",
         "visualize_grid_data",
         "ask_user_question",
@@ -374,6 +384,13 @@ function ChatInstance({
           const isHome = isWorkspaceHomePath(pathOnly);
           const workspaceId = workspaceIdFromPath(pathOnly);
           const workspaceLabel = workspaceLabelFromPath(pathOnly);
+          // Seçili ajan (kapsam dışıysa yok sayılır) — kimlik + skill daraltma için.
+          const agentStore = useUserAgentsStore.getState();
+          const activeAgent = agentStore.activeAgentId
+            ? (filterAgentsByScope(agentStore.agents, workspaceId).find(
+                (a) => a.id === agentStore.activeAgentId,
+              ) ?? null)
+            : null;
           const mode: "main" | "dock" = isHome ? "main" : "dock";
           const aiConfig = readYulaClientAiConfig();
 
@@ -521,6 +538,37 @@ function ChatInstance({
                 screenState: screenSnapshot,
                 screenDiff,
                 stateLegend: screenReg?.stateLegend,
+                // Kullanıcı skill envanteri (yalnızca isim/açıklama —
+                // progressive disclosure; tam talimat run_user_skill ile).
+                // Seçili ajan skill listesi verdiyse envanter ona daralır.
+                userSkills: (() => {
+                  const all = getEffectiveUserSkills(
+                    useUserSkillsStore.getState().skills,
+                    BUILT_IN_USER_SKILLS,
+                    workspaceId,
+                  );
+                  const agentSkills = activeAgent?.skills;
+                  const narrowed =
+                    agentSkills && agentSkills.length > 0
+                      ? all.filter((s) => agentSkills.includes(s.slash.toLowerCase()))
+                      : all;
+                  return narrowed.map((s) => ({
+                    slash: s.slash,
+                    label: s.label,
+                    description: s.description,
+                  }));
+                })(),
+                // Seçili ajan kimliği (kapsam dışıysa yok sayılır).
+                agent: activeAgent
+                  ? {
+                      name: activeAgent.name,
+                      instructions: activeAgent.instructions,
+                      tools: activeAgent.tools,
+                      skills: activeAgent.skills,
+                      provider: activeAgent.provider,
+                      model: activeAgent.model,
+                    }
+                  : null,
               },
             },
           };
@@ -619,6 +667,8 @@ function ChatInstance({
       state?: string;
     }) => {
       if (part.state && part.state !== "input-available") return;
+      // Sunucu-execute araçlar istemcide koşmaz (çift yürütme + bozuk resubmit).
+      if (SERVER_EXECUTED_TOOLS.has(part.toolName)) return;
       // Yürütme tamamen patlarsa bile SDK kanonik hata çıktısı ekle
       // (state:"output-error" + errorText) — aksi halde satır "Çalışıyor…"da
       // asılı kalır ve resubmit hatalı geçmişle sunucuda patlar.
@@ -751,6 +801,7 @@ function ChatInstance({
               (info): info is NonNullable<typeof info> =>
                 info !== null &&
                 info.state === "input-available" &&
+                !SERVER_EXECUTED_TOOLS.has(info.toolName) &&
                 !handledToolsRef.current.has(info.toolCallId),
             )
         : [],

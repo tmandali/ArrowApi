@@ -258,6 +258,20 @@ async function doIndexReportSchemas(): Promise<number> {
       metadata: { type: "system_route", path: "/system/users" },
       tier: "global",
     },
+    {
+      id: "system_agents",
+      scope: "system",
+      content: "Ajanlar (/system/agents): Kullanıcı tanımlı Yula ajan kimlikleri (persona talimatı, araç erişimi, skill seti, model) bu ekranda oluşturulur, düzenlenir, aktifleştirilir ve silinir.",
+      metadata: { type: "system_route", path: "/system/agents" },
+      tier: "global",
+    },
+    {
+      id: "system_skills",
+      scope: "system",
+      content: "Skill'ler (/system/skills): Kullanıcı tanımlı slash komutları (User sekmesi) ve yerleşik skill'ler (System sekmesi) bu ekranda yönetilir.",
+      metadata: { type: "system_route", path: "/system/skills" },
+      tier: "global",
+    },
   );
 
   // 1. OPFS kalıcı önbelleğini yükle

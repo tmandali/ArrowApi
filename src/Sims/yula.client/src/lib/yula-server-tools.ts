@@ -170,6 +170,200 @@ const askUserQuestionTool = tool({
   }),
 });
 
+/**
+ * run_user_skill — kullanıcının cihaz-içi skill'ini çalıştırır (cookbook:
+ * agent-skills progressive disclosure). Envanter (isim/açıklama) sistem
+ * prompt'undadır; tam talimat istemcide yüklenir ve çıktı olarak döner —
+ * model talimatları araçlarıyla uygulamaya devam eder (terminal değildir).
+ * STATIC_TOOLS ve grid araçlarında paylaşılır (ask_user_question deseni).
+ */
+const runUserSkillTool = tool({
+  description: [
+    "Run a USER-DEFINED on-device skill (slash command created by this user).",
+    "Call when the user's request matches one of the USER SKILLS listed in the system prompt, or when they reference a skill by /name.",
+    "The tool returns the skill's full instructions — follow them with your tools in the following steps.",
+    "If the output lists attached files, read them with 'read_user_file' when the instructions reference them.",
+    "Never invent skill names; use only the listed inventory.",
+  ].join(" "),
+  inputSchema: z.object({
+    skill: z.string().describe("Skill slash name without '/' (e.g. 'haftalik-ozet')"),
+    input: z.string().optional().describe("User's extra input appended to the skill prompt"),
+  }),
+  outputSchema: z.object({
+    status: z.enum(["loaded", "not-found"]),
+    skill: z.string().optional(),
+    prompt: z.string().optional(),
+    files: z
+      .array(z.object({ name: z.string(), chars: z.number() }))
+      .optional()
+      .describe("Attached reference files (load via read_user_file)"),
+    message: z.string(),
+  }),
+});
+
+/**
+ * run_skill_script — yerleşik SKILL BETİĞİNİ sunucu sandbox'ında koşturur.
+ * İstemci araçlarından FARKLIDIR: `execute` sunucudadır (SDK çok-adımlı
+ * döngüde otomatik koşar); istemci yürütme döngüsü SERVER_EXECUTED_TOOLS
+ * ile dokunmaz. Betikler skills/<ad>/scripts/*.mjs altındadır, shell'siz
+ * node ile koşar, tek satır JSON basar.
+ */
+const runSkillScriptTool = tool({
+  description: [
+    "Run a built-in SKILL SCRIPT (.mjs) inside the server sandbox for deterministic computations the model must not hand-calculate.",
+    "Available scripts: 'ay-kapanis/scripts/month-range.mjs' converts month/week expressions to exact ISO date ranges (input args JSON: {month: 'YYYY-MM'} or {relative: 'last-month'|'this-month'|'last-week'|'this-week', today?: 'YYYY-MM-DD'}; returns {start, end, range, label}).",
+    "Use the returned start..end range directly in criteria or SQL. Never invent script paths; use only the listed inventory.",
+  ].join(" "),
+  inputSchema: z.object({
+    script: z
+      .string()
+      .describe(
+        "Skill script path under skills/ (e.g. 'ay-kapanis/scripts/month-range.mjs')",
+      ),
+    args: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Arguments passed to the script as a single JSON object"),
+  }),
+  outputSchema: z.object({
+    status: z.enum(["ok", "error"]),
+    script: z.string().optional(),
+    data: z.unknown().optional(),
+    message: z.string(),
+  }),
+  execute: async ({ script, args }) => {
+    const { createNodeSandbox } = await import("@/lib/skill-sandbox");
+    const { default: path } = await import("node:path");
+    const sandbox = createNodeSandbox(
+      process.env.YULA_SKILLS_DIR ?? path.join(process.cwd(), "skills"),
+    );
+    try {
+      const { stdout } = await sandbox.exec({
+        script,
+        args: [JSON.stringify(args ?? {})],
+      });
+      const data: unknown = JSON.parse(stdout);
+      if (
+        data &&
+        typeof data === "object" &&
+        (data as { status?: unknown }).status === "error"
+      ) {
+        return {
+          status: "error" as const,
+          script,
+          message: String(
+            (data as { message?: unknown }).message ?? "Betik hata döndürdü.",
+          ),
+        };
+      }
+      return {
+        status: "ok" as const,
+        script,
+        data,
+        message: "Betik tamamlandı.",
+      };
+    } catch (err) {
+      return {
+        status: "error" as const,
+        script,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+});
+
+/**
+ * read_skill_file — skill paketli REFERANS dosyasını sunucu sandbox'ından
+ * okur (cookbook: agent-skills "Accessing Bundled Resources"). Uzun
+ * playbook/dokümanlar skill gövdesine değil references/ altına konur;
+ * model yalnızca gerektiğinde çeker (bağlam ekonomisi). run_skill_script
+ * gibi server-executed'dır (istemci döngüsü dokunmaz), terminal değildir.
+ */
+const SKILL_READ_EXTENSIONS = new Set([".md", ".txt", ".json"]);
+const SKILL_READ_MAX_CHARS = 64_000;
+
+const readSkillFileTool = tool({
+  description: [
+    "Read a bundled SKILL REFERENCE file (long playbooks, checklists, SQL patterns shipped under skills/<skill>/references/).",
+    "Call when a skill body points at a references file, or when you need detailed domain rules that don't fit the turn budget.",
+    "Only .md/.txt/.json under skills/; paths outside the skills directory are rejected. Long files are truncated.",
+  ].join(" "),
+  inputSchema: z.object({
+    path: z
+      .string()
+      .describe(
+        "Reference path under skills/ (e.g. 'ay-kapanis/references/kapanis-kontrol-listesi.md')",
+      ),
+  }),
+  outputSchema: z.object({
+    status: z.enum(["ok", "error"]),
+    path: z.string().optional(),
+    content: z.string().optional(),
+    truncated: z.boolean().optional(),
+    message: z.string(),
+  }),
+  execute: async ({ path: relPath }) => {
+    const { createNodeSandbox } = await import("@/lib/skill-sandbox");
+    const { default: nodePath } = await import("node:path");
+    const fail = (message: string) => ({
+      status: "error" as const,
+      path: relPath,
+      message,
+    });
+    const ext = nodePath.extname(relPath).toLowerCase();
+    if (!SKILL_READ_EXTENSIONS.has(ext)) {
+      return fail(
+        `Yalnızca ${[...SKILL_READ_EXTENSIONS].join(", ")} okunur.`,
+      );
+    }
+    const sandbox = createNodeSandbox(
+      process.env.YULA_SKILLS_DIR ?? nodePath.join(process.cwd(), "skills"),
+    );
+    try {
+      const content = await sandbox.readFile(relPath, "utf-8");
+      const truncated = content.length > SKILL_READ_MAX_CHARS;
+      return {
+        status: "ok" as const,
+        path: relPath,
+        content: truncated
+          ? content.slice(0, SKILL_READ_MAX_CHARS)
+          : content,
+        truncated,
+        message: truncated
+          ? "Dosya 64K karakterde kesildi."
+          : "Dosya okundu.",
+      };
+    } catch (err) {
+      return fail(err instanceof Error ? err.message : String(err));
+    }
+  },
+});
+
+/**
+ * read_user_file — kullanıcı skill'ine ekli REFERANS dosyayı okur
+ * (read_skill_file'ın cihaz-içi karşılığı). Betik YOKTUR: kullanıcı
+ * skill'leri yalnızca doküman taşır. İstemcide yürütülür (localStorage),
+ * terminal değildir.
+ */
+const readUserFileTool = tool({
+  description: [
+    "Read a USER SKILL reference file (long docs attached to an on-device skill).",
+    "Call when a loaded skill lists attached files, or when skill instructions reference a document.",
+    "User skills never contain scripts — only .md/.txt/.json references.",
+  ].join(" "),
+  inputSchema: z.object({
+    skill: z.string().describe("Skill slash name without '/'"),
+    file: z.string().describe("File name as listed in the skill load output"),
+  }),
+  outputSchema: z.object({
+    status: z.enum(["ok", "not-found"]),
+    skill: z.string().optional(),
+    file: z.string().optional(),
+    content: z.string().optional(),
+    message: z.string(),
+  }),
+});
+
 /** STATİK istemci-yürütülebilir araç seti (tipli parça üretir). */
 export const STATIC_TOOLS = {
     get_report_schema: reportSchemaTool,
@@ -257,6 +451,7 @@ export const STATIC_TOOLS = {
         "Ask the user for HUMAN APPROVAL (human-in-the-loop) before critical, high-cost, or data-changing operations.",
         "Call when the user asks for bulk updates, deletions, heavy queries, discount operations, stock adjustments, or the operation requires approval.",
         "Opens an interactive [Approve] / [Cancel] card. The operation does not execute until the user responds.",
+        "If a previous call returned confirmed:false, do NOT call this tool again for the same operation.",
       ].join(" "),
       inputSchema: z.object({
         title: z.string().describe("Short card title (e.g. 'Bulk Discount Operation')"),
@@ -271,6 +466,10 @@ export const STATIC_TOOLS = {
       }),
     }),
     ask_user_question: askUserQuestionTool,
+    run_user_skill: runUserSkillTool,
+    run_skill_script: runSkillScriptTool,
+    read_skill_file: readSkillFileTool,
+    read_user_file: readUserFileTool,
     navigate_to_page: tool({
       description: [
         "Navigate to a page, workspace, or report inside the app (in-app client navigation).",
@@ -506,6 +705,10 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
   return {
     get_report_schema: reportSchemaTool,
     ask_user_question: askUserQuestionTool,
+    run_user_skill: runUserSkillTool,
+    run_skill_script: runSkillScriptTool,
+    read_skill_file: readSkillFileTool,
+    read_user_file: readUserFileTool,
     analyze_grid_data: dynamicTool({
       description: [
         "Açık veri kümesinde analizi çalıştırır (KPI/toplam/grup).",

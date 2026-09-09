@@ -16,13 +16,18 @@ import { YulaChatTurn } from "@/components/layout/yula-chat-turn"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { workspaceIconFor } from "@/components/layout/workspace-brand"
 import { YULA } from "@/components/layout/yula-brand-data"
-import { YulaModelSelector } from "@/components/layout/yula-model-selector"
+import { YulaAgentCards } from "@/components/layout/yula-agent-cards"
+import { useUserAgentsStore } from "@/lib/stores/user-agents"
+import { filterAgentsByScope } from "@/lib/yula-user-agent"
 import {
   getAllYulaCommands,
   matchYulaCommands,
+  userSkillsToCommands,
   type YulaCommand,
 } from "@/components/layout/yula-commands"
 import { useChatsStore } from "@/lib/stores/chats"
+import { useUserSkillsStore } from "@/lib/stores/user-skills"
+import { buildUserSkillPrompt } from "@/lib/yula-user-skill"
 import { YulaHistorySidebar, YulaHistoryMainView } from "@/components/layout/yula-history-sidebar"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useYulaChat, useOptionalYulaChat } from "@/hooks/use-yula-chat"
@@ -375,6 +380,7 @@ function AIChatPanelSession({
   }, [])
 
   const pathname = usePathname()
+  const router = useRouter()
   const isHomePath = isWorkspaceHomePath(pathname)
   const isMainMode = mode ? mode === "main" : isHomePath
 
@@ -403,7 +409,18 @@ function AIChatPanelSession({
       : extractJobIdFromPath(pathname)
   const isViewingResults =
     isReportResultPath(pathname) || Boolean(selectedJobId)
-  const allCommands = React.useMemo(() => getAllYulaCommands(isViewingResults, pathname), [isViewingResults, pathname])
+  const userSkills = useUserSkillsStore((s) => s.skills)
+  const workspaceId = workspaceIdFromPath(pathname)
+  // Aktif ajan rozeti (varsayılan Yula'da gösterilmez).
+  const userAgents = useUserAgentsStore((s) => s.agents)
+  const activeAgentId = useUserAgentsStore((s) => s.activeAgentId)
+  const setActiveAgentId = useUserAgentsStore((s) => s.setActiveAgentId)
+  const effectiveAgent = React.useMemo(() => {
+    const inScope = filterAgentsByScope(userAgents, workspaceId)
+    return activeAgentId ? (inScope.find((a) => a.id === activeAgentId) ?? null) : null
+  }, [userAgents, activeAgentId, workspaceId])
+  const userSkillCommands = React.useMemo(() => userSkillsToCommands(userSkills, workspaceId), [userSkills, workspaceId])
+  const allCommands = React.useMemo(() => getAllYulaCommands(isViewingResults, pathname, userSkillCommands), [isViewingResults, pathname, userSkillCommands])
   const commandMatches = matchYulaCommands(input, allCommands)
   const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0
   const hasUserMessages = messages.some((message) => message.role === "user")
@@ -480,7 +497,9 @@ function AIChatPanelSession({
     }
 
     let finalPrompt = ""
-    if (promptPrefix) {
+    if (selectedCommand?.source === "user") {
+      finalPrompt = buildUserSkillPrompt(selectedCommand, trimmed)
+    } else if (promptPrefix) {
       finalPrompt = trimmed ? `${promptPrefix} ${trimmed}` : promptPrefix
     } else {
       finalPrompt = trimmed
@@ -557,6 +576,24 @@ function AIChatPanelSession({
 
   const inputArea = (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
+      {effectiveAgent ? (
+        <div className="flex items-center gap-1.5 px-1">
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/[0.07] px-2 py-0.5 text-[10.5px] font-medium text-primary">
+            {effectiveAgent.name}
+            {effectiveAgent.model ? (
+              <span className="font-mono font-normal opacity-70">{effectiveAgent.model}</span>
+            ) : null}
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveAgentId(null)}
+            title="Ajan seçimini kaldır (varsayılan Yula)"
+            className="rounded-full p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      ) : null}
       {showCommands ? (
         <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
           <Command shouldFilter={false} className="p-1">
@@ -588,9 +625,27 @@ function AIChatPanelSession({
                       <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
                         {command.description || command.label}
                       </span>
+                      {command.source === "user" ? (
+                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1 py-px text-[9.5px] font-medium text-primary">
+                          skill
+                        </span>
+                      ) : null}
                     </CommandItem>
                   )
                 })}
+                <CommandItem
+                  value="__new-agent__"
+                  onSelect={() => router.push("/system/agents")}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors hover:bg-accent/80"
+                >
+                  <Plus className="size-3.5 text-primary shrink-0" />
+                  <span className="font-semibold text-foreground shrink-0">
+                    Ajan oluştur
+                  </span>
+                  <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
+                    Yönetim sayfasını aç
+                  </span>
+                </CommandItem>
               </CommandGroup>
             </CommandList>
           </Command>
@@ -766,9 +821,6 @@ function AIChatPanelSession({
             >
               <Plus className="size-3.5" />
             </Button>
-            <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0 self-center" aria-hidden="true" />
-
-            <YulaModelSelector />
           </div>
 
           {isLoading && !canSubmit ? (
@@ -885,6 +937,11 @@ function AIChatPanelSession({
               <p className="mt-1 max-w-md text-center text-sm text-muted-foreground">
                 {introDescription}
               </p>
+              <YulaAgentCards
+                workspaceId={workspaceId}
+                onManage={() => router.push("/system/agents")}
+                className="mt-6"
+              />
               <div className="mt-8 flex w-full justify-center">{inputArea}</div>
             </div>
           )

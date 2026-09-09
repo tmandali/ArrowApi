@@ -18,7 +18,8 @@ import {
 } from "@/lib/yula-actions";
 
 export type { KnownSystemAction };
-import { findingItemPrompt, parseColonTitleLine } from "@/lib/finding-actions";
+import { parseColonTitleLine, extractFindingFilterPrompt } from "@/lib/finding-actions";
+import { buildFindingDrillPrompt } from "@/lib/yula-finding-drill";
 
 /**
  * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
@@ -167,6 +168,8 @@ export interface ChatMarkdownCallbacks {
   isExecutionConfirmation: boolean
   /** Bulgu → filtre prompt çıkarımı için açık grid kolonları */
   columns: string[]
+  /** Turun analizinin üretildiği kaynak tablo (yoksa aktif view kullanılır) */
+  sourceTable?: string | null
 }
 
 /* ----------------------------- blok renderları ---------------------------- */
@@ -234,7 +237,23 @@ function renderBulletedItem(
 
   const { title: itemTitle, desc: itemDesc } = parsed
   const knownAction = KNOWN_SYSTEM_ACTIONS.find((a) => a.pattern.test(itemTitle))
-  const reQueryPrompt = findingItemPrompt(itemTitle, itemDesc)
+  // Bulgu tıklaması iki kademeli çözülür: önce yapısal filtre çıkarımı
+  // (ucuz, deterministik grid filtresi), çıkarılamazsa başlık + açıklamayı
+  // taşıyan tıklama-bağlamı (LLM tespit sorgusunu üretir).
+  // View pini: analiz farklı bir tablodan üretildiyse ve kullanıcı o zamandan
+  // beri view değiştirdiyse, grid filtresi (aktif view'a işler) atlanır ve
+  // drill doğrudan kaynak tabloya pinlenir.
+  const findingText = `${itemTitle}: ${itemDesc}`
+  const pinnedTable = cb.sourceTable ?? null
+  const liveTable = useYulaGridStore.getState().spec?.tableName ?? null
+  const sameView =
+    !pinnedTable ||
+    !liveTable ||
+    pinnedTable.toLowerCase() === liveTable.toLowerCase()
+  const findingClickPrompt = sameView
+    ? (extractFindingFilterPrompt({ text: findingText, columns: cb.columns }) ??
+      buildFindingDrillPrompt(findingText))
+    : buildFindingDrillPrompt(findingText, pinnedTable)
 
   return (
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
@@ -251,9 +270,9 @@ function renderBulletedItem(
               cb.onPrompt(knownAction.prompt)
               return
             }
-            cb.onPrompt(reQueryPrompt)
+            cb.onPrompt(findingClickPrompt)
           }}
-          title={`"${reQueryPrompt}" olarak sormak için tıklayın`}
+          title={`"${findingClickPrompt}" olarak sormak için tıklayın`}
           className={cn(
             "mr-1.5 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors",
           )}
@@ -828,6 +847,7 @@ export function ChatMarkdown({
   text,
   isExecutionConfirmation,
   columns,
+  sourceTable,
   onPrompt,
   onNavigateReport,
   className,
@@ -835,14 +855,15 @@ export function ChatMarkdown({
   text: string
   isExecutionConfirmation: boolean
   columns: string[]
+  sourceTable?: string | null
   onPrompt: (text: string) => void
   onNavigateReport: (reportTitle: string) => boolean
   className?: string
 }) {
   const blocks = React.useMemo(() => parseMarkdownBlocks(text), [text])
   const callbacks = React.useMemo<ChatMarkdownCallbacks>(
-    () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns }),
-    [onPrompt, onNavigateReport, isExecutionConfirmation, columns],
+    () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable }),
+    [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable],
   )
 
   return (

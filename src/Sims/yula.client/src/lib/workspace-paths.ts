@@ -131,6 +131,8 @@ function reportScreenLabel(pathname: string): string | null {
   if (pathname.includes("/stock/stock-ledger")) return "Stok Ekstre"
   if (pathname.includes("/stock/item")) return "Stok Kartı"
   if (pathname.includes("/system/users")) return "Kullanıcılar"
+  if (pathname.includes("/system/agents")) return "Ajanlar"
+  if (pathname.includes("/system/skills")) return "Skill'ler"
   return null
 }
 

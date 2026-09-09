@@ -9,6 +9,16 @@ export interface YulaToolPartInfo {
   errorText?: string;
 }
 
+/**
+ * `execute` ile SUNUCUDA koşan araçlar — istemci yürütme döngüsü
+ * (runPendingTool) bunlara dokunmaz; aksi halde çift yürütme + hatalı
+ * geçmişle resubmit olur. Yeni server-executed araç buraya eklenir.
+ */
+export const SERVER_EXECUTED_TOOLS: ReadonlySet<string> = new Set([
+  "run_skill_script",
+  "read_skill_file",
+]);
+
 export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
   const p = part as { type?: string } | null;
   if (!p?.type) return null;

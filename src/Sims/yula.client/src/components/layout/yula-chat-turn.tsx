@@ -21,6 +21,11 @@ import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 import { copyToClipboard } from "@/lib/clipboard";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { describeYulaStreamError } from "@/lib/yula-stream-error";
+import {
+  detectUserLanguage,
+  pickLang,
+  type YulaUiLang,
+} from "@/lib/yula-lang";
 
 const SCREEN_TOOLS = new Set([
   "filter_current_grid",
@@ -44,39 +49,40 @@ function formatTokenCount(n: number): string {
   return `${n}`;
 }
 
-function liveStatusLabel(toolParts: YulaToolPartInfo[]): string {
+function liveStatusLabel(toolParts: YulaToolPartInfo[], lang: YulaUiLang): string {
   const pending = toolParts.find(
     (i) => i.state === "input-available" || i.state === "input-streaming",
   );
+  const L = (tr: string, en: string) => pickLang(lang, tr, en);
   switch (pending?.toolName) {
     case "profile_grid_table":
-      return "Tablo analiz ediliyor — lütfen bekleyin…";
+      return L("Tablo analiz ediliyor — lütfen bekleyin…", "Analyzing table — please wait…");
     case "analyze_grid_data":
-      return "Tablo özeti hesaplanıyor…";
+      return L("Tablo özeti hesaplanıyor…", "Computing table summary…");
     case "run_expert_sql":
-      return "SQL sorgusu çalışıyor…";
+      return L("SQL sorgusu çalışıyor…", "Running SQL query…");
     case "visualize_grid_data":
-      return "Grafik hazırlanıyor…";
+      return L("Grafik hazırlanıyor…", "Preparing chart…");
     case "ask_user_question":
-      return "Sorular hazırlanıyor…";
+      return L("Sorular hazırlanıyor…", "Preparing questions…");
     case "filter_current_grid":
     case "apply_grid_filters":
-      return "Filtre uygulanıyor…";
+      return L("Filtre uygulanıyor…", "Applying filter…");
     case "set_grid_sort":
-      return "Tablo sıralanıyor…";
+      return L("Tablo sıralanıyor…", "Sorting table…");
     case "configure_grid_columns":
     case "pin_grid_columns":
-      return "Kolonlar düzenleniyor…";
+      return L("Kolonlar düzenleniyor…", "Arranging columns…");
     case "reset_grid_layout":
-      return "Görünüm sıfırlanıyor…";
+      return L("Görünüm sıfırlanıyor…", "Resetting view…");
     case "export_grid_data":
-      return "Dosya dışa aktarılıyor…";
+      return L("Dosya dışa aktarılıyor…", "Exporting file…");
     case "set_grid_query":
-      return "Tablo görünümü güncelleniyor…";
+      return L("Tablo görünümü güncelleniyor…", "Updating table view…");
     default:
       return pending
-        ? "İstek işleniyor — lütfen bekleyin…"
-        : "Yula yanıt hazırlıyor — lütfen bekleyin…";
+        ? L("İstek işleniyor — lütfen bekleyin…", "Processing request — please wait…")
+        : L("Yula yanıt hazırlıyor — lütfen bekleyin…", "Yula is preparing a reply — please wait…");
   }
 }
 
@@ -84,10 +90,12 @@ function SilentTurnFallback({
   toolParts,
   streamErrorText,
   onRetry,
+  lang,
 }: {
   toolParts: YulaToolPartInfo[];
   streamErrorText?: string;
   onRetry: () => void;
+  lang: YulaUiLang;
 }) {
   const failed = toolParts.filter((i) => isFailedToolInfo(i));
   const hasScreenOk = toolParts.some(
@@ -96,16 +104,30 @@ function SilentTurnFallback({
   if (hasScreenOk && !streamErrorText) return null;
 
   const friendlyStreamError = describeYulaStreamError(streamErrorText);
-  const hint =
+  const hint = pickLang(
+    lang,
     friendlyStreamError
       ? `AI sağlayıcısı hata döndürdü: ${friendlyStreamError}`
       : failed.length > 0
         ? `Analiz tamamlanamadı: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "araç hatası")}.`
-        : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).";
+        : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).",
+    friendlyStreamError
+      ? `AI provider returned an error: ${friendlyStreamError}`
+      : failed.length > 0
+        ? `Analysis could not finish: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "tool error")}.`
+        : "No visible reply was produced in this turn (analysis may be stuck or the model ended silently).",
+  );
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-2.5 text-[12px] leading-relaxed text-amber-950 dark:text-amber-100">
-      <p>{hint} Yeni bir mesaj yazmadan önce yeniden deneyin.</p>
+      <p>
+        {hint}{" "}
+        {pickLang(
+          lang,
+          "Yeni bir mesaj yazmadan önce yeniden deneyin.",
+          "Please retry before writing a new message.",
+        )}
+      </p>
       <Button
         type="button"
         size="sm"
@@ -113,7 +135,7 @@ function SilentTurnFallback({
         className="h-7 w-fit text-[11px]"
         onClick={onRetry}
       >
-        Yanıtı yeniden dene
+        {pickLang(lang, "Yanıtı yeniden dene", "Retry reply")}
       </Button>
     </div>
   );
@@ -159,6 +181,9 @@ export function YulaChatTurn({
       .map((p) => (p as { text: string }).text)
       .join("\n");
   }, [userMessage]);
+
+  // Tur dili: sabit arayüz metinleri (durum etiketi, fallback) için
+  const turnLang = React.useMemo(() => detectUserLanguage(userText), [userText]);
 
   // Asistan mesajının metni
   const assistantText = React.useMemo(() => {
@@ -382,13 +407,14 @@ export function YulaChatTurn({
         {isLive ? (
           <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground">
             <Loader2 className="size-3.5 shrink-0 text-primary animate-spin" />
-            <span>{liveStatusLabel(toolParts)}</span>
+            <span>{liveStatusLabel(toolParts, turnLang)}</span>
           </div>
         ) : !assistantText.trim() && !fallbackMessage ? (
           <SilentTurnFallback
             toolParts={toolParts}
             streamErrorText={streamErrorText}
             onRetry={() => void yula.retryResponse()}
+            lang={turnLang}
           />
         ) : null}
 
