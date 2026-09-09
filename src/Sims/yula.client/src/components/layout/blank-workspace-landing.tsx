@@ -22,6 +22,7 @@ import {
   pinnedChartToOutput,
   usePinnedCharts,
 } from "@/hooks/use-pinned-charts";
+import { useYulaGridStore } from "@/lib/stores/grid";
 import { getWorkspaceForPath, getWorkspace } from "@/lib/workspace-registry";
 import {
   type WorkspaceLandingData,
@@ -205,15 +206,23 @@ export function WorkspaceLandingTemplate({
                 <div key={chart.id} className="group relative">
                   <Link
                     href={chart.sourceHref}
-                    className="block rounded-md outline-none transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-primary/40"
-                    title="Kaynak rapora git"
+                    className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
+                    title="Kaynak raporu grafik sorgusuyla aç"
+                    onClick={() => {
+                      if (chart.sql) {
+                        useYulaGridStore
+                          .getState()
+                          .setCustomQuerySql(chart.sql, chart.title);
+                      }
+                    }}
                   >
                     <YulaChartCard
                       output={pinnedChartToOutput(chart)}
                       compact
                       pinEnabled={false}
                       showGridAction={false}
-                      className="transition-shadow group-hover:shadow-sm"
+                      borderless
+                      className="transition-colors group-hover:bg-muted/40"
                     />
                   </Link>
                   <button

@@ -158,12 +158,15 @@ export function YulaChartCard({
   compact = false,
   /** Grid’e yaz butonu (landing’de kapalı). */
   showGridAction = true,
+  /** Dashboard gömülü kullanımda bordersız soft KPI görünümü. */
+  borderless = false,
 }: {
   output: unknown;
   className?: string;
   pinEnabled?: boolean;
   compact?: boolean;
   showGridAction?: boolean;
+  borderless?: boolean;
 }) {
   const parsed = React.useMemo(() => parseChartOutput(output), [output]);
   const uid = React.useId().replace(/:/g, "");
@@ -271,10 +274,15 @@ export function YulaChartCard({
     Math.max(0.35, 1 - originalIndex * toneStep);
 
   // Yatay barda bar sayısına göre dinamik yükseklik (30 kategoriye kadar okunur)
+  // Compact (dashboard) modda üstten kesmeyi önlemek için daha nefes alan min yükseklik.
+  // Dashboard pie'da legend yana alındığı için grafik daha büyük çizilir.
+  const isSideLegendPie = borderless && chartType === "pie";
   const chartHeight = compact
     ? chartType === "bar"
-      ? Math.min(220, Math.max(140, rows.length * 18 + 36))
-      : 160
+      ? Math.min(240, Math.max(160, rows.length * 24 + 48))
+      : chartType === "pie"
+        ? Math.min(240, Math.max(200, rows.length * 14 + 160))
+        : 184
     : chartType === "bar"
       ? Math.min(420, Math.max(180, rows.length * 26 + 48))
       : 224;
@@ -291,11 +299,18 @@ export function YulaChartCard({
   return (
     <div
       className={cn(
-        "w-full overflow-hidden rounded-md border bg-card text-card-foreground",
+        borderless
+          ? "w-full overflow-hidden rounded-xl bg-transparent text-card-foreground border-0 shadow-none"
+          : "w-full overflow-hidden rounded-md border bg-card text-card-foreground",
         className,
       )}
     >
-      <div className="group/header flex h-7 items-center justify-between gap-2 border-b bg-muted/40 px-3">
+      <div
+        className={cn(
+          "group/header flex h-7 items-center justify-between gap-2 px-3",
+          borderless ? "border-0 bg-transparent" : "border-b bg-muted/40",
+        )}
+      >
         <p className="min-w-0 truncate text-[11px] font-medium leading-none">
           {title}
         </p>
@@ -332,16 +347,83 @@ export function YulaChartCard({
           ) : null}
         </div>
       </div>
-      {description ? (
+      {!borderless && description ? (
         <div className="px-3 pt-1.5">
           <p className="text-[11px] leading-snug text-muted-foreground">
             {description}
           </p>
         </div>
       ) : null}
+      {isSideLegendPie ? (
+        <div className="flex w-full items-stretch gap-1 px-2 pt-2 pb-1">
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-auto min-w-0 flex-1"
+            style={{ height: chartHeight }}
+          >
+            <PieChart>
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    labelKey="label"
+                    formatter={(value) =>
+                      numberFmt.format(Number(value ?? 0))
+                    }
+                  />
+                }
+              />
+              <Pie
+                data={rows}
+                dataKey={dimensionY[0]}
+                nameKey="label"
+                innerRadius={Math.max(40, chartHeight * 0.22)}
+                outerRadius={Math.max(68, chartHeight * 0.38)}
+                paddingAngle={2}
+                strokeWidth={1}
+              >
+                {rows.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={CHART_COLORS[0]}
+                    fillOpacity={tone(i)}
+                    stroke="var(--background)"
+                  />
+                ))}
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+          <ul
+            className="flex w-32 shrink-0 flex-col justify-center gap-1 overflow-y-auto py-1 pr-1"
+            style={{ maxHeight: chartHeight }}
+          >
+            {rows.map((row, i) => (
+              <li
+                key={i}
+                className="flex min-w-0 items-center gap-1.5 text-[10px] leading-tight"
+                title={`${String(row.label ?? "")}: ${numberFmt.format(Number(row[dimensionY[0]] ?? 0))}`}
+              >
+                <span
+                  className="size-2 shrink-0 rounded-sm"
+                  style={{
+                    backgroundColor: CHART_COLORS[0],
+                    opacity: tone(i),
+                  }}
+                />
+                <span className="min-w-0 flex-1 truncate text-foreground/85">
+                  {String(row.label ?? "")}
+                </span>
+                <span className="shrink-0 font-medium text-foreground">
+                  {compactFmt.format(Number(row[dimensionY[0]] ?? 0))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
       <ChartContainer
         config={chartConfig}
-        className="aspect-auto w-full px-2"
+        className="aspect-auto w-full px-2 pt-2 pb-1"
         style={{ height: chartHeight }}
       >
         {chartType === "pie" ? (
@@ -360,8 +442,8 @@ export function YulaChartCard({
               data={rows}
               dataKey={dimensionY[0]}
               nameKey="label"
-              innerRadius={36}
-              outerRadius={70}
+              innerRadius={compact ? 30 : 36}
+              outerRadius={compact ? 58 : 70}
               paddingAngle={2}
               strokeWidth={1}
             >
@@ -370,7 +452,7 @@ export function YulaChartCard({
                   key={i}
                   fill={CHART_COLORS[0]}
                   fillOpacity={tone(i)}
-                  stroke="var(--card)"
+                  stroke={borderless ? "var(--background)" : "var(--card)"}
                 />
               ))}
             </Pie>
@@ -378,7 +460,7 @@ export function YulaChartCard({
         ) : chartType === "line" ? (
           <AreaChart
             data={rows}
-            margin={{ top: 8, right: 20, bottom: 0, left: 4 }}
+            margin={{ top: 12, right: 20, bottom: 4, left: 4 }}
           >
             <defs>
               {dimensionY.map((k, i) => (
@@ -427,7 +509,7 @@ export function YulaChartCard({
           <BarChart
             data={barRows}
             layout="vertical"
-            margin={{ top: 4, right: 20, bottom: 0, left: 4 }}
+            margin={{ top: 8, right: 20, bottom: 4, left: 4 }}
           >
             <CartesianGrid horizontal={false} strokeDasharray="3 3" />
             <XAxis
@@ -475,8 +557,14 @@ export function YulaChartCard({
           </BarChart>
         )}
       </ChartContainer>
-      {takeaway ? (
-        <div className="flex h-7 items-center border-t bg-muted/40 px-3">
+      )}
+      {takeaway && !borderless ? (
+        <div
+          className={cn(
+            "flex h-7 items-center px-3",
+            borderless ? "border-0 bg-transparent" : "border-t bg-muted/40",
+          )}
+        >
           <p className="truncate text-[11px] leading-none text-muted-foreground">
             <span className="mr-1">💡</span>
             {takeaway}
