@@ -30,7 +30,7 @@ import { Paperclip, Plus } from "lucide-react";
 import { DetailTimeline } from "@/components/layout/detail-timeline";
 import { FormGrid } from "@/components/layout/form-grid";
 import { DetailFormLayout } from "@/components/layout/detail-form-layout";
-import { DetailAside, DetailMeta, type DetailMetaRow } from "@/components/layout/detail-aside";
+import { DetailAsidePanel, type DetailMetaRow } from "@/components/layout/detail-aside";
 import { formatMetaDate } from "@/utils/format";
 import { AgentImageUpload } from "./agent-image-upload";
 import {
@@ -520,66 +520,64 @@ export function AgentEditor({
             </>
           }
           aside={
-            <>
-              <DetailAside
-                image={
-                  <AgentImageUpload
-                    value={avatar}
-                    onChange={setAvatar}
-                    onError={setError}
-                    disabled={isRO}
-                    className="w-full"
-                  />
-                }
-                addControl={
-                  !isRO ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => attachmentInputRef.current?.click()}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Paperclip className="size-3.5" />
-                          Ek dosyalar
-                        </span>
-                        <Plus className="size-3.5" />
-                      </Button>
-                      <input
-                        ref={attachmentInputRef}
-                        type="file"
-                        accept=".md,.markdown,.txt,.json"
-                        multiple
-                        className="sr-only"
-                        onChange={(e) => {
-                          handlePickAttachments(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                    </>
-                  ) : undefined
-                }
-                files={attachments.map((file) => ({
-                  key: file.name.toLowerCase(),
-                  name: file.name,
-                  dotClassName: fileDotClass(fileKindForName(file.name)),
-                }))}
-                onRemoveFile={
-                  !isRO
-                    ? (key) =>
-                        setAttachments((prev) =>
-                          prev.filter((p) => p.name.toLowerCase() !== key),
-                        )
-                    : undefined
-                }
-              />
-              <DetailMeta
-                rows={agentMetaRows}
-                emptyTitle="Henüz bilgi yok"
-                emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
-                showEmpty={attachments.length === 0}
-              />
-            </>
+            isRO ? undefined : (
+            <DetailAsidePanel
+              image={
+                <AgentImageUpload
+                  value={avatar}
+                  onChange={setAvatar}
+                  onError={setError}
+                  disabled={isRO}
+                  className="w-full"
+                />
+              }
+              addControl={
+                !isRO ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
+                      onClick={() => attachmentInputRef.current?.click()}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Paperclip className="size-3.5" />
+                        Ek dosyalar
+                      </span>
+                      <Plus className="size-3.5" />
+                    </Button>
+                    <input
+                      ref={attachmentInputRef}
+                      type="file"
+                      accept=".md,.markdown,.txt,.json"
+                      multiple
+                      className="sr-only"
+                      onChange={(e) => {
+                        handlePickAttachments(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </>
+                ) : undefined
+              }
+              files={attachments.map((file) => ({
+                key: file.name.toLowerCase(),
+                name: file.name,
+                dotClassName: fileDotClass(fileKindForName(file.name)),
+              }))}
+              onRemoveFile={
+                !isRO
+                  ? (key) =>
+                      setAttachments((prev) =>
+                        prev.filter((p) => p.name.toLowerCase() !== key),
+                      )
+                  : undefined
+              }
+              metaRows={agentMetaRows}
+              emptyTitle="Henüz bilgi yok"
+              emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
+              isNew={!agent}
+            />
+            )
           }
           timeline={
             showTimeline ? (

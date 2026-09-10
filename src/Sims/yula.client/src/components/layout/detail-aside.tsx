@@ -101,6 +101,69 @@ export type DetailMetaRow = {
 };
 
 /**
+ * Sağ panel bileşimi (aside + meta): boş-panel kuralının tek evi.
+ * Ekranlar `showEmpty` gibi UI koşulu hesaplamaz; yalnızca veriyi
+ * (`files`, `metaRows`, `isNew`) verir. "Henüz bilgi yok" ipucu yalnızca
+ * gerçekten boş yeni formda basılır — kayıtlı kayıtlarda ya da dosyası
+ * olanlarda basılmaz.
+ */
+export function DetailAsidePanel({
+  image,
+  addControl,
+  files = [],
+  onRemoveFile,
+  metaRows = [],
+  metaBare = false,
+  emptyTitle,
+  emptyDescription,
+  isNew = false,
+  className,
+}: {
+  /** Görsel kutusu slot'u (AgentImageUpload vb.) */
+  image?: ReactNode;
+  /** Dosya ekleme kontrolü (buton + gizli input, çağıranda) */
+  addControl?: ReactNode;
+  /** Dosya satırları */
+  files?: DetailAsideFile[];
+  /** Silme izni (view modda kapalı) */
+  onRemoveFile?: (key: string) => void;
+  /** Meta satırları (boşsa ve kayıt yeni değilse meta basılmaz) */
+  metaRows?: DetailMetaRow[];
+  /** Meta tek başına kullanıldığında baştaki ayraç atlanır */
+  metaBare?: boolean;
+  /** Boş meta ipucu (yalnızca yeni kayıtta gösterilir) */
+  emptyTitle?: string;
+  emptyDescription?: string;
+  /** Yeni (henüz kaydedilmemiş) kayıt */
+  isNew?: boolean;
+  className?: string;
+}) {
+  const hasAside = image != null || addControl != null || files.length > 0;
+  const showMetaEmpty = metaRows.length === 0 && isNew && files.length === 0;
+  if (!hasAside && metaRows.length === 0 && !showMetaEmpty) return null;
+  return (
+    <>
+      {hasAside ? (
+        <DetailAside
+          image={image}
+          addControl={addControl}
+          files={files}
+          onRemoveFile={onRemoveFile}
+          className={className}
+        />
+      ) : null}
+      {metaRows.length > 0 || showMetaEmpty ? (
+        <DetailMeta
+          rows={metaRows}
+          bare={metaBare}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          showEmpty={showMetaEmpty}
+        />
+      ) : null}
+    </>
+  );
+}/**
  * Detay meta bilgi bloğu (item aside deseni): ayraç + başlık/açıklama
  * satırları. Tek başına kullanıldığında `bare` ile baştaki ayraç atlanır.
  * Satır yoksa `emptyTitle` verilmişse shadcn boş durumu basılır.

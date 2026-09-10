@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Paperclip, Plus } from "lucide-react";
 import { DetailTimeline } from "@/components/layout/detail-timeline";
 import { FormGrid } from "@/components/layout/form-grid";
-import { DetailAside, DetailMeta, type DetailMetaRow } from "@/components/layout/detail-aside";
+import { DetailAsidePanel, type DetailMetaRow } from "@/components/layout/detail-aside";
 import { DetailFormLayout } from "@/components/layout/detail-form-layout";
 import {
   FILE_KIND_LABEL,
@@ -429,53 +429,51 @@ export function SkillEditor({
             </>
           }
           aside={
-            <>
-              <DetailAside
-                addControl={
-                  !isRO ? (
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Paperclip className="size-3.5" />
-                        Ek dosyalar
-                      </span>
-                      <Plus className="size-3.5" />
-                    </Button>
-                  ) : undefined
-                }
-                files={
-                  isRO && skill
-                    ? builtinFiles.map((f) => {
-                        const name = f.path.split("/").pop() ?? f.path;
-                        return {
-                          key: `file:${f.path}`,
-                          name,
-                          dotClassName: fileDotClass(
-                            f.kind === "script"
-                              ? ("script" as const)
-                              : fileKindForName(name),
-                          ),
-                        };
-                      })
-                    : files.map((f) => ({
-                        key: `file:${f.name.toLowerCase()}`,
-                        name: f.name,
-                        dotClassName: fileDotClass(fileKindForName(f.name)),
-                      }))
-                }
-                onRemoveFile={!isRO ? handleRemoveFile : undefined}
-              />
-              <DetailMeta
-                rows={skillMetaRows}
-                bare
-                emptyTitle="Henüz bilgi yok"
-                emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
-                showEmpty={files.length === 0}
-              />
-            </>
+            isRO ? undefined : (
+            <DetailAsidePanel
+              addControl={
+                !isRO ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Paperclip className="size-3.5" />
+                      Ek dosyalar
+                    </span>
+                    <Plus className="size-3.5" />
+                  </Button>
+                ) : undefined
+              }
+              files={
+                isRO && skill
+                  ? builtinFiles.map((f) => {
+                      const name = f.path.split("/").pop() ?? f.path;
+                      return {
+                        key: `file:${f.path}`,
+                        name,
+                        dotClassName: fileDotClass(
+                          f.kind === "script"
+                            ? ("script" as const)
+                            : fileKindForName(name),
+                        ),
+                      };
+                    })
+                  : files.map((f) => ({
+                      key: `file:${f.name.toLowerCase()}`,
+                      name: f.name,
+                      dotClassName: fileDotClass(fileKindForName(f.name)),
+                    }))
+              }
+              onRemoveFile={!isRO ? handleRemoveFile : undefined}
+              metaRows={skillMetaRows}
+              metaBare
+              emptyTitle="Henüz bilgi yok"
+              emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
+              isNew={!skill}
+            />
+            )
           }
           timeline={
             showTimeline ? (
