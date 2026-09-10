@@ -469,9 +469,6 @@ export function SkillEditor({
               onRemoveFile={!isRO ? handleRemoveFile : undefined}
               metaRows={skillMetaRows}
               metaBare
-              emptyTitle="Henüz bilgi yok"
-              emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
-              isNew={!skill}
             />
             )
           }

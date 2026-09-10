@@ -321,7 +321,7 @@ export function AgentEditor({
                     value={scope}
                     onChange={(v) => setScope(v || "global")}
                     options={[
-                      { value: "global", label: "Global (her yerde)" },
+                      { value: "global", label: "Global (tüm çalışma alanları)" },
                       ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
                     ]}
                     disabled={isRO}
@@ -573,9 +573,6 @@ export function AgentEditor({
                   : undefined
               }
               metaRows={agentMetaRows}
-              emptyTitle="Henüz bilgi yok"
-              emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
-              isNew={!agent}
             />
             )
           }

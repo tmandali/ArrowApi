@@ -1,15 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Info, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { cn } from "@/utils/cn";
 
 export type DetailAsideFile = {
@@ -101,11 +94,8 @@ export type DetailMetaRow = {
 };
 
 /**
- * Sağ panel bileşimi (aside + meta): boş-panel kuralının tek evi.
- * Ekranlar `showEmpty` gibi UI koşulu hesaplamaz; yalnızca veriyi
- * (`files`, `metaRows`, `isNew`) verir. "Henüz bilgi yok" ipucu yalnızca
- * gerçekten boş yeni formda basılır — kayıtlı kayıtlarda ya da dosyası
- * olanlarda basılmaz.
+ * Sağ panel bileşimi (aside + meta): ekranlar yalnızca veriyi
+ * (`files`, `metaRows`) verir; içerik yoksa panel basılmaz.
  */
 export function DetailAsidePanel({
   image,
@@ -114,9 +104,6 @@ export function DetailAsidePanel({
   onRemoveFile,
   metaRows = [],
   metaBare = false,
-  emptyTitle,
-  emptyDescription,
-  isNew = false,
   className,
 }: {
   /** Görsel kutusu slot'u (AgentImageUpload vb.) */
@@ -127,20 +114,14 @@ export function DetailAsidePanel({
   files?: DetailAsideFile[];
   /** Silme izni (view modda kapalı) */
   onRemoveFile?: (key: string) => void;
-  /** Meta satırları (boşsa ve kayıt yeni değilse meta basılmaz) */
+  /** Meta satırları (boşsa meta basılmaz) */
   metaRows?: DetailMetaRow[];
   /** Meta tek başına kullanıldığında baştaki ayraç atlanır */
   metaBare?: boolean;
-  /** Boş meta ipucu (yalnızca yeni kayıtta gösterilir) */
-  emptyTitle?: string;
-  emptyDescription?: string;
-  /** Yeni (henüz kaydedilmemiş) kayıt */
-  isNew?: boolean;
   className?: string;
 }) {
   const hasAside = image != null || addControl != null || files.length > 0;
-  const showMetaEmpty = metaRows.length === 0 && isNew && files.length === 0;
-  if (!hasAside && metaRows.length === 0 && !showMetaEmpty) return null;
+  if (!hasAside && metaRows.length === 0) return null;
   return (
     <>
       {hasAside ? (
@@ -152,56 +133,26 @@ export function DetailAsidePanel({
           className={className}
         />
       ) : null}
-      {metaRows.length > 0 || showMetaEmpty ? (
-        <DetailMeta
-          rows={metaRows}
-          bare={metaBare}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          showEmpty={showMetaEmpty}
-        />
+      {metaRows.length > 0 ? (
+        <DetailMeta rows={metaRows} bare={metaBare} />
       ) : null}
     </>
   );
-}/**
+}
+
+/**
  * Detay meta bilgi bloğu (item aside deseni): ayraç + başlık/açıklama
  * satırları. Tek başına kullanıldığında `bare` ile baştaki ayraç atlanır.
- * Satır yoksa `emptyTitle` verilmişse shadcn boş durumu basılır.
+ * Satır yoksa hiçbir şey basılmaz.
  */
 export function DetailMeta({
   rows,
   bare = false,
-  emptyTitle,
-  emptyDescription,
-  showEmpty = true,
 }: {
   rows: DetailMetaRow[];
   bare?: boolean;
-  emptyTitle?: string;
-  emptyDescription?: string;
-  showEmpty?: boolean;
 }) {
-  if (rows.length === 0) {
-    if (!emptyTitle || !showEmpty) return null;
-    return (
-      <Empty className="border-0 p-4">
-        <EmptyHeader>
-          <EmptyMedia
-            variant="icon"
-            className="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-          >
-            <Info className="size-4" />
-          </EmptyMedia>
-          <EmptyTitle className="text-xs">{emptyTitle}</EmptyTitle>
-          {emptyDescription ? (
-            <EmptyDescription className="text-[11px]">
-              {emptyDescription}
-            </EmptyDescription>
-          ) : null}
-        </EmptyHeader>
-      </Empty>
-    );
-  }
+  if (rows.length === 0) return null;
   return (
     <>
       {bare ? null : <Separator />}
