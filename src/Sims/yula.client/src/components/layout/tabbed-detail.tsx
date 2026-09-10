@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { History } from "lucide-react";
+import { History, Maximize2, Minimize2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -36,6 +36,12 @@ type TabbedDetailProps = {
   empty?: ReactNode;
   /** Sekme içerikleri (çağıranın TabsContent'leri) */
   children?: ReactNode;
+  /** Detay başlığında maksimize düğmesi gösterilsin mi */
+  maximizable?: boolean;
+  /** Detay tam genişlikte (liste paneli gizli) */
+  detailMaximized?: boolean;
+  /** Maksimize aç/kapa */
+  onToggleDetailMaximize?: () => void;
 };
 
 /**
@@ -52,6 +58,9 @@ export function TabbedDetail({
   containerClass,
   empty,
   children,
+  maximizable = false,
+  detailMaximized = false,
+  onToggleDetailMaximize,
 }: TabbedDetailProps) {
   return (
     <Tabs
@@ -85,6 +94,23 @@ export function TabbedDetail({
           <div className="min-w-0 flex-1" />
         )}
         {subtitle}
+        {maximizable && (showTabs || detailMaximized) ? (
+          <Button
+            type="button"
+            variant={detailMaximized ? "secondary" : "outline"}
+            size="icon"
+            className="size-7 shrink-0 self-center"
+            onClick={() => onToggleDetailMaximize?.()}
+            title={detailMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+            aria-label={detailMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+          >
+            {detailMaximized ? (
+              <Minimize2 className="size-3.5" />
+            ) : (
+              <Maximize2 className="size-3.5" />
+            )}
+          </Button>
+        ) : null}
         {headerActions ? (
           <div className="flex shrink-0 items-center gap-1 self-center">
             {headerActions}

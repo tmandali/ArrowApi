@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import type { ReactNode } from "react";
+import { usePagePanelContext } from "@/context/page-panel-context";
 import { MasterDetailPage } from "@/components/layout/master-detail-page";
 import {
   TabbedDetail,
@@ -40,6 +42,8 @@ type ManagementPageTemplateProps = {
   children?: ReactNode;
   listPanelId?: string;
   detailPanelId?: string;
+  /** Detay kutusunda maksimize düğmesi (rapor ızgarasındaki desen) */
+  maximizable?: boolean;
 };
 
 /**
@@ -63,7 +67,57 @@ export function ManagementPageTemplate({
   children,
   listPanelId,
   detailPanelId,
+  maximizable = true,
 }: ManagementPageTemplateProps) {
+  // Detay maksimize: örnekteki (rapor sonucu) desen — liste paneli gizlenir,
+  // detay %100'e açılır; her şey WorkspaceAiDock içinde kalır, Yula kapanmaz.
+  // Nav menü de dahil: açılırken kapatılır, çıkarken önceki durumuna döner.
+  const [detailMaximized, setDetailMaximized] = React.useState(false);
+  const { openById, setOpen: setPagePanelOpen } = usePagePanelContext();
+  const navOpen = openById["module-nav"] ?? false;
+  const prevNavOpenRef = React.useRef(false);
+
+  const restoreNav = React.useCallback(() => {
+    if (prevNavOpenRef.current) {
+      setPagePanelOpen("module-nav", true);
+      prevNavOpenRef.current = false;
+    }
+  }, [setPagePanelOpen]);
+
+  const handleToggleDetailMaximize = React.useCallback(() => {
+    if (!detailMaximized) {
+      prevNavOpenRef.current = navOpen;
+      if (navOpen) setPagePanelOpen("module-nav", false);
+    } else {
+      restoreNav();
+    }
+    setDetailMaximized((v) => !v);
+  }, [detailMaximized, navOpen, restoreNav, setPagePanelOpen]);
+
+  // Esc tuşu ile genişletilmiş moddan çıkış (örnekteki davranış).
+  React.useEffect(() => {
+    if (!detailMaximized) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        restoreNav();
+        setDetailMaximized(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [detailMaximized, restoreNav]);
+
+  // Maksimizede sayfadan çıkılırsa nav'ı önceki durumuna döndür.
+  React.useEffect(
+    () => () => {
+      if (prevNavOpenRef.current) {
+        setPagePanelOpen("module-nav", true);
+      }
+    },
+    [setPagePanelOpen],
+  );
+
   return (
     <MasterDetailPage
       title={title}
@@ -73,6 +127,7 @@ export function ManagementPageTemplate({
       list={list}
       listPanelId={listPanelId}
       detailPanelId={detailPanelId}
+      detailMaximized={detailMaximized}
     >
       <TabbedDetail
         resetKey={tabResetKey}
@@ -82,6 +137,9 @@ export function ManagementPageTemplate({
         subtitle={tabSubtitle}
         containerClass={containerClass}
         empty={empty}
+        maximizable={maximizable}
+        detailMaximized={detailMaximized}
+        onToggleDetailMaximize={handleToggleDetailMaximize}
       >
         {children}
       </TabbedDetail>

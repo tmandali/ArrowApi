@@ -34,6 +34,8 @@ type MasterDetailPageProps = {
   children: ReactNode;
   listPanelId?: string;
   detailPanelId?: string;
+  /** Detay tam genişlikte (liste paneli gizli) — Yula dock'u etkilenmez */
+  detailMaximized?: boolean;
   listDefaultSize?: number;
   listMinSize?: number | string;
   listMaxSize?: number | string;
@@ -55,6 +57,7 @@ export function MasterDetailPage({
   children,
   listPanelId = "master-list",
   detailPanelId = "master-detail",
+  detailMaximized = false,
   listDefaultSize = 360,
   listMinSize = 320,
   listMaxSize = 520,
@@ -77,30 +80,34 @@ export function MasterDetailPage({
               orientation="horizontal"
               className="min-h-0 flex-1 overflow-hidden"
             >
-              <ResizablePanel
-                id={listPanelId}
-                defaultSize={listDefaultSize}
-                minSize={listMinSize}
-                maxSize={listMaxSize}
-                groupResizeBehavior="preserve-pixel-size"
-                className="min-h-0 min-w-0"
-              >
-                <section className={cn(panelCardClass, "h-full")}>
-                  <div className={panelHeaderClass}>{listHeader}</div>
-                  <ScrollArea className="h-0 min-h-0 w-full flex-1">
-                    {list}
-                  </ScrollArea>
-                </section>
-              </ResizablePanel>
+              {!detailMaximized ? (
+                <>
+                  <ResizablePanel
+                    id={listPanelId}
+                    defaultSize={listDefaultSize}
+                    minSize={listMinSize}
+                    maxSize={listMaxSize}
+                    groupResizeBehavior="preserve-pixel-size"
+                    className="min-h-0 min-w-0"
+                  >
+                    <section className={cn(panelCardClass, "h-full")}>
+                      <div className={panelHeaderClass}>{listHeader}</div>
+                      <ScrollArea className="h-0 min-h-0 w-full flex-1">
+                        {list}
+                      </ScrollArea>
+                    </section>
+                  </ResizablePanel>
 
-              <ResizableHandle
-                withHandle
-                className={panelResizeHandleClass}
-              />
+                  <ResizableHandle
+                    withHandle
+                    className={panelResizeHandleClass}
+                  />
+                </>
+              ) : null}
 
               <ResizablePanel
                 id={detailPanelId}
-                minSize={detailMinSize}
+                minSize={detailMaximized ? "100%" : detailMinSize}
                 className="min-h-0 min-w-0 flex-1"
               >
                 <section className={cn(panelCardClass, "h-full min-w-0")}>
