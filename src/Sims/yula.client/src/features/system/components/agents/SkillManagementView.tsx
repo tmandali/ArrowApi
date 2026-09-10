@@ -24,7 +24,8 @@ import { Filter } from "lucide-react";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/yula-user-skill";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
-import { SkillEditor, type SkillEditorHandle, type SkillDetailFileTab } from "./skill-editor";
+import { SkillEditor, type SkillEditorHandle, type SkillDetailFileTab, type SkillEditorMode } from "./skill-editor";
+import { skillFileDotClass } from "./skill-file-kind";
 
 type Selection = { id: string | null; readOnly?: boolean } | null;
 
@@ -42,6 +43,17 @@ export function SkillManagementView() {
   const [fileTabs, setFileTabs] = React.useState<SkillDetailFileTab[]>([]);
 
   const isReadOnly = selection?.readOnly === true;
+
+  // Sayfa modu: seçim yoksa editör basılmaz; yeni kayıt / görüntüleme /
+  // düzenleme ayrımı enum ile taşınır.
+  const mode: SkillEditorMode | null =
+    selection == null
+      ? null
+      : selection.id == null
+        ? "new"
+        : selection.readOnly
+          ? "view"
+          : "edit";
 
   const systemSkills: Array<UserSkill & { readOnly: boolean }> =
     React.useMemo(
@@ -236,6 +248,10 @@ export function SkillManagementView() {
                             className="max-w-40 font-mono text-[11px]"
                             title={t.title ?? t.key}
                           >
+                            <span
+                              aria-hidden
+                              className={cn("size-1.5 shrink-0 rounded-full", skillFileDotClass(t.kind))}
+                            />
                             <span className="truncate">{t.label}</span>
                           </TabsTrigger>
                         ))}
@@ -284,7 +300,7 @@ export function SkillManagementView() {
                           <SkillEditor
                             key={`${selection.id ?? "new-skill"}-${formRev}`}
                             skill={selectedSkill}
-                            readOnly={selection.readOnly === true}
+                            mode={mode ?? "new"}
                             editorRef={editorRef}
                             onSaved={(id) =>
                               setSelection({ id, readOnly: false })

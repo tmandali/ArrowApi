@@ -37,6 +37,7 @@ type CriteriaSimpleComboboxProps = {
   multiple?: boolean
   variant?: "cell" | "form"
   showClear?: boolean
+  disabled?: boolean
 }
 
 const cellFrameClass =
@@ -66,6 +67,7 @@ export function CriteriaSimpleCombobox({
   multiple = false,
   variant = "cell",
   showClear = true,
+  disabled = false,
 }: CriteriaSimpleComboboxProps) {
   const items = React.useMemo(() => normalizeOptions(options), [options])
   const anchor = useComboboxAnchor()
@@ -90,6 +92,27 @@ export function CriteriaSimpleCombobox({
     // cellInputClass often includes px-2; that must not pad the InputGroup (would double with input px-2).
     variant === "cell" && "px-0 py-0"
   )
+
+  // Salt-okunur form görünümü: aynı form çerçevesiyle disabled girdi.
+  if (disabled) {
+    const display = multiple
+      ? (selectedItems ?? []).map((i) => i.label).join(", ")
+      : (singleValue?.label ?? value)
+    return (
+      <input
+        value={display}
+        disabled
+        readOnly
+        placeholder={placeholder}
+        data-grid-cell={dataGridCell}
+        aria-invalid={ariaInvalid}
+        className={cn(
+          "h-9 min-h-9 w-full rounded-md border border-muted-foreground/20 bg-muted/30 px-2 text-xs font-medium opacity-80 shadow-none outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed dark:bg-muted/30",
+          className,
+        )}
+      />
+    )
+  }
 
   if (multiple) {
     return (

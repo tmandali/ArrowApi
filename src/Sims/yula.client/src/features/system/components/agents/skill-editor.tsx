@@ -8,8 +8,6 @@ import {
   userSkillFilesSize,
   USER_SKILL_FILES_TOTAL_MAX_CHARS,
   buildUserSkillMarkdown,
-  languageForPath,
-  isMarkdownPath,
   type UserSkill,
   type UserSkillFile,
 } from "@/lib/yula-user-skill";
@@ -20,16 +18,28 @@ import {
 import { getRailWorkspaces } from "@/lib/workspace-registry";
 import { getRegisteredYulaCommands } from "@/components/layout/yula-commands";
 import { TabsContent } from "@/components/ui/tabs";
-import { CodeBlock } from "@/components/ui/code-block";
-import { MarkdownDoc } from "./skill-markdown-doc";
 import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  SKILL_FILE_KIND_LABEL,
+  skillFileChipClass,
+  skillFileKindForName,
+  type SkillFileKind,
+} from "./skill-file-kind";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CriteriaSimpleCombobox } from "@/features/report-criteria";
 
 /**
- * Sağ panel skill düzenleyici (null = yeni skill; readOnly = yerleşik salt-okunur).
- * Kaydet/Sil/Dosya-ekle başlık toolbar'ından çağrılır (editorRef üzerinden).
+ * Sağ panel skill düzenleyici modu: `new` (boş form), `edit` (kullanıcı
+ * skill'i düzenleme), `view` (yerleşik skill salt-okunur görüntüleme).
+ */
+export type SkillEditorMode = "new" | "edit" | "view";
+
+/**
+ * Sağ panel skill düzenleyici. Tek render yolu: `view` modu yalnızca
+ * girdileri `disabled` yapar, görünüm aynı bileşenle birebir aynı kalır.
+ * Kaydet/Sil/Dosya-ekle başlık toolbar'ından çağrılır (editorRef üzerinden;
+ * `view` modda null).
  * Sekme içerikleri buradadır (`genel` / `skillmd` / `file:*`); sekme şeridi
  * görünümde (`SkillManagementView`) yaşar, dosya sekmeleri onFileTabsChange
  * ile yukarı bildirilir.
@@ -45,23 +55,28 @@ export interface SkillDetailFileTab {
   key: string;
   label: string;
   title?: string;
+  kind: SkillFileKind;
 }
 
 export function SkillEditor({
   skill,
-  readOnly,
+  mode,
   editorRef,
   onSaved,
   onDeleted,
   onFileTabsChange,
 }: {
   skill: UserSkill | null;
-  readOnly?: boolean;
+  mode: SkillEditorMode;
   editorRef: { current: SkillEditorHandle | null };
   onSaved: (id: string) => void;
   onDeleted: () => void;
   onFileTabsChange?: (tabs: SkillDetailFileTab[]) => void;
 }) {
+  // Tek görünüm: `view` modu yalnızca disabled eder (ebeveyn `key` ile
+  // remount ettiği için state başlangıcı her seçimde skill'den gelir).
+  const isRO = mode === "view";
+
   const skills = useUserSkillsStore((s) => s.skills);
   const upsertSkill = useUserSkillsStore((s) => s.upsertSkill);
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
@@ -69,7 +84,9 @@ export function SkillEditor({
   const [slash, setSlash] = React.useState(skill?.slash ?? "");
   const [label, setLabel] = React.useState(skill?.label ?? "");
   const [description, setDescription] = React.useState(skill?.description ?? "");
-  const [prompt, setPrompt] = React.useState(skill?.prompt ?? "");
+  // Tek kaynak: SKILL.md gövdesi (= prompt). Genel sekmesinde ayrı Prompt
+  // alanı yok; SKILL.md sekmesindeki ham markdown editöründen düzenlenir.
+  const [skillMd, setSkillMd] = React.useState(skill?.prompt ?? "");
   const [scope, setScope] = React.useState(skill?.scope ?? "global");
   const [files, setFiles] = React.useState<UserSkillFile[]>(skill?.files ?? []);
   const [error, setError] = React.useState<string | null>(null);
@@ -94,7 +111,10 @@ export function SkillEditor({
   ];
 
   const handleSave = () => {
-    const err = validateUserSkill({ slash, label, prompt }, takenSlashes);
+    const err = validateUserSkill(
+      { slash, label, prompt: skillMd },
+      takenSlashes,
+    );
     if (err) {
       setError(err);
       return;
@@ -104,7 +124,7 @@ export function SkillEditor({
       slash,
       label,
       description,
-      prompt,
+      prompt: skillMd,
       scope,
       files,
     });
@@ -146,8 +166,8 @@ export function SkillEditor({
     reader.readAsText(file);
   };
 
-  const builtinFiles = readOnly && skill ? (BUILT_IN_SKILL_FILES[skill.slash] ?? []) : [];
-  const builtinMd = readOnly && skill ? BUILT_IN_SKILL_SOURCES[skill.slash] : undefined;
+  const builtinFiles = isRO && skill ? (BUILT_IN_SKILL_FILES[skill.slash] ?? []) : [];
+  const builtinMd = isRO && skill ? BUILT_IN_SKILL_SOURCES[skill.slash] : undefined;
 
   // Betik metinleri demete gömülü değildir (.mjs ham-importu tüm projeyi
   // bozar); salt-okunur önizleme için sunucu rotasından tembel yüklenir.
@@ -155,7 +175,7 @@ export function SkillEditor({
   const [scriptsLoading, setScriptsLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!(readOnly && skill)) return;
+    if (!(isRO && skill)) return;
     const missing = (BUILT_IN_SKILL_FILES[skill.slash] ?? []).filter(
       (f) =>
         f.kind === "script" && !f.content && scriptContents[f.path] === undefined,
@@ -193,30 +213,35 @@ export function SkillEditor({
     return () => {
       cancelled = true;
     };
-  }, [readOnly, skill, scriptContents]);
+  }, [isRO, skill, scriptContents]);
 
   const fileTabs = React.useMemo<SkillDetailFileTab[]>(() => {
-    if (readOnly && skill) {
+    if (isRO && skill) {
       const fs = BUILT_IN_SKILL_FILES[skill.slash] ?? [];
-      return fs.map((f) => ({
-        key: `file:${f.path}`,
-        label: f.path.split("/").pop() ?? f.path,
-        title: f.path,
-      }));
+      return fs.map((f) => {
+        const label = f.path.split("/").pop() ?? f.path;
+        return {
+          key: `file:${f.path}`,
+          label,
+          title: f.path,
+          kind: f.kind === "script" ? ("script" as const) : skillFileKindForName(label),
+        };
+      });
     }
-    if (!readOnly) {
+    if (!isRO) {
       return files.map((f) => ({
         key: `file:${f.name.toLowerCase()}`,
         label: f.name,
         title: f.name,
+        kind: skillFileKindForName(f.name),
       }));
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, skill, files]);
+  }, [isRO, skill, files]);
 
   React.useEffect(() => {
-    editorRef.current = readOnly
+    editorRef.current = isRO
       ? null
       : {
           save: handleSave,
@@ -229,82 +254,56 @@ export function SkillEditor({
     onFileTabsChange?.(fileTabs);
   }, [fileTabs, onFileTabsChange]);
 
-  if (readOnly && skill) {
-    const props: Array<[string, string]> = [
-      ["Slash", `/${skill.slash}`],
-      ["Başlık", skill.label || "—"],
-      ["Açıklama", skill.description || "—"],
-      ["Kapsam", skill.scope ?? "global"],
-      ["Kaynak", `skills/${skill.slash}/SKILL.md`],
-    ];
-    return (
-      <>
-        <TabsContent value="genel" className="mt-0">
-          <div className="min-w-0 space-y-5">
-            <div className="grid grid-cols-1 gap-x-10 gap-y-5 @[40rem]/skill-detail:grid-cols-2">
-              {props.map(([k, v]) => (
-                <div key={k} className="min-w-0">
-                  <p className="text-xs text-muted-foreground">{k}</p>
-                  <p className="mt-0.5 truncate text-[12px] font-medium text-foreground" title={v}>
-                    {v}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <Field>
-              <FieldLabel className="text-xs text-muted-foreground">
-                Prompt
-              </FieldLabel>
-              <pre className="overflow-auto rounded-md border border-border/60 bg-muted/30 p-2.5 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
-                {skill.prompt}
-              </pre>
-            </Field>
-            <p className="text-[11.5px] text-muted-foreground">
-              Yerleşik skill&apos;ler salt-okunurdur.
-            </p>
-          </div>
-        </TabsContent>
-        <TabsContent value="skillmd" className="mt-0">
-          {builtinMd ? (
-            <MarkdownDoc value={builtinMd} />
-          ) : (
-            <p className="text-[11.5px] text-muted-foreground">
-              SKILL.md bulunamadı.
-            </p>
-          )}
-        </TabsContent>
-        {builtinFiles.map((f) => {
-          const content = f.content ?? scriptContents[f.path];
-          return (
-            <TabsContent key={f.path} value={`file:${f.path}`} className="mt-0">
-              {content ? (
-                isMarkdownPath(f.path) ? (
-                  <MarkdownDoc value={content} />
-                ) : (
-                  <CodeBlock
-                    value={content}
-                    language={languageForPath(f.path)}
-                    className="max-h-none overflow-visible rounded-none border-0"
-                  />
-                )
-              ) : scriptsLoading ? (
-                <p className="text-[11.5px] text-muted-foreground">
-                  Yükleniyor…
-                </p>
-              ) : (
-                <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                  <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                    betik
-                  </span>
-                  Sunucu sandbox&apos;ında çalışır (run_skill_script).
-                </p>
-              )}
-            </TabsContent>
-          );
-        })}
-      </>
-    );
-  }
+  const scopeOptions = React.useMemo(
+    () => [
+      { value: "global", label: "Global (her yerde)" },
+      ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
+    ],
+    [],
+  );
+
+  // SKILL.md önizlemesi: yerleşiklerde paketlenmiş tam dosya, kullanıcılarda
+  // Genel alanlarından üretilen canlı dosya.
+  const skillMdPreview = isRO
+    ? (builtinMd ??
+      buildUserSkillMarkdown({
+        slash: skill?.slash ?? slash,
+        label: skill?.label ?? label,
+        description: skill?.description ?? description,
+        scope: skill?.scope ?? scope,
+        prompt: skill?.prompt ?? skillMd,
+      }))
+    : buildUserSkillMarkdown({
+        slash,
+        label,
+        description,
+        scope,
+        prompt: skillMd,
+      });
+
+  // Dosya sekmeleri için birleşik satırlar: aynı sıra (tip rozeti + ham
+  // editör + alt bilgi), yalnızca disabled/kaynak farklı.
+  const fileRows: Array<{
+    key: string;
+    name: string;
+    content: string | undefined;
+    kind: SkillFileKind;
+  }> = isRO
+    ? builtinFiles.map((f) => {
+        const name = f.path.split("/").pop() ?? f.path;
+        return {
+          key: `file:${f.path}`,
+          name,
+          content: f.content ?? scriptContents[f.path],
+          kind: f.kind === "script" ? ("script" as const) : skillFileKindForName(name),
+        };
+      })
+    : files.map((f) => ({
+        key: `file:${f.name.toLowerCase()}`,
+        name: f.name,
+        content: f.content,
+        kind: skillFileKindForName(f.name),
+      }));
 
   return (
     <>
@@ -316,34 +315,12 @@ export function SkillEditor({
                 Slash adı <span className="font-mono">/ornek-skill</span>
               </FieldLabel>
               <Input
-                value={slash}
-                onChange={(e) => setSlash(e.target.value)}
+                value={isRO ? (skill?.slash ?? slash) : slash}
+                onChange={isRO ? undefined : (e) => setSlash(e.target.value)}
                 placeholder="haftalik-ozet"
-                className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs font-mono"
-              />
-            </Field>
-            <Field>
-              <FieldLabel className="text-xs text-muted-foreground">
-                Başlık
-              </FieldLabel>
-              <Input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Haftalık özet"
-                className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-1 gap-x-10 gap-y-5 @[40rem]/skill-detail:grid-cols-2">
-            <Field>
-              <FieldLabel className="text-xs text-muted-foreground">
-                Açıklama
-              </FieldLabel>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ne zaman kullanılır?"
-                className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
+                disabled={isRO}
+                readOnly={isRO}
+                className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs font-mono data-disabled:opacity-80"
               />
             </Field>
             <Field>
@@ -352,88 +329,151 @@ export function SkillEditor({
               </FieldLabel>
               <CriteriaSimpleCombobox
                 variant="form"
-                value={scope}
+                value={isRO ? (skill?.scope ?? scope) : scope}
                 onChange={(v) => setScope(v || "global")}
-                options={[
-                  { value: "global", label: "Global (her yerde)" },
-                  ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
-                ]}
+                options={scopeOptions}
+                disabled={isRO}
               />
             </Field>
           </div>
           <Field>
             <FieldLabel className="text-xs text-muted-foreground">
-              Prompt ({"{{input}}"} kullanıcının ek metniyle değişir)
+              Başlık
             </FieldLabel>
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Son 7 günün satış özetini çıkar: {{input}}"
-              rows={8}
-              className="bg-muted/30 border-muted-foreground/20 font-mono text-xs resize-y"
+            <Input
+              value={isRO ? (skill?.label ?? label) : label}
+              onChange={isRO ? undefined : (e) => setLabel(e.target.value)}
+              placeholder="Haftalık özet"
+              disabled={isRO}
+              readOnly={isRO}
+              className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs data-disabled:opacity-80"
             />
           </Field>
-          {fileError ? (
+          <Field>
+            <FieldLabel className="text-xs text-muted-foreground">
+              Açıklama
+            </FieldLabel>
+            <Textarea
+              value={isRO ? (skill?.description ?? description) : description}
+              onChange={isRO ? undefined : (e) => setDescription(e.target.value)}
+              placeholder="Ne zaman kullanılır?"
+              disabled={isRO}
+              readOnly={isRO}
+              rows={3}
+              className="bg-muted/30 border-muted-foreground/20 text-xs resize-y min-h-16 whitespace-pre-wrap data-disabled:opacity-80"
+            />
+          </Field>
+          {!isRO && fileError ? (
             <p className="text-[12px] text-red-600 dark:text-red-400">{fileError}</p>
           ) : null}
-          {error ? (
+          {!isRO && error ? (
             <p className="text-[12px] text-red-600 dark:text-red-400">{error}</p>
           ) : null}
         </div>
       </TabsContent>
       <TabsContent value="skillmd" className="mt-0">
-        <MarkdownDoc
-          value={buildUserSkillMarkdown({ slash, label, description, scope, prompt })}
-        />
-        <p className="mt-1.5 text-[11.5px] text-muted-foreground">
-          Önizleme — Genel sekmesindeki alanlardan üretilir, ayrıca kaydedilmez.
-        </p>
-      </TabsContent>
-      {files.map((f) => (
-        <TabsContent
-          key={f.name.toLowerCase()}
-          value={`file:${f.name.toLowerCase()}`}
-          className="mt-0"
-        >
-          {isMarkdownPath(f.name) ? (
-            <MarkdownDoc value={f.content} />
-          ) : (
-            <CodeBlock
-              value={f.content}
-              language={languageForPath(f.name)}
-              className="max-h-none overflow-visible rounded-none border-0"
+        {skillMdPreview ? (
+          <div className="min-w-0">
+            <Textarea
+              value={isRO ? (skill?.prompt ?? skillMd) : skillMd}
+              onChange={isRO ? undefined : (e) => setSkillMd(e.target.value)}
+              placeholder="Son 7 günün satış özetini çıkar: {{input}}"
+              disabled={isRO}
+              readOnly={isRO}
+              rows={14}
+              aria-label="SKILL.md ham markdown"
+              className="min-h-[50vh] w-full resize-y rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
             />
-          )}
-          <div className="mt-1.5 flex items-center justify-between">
-            <span className="font-mono text-[10px] text-muted-foreground/70">
-              {(f.content.length / 1024).toFixed(1)}K
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setFiles((prev) =>
-                  prev.filter(
-                    (p) => p.name.toLowerCase() !== f.name.toLowerCase(),
-                  ),
-                )
-              }
-              className="rounded-md px-2 py-1 text-[11.5px] text-muted-foreground hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-            >
-              Kaldır
-            </button>
+          </div>
+        ) : (
+          <p className="text-[11.5px] text-muted-foreground">
+            SKILL.md bulunamadı.
+          </p>
+        )}
+      </TabsContent>
+      {fileRows.map((f) => (
+        <TabsContent key={f.key} value={f.key} className="mt-0">
+          <div className="min-w-0">
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <span
+                className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${skillFileChipClass(f.kind)}`}
+              >
+                {SKILL_FILE_KIND_LABEL[f.kind]}
+              </span>
+              {f.kind === "script" && isRO ? (
+                <span className="text-[10.5px] text-muted-foreground">
+                  Sunucu sandbox&apos;ında çalışır
+                </span>
+              ) : null}
+            </div>
+            {f.content ? (
+              <Textarea
+                value={f.content}
+                onChange={
+                  isRO
+                    ? undefined
+                    : (e) =>
+                        setFiles((prev) =>
+                          prev.map((p) =>
+                            `file:${p.name.toLowerCase()}` === f.key
+                              ? { ...p, content: e.target.value }
+                              : p,
+                          ),
+                        )
+                }
+                rows={14}
+                disabled={isRO}
+                readOnly={isRO}
+                aria-label={`${f.name} ham metin`}
+                className="min-h-[40vh] w-full resize-y rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+              />
+            ) : scriptsLoading ? (
+              <p className="text-[11.5px] text-muted-foreground">
+                Yükleniyor…
+              </p>
+            ) : (
+              <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                  betik
+                </span>
+                Sunucu sandbox&apos;ında çalışır (run_skill_script).
+              </p>
+            )}
+            <div className="mt-1.5 flex items-center justify-between">
+              <span className="font-mono text-[10px] text-muted-foreground/70">
+                {f.content ? `${(f.content.length / 1024).toFixed(1)}K` : "—"}
+              </span>
+              {!isRO ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFiles((prev) =>
+                      prev.filter(
+                        (p) => `file:${p.name.toLowerCase()}` !== f.key,
+                      ),
+                    )
+                  }
+                  className="rounded-md px-2 py-1 text-[11.5px] text-muted-foreground hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+                >
+                  Kaldır
+                </button>
+              ) : null}
+            </div>
           </div>
         </TabsContent>
       ))}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".md,.markdown,.txt,.json"
-        className="hidden"
-        onChange={(e) => {
-          handlePickFile(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
+      {!isRO ? (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.markdown,.txt,.json"
+          className="hidden"
+          onChange={(e) => {
+            handlePickFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      ) : null}
     </>
   );
 }
