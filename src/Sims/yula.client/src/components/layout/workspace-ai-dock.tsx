@@ -22,8 +22,7 @@ import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
-import { filterAgentsByScope } from "@/lib/yula-user-agent"
-import { workspaceIdFromPath } from "@/lib/workspace-paths"
+import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agent"
 import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import {
@@ -145,7 +144,7 @@ function DockAgentSwitch() {
   const currentId = dockAgent?.id ?? activeAgentId ?? null
 
   const inScope = React.useMemo(
-    () => filterAgentsByScope(agents, workspaceIdFromPath(pathname)),
+    () => filterAgentsByScope(agents, agentScopeWorkspaceId(pathname)),
     [agents, pathname],
   )
 

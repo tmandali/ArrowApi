@@ -12,25 +12,29 @@ import { AgentAvatar, agentInitials } from "@/features/system/components/agents/
 /**
  * Ajan kart ızgarası (workspace kartları deseni): boş sohbette gösterilir.
  * Varsayılan Yula için kart yoktur — seçim yokluğu = Yula.
- * Karta tıklama ayrı ajan oturumuna gider (/agents/<id>); seçim toggle'ı yok.
+ * Karta tıklama SADECE ayrı ajan oturumuna gider (/agents/<id>); global
+ * seçimi değiştirmez. Tik, dock anahtarıyla seçili global personayı gösterir.
+ * `showAll` (ana sayfa başlatıcı): kapsam filtresi uygulanmaz, tüm ajanlar
+ * listelenir — oturumlar zaten kapsam bağımsız açılır.
  */
 export function YulaAgentCards({
   workspaceId,
   onManage,
   className,
+  showAll = false,
 }: {
   workspaceId?: string | null;
   onManage: (editingId?: string | null) => void;
   className?: string;
+  showAll?: boolean;
 }) {
   const router = useRouter();
   const agents = useUserAgentsStore((s) => s.agents);
   const activeAgentId = useUserAgentsStore((s) => s.activeAgentId);
-  const setActiveAgentId = useUserAgentsStore((s) => s.setActiveAgentId);
 
   const inScope = React.useMemo(
-    () => filterAgentsByScope(agents, workspaceId),
-    [agents, workspaceId],
+    () => (showAll ? agents : filterAgentsByScope(agents, workspaceId)),
+    [agents, workspaceId, showAll],
   );
 
   return (
@@ -48,7 +52,6 @@ export function YulaAgentCards({
               key={a.id}
               type="button"
               onClick={() => {
-                setActiveAgentId(a.id);
                 router.push(agentSessionPath(a.id));
               }}
               title={`${a.name} ile ayrı oturumda konuş`}

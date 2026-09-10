@@ -38,7 +38,7 @@ import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
 import { getAllUserSkillsInventory, getEffectiveUserSkills } from "@/lib/yula-user-skill";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
-import { filterAgentsByScope } from "@/lib/yula-user-agent";
+import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agent";
 import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
 import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
 import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
@@ -410,9 +410,10 @@ function ChatInstance({
           const activeAgent = effectiveAgentId
             ? ((routeAgentId
                 ? agentStore.agents.find((a) => a.id === routeAgentId)
-                : filterAgentsByScope(agentStore.agents, workspaceId).find(
-                    (a) => a.id === effectiveAgentId,
-                  )) ?? null)
+                : filterAgentsByScope(
+                    agentStore.agents,
+                    agentScopeWorkspaceId(pathOnly),
+                  ).find((a) => a.id === effectiveAgentId)) ?? null)
             : null;
           const mode: "main" | "dock" = isHome || routeAgentId ? "main" : "dock";
           const aiConfig = readYulaClientAiConfig();

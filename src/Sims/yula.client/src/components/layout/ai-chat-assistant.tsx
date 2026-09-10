@@ -18,7 +18,7 @@ import { workspaceIconFor } from "@/components/layout/workspace-brand"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaAgentCards } from "@/components/layout/yula-agent-cards"
 import { useUserAgentsStore, ensureExampleAgent } from "@/lib/stores/user-agents"
-import { AGENT_PROVIDER_OPTIONS, filterAgentsByScope } from "@/lib/yula-user-agent"
+import { AGENT_PROVIDER_OPTIONS, agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agent"
 import { readYulaClientAiConfig } from "@/lib/yula-ai-client-config"
 import {
   getAllYulaCommands,
@@ -416,6 +416,9 @@ function AIChatPanelSession({
     isReportResultPath(pathname) || Boolean(selectedJobId)
   const userSkills = useUserSkillsStore((s) => s.skills)
   const workspaceId = workspaceIdFromPath(pathname)
+  // Ajan kapsamı: "/" ana sayfada global ajanlar geçerli, system
+  // yönetim sayfalarında ajan seçilemez (skill kapsamı etkilenmez).
+  const agentWorkspaceId = agentScopeWorkspaceId(pathname)
   // Oturum ajanı (hero karşılaması için; girdi üstü rozet kaldırıldı —
   // kimlik URL + panel başlığı + hero ile belli olur).
   const userAgents = useUserAgentsStore((s) => s.agents)
@@ -425,9 +428,9 @@ function AIChatPanelSession({
   const effectiveAgent = React.useMemo(() => {
     // Ayrı ajan oturumunda URL kazanır (kapsam filtresiz direkt bul).
     if (routeAgentId) return userAgents.find((a) => a.id === routeAgentId) ?? null
-    const inScope = filterAgentsByScope(userAgents, workspaceId)
+    const inScope = filterAgentsByScope(userAgents, agentWorkspaceId)
     return activeAgentId ? (inScope.find((a) => a.id === activeAgentId) ?? null) : null
-  }, [userAgents, activeAgentId, workspaceId, routeAgentId])
+  }, [userAgents, activeAgentId, agentWorkspaceId, routeAgentId])
   const chatsModel = useChatsStore((s) => s.model)
   const isThinkingEnabled = useChatsStore((s) => s.isThinkingEnabled)
   // Ajanın kullandığı çıkarım kimliği (ajan pini > genel ayar zinciri).
@@ -998,9 +1001,10 @@ function AIChatPanelSession({
 
               {belowInput}
 
-              {isAgentSession ? null : (
+              {isAgentSession || agentWorkspaceId === "system" ? null : (
                 <YulaAgentCards
-                  workspaceId={workspaceId}
+                  workspaceId={agentWorkspaceId}
+                  showAll={pathname === "/"}
                   onManage={(id) =>
                     router.push(
                       id ? `/system/agents?edit=${encodeURIComponent(id)}` : "/system/agents",
@@ -1020,15 +1024,18 @@ function AIChatPanelSession({
               <p className="mt-1 max-w-md text-center text-sm text-muted-foreground">
                 {introDescription}
               </p>
-              <YulaAgentCards
-                workspaceId={workspaceId}
-                onManage={(id) =>
-                  router.push(
-                    id ? `/system/agents?edit=${encodeURIComponent(id)}` : "/system/agents",
-                  )
-                }
-                className="mt-6"
-              />
+              {agentWorkspaceId === "system" ? null : (
+                <YulaAgentCards
+                  workspaceId={agentWorkspaceId}
+                  showAll={pathname === "/"}
+                  onManage={(id) =>
+                    router.push(
+                      id ? `/system/agents?edit=${encodeURIComponent(id)}` : "/system/agents",
+                    )
+                  }
+                  className="mt-6"
+                />
+              )}
               <div className="mt-8 flex w-full justify-center">{inputArea}</div>
             </div>
           )

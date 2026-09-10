@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  agentScopeWorkspaceId,
   filterActiveToolsByAgent,
   filterAgentsByScope,
   validateUserAgent,
@@ -49,6 +50,22 @@ describe("filterAgentsByScope", () => {
       filterAgentsByScope(agents, null).map((a) => a.name),
       ["Genel"],
     );
+  });
+  it("returns none on system workspace", () => {
+    assert.deepEqual(filterAgentsByScope(agents, "system"), []);
+  });
+});
+
+describe("agentScopeWorkspaceId", () => {
+  it("returns null on home so global agents apply", () => {
+    assert.equal(agentScopeWorkspaceId("/"), null);
+  });
+  it("returns system for management pages", () => {
+    assert.equal(agentScopeWorkspaceId("/system/skills"), "system");
+    assert.equal(agentScopeWorkspaceId("/system/agents"), "system");
+  });
+  it("returns the work workspace elsewhere", () => {
+    assert.equal(agentScopeWorkspaceId("/stock/item"), "stock");
   });
 });
 

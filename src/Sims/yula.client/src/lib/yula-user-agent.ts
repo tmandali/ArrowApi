@@ -12,6 +12,7 @@
  */
 import { load } from "js-yaml";
 import { normalizeEffort, type YulaEffort } from "./yula-reasoning";
+import { workspaceIdFromPath } from "./workspace-paths";
 export interface UserAgent {
   id: string;
   name: string;
@@ -235,11 +236,25 @@ export function validateUserAgent(
   return null;
 }
 
-/** Kapsam filtresi — saf. */
+/**
+ * Ajan kapsamı için sayfa kimliği: "/" ana sayfa çalışma alanı bağlamı
+ * taşımaz (filtre global ajanları geçirir); system yönetim sayfalarında
+ * ajan seçilemez (filterAgentsByScope "system" için [] döner).
+ */
+export function agentScopeWorkspaceId(pathname: string): string | null {
+  if (pathname === "/") return null;
+  return workspaceIdFromPath(pathname);
+}
+
+/**
+ * Kapsam filtresi — saf. System yönetim alanında ajan kimliği seçilemez
+ * (hiçbir ajan system kapsamlı olamaz); global = tüm çalışma alanları.
+ */
 export function filterAgentsByScope(
   agents: UserAgent[],
   workspaceId?: string | null,
 ): UserAgent[] {
+  if (workspaceId === "system") return [];
   return agents.filter((a) => {
     const scope = a.scope ?? "global";
     if (scope === "global") return true;
