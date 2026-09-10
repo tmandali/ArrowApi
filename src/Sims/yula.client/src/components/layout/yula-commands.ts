@@ -17,7 +17,7 @@ import reportCommandsYaml from "@/workspaces/stock/agents/report.agent.yaml";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
-import { getEffectiveUserSkills } from "@/lib/yula-user-skill";
+import { getAllUserSkillsInventory, getEffectiveUserSkills } from "@/lib/yula-user-skill";
 
 export type YulaCommand = {
   id: string;
@@ -114,16 +114,25 @@ export function getAllYulaCommands(
   return [...SYSTEM_COMMANDS, ...reportCommands, ...extra];
 }
 
-/** Kullanıcı skill'lerini YulaCommand borusuna dönüştürür (yerleşikler dahil). */
+/**
+ * Kullanıcı skill'lerini YulaCommand borusuna dönüştürür (yerleşikler dahil).
+ * `allowedSlashes` verilirse (ajan seçimi) kapsam filtresi uygulanmaz —
+ * ajanın açık seçimi kapsamı ezer; boş dizi = skill komutu yok.
+ */
 export function userSkillsToCommands(
   skills: UserSkill[],
   workspaceId?: string | null,
+  allowedSlashes?: string[],
 ): YulaCommand[] {
-  const inScope = getEffectiveUserSkills(
-    skills,
-    BUILT_IN_USER_SKILLS,
-    workspaceId,
-  );
+  const inScope =
+    allowedSlashes !== undefined
+      ? (() => {
+          const allowed = new Set(allowedSlashes.map((s) => s.toLowerCase()));
+          return getAllUserSkillsInventory(skills, BUILT_IN_USER_SKILLS).filter(
+            (s) => allowed.has(s.slash.toLowerCase()),
+          );
+        })()
+      : getEffectiveUserSkills(skills, BUILT_IN_USER_SKILLS, workspaceId);
   return inScope.map((s) => ({
     id: s.id,
     slash: s.slash,

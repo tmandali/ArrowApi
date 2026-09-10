@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   Timeline,
@@ -9,7 +8,7 @@ import {
   TimelineTime,
   TimelineTitle,
 } from "@/components/ui/timeline"
-import { Mail, MessageSquare, Plus } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import { cn } from "@/utils/cn"
 
 export type ActivityItem = {
@@ -24,6 +23,8 @@ export type ActivityItem = {
 type DocumentActivityProps = {
   items?: ActivityItem[]
   className?: string
+  /** Yorum satırındaki Vazgeç butonu (kayıt bazında silme) */
+  onDismissComment?: (id: string) => void
 }
 
 const defaultItems: ActivityItem[] = [
@@ -54,6 +55,7 @@ const defaultItems: ActivityItem[] = [
 export function DocumentActivity({
   items = defaultItems,
   className,
+  onDismissComment,
 }: DocumentActivityProps) {
   const [showAllActivity, setShowAllActivity] = React.useState(false)
 
@@ -68,17 +70,13 @@ export function DocumentActivity({
               role="switch"
               aria-checked={showAllActivity}
               id="show-all-activity"
+              data-state={showAllActivity ? "checked" : "unchecked"}
               onClick={() => setShowAllActivity((prev) => !prev)}
-              className={cn(
-                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors",
-                showAllActivity ? "bg-primary" : "bg-muted-foreground/30"
-              )}
+              className="peer inline-flex h-[1.15rem] w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-input/80"
             >
               <span
-                className={cn(
-                  "pointer-events-none absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform",
-                  showAllActivity ? "left-4" : "left-0.5"
-                )}
+                data-state={showAllActivity ? "checked" : "unchecked"}
+                className="bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0"
               />
             </button>
             <Label
@@ -88,11 +86,6 @@ export function DocumentActivity({
               Show all activity
             </Label>
           </div>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-            <Plus className="size-3.5" />
-            New Email
-            <Mail className="size-3.5 text-muted-foreground" />
-          </Button>
         </div>
       </div>
 
@@ -122,6 +115,9 @@ export function DocumentActivity({
                         <button
                           type="button"
                           className="text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            onDismissComment?.(item.id)
+                          }
                         >
                           Dismiss
                         </button>

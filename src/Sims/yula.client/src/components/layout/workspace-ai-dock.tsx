@@ -3,7 +3,8 @@
 // Workspace AI Dock component
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { isWorkspaceHomePath, isConversationOnScreen } from "@/lib/workspace-paths"
+import { isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
+import { useUserAgentsStore } from "@/lib/stores/user-agents"
 import {
   AIChatPanel,
   AIChatPanelTitle,
@@ -21,8 +22,25 @@ import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
+import { filterAgentsByScope } from "@/lib/yula-user-agent"
+import { workspaceIdFromPath } from "@/lib/workspace-paths"
+import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar"
+import { YulaMarkIcon } from "@/components/layout/yula-brand"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { cn } from "@/utils/cn"
-import { History, SquarePen } from "lucide-react"
+import { Check, History, PanelRightClose, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -67,16 +85,174 @@ function YulaNewChatButton() {
   )
 }
 
+/**
+ * Dock başlığındaki oturum ajanını çözer: önce aktif konuşma kaydı, sonra
+ * global seçim. Yoksa null = varsayılan Yula.
+ */
+function useDockAgent() {
+  const activeId = useChatsStore((s) => s.activeId)
+  const conversations = useChatsStore((s) => s.conversations)
+  const agents = useUserAgentsStore((s) => s.agents)
+  const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId)
+  return React.useMemo(() => {
+    const conv = conversations.find((c) => c.id === activeId)
+    const id = conv?.agentId ?? storeActiveAgentId ?? null
+    return id ? (agents.find((a) => a.id === id) ?? null) : null
+  }, [conversations, activeId, agents, storeActiveAgentId])
+}
+
+/** Ajan ikon rozeti (yüklenen görsel veya baş harf karosu). */
+function DockAgentIcon({ agentId, className }: { agentId?: string | null; className?: string }) {
+  const agents = useUserAgentsStore((s) => s.agents)
+  const agent = agentId ? (agents.find((a) => a.id === agentId) ?? null) : null
+  if (agent?.avatar) {
+    return (
+      <AgentAvatar
+        value={agent.avatar}
+        name={agent.name}
+        className={cn("size-7 rounded-md", className)}
+      />
+    )
+  }
+  if (agent) {
+    return (
+      <span
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-md bg-orange-500 text-[10px] font-bold text-white",
+          className,
+        )}
+      >
+        {agentInitials(agent.name)}
+      </span>
+    )
+  }
+  return <YulaMarkIcon className={cn("size-5 shrink-0", className)} />
+}
+
+/**
+ * Başlıktaki ikon-only ajan değiştirici: isim yazmaz, tıklayınca aramalı
+ * liste açılır (Yula + kapsamdaki ajanlar). Seçim değişince persona değişir
+ * ve ajan ayrımı için taze sohbet açılır.
+ */
+function DockAgentSwitch() {
+  const pathname = usePathname()
+  const agents = useUserAgentsStore((s) => s.agents)
+  const activeAgentId = useUserAgentsStore((s) => s.activeAgentId)
+  const setActiveAgentId = useUserAgentsStore((s) => s.setActiveAgentId)
+  const { newConversation } = useOptionalYulaChat() ?? {}
+  const [open, setOpen] = React.useState(false)
+  const dockAgent = useDockAgent()
+  const currentId = dockAgent?.id ?? activeAgentId ?? null
+
+  const inScope = React.useMemo(
+    () => filterAgentsByScope(agents, workspaceIdFromPath(pathname)),
+    [agents, pathname],
+  )
+
+  const select = (id: string | null) => {
+    if ((currentId ?? null) === (id ?? null)) {
+      setOpen(false)
+      return
+    }
+    setActiveAgentId(id)
+    if (newConversation) {
+      newConversation()
+    } else {
+      useChatsStore.getState().newConversation()
+    }
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={dockAgent ? `${dockAgent.name} — ajanı değiştir` : "Yula — ajanı değiştir"}
+          aria-label="Ajanı değiştir"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-muted/60"
+        >
+          <DockAgentIcon agentId={currentId} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-1">
+        <Command>
+          <CommandInput placeholder="Ajan ara…" className="text-xs" />
+          <CommandList>
+            <CommandEmpty>Sonuç yok.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="Yula varsayılan"
+                onSelect={() => select(null)}
+                className="flex cursor-pointer items-center gap-2 text-xs"
+              >
+                <YulaMarkIcon className="size-4 shrink-0" />
+                <span className="flex-1 truncate">Yula (varsayılan)</span>
+                {currentId === null ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+              </CommandItem>
+              {inScope.map((a) => (
+                <CommandItem
+                  key={a.id}
+                  value={a.name}
+                  onSelect={() => select(a.id)}
+                  className="flex cursor-pointer items-center gap-2 text-xs"
+                >
+                  <DockAgentIcon agentId={a.id} className="size-5 rounded" />
+                  <span className="flex-1 truncate">{a.name}</span>
+                  {currentId === a.id ? (
+                    <Check className="size-3.5 shrink-0 text-primary" />
+                  ) : null}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** Başlık metni + ajan değiştirici kompozisyonu (isim yazılmaz). */
+function DockHeaderTitle() {
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+      <DockAgentSwitch />
+      <AIChatPanelTitle hideIcon />
+    </span>
+  )
+}
+
+/** Paneli kapatma ikonu (başlık-butonu collapse'unun yerine). */
+function DockCollapseButton({ onCollapse }: { onCollapse: () => void }) {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+      onClick={onCollapse}
+      title="Paneli kapat"
+      aria-label="Paneli kapat"
+    >
+      <PanelRightClose className="size-3.5" />
+    </Button>
+  )
+}
+
 export function YulaScreenHistoryButton() {
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const historyFilter = useChatsStore((s) => s.historyFilter)
   const toggleHistory = useChatsStore((s) => s.toggleHistory)
   const conversations = useChatsStore((s) => s.conversations)
   const pathname = usePathname()
+  const dockActiveAgentId = useUserAgentsStore((s) => s.activeAgentId)
+  const dockCurrentAgentId = extractAgentIdFromPath(pathname) ?? dockActiveAgentId ?? null
 
   const screenCount = React.useMemo(() => {
-    return conversations.filter((c) => isConversationOnScreen(c.pathname, pathname)).length
-  }, [conversations, pathname])
+    return conversations.filter((c) =>
+      isConversationVisibleForAgent(c, pathname, dockCurrentAgentId),
+    ).length
+  }, [conversations, pathname, dockCurrentAgentId])
 
   const isActive = isHistoryOpen && historyFilter === "screen"
 
@@ -145,7 +321,7 @@ export function WorkspaceAiDock({
     useWorkspaceAiChat()
   const { open: searchOpen } = useWorkspaceSearch()
   const pathname = usePathname()
-  const isHomePage = isWorkspaceHomePath(pathname)
+  const isHomePage = isWorkspaceHomePath(pathname) || isAgentSessionPath(pathname)
 
   // Workspace search açıkken dock içeriği ana arama görünümüne döner —
   // hangi ekran AiDock kullanıyorsa search her ekranda çalışır.
@@ -201,16 +377,10 @@ export function WorkspaceAiDock({
         >
           {!hideHeader ? (
             <div className={cn(panelHeaderClass, "gap-1")}>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-0.5 py-1 text-left text-sm font-semibold tracking-tight text-primary dark:text-sidebar-primary transition-colors hover:bg-muted/40"
-                aria-label={YULA.collapseLabel}
-              >
-                <AIChatPanelTitle />
-              </button>
+              <DockHeaderTitle />
               <YulaScreenHistoryButton />
               <YulaNewChatButton />
+              <DockCollapseButton onCollapse={() => setOpen(false)} />
             </div>
           ) : null}
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -227,12 +397,14 @@ export function WorkspaceAiDock({
     <WorkspaceSidePanelLayout
       open={open}
       onOpenChange={setOpen}
-      title={<AIChatPanelTitle />}
+      title={<DockHeaderTitle />}
+      titleCollapseDisabled
       collapseLabel={YULA.collapseLabel}
       headerActions={
-        <div className="flex items-center gap-0.5">
+        <div className="flex min-w-0 items-center gap-0.5">
           <YulaScreenHistoryButton />
           <YulaNewChatButton />
+          <DockCollapseButton onCollapse={() => setOpen(false)} />
         </div>
       }
       panel={<AIChatPanel centeredIntro={centeredIntro} />}

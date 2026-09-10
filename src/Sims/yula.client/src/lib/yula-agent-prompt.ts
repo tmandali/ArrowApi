@@ -69,6 +69,7 @@ export interface YulaScreenContext {
   /**
    * Seçili kullanıcı ajanı (persona) — istemcide çözülmüş gelir.
    * instructions LEVEL 0'a eklenir; tools prepareStep'te kesiştirilir.
+   * attachments (varsa) LEVEL 0 sonuna referans doküman olarak gömülür.
    */
   agent?: {
     name: string;
@@ -77,6 +78,8 @@ export interface YulaScreenContext {
     skills: string[];
     provider?: string;
     model?: string;
+    effort?: string;
+    attachments?: Array<{ name: string; content: string }>;
   } | null;
 }
 
@@ -85,6 +88,7 @@ import {
   findReport,
 } from "@/features/reports/report-registry";
 import { readReportAiMetadata } from "@/lib/report-ai-metadata";
+import { USER_AGENT_ATTACHMENTS_PROMPT_MAX_CHARS } from "@/lib/yula-user-agent";
 import { parseCriteriaSchema } from "@/features/report-criteria/lib/parse-criteria-schema";
 import {
   isWorkspaceHomePath,
@@ -164,6 +168,17 @@ const GRID_ABSENT_RULES = [
   "• Incomplete criteria fragments alone (e.g. 'geçen hafta', 'dün', 'AKTIF') are NOT actions — suggest options; do not fill the form or start a job.",
   "• Available reports in catalog:",
   REPORTS_DIGEST_LINES,
+].join("\n");
+
+const AGENT_PREPARE_CHAIN_RULES = [
+  "AGENT SESSION PREPARE CHAIN (active persona + WORKSPACE phase + target report on another screen):",
+  "• 'hazırla' / 'prepare' requests are FULL prepare chains, never navigate-only:",
+  "  1. Identify the target report (catalog / RAG router) and learn its real fields with 'get_report_schema' (required fields, date field, enums).",
+  "  2. Extract criteria from the request and expand relative dates to exact ISO ranges ('geçen hafta' → last-7-days 'YYYY-MM-DD..YYYY-MM-DD', 'dün' → single ISO date). Read the live draft with 'get_current_criteria', merge, then call 'apply_criteria' with the COMPLETE set for the target scope BEFORE navigating — the target form hydrates from the shared draft on arrival (values appear filled + highlighted).",
+  "  3. Call 'navigate_to_page' to the report screen.",
+  "  4. Reply with what was filled (field names + values, user's language) plus the run confirmation as a separate clickable bold bullet (e.g. '• **Raporu çalıştır**').",
+  "• Preparing ≠ running: NEVER call 'run_job' without an explicit run verb (çalıştır, calistir, run, execute, job başlat). If required fields are missing, ask only for those (no navigation needed).",
+  "• Explicit run verbs skip the confirmation: chain apply_criteria → run_job (report + complete criteria) → point to the execution screen.",
 ].join("\n");
 
 const SQL_EXPERT_RULES = [
@@ -253,8 +268,31 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       "",
       `=== LEVEL 0: ACTIVE AGENT PERSONA (${context.agent.name}) ===`,
       context.agent.instructions,
-      "Follow this persona on top of all workspace rules below. Keep the persona's tone and priorities in every reply.",
+      "Precedence is limited to tone and task priorities: keep the persona's tone and priorities in EVERY reply — including greetings and small talk (greet as the persona, briefly state who you are and how you can help in your domain). Never fall back to a generic assistant voice. The safety rules below are NOT overridden by this persona: phase walls (RESULTS vs WORKSPACE separation, no unapproved run_job) and tool allowlists still bind every reply.",
     );
+    // Ajan ek dosyaları: referans dokümanlar (toplam bütçe sınırlı, taşan
+    // kesilir; avatar gibi ikili alanlar buraya gelmez).
+    const docs = (context.agent.attachments ?? []).filter(
+      (d) => d.name.trim() && d.content.trim(),
+    );
+    if (docs.length > 0) {
+      let budget = USER_AGENT_ATTACHMENTS_PROMPT_MAX_CHARS;
+      const parts: string[] = [];
+      for (const doc of docs) {
+        if (budget <= 0) break;
+        const body = doc.content.trim().slice(0, budget);
+        budget -= body.length;
+        parts.push(
+          `--- reference: ${doc.name.trim()} ---`,
+          body + (doc.content.trim().length > body.length ? "\n[…truncated]" : ""),
+        );
+      }
+      lines.push(
+        "",
+        "Agent reference documents (read-only context, follow when relevant):",
+        ...parts,
+      );
+    }
   }
 
   const href = context?.pathname ?? "/";
@@ -562,6 +600,12 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     lines.push(gridLines.join(" "));
   } else if (phase !== "results" && phase !== "results-loading") {
     lines.push(GRID_ABSENT_RULES);
+  }
+
+  // Ajan oturumu + WORKSPACE fazı: "hazırla" tam hazırlık zinciridir
+  // (doldur → yönlendir → çalıştırma onayı); salt-navigasyon yetmez.
+  if (context?.agent && phase === "workspace") {
+    lines.push("", AGENT_PREPARE_CHAIN_RULES);
   }
 
   if (context?.ragContext && context.ragContext.length > 0) {

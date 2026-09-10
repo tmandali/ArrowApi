@@ -4,7 +4,8 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
-import { isConversationOnScreen, formatPathnameLabel } from "@/lib/workspace-paths";
+import { isConversationVisibleForAgent, formatPathnameLabel, extractAgentIdFromPath } from "@/lib/workspace-paths";
+import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
@@ -82,15 +83,19 @@ export function YulaHistorySidebar({
   const [confirmClear, setConfirmClear] = React.useState(false);
 
   const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
+  const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
+  const currentAgentId = extractAgentIdFromPath(currentPathname) ?? storeActiveAgentId ?? null;
 
   const filteredSessions = React.useMemo(() => {
-    let list = conversations.filter((c) => isConversationOnScreen(c.pathname, currentPathname));
+    let list = conversations.filter((c) =>
+      isConversationVisibleForAgent(c, currentPathname, currentAgentId),
+    );
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((s) => s.title.toLowerCase().includes(q));
     }
     return list;
-  }, [conversations, currentPathname, searchQuery]);
+  }, [conversations, currentPathname, currentAgentId, searchQuery]);
 
   const grouped = React.useMemo(
     () => groupConversationsByDate(filteredSessions),
@@ -357,16 +362,21 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const [confirmClear, setConfirmClear] = React.useState(false);
 
   const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
+  const mainStoreActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
+  const mainCurrentAgentId =
+    extractAgentIdFromPath(currentPathname) ?? mainStoreActiveAgentId ?? null;
 
-  // Main modda TÜM sohbet geçmişi listelenir
+  // Main modda da ajan ayrımı korunur: o oturumun sohbetleri listelenir.
   const filteredSessions = React.useMemo(() => {
-    let list = conversations;
+    let list = conversations.filter(
+      (c) => (c.agentId ?? null) === (mainCurrentAgentId ?? null),
+    );
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((s) => s.title.toLowerCase().includes(q));
     }
     return list;
-  }, [conversations, searchQuery]);
+  }, [conversations, searchQuery, mainCurrentAgentId]);
 
   const grouped = React.useMemo(
     () => groupConversationsByDate(filteredSessions),

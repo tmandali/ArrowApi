@@ -143,6 +143,22 @@ export function getEffectiveUserSkills(
   return filterSkillsByScope([...builtIns, ...storeSkills], workspaceId);
 }
 
+/** Kapsamsız TAM envanter (slash'e göre tekil; yerleşikler öncelikli) — saf. */
+export function getAllUserSkillsInventory(
+  storeSkills: UserSkill[],
+  builtIns: UserSkill[],
+): UserSkill[] {
+  const seen = new Set<string>();
+  const out: UserSkill[] = [];
+  for (const s of [...builtIns, ...storeSkills]) {
+    const key = s.slash.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
 const SLASH_RE = /^[a-z0-9][a-z0-9-_çğıöşü]*$/i;
 
 /** Editor validasyonu — saf. */

@@ -71,3 +71,13 @@ describe("filterActiveToolsByAgent", () => {
     ]);
   });
 });
+
+describe("lintAgentInstructions", () => {
+  it("flags approval bypass, tool ban, single-language impositions", async () => {
+    const { lintAgentInstructions, AGENT_LINT_SAMPLES } = await import("./yula-user-agent.ts");
+    assert.equal(lintAgentInstructions(AGENT_LINT_SAMPLES.clean).length, 0);
+    assert.ok(lintAgentInstructions(AGENT_LINT_SAMPLES.approvalBypass).length > 0);
+    assert.ok(lintAgentInstructions(AGENT_LINT_SAMPLES.toolBan).length > 0);
+    assert.ok(lintAgentInstructions(AGENT_LINT_SAMPLES.singleLanguage).length > 0);
+  });
+});

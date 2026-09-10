@@ -1,8 +1,8 @@
-/** Skill dosya sekmeleri tip renklendirmesi (uzantı/tür → renk). */
+/** Dosya sekmeleri/satırları tip renklendirmesi (uzantı/tür → renk). */
 
-export type SkillFileKind = "markdown" | "script" | "json" | "text";
+export type FileKind = "markdown" | "script" | "json" | "text";
 
-export function skillFileKindForName(name: string): SkillFileKind {
+export function fileKindForName(name: string): FileKind {
   const ext = name.split(".").pop()?.toLowerCase();
   if (ext === "mjs" || ext === "js" || ext === "cjs") return "script";
   if (ext === "json") return "json";
@@ -10,14 +10,14 @@ export function skillFileKindForName(name: string): SkillFileKind {
   return "text";
 }
 
-export const SKILL_FILE_KIND_LABEL: Record<SkillFileKind, string> = {
+export const FILE_KIND_LABEL: Record<FileKind, string> = {
   markdown: "md",
   script: "betik",
   json: "json",
   text: "metin",
 };
 
-export function skillFileDotClass(kind: SkillFileKind): string {
+export function fileDotClass(kind: FileKind): string {
   switch (kind) {
     case "markdown":
       return "bg-sky-500";
@@ -30,7 +30,7 @@ export function skillFileDotClass(kind: SkillFileKind): string {
   }
 }
 
-export function skillFileChipClass(kind: SkillFileKind): string {
+export function fileChipClass(kind: FileKind): string {
   switch (kind) {
     case "markdown":
       return "bg-sky-500/15 text-sky-700 dark:text-sky-400";

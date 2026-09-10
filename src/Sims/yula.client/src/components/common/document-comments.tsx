@@ -1,15 +1,28 @@
+import * as React from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 
 type DocumentCommentsProps = {
   initials?: string
   placeholder?: string
+  /** Verilirse Enter ile yorumu kaydeder (kayıt bazında kalıcı) */
+  onSubmit?: (text: string) => void
 }
 
 export function DocumentComments({
   initials = "JD",
   placeholder = "Type a reply / comment",
+  onSubmit,
 }: DocumentCommentsProps) {
+  const [value, setValue] = React.useState("")
+
+  const submit = () => {
+    const clean = value.trim()
+    if (!clean) return
+    onSubmit?.(clean)
+    setValue("")
+  }
+
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold">Comments</h3>
@@ -20,6 +33,14 @@ export function DocumentComments({
           </AvatarFallback>
         </Avatar>
         <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              submit()
+            }
+          }}
           placeholder={placeholder}
           className="bg-muted/20 border-muted-foreground/20 h-9 text-xs flex-1"
         />

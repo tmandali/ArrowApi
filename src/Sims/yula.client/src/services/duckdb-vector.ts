@@ -32,8 +32,9 @@ export interface RagVectorItem {
  * Korpus sürümü: indekslenen metinler değiştiğinde artırılır. OPFS vektör
  * önbelleği id-bazlı ve kalıcı olduğu için sürüm değişiminde önbellek
  * temizlenip vektörler yeniden üretilir (stale embedding savunması).
+ * v3: sohbet metadata'sına `agentId` etiketi (ajan-bazlı ayrım).
  */
-export const RAG_CORPUS_VERSION = 2;
+export const RAG_CORPUS_VERSION = 3;
 const OPFS_CORPUS_VERSION_FILE = "yula_rag_corpus_version.txt";
 
 let activeStoreDimension: number | null = null;
@@ -261,14 +262,14 @@ async function doIndexReportSchemas(): Promise<number> {
     {
       id: "system_agents",
       scope: "system",
-      content: "Ajanlar (/system/agents): Kullanıcı tanımlı Yula ajan kimlikleri (persona talimatı, araç erişimi, skill seti, model) bu ekranda oluşturulur, düzenlenir, aktifleştirilir ve silinir.",
+      content: "Ajan Ayarları (/system/agents): Kullanıcı tanımlı Yula ajan kimlikleri (persona talimatı, araç erişimi, skill seti, model) bu ekranda oluşturulur, düzenlenir, aktifleştirilir ve silinir.",
       metadata: { type: "system_route", path: "/system/agents" },
       tier: "global",
     },
     {
       id: "system_skills",
       scope: "system",
-      content: "Skill'ler (/system/skills): Kullanıcı tanımlı slash komutları (User sekmesi) ve yerleşik skill'ler (System sekmesi) bu ekranda yönetilir.",
+      content: "Skill Ayarları (/system/skills): Kullanıcı tanımlı slash komutları (User sekmesi) ve yerleşik skill'ler (System sekmesi) bu ekranda yönetilir.",
       metadata: { type: "system_route", path: "/system/skills" },
       tier: "global",
     },
@@ -478,6 +479,8 @@ export interface ConversationIndexItem {
   title: string;
   pathname?: string;
   jobId?: string;
+  /** Ayrı ajan oturumu ise ajan id'si; null/undefined = varsayılan Yula. */
+  agentId?: string | null;
   /** Sohbetin ilk kullanıcı mesajı (bağlam için, kırpılmış). */
   snippet: string;
 }
@@ -555,6 +558,7 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
             pathname: it.pathname,
             jobId: it.jobId,
             conversationId: it.id,
+            agentId: it.agentId ?? null,
           },
           // Kullanıcı katmanı: cihaz başına tek kullanıcı varsayımı; çok kullanıcılı
           // cihazda id öneki (user:<id>) gerekir — sonraki adım.
@@ -704,20 +708,38 @@ export async function searchVectorContext(
         r.distance <= cutoff,
     );
 
+    // Ajan ayrımı: kullanıcı katmanı (sohbet geçmişi) kayıtları yalnız
+    // istenen ajana aittir. Etiketli çağrılarda uymayan kayıtlar düşer;
+    // etiketsiz eski satırlar Yula (null) sayılır.
+    const scoped =
+      opts.agentId !== undefined
+        ? filtered.filter((r) => {
+            const meta = r.metadata as {
+              type?: string;
+              agentId?: string | null;
+            } | null;
+            const isConversation =
+              meta?.type === "conversation" ||
+              (r.tier === "user" && r.scope === "chats");
+            if (!isConversation) return true;
+            return (meta?.agentId ?? null) === (opts.agentId ?? null);
+          })
+        : filtered;
+
     if (results.length > 0) {
       console.info(
-        `%c🤖 [Yula RAG Telemetry]%c query: "%c${trimmed}%c" · %c${filtered.length}/${results.length} vector context items (cutoff ${cutoff.toFixed(2)})%c (${Math.round(performance.now() - startMs)} ms)`,
+        `%c🤖 [Yula RAG Telemetry]%c query: "%c${trimmed}%c" · %c${scoped.length}/${results.length} vector context items (cutoff ${cutoff.toFixed(2)})%c (${Math.round(performance.now() - startMs)} ms)`,
         "color: #f59e0b; font-weight: bold;",
         "color: inherit;",
         "color: #3b82f6; font-style: italic;",
         "color: inherit;",
         "color: #10b981; font-weight: bold;",
         "color: #6b7280;",
-        filtered,
+        scoped,
       );
     }
 
-    return filtered;
+    return scoped;
   } catch (err) {
     console.warn("[Vector Store] search error:", err);
     return [];

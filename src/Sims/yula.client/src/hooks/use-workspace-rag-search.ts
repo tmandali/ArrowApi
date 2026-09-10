@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { usePathname } from "next/navigation";
 import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/workspaces/stock/lib/stock-menu-registry";
 import { searchVectorContext } from "@/services/duckdb-vector";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
+import { useUserAgentsStore } from "@/lib/stores/user-agents";
+import { extractAgentIdFromPath } from "@/lib/workspace-paths";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 
 export interface WorkspaceSearchResultItem {
@@ -81,9 +84,14 @@ function conversationResultItem(
 }
 
 /** Zustand store'daki içi dolu konuşmaları (başlık + ilk kullanıcı mesajı) okur. */
-function readChatConversations(): Array<{ conv: YulaConversation; snippet: string }> {
+function readChatConversations(
+  agentId?: string | null,
+): Array<{ conv: YulaConversation; snippet: string }> {
   const store = useChatsStore.getState();
   return store.conversations
+    .filter((conv) =>
+      agentId === undefined ? true : ((conv.agentId ?? null) === (agentId ?? null)),
+    )
     .map((conv) => ({ conv, snippet: firstUserText(store.messagesById[conv.id]).slice(0, 400) }))
     .filter((entry) => entry.snippet.trim().length > 0);
 }
@@ -95,6 +103,10 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
   const [isSearchingRag, setIsSearchingRag] = useState(false);
   // Silme/ekleme sonrası listenin tazelenmesi için store'a abone ol
   const conversations = useChatsStore((s) => s.conversations);
+  // Ajan kapsamı: ajan sayfasında URL, diğer sayfalarda global seçim.
+  const pathname = usePathname();
+  const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
+  const currentAgentId = extractAgentIdFromPath(pathname) ?? storeActiveAgentId ?? null;
 
   useEffect(() => {
     const trimmed = query.trim().toLowerCase();
@@ -125,7 +137,7 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
           source: "menu" as const,
         }));
 
-      const recentConversations = readChatConversations()
+      const recentConversations = readChatConversations(currentAgentId)
         .sort((a, b) => b.conv.createdAt - a.conv.createdAt)
         .map((entry) => conversationResultItem(entry.conv, entry.snippet, 100, true));
 
@@ -166,7 +178,7 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
       }));
 
     // 1b) Sohbet geçmişi hızlı yol: başlık + ilk kullanıcı mesajında token eşleşmesi
-    const conversationMatches = readChatConversations()
+    const conversationMatches = readChatConversations(currentAgentId)
       .filter(({ conv, snippet }) =>
         matchesSearchTokens(`${conv.title} ${snippet}`.toLowerCase(), activeTokens),
       )
@@ -191,7 +203,7 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
     const timer = setTimeout(async () => {
       try {
         const startTime = performance.now();
-        const ragItems = await searchVectorContext(query, 20);
+        const ragItems = await searchVectorContext(query, 20, { agentId: currentAgentId });
         if (isCancelled) return;
 
         // Silinmiş yazışmalar semantik sonuçlarda tekrar listelenmesin
@@ -219,10 +231,13 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
           const similarityScore = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
 
           if (meta?.type === "conversation") {
-            // Sohbet geçmişi semantik eşleşmesi
+            // Sohbet geçmişi semantik eşleşmesi (ajan kapsamlı — savunma
+            // derinliği: vektör katmanı da filtreler, burada tekrar doğrulanır)
+            const hitAgentId = (meta as { agentId?: string | null }).agentId ?? null;
             if (
               meta.conversationId &&
               existingConvIds.has(meta.conversationId) &&
+              hitAgentId === (currentAgentId ?? null) &&
               similarityScore >= 50 &&
               !seenIds.has(ragItem.id)
             ) {
@@ -305,7 +320,7 @@ export function useWorkspaceRagSearch(query: string, workspace = "stock") {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [query, workspace, conversations]);
+  }, [query, workspace, conversations, currentAgentId, pathname, storeActiveAgentId]);
 
   return {
     results,

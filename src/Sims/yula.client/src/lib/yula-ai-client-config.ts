@@ -2,6 +2,7 @@
 
 import type { AIProviderType } from "./yula-config";
 import { normalizeProvider } from "./yula-config";
+import { normalizeEffort, type YulaEffort } from "./yula-reasoning";
 
 export const YULA_AI_CONFIG_KEY = "yula_ai_config";
 
@@ -9,6 +10,7 @@ export interface YulaClientAiConfig {
   provider?: AIProviderType;
   model?: string;
   endpoint?: string;
+  effort?: YulaEffort;
 }
 
 export function readYulaClientAiConfig(): YulaClientAiConfig {
@@ -17,10 +19,13 @@ export function readYulaClientAiConfig(): YulaClientAiConfig {
     const raw = localStorage.getItem(YULA_AI_CONFIG_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // Eski anahtar: MySettingsForm `thinkingLevel` yazıyordu — effort'a migrate edilir.
+    const effortRaw = parsed.effort ?? parsed.thinkingLevel;
     return {
       provider: normalizeProvider(String(parsed.provider ?? "")),
       model: typeof parsed.model === "string" ? parsed.model : undefined,
       endpoint: typeof parsed.endpoint === "string" ? parsed.endpoint : undefined,
+      effort: normalizeEffort(effortRaw ?? ""),
     };
   } catch {
     return {};

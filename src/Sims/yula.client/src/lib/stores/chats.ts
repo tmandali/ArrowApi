@@ -10,6 +10,8 @@ export interface YulaConversation {
   pathname?: string;
   /** Sonuç analizi sohbeti ise job GUID (pathname ile uyumlu). */
   jobId?: string;
+  /** Ayrı ajan oturumu ise ajan id'si; null/undefined = varsayılan Yula. */
+  agentId?: string | null;
 }
 
 interface ChatsState {
@@ -33,11 +35,11 @@ interface ChatsState {
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
-  renameFromFirstMessage: (id: string, text: string) => void;
+  renameFromFirstMessage: (id: string, text: string, agentId?: string | null) => void;
   clearAllConversations: () => void;
-  saveMessages: (id: string, messages: YulaMessage[], pathname?: string) => void;
+  saveMessages: (id: string, messages: YulaMessage[], pathname?: string, agentId?: string | null) => void;
   beginConversationFollow: (id: string) => void;
-  followArrivedConversation: (id: string, href?: string) => void;
+  followArrivedConversation: (id: string, href?: string, agentId?: string | null) => void;
   isThinkingEnabled: boolean;
   setThinkingEnabled: (enabled: boolean) => void;
   setModel: (model: string) => void;
@@ -124,7 +126,7 @@ export const useChatsStore = create<ChatsState>()(
           ),
         })),
 
-      renameFromFirstMessage: (id, text) =>
+      renameFromFirstMessage: (id, text, agentId) =>
         set((s) => {
           const existingIndex = s.conversations.findIndex((c) => c.id === id);
           const title = text.slice(0, 40) || "Yeni Sohbet";
@@ -138,6 +140,7 @@ export const useChatsStore = create<ChatsState>()(
                   createdAt: Date.now(),
                   pathname: currentPath,
                   jobId: extractJobIdFromHref(currentPath) ?? undefined,
+                  agentId: agentId ?? null,
                 },
                 ...s.conversations,
               ],
@@ -154,6 +157,7 @@ export const useChatsStore = create<ChatsState>()(
                       extractJobIdFromHref(
                         resolveConversationPathname(c.pathname, currentPath),
                       ) ?? c.jobId,
+                    agentId: agentId !== undefined ? (agentId ?? null) : (c.agentId ?? null),
                   }
                 : c
             ),
@@ -170,7 +174,7 @@ export const useChatsStore = create<ChatsState>()(
         });
       },
 
-      saveMessages: (id, messages, pathname) =>
+      saveMessages: (id, messages, pathname, agentId) =>
         set((s) => {
           const messagesById = { ...s.messagesById, [id]: messages };
           const userMsgs = messages.filter((m) => m.role === "user");
@@ -192,6 +196,7 @@ export const useChatsStore = create<ChatsState>()(
                   createdAt: Date.now(),
                   pathname: resolveConversationPathname(undefined, currentPath),
                   jobId: extractJobIdFromHref(currentPath) ?? undefined,
+                  agentId: agentId ?? null,
                 },
                 ...conversations,
               ];
@@ -214,6 +219,7 @@ export const useChatsStore = create<ChatsState>()(
                   jobId: hasNewContent
                     ? extractJobIdFromHref(updatedPath) ?? c.jobId
                     : c.jobId,
+                  agentId: agentId !== undefined ? (agentId ?? null) : (c.agentId ?? null),
                 };
               });
             }
@@ -225,7 +231,7 @@ export const useChatsStore = create<ChatsState>()(
       beginConversationFollow: (id) =>
         set({ followNav: { id, at: Date.now() } }),
 
-      followArrivedConversation: (id, href) =>
+      followArrivedConversation: (id, href, agentId) =>
         set((s) => {
           const resolved = href ?? currentLocationHref();
           if (!resolved) return { followNav: null };
@@ -242,6 +248,7 @@ export const useChatsStore = create<ChatsState>()(
                   createdAt: Date.now(),
                   pathname,
                   jobId,
+                  agentId: agentId ?? null,
                 },
                 ...s.conversations,
               ],
@@ -250,7 +257,14 @@ export const useChatsStore = create<ChatsState>()(
           return {
             followNav: null,
             conversations: s.conversations.map((c) =>
-              c.id === id ? { ...c, pathname, jobId: jobId ?? c.jobId } : c,
+              c.id === id
+                ? {
+                    ...c,
+                    pathname,
+                    jobId: jobId ?? c.jobId,
+                    agentId: agentId !== undefined ? (agentId ?? null) : (c.agentId ?? null),
+                  }
+                : c,
             ),
           };
         }),

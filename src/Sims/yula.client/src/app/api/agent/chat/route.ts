@@ -26,6 +26,14 @@ import {
   getAvailableProviderModels,
 } from "@/lib/yula-provider";
 import { getDefaultModel, resolveProvider, resolveThinkingEnabled } from "@/lib/yula-config";
+import {
+  effortToOllamaThink,
+  effortToReasoning,
+  normalizeEffort,
+  resolveEffort,
+  thinkingToEffort,
+  type YulaEffort,
+} from "@/lib/yula-reasoning";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +49,14 @@ export type YulaMessageMetadata = { usage?: LanguageModelUsage };
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
 
 export const DEFAULT_MODEL = getDefaultModel();
+
+/** Skill çalıştırma/okuma araçları (ajan skill listesi boşsa kapatılır). */
+const SKILL_TOOL_NAMES = new Set([
+  "run_user_skill",
+  "read_user_file",
+  "run_skill_script",
+  "read_skill_file",
+]);
 
 /**
  * Context compaction (SDK recipe: track-agent-token-usage).
@@ -173,11 +189,12 @@ export async function POST(req: Request) {
       return Response.json({ error: "invalid json" }, { status: 400 });
     }
 
-    const { messages, model, thinkingEnabled, context, provider: requestedProvider, endpoint } =
+    const { messages, model, thinkingEnabled, effort: requestedEffort, context, provider: requestedProvider, endpoint } =
       (body ?? {}) as {
         messages?: YulaMessage[];
         model?: string;
         thinkingEnabled?: boolean;
+        effort?: YulaEffort | string;
         context?: YulaScreenContext;
         provider?: string;
         endpoint?: string;
@@ -235,6 +252,19 @@ export async function POST(req: Request) {
     };
 
     const isThinking = resolveThinkingEnabled(thinkingEnabled);
+    // Efor önceliği: ajan pini > istek > eski boolean bayrak. Cookbook deseni:
+    // taşınabilir top-level `reasoning` kullanılır, providerOptions ile aynı
+    // anda reasoning yazılmaz (precedence çakışması olur).
+    const agentEffort = normalizeEffort(
+      (context?.agent as { effort?: unknown } | null | undefined)?.effort ?? "",
+    );
+    const bodyEffort =
+      normalizeEffort(requestedEffort ?? "") ?? thinkingToEffort(thinkingEnabled);
+    const effort = resolveEffort({
+      agentEffort,
+      requestEffort: bodyEffort,
+      defaultEffort: isThinking ? "low" : "off",
+    });
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
     // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
     const systemPrompt = buildSystemPrompt(context);
@@ -252,9 +282,31 @@ export async function POST(req: Request) {
       baseUrl,
     });
 
+    // Capability gate: efor desteklemeyen modelde reasoning/think gönderilmez
+    // (desteklenmeyen modelde API hatası / coercion uyarısı vermemek için).
+    // resolveModel zaten liste içinden seçti; yetenek aynı listeden okunur.
+    let reasoning = effortToReasoning(effort);
+    let ollamaThink: boolean | string | undefined;
+    if (provider === "ollama") {
+      ollamaThink = effortToOllamaThink(effort, activeModel);
+    }
+    try {
+      const listed = await getAvailableProviderModels({ provider, baseUrl });
+      const cap = listed.find(
+        (m) => m.name === activeModel || m.name.toLowerCase() === activeModel.toLowerCase(),
+      );
+      const supported = Boolean(cap?.capabilities?.hasThinking ?? cap?.hasThinking);
+      if (!supported) {
+        reasoning = undefined;
+        ollamaThink = undefined;
+      }
+    } catch {
+      // Liste alınamazsa hesaplanan değerle devam (best-effort).
+    }
+
     // Token bütçesi ve sağlayıcı telemetrisi
     console.info(
-      `[Yula AI] provider: ${providerInfo.provider} · model: ${activeModel} · system: ${systemPrompt.length} chars (≈${Math.round(systemPrompt.length / 3.4)} tok) · tools: ${Object.keys(tools).length} · phase: ${phase} · thinking: ${isThinking}`,
+      `[Yula AI] provider: ${providerInfo.provider} · model: ${activeModel} · system: ${systemPrompt.length} chars (≈${Math.round(systemPrompt.length / 3.4)} tok) · tools: ${Object.keys(tools).length} · phase: ${phase} · thinking: ${isThinking} · effort: ${effort}${reasoning ? "" : " (n/a)"}`,
     );
 
     const middleware = [
@@ -281,8 +333,12 @@ export async function POST(req: Request) {
         model: languageModel,
         middleware,
       }),
+      ...(reasoning ? { reasoning } : {}),
       providerOptions: {
         anthropic: { cacheControl: { type: "ephemeral" } },
+        ...(provider === "ollama" && ollamaThink !== undefined
+          ? { ollama: { think: ollamaThink } }
+          : {}),
       },
       system: systemPrompt,
       messages: modelMessages,
@@ -292,10 +348,21 @@ export async function POST(req: Request) {
         // Ajan kapısı (Step 5/6 karşılığı): seçili ajan allowlist verdiyse
         // faz araçları onunla kesiştirilir; boş = tüm faz araçları.
         const agentTools = context?.agent?.tools;
-        const gatedTools =
+        let gatedTools =
           agentTools && agentTools.length > 0
             ? filterActiveToolsByAgent(phaseToolNames, gridToolNames, agentTools)
             : phaseToolNames;
+        // Skill kapısı: ajanın skill listesi boşsa skill araçları kapatılır
+        // (boş = skill yok; envanter + palet de aynı kuralı uygular).
+        const agentSkillList = context?.agent?.skills;
+        if (
+          context?.agent &&
+          (!agentSkillList || agentSkillList.length === 0)
+        ) {
+          gatedTools = gatedTools.filter(
+            (t) => !SKILL_TOOL_NAMES.has(t),
+          );
+        }
         const activeTools = gatedTools as Extract<
           keyof typeof tools,
           string

@@ -18,13 +18,21 @@ import {
 import { getRailWorkspaces } from "@/lib/workspace-registry";
 import { getRegisteredYulaCommands } from "@/components/layout/yula-commands";
 import { TabsContent } from "@/components/ui/tabs";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Paperclip, Plus } from "lucide-react";
+import { DetailTimeline } from "@/components/layout/detail-timeline";
+import { FormGrid } from "@/components/layout/form-grid";
+import { DetailAside, DetailMeta, type DetailMetaRow } from "@/components/layout/detail-aside";
+import { DetailFormLayout } from "@/components/layout/detail-form-layout";
 import {
-  SKILL_FILE_KIND_LABEL,
-  skillFileChipClass,
-  skillFileKindForName,
-  type SkillFileKind,
-} from "./skill-file-kind";
+  FILE_KIND_LABEL,
+  fileChipClass,
+  fileDotClass,
+  fileKindForName,
+  type FileKind,
+} from "@/components/layout/file-kind";
+import { formatMetaDate } from "@/utils/format";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CriteriaSimpleCombobox } from "@/features/report-criteria";
@@ -55,12 +63,13 @@ export interface SkillDetailFileTab {
   key: string;
   label: string;
   title?: string;
-  kind: SkillFileKind;
+  kind: FileKind;
 }
 
 export function SkillEditor({
   skill,
   mode,
+  showTimeline = true,
   editorRef,
   onSaved,
   onDeleted,
@@ -68,6 +77,8 @@ export function SkillEditor({
 }: {
   skill: UserSkill | null;
   mode: SkillEditorMode;
+  /** Kayıt geçmişi (alt timeline) görünürlüğü — başlık düğmesinden yönetilir */
+  showTimeline?: boolean;
   editorRef: { current: SkillEditorHandle | null };
   onSaved: (id: string) => void;
   onDeleted: () => void;
@@ -137,33 +148,56 @@ export function SkillEditor({
     onDeleted();
   };
 
-  const handlePickFile = (file: File | undefined) => {
+  const handlePickFiles = (list: FileList | null | undefined) => {
     setFileError(null);
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onerror = () =>
-      setFileError(`"${file.name}" okunamadı.`);
-    reader.onload = () => {
-      const content = typeof reader.result === "string" ? reader.result : "";
-      const candidate = { name: file.name, content };
-      const err = validateUserSkillFile(
-        candidate,
-        files.map((f) => f.name),
+    if (!list || list.length === 0) return;
+    const picked = Array.from(list);
+    void (async () => {
+      const texts = await Promise.all(
+        picked.map(
+          (file) =>
+            new Promise<{ name: string; content: string }>((resolve) => {
+              const reader = new FileReader();
+              reader.onerror = () => resolve({ name: file.name, content: "" });
+              reader.onload = () =>
+                resolve({
+                  name: file.name,
+                  content:
+                    typeof reader.result === "string" ? reader.result : "",
+                });
+              reader.readAsText(file);
+            }),
+        ),
       );
-      if (err) {
-        setFileError(err);
-        return;
-      }
-      if (
-        userSkillFilesSize(files) + content.length >
-        USER_SKILL_FILES_TOTAL_MAX_CHARS
-      ) {
-        setFileError("Toplam dosya boyutu 200K karakteri geçemez.");
-        return;
-      }
-      setFiles((prev) => [...prev, candidate]);
-    };
-    reader.readAsText(file);
+      setFiles((prev) => {
+        const next = [...prev];
+        for (const candidate of texts) {
+          const err = validateUserSkillFile(
+            candidate,
+            next.map((f) => f.name),
+          );
+          if (err) {
+            setFileError(err);
+            continue;
+          }
+          if (
+            userSkillFilesSize(next) + candidate.content.length >
+            USER_SKILL_FILES_TOTAL_MAX_CHARS
+          ) {
+            setFileError("Toplam dosya boyutu 200K karakteri geçemez.");
+            continue;
+          }
+          next.push(candidate);
+        }
+        return next;
+      });
+    });
+  };
+
+  const handleRemoveFile = (key: string) => {
+    setFiles((prev) =>
+      prev.filter((p) => `file:${p.name.toLowerCase()}` !== key),
+    );
   };
 
   const builtinFiles = isRO && skill ? (BUILT_IN_SKILL_FILES[skill.slash] ?? []) : [];
@@ -224,7 +258,7 @@ export function SkillEditor({
           key: `file:${f.path}`,
           label,
           title: f.path,
-          kind: f.kind === "script" ? ("script" as const) : skillFileKindForName(label),
+          kind: f.kind === "script" ? ("script" as const) : fileKindForName(label),
         };
       });
     }
@@ -233,7 +267,7 @@ export function SkillEditor({
         key: `file:${f.name.toLowerCase()}`,
         label: f.name,
         title: f.name,
-        kind: skillFileKindForName(f.name),
+        kind: fileKindForName(f.name),
       }));
     }
     return [];
@@ -287,7 +321,7 @@ export function SkillEditor({
     key: string;
     name: string;
     content: string | undefined;
-    kind: SkillFileKind;
+    kind: FileKind;
   }> = isRO
     ? builtinFiles.map((f) => {
         const name = f.path.split("/").pop() ?? f.path;
@@ -295,21 +329,44 @@ export function SkillEditor({
           key: `file:${f.path}`,
           name,
           content: f.content ?? scriptContents[f.path],
-          kind: f.kind === "script" ? ("script" as const) : skillFileKindForName(name),
+          kind: f.kind === "script" ? ("script" as const) : fileKindForName(name),
         };
       })
     : files.map((f) => ({
         key: `file:${f.name.toLowerCase()}`,
         name: f.name,
         content: f.content,
-        kind: skillFileKindForName(f.name),
+        kind: fileKindForName(f.name),
       }));
+
+  // Sağ meta panel satırları (item aside deseni): kullanıcı
+  // skill'lerinde tarihler; yerleşik ve yeni kayıtta basılmaz.
+  const skillMetaRows: DetailMetaRow[] = (() => {
+    if (!isRO && skill) {
+      return [
+        {
+          key: "created",
+          title: "Oluşturuldu",
+          detail: formatMetaDate(skill.createdAt),
+        },
+        {
+          key: "updated",
+          title: "Son düzenleme",
+          detail: formatMetaDate(skill.updatedAt),
+        },
+      ];
+    }
+    return [];
+  })();
 
   return (
     <>
       <TabsContent value="genel" className="mt-0">
-        <div className="min-w-0 space-y-5">
-          <div className="grid grid-cols-1 gap-x-10 gap-y-5 @[40rem]/skill-detail:grid-cols-2">
+        <DetailFormLayout
+          containerName="skill-detail"
+          content={
+            <>
+              <FormGrid twoColClass="@[40rem]/skill-detail:grid-cols-2">
             <Field>
               <FieldLabel className="text-xs text-muted-foreground">
                 Slash adı <span className="font-mono">/ornek-skill</span>
@@ -335,7 +392,7 @@ export function SkillEditor({
                 disabled={isRO}
               />
             </Field>
-          </div>
+          </FormGrid>
           <Field>
             <FieldLabel className="text-xs text-muted-foreground">
               Başlık
@@ -369,7 +426,70 @@ export function SkillEditor({
           {!isRO && error ? (
             <p className="text-[12px] text-red-600 dark:text-red-400">{error}</p>
           ) : null}
-        </div>
+            </>
+          }
+          aside={
+            <>
+              <DetailAside
+                addControl={
+                  !isRO ? (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Paperclip className="size-3.5" />
+                        Ek dosyalar
+                      </span>
+                      <Plus className="size-3.5" />
+                    </Button>
+                  ) : undefined
+                }
+                files={
+                  isRO && skill
+                    ? builtinFiles.map((f) => {
+                        const name = f.path.split("/").pop() ?? f.path;
+                        return {
+                          key: `file:${f.path}`,
+                          name,
+                          dotClassName: fileDotClass(
+                            f.kind === "script"
+                              ? ("script" as const)
+                              : fileKindForName(name),
+                          ),
+                        };
+                      })
+                    : files.map((f) => ({
+                        key: `file:${f.name.toLowerCase()}`,
+                        name: f.name,
+                        dotClassName: fileDotClass(fileKindForName(f.name)),
+                      }))
+                }
+                onRemoveFile={!isRO ? handleRemoveFile : undefined}
+              />
+              <DetailMeta
+                rows={skillMetaRows}
+                bare
+                emptyTitle="Henüz bilgi yok"
+                emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
+              />
+            </>
+          }
+          timeline={
+            showTimeline ? (
+              <DetailTimeline
+                recordName={skill?.slash}
+                createdAt={isRO ? undefined : skill?.createdAt}
+                updatedAt={isRO ? undefined : skill?.updatedAt}
+                builtinSource={
+                  isRO && skill ? `skills/${skill.slash}/SKILL.md` : undefined
+                }
+                recordKey={skill ? `skill:${skill.id}` : undefined}
+              />
+            ) : undefined
+          }
+        />
       </TabsContent>
       <TabsContent value="skillmd" className="mt-0">
         {skillMdPreview ? (
@@ -396,9 +516,9 @@ export function SkillEditor({
           <div className="min-w-0">
             <div className="mb-1.5 flex items-center gap-1.5">
               <span
-                className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${skillFileChipClass(f.kind)}`}
+                className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${fileChipClass(f.kind)}`}
               >
-                {SKILL_FILE_KIND_LABEL[f.kind]}
+                {FILE_KIND_LABEL[f.kind]}
               </span>
               {f.kind === "script" && isRO ? (
                 <span className="text-[10.5px] text-muted-foreground">
@@ -446,13 +566,7 @@ export function SkillEditor({
               {!isRO ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    setFiles((prev) =>
-                      prev.filter(
-                        (p) => `file:${p.name.toLowerCase()}` !== f.key,
-                      ),
-                    )
-                  }
+                  onClick={() => handleRemoveFile(f.key)}
                   className="rounded-md px-2 py-1 text-[11.5px] text-muted-foreground hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                 >
                   Kaldır
@@ -467,9 +581,10 @@ export function SkillEditor({
           ref={fileInputRef}
           type="file"
           accept=".md,.markdown,.txt,.json"
+          multiple
           className="hidden"
           onChange={(e) => {
-            handlePickFile(e.target.files?.[0]);
+            handlePickFiles(e.target.files);
             e.target.value = "";
           }}
         />

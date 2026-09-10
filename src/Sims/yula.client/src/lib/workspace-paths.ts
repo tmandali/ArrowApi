@@ -36,7 +36,9 @@ export function workspaceLabelFromPath(pathname: string): string {
     pathname === "/" ||
     pathname.startsWith("/my") ||
     pathname.startsWith("/system") ||
-    pathname.startsWith("/user-settings")
+    pathname.startsWith("/user-settings") ||
+    pathname.startsWith("/agents") ||
+    pathname.startsWith("/agent/")
   ) {
     return "System"
   }
@@ -48,13 +50,36 @@ export function workspaceLabelFromPath(pathname: string): string {
   return "System"
 }
 
+/** Ayrı ajan oturumu: /agents/<agentId> (tekil /agent/<id> de kabul edilir). */
+export function extractAgentIdFromPath(pathname?: string | null): string | null {
+  if (!pathname) return null
+  const clean = pathname.split("?")[0].replace(/\/+$/, "") || "/"
+  const parts = clean.split("/").filter(Boolean)
+  if (parts.length >= 2 && (parts[0] === "agents" || parts[0] === "agent")) {
+    return parts[1] || null
+  }
+  return null
+}
+
+/** True if the pathname is a dedicated agent session page. */
+export function isAgentSessionPath(pathname?: string | null): boolean {
+  return extractAgentIdFromPath(pathname) !== null
+}
+
+/** Dedicated agent session URL (id-tabanlı; isim değişebilir). */
+export function agentSessionPath(agentId: string): string {
+  return `/agents/${encodeURIComponent(agentId)}`
+}
+
 /** Workspace ID slug for a pathname. */
 export function workspaceIdFromPath(pathname: string): string {
   if (
     pathname === "/" ||
     pathname.startsWith("/my") ||
     pathname.startsWith("/system") ||
-    pathname.startsWith("/user-settings")
+    pathname.startsWith("/user-settings") ||
+    pathname.startsWith("/agents") ||
+    pathname.startsWith("/agent/")
   ) {
     return "system"
   }
@@ -124,15 +149,26 @@ export function isConversationOnScreen(
   return cBase !== "/" && !isWorkspaceHomePath(c) && cBase === currBase
 }
 
+/** Agent-aware görünürlük: önce ajan kimliği, sonra ekran eşleşmesi. */
+export function isConversationVisibleForAgent(
+  c: { pathname?: string; agentId?: string | null },
+  currentPath?: string,
+  currentAgentId?: string | null,
+): boolean {
+  if ((c.agentId ?? null) !== (currentAgentId ?? null)) return false
+  return isConversationOnScreen(c.pathname, currentPath)
+}
+
 function reportScreenLabel(pathname: string): string | null {
+  if (pathname.startsWith("/agents/") || pathname.startsWith("/agent/")) return "Ajan"
   if (pathname.includes("/stock/stock-balance")) return "Stok Bakiye"
   if (pathname.includes("/stock/stock-analytics")) return "Stok Analiz"
   if (pathname.includes("/stock/retail-sales-report")) return "Perakende Satış"
   if (pathname.includes("/stock/stock-ledger")) return "Stok Ekstre"
   if (pathname.includes("/stock/item")) return "Stok Kartı"
   if (pathname.includes("/system/users")) return "Kullanıcılar"
-  if (pathname.includes("/system/agents")) return "Ajanlar"
-  if (pathname.includes("/system/skills")) return "Skill'ler"
+  if (pathname.includes("/system/agents")) return "Ajan Ayarları"
+  if (pathname.includes("/system/skills")) return "Skill Ayarları"
   return null
 }
 

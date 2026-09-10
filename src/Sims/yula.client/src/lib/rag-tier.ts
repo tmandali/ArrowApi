@@ -8,6 +8,11 @@ export interface RagSearchFilter {
   /** Aranacak katmanlar; verilmezse tümü. */
   tiers?: RagVectorTier[];
   maxDistance?: number;
+  /**
+   * Ajan kapsamı (verilirse kullanıcı katmanı/sohbet kayıtları buna daraltılır;
+   * `null` = varsayılan Yula). Verilmezse kapsam filtresi uygulanmaz (legacy).
+   */
+  agentId?: string | null;
 }
 
 /** Katman filtresini SQL WHERE cümlesine çevirir (saf, test edilebilir). */

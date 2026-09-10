@@ -1,16 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Check, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Pencil, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { filterAgentsByScope } from "@/lib/yula-user-agent";
-import { YulaThinkingToggle } from "@/components/layout/yula-model-selector";
+import { agentSessionPath } from "@/lib/workspace-paths";
+import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar";
 
 /**
  * Ajan kart ızgarası (workspace kartları deseni): boş sohbette gösterilir.
  * Varsayılan Yula için kart yoktur — seçim yokluğu = Yula.
- * Karta tıklama seçer/seçimi kaldırır.
+ * Karta tıklama ayrı ajan oturumuna gider (/agents/<id>); seçim toggle'ı yok.
  */
 export function YulaAgentCards({
   workspaceId,
@@ -21,6 +23,7 @@ export function YulaAgentCards({
   onManage: (editingId?: string | null) => void;
   className?: string;
 }) {
+  const router = useRouter();
   const agents = useUserAgentsStore((s) => s.agents);
   const activeAgentId = useUserAgentsStore((s) => s.activeAgentId);
   const setActiveAgentId = useUserAgentsStore((s) => s.setActiveAgentId);
@@ -36,10 +39,6 @@ export function YulaAgentCards({
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
           Ajanlar (Agents)
         </h2>
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          Düşünme
-          <YulaThinkingToggle />
-        </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {inScope.map((a) => {
@@ -48,8 +47,11 @@ export function YulaAgentCards({
             <button
               key={a.id}
               type="button"
-              onClick={() => setActiveAgentId(isActive ? null : a.id)}
-              title={isActive ? "Seçimi kaldır (varsayılan Yula)" : `${a.name} ile konuş`}
+              onClick={() => {
+                setActiveAgentId(a.id);
+                router.push(agentSessionPath(a.id));
+              }}
+              title={`${a.name} ile ayrı oturumda konuş`}
               className={cn(
                 "group relative flex items-start gap-3.5 rounded-xl border p-3.5 text-left transition-all duration-200 hover:shadow-sm",
                 isActive
@@ -57,24 +59,47 @@ export function YulaAgentCards({
                   : "border-border/60 bg-background/50 hover:bg-accent/40 hover:border-primary/40",
               )}
             >
-              <div
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-200",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground",
-                )}
-              >
-                <Bot className="size-5" />
-              </div>
+              {a.avatar ? (
+                <AgentAvatar
+                  value={a.avatar}
+                  name={a.name}
+                  className="size-10 shrink-0 rounded-lg"
+                />
+              ) : (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-500 text-xs font-bold text-white">
+                  {agentInitials(a.name)}
+                </span>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
                   <h3 className="text-xs font-semibold tracking-tight truncate">
                     {a.name}
                   </h3>
-                  {isActive ? (
-                    <Check className="size-3.5 text-primary shrink-0" />
-                  ) : null}
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    {isActive ? (
+                      <Check className="size-3.5 text-primary shrink-0" />
+                    ) : null}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title={`${a.name} — düzenle`}
+                      aria-label={`${a.name} düzenle`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onManage(a.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onManage(a.id);
+                        }
+                      }}
+                      className="rounded border-0 bg-transparent p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <Pencil className="size-3.5" />
+                    </span>
+                  </span>
                 </div>
                 <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                   {a.description || "Özel ajan kimliği"}

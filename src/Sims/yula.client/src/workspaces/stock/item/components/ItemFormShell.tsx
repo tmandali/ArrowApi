@@ -31,7 +31,6 @@ import {
   Printer,
   MoreHorizontal,
   Plus,
-  X,
   UserPlus,
   Paperclip,
   Tag,
@@ -45,6 +44,7 @@ import { pageHeaderCardClass, pageHeaderShellClass, panelCardClass } from "@/com
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
+import { DetailAside } from "@/components/layout/detail-aside"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
@@ -496,78 +496,68 @@ export function ItemFormShell({
             </div>
 
             <aside className="w-full space-y-4 border-t bg-muted/10 p-3 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0 sm:p-4">
-              <ItemImageUpload />
+              <DetailAside
+                image={<ItemImageUpload />}
+                addControl={
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="flex items-center gap-2">
+                        <UserPlus className="size-3.5" />
+                        Assigned To
+                      </span>
+                      <Plus className="size-3.5" />
+                    </Button>
+                    <div>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => attachmentInputRef.current?.click()}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Paperclip className="size-3.5" />
+                          Attachments
+                        </span>
+                        <Plus className="size-3.5" />
+                      </Button>
+                      <input
+                        ref={attachmentInputRef}
+                        type="file"
+                        className="sr-only"
+                        multiple
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files ?? [])
+                          if (files.length === 0) {
+                            return
+                          }
+                          setAttachments((prev) => [
+                            ...prev,
+                            ...files.map((file) => ({
+                              id: `${file.name}-${file.lastModified}-${file.size}`,
+                              name: file.name,
+                            })),
+                          ])
+                          event.target.value = ""
+                        }}
+                      />
+                    </div>
+                  </div>
+                }
+                files={attachments.map((file) => ({
+                  key: file.id,
+                  name: file.name,
+                  icon: <ShoppingBag className="size-3.5 shrink-0" />,
+                }))}
+                onRemoveFile={(key) =>
+                  setAttachments((prev) =>
+                    prev.filter((item) => item.id !== key)
+                  )
+                }
+              />
 
               <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="flex items-center gap-2">
-                    <UserPlus className="size-3.5" />
-                    Assigned To
-                  </span>
-                  <Plus className="size-3.5" />
-                </Button>
-
-                <div>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                    onClick={() => attachmentInputRef.current?.click()}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Paperclip className="size-3.5" />
-                      Attachments
-                    </span>
-                    <Plus className="size-3.5" />
-                  </Button>
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    onChange={(event) => {
-                      const files = Array.from(event.target.files ?? [])
-                      if (files.length === 0) {
-                        return
-                      }
-                      setAttachments((prev) => [
-                        ...prev,
-                        ...files.map((file) => ({
-                          id: `${file.name}-${file.lastModified}-${file.size}`,
-                          name: file.name,
-                        })),
-                      ])
-                      event.target.value = ""
-                    }}
-                  />
-                  {attachments.length > 0 ? (
-                    <div className="mt-1 space-y-1 pl-2">
-                      {attachments.map((file) => (
-                        <div
-                          key={file.id}
-                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-muted/60"
-                        >
-                          <ShoppingBag className="size-3.5 shrink-0" />
-                          <span className="truncate flex-1">{file.name}</span>
-                          <button
-                            type="button"
-                            className="rounded p-0.5 hover:bg-muted hover:text-foreground"
-                            onClick={() =>
-                              setAttachments((prev) =>
-                                prev.filter((item) => item.id !== file.id)
-                              )
-                            }
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
                 <Button
                   variant="ghost"
                   className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"

@@ -30,6 +30,8 @@ type WorkspaceSidePanelLayoutProps = {
   children: React.ReactNode
   /** Extra controls in the panel header (before collapse). */
   headerActions?: React.ReactNode
+  /** Başlık collapse butonu yerine statik alan olur (tıklama kapatmaz). */
+  titleCollapseDisabled?: boolean
   /** Collapse control aria-label. Defaults from string title when possible. */
   collapseLabel?: string
   defaultSizePercent?: number
@@ -68,26 +70,36 @@ function SidePanelHeader({
   headerActions,
   collapseLabel,
   onCollapse,
+  titleCollapseDisabled = false,
   className,
 }: {
   title: React.ReactNode
   headerActions?: React.ReactNode
   collapseLabel: string
   onCollapse: () => void
+  titleCollapseDisabled?: boolean
   className?: string
 }) {
   return (
     <div className={cn(panelHeaderClass, "gap-1", className)}>
-      <button
-        type="button"
-        onClick={onCollapse}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-0.5 py-1 text-left transition-colors hover:bg-muted/40"
-        aria-label={collapseLabel}
-      >
-        <span className={cn("flex min-w-0 items-center gap-2", panelHeaderTitleClass)}>
-          {title}
-        </span>
-      </button>
+      {titleCollapseDisabled ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-0.5 py-1 text-left">
+          <span className={cn("flex min-w-0 items-center gap-2", panelHeaderTitleClass)}>
+            {title}
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-0.5 py-1 text-left transition-colors hover:bg-muted/40"
+          aria-label={collapseLabel}
+        >
+          <span className={cn("flex min-w-0 items-center gap-2", panelHeaderTitleClass)}>
+            {title}
+          </span>
+        </button>
+      )}
       {headerActions}
     </div>
   )
@@ -105,6 +117,7 @@ export function WorkspaceSidePanelLayout({
   panel,
   children,
   headerActions,
+  titleCollapseDisabled = false,
   collapseLabel,
   defaultSizePercent: _defaultSizePercent = WORKSPACE_SIDE_PANEL_PERCENT,
   minSizePercent: _minSizePercent,
@@ -142,6 +155,7 @@ export function WorkspaceSidePanelLayout({
         headerActions={headerActions}
         collapseLabel={resolvedCollapseLabel}
         onCollapse={() => onOpenChange(false)}
+        titleCollapseDisabled={titleCollapseDisabled}
         className={resolvedHeaderClass}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

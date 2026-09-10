@@ -13,7 +13,7 @@ export const panelCardClass =
   "flex min-h-0 flex-col overflow-hidden rounded-md border bg-card shadow-none"
 
 export const panelHeaderClass =
-  "flex h-11 shrink-0 items-center justify-between gap-2 border-b border-orange-500/15 px-3 dark:border-orange-400/20"
+  "flex h-11 shrink-0 items-center justify-between gap-2 border-b border-primary/15 px-3"
 
 export const panelHeaderActionClass = "h-7 shrink-0 px-2.5 text-xs"
 

@@ -26,12 +26,12 @@ export const systemNav: WorkspaceNavItem[] = [
     icon: UserCheckIcon,
   },
   {
-    title: "Ajanlar",
+    title: "Ajan Ayarları",
     url: "/system/agents",
     icon: BotIcon,
   },
   {
-    title: "Skill'ler",
+    title: "Skill Ayarları",
     url: "/system/skills",
     icon: SparklesIcon,
   },

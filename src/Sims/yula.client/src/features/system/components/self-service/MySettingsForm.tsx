@@ -3,9 +3,7 @@
 import * as React from "react"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
-import { ModuleNavPane } from "@/components/layout/module-nav-pane"
-import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
-import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
+import { WorkspacePageShell } from "@/components/layout/workspace-page-shell"
 import { panelCardClass } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn"
 import { Button } from "@/components/ui/button"
@@ -72,6 +70,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { loadSecret, saveSecret } from "@/lib/secure-config"
+import { normalizeEffort } from "@/lib/yula-reasoning"
+import { writeYulaClientAiConfig } from "@/lib/yula-ai-client-config"
 
 export interface AiProviderConfig {
   provider: "ollama" | "azure" | "google" | "openai"
@@ -95,9 +95,11 @@ function loadStoredAiConfig(): AiProviderConfig {
   try {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY)
     if (raw) {
-      const parsed = { ...defaults, ...JSON.parse(raw) } as AiProviderConfig
+      const parsed = { ...defaults, ...JSON.parse(raw) } as AiProviderConfig & { effort?: unknown }
       if (String(parsed.provider) === "foundry") parsed.provider = "azure"
-      return { ...parsed, apiKey: "" }
+      // Eski `effort` anahtarı `thinkingLevel`'e migrate edilir (değerler birebir).
+      const migrated = normalizeEffort(parsed.effort ?? parsed.thinkingLevel ?? "")
+      return { ...parsed, apiKey: "", thinkingLevel: migrated ?? parsed.thinkingLevel ?? "low" }
     }
   } catch {
     // fallback
@@ -184,6 +186,14 @@ export function MySettingsForm() {
     }
     setAiConfigState(updated)
     persistAiConfigWithoutSecret(updated)
+    // Sohbet hattı `yula_ai_config` anahtarından okur — eforu oraya da yaz
+    // (aynı localStorage anahtarı; `effort` taşınabilir `reasoning`'e gider).
+    void writeYulaClientAiConfig({
+      provider: aiProvider === "google" ? undefined : aiProvider,
+      model: aiModel,
+      endpoint: aiEndpoint,
+      effort: normalizeEffort(aiThinkingLevel) ?? undefined,
+    })
     void saveSecret(aiApiKey)
     setAiSaved(true)
     setTimeout(() => setAiSaved(false), 2500)
@@ -228,12 +238,12 @@ export function MySettingsForm() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <WorkspacePageHeader
-        showSearch={false}
-        actions={
-          <>
-            <Select defaultValue="password">
+    <WorkspacePageShell
+      title={<PageHeaderTitle>Profile & Settings</PageHeaderTitle>}
+      showSearch={false}
+      actions={
+        <>
+          <Select defaultValue="password">
               <SelectTrigger className="h-7 gap-1 px-2.5 text-xs font-normal">
                 <SelectValue placeholder="Password" />
               </SelectTrigger>
@@ -273,16 +283,6 @@ export function MySettingsForm() {
           </>
         }
       >
-        <PageHeaderTitle>Profile & Settings</PageHeaderTitle>
-      </WorkspacePageHeader>
-
-      <WorkspaceAiDock>
-        <ModuleNavPane>
-        <div
-          className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-          )}
-        >
           <div className={cn(panelCardClass, "min-h-0 flex-1")}>
             <Tabs defaultValue="user-details" className="flex flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-primary/15 px-4 py-1 dark:border-primary/25">
@@ -617,6 +617,9 @@ export function MySettingsForm() {
                                 <SelectItem value="high">Yüksek (En derin akıl yürütme)</SelectItem>
                               </SelectContent>
                             </Select>
+                            <p className="text-[11px] text-muted-foreground">
+                              Eforu desteklemeyen modelde sunucu bu ayarı yok sayar (AI SDK portable reasoning).
+                            </p>
                           </Field>
                         </div>
 
@@ -981,9 +984,6 @@ export function MySettingsForm() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
-        </ModuleNavPane>
-      </WorkspaceAiDock>
-    </div>
+    </WorkspacePageShell>
   )
 }

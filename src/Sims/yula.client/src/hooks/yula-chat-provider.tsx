@@ -29,13 +29,14 @@ import {
   isReportResultPath,
   extractJobIdFromHref,
   reportExecutionPath,
+  extractAgentIdFromPath,
 } from "@/lib/workspace-paths";
 import {
   useChatsStore,
 } from "@/lib/stores/chats";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
-import { getEffectiveUserSkills } from "@/lib/yula-user-skill";
+import { getAllUserSkillsInventory, getEffectiveUserSkills } from "@/lib/yula-user-skill";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { filterAgentsByScope } from "@/lib/yula-user-agent";
 import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
@@ -224,6 +225,20 @@ const lastScreenSnapshots = new Map<string, ScreenSnapshot>();
 
 function getActiveConversationId() {
   return activeConversationId
+}
+
+/**
+ * Güncel ajan kimliği: /agents/<id> sayfasındayken URL kazanır (ayrı session),
+ * diğer sayfalarda global seçim geçerlidir. null = varsayılan Yula.
+ */
+function resolveCurrentAgentId(hrefOrPath: string): string | null {
+  const fromUrl = extractAgentIdFromPath(hrefOrPath.split("?")[0] || "/");
+  if (fromUrl) return fromUrl;
+  try {
+    return useUserAgentsStore.getState().activeAgentId ?? null;
+  } catch {
+    return null;
+  }
 } // 45 saniye azami yanıt süresi eşiği (yerel Ollama model soğuk yükleme payı)
 
 const customFetchWithTimeout: typeof fetch = async (url, init) => {
@@ -372,8 +387,11 @@ function ChatInstance({
             try {
               const { searchVectorContext } = await import("@/services/duckdb-vector");
               const ragWorkspace = workspaceIdFromPath(href.split("?")[0] || "/");
+              // Modelle giden bağlam da ajan kapsamlı: başka ajanın sohbet
+              // kırıntıları prompt'a sızmaz.
               ragContext = await searchVectorContext(lastTextPart.text, 3, {
                 workspace: ragWorkspace === "system" ? undefined : ragWorkspace,
+                agentId: resolveCurrentAgentId(href),
               });
             } catch (err) {
               console.warn("[Yula RAG] Vector search error:", err);
@@ -384,14 +402,19 @@ function ChatInstance({
           const isHome = isWorkspaceHomePath(pathOnly);
           const workspaceId = workspaceIdFromPath(pathOnly);
           const workspaceLabel = workspaceLabelFromPath(pathOnly);
-          // Seçili ajan (kapsam dışıysa yok sayılır) — kimlik + skill daraltma için.
+          // Seçili ajan — /agents/<id> sayfasında URL kazanır (ayrı session),
+          // aksi halde global seçim kapsam filtresinden geçer.
           const agentStore = useUserAgentsStore.getState();
-          const activeAgent = agentStore.activeAgentId
-            ? (filterAgentsByScope(agentStore.agents, workspaceId).find(
-                (a) => a.id === agentStore.activeAgentId,
-              ) ?? null)
+          const routeAgentId = extractAgentIdFromPath(pathOnly);
+          const effectiveAgentId = routeAgentId ?? agentStore.activeAgentId;
+          const activeAgent = effectiveAgentId
+            ? ((routeAgentId
+                ? agentStore.agents.find((a) => a.id === routeAgentId)
+                : filterAgentsByScope(agentStore.agents, workspaceId).find(
+                    (a) => a.id === effectiveAgentId,
+                  )) ?? null)
             : null;
-          const mode: "main" | "dock" = isHome ? "main" : "dock";
+          const mode: "main" | "dock" = isHome || routeAgentId ? "main" : "dock";
           const aiConfig = readYulaClientAiConfig();
 
           const jobId = extractJobIdFromHref(pathname);
@@ -516,7 +539,13 @@ function ChatInstance({
               model: useChatsStore.getState().model || aiConfig.model,
               ...(aiConfig.provider ? { provider: aiConfig.provider } : {}),
               ...(aiConfig.endpoint ? { endpoint: aiConfig.endpoint } : {}),
-              thinkingEnabled: useChatsStore.getState().isThinkingEnabled,
+              // Efor önceliği: ajan pini > global ayar. Boş = miras (sunucu default uygular).
+              ...(activeAgent?.effort ?? aiConfig.effort
+                ? { effort: activeAgent?.effort ?? aiConfig.effort }
+                : {}),
+              thinkingEnabled:
+                activeAgent?.thinking ??
+                useChatsStore.getState().isThinkingEnabled,
               context: {
                 pathname,
                 mode,
@@ -540,19 +569,26 @@ function ChatInstance({
                 stateLegend: screenReg?.stateLegend,
                 // Kullanıcı skill envanteri (yalnızca isim/açıklama —
                 // progressive disclosure; tam talimat run_user_skill ile).
-                // Seçili ajan skill listesi verdiyse envanter ona daralır.
+                // Ajanın açık seçimi kapsamı ezer (boş = yok); Yula'da kapsam filtresi.
                 userSkills: (() => {
-                  const all = getEffectiveUserSkills(
-                    useUserSkillsStore.getState().skills,
-                    BUILT_IN_USER_SKILLS,
-                    workspaceId,
-                  );
-                  const agentSkills = activeAgent?.skills;
-                  const narrowed =
-                    agentSkills && agentSkills.length > 0
-                      ? all.filter((s) => agentSkills.includes(s.slash.toLowerCase()))
-                      : all;
-                  return narrowed.map((s) => ({
+                  const storeSkills = useUserSkillsStore.getState().skills;
+                  const list = activeAgent
+                    ? (() => {
+                        const allowed = new Set(
+                          (activeAgent.skills ?? []).map((s) => s.toLowerCase()),
+                        );
+                        if (allowed.size === 0) return [];
+                        return getAllUserSkillsInventory(
+                          storeSkills,
+                          BUILT_IN_USER_SKILLS,
+                        ).filter((s) => allowed.has(s.slash.toLowerCase()));
+                      })()
+                    : getEffectiveUserSkills(
+                        storeSkills,
+                        BUILT_IN_USER_SKILLS,
+                        workspaceId,
+                      );
+                  return list.map((s) => ({
                     slash: s.slash,
                     label: s.label,
                     description: s.description,
@@ -567,6 +603,8 @@ function ChatInstance({
                       skills: activeAgent.skills,
                       provider: activeAgent.provider,
                       model: activeAgent.model,
+                      effort: activeAgent.effort,
+                      attachments: activeAgent.attachments,
                     }
                   : null,
               },
@@ -642,21 +680,22 @@ function ChatInstance({
     });
   }, []);
 
-  // Konuşma kalıcılığı (localStorage / zustand persist)
+  // Konuşma kalıcılığı (localStorage / zustand persist) — ajan kimliğiyle birlikte.
   React.useEffect(() => {
     if (!conversationId || status !== "ready") return;
     const currentPath =
       typeof window !== "undefined"
         ? `${window.location.pathname}${window.location.search}`
         : undefined;
-    saveMessages(conversationId, chat.messages, currentPath);
+    const currentAgentId = currentPath ? resolveCurrentAgentId(currentPath) : null;
+    saveMessages(conversationId, chat.messages, currentPath, currentAgentId);
     const firstUser = chat.messages.find((m) => m.role === "user");
     const textPart = firstUser?.parts.find(
       (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
     );
     const text =
       textPart && textPart.type === "text" ? textPart.text : "";
-    if (text) renameFromFirstMessage(conversationId, text);
+    if (text) renameFromFirstMessage(conversationId, text, currentAgentId);
   }, [status, chat.messages, conversationId, saveMessages, renameFromFirstMessage]);
 
   const runPendingTool = React.useCallback(
@@ -761,6 +800,49 @@ function ChatInstance({
           toolCallId: part.toolCallId,
           state: "output-available",
           output: output as never,
+        });
+      }
+
+      // Prepare-chain telemetrisi: zincir araçlarının sonucu tek satırda
+      // (schema → apply → navigate → run). Atlanan/hata veren adımın nedeni
+      // "yarım kaldı" teşhisinde 10 saniyede görünür.
+      if (
+        part.toolName === "apply_criteria" ||
+        part.toolName === "navigate_to_page" ||
+        part.toolName === "run_job" ||
+        part.toolName === "get_report_schema" ||
+        part.toolName === "find_matching_report"
+      ) {
+        const statusText =
+          typeof output === "object" && output !== null
+            ? String((output as Record<string, unknown>).status ?? "")
+            : "";
+        const chainLabel =
+          part.toolName === "get_report_schema"
+            ? "Zincir: şema"
+            : part.toolName === "find_matching_report"
+              ? "Zincir: eşleşme"
+              : part.toolName === "apply_criteria"
+                ? "Zincir: kriter doldurma"
+                : part.toolName === "navigate_to_page"
+                  ? "Zincir: yönlendirme"
+                  : "Zincir: çalıştırma";
+        upsertTurnTrace(getActiveConversationId(), {
+          id: `prepare-chain:${part.toolCallId}`,
+          toolName: part.toolName,
+          label: chainLabel,
+          subLabel: statusText || (errorText ? "hata" : "ok"),
+          isError:
+            errorText !== undefined ||
+            statusText === "error" ||
+            statusText === "validation-error" ||
+            statusText === "blocked",
+          detailText:
+            errorText ??
+            (statusText && statusText !== "ok" && statusText !== "navigated" && statusText !== "executed"
+              ? `Durum: ${statusText} — zincir bu adımda durdu.`
+              : undefined),
+          input: part.input,
         });
       }
 
@@ -1055,7 +1137,12 @@ function ChatInstance({
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : undefined;
-      saveMessages(conversationId, remainingMessages, currentPath);
+      saveMessages(
+        conversationId,
+        remainingMessages,
+        currentPath,
+        currentPath ? resolveCurrentAgentId(currentPath) : null,
+      );
 
       userStoppedRef.current = false;
       setStopped(false);
@@ -1258,28 +1345,53 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
     if (activePathRef.current === pathname) return;
     activePathRef.current = pathname;
 
+    // Ayrı ajan oturumu: URL'deki ajan kimliği global seçimi ezer.
+    // Yula kökü (/) her zaman saf Yula'dır: eski ajan seçimi temizlenir,
+    // böylece ana ekranda ajan çipi/persona sızıntısı olmaz.
+    const routeAgentId = extractAgentIdFromPath(pathname);
+    if (routeAgentId) {
+      const agentStore = useUserAgentsStore.getState();
+      if (agentStore.activeAgentId !== routeAgentId) {
+        agentStore.setActiveAgentId(routeAgentId);
+      }
+    } else if (pathname === "/") {
+      const agentStore = useUserAgentsStore.getState();
+      if (agentStore.activeAgentId !== null) {
+        agentStore.setActiveAgentId(null);
+      }
+    }
+
     const store = useChatsStore.getState();
     const currentActiveId = store.activeId;
 
     // Sohbet KENDİ navigasyonuyla sayfa değiştirdiyse: hedefe VARILDIĞINDA
     // kaydı yeni sayfaya bağla (son açılan sayfa kazanır) ve aktif sohbeti koru.
     // Push'tan ÖNCE bağlamak çalışmaz — persist efekti eski sayfada kaydedip ezer.
+    // Ajan kimliği korunur: ajan session'ından rapor sayfasına geçişte persona kaybolmaz.
     const follow = store.followNav;
     if (follow) {
       useChatsStore.setState({ followNav: null });
       if (follow.id === currentActiveId && Date.now() - follow.at < 15_000) {
-        store.followArrivedConversation(follow.id);
+        const followAgentId =
+          store.conversations.find((c) => c.id === follow.id)?.agentId ??
+          routeAgentId ??
+          useUserAgentsStore.getState().activeAgentId ??
+          null;
+        store.followArrivedConversation(follow.id, undefined, followAgentId);
         return;
       }
     }
 
     // Her sayfa değişimi = taze sohbet: aktif sohbet yalnız bu sayfaya BİREBİR
-    // bağlıysa korunur (history tıklaması da bu eşleşmeyle korunur); aksi halde
-    // yeni sohbet açılır. Gevşek eşleşme (aynı rapor/baz-rota) kaldırıldı.
+    // bağlıysa VE aynı ajan kimliğini taşıyorsa korunur (history tıklaması da
+    // bu eşleşmeyle korunur); aksi halde yeni sohbet açılır.
     const activeConv = store.conversations.find((c) => c.id === currentActiveId);
     const activeMsgs = currentActiveId ? store.messagesById[currentActiveId] ?? [] : [];
+    const currentAgentId =
+      routeAgentId ?? useUserAgentsStore.getState().activeAgentId ?? null;
     const isSamePage = activeConv
-      ? normalizePath(activeConv.pathname ?? "/") === normalizePath(pathname)
+      ? normalizePath(activeConv.pathname ?? "/") === normalizePath(pathname) &&
+        (activeConv.agentId ?? null) === (currentAgentId ?? null)
       : activeMsgs.length === 0;
 
     if (!isSamePage) {
@@ -1307,6 +1419,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
         title: c.title,
         pathname: c.pathname,
         jobId: c.jobId,
+        agentId: c.agentId ?? null,
         snippet: firstUserMessageText(store.messagesById[c.id]).slice(0, 400),
       }))
       .filter((i) => i.snippet.trim().length > 0);
@@ -1325,6 +1438,10 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       store.selectConversation(id);
       const target = store.conversations.find((c) => c.id === id);
       if (!target) return;
+      // Geçmişten ajan sohbeti seçildiyse persona seçimini de eşitle.
+      if (target.agentId) {
+        useUserAgentsStore.getState().setActiveAgentId(target.agentId);
+      }
       navigateToConversationScreen(
         target,
         (href) => {

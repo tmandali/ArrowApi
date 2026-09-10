@@ -18,3 +18,14 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+/**
+ * Epoch-ms tarih biçimlendirme (örn. `2026-09-10`). UTC tabanlıdır; SSR ile
+ * istemci aynı dizgiyi üretir (hydration güvenli).
+ */
+export function formatMetaDate(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return "—"
+  const d = new Date(value)
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`
+}
+

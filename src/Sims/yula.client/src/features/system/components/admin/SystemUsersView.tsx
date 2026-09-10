@@ -3,9 +3,7 @@
 import * as React from "react";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
-import { ModuleNavPane } from "@/components/layout/module-nav-pane"
-import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock";
-import { WorkspacePageHeader } from "@/components/layout/workspace-page-header";
+import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { panelCardClass } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -67,30 +65,20 @@ export function SystemUsersView() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <WorkspacePageHeader
-        showSearch={false}
-        actions={
-          <>
-            <Button size="sm" className="h-7 px-3 text-xs gap-1.5">
-              <UserPlus className="size-3.5" />
-              Yeni Kullanıcı Ekle
-            </Button>
-            <AIChatAssistant />
-          </>
-        }
-      >
-        <PageHeaderTitle>Tüm Kullanıcılar & Yetkiler</PageHeaderTitle>
-      </WorkspacePageHeader>
-
-      <WorkspaceAiDock>
-        <ModuleNavPane>
-        <div
-          className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-          )}
-        >
-          <div className={cn(panelCardClass, "min-h-0 flex-1 flex flex-col p-4 md:p-6 space-y-4 overflow-hidden")}>
+    <WorkspacePageShell
+      title={<PageHeaderTitle>Tüm Kullanıcılar & Yetkiler</PageHeaderTitle>}
+      showSearch={false}
+      actions={
+        <>
+          <Button size="sm" className="h-7 px-3 text-xs gap-1.5">
+            <UserPlus className="size-3.5" />
+            Yeni Kullanıcı Ekle
+          </Button>
+          <AIChatAssistant />
+        </>
+      }
+    >
+      <div className={cn(panelCardClass, "min-h-0 flex-1 flex flex-col p-4 md:p-6 space-y-4 overflow-hidden")}>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -160,9 +148,6 @@ export function SystemUsersView() {
               </Table>
             </div>
           </div>
-        </div>
-        </ModuleNavPane>
-      </WorkspaceAiDock>
-    </div>
+    </WorkspacePageShell>
   );
 }

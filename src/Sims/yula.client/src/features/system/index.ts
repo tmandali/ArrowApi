@@ -3,6 +3,7 @@ export { MySettingsForm as UserSettingsForm } from "./components/self-service/My
 export { SystemUsersView } from "./components/admin/SystemUsersView";
 export { SystemHomeView } from "./components/SystemHomeView";
 export { AgentManagementView } from "./components/agents/AgentManagementView";
+export { AgentSessionView } from "./components/agents/AgentSessionView";
 export { SkillManagementView } from "./components/agents/SkillManagementView";
 
 export { systemWorkspace } from "./workspace.config";
