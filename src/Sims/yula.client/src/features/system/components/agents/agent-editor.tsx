@@ -588,7 +588,7 @@ export function AgentEditor({
           }
         />
       </TabsContent>
-      <TabsContent value="agentmd" className="mt-0 flex flex-col min-w-0">
+      <TabsContent value="agentmd" className="mt-0 flex min-h-[60vh] flex-col min-w-0">
         {!isRO && lintAgentInstructions(agentMd).length > 0 ? (
           <div
             role="note"
@@ -612,7 +612,7 @@ export function AgentEditor({
            readOnly={isRO}
            rows={1}
            aria-label="AGENT.md ham markdown"
-            className="h-full w-full rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+            className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
         />
       </TabsContent>
     </>
