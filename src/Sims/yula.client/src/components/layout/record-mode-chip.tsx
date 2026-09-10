@@ -18,13 +18,16 @@ const MODE_CLASS: Record<RecordMode, string> = {
 
 /**
  * Kayıt sayfa modu rozeti (new/edit/view): detay başlığı yanında
- * tipe göre renklendirilir.
+ * tipe göre renklendirilir. `labels` ile ekran diline göre ezilebilir
+ * (örn. raporlarda kayıt dili yerine New/View).
  */
 export function RecordModeChip({
   mode,
+  labels,
   className,
 }: {
   mode: RecordMode;
+  labels?: Partial<Record<RecordMode, string>>;
   className?: string;
 }) {
   return (
@@ -35,7 +38,7 @@ export function RecordModeChip({
         className,
       )}
     >
-      {MODE_LABEL[mode]}
+      {labels?.[mode] ?? MODE_LABEL[mode]}
     </span>
   );
 }

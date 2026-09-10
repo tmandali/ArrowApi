@@ -16,7 +16,7 @@ import {
   panelHeaderTitleClass,
 } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn";
-import { Bot, Check, Filter, Trash2 } from "lucide-react";
+import { Bot, Check, FilePlus2, Filter, Trash2, X } from "lucide-react";
 import { useUserAgentsStore, ensureExampleAgent } from "@/lib/stores/user-agents";
 import { AgentEditor, type AgentEditorHandle, type AgentEditorMode } from "./agent-editor";
 
@@ -156,14 +156,32 @@ export function AgentManagementView() {
               onToggle={() => setHistoryOpen((v) => !v)}
             />
           ) : null}
+          {selection?.id != null && selectedAgent ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => editorRef.current?.remove()}
+              title="Ajanı sil"
+              aria-label="Ajanı sil"
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
+          ) : null}
           {(() => {
             const isNewMode = selection != null && selection.id == null;
             return (
               <Button
                 type="button"
                 size="sm"
-                variant={selection != null ? "outline" : "default"}
-                className="h-7 text-xs px-3 transition-opacity duration-150"
+                variant={isNewMode ? "ghost" : "outline"}
+                className={
+                  isNewMode
+                    ? "h-7 shrink-0 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    : "h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+                }
                 onClick={() => {
                   if (isNewMode) {
                     setSelection(lastSelectionRef.current);
@@ -173,8 +191,15 @@ export function AgentManagementView() {
                     setSelection({ id: null });
                   }
                 }}
+                title={isNewMode ? "Cancel" : "New agent"}
+                aria-label={isNewMode ? "Cancel" : "New agent"}
               >
-                {isNewMode ? "Vazgeç" : "Yeni Ajan"}
+                {isNewMode ? (
+                  <X className="size-3.5" />
+                ) : (
+                  <FilePlus2 className="size-3.5" />
+                )}
+                {isNewMode ? "Cancel" : "New"}
               </Button>
             );
           })()}
@@ -187,10 +212,12 @@ export function AgentManagementView() {
               ) : null}
               <Button
                 type="button"
+                variant="outline"
                 size="sm"
-                className="h-7 px-3 text-[11.5px]"
+                className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
                 onClick={() => editorRef.current?.save()}
               >
+                <Check className="size-3.5" />
                 Kaydet
               </Button>
             </span>

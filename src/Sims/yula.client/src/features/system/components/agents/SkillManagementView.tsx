@@ -9,7 +9,7 @@ import {
 } from "@/components/layout/tabbed-detail";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
-import { Filter, Trash2 } from "lucide-react";
+import { Check, Filter, FilePlus2, Trash2, X } from "lucide-react";
 import { useUserSkillsStore, ensureExampleSkill } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/yula-user-skill";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
@@ -137,14 +137,32 @@ export function SkillManagementView() {
               onToggle={() => setHistoryOpen((v) => !v)}
             />
           ) : null}
+          {selection?.id != null && !isReadOnly ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => editorRef.current?.remove()}
+              title="Skill'i sil"
+              aria-label="Skill'i sil"
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
+          ) : null}
           {(() => {
             const isNewMode = selection != null && selection.id == null;
             return (
               <Button
                 type="button"
+                variant={isNewMode ? "ghost" : "outline"}
                 size="sm"
-                variant={selection != null ? "outline" : "default"}
-                className="h-7 text-xs px-3 transition-opacity duration-150"
+                className={
+                  isNewMode
+                    ? "h-7 shrink-0 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    : "h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+                }
                 onClick={() => {
                   if (isNewMode) {
                     setSelection(lastSelectionRef.current);
@@ -155,18 +173,27 @@ export function SkillManagementView() {
                     setSelection({ id: null });
                   }
                 }}
+                title={isNewMode ? "Cancel" : "New skill"}
+                aria-label={isNewMode ? "Cancel" : "New skill"}
               >
-                {isNewMode ? "Vazgeç" : "Yeni Skill"}
+                {isNewMode ? (
+                  <X className="size-3.5" />
+                ) : (
+                  <FilePlus2 className="size-3.5" />
+                )}
+                {isNewMode ? "Cancel" : "New"}
               </Button>
             );
           })()}
           {selection != null && !isReadOnly ? (
             <Button
               type="button"
+              variant="outline"
               size="sm"
-              className="h-7 px-3 text-[11.5px]"
+              className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
               onClick={() => editorRef.current?.save()}
             >
+              <Check className="size-3.5" />
               Kaydet
             </Button>
           ) : null}

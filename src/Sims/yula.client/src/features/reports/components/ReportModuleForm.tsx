@@ -88,8 +88,12 @@ export function ReportModuleForm({
     selectPendingJob,
   })
 
+  // New'e geçerken bırakılan seçim — Vazgeç buraya döner (skill/agent deseni).
+  const [lastJobId, setLastJobId] = React.useState<string | null>(null)
+
   const handleJobCreated = React.useCallback(
     (job: ArrowJobStatus, request: Record<string, unknown>) => {
+      setLastJobId(null)
       handleSubmitted(job, request)
     },
     [handleSubmitted]
@@ -112,6 +116,7 @@ export function ReportModuleForm({
 
   const handleJobSelect = React.useCallback(
     (jobId: string, job?: ArrowJobStatus) => {
+      setLastJobId(null)
       setComposing(false)
       setViewMode("result")
       handleSelectJob(job ?? jobId)
@@ -141,6 +146,26 @@ export function ReportModuleForm({
     handleJobSelect(queryJobId)
   }, [queryJobId, activeJobId, handleJobSelect])
 
+  const handleStartNewReport = React.useCallback(() => {
+    setLastJobId((prev) => prev ?? activeJobId)
+    setViewMode("result")
+    setSelectedCompleted(false)
+    setCanDelete(false)
+    setCanCancel(false)
+    setComposing(true)
+    handleSelectJob(null)
+  }, [activeJobId, handleSelectJob, setComposing])
+
+  const handleCancelNewReport = React.useCallback(() => {
+    const restoreId = lastJobId
+    setLastJobId(null)
+    setViewMode("result")
+    setComposing(false)
+    if (restoreId) handleSelectJob(restoreId)
+  }, [lastJobId, handleSelectJob, setComposing])
+
+  const isNewMode = composing && lastJobId != null
+
   const handleExitCompose = React.useCallback(() => {
     setComposing(false)
   }, [setComposing])
@@ -158,13 +183,12 @@ export function ReportModuleForm({
     const handleOpenCompose = (e: Event) => {
       const detail = (e as CustomEvent<{ scope?: string }>).detail
       if (!detail?.scope || detail.scope === scope) {
-        setComposing(true)
-        handleSelectJob(null)
+        handleStartNewReport()
       }
     }
     window.addEventListener("yula:open-compose", handleOpenCompose)
     return () => window.removeEventListener("yula:open-compose", handleOpenCompose)
-  }, [scope, setComposing, handleSelectJob])
+  }, [scope, handleStartNewReport])
 
   const [canDelete, setCanDelete] = React.useState(false)
   const deleteJobRef = React.useRef<(() => void) | null>(null)
@@ -241,17 +265,15 @@ export function ReportModuleForm({
       workspaceId={workspace}
       schema={schema}
       activeJobId={activeJobId}
+      recordMode={composing ? "new" : "view"}
+      recordModeLabels={{ new: "New", view: "View" }}
       headerActions={headerActions}
       onJobCreated={handleJobCreated}
-      onStartNewReport={() => {
-        setViewMode("result")
-        setSelectedCompleted(false)
-        setCanDelete(false)
-        setCanCancel(false)
-        setComposing(true)
-        handleSelectJob(null)
-      }}
-      renderFilter={(registerFilter, { onRun, runDisabled, onListError }) => (
+      onStartNewReport={handleStartNewReport}
+      onCancelNewReport={handleCancelNewReport}
+      isNewMode={isNewMode}
+      criteriaLocked={criteriaLocked}
+      renderFilter={(registerFilter, { onListError }) => (
         <ReportModuleFilter
           ref={registerFilter}
           schema={schema}
@@ -285,8 +307,6 @@ export function ReportModuleForm({
             onListLoaded: handleListLoaded,
             onListError,
           }}
-          onRun={onRun}
-          runDisabled={runDisabled}
         />
       )}
     />

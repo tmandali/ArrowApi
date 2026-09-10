@@ -61,8 +61,6 @@ export type ReportModuleFilterProps = {
   schema: JsonSchemaObject
   emptyListHint?: string
   jobSession?: ReportModuleJobSession
-  onRun?: () => void
-  runDisabled?: boolean
 }
 
 export const ReportModuleFilter = React.forwardRef<
@@ -77,8 +75,6 @@ export const ReportModuleFilter = React.forwardRef<
     emptyListHint,
     className,
     jobSession,
-    onRun,
-    runDisabled = false,
   },
   ref
 ) {
@@ -173,28 +169,17 @@ export const ReportModuleFilter = React.forwardRef<
           />
         }
         detailSlotActions={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 shrink-0 gap-1 px-2.5 text-xs"
-              disabled={criteriaLocked}
-              onClick={() => filterRef.current?.clear()}
-            >
-              <RotateCcw className="size-3.5" />
-              Clear
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 shrink-0 px-3 text-xs"
-              disabled={runDisabled || criteriaLocked}
-              onClick={() => onRun?.()}
-            >
-              Run
-            </Button>
-          </>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 gap-1 px-2.5 text-xs"
+            disabled={criteriaLocked}
+            onClick={() => filterRef.current?.clear()}
+          >
+            <RotateCcw className="size-3.5" />
+            Clear
+          </Button>
         }
         criteriaActive={composing}
         criteriaSchema={schema}

@@ -1,15 +1,12 @@
 "use client";
 
 import * as React from "react"
-import { FilePlus2 } from "lucide-react"
+import { FilePlus2, Loader2, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
-import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
-import {
-  pageHeaderCardClass,
-  pageHeaderShellClass,
-} from "@/components/layout/panel-chrome"
+import { RecordModeChip, type RecordMode } from "@/components/layout/record-mode-chip"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
@@ -41,6 +38,10 @@ export type ReportCriteriaShellProps = {
   schema: JsonSchemaObject
   /** Çalışan/aktif job varsa sonuç modu özetinde gösterilir. */
   activeJobId?: string | null
+  /** Sayfa modu — başlık yanında rozet (agent/skill deseni: new/edit/view). */
+  recordMode?: RecordMode | null
+  /** Rozet metinleri — verilmezse kayıt dili (Yeni/Düzenleme/Salt okunur). */
+  recordModeLabels?: Partial<Record<RecordMode, string>>
   /** Job oluşturulduğunda (veya aynı kriterli aktif job seçildiğinde) çağrılır. */
   onJobCreated?: (
     job: ArrowJobStatus,
@@ -48,26 +49,34 @@ export type ReportCriteriaShellProps = {
   ) => void
   /** Header'daki "New" butonu — compose moduna geçiştir. */
   onStartNewReport?: () => void
+  /** Yeni modda header'daki "Vazgeç" butonu — compose'dan önceki seçime döner. */
+  onCancelNewReport?: () => void
+  /** Compose'da bırakılan önceki seçim varsa New, Vazgeç'e döner (skill/agent deseni). */
+  isNewMode?: boolean
+  /** Aktif job çalışıyor → header'daki Run kilitli. */
+  criteriaLocked?: boolean
   /** Header sağ aksiyonlarına eklenecek özel butonlar (örn. Detail / Grid geçiş butonu). */
   headerActions?: React.ReactNode
   /**
    * Criteria + Executions filtresini render eder. Shell, kriter gridi handle'ını
-   * toplayan callback ref'i ve Run/onListError yardımcılarını bu callback
-   * üzerinden enjekte eder.
+   * toplayan callback ref'i ve onListError yardımcısını bu callback
+   * üzerinden enjekte eder. Run header'dadır (sayfa aksiyonu).
    */
   renderFilter: (
-    registerFilter: (handle: SchemaCriteriaFilterHandle | null) => void,    helpers: {
-      onRun: () => void
-      runDisabled: boolean
+    registerFilter: (handle: SchemaCriteriaFilterHandle | null) => void,
+    helpers: {
       onListError: (message: string | null) => void
     }
   ) => React.ReactNode
 }
 
 /**
- * Workspace-agnostik rapor kriter ekranı kabuğu: New aksiyonu, banner'lar,
- * job oluşturma (createArrowJob), AI run_job otobüsü ve screen agent
- * context. Filtre bileşeni `renderFilter` ile enjekte edilir.
+ * Rapor master-detail sayfa şablonu (workspace-agnostik): `MasterDetailPage`
+ * ile aynı kabuk (`WorkspacePageHeader` + `WorkspaceAiDock` + `ModuleNavPane`).
+ * Sol kolon `ArrowJobExecutionsPanel` listesi, sağ kolon criteria / detay /
+ * sonuç grid'idir. Workspace Form dosyaları yalnızca ince wrapper olur —
+ * orkestrasyon (`ReportModuleForm`) + kriter ekranı (`ReportCriteriaShell`)
+ * + filtre (`ReportModuleFilter`) içindedir.
  */
 export function ReportCriteriaShell({
   mode,
@@ -75,8 +84,13 @@ export function ReportCriteriaShell({
   workspaceId,
   schema,
   activeJobId,
+  recordMode = null,
+  recordModeLabels,
   onJobCreated,
   onStartNewReport,
+  onCancelNewReport,
+  isNewMode = false,
+  criteriaLocked = false,
   headerActions,
   renderFilter,
 }: ReportCriteriaShellProps) {
@@ -222,40 +236,62 @@ export function ReportCriteriaShell({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {searchOpen || isGridMaximized ? null : (
-        <div className={pageHeaderShellClass}>
-        <header
-          className={cn(
-            pageHeaderCardClass,
-            "justify-between gap-1.5 sm:gap-2"
-          )}
+      {isGridMaximized ? null : (
+        <WorkspacePageHeader
+          showSearch={false}
+          startExtra={
+            recordMode != null ? (
+              <RecordModeChip mode={recordMode} labels={recordModeLabels} />
+            ) : null
+          }
+          actions={
+            <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
+              {headerActions}
+              <Button
+                type="button"
+                variant={isNewMode ? "ghost" : "outline"}
+                size="sm"
+                className={
+                  isNewMode
+                    ? "h-7 shrink-0 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    : "h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+                }
+                onClick={() =>
+                  isNewMode ? onCancelNewReport?.() : onStartNewReport?.()
+                }
+                title={isNewMode ? "Cancel" : "New report"}
+                aria-label={isNewMode ? "Cancel" : "New report"}
+              >
+                {isNewMode ? (
+                  <X className="size-3.5" />
+                ) : (
+                  <FilePlus2 className="size-3.5" />
+                )}
+                {isNewMode ? "Cancel" : "New"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
+                disabled={submittingCriteria || criteriaLocked}
+                onClick={() => void handleCriteriaSubmit()}
+                title="Run report"
+                aria-label="Run report"
+              >
+                {submittingCriteria ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Play className="size-3.5" />
+                )}
+                Run
+              </Button>
+              <AIChatAssistant />
+            </div>
+          }
         >
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
-            <PagePanelTrigger
-              className="-ml-1 shrink-0"
-              separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
-            />
-            <PageHeaderTitle>{title}</PageHeaderTitle>
-          </div>
-
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-            {headerActions}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={() => onStartNewReport?.()}
-              title="New report"
-              aria-label="New report"
-            >
-              <FilePlus2 className="size-3.5" />
-              New
-            </Button>
-            <AIChatAssistant />
-          </div>
-        </header>
-        </div>
+          <PageHeaderTitle>{title}</PageHeaderTitle>
+        </WorkspacePageHeader>
       )}
 
       {!searchOpen && !isGridMaximized && listErrorBanner ? (
@@ -282,8 +318,6 @@ export function ReportCriteriaShell({
       >
         <ModuleNavPane>
           {renderFilter(setCriteriaHandle, {
-            onRun: () => void handleCriteriaSubmit(),
-            runDisabled: submittingCriteria,
             onListError: handleListError,
           })}
         </ModuleNavPane>
