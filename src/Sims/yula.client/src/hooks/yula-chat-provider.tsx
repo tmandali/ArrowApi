@@ -136,7 +136,41 @@ function stableSignature(value: unknown): string {
 }
 
 /** Dedupe sinyali — hata metni bu önekle başlar (predicate ile paylaşılır). */
-const DEDUPE_SKIP_MARKER = "Bu araç aynı girdiyle bu turda zaten çalıştırıldı";
+const DEDUPE_SKIP_MARKER = "This tool was already executed with the same input in this turn";
+
+/** Wait for arrival at the target pathname so the apply→navigate chain resumes with fresh context. */
+function waitForPathname(target: string, timeoutMs = 7000): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  const norm = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+  const wanted = norm(target);
+  return new Promise((resolve) => {
+    if (norm(window.location.pathname) === wanted) {
+      resolve(true);
+      return;
+    }
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (norm(window.location.pathname) === wanted) {
+        window.clearInterval(timer);
+        resolve(true);
+      } else if (Date.now() - started >= timeoutMs) {
+        window.clearInterval(timer);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+/** Does the apply_criteria output carry navigation to another screen? (only when no required fields are missing) */
+function isApplyNavigateOutput(output: unknown): boolean {
+  if (!output || typeof output !== "object") return false;
+  const o = output as Record<string, unknown>;
+  return (
+    o.status === "ok" &&
+    typeof o.navigateTo === "string" &&
+    (!Array.isArray(o.missingRequired) || o.missingRequired.length === 0)
+  );
+}
 
 function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   const last = messages[messages.length - 1];
@@ -163,6 +197,9 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
   // "aç + doldur + çalıştır" zinciri sürer. Yalın navigasyonlar döngüye girmez:
   // resubmit sonrası yeni araç çağrısı yoksa (toolInfos boş) veya model esaslı
   // cevap yazdıysa aşağıdaki kapılar durur; tekrar navigasyon dedupe'a takılır.
+  // apply_criteria + navigateTo is NOT terminal either: runPendingTool
+  // navigates to the target screen and waits for arrival, so the resubmit
+  // goes out with fresh context (confirmation / run continues there).
   const hasSuccessfulTerminalScreenTool = toolInfos.some(
     (i) =>
       [
@@ -173,7 +210,10 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
         "open_last_report",
         "visualize_grid_data",
         "ask_user_question",
-      ].includes(i.toolName) && (!isFailedToolInfo(i) || i.toolName === "ask_user_question"),
+      ].includes(i.toolName) &&
+      (!isFailedToolInfo(i) || i.toolName === "ask_user_question") &&
+      // Yönlendirmeli apply: zincir hedef ekranda sürecek, burada durma.
+      !(i.toolName === "apply_criteria" && isApplyNavigateOutput(i.output)),
   );
   if (hasSuccessfulTerminalScreenTool) return false;
 
@@ -379,31 +419,9 @@ function ChatInstance({
                 ? "results-loading"
                 : "workspace";
 
-          // WASM Vector RAG araması (katmanlı: aktif workspace + global)
-          let ragContext: Array<{ scope: string; content: string; metadata?: Record<string, unknown>; distance?: number }> = [];
-          const lastUserMsg = messages.filter((m) => m.role === "user").pop();
-          const lastTextPart = lastUserMsg?.parts.find((p) => p.type === "text") as { text?: string } | undefined;
-          if (lastTextPart?.text) {
-            try {
-              const { searchVectorContext } = await import("@/services/duckdb-vector");
-              const ragWorkspace = workspaceIdFromPath(href.split("?")[0] || "/");
-              // Modelle giden bağlam da ajan kapsamlı: başka ajanın sohbet
-              // kırıntıları prompt'a sızmaz.
-              ragContext = await searchVectorContext(lastTextPart.text, 3, {
-                workspace: ragWorkspace === "system" ? undefined : ragWorkspace,
-                agentId: resolveCurrentAgentId(href),
-              });
-            } catch (err) {
-              console.warn("[Yula RAG] Vector search error:", err);
-            }
-          }
-
+          // Selected agent — on /agents/<id> the URL wins (separate session),
+          // otherwise the global selection passes the scope filter.
           const pathOnly = href.split("?")[0] || "/";
-          const isHome = isWorkspaceHomePath(pathOnly);
-          const workspaceId = workspaceIdFromPath(pathOnly);
-          const workspaceLabel = workspaceLabelFromPath(pathOnly);
-          // Seçili ajan — /agents/<id> sayfasında URL kazanır (ayrı session),
-          // aksi halde global seçim kapsam filtresinden geçer.
           const agentStore = useUserAgentsStore.getState();
           const routeAgentId = extractAgentIdFromPath(pathOnly);
           const effectiveAgentId = routeAgentId ?? agentStore.activeAgentId;
@@ -415,6 +433,39 @@ function ChatInstance({
                     agentScopeWorkspaceId(pathOnly),
                   ).find((a) => a.id === effectiveAgentId)) ?? null)
             : null;
+
+          // WASM vector RAG search (layered: workspace + global). The workspace
+          // filter is agent-scoped: a non-global agent scope (e.g. "selling")
+          // wins over the page workspace, so report_router candidates stay
+          // inside the agent's domain (agent sessions have no page workspace).
+          let ragContext: Array<{ scope: string; content: string; metadata?: Record<string, unknown>; distance?: number }> = [];
+          const lastUserMsg = messages.filter((m) => m.role === "user").pop();
+          const lastTextPart = lastUserMsg?.parts.find((p) => p.type === "text") as { text?: string } | undefined;
+          if (lastTextPart?.text) {
+            try {
+              const { searchChatRagContext } = await import("@/services/duckdb-vector");
+              const pageWorkspace = workspaceIdFromPath(href.split("?")[0] || "/");
+              const agentRagScope =
+                activeAgent?.scope && activeAgent.scope !== "global"
+                  ? activeAgent.scope
+                  : undefined;
+              const ragWorkspace = agentRagScope ?? pageWorkspace;
+              // Model-bound context is agent-scoped too: another agent's chat
+              // fragments never leak into the prompt. Tier-diverse selection:
+              // near-duplicate conversations must not crowd out report
+              // routing records.
+              ragContext = await searchChatRagContext(lastTextPart.text, 3, {
+                workspace: ragWorkspace === "system" ? undefined : ragWorkspace,
+                agentId: resolveCurrentAgentId(href),
+              });
+            } catch (err) {
+              console.warn("[Yula RAG] Vector search error:", err);
+            }
+          }
+
+          const isHome = isWorkspaceHomePath(pathOnly);
+          const workspaceId = workspaceIdFromPath(pathOnly);
+          const workspaceLabel = workspaceLabelFromPath(pathOnly);
           const mode: "main" | "dock" = isHome || routeAgentId ? "main" : "dock";
           const aiConfig = readYulaClientAiConfig();
 
@@ -602,6 +653,7 @@ function ChatInstance({
                       instructions: activeAgent.instructions,
                       tools: activeAgent.tools,
                       skills: activeAgent.skills,
+                      scope: activeAgent.scope,
                       provider: activeAgent.provider,
                       model: activeAgent.model,
                       effort: activeAgent.effort,
@@ -723,8 +775,8 @@ function ChatInstance({
           state: "output-error",
           errorText:
             DEDUPE_SKIP_MARKER +
-            " ve sonuç değişmez. " +
-            "Aynı aracı tekrar çağırma; eldeki sonuçlarla nihai yanıtını tek seferde ver.",
+            " and the result would not change. " +
+            "Do not call the same tool again; give your final answer in one go with the results at hand.",
         });
         return;
       }
@@ -773,6 +825,18 @@ function ChatInstance({
           output: output as YulaTools["run_job"]["output"],
         });
       } else if (part.toolName === "apply_criteria") {
+        // Navigating apply: navigate to the target screen and wait for arrival
+        // BEFORE appending the output — the resubmit then carries the fresh
+        // pathname/screenState, and the model continues with the confirmation
+        // sentence/link (or run_job on explicit run intent).
+        // On timeout the output is still appended, so the model writes the link fallback.
+        if (isApplyNavigateOutput(output)) {
+          const target = (output as Record<string, unknown>).navigateTo as string;
+          useChatsStore.getState().beginConversationFollow(getActiveConversationId());
+          useYulaDockStore.getState().setOpen(true);
+          void router.push(target);
+          await waitForPathname(target);
+        }
         chat.addToolOutput({
           tool: "apply_criteria",
           toolCallId: part.toolCallId,
@@ -852,14 +916,15 @@ function ChatInstance({
           ? (output as Record<string, unknown>)
           : undefined;
 
-      // Gerçek job açıldıysa veya sayfa yönlendirmesi istendiyse rotaya geç
+      // Route when a real job opened or a page navigation was requested.
+      // (apply_criteria navigation is handled above, with arrival awaited.)
       if (
         (execOut?.status === "executed" || execOut?.status === "navigated") &&
         typeof execOut.navigateTo === "string"
       ) {
         useChatsStore.getState().beginConversationFollow(getActiveConversationId());
         useYulaDockStore.getState().setOpen(true);
-        void router.push(execOut.navigateTo);
+        void router.push(execOut.navigateTo as string);
       }
       // sendAutomaticallyWhen=true → resubmission SDK tarafında otomatik
     },
