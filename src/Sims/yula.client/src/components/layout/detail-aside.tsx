@@ -110,14 +110,16 @@ export function DetailMeta({
   bare = false,
   emptyTitle,
   emptyDescription,
+  showEmpty = true,
 }: {
   rows: DetailMetaRow[];
   bare?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
+  showEmpty?: boolean;
 }) {
   if (rows.length === 0) {
-    if (!emptyTitle) return null;
+    if (!emptyTitle || !showEmpty) return null;
     return (
       <Empty className="border-0 p-4">
         <EmptyHeader>

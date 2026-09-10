@@ -577,6 +577,7 @@ export function AgentEditor({
                 rows={agentMetaRows}
                 emptyTitle="Henüz bilgi yok"
                 emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
+                showEmpty={attachments.length === 0}
               />
             </>
           }
@@ -592,34 +593,32 @@ export function AgentEditor({
           }
         />
       </TabsContent>
-      <TabsContent value="agentmd" className="mt-0">
-        <div className="min-w-0">
-          {!isRO && lintAgentInstructions(agentMd).length > 0 ? (
-            <div
-              role="note"
-              className="mb-2 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-3 py-2"
-            >
-              {lintAgentInstructions(agentMd).map((w) => (
-                <p
-                  key={w.slice(0, 32)}
-                  className="text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300"
-                >
-                  ⚠ {w}
-                </p>
-              ))}
-            </div>
-          ) : null}
-          <Textarea
-            value={agentMd}
-            onChange={isRO ? undefined : (e) => setAgentMd(e.target.value)}
-            placeholder="Kısa yaz, önce özet tablo ver, teknik detaya girme…"
-            disabled={isRO}
-            readOnly={isRO}
-            rows={14}
-            aria-label="AGENT.md ham markdown"
-            className="min-h-[50vh] w-full resize-y rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
-          />
-        </div>
+      <TabsContent value="agentmd" className="mt-0 flex flex-col min-w-0">
+        {!isRO && lintAgentInstructions(agentMd).length > 0 ? (
+          <div
+            role="note"
+            className="mb-2 shrink-0 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-3 py-2"
+          >
+            {lintAgentInstructions(agentMd).map((w) => (
+              <p
+                key={w.slice(0, 32)}
+                className="text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300"
+              >
+                ⚠ {w}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        <Textarea
+          value={agentMd}
+          onChange={isRO ? undefined : (e) => setAgentMd(e.target.value)}
+          placeholder="Kısa yaz, önce özet tablo ver, teknik detaya girme…"
+          disabled={isRO}
+           readOnly={isRO}
+           rows={1}
+           aria-label="AGENT.md ham markdown"
+            className="h-full w-full rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+        />
       </TabsContent>
     </>
   );

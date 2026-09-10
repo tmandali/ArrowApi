@@ -27,22 +27,27 @@ export function SkillManagementView() {
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
 
   const [tab, setTab] = React.useState<"user" | "system">("user");
-  const [selection, setSelection] = React.useState<Selection>(() => {
-    // Açılışta ilk kayıt öntanımlı seçili gelir (effect'siz — lint güvenli).
-    ensureExampleSkill();
-    const first = useUserSkillsStore.getState().skills[0];
-    return first
-      ? {
-          id: first.id,
-          readOnly: "readOnly" in first && first.readOnly === true,
-        }
-      : null;
-  });
+  const [selection, setSelection] = React.useState<Selection>(null);
   const editorRef = React.useRef<SkillEditorHandle | null>(null);
   const [fileTabs, setFileTabs] = React.useState<SkillDetailFileTab[]>([]);
   const [historyOpen, setHistoryOpen] = React.useState(true);
   // Yeni kayda geçerken bırakılan seçim — Vazgeç buraya döner.
   const lastSelectionRef = React.useRef<Selection>(null);
+
+  // İlk bağlanışta örnek skill üret ve varsayılan seçiliyi belirle.
+  // `ensureExampleSkill` localStorage'a erişir → SSR'de no-op,
+  // bu yüzden ilk render'da selection = null kalır (hydration uyumlu).
+  React.useEffect(() => {
+    ensureExampleSkill();
+    const first = useUserSkillsStore.getState().skills[0];
+    if (first && selection == null) {
+      setSelection({
+        id: first.id,
+        readOnly: "readOnly" in first && first.readOnly === true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isReadOnly = selection?.readOnly === true;
 

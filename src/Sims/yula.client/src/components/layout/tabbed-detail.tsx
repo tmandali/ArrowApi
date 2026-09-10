@@ -93,7 +93,7 @@ export function TabbedDetail({
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <ScrollArea className="h-0 min-h-0 w-full flex-1">
-          <div className={containerClass}>
+          <div className={cn("h-full", containerClass)}>
             {showTabs ? children : empty}
           </div>
         </ScrollArea>

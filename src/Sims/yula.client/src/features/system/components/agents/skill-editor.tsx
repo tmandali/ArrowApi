@@ -473,6 +473,7 @@ export function SkillEditor({
                 bare
                 emptyTitle="Henüz bilgi yok"
                 emptyDescription="Kaydedildiğinde oluşturma bilgileri burada görünür."
+                showEmpty={files.length === 0}
               />
             </>
           }
@@ -491,20 +492,18 @@ export function SkillEditor({
           }
         />
       </TabsContent>
-      <TabsContent value="skillmd" className="mt-0">
+      <TabsContent value="skillmd" className="mt-0 flex min-h-[60vh] flex-col min-w-0">
         {skillMdPreview ? (
-          <div className="min-w-0">
-            <Textarea
-              value={isRO ? (skill?.prompt ?? skillMd) : skillMd}
-              onChange={isRO ? undefined : (e) => setSkillMd(e.target.value)}
-              placeholder="Son 7 günün satış özetini çıkar: {{input}}"
-              disabled={isRO}
-              readOnly={isRO}
-              rows={14}
-              aria-label="SKILL.md ham markdown"
-              className="min-h-[50vh] w-full resize-y rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
-            />
-          </div>
+          <Textarea
+            value={isRO ? (skill?.prompt ?? skillMd) : skillMd}
+            onChange={isRO ? undefined : (e) => setSkillMd(e.target.value)}
+            placeholder="Son 7 günün satış özetini çıkar: {{input}}"
+            disabled={isRO}
+             readOnly={isRO}
+             rows={1}
+             aria-label="SKILL.md ham markdown"
+             className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+          />
         ) : (
           <p className="text-[11.5px] text-muted-foreground">
             SKILL.md bulunamadı.
@@ -512,67 +511,64 @@ export function SkillEditor({
         )}
       </TabsContent>
       {fileRows.map((f) => (
-        <TabsContent key={f.key} value={f.key} className="mt-0">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <span
-                className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${fileChipClass(f.kind)}`}
+        <TabsContent key={f.key} value={f.key} className="mt-0 flex flex-col min-w-0">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span
+              className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${fileChipClass(f.kind)}`}
+            >
+              {FILE_KIND_LABEL[f.kind]}
+            </span>
+            {f.kind === "script" && isRO ? (
+              <span className="text-[10.5px] text-muted-foreground">
+                Sunucu sandbox&apos;ında çalışır
+              </span>
+            ) : null}
+          </div>
+          {f.content ? (
+            <Textarea
+              value={f.content}
+              onChange={
+                isRO
+                  ? undefined
+                  : (e) =>
+                      setFiles((prev) =>
+                        prev.map((p) =>
+                          `file:${p.name.toLowerCase()}` === f.key
+                            ? { ...p, content: e.target.value }
+                            : p,
+                       ),
+                     )}
+                     rows={1}
+                     disabled={isRO}
+                     readOnly={isRO}
+                     aria-label={`${f.name} ham metin`}
+                     className="h-full w-full rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+                   />
+          ) : scriptsLoading ? (
+            <p className="text-[11.5px] text-muted-foreground">
+              Yükleniyor…
+            </p>
+          ) : (
+            <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+              <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                betik
+              </span>
+              Sunucu sandbox&apos;ında çalışır (run_skill_script).
+            </p>
+          )}
+          <div className="mt-1.5 flex items-center justify-between">
+            <span className="font-mono text-[10px] text-muted-foreground/70">
+              {f.content ? `${(f.content.length / 1024).toFixed(1)}K` : "—"}
+            </span>
+            {!isRO ? (
+              <button
+                type="button"
+                onClick={() => handleRemoveFile(f.key)}
+                className="rounded-md px-2 py-1 text-[11.5px] text-muted-foreground hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
               >
-                {FILE_KIND_LABEL[f.kind]}
-              </span>
-              {f.kind === "script" && isRO ? (
-                <span className="text-[10.5px] text-muted-foreground">
-                  Sunucu sandbox&apos;ında çalışır
-                </span>
-              ) : null}
-            </div>
-            {f.content ? (
-              <Textarea
-                value={f.content}
-                onChange={
-                  isRO
-                    ? undefined
-                    : (e) =>
-                        setFiles((prev) =>
-                          prev.map((p) =>
-                            `file:${p.name.toLowerCase()}` === f.key
-                              ? { ...p, content: e.target.value }
-                              : p,
-                          ),
-                        )
-                }
-                rows={14}
-                disabled={isRO}
-                readOnly={isRO}
-                aria-label={`${f.name} ham metin`}
-                className="min-h-[40vh] w-full resize-y rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
-              />
-            ) : scriptsLoading ? (
-              <p className="text-[11.5px] text-muted-foreground">
-                Yükleniyor…
-              </p>
-            ) : (
-              <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                  betik
-                </span>
-                Sunucu sandbox&apos;ında çalışır (run_skill_script).
-              </p>
-            )}
-            <div className="mt-1.5 flex items-center justify-between">
-              <span className="font-mono text-[10px] text-muted-foreground/70">
-                {f.content ? `${(f.content.length / 1024).toFixed(1)}K` : "—"}
-              </span>
-              {!isRO ? (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveFile(f.key)}
-                  className="rounded-md px-2 py-1 text-[11.5px] text-muted-foreground hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-                >
-                  Kaldır
-                </button>
-              ) : null}
-            </div>
+                Kaldır
+              </button>
+            ) : null}
           </div>
         </TabsContent>
       ))}

@@ -33,12 +33,7 @@ export function AgentManagementView() {
 
   const [selection, setSelection] = React.useState<{
     id: string | null;
-  } | null>(() => {
-    // Açılışta ilk kayıt öntanımlı seçili gelir (effect'siz — lint güvenli).
-    ensureExampleAgent();
-    const first = useUserAgentsStore.getState().agents[0];
-    return first ? { id: first.id } : null;
-  });
+  } | null>(null);
 
   const editorRef = React.useRef<AgentEditorHandle | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(true);
@@ -59,10 +54,16 @@ export function AgentManagementView() {
   // Yeni kayda geçerken bırakılan seçim — Vazgeç buraya döner.
   const lastSelectionRef = React.useRef<{ id: string | null } | null>(null);
 
-  // Ajan kartındaki hover-düzenle butonu `?edit=<id>` ile gelir:
-  // ilgili kayıt editörde açılır (mount sonrası bir kez).
+  // İlk bağlanışta örnek ajan üret ve varsayılan seçiliyi belirle.
+  // `ensureExampleAgent` localStorage'a erişir → SSR'de no-op,
+  // bu yüzden ilk render'da selection = null kalır (hydration uyumlu).
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    ensureExampleAgent();
+    const first = useUserAgentsStore.getState().agents[0];
+    if (first && selection == null) {
+      setSelection({ id: first.id });
+    }
+    // Ajan kartındaki hover-düzenle butonu `?edit=<id>` ile gelir:
     const editId = new URLSearchParams(window.location.search).get("edit");
     if (editId && useUserAgentsStore.getState().agents.some((a) => a.id === editId)) {
       setSelection({ id: editId });
