@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildUserSkillPrompt, filterSkillsByScope, validateUserSkill, validateUserSkillFile, userSkillFilesSize, getEffectiveUserSkills } from "./yula-user-skill.ts";
+import { buildUserSkillPrompt, buildUserSkillMarkdown, filterSkillsByScope, validateUserSkill, validateUserSkillFile, userSkillFilesSize, getEffectiveUserSkills } from "./yula-user-skill.ts";
 
 describe("validateUserSkill", () => {
   it("accepts a well-formed draft", () => {
@@ -78,6 +78,27 @@ describe("validateUserSkillFile", () => {
       ]),
       7,
     );
+  });
+});
+describe("buildUserSkillMarkdown", () => {
+  it("renders frontmatter + prompt", () => {
+    const out = buildUserSkillMarkdown({
+      slash: "Haftalik-Ozet",
+      label: "Haftalık özet",
+      description: "Ne zaman?",
+      scope: "stock",
+      prompt: "Özet çıkar.",
+    });
+    assert.ok(out.includes("name: haftalik-ozet"));
+    assert.ok(out.includes("scope: stock"));
+    assert.ok(out.endsWith("Özet çıkar.\n"));
+  });
+  it("falls back on empty fields", () => {
+    const out = buildUserSkillMarkdown({
+      slash: "", label: "", description: "", prompt: "",
+    });
+    assert.ok(out.includes("name: yeni-skill"));
+    assert.ok(out.includes("scope: global"));
   });
 });
 describe("getEffectiveUserSkills", () => {

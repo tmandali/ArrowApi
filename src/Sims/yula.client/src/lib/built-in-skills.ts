@@ -42,6 +42,11 @@ export interface BuiltInSkillFile {
   content?: string;
 }
 
+/** Yerleşik SKILL.md ham kaynakları (slash → dosya içeriği). */
+export const BUILT_IN_SKILL_SOURCES: Record<string, string> = Object.fromEntries(
+  BUILT_IN_USER_SKILLS.map((s, i) => [s.slash, SOURCES[i].md]),
+);
+
 /** Skill paketi dosya envanteri (SKILL.md dışı): betikler + referanslar. */
 export const BUILT_IN_SKILL_FILES: Record<string, BuiltInSkillFile[]> = {
   "ay-kapanis": [

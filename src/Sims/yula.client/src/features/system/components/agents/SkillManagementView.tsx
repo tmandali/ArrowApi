@@ -16,18 +16,15 @@ import {
 import {
   panelCardClass,
   panelHeaderClass,
-  panelHeaderIconClass,
-  panelHeaderTitleClass,
-  panelHeaderSubtitleClass,
   panelResizeHandleClass,
 } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Filter, Sparkles } from "lucide-react";
+import { Filter } from "lucide-react";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/yula-user-skill";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
-import { SkillEditor, type SkillEditorHandle } from "./skill-editor";
+import { SkillEditor, type SkillEditorHandle, type SkillDetailFileTab } from "./skill-editor";
 
 type Selection = { id: string | null; readOnly?: boolean } | null;
 
@@ -42,6 +39,7 @@ export function SkillManagementView() {
   const [selection, setSelection] = React.useState<Selection>(null);
   const editorRef = React.useRef<SkillEditorHandle | null>(null);
   const [formRev, setFormRev] = React.useState(0);
+  const [fileTabs, setFileTabs] = React.useState<SkillDetailFileTab[]>([]);
 
   const isReadOnly = selection?.readOnly === true;
 
@@ -58,12 +56,10 @@ export function SkillManagementView() {
           (s) => s.id === selection.id,
         ) ?? null)
       : null;
-  const detailTitle =
-    selection == null
-      ? "Seçim yok"
-      : selection.id != null
-        ? `/${selectedSkill?.slash ?? "skill"}`
-        : "Yeni skill";
+  const detailTabLabel =
+    selection?.id != null
+      ? `/${selectedSkill?.slash ?? "skill"}`
+      : "Yeni skill";
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -224,24 +220,29 @@ export function SkillManagementView() {
                     className="flex min-h-0 flex-1 flex-col overflow-hidden"
                   >
                   <div className={panelHeaderClass}>
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <Sparkles className={panelHeaderIconClass} aria-hidden />
-                        <span className={panelHeaderTitleClass}>{detailTitle}</span>
-                      </div>
-                      {selection?.id != null && selectedSkill ? (
-                        <span className={panelHeaderSubtitleClass}>
-                          {tab === "system" ? "yerleşik · salt-okunur" : (selectedSkill.scope ?? "global")}
-                        </span>
-                      ) : null}
-                    </div>
                     {selection != null ? (
-                      <TabsList variant="line" className="shrink-0">
-                        <TabsTrigger value="genel">Genel</TabsTrigger>
-                        <TabsTrigger value="prompt">Prompt</TabsTrigger>
-                        <TabsTrigger value="dosyalar">Dosyalar</TabsTrigger>
+                      <TabsList variant="line" className="min-w-0 flex-1 justify-start overflow-x-auto no-scrollbar">
+                        <TabsTrigger value="genel" style={{ flex: "0 0 auto" }} className="max-w-48 font-mono">
+                          <span className="truncate">{detailTabLabel}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="skillmd" style={{ flex: "0 0 auto" }}>
+                          SKILL.md
+                        </TabsTrigger>
+                        {fileTabs.map((t) => (
+                          <TabsTrigger
+                            key={t.key}
+                            value={t.key}
+                            style={{ flex: "0 0 auto" }}
+                            className="max-w-40 font-mono text-[11px]"
+                            title={t.title ?? t.key}
+                          >
+                            <span className="truncate">{t.label}</span>
+                          </TabsTrigger>
+                        ))}
                       </TabsList>
-                    ) : null}
+                    ) : (
+                      <div className="min-w-0 flex-1" />
+                    )}
                     {selection != null && !isReadOnly ? (
                       <div className="flex shrink-0 items-center gap-1 self-center">
                         <Button
@@ -289,6 +290,7 @@ export function SkillManagementView() {
                               setSelection({ id, readOnly: false })
                             }
                             onDeleted={() => setSelection(null)}
+                            onFileTabsChange={setFileTabs}
                           />
                         )}
                       </div>

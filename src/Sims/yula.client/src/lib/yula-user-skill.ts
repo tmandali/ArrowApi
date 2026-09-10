@@ -68,6 +68,30 @@ export function userSkillFilesSize(files: UserSkillFile[]): number {
   return files.reduce((acc, f) => acc + f.content.length, 0);
 }
 
+/** Form durumundan SKILL.md önizlemesi üretir (kaydedilmez) — saf. */
+export function buildUserSkillMarkdown(draft: {
+  slash: string;
+  label: string;
+  description: string;
+  scope?: string;
+  prompt: string;
+}): string {
+  const slash = draft.slash.trim().toLowerCase() || "yeni-skill";
+  const scope = draft.scope?.trim() || "global";
+  return [
+    "---",
+    `name: ${slash}`,
+    `slash: ${slash}`,
+    `label: ${draft.label.trim() || slash}`,
+    `description: ${draft.description.trim()}`,
+    `scope: ${scope}`,
+    "---",
+    "",
+    draft.prompt.trim(),
+    "",
+  ].join("\n");
+}
+
 /** Dosya uzantısına göre shiki dili (CodeBlock renklendirmesi için) — saf. */
 export function languageForPath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase();
@@ -90,6 +114,12 @@ export function languageForPath(path: string): string {
     default:
       return "plaintext";
   }
+}
+
+/** Önizleme dili: markdown dosyaları formatlı basılır, gerisi kod bloğudur — saf. */
+export function isMarkdownPath(path: string): boolean {
+  const ext = path.split(".").pop()?.toLowerCase();
+  return ext === "md" || ext === "markdown";
 }
 
 /** Palet/envanter için kapsam filtresi — saf. */
