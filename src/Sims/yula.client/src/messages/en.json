@@ -1013,6 +1013,20 @@
     "subcontracting_title": "Subcontracting Dashboard",
     "subcontracting_description": "Summary dashboard for subcontracting production orders, external sourcing and delivery routing."
   },
+  "Detail": {
+    "minimize": "Minimize (Esc)",
+    "maximize": "Expanded View (Maximize)",
+    "hide_history": "Hide record history",
+    "show_history": "Show record history",
+    "history": "History",
+    "commented": "left a comment",
+    "comment_placeholder": "Write a reply / comment",
+    "builtin": "shipped with the built-in package",
+    "created": "created this record",
+    "updated": "updated this record",
+    "you": "You",
+    "system": "System"
+  },
   "ReportGrid": {
     "partial_memory_title": "The browser's WebAssembly memory limit was reached — only the portion downloaded from the server is shown. The refresh button tries again.",
     "export_preparing": "{label} is being prepared...",

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn";
+import { useTranslations } from "next-intl"
 
 export type TabbedDetailTab = {
   value: string;
@@ -62,6 +63,7 @@ export function TabbedDetail({
   detailMaximized = false,
   onToggleDetailMaximize,
 }: TabbedDetailProps) {
+  const t = useTranslations("Detail")
   return (
     <Tabs
       key={resetKey}
@@ -101,8 +103,8 @@ export function TabbedDetail({
             size="icon"
             className="size-7 shrink-0 self-center"
             onClick={() => onToggleDetailMaximize?.()}
-            title={detailMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
-            aria-label={detailMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+            title={detailMaximized ? t("minimize") : t("maximize")}
+            aria-label={detailMaximized ? t("minimize") : t("maximize")}
           >
             {detailMaximized ? (
               <Minimize2 className="size-3.5" />
@@ -138,13 +140,14 @@ export function DetailHistoryToggle({
   open: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("Detail")
   return (
     <Button
       type="button"
       size="sm"
       variant="ghost"
       aria-pressed={open}
-      title={open ? "Kayıt geçmişini gizle" : "Kayıt geçmişini göster"}
+      title={open ? t("hide_history") : t("show_history")}
       className={cn(
         "h-7 px-2.5 text-[11.5px]",
         open ? "bg-muted text-foreground" : "text-muted-foreground",
@@ -152,7 +155,7 @@ export function DetailHistoryToggle({
       onClick={onToggle}
     >
       <History className="size-3.5" />
-      Geçmiş
+      {t("history")}
     </Button>
   );
 }

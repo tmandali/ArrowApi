@@ -1013,6 +1013,20 @@
     "subcontracting_title": "Fason Paneli",
     "subcontracting_description": "Fason üretim emirleri, dış tedarik ve fason teslimat rotalama özet panosu."
   },
+  "Detail": {
+    "minimize": "Küçült (Esc)",
+    "maximize": "Genişletilmiş Görünüm (Maximize)",
+    "hide_history": "Kayıt geçmişini gizle",
+    "show_history": "Kayıt geçmişini göster",
+    "history": "Geçmiş",
+    "commented": "yorum yaptı",
+    "comment_placeholder": "Yanıt / yorum yazın",
+    "builtin": "yerleşik paketle birlikte geldi",
+    "created": "bu kaydı oluşturdu",
+    "updated": "bu kaydı güncelledi",
+    "you": "Siz",
+    "system": "Sistem"
+  },
   "ReportGrid": {
     "partial_memory_title": "Tarayıcı WebAssembly bellek sınırı doldu — raporun yalnızca sunucudan inen kısmı gösteriliyor. Yenile butonu tekrar dener.",
     "export_preparing": "{label} hazırlanıyor...",

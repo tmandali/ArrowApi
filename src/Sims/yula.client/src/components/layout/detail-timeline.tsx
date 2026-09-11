@@ -12,15 +12,20 @@ import {
   type RecordComment,
 } from "@/lib/stores/record-comments";
 import { formatMetaDate } from "@/utils/format";
+import { useTranslations } from "next-intl"
 
 const EMPTY_COMMENTS: RecordComment[] = [];
 
-function commentToItem(comment: RecordComment): ActivityItem {
+function commentToItem(
+  comment: RecordComment,
+  commentedLabel: string,
+  youLabel: string,
+): ActivityItem {
   return {
     id: comment.id,
     type: "comment",
-    author: "Siz",
-    message: "yorum yaptı",
+    author: youLabel,
+    message: commentedLabel,
     time: formatMetaDate(comment.createdAt),
     commentText: comment.text,
   };
@@ -67,19 +72,20 @@ export function DetailTimeline({
   updatedAt,
   builtinSource,
   items,
-  commentPlaceholder = "Yanıt / yorum yazın",
+  commentPlaceholder,
   commentInitials,
   showComments = true,
   recordKey,
   children,
 }: DetailTimelineProps) {
+  const t = useTranslations("Detail")
   const autoItems: ActivityItem[] = (() => {
     if (builtinSource) {
       return [
         {
           id: "builtin",
-          author: "Sistem",
-          message: "yerleşik paketle birlikte geldi",
+          author: t("system"),
+          message: t("builtin"),
           time: builtinSource,
         },
       ];
@@ -88,21 +94,23 @@ export function DetailTimeline({
     const built: ActivityItem[] = [
       {
         id: "created",
-        author: "Siz",
-        message: "bu kaydı oluşturdu",
+        author: t("you"),
+        message: t("created"),
         time: formatMetaDate(createdAt),
       },
     ];
     if (updatedAt != null && updatedAt !== createdAt) {
       built.unshift({
         id: "updated",
-        author: "Siz",
-        message: "bu kaydı güncelledi",
+        author: t("you"),
+        message: t("updated"),
         time: formatMetaDate(updatedAt),
       });
     }
     return built;
   })();
+
+  const resolvedPlaceholder = commentPlaceholder ?? t("comment_placeholder")
 
   const resolvedItems = items ?? autoItems;
   const canComment = showComments && recordKey != null;
@@ -118,7 +126,7 @@ export function DetailTimeline({
     <TimelineWithComments
       recordKey={recordKey}
       initials={initials}
-      commentPlaceholder={commentPlaceholder}
+      commentPlaceholder={resolvedPlaceholder}
       canComment={canComment}
       autoItems={resolvedItems}
     >
@@ -149,9 +157,12 @@ function TimelineWithComments({
   const byRecord = useRecordCommentsStore((s) => s.byRecord);
   const addComment = useRecordCommentsStore((s) => s.addComment);
   const removeComment = useRecordCommentsStore((s) => s.removeComment);
+  const t = useTranslations("Detail")
 
   const stored = recordKey ? (byRecord[recordKey] ?? EMPTY_COMMENTS) : EMPTY_COMMENTS;
-  const storedItems = [...stored].reverse().map(commentToItem);
+  const storedItems = [...stored].reverse().map((c) =>
+    commentToItem(c, t("commented"), t("you")),
+  );
   const merged = [...storedItems, ...autoItems];
   const showBox = canComment && recordKey != null;
 
