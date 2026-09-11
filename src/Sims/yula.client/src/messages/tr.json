@@ -266,5 +266,12 @@
     "empty_state": "Henüz ajan yok — Yeni Ajan ile tanımlayın.",
     "records": "kayıt",
     "no_records": "kayıt yok"
+  },
+  "WorkspaceSearch": {
+    "search_accounting": "Muhasebe & finans modüllerini ve sohbet geçmişini ara...",
+    "search_stock": "Stok modüllerini ve sohbet geçmişini ara...",
+    "search_manufacturing": "İmalat & BOM modüllerini ve sohbet geçmişini ara...",
+    "search_subcontracting": "Alt iş & satış modüllerini ve sohbet geçmişini ara...",
+    "search_all": "Modülleri, raporları ve sohbet geçmişini ara..."
   }
 }
