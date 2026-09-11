@@ -57,8 +57,8 @@ describe("filterAgentsByScope", () => {
 });
 
 describe("agentScopeWorkspaceId", () => {
-  it("returns null on home so global agents apply", () => {
-    assert.equal(agentScopeWorkspaceId("/"), null);
+  it("treats home as system scope so only main Yula applies", () => {
+    assert.equal(agentScopeWorkspaceId("/"), "system");
   });
   it("returns system for management pages", () => {
     assert.equal(agentScopeWorkspaceId("/system/skills"), "system");

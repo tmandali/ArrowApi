@@ -465,8 +465,10 @@ function AIChatPanelSession({
     isReportResultPath(pathname) || Boolean(selectedJobId)
   const userSkills = useUserSkillsStore((s) => s.skills)
   const workspaceId = workspaceIdFromPath(pathname)
-  // Ajan kapsamı: "/" ana sayfada global ajanlar geçerli, system
-  // yönetim sayfalarında ajan seçilemez (skill kapsamı etkilenmez).
+  // Ajan kapsamı: system workspace'ü (ana sayfa "/" + "/system/*") daima
+  // yalnız ana Yula AI ile çalışır (kapsam filtresi [] döner); diğer
+  // workspace'lerde global + o alana özel ajanlar geçerli (skill kapsamı
+  // etkilenmez).
   const agentWorkspaceId = agentScopeWorkspaceId(pathname)
   // Oturum ajanı (hero karşılaması için; girdi üstü rozet kaldırıldı —
   // kimlik URL + panel başlığı + hero ile belli olur).

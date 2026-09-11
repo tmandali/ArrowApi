@@ -287,12 +287,13 @@ export function validateUserAgent(
 }
 
 /**
- * Ajan kapsamı için sayfa kimliği: "/" ana sayfa çalışma alanı bağlamı
- * taşımaz (filtre global ajanları geçirir); system yönetim sayfalarında
- * ajan seçilemez (filterAgentsByScope "system" için [] döner).
+ * Ajan kapsamı için sayfa kimliği. System workspace'ü (kök "/" ve tüm
+ * "/system/*" yönetim sayfaları) daima yalnız ana Yula AI ile çalışır:
+ * "system" kapsamı `filterAgentsByScope`'ta [] döner, böylece global/user
+ * ajanlar ana sayfa dock'unda da görünmez. Diğer workspace'lerde global +
+ * o workspace'e özel ajanlar geçerlidir.
  */
-export function agentScopeWorkspaceId(pathname: string): string | null {
-  if (pathname === "/") return null;
+export function agentScopeWorkspaceId(pathname: string): string {
   return workspaceIdFromPath(pathname);
 }
 
