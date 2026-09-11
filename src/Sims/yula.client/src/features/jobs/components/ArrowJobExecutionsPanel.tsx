@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { usePersistedPanelLayout } from "@/lib/use-persisted-panel-layout"
 import {
   CircleCheck,
@@ -127,8 +128,8 @@ function ExecutionStatusMark({
         <span
           role="button"
           tabIndex={-1}
-          title="Delete execution"
-          aria-label="Delete execution"
+          title={t("delete_execution")}
+          aria-label={t("delete_execution")}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -322,7 +323,7 @@ export function ArrowJobExecutionsPanel({
   jobsEndpoint,
   jobName = "report",
   openJobHref,
-  emptyListHint = "Past report jobs",
+  emptyListHint = "",
   activeJobId = null,
   activeLiveStatus,
   activeRequestJson,
@@ -338,7 +339,7 @@ export function ArrowJobExecutionsPanel({
   listRefreshToken = 0,
   pendingJobs = [],
   detailSlot,
-  detailSlotTitle = "Criteria",
+  detailSlotTitle = "",
   detailSlotActions,
   criteriaActive = false,
   criteriaSchema: _criteriaSchema,
@@ -352,6 +353,7 @@ export function ArrowJobExecutionsPanel({
   onCanCancelChange,
   onCancellingChange,
 }: ArrowJobExecutionsPanelProps) {
+  const t = useTranslations("JobExecutions")
   const showCriteriaSlot = detailSlot != null
   const isGridMaximized = useYulaGridStore((s) => s.isMaximized)
   const removeTrackedJob = useActiveJobsStore((s) => s.removeJob)
@@ -432,7 +434,7 @@ export function ArrowJobExecutionsPanel({
       } catch (err) {
         if (signal?.aborted) return
         setError(
-          err instanceof Error ? err.message : "Job listesi alınamadı"
+          err instanceof Error ? err.message : t("job_list_fetch_failed")
         )
         if (!options?.silent) {
           setItems([])
@@ -885,7 +887,7 @@ export function ArrowJobExecutionsPanel({
       ) {
         return {
           ...e,
-          detail: `${formatCount(targetRows)} rows`,
+          detail: `${formatCount(targetRows)} ${t("rows_plural", { count: targetRows })}`,
           totalRows: targetRows,
           batchCount: selectedJob.batchCount ?? e.batchCount,
         }
@@ -1088,7 +1090,7 @@ export function ArrowJobExecutionsPanel({
             ? err.message
             : err instanceof Error
               ? err.message
-              : "Job silinemedi"
+              : t("job_delete_failed")
         setDeleteError(message)
       } finally {
         setDeleting(false)
@@ -1099,7 +1101,7 @@ export function ArrowJobExecutionsPanel({
 
   const detailLines = React.useMemo(() => {
     if (!selectedJob && !isActiveSelected) {
-      return [{ label: "Status", value: "—" }]
+      return [{ label: t("status"), value: "—" }]
     }
     const duration = formatTotalDuration({
       createdAt: selectedJob?.createdAt,
@@ -1108,12 +1110,12 @@ export function ArrowJobExecutionsPanel({
       steps: progressEvents,
     })
     const lines = [
-      { label: "Status", value: selectedDisplayStatus },
-      { label: "Created", value: formatWhen(selectedJob?.createdAt) },
-      { label: "Completed", value: formatWhen(selectedJob?.completedAt) },
-      { label: "Duration", value: duration ?? "—" },
+      { label: t("status"), value: selectedDisplayStatus },
+      { label: t("created"), value: formatWhen(selectedJob?.createdAt) },
+      { label: t("completed"), value: formatWhen(selectedJob?.completedAt) },
+      { label: t("duration"), value: duration ?? "—" },
       {
-        label: "Rows",
+        label: t("rows"),
         value:
           isTerminal && selectedJob?.totalRows != null
             ? formatCount(selectedJob.totalRows)
@@ -1124,7 +1126,7 @@ export function ArrowJobExecutionsPanel({
                 : "—",
       },
       {
-        label: "Batches",
+        label: t("batches"),
         value:
           isTerminal && selectedJob?.batchCount != null
             ? formatCount(selectedJob.batchCount)
@@ -1135,7 +1137,7 @@ export function ArrowJobExecutionsPanel({
                 : "—",
       },
       {
-        label: "OPFS Cache",
+        label: t("opfs_cache"),
         value: opfsDetail?.hasParts
           ? `${opfsDetail.partCount} parça (${formatBytes(opfsDetail.totalSizeBytes)})`
           : opfsLoading
@@ -1143,14 +1145,14 @@ export function ArrowJobExecutionsPanel({
             : "Yok",
       },
       {
-        label: "OPFS Date",
+        label: t("opfs_date"),
         value: opfsDetail?.files?.[0]?.lastModified
           ? formatWhen(new Date(opfsDetail.files[0].lastModified).toISOString())
           : "—",
       },
     ]
     if (selectedJob?.error) {
-      lines.push({ label: "Error", value: selectedJob.error })
+      lines.push({ label: t("error"), value: selectedJob.error })
     }
     return lines
   }, [
@@ -1208,11 +1210,11 @@ export function ArrowJobExecutionsPanel({
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <History className={panelHeaderIconClass} aria-hidden />
-                  <span className={panelHeaderTitleClass}>Executions</span>
+                  <span className={panelHeaderTitleClass}>{t("executions")}</span>
                 </div>
                 <span className={panelHeaderSubtitleClass}>
                   {total > 0
-                    ? `${formatCount(total)} run${total === 1 ? "" : "s"}`
+                    ? `${formatCount(total)} ${t("run_plural", { count: total })}`
                     : emptyListHint}
                 </span>
               </div>
@@ -1223,8 +1225,8 @@ export function ArrowJobExecutionsPanel({
                 className="size-7 shrink-0"
                 disabled={loading || refreshing}
                 onClick={handleRefresh}
-                title="Refresh"
-                aria-label="Refresh"
+                title={t("refresh")}
+                aria-label={t("refresh")}
               >
                 <RefreshCw className={cn("size-3.5", (loading || refreshing) && "animate-spin")} />
               </Button>
@@ -1246,9 +1248,9 @@ export function ArrowJobExecutionsPanel({
                     >
                       <History className="size-4" />
                     </EmptyMedia>
-                    <EmptyTitle>No executions yet</EmptyTitle>
+                    <EmptyTitle>{t("no_executions_yet")}</EmptyTitle>
                     <EmptyDescription>
-                      Run a report to see it here.
+                      {t("run_a_report_to_see_here")}
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
@@ -1285,8 +1287,8 @@ export function ArrowJobExecutionsPanel({
                             <span
                               role="button"
                               tabIndex={-1}
-                              title="Copy GUID"
-                              aria-label="Copy GUID"
+                              title={t("copy_guid")}
+                              aria-label={t("copy_guid")}
                               onClick={(event) => {
                                 event.preventDefault()
                                 event.stopPropagation()
@@ -1319,7 +1321,7 @@ export function ArrowJobExecutionsPanel({
                             <span className="opacity-50">·</span>
                             <span
                               className="shrink-0 tabular-nums"
-                              title="Duration"
+                              title={t("duration")}
                             >
                               {formatTotalDuration({
                                 createdAt: job.createdAt,
@@ -1330,7 +1332,7 @@ export function ArrowJobExecutionsPanel({
                           </div>
                           <span className="shrink-0">
                             {job.totalRows != null
-                              ? `${formatCount(job.totalRows)} rows`
+                              ? `${formatCount(job.totalRows)} ${t("rows_plural", { count: job.totalRows })}`
                               : "—"}
                           </span>
                         </div>
@@ -1361,7 +1363,7 @@ export function ArrowJobExecutionsPanel({
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <Filter className={panelHeaderIconClass} aria-hidden />
-                  <span className={panelHeaderTitleClass}>{detailSlotTitle}</span>
+                  <span className={panelHeaderTitleClass}>{detailSlotTitle || t("criteria")}</span>
                 </div>
               </div>
               {detailSlotActions ? (
@@ -1380,7 +1382,7 @@ export function ArrowJobExecutionsPanel({
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <FileText className={panelHeaderIconClass} aria-hidden />
-                  <span className={panelHeaderTitleClass}>Detail</span>
+                  <span className={panelHeaderTitleClass}>{t("detail")}</span>
                 </div>
                 {selectedDisplayStatus ? (
                   <Badge
@@ -1399,18 +1401,18 @@ export function ArrowJobExecutionsPanel({
                     title={selectedId ?? undefined}
                   >
                     {detailLoading
-                      ? "Loading request…"
+                      ? t("loading_request")
                       : selectedId
                         ? selectedId
-                        : "Status, meta and request payload"}
+                        : t("status_meta_request")}}
                   </span>
                   {selectedId ? (
                     <button
                       type="button"
                       onClick={() => handleCopy(selectedId, "url")}
                       className="shrink-0 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground"
-                      aria-label="Copy report URL"
-                      title="Copy report URL"
+                      aria-label={t("copy_report_url")}
+                      title={t("copy_report_url")}
                     >
                       <Copy className="size-3" />
                     </button>
@@ -1434,12 +1436,12 @@ export function ArrowJobExecutionsPanel({
                         <dd
                           className={cn(
                             "text-foreground",
-                            line.label === "Error" &&
+                            line.label === t("error") &&
                               "whitespace-normal break-all"
                           )}
                           title={line.value}
                         >
-                          {line.label === "Error" ? (
+                          {line.label === t("error") ? (
                             <span className="flex min-w-0 items-center gap-1.5">
                               <span className="min-w-0 truncate">
                                 {line.value}
@@ -1450,8 +1452,8 @@ export function ArrowJobExecutionsPanel({
                                   handleCopy(line.value, "id")
                                 }
                                 className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                                aria-label="Copy error"
-                                title="Copy to clipboard"
+                                aria-label={t("copy_error")}
+                                title={t("copy_to_clipboard")}
                               >
                                 <Copy className="size-3" />
                               </button>
@@ -1550,7 +1552,7 @@ export function ArrowJobExecutionsPanel({
           <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
             <Trash2 />
           </AlertDialogMedia>
-          <AlertDialogTitle>Delete this execution?</AlertDialogTitle>
+          <AlertDialogTitle>{t("delete_this_execution")}</AlertDialogTitle>
           <AlertDialogDescription>
             {deleteTargetId ? (
               <>
@@ -1570,14 +1572,14 @@ export function ArrowJobExecutionsPanel({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel variant="outline" disabled={deleting}>
-            Cancel
+            {t("cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={deleting}
             onClick={(event) => void handleConfirmDelete(event)}
           >
-            {deleting ? "Deleting…" : "Delete"}
+            {deleting ? t("deleting") : t("delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

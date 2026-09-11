@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { FilePlus2, Loader2, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
@@ -94,6 +95,7 @@ export function ReportCriteriaShell({
   headerActions,
   renderFilter,
 }: ReportCriteriaShellProps) {
+  const t = useTranslations("ReportCriteria")
   // Kriter gridi handle'ı callback ref olarak toplanır: setter commit fazında
   // React tarafından çağrılır, render sırasında ref erişimi yapılmaz.
   const [criteriaHandle, setCriteriaHandle] =
@@ -158,7 +160,7 @@ export function ReportCriteriaShell({
   const formatValidationBanner = React.useCallback(
     (result: CriteriaValidationResult) => {
       if (result.valid || result.errors.length === 0) return null
-      const first = result.errors[0]?.message ?? "Validation failed"
+      const first = result.errors[0]?.message ?? t("validation_failed")
       const extra =
         result.errors.length > 1 ? ` (+${result.errors.length - 1})` : ""
       return `${first}${extra}`
@@ -173,7 +175,7 @@ export function ReportCriteriaShell({
     if (!result.valid) {
       const message = formatValidationBanner(result)
       setCriteriaBanner(
-        message ? { tone: "error", message } : { tone: "error", message: "Validation failed" }
+        message ? { tone: "error", message } : { tone: "error", message: t("validation_failed") }
       )
       return
     }
@@ -181,7 +183,7 @@ export function ReportCriteriaShell({
     if (!result.jobEndpoint) {
       setCriteriaBanner({
         tone: "error",
-        message: "Schema x-job-endpoint is missing",
+        message: t("schema_missing_endpoint"),
       })
       return
     }
@@ -214,7 +216,7 @@ export function ReportCriteriaShell({
           ? error.message
           : error instanceof Error
             ? error.message
-            : "Job create failed"
+            : t("job_create_failed")
       setCriteriaBanner({ tone: "error", message })
     } finally {
       setSubmittingCriteria(false)
@@ -259,15 +261,15 @@ export function ReportCriteriaShell({
                 onClick={() =>
                   isNewMode ? onCancelNewReport?.() : onStartNewReport?.()
                 }
-                title={isNewMode ? "Cancel" : "New report"}
-                aria-label={isNewMode ? "Cancel" : "New report"}
+                title={isNewMode ? t("cancel") : t("new_report")}
+                aria-label={isNewMode ? t("cancel") : t("new_report")}
               >
                 {isNewMode ? (
                   <X className="size-3.5" />
                 ) : (
                   <FilePlus2 className="size-3.5" />
                 )}
-                {isNewMode ? "Cancel" : "New"}
+                {isNewMode ? t("cancel") : t("new")}
               </Button>
               <Button
                 type="button"
@@ -276,15 +278,15 @@ export function ReportCriteriaShell({
                 className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
                 disabled={submittingCriteria || criteriaLocked}
                 onClick={() => void handleCriteriaSubmit()}
-                title="Run report"
-                aria-label="Run report"
+                title={t("run_report")}
+                aria-label={t("run_report")}
               >
                 {submittingCriteria ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Play className="size-3.5" />
                 )}
-                Run
+                {t("run")}
               </Button>
               <AIChatAssistant />
             </div>
