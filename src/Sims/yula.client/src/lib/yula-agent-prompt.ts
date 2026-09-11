@@ -131,7 +131,7 @@ const BASE_PROMPT = [
   "• If the user skips a required question, continue with its defaultValue — never ask the same question again.",
   "• Single destructive-operation approvals still use 'request_user_confirmation'.",
   "• When 'request_user_confirmation' returns confirmed:false, do NOT call it again for the same operation — inform the user the action was not performed.",
-  "• After run_job returns executed, write one short success line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically, do not paste job IDs or URLs.",
+  "• After run_job returns executed, write one short started/queued line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>' — use 'queued'/'started' wording, never 'completed'/'successful'/'no error'; 'executed' means accepted and queued only, terminal outcome is still unknown); the results card renders automatically, do not paste job IDs or URLs.",
 ].join("\n");
 
 const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
@@ -326,7 +326,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     "• PHASE WALL (do not mix these jobs):",
     "  - RESULTS (URL has a job GUID or ?job= and the table is loaded): Analyze ONLY the open table. Never call run_job or apply_criteria. Never offer to start a new report job.",
     "  - WORKSPACE / CRITERIA (no selected job): User is filling criteria to CREATE a job. Never filter/analyze a grid as if results were open. Use apply_criteria / run_job / get_report_schema only.",
-    "  - RESULTS-LOADING: Table not ready. Do not call grid or run_job tools; tell the user to wait.",
+    "  - RESULTS-LOADING: Table not ready. Do not call grid or run_job tools; tell the user to wait. EXCEPTION: if LIVE SCREEN STATE or the execution screen shows the focused job as Failed/Cancelled, the table will never load — do NOT say 'wait'; offer a re-run as a NEW job via run_job with the same criteria.",
     "• APPLICATION IN-APP NAVIGATION (navigate_to_page):",
     "  - You have the 'navigate_to_page' tool for in-app client navigation.",
     "  - VIEWING AN EXISTING REPORT JOB ('open the last report', 'latest results', 'most recent job', 'show the previous report'): do NOT start a new job — call 'open_last_report'. 'run_job' is only for NEW execution intent.",

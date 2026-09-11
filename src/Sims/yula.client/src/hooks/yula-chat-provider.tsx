@@ -45,7 +45,7 @@ import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-t
 import { isYulaGridSlashPrompt } from "@/components/layout/yula-commands";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { useYulaDockStore } from "@/lib/stores/dock";
-import { useActiveJobsStore } from "@/store/slices/active-jobs-store";
+import { useActiveJobsStore, isTerminalJobStatus } from "@/store/slices/active-jobs-store";
 import { useDraftCriteriaStore } from "@/store/slices/draft-criteria-store";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import {
@@ -363,6 +363,31 @@ function ChatInstance({
           const expectedTable = jobIdSeg
             ? `report_${jobIdSeg.replace(/[^a-zA-Z0-9_]/g, "_")}`
             : "";
+          // F5 sonrası store boştur: odaktaki job'ın gerçek durumunu
+          // backend'den çöz (best-effort, 4sn). Failed/Cancelled ise faz
+          // workspace'e düşer, model "bekle" yerine yeni job açar.
+          let resolvedFocusedStatus: string | undefined = jobIdSeg
+            ? useActiveJobsStore.getState().jobs[jobIdSeg]?.status
+            : undefined;
+          if (jobIdSeg && !resolvedFocusedStatus) {
+            try {
+              const { fetchJobStatus } = await import(
+                "@/features/jobs/arrow-job-client"
+              );
+              const fresh = await fetchJobStatus(
+                jobIdSeg,
+                AbortSignal.timeout(4000),
+              );
+              if (fresh?.status) {
+                resolvedFocusedStatus = fresh.status;
+                useActiveJobsStore
+                  .getState()
+                  .updateJob(jobIdSeg, { status: fresh.status });
+              }
+            } catch {
+              // Backend'e ulaşılamazsa store'daki bilgiyle devam.
+            }
+          }
 
           if (
             jobDetail &&
@@ -411,11 +436,21 @@ function ChatInstance({
           const specMatchesJob =
             hasActiveGrid &&
             (!expectedTable || spec?.tableName === expectedTable);
+          // Terminal-failed job: tablo asla gelmeyecek — "yükleniyor" değil,
+          // yeni job kurulabilen workspace fazı (re-run için run_job gerekir).
+          // Completed kapı dışı: tablosu henüz hidratlanıyor olabilir.
+          const focusedJobStatus = resolvedFocusedStatus;
+          const isFailedFocusedJob =
+            !hasActiveGrid &&
+            Boolean(jobIdSeg) &&
+            Boolean(focusedJobStatus) &&
+            isTerminalJobStatus(focusedJobStatus) &&
+            focusedJobStatus !== "Completed";
 
           const phase: "results" | "results-loading" | "workspace" =
             hasActiveGrid
               ? "results"
-              : jobDetail
+              : jobDetail && !isFailedFocusedJob
                 ? "results-loading"
                 : "workspace";
 
@@ -501,9 +536,7 @@ function ChatInstance({
             scope: snapshotScope,
             draftRows,
             focusedJobId: jobIdSeg || undefined,
-            focusedJobStatus: jobIdSeg
-              ? useActiveJobsStore.getState().jobs[jobIdSeg]?.status
-              : undefined,
+            focusedJobStatus: resolvedFocusedStatus,
             trackedJobs,
             gridFilters: useYulaGridStore.getState().filters,
             extra: screenReg?.stateExtra,
