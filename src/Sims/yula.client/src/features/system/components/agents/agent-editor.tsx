@@ -94,16 +94,22 @@ export function AgentEditor({
   const isRO = mode === "view"
   const t = useTranslations("AgentEditor")
   const tv = useTranslations("Validation")
+  // Katalog label'ları `AgentCatalog` namespace'inde (tool_*/provider_*).
+  const tCat = useTranslations("AgentCatalog")
 
   // Veri kataloğu label'ları render anında yerelleştirilir (tool `name` /
   // provider `id` model katmanında dil bağımsız kalır).
   const toolCatalog = React.useMemo(
-    () => localizeAgentToolCatalog(AGENT_TOOL_CATALOG, t),
-    [t],
+    () => localizeAgentToolCatalog(AGENT_TOOL_CATALOG, tCat),
+    // next-intl v4'te `t`/`tCat` referans-stabil değil → dep'da yok (locale
+    // değişince sayfa yenilenir; `useLocale` dep eklenmez).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
   const providerOptions = React.useMemo(
-    () => localizeProviderOptions(AGENT_PROVIDER_OPTIONS, t),
-    [t],
+    () => localizeProviderOptions(AGENT_PROVIDER_OPTIONS, tCat),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   const agents = useUserAgentsStore((s) => s.agents);
