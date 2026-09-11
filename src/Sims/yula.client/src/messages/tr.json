@@ -1312,5 +1312,43 @@
     "new": "Yeni",
     "edit": "Düzenleme",
     "view": "Salt okunur"
+  },
+  "Commands": {
+    "new": {
+      "label": "Yeni sohbet",
+      "description": "Mevcut konuşmayı ve sohbet geçmişini sıfırla",
+      "prompt": "/new"
+    },
+    "attach": {
+      "label": "Dosya ekle",
+      "description": "Sohbete belge veya dosya ekle",
+      "prompt": "/dosya"
+    },
+    "grid-analiz": {
+      "label": "Tablo Analizi & Veri Kalitesi",
+      "description": "Veri kalitesi ve anomali analizi yaparak problemleri tıklanabilir aksiyon linkleriyle listeler",
+      "prompt": "/analiz"
+    },
+    "grid-top5": {
+      "label": "En Yüksek 5 Grafik",
+      "description": "En yüksek ilk 5 kaydı grafikle özetle",
+      "prompt": "En yüksek ilk 5 kaydı grafikle özetle"
+    },
+    "grid-temizle": {
+      "label": "Görünümü & Filtreleri Sıfırla",
+      "description": "Aktif filtreleri temizler, gizli kolonları açar ve tabloyu fabrika ayarlarına döndürür",
+      "prompt": "Aktif filtreleri temizle, gizli kolonları aç ve tabloyu sıfırla"
+    },
+    "grid-indir": {
+      "label": "Raporu İndir (Export)",
+      "description": "Tablodaki aktif veriyi Excel veya CSV formatında bilgisayarınıza indirir",
+      "prompt": "Bu tablodaki verileri Excel olarak indir"
+    },
+    "report-run-job": {
+      "label": "Öner & Çalıştır",
+      "description": "Açık raporun şemasını yorumlayarak öneriler sunar, seçime göre kriterleri forma doldurur",
+      "prompt": "Rapor şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
+    },
+    "user_skill_default": "Kullanıcı skill'i"
   }
 }

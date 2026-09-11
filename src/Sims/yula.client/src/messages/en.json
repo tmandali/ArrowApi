@@ -962,7 +962,7 @@
     "top5_charts": "Top 5 Charts",
     "top5_charts_prompt": "Summarize the top 5 records with charts",
     "anomaly_risk": "Anomaly & Risk",
-    "anomaly_risk_prompt": "/analyze",
+    "anomaly_risk_prompt": "/analiz",
     "sql_analysis": "SQL Analysis & Suggestions",
     "sql_analysis_prompt": "Analyze the table like a SQL expert: profile it, share suggestions and verification queries",
     "explain_columns": "Explain Columns",
@@ -1312,5 +1312,43 @@
     "new": "New",
     "edit": "Edit",
     "view": "Read-only"
+  },
+  "Commands": {
+    "new": {
+      "label": "New chat",
+      "description": "Reset the current conversation and chat history",
+      "prompt": "/new"
+    },
+    "attach": {
+      "label": "Attach file",
+      "description": "Add a document or file to the chat",
+      "prompt": "/dosya"
+    },
+    "grid-analiz": {
+      "label": "Table Analysis & Data Quality",
+      "description": "Analyzes data quality and anomalies, listing problems with clickable action links",
+      "prompt": "/analiz"
+    },
+    "grid-top5": {
+      "label": "Top 5 Charts",
+      "description": "Summarize the top 5 records with a chart",
+      "prompt": "Summarize the top 5 records with a chart"
+    },
+    "grid-temizle": {
+      "label": "Reset View & Filters",
+      "description": "Clears active filters, un-hides hidden columns, and resets the table to defaults",
+      "prompt": "Clear active filters, un-hide hidden columns, and reset the table to defaults"
+    },
+    "grid-indir": {
+      "label": "Download Report (Export)",
+      "description": "Downloads the active data in this table to your computer as Excel or CSV",
+      "prompt": "Download the active data in this table as Excel"
+    },
+    "report-run-job": {
+      "label": "Suggest & Run",
+      "description": "Interprets the open report's schema, suggests options, and fills criteria per selection",
+      "prompt": "Interpret the report schema and its required fields, and suggest 1-2 options."
+    },
+    "user_skill_default": "User skill"
   }
 }

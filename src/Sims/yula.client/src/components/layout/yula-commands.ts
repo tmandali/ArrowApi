@@ -123,6 +123,7 @@ export function userSkillsToCommands(
   skills: UserSkill[],
   workspaceId?: string | null,
   allowedSlashes?: string[],
+  t?: (key: string) => string,
 ): YulaCommand[] {
   const inScope =
     allowedSlashes !== undefined
@@ -137,7 +138,7 @@ export function userSkillsToCommands(
     id: s.id,
     slash: s.slash,
     label: s.label,
-    description: s.description || "Kullanıcı skill'i",
+    description: s.description || t?.("user_skill_default") || "User skill",
     prompt: s.prompt,
     icon: Sparkles,
     source: "user" as const,
@@ -168,6 +169,29 @@ export function getRegisteredYulaCommands(
   return out;
 }
 
+/**
+ * Komut metinlerini yerel dilde çözümleyerek döndürür:
+ * `Commands` next-intl ad alanından id bazlı label/description/prompt
+ * alınır; slash tetikleyici token'ları dil-bağımsız (stable key) olarak
+ * değişmeden kalır.
+ * `source === "user"` komutları (kullanıcı skill'leri) içerik olarak
+ * çevrilemez → olduğu gibi geçer.
+ */
+export function localizeYulaCommands(
+  commands: YulaCommand[],
+  t: (key: string) => string,
+): YulaCommand[] {
+  return commands.map((cmd) => {
+    if (cmd.source === "user") return cmd;
+    return {
+      ...cmd,
+      label: t(`${cmd.id}.label`),
+      description: t(`${cmd.id}.description`),
+      prompt: t(`${cmd.id}.prompt`),
+    };
+  });
+}
+
 /** `/analiz foo` → kayıtlı komut; `/4` veya bilinmeyen slash → null. */
 export function resolveYulaSlashCommand(
   input: string,
@@ -179,12 +203,15 @@ export function resolveYulaSlashCommand(
   return commands.find((c) => c.slash.toLowerCase() === token) ?? null;
 }
 
-export function isYulaGridSlashPrompt(text: string): boolean {
+export function isYulaGridSlashPrompt(
+  text: string,
+  commands: YulaCommand[] = GRID_COMMANDS,
+): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
-  if (resolveYulaSlashCommand(trimmed, GRID_COMMANDS)) return true;
+  if (resolveYulaSlashCommand(trimmed, commands)) return true;
   const lower = trimmed.toLowerCase();
-  return GRID_COMMANDS.some((cmd) => cmd.prompt.trim().toLowerCase() === lower);
+  return commands.some((cmd) => cmd.prompt.trim().toLowerCase() === lower);
 }
 
 export function matchYulaCommands(

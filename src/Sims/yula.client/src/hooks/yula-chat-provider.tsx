@@ -44,7 +44,7 @@ import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agen
 import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
 import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
 import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
-import { isYulaGridSlashPrompt } from "@/components/layout/yula-commands";
+import { GRID_COMMANDS, isYulaGridSlashPrompt, localizeYulaCommands } from "@/components/layout/yula-commands";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { useYulaDockStore } from "@/lib/stores/dock";
 import { useActiveJobsStore, isTerminalJobStatus } from "@/store/slices/active-jobs-store";
@@ -56,6 +56,7 @@ import {
   type ScreenSnapshot,
 } from "@/lib/screen-snapshot";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-steps";
+import { useLocale, useTranslations } from "next-intl";
 import { readYulaClientAiConfig, yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
 
 /**
@@ -330,6 +331,17 @@ function ChatInstance({
   >) => void;
 }) {
   const router = useRouter();
+  const tc = useTranslations("Commands");
+  const locale = useLocale();
+  // Yerel dilde grid komut listesi: metin alanları `Commands` next-intl
+  // ad alanından çözülür; locale stabil string → yalnız locale değişince
+  // yeniden hesaplanır (`tc` render başına yenidir, bağımlılık yerine locale izlenir).
+  const localizedGridCommands = React.useMemo(
+    () => localizeYulaCommands(GRID_COMMANDS, tc),
+    /* eslint-disable react-hooks/exhaustive-deps -- `tc` render başına yenidir; locale değişimi gerçek sürücüdür, locale izlenir */
+    [locale],
+    /* eslint-enable react-hooks/exhaustive-deps */
+  );
   const saveMessages = useChatsStore((s) => s.saveMessages);
   const renameFromFirstMessage = useChatsStore(
     (s) => s.renameFromFirstMessage,
@@ -508,7 +520,7 @@ function ChatInstance({
 
           const jobId = extractJobIdFromHref(pathname);
           const lastText = lastTextPart?.text ?? "";
-          const gridPrompt = isYulaGridSlashPrompt(lastText);
+          const gridPrompt = isYulaGridSlashPrompt(lastText, localizedGridCommands);
           const phaseBreak = gridPrompt && phase !== "results";
           const specCols = spec?.columns?.length ?? 0;
 
@@ -711,7 +723,8 @@ function ChatInstance({
           };
         },
       }),
-    [],
+    // Mount-snapshot transport: locale değişince (stabil string) yeniden kurulur
+    [localizedGridCommands],
   );
 
   // Kullanıcı "durdur" bayrağı — bir sonraki kullanıcı mesajına kadar otomatik
@@ -1366,7 +1379,7 @@ function ChatInstance({
       });
 
       if (
-        isYulaGridSlashPrompt(text) &&
+        isYulaGridSlashPrompt(text, localizedGridCommands) &&
         !isReportResultPath(pathOnly) &&
         selectedJobId &&
         !tableReadyOnScreen
@@ -1442,7 +1455,7 @@ function ChatInstance({
       })();
     },
     runPendingTool,
-  }), [chat, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, streamErrorTexts, busy, router, conversationId]);
+  }), [chat, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, streamErrorTexts, busy, router, conversationId, localizedGridCommands]);
 
   // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
   React.useEffect(() => {

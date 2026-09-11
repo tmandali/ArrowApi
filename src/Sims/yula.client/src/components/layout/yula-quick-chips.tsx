@@ -50,7 +50,7 @@ export function YulaQuickActionChips() {
       return RESULT_CHIPS_TEMPLATE.map((c) => ({
         ...c,
         label: t(c.labelKey),
-        prompt: c.labelKey === "anomaly_risk" ? "/analiz" : t(`${c.labelKey}_prompt`),
+        prompt: t(`${c.labelKey}_prompt`),
       }))
     }
     const path = (pathname ?? "/").split("?")[0] || "/"

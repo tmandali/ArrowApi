@@ -23,6 +23,7 @@ import { AGENT_PROVIDER_OPTIONS, agentScopeWorkspaceId, filterAgentsByScope } fr
 import { readYulaClientAiConfig } from "@/lib/yula-ai-client-config"
 import {
   getAllYulaCommands,
+  localizeYulaCommands,
   matchYulaCommands,
   userSkillsToCommands,
   type YulaCommand,
@@ -498,6 +499,7 @@ function AIChatPanelSession({
     const thinkingText = `${t("inference_thinking")}: ${thinkingOn ? t("inference_on") : t("inference_off")}${effectiveAgent.thinking === undefined ? ` ${t("inference_general")}` : ""}`
     return `${providerText} · ${modelText} · ${effortText} · ${thinkingText}`
   }, [effectiveAgent, chatsModel, isThinkingEnabled, t])
+  const tc = useTranslations("Commands")
   // Komut menüsündeki skill'ler ajanın seçtikleridir (açık seçim kapsamı
   // ezer; seçili ajan + boş liste = skill komutu yok).
   const userSkillCommands = React.useMemo(
@@ -506,14 +508,19 @@ function AIChatPanelSession({
         userSkills,
         workspaceId,
         effectiveAgent ? effectiveAgent.skills : undefined,
+        tc,
       ),
-    [userSkills, workspaceId, effectiveAgent],
+    [userSkills, workspaceId, effectiveAgent, tc],
   )
   // Örnek ajan: ana sayfa kartlarında seçilebilir olması için ilk bağlanışta üret.
   React.useEffect(() => {
     ensureExampleAgent()
   }, [])
-  const allCommands = React.useMemo(() => getAllYulaCommands(isViewingResults, pathname, userSkillCommands), [isViewingResults, pathname, userSkillCommands])
+  const allCommands = React.useMemo(
+    () => localizeYulaCommands(getAllYulaCommands(isViewingResults, pathname, userSkillCommands), tc),
+    // `tc` render başına yenidir; liste küçüktür → her render yeniden çözümle
+    [isViewingResults, pathname, userSkillCommands, tc]
+  )
   const commandMatches = matchYulaCommands(input, allCommands)
   const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0
   // "Ajan oluştur" alt öğesi yalnız ana Yula ekranında (/) gösterilir ve
