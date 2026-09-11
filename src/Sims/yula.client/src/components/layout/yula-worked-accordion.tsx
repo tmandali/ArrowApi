@@ -94,7 +94,7 @@ export function YulaWorkedAccordion({
         .map((p) => {
           if (p.type === "text") return (p as { text: string }).text;
           if (p.type === "reasoning" && (p as { text?: string }).text) {
-            return `[Düşünme / Reasoning]\n${(p as { text: string }).text}`;
+            return `[Thinking / Reasoning]\n${(p as { text: string }).text}`;
           }
           return "";
         })

@@ -1,21 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/utils/cn";
 
 export type RecordMode = "new" | "edit" | "view";
-
-const MODE_LABEL: Record<RecordMode, string> = {
-  new: "Yeni",
-  edit: "Düzenleme",
-  view: "Salt okunur",
-};
 
 const MODE_CLASS: Record<RecordMode, string> = {
   new: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
   edit: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   view: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400",
 };
-
 /**
  * Kayıt sayfa modu rozeti (new/edit/view): detay başlığı yanında
  * tipe göre renklendirilir. `labels` ile ekran diline göre ezilebilir
@@ -30,6 +24,7 @@ export function RecordModeChip({
   labels?: Partial<Record<RecordMode, string>>;
   className?: string;
 }) {
+  const t = useTranslations("RecordMode");
   return (
     <span
       className={cn(
@@ -38,7 +33,7 @@ export function RecordModeChip({
         className,
       )}
     >
-      {labels?.[mode] ?? MODE_LABEL[mode]}
+      {labels?.[mode] ?? t(mode)}
     </span>
   );
 }

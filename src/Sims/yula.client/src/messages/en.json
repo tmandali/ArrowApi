@@ -720,7 +720,8 @@
     },
     "agent_session": "Start a separate session with {name}",
     "agent_identity_fallback": "Custom agent identity",
-    "agent_identity_desc": "Define your own identity with a prompt + tools + skills"
+    "agent_identity_desc": "Define your own identity with a prompt + tools + skills",
+    "edit_agent": "Edit {name}"
   },
   "HistorySidebar": {
     "search_ph": "Search screen conversations...",
@@ -1293,7 +1294,8 @@
     "preparing": "Preparing company context…",
     "remounting": "Workspace is reloading…",
     "loading": "Modules are lazy-loading…",
-    "finishing": "Finishing the switch…"
+    "finishing": "Finishing the switch…",
+    "loading_with": "Loading {label}"
   },
   "PagePanelTrigger": {
     "open_panel": "Open {title} panel",
@@ -1305,5 +1307,10 @@
     "afternoon": "Good afternoon",
     "evening": "Good evening",
     "fallback": "Welcome"
+  },
+  "RecordMode": {
+    "new": "New",
+    "edit": "Edit",
+    "view": "Read-only"
   }
 }

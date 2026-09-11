@@ -113,7 +113,7 @@ export function CompanySwitchOverlay() {
       role="alertdialog"
       aria-busy="true"
       aria-live="polite"
-      aria-label={`${label} yükleniyor`}
+      aria-label={t("loading_with", { label: label })}
     >
       <div className="mx-4 w-full max-w-sm rounded-xl border bg-card p-6 shadow-lg">
         <div className="flex items-start gap-3">

@@ -720,7 +720,8 @@
     },
     "agent_session": "{name} ile ayrı oturumda konuş",
     "agent_identity_fallback": "Özel ajan kimliği",
-    "agent_identity_desc": "Talimat + araç + skill setiyle kendi kimliğini tanımla"
+    "agent_identity_desc": "Talimat + araç + skill setiyle kendi kimliğini tanımla",
+    "edit_agent": "{name} — düzenle"
   },
   "HistorySidebar": {
     "search_ph": "Ekran sohbetlerinde ara...",
@@ -1293,7 +1294,8 @@
     "preparing": "Şirket bağlamı hazırlanıyor…",
     "remounting": "Workspace yeniden yükleniyor…",
     "loading": "Modüller lazy-load ediliyor…",
-    "finishing": "Geçiş tamamlanıyor…"
+    "finishing": "Geçiş tamamlanıyor…",
+    "loading_with": "{label} yükleniyor"
   },
   "PagePanelTrigger": {
     "open_panel": "{title} panelini aç",
@@ -1305,5 +1307,10 @@
     "afternoon": "İyi günler",
     "evening": "İyi akşamlar",
     "fallback": "Hoş geldiniz"
+  },
+  "RecordMode": {
+    "new": "Yeni",
+    "edit": "Düzenleme",
+    "view": "Salt okunur"
   }
 }

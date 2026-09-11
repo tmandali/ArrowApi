@@ -124,8 +124,8 @@ export function YulaAgentCards({
                     <span
                       role="button"
                       tabIndex={0}
-                      title={`${a.name} — düzenle`}
-                      aria-label={`${a.name} düzenle`}
+                      title={t("edit_agent", { name: a.name })}
+                      aria-label={t("edit_agent", { name: a.name })}
                       onClick={(e) => {
                         e.stopPropagation();
                         onManage(a.id);
