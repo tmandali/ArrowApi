@@ -909,7 +909,7 @@
     "tool_execution": "Araç Çalıştırma"
   },
   "WorkedAccordion": {
-    "worked_for": "{{timeLabel}} saniye çalıştı",
+    "worked_for": "{timeLabel} saniye çalıştı",
     "step": "adım",
     "steps": "adım"
   },
@@ -932,7 +932,7 @@
     "prepare_prompt": "{title} hazırla"
   },
   "AgentEditor": {
-    "name_clashes_with_command": "\"{{name}}\" bir komut adıyla çakışıyor — başka ad seçin.",
+    "name_clashes_with_command": "\"{name}\" bir komut adıyla çakışıyor — başka ad seçin.",
     "file_size_exceeded": "Toplam dosya boyutu 200K karakteri geçemez.",
     "created": "Oluşturuldu",
     "last_modified": "Son düzenleme",
@@ -963,7 +963,7 @@
     "label_placeholder": "Haftalık özet",
     "description_placeholder": "Ne zaman kullanılır?",
     "attachments": "Ek dosyalar",
-    "prompt_placeholder": "Son 7 günün satış özetini çıkar: {{input}}",
+    "prompt_placeholder": "Son 7 günün satış özetini çıkar: \\{\\{input\\}\\}",
     "runs_in_server_sandbox": "Sunucu sandbox'ında çalışır",
     "runs_in_server_sandbox_detail": "Sunucu sandbox'ında çalışır (run_skill_script)."
   },

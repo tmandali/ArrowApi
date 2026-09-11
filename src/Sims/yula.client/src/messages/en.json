@@ -909,7 +909,7 @@
     "tool_execution": "Tool Execution"
   },
   "WorkedAccordion": {
-    "worked_for": "Worked for {{timeLabel}}s",
+    "worked_for": "Worked for {timeLabel}s",
     "step": "step",
     "steps": "steps"
   },
@@ -932,7 +932,7 @@
     "prepare_prompt": "Prepare {title}"
   },
   "AgentEditor": {
-    "name_clashes_with_command": "The name \"{{name}}\" clashes with a command — please choose another.",
+    "name_clashes_with_command": "The name \"{name}\" clashes with a command — please choose another.",
     "file_size_exceeded": "Total file size cannot exceed 200K characters.",
     "created": "Created",
     "last_modified": "Last modified",
@@ -963,7 +963,7 @@
     "label_placeholder": "Weekly Summary",
     "description_placeholder": "When should this skill be used?",
     "attachments": "Attachments",
-    "prompt_placeholder": "Generate a summary of the last 7 days of sales: {{input}}",
+    "prompt_placeholder": "Generate a summary of the last 7 days of sales: \\{\\{input\\}\\}",
     "runs_in_server_sandbox": "Runs in server sandbox",
     "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script)."
   },
