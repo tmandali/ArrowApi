@@ -302,8 +302,7 @@ export function useWorkspaceLandingData(workspaceId: WorkspaceId): WorkspaceLand
   const struct =
     WORKSPACE_LANDING_STRUCTURE[workspaceId] ??
     WORKSPACE_LANDING_STRUCTURE.system;
-  const raw = t.raw as unknown as Record<string, WorkspaceLandingText>;
-  const text = raw[workspaceId] ?? raw.system;
+  const text = (t.raw(workspaceId) ?? t.raw("system")) as WorkspaceLandingText;
 
   return {
     workspaceId,

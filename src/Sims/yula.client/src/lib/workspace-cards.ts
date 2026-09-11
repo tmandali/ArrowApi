@@ -71,11 +71,9 @@ export interface WorkspaceCardText {
  */
 export function useWorkspaceCards(): WorkspaceCardItem[] {
   const t = useTranslations("WorkspaceLanding");
-  const raw = t.raw as unknown as {
-    cards: Record<string, WorkspaceCardText>;
-  };
+  const cards = (t.raw("cards") ?? {}) as Record<string, WorkspaceCardText>;
   return WORKSPACE_CARDS_STRUCTURE.map((card) => {
-    const s = raw.cards[card.id];
+    const s = cards[card.id];
     return {
       ...card,
       titleLead: s?.title_lead ?? card.name,
