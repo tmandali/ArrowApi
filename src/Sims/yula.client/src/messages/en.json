@@ -7,16 +7,9 @@
     "adding": "Adding...",
     "delete": "Delete",
     "retry": "Retry",
-    "search": "Search...",
     "actions": "Actions",
     "active": "Active",
-    "inactive": "Inactive",
-    "share": "Share",
-    "yes": "Yes",
-    "no": "No",
-    "confirm_clear": "Delete all?",
-    "confirm_clear_ask": "Are you sure?",
-    "count_conversations": "{count} conversations"
+    "inactive": "Inactive"
   },
   "SystemUsers": {
     "title": "All Users & Permissions",
@@ -121,10 +114,6 @@
     "app_body": "App UI settings.",
     "tpa_title": "Third Party Authentication",
     "social_logins": "Social Logins",
-    "th_no": "No.",
-    "th_provider": "Provider",
-    "th_username": "Username",
-    "th_user_id": "User ID",
     "connections_body": "Connected Social Logins & Roles"
   },
   "WorkspaceLanding": {
@@ -727,7 +716,6 @@
     "delete_conv": "Delete conversation",
     "confirm_delete_all": "Delete all?",
     "clear_btn": "Clear",
-    "clear_confirm_ask": "Are you sure?",
     "header_title": "Chat History",
     "back_to_chat": "Back to Chat",
     "group_today": "Today",
@@ -736,7 +724,13 @@
     "group_older": "Older",
     "screen_placeholder": "This Screen",
     "confirm_yes": "Yes",
-    "confirm_no": "No"
+    "confirm_no": "No",
+    "confirm_clear_ask": "Are you sure?",
+    "cancel": "İptal",
+    "count_conversations": "{count} sohbet",
+    "no": "Hayır",
+    "save": "Kaydet",
+    "yes": "Evet"
   },
   "SearchMainView": {
     "save": "Save",
@@ -863,7 +857,9 @@
       "qwen2_5:32b": "Strong SQL and coding capability",
       "deepseek-r1:14b": "Deep thinking steps",
       "gemini-3_6-flash": "Fast cloud model"
-    }
+    },
+    "tag_local": "Yerel",
+    "agnes_cloud_desc": "Sapiens AI bulut modeli"
   },
   "JobStarted": {
     "job_started": "Report started",
@@ -1013,7 +1009,7 @@
     "label_placeholder": "Weekly Summary",
     "description_placeholder": "When should this skill be used?",
     "attachments": "Attachments",
-    "prompt_placeholder": "Generate a summary of the last 7 days of sales: \\{\\{input\\}\\}",
+    "prompt_placeholder": "Generate a summary of the last 7 days of sales: {{input}}",
     "runs_in_server_sandbox": "Runs in server sandbox",
     "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script).",
     "slash_label": "Slash name",
@@ -1200,14 +1196,12 @@
     "sql_dialog_intro": "This view was produced on DuckDB WASM with the following read-only SQL.",
     "copied": "Copied!",
     "copy_query": "Copy Query",
-    "GridViews": {
-      "loading_view": "Loading: {title}",
-      "unsaved_badge_title": "Unsaved",
-      "save": "Save",
-      "save_rename_title": "Save (Enter)",
-      "sql_dialog_title": "{title} — SQL Query",
-      "close": "Close"
-    }
+    "loading_view": "Loading: {title}",
+    "unsaved_badge_title": "Unsaved",
+    "save": "Save",
+    "save_rename_title": "Save (Enter)",
+    "sql_dialog_title": "{title} — SQL Query",
+    "close": "Close"
   },
   "GridColumns": {
     "manage_title": "Manage Columns (Visibility, Order, Pinning)",
@@ -1227,11 +1221,9 @@
     "type_number": "Data Type: Number / Amount{detail}{pinned}",
     "type_boolean": "Data Type: Boolean{detail}{pinned}",
     "pinned_suffix": " (pinned)",
-    "GridColumns": {
-      "columns_heading": "Columns",
-      "type_date": "Data Type: Date{detail}{pinned}",
-      "type_text": "Data Type: Text{detail}{pinned}"
-    }
+    "columns_heading": "Columns",
+    "type_date": "Data Type: Date{detail}{pinned}",
+    "type_text": "Data Type: Text{detail}{pinned}"
   },
   "JobResultPanel": {
     "job_not_found": "Job not found",

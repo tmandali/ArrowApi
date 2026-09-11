@@ -7,16 +7,9 @@
     "adding": "Ekleniyor...",
     "delete": "Sil",
     "retry": "Tekrar Dene",
-    "search": "Ara...",
     "actions": "İşlem",
     "active": "Aktif",
-    "inactive": "Pasif",
-    "share": "Paylaş",
-    "yes": "Evet",
-    "no": "Hayır",
-    "confirm_clear": "Tümü silinsin mi?",
-    "confirm_clear_ask": "Emin misiniz?",
-    "count_conversations": "{count} sohbet"
+    "inactive": "Pasif"
   },
   "SystemUsers": {
     "title": "Tüm Kullanıcılar & Yetkiler",
@@ -121,10 +114,6 @@
     "app_body": "Uygulama arayüz ayarları.",
     "tpa_title": "Üçüncü Parti Kimlik Doğrulama",
     "social_logins": "Sosyal Girişler",
-    "th_no": "No.",
-    "th_provider": "Sağlayıcı",
-    "th_username": "Kullanıcı Adı",
-    "th_user_id": "Kullanıcı ID",
     "connections_body": "Bağlı Sosyal Girişler & Roller"
   },
   "WorkspaceLanding": {
@@ -727,7 +716,6 @@
     "delete_conv": "Sohbeti sil",
     "confirm_delete_all": "Tümü silinsin mi?",
     "clear_btn": "Temizle",
-    "clear_confirm_ask": "Emin misiniz?",
     "header_title": "Sohbet Geçmişi",
     "back_to_chat": "Yazışmaya Dön",
     "group_today": "Bugün",
@@ -736,7 +724,13 @@
     "group_older": "Daha Eski",
     "screen_placeholder": "Bu Ekran",
     "confirm_yes": "Evet",
-    "confirm_no": "Hayır"
+    "confirm_no": "Hayır",
+    "confirm_clear_ask": "Emin misiniz?",
+    "cancel": "İptal",
+    "count_conversations": "{count} sohbet",
+    "no": "Hayır",
+    "save": "Kaydet",
+    "yes": "Evet"
   },
   "SearchMainView": {
     "save": "Kaydet",
@@ -863,7 +857,9 @@
       "qwen2_5:32b": "Güçlü SQL ve kod yeteneği",
       "deepseek-r1:14b": "Derin düşünce adımları",
       "gemini-3_6-flash": "Hızlı bulut modeli"
-    }
+    },
+    "tag_local": "Yerel",
+    "agnes_cloud_desc": "Sapiens AI bulut modeli"
   },
   "JobStarted": {
     "job_started": "Rapor çalıştırıldı",
@@ -1013,7 +1009,7 @@
     "label_placeholder": "Haftalık özet",
     "description_placeholder": "Ne zaman kullanılır?",
     "attachments": "Ek dosyalar",
-    "prompt_placeholder": "Son 7 günün satış özetini çıkar: \\{\\{input\\}\\}",
+    "prompt_placeholder": "Son 7 günün satış özetini çıkar: {{input}}",
     "runs_in_server_sandbox": "Sunucu sandbox''ında çalışır",
     "runs_in_server_sandbox_detail": "Sunucu sandbox''ında çalışır (run_skill_script).",
     "slash_label": "Slash adı",
@@ -1200,14 +1196,12 @@
     "sql_dialog_intro": "Bu görünüm DuckDB WASM üzerinde aşağıdaki salt-okunur SQL ile üretilmiştir.",
     "copied": "Kopyalandı!",
     "copy_query": "Sorguyu Kopyala",
-    "GridViews": {
-      "loading_view": "Yükleniyor: {title}",
-      "unsaved_badge_title": "Kaydedilmedi",
-      "save": "Kaydet",
-      "save_rename_title": "Kaydet (Enter)",
-      "sql_dialog_title": "{title} — SQL Sorgusu",
-      "close": "Kapat"
-    }
+    "loading_view": "Yükleniyor: {title}",
+    "unsaved_badge_title": "Kaydedilmedi",
+    "save": "Kaydet",
+    "save_rename_title": "Kaydet (Enter)",
+    "sql_dialog_title": "{title} — SQL Sorgusu",
+    "close": "Kapat"
   },
   "GridColumns": {
     "manage_title": "Kolonları Yönet (Görünürlük, Sıralama, Sabitleme)",
@@ -1227,11 +1221,9 @@
     "type_number": "Veri Tipi: Sayı / Tutar{detail}{pinned}",
     "type_boolean": "Veri Tipi: Mantıksal{detail}{pinned}",
     "pinned_suffix": " (Sabitlendi)",
-    "GridColumns": {
-      "columns_heading": "Kolonlar",
-      "type_date": "Veri Tipi: Tarih{detail}{pinned}",
-      "type_text": "Veri Tipi: Metin{detail}{pinned}"
-    }
+    "columns_heading": "Kolonlar",
+    "type_date": "Veri Tipi: Tarih{detail}{pinned}",
+    "type_text": "Veri Tipi: Metin{detail}{pinned}"
   },
   "JobResultPanel": {
     "job_not_found": "Job bulunamadı",
