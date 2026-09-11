@@ -21,7 +21,7 @@
   "LocaleSwitcher": {
     "change_language": "Dili değiştir",
     "turkish": "Türkçe",
-    "english": "English"
+    "english": "İngilizce"
   },
   "SystemUsers": {
     "title": "Tüm Kullanıcılar & Yetkiler",
@@ -183,21 +183,21 @@
     "click_or_enter": "Gitmek için tıklayın veya Enter'a basın"
   },
   "NavUser": {
-    "company_label": "Company",
-    "profile": "Profile",
-    "preferences": "Preferences",
-    "manage_accounts": "Manage Accounts",
-    "language_label": "Language",
-    "theme_label": "Theme",
-    "sign_out": "Sign Out"
+    "company_label": "Şirket",
+    "profile": "Profil",
+    "preferences": "Tercihler",
+    "manage_accounts": "Hesapları Yönet",
+    "language_label": "Dil",
+    "theme_label": "Tema",
+    "sign_out": "Çıkış Yap"
   },
   "Notifications": {
-    "financial_title": "Financial Notifications",
-    "stock_title": "Stock Notifications",
-    "manufacturing_title": "Manufacturing Notifications",
-    "subcontracting_title": "Subcontracting Notifications",
-    "mark_all_read": "Mark all",
-    "clear_read": "Clear read",
+    "financial_title": "Finansal Bildirimler",
+    "stock_title": "Stok Bildirimleri",
+    "manufacturing_title": "İmalat Bildirimleri",
+    "subcontracting_title": "Alt İş Bildirimleri",
+    "mark_all_read": "Tümünü okundu işaretle",
+    "clear_read": "Okunanları temizle",
     "delete_notification": "Bildirimi sil",
     "empty_state": "Bu çalışma alanında bildirim bulunmuyor.",
     "notification_running": "işlem devam ediyor…"
