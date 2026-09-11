@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { workspaceIconFor } from "@/components/layout/workspace-brand"
@@ -25,11 +26,17 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
   const pathname = usePathname()
   const activeWorkspaceId = useActiveWorkspaceId()
   const railWorkspaces = getRailWorkspaces()
+  const tRail = useTranslations("WorkspaceRail")
+
+  /** Tooltip/aria metni: `WorkspaceRail` kataloğundan; yeni workspace id'si
+   *  kataloğa eklanana dek veri metniyle (İngilizce ad) düşer. */
+  const railLabel = (id: string, fallback: string): string =>
+    tRail.has(id) ? tRail(id) : fallback
 
   return (
     <TooltipProvider>
       <nav
-        aria-label="Workspaces"
+        aria-label={tRail("workspaces")}
         className={cn(
           "flex w-11 shrink-0 flex-col items-center gap-1.5 pl-2",
           className
@@ -39,7 +46,7 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
           <TooltipTrigger asChild>
             <Link
               href="/"
-              aria-label={YULA.ariaLabel}
+              aria-label={tRail("yula_aria")}
               className="mt-1.5 flex size-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-sidebar-accent dark:text-sidebar-primary"
             >
               <span className="block size-5">
@@ -57,7 +64,7 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-label={workspace.name}
+                  aria-label={railLabel(workspace.id, workspace.name)}
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => {
                     // Rail ikonları her zaman workspace landing sayfasını açar (kaldığı yerden devam yok)
@@ -81,7 +88,7 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
                   {WorkspaceIcon ? <WorkspaceIcon className="size-5" /> : null}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right">{workspace.name}</TooltipContent>
+              <TooltipContent side="right">{railLabel(workspace.id, workspace.name)}</TooltipContent>
             </Tooltip>
           )
         })}

@@ -1533,5 +1533,14 @@
     "serial_batch": "Serial & Batch",
     "settings": "Settings",
     "tools": "Tools"
+  },
+  "WorkspaceRail": {
+    "accounting": "Accounting",
+    "manufacturing": "Manufacturing",
+    "selling": "Selling",
+    "stock": "Stock",
+    "subcontracting": "Subcontracting",
+    "workspaces": "Workspaces",
+    "yula_aria": "Yula — AI Assistant"
   }
 }

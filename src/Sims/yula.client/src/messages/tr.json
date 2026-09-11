@@ -1533,5 +1533,14 @@
     "serial_batch": "Seri & Parti",
     "settings": "Ayarlar",
     "tools": "Araçlar"
+  },
+  "WorkspaceRail": {
+    "accounting": "Muhasebe & Finans",
+    "manufacturing": "Üretim",
+    "selling": "Satış",
+    "stock": "Stok",
+    "subcontracting": "Fason & Tedarik",
+    "workspaces": "Çalışma Alanları",
+    "yula_aria": "Yula — Yapay Zeka Asistanı"
   }
 }
