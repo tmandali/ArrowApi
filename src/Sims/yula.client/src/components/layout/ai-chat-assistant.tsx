@@ -517,9 +517,10 @@ function AIChatPanelSession({
     [userSkills, workspaceId, effectiveAgent, tc],
   )
   // Örnek ajan: ana sayfa kartlarında seçilebilir olması için ilk bağlanışta üret.
+  // `locale` bağımlılığı: dil değişirse (aynı oturumda bile) yeni locale seed'i garanti.
   React.useEffect(() => {
-    ensureExampleAgent()
-  }, [])
+    ensureExampleAgent(locale as "tr" | "en")
+  }, [locale])
   const allCommands = React.useMemo(
     () => localizeYulaCommands(getAllYulaCommands(isViewingResults, pathname, userSkillCommands), tc),
     // `tc` render başına yenidir; liste küçüktür → her render yeniden çözümle

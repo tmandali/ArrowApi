@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import {
@@ -26,6 +26,7 @@ type Selection = { id: string | null; readOnly?: boolean } | null;
  */
 export function SkillManagementView() {
   const t = useTranslations("SkillManagement")
+  const locale = useLocale()
   const ts = useTranslations("Skills")
   const userSkills = useUserSkillsStore((s) => s.skills);
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
@@ -42,7 +43,7 @@ export function SkillManagementView() {
   // `ensureExampleSkill` localStorage'a erişir → SSR'de no-op,
   // bu yüzden ilk render'da selection = null kalır (hydration uyumlu).
   React.useEffect(() => {
-    ensureExampleSkill();
+    ensureExampleSkill(locale as "tr" | "en");
     const first = useUserSkillsStore.getState().skills[0];
     if (first && selection == null) {
       setSelection({

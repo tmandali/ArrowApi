@@ -4,6 +4,7 @@ import type { UserAgent, UserAgentAttachment } from "@/lib/yula-user-agent";
 import { isGeneratedTileAvatar } from "@/lib/yula-user-agent";
 import type { YulaEffort } from "@/lib/yula-reasoning";
 import { normalizeEffort } from "@/lib/yula-reasoning";
+import { parseSeededLocales, withSeededLocale } from "./seed-flags";
 
 export type { UserAgent, UserAgentAttachment };
 
@@ -89,6 +90,21 @@ export const useUserAgentsStore = create<UserAgentsState>()(
 
 const AGENT_SEED_FLAG = "yula-user-agents-seeded-v2";
 
+/**
+ * Seed ajan locale varyantı (gösterim metni); prompt gövdesi dil
+ * politikası gereği TR kaynak metin olarak kalır.
+ */
+const SEED_AGENT_TEXT: Record<"tr" | "en", { name: string; description: string }> = {
+  tr: {
+    name: "Satış Danışmanı",
+    description: "Satış sorularında kısa, sayı odaklı yanıt verir",
+  },
+  en: {
+    name: "Sales Consultant",
+    description: "Answers sales questions with short, number-focused replies",
+  },
+};
+
 /** Eski tohum metni (değiştirilmemişse yeni kimlikli metne yükseltilir). */
 const LEGACY_SEED_INSTRUCTIONS =
   "Kısa yaz. Önce sonuç cümlesi, sonra en fazla 3 maddelik bulgu listesi ver. Sayıları grid verisinden al, tahmin üretme. Emin olmadığın filtreyi sormadan çalıştırma; önce sor.";
@@ -98,20 +114,26 @@ const SEED_INSTRUCTIONS =
   "Sen bir satış danışmanısın: satış raporları, ciro, müşteri ve ürün sorularında uzmansın. Selamlaşmalarda bile bu kimlikle karşıla; kendini kısaca tanıt ve hangi satış verilerinde yardımcı olabileceğini söyle. Kısa yaz. Önce sonuç cümlesi, sonra en fazla 3 maddelik bulgu listesi ver. Sayıları grid verisinden al, tahmin üretme. Emin olmadığın filtreyi sormadan çalıştırma; önce sor.";
 
 /**
- * İlk açılışta örnek ajan üretir (tek seferlik; kullanıcı silerse
- * yeniden eklenmez). Eski tohum metni hiç değiştirilmeden duruyorsa
- * yeni kimlikli metne yükseltilir; kullanıcının kendi düzenlemesine
- * dokunulmaz. Yönetim ekranı ilk bağlanışta çağırır.
+ * İlk açılışta örnek ajan üretir (locale başına tek seferlik; kullanıcı
+ * silerse aynı locale'de yeniden eklenmez, dil değişince yeni locale'de
+ * eklenir). Eski tohum metni hiç değiştirilmeden duruyorsa yeni kimlikli
+ * metne yükseltilir; kullanıcının kendi düzenlemesine dokunulmaz.
+ * Yönetim ekranı ilk bağlanışta çağırır.
+ *
+ * Gövde (`instructions`) dil politikası gereği TR kaynak metin olarak
+ * kalır; yalnız isim/açıklama locale varyantındır.
  */
-export function ensureExampleAgent() {
+export function ensureExampleAgent(locale: "tr" | "en" = "tr") {
   if (typeof localStorage === "undefined") return;
   const { agents, upsertAgent } = useUserAgentsStore.getState();
+  const seedText = SEED_AGENT_TEXT[locale];
   const untouchedSeed = agents.find(
     (a) =>
-      a.name === "Satış Danışmanı" &&
+      (a.name === SEED_AGENT_TEXT.tr.name || a.name === SEED_AGENT_TEXT.en.name) &&
       (a.instructions === LEGACY_SEED_INSTRUCTIONS ||
         a.instructions === SEED_INSTRUCTIONS),
   );
+  const rawFlag = localStorage.getItem(AGENT_SEED_FLAG);
   if (
     untouchedSeed &&
     (untouchedSeed.instructions === LEGACY_SEED_INSTRUCTIONS ||
@@ -120,15 +142,15 @@ export function ensureExampleAgent() {
     upsertAgent({
       ...untouchedSeed,
       instructions: SEED_INSTRUCTIONS,
-      // Eski tek harfli karo temizlenir → 2 harfli standart yedek (SD) görünür.
+      // Eski tek harfli karo temizlenir → 2 harfli standart yedek görünür.
       avatar: isGeneratedTileAvatar(untouchedSeed.avatar)
         ? undefined
         : untouchedSeed.avatar,
     });
-  } else if (agents.length === 0 && !localStorage.getItem(AGENT_SEED_FLAG)) {
+  } else if (agents.length === 0 && !parseSeededLocales(rawFlag).includes(locale)) {
     upsertAgent({
-      name: "Satış Danışmanı",
-      description: "Satış sorularında kısa, sayı odaklı yanıt verir",
+      name: seedText.name,
+      description: seedText.description,
       instructions: SEED_INSTRUCTIONS,
       tools: [],
       skills: [],
@@ -137,5 +159,5 @@ export function ensureExampleAgent() {
       model: "",
     });
   }
-  localStorage.setItem(AGENT_SEED_FLAG, "1");
+  localStorage.setItem(AGENT_SEED_FLAG, withSeededLocale(rawFlag, locale));
 }

@@ -5,6 +5,7 @@ import { AppProviders } from "@/context/AppProviders";
 import { ThemeProvider } from "@/context/theme-provider";
 import { YulaChatProvider } from "@/hooks/yula-chat-provider";
 import { PagePanelProvider } from "@/context/page-panel-provider";
+import { DocLangSync } from "@/components/app/doc-lang-sync";
 
 export function Providers({
   children,
@@ -20,7 +21,10 @@ export function Providers({
     >
       <PagePanelProvider>
         <AppProviders>
-          <YulaChatProvider>{children}</YulaChatProvider>
+          <YulaChatProvider>
+            <DocLangSync />
+            {children}
+          </YulaChatProvider>
         </AppProviders>
       </PagePanelProvider>
     </ThemeProvider>

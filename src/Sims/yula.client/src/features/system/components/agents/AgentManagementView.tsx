@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
 import { agentSessionPath } from "@/lib/workspace-paths";
 import {
@@ -27,6 +27,7 @@ import { AgentEditor, type AgentEditorHandle, type AgentEditorMode } from "./age
  */
 export function AgentManagementView() {
   const t = useTranslations("AgentManagement")
+  const locale = useLocale()
   const router = useRouter();
   const agents = useUserAgentsStore((s) => s.agents);
   const activeAgentId = useUserAgentsStore((s) => s.activeAgentId);
@@ -61,7 +62,7 @@ export function AgentManagementView() {
   // `ensureExampleAgent` localStorage'a erişir → SSR'de no-op,
   // bu yüzden ilk render'da selection = null kalır (hydration uyumlu).
   React.useEffect(() => {
-    ensureExampleAgent();
+    ensureExampleAgent(locale as "tr" | "en");
     const first = useUserAgentsStore.getState().agents[0];
     if (first && selection == null) {
       setSelection({ id: first.id });
