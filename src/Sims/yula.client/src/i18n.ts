@@ -8,7 +8,7 @@ import { routing } from "./lib/i18n-routing";
  * `createNextIntlPlugin('./src/i18n.ts')` burayı gösterir.
  * Mesaj dosyaları: `src/messages/<locale>.json` (tr = kaynak dil).
  *
- * Dil `NEXT_LOCALE` çerezinden okunur (`LocaleSwitcher` yazar);
+ * Dil `NEXT_LOCALE` çerezinden okunur (User Settings dil kartı yazar);
  * yoksa `Accept-Language`, o da yoksa varsayılan (tr).
  * next-intl middleware'i KULLANILMIYOR — `localePrefix:'never'` modunda
  * 404'e çevirdiği için dil burada çözülüyor (deterministik, URL sabit).

@@ -18,11 +18,6 @@
     "confirm_clear_ask": "Emin misiniz?",
     "count_conversations": "{count} sohbet"
   },
-  "LocaleSwitcher": {
-    "change_language": "Dili değiştir",
-    "turkish": "Türkçe",
-    "english": "İngilizce"
-  },
   "SystemUsers": {
     "title": "Tüm Kullanıcılar & Yetkiler",
     "subtitle": "Sistemdeki tüm kayıtlı kullanıcıların rolleri, erişim izinleri ve oturum durumları.",
@@ -772,7 +767,6 @@
     "profile": "Profil",
     "preferences": "Tercihler",
     "manage_accounts": "Hesapları Yönet",
-    "language_label": "Dil",
     "theme_label": "Tema",
     "sign_out": "Çıkış Yap"
   },

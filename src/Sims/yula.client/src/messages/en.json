@@ -18,11 +18,6 @@
     "confirm_clear_ask": "Are you sure?",
     "count_conversations": "{count} conversations"
   },
-  "LocaleSwitcher": {
-    "change_language": "Change language",
-    "turkish": "Türkçe",
-    "english": "English"
-  },
   "SystemUsers": {
     "title": "All Users & Permissions",
     "subtitle": "Roles, access permissions and session states of all registered users.",
@@ -772,7 +767,6 @@
     "profile": "Profile",
     "preferences": "Preferences",
     "manage_accounts": "Manage Accounts",
-    "language_label": "Language",
     "theme_label": "Theme",
     "sign_out": "Sign Out"
   },
