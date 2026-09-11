@@ -1098,7 +1098,8 @@
     "not_found_title": "Agent not found",
     "not_found_body": "No agent exists with this id (it may have been deleted). Pick a new one from the agent list.",
     "back_to_yula": "Back to Yula",
-    "manage_agents": "Manage agents"
+    "manage_agents": "Manage agents",
+    "new_chat": "New Chat"
   },
   "AgentImageUpload": {
     "only_image": "Only image files can be uploaded.",

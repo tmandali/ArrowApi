@@ -25,10 +25,11 @@ function AgentSessionHeaderTitle({
 }) {
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
+  const t = useTranslations("AgentSession");
   const activeConv = activeId
     ? conversations.find((c) => c.id === activeId)
     : undefined;
-  const chatName = activeConv?.title?.trim() || "Yeni Sohbet";
+  const chatName = activeConv?.title?.trim() || t("new_chat");
   const shortNo = activeId
     ? (activeId.split("-").pop() || activeId).slice(-6).toUpperCase()
     : null;

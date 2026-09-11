@@ -1098,7 +1098,8 @@
     "not_found_title": "Ajan bulunamadı",
     "not_found_body": "Bu kimlikte bir ajan yok (silinmiş olabilir). Ajan listesinden yenisini seçin.",
     "back_to_yula": "Yula''ya dön",
-    "manage_agents": "Ajanları yönet"
+    "manage_agents": "Ajanları yönet",
+    "new_chat": "Yeni Sohbet"
   },
   "AgentImageUpload": {
     "only_image": "Yalnızca görsel dosyası yüklenebilir.",
