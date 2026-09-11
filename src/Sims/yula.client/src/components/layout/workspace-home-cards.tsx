@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ChevronRight } from "lucide-react";
 import { WORKSPACE_CARDS } from "@/lib/workspace-cards";
 
 export function WorkspaceHomeCards() {
+  const t = useTranslations("WorkspaceLanding")
   return (
     <div className="w-full max-w-3xl px-3 pt-2 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-          Çalışma Alanları (Workspaces)
+          {t("workspaces_title")}
         </h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

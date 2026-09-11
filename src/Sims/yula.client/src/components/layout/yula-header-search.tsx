@@ -2,16 +2,18 @@
 
 import * as React from "react";
 import { Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useChatsStore } from "@/lib/stores/chats";
 import { cn } from "@/utils/cn";
 
 export function YulaHeaderSearch({
   className,
-  placeholder = "Sohbet geçmişinde ara...",
+  placeholder,
 }: {
   className?: string;
   placeholder?: string;
 }) {
+  const t = useTranslations("HeaderSearch");
   const searchQuery = useChatsStore((s) => s.searchQuery);
   const setSearchQuery = useChatsStore((s) => s.setSearchQuery);
   const isSearchingHistory = useChatsStore((s) => s.isSearchingHistory);
@@ -51,7 +53,7 @@ export function YulaHeaderSearch({
             inputRef.current?.blur();
           }
         }}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("search_ph")}
         className="w-full rounded-lg border border-input/60 bg-muted/30 py-1 pl-8 pr-7 text-xs outline-none focus:border-primary/40 focus:bg-background focus:ring-2 focus:ring-primary/20 transition-all dark:bg-muted/20"
       />
       {isSearchingHistory || searchQuery ? (
@@ -63,7 +65,7 @@ export function YulaHeaderSearch({
             inputRef.current?.blur();
           }}
           className="absolute right-2 text-muted-foreground/60 hover:text-foreground p-0.5 rounded transition-colors"
-          title="Aramayı Kapat"
+          title={t("close_search")}
         >
           <X className="size-3.5" />
         </button>

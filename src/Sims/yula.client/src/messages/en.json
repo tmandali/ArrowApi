@@ -11,7 +11,12 @@
     "actions": "Actions",
     "active": "Active",
     "inactive": "Inactive",
-    "share": "Share"
+    "share": "Share",
+    "yes": "Yes",
+    "no": "No",
+    "confirm_clear": "Delete all?",
+    "confirm_clear_ask": "Are you sure?",
+    "count_conversations": "{count} conversations"
   },
   "LocaleSwitcher": {
     "change_language": "Change language",
@@ -126,5 +131,117 @@
     "th_username": "Username",
     "th_user_id": "User ID",
     "connections_body": "Connected Social Logins & Roles"
+  },
+  "WorkspaceLanding": {
+    "pending_actions_title": "Pending Actions",
+    "assigned_title": "Assigned to Me",
+    "responsible": "Responsible",
+    "deadline_label": "Deadline",
+    "assigned_by_label": "Assigned by",
+    "quick_access_title": "Quick Access",
+    "pinned_charts_title": "Pinned Charts",
+    "pin_remove": "Unpin",
+    "open_source_report": "Open source report with chart query",
+    "workspaces_title": "Workspaces"
+  },
+  "HistorySidebar": {
+    "search_ph": "Search screen conversations...",
+    "search_no_results": "No conversations match the search.",
+    "search_no_conversations": "No conversations for this screen yet.",
+    "rename": "Rename",
+    "delete_conv": "Delete conversation",
+    "confirm_delete_all": "Delete all?",
+    "clear_btn": "Clear",
+    "clear_confirm_ask": "Are you sure?",
+    "header_title": "Chat History",
+    "back_to_chat": "Back to Chat",
+    "group_today": "Today",
+    "group_yesterday": "Yesterday",
+    "group_last_week": "Last Week",
+    "group_older": "Older",
+    "screen_placeholder": "This Screen"
+  },
+  "SearchMainView": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "rename": "Rename",
+    "delete_conversation": "Delete conversation",
+    "unpin": "Unpin",
+    "pin_home": "Pin to Home",
+    "close_search": "Close search",
+    "search_results": "\"{query}\" Results",
+    "menu_chats": "Menus & Chats",
+    "results_loading": "Loading results...",
+    "no_result_found": "No module or conversation found for \"{query}\".",
+    "no_conversation_yet": "No conversations yet. Start a chat with Yula and your conversations will appear here.",
+    "search_hint": "Searching modules, reports and chat history as you type; describe what you want to do if you can't remember exactly.",
+    "menus_label": "Menus",
+    "no_modules": "No modules found.",
+    "chats_label": "Chat History",
+    "no_chats_found": "No conversations found.",
+    "no_chats_yet": "No conversations yet.",
+    "click_or_enter": "Click or press Enter to navigate"
+  },
+  "NavUser": {
+    "company_label": "Company",
+    "profile": "Profile",
+    "preferences": "Preferences",
+    "manage_accounts": "Manage Accounts",
+    "language_label": "Language",
+    "theme_label": "Theme",
+    "sign_out": "Sign Out"
+  },
+  "Notifications": {
+    "financial_title": "Financial Notifications",
+    "stock_title": "Stock Notifications",
+    "manufacturing_title": "Manufacturing Notifications",
+    "subcontracting_title": "Subcontracting Notifications",
+    "mark_all_read": "Mark all",
+    "clear_read": "Clear read",
+    "delete_notification": "Delete notification",
+    "empty_state": "No notifications in this workspace.",
+    "notification_running": "job in progress…"
+  },
+  "HeaderSearch": {
+    "search_ph": "Search chat history...",
+    "close_search": "Close search"
+  },
+  "AppHeader": {
+    "module_home": "Module home"
+  },
+  "AiDock": {
+    "new_chat": "New Chat",
+    "continue_main": "Continue in main screen",
+    "toggle_history_show": "Show Chat History",
+    "toggle_history_hide": "Hide Chat History",
+    "close_panel": "Close panel"
+  },
+  "PinnedItems": {
+    "unpin": "Unpin"
+  },
+  "NotFound": {
+    "title": "Page Not Found",
+    "description": "The page you are looking for may have been removed, renamed, or not yet added.",
+    "back_home": "Back to Home",
+    "back_workspace": "Back to {wsLabel} Workspace Home"
+  },
+  "GlobalError": {
+    "title": "Application failed to load",
+    "description": "An unexpected error occurred; the page cannot reload. Check the browser console for details.",
+    "reload_btn": "Reload page"
+  },
+  "SystemHome": {
+    "new_chat_btn": "Start New Chat",
+    "new_chat_short": "New Chat",
+    "agent_settings_btn": "Agent Settings",
+    "empty_chat_title": "New Chat",
+    "delete_conv": "Delete conversation"
+  },
+  "WorkspaceSearch": {
+    "search_accounting": "Search accounting & finance modules and chat history...",
+    "search_stock": "Search stock modules and chat history...",
+    "search_manufacturing": "Search manufacturing & BOM modules and chat history...",
+    "search_subcontracting": "Search subcontracting & sales modules and chat history...",
+    "search_all": "Search modules, reports and chat history..."
   }
 }

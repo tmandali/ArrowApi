@@ -11,7 +11,12 @@
     "actions": "İşlem",
     "active": "Aktif",
     "inactive": "Pasif",
-    "share": "Paylaş"
+    "share": "Paylaş",
+    "yes": "Evet",
+    "no": "Hayır",
+    "confirm_clear": "Tümü silinsin mi?",
+    "confirm_clear_ask": "Emin misiniz?",
+    "count_conversations": "{count} sohbet"
   },
   "LocaleSwitcher": {
     "change_language": "Dili değiştir",
@@ -126,5 +131,117 @@
     "th_username": "Kullanıcı Adı",
     "th_user_id": "Kullanıcı ID",
     "connections_body": "Bağlı Sosyal Girişler & Roller"
+  },
+  "WorkspaceLanding": {
+    "pending_actions_title": "İşlem Bekleyenler",
+    "assigned_title": "Bana Atananlar",
+    "responsible": "Sorumlu",
+    "deadline_label": "Termin",
+    "assigned_by_label": "Atayan",
+    "quick_access_title": "Hızlı Erişim",
+    "pinned_charts_title": "Sabitlenen Grafikler",
+    "pin_remove": "İğneyi Kaldır",
+    "open_source_report": "Kaynak raporu grafik sorgusuyla aç",
+    "workspaces_title": "Çalışma Alanları"
+  },
+  "HistorySidebar": {
+    "search_ph": "Ekran sohbetlerinde ara...",
+    "search_no_results": "Aramayla eşleşen sohbet bulunamadı.",
+    "search_no_conversations": "Bu ekranına ait henüz bir yazışma bulunmuyor.",
+    "rename": "Yeniden adlandır",
+    "delete_conv": "Sohbeti sil",
+    "confirm_delete_all": "Tümü silinsin mi?",
+    "clear_btn": "Temizle",
+    "clear_confirm_ask": "Emin misiniz?",
+    "header_title": "Sohbet Geçmişi",
+    "back_to_chat": "Yazışmaya Dön",
+    "group_today": "Bugün",
+    "group_yesterday": "Dün",
+    "group_last_week": "Geçen Hafta",
+    "group_older": "Daha Eski",
+    "screen_placeholder": "Bu Ekran"
+  },
+  "SearchMainView": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "rename": "Yeniden Adlandır",
+    "delete_conversation": "Yazışmayı Sil",
+    "unpin": "İğneyi Kaldır",
+    "pin_home": "Ana Ekrana İğnele",
+    "close_search": "Aramayı Kapat",
+    "search_results": "{query} Sonuçları",
+    "menu_chats": "Menüler & Sohbetler",
+    "results_loading": "Sonuçlar getiriliyor...",
+    "no_result_found": "{query} için uygun bir modül veya yazışma bulunamadı.",
+    "no_conversation_yet": "Henüz bir yazışma bulunmuyor. Yula ile sohbet başlattığınızda yazışmalarınız burada listelenir.",
+    "search_hint": "Yazdığınızda modül, rapor ve sohbet geçmişinde arama yapılır; tam hatırlamıyorsanız yapmak istediğiniz işi tarif edin.",
+    "menus_label": "Menüler",
+    "no_modules": "Modül bulunamadı.",
+    "chats_label": "Sohbet Geçmişi",
+    "no_chats_found": "Yazışma bulunamadı.",
+    "no_chats_yet": "Henüz bir yazışma bulunmuyor.",
+    "click_or_enter": "Gitmek için tıklayın veya Enter'a basın"
+  },
+  "NavUser": {
+    "company_label": "Company",
+    "profile": "Profile",
+    "preferences": "Preferences",
+    "manage_accounts": "Manage Accounts",
+    "language_label": "Language",
+    "theme_label": "Theme",
+    "sign_out": "Sign Out"
+  },
+  "Notifications": {
+    "financial_title": "Financial Notifications",
+    "stock_title": "Stock Notifications",
+    "manufacturing_title": "Manufacturing Notifications",
+    "subcontracting_title": "Subcontracting Notifications",
+    "mark_all_read": "Mark all",
+    "clear_read": "Clear read",
+    "delete_notification": "Bildirimi sil",
+    "empty_state": "Bu çalışma alanında bildirim bulunmuyor.",
+    "notification_running": "işlem devam ediyor…"
+  },
+  "HeaderSearch": {
+    "search_ph": "Sohbet geçmişinde ara...",
+    "close_search": "Aramayı Kapat"
+  },
+  "AppHeader": {
+    "module_home": "Modül ana sayfası"
+  },
+  "AiDock": {
+    "new_chat": "Yeni Sohbet Başlat",
+    "continue_main": "Ana ekranda devam et",
+    "toggle_history_show": "Sohbet Geçmişini Göster",
+    "toggle_history_hide": "Sohbet Geçmişini Gizle",
+    "close_panel": "Paneli kapat"
+  },
+  "PinnedItems": {
+    "unpin": "İğneyi Kaldır"
+  },
+  "NotFound": {
+    "title": "Ekran Bulunamadı",
+    "description": "Aradığınız sayfa kaldırılmış, adı değiştirilmiş veya henüz eklenmemiş olabilir.",
+    "back_home": "Ana Sayfaya Dön",
+    "back_workspace": "{wsLabel} Workspace Ana Sayfasına Dön"
+  },
+  "GlobalError": {
+    "title": "Uygulama yüklenemedi",
+    "description": "Beklenmeyen bir hata oluştu; sayfa yeniden yüklenemiyor. Ayrıntılar için tarayıcı konsoluna bakabilirsiniz.",
+    "reload_btn": "Sayfayı yenile"
+  },
+  "SystemHome": {
+    "new_chat_btn": "Yeni Sohbet Başlat",
+    "new_chat_short": "Yeni Sohbet",
+    "agent_settings_btn": "Ajan Ayarları",
+    "empty_chat_title": "Yeni Sohbet",
+    "delete_conv": "Sohbeti sil"
+  },
+  "WorkspaceSearch": {
+    "search_accounting": "Muhasebe & Finans modülleri ve sohbet geçmişinde ara...",
+    "search_stock": "Stock modülleri ve sohbet geçmişinde ara...",
+    "search_manufacturing": "Manufacturing & BOM modülleri ve sohbet geçmişinde ara...",
+    "search_subcontracting": "Fason & Satış modülleri ve sohbet geçmişinde ara...",
+    "search_all": "Modül, rapor ve sohbet geçmişinde ara..."
   }
 }

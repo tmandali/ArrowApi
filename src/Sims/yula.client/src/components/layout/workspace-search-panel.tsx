@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Command,
@@ -182,6 +183,7 @@ export function WorkspaceSearchResults({
   listClassName,
   showFooter = true,
 }: WorkspaceSearchResultsProps) {
+  const t = useTranslations("SearchMainView")
   const { workspace } = useWorkspaceSearchMeta()
   const { groupedResults, results, isSearching } = useWorkspaceRagSearch(query, workspace)
 
@@ -193,11 +195,11 @@ export function WorkspaceSearchResults({
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/30 bg-muted/20 text-[10.5px] font-medium text-muted-foreground/70">
         <div className="flex items-center gap-1.5">
           <Sparkles className="size-3 text-amber-500" />
-          <span>Modül & Menü Arama</span>
+          <span>{t("menus_label")}</span>
         </div>
         {isSearching ? (
           <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium text-[10px]">
-            <Loader2 className="size-3 animate-spin" /> Aranıyor...
+            <Loader2 className="size-3 animate-spin" /> {t("results_loading")}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground/60">{results.length} öğe</span>
@@ -210,8 +212,8 @@ export function WorkspaceSearchResults({
             <MessageSquare className="size-6 text-muted-foreground/30" />
             <p className="max-w-[220px]">
               {hasQuery
-                ? `"${query}" ile eşleşen modül veya menü öğesi bulunamadı.`
-                : "Bu alanda görüntülenecek menü öğesi bulunamadı."}
+                ? `"${query}" ${t("no_result_found", { query }).toLowerCase()}`
+                : t("no_modules")}
             </p>
           </CommandEmpty>
         ) : null}
@@ -264,7 +266,7 @@ export function WorkspaceSearchResults({
         <div className="shrink-0 px-3 py-2 flex items-center justify-between text-[11px] text-muted-foreground/60 border-t border-border/30 bg-transparent">
           <div className="flex items-center gap-1.5">
             <CornerDownLeft className="size-3 text-muted-foreground/50" />
-            <span>Sayfaya gitmek için tıklayın veya Enter'a basın</span>
+            <span>{t("click_or_enter")}</span>
           </div>
           <span className="font-mono text-[9.5px] text-muted-foreground/50">ESC</span>
         </div>

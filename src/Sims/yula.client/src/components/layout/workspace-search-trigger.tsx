@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { SearchIcon, X } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
@@ -21,6 +22,7 @@ export function WorkspaceSearchTrigger({
   className,
   placeholder,
 }: WorkspaceSearchTriggerProps) {
+  const t = useTranslations("HeaderSearch")
   const { open, setOpen, query, setQuery, registerTrigger } = useWorkspaceSearch()
   const { placeholder: workspacePlaceholder } = useWorkspaceSearchMeta()
 
@@ -84,7 +86,7 @@ export function WorkspaceSearchTrigger({
             inputRef.current?.blur()
           }}
           className="text-muted-foreground/60 hover:text-foreground p-0.5 rounded transition-colors"
-          title="Aramayı Kapat"
+          title={t("close_search")}
         >
           <X className="size-3.5" />
         </button>

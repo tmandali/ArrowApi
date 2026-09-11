@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { useTheme } from "@/context/theme-context"
 import {
   Avatar,
@@ -54,6 +55,7 @@ export function NavUser({
     avatar: string
   }
 }) {
+  const t = useTranslations("NavUser")
   const { theme, setTheme } = useTheme()
   const router = useRouter();
   const navigate = (
@@ -154,7 +156,7 @@ export function NavUser({
             <DropdownMenuSeparator />
 
             <DropdownMenuLabel className="px-2 py-1.5 text-xs text-muted-foreground">
-              Company
+              {t("company_label")}
             </DropdownMenuLabel>
             <DropdownMenuGroup>
               {companies.map((item) => {
@@ -185,19 +187,19 @@ export function NavUser({
               <DropdownMenuItem className="cursor-pointer" asChild>
                 <Link href="/user-settings">
                   <User />
-                  Profile
+                  {t("profile")}
                   <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" asChild>
                 <Link href="/user-settings">
                   <Settings />
-                  Preferences
+                  {t("preferences")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer">
                 <Inbox />
-                Manage Accounts
+                {t("manage_accounts")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
 
@@ -206,7 +208,7 @@ export function NavUser({
             <DropdownMenuItem className="cursor-default justify-between gap-3 focus:bg-transparent" onSelect={(event) => event.preventDefault()}>
               <span className="flex items-center gap-2">
                 <Languages className="size-3.5" />
-                Language
+                {t("language_label")}
               </span>
               <LocaleSwitcher defaultLocale={defaultLang} />
             </DropdownMenuItem>
@@ -216,7 +218,7 @@ export function NavUser({
             <DropdownMenuItem className="cursor-default justify-between gap-3 focus:bg-transparent" onSelect={(event) => event.preventDefault()}>
               <span className="flex items-center gap-2">
                 <Palette />
-                Theme
+                {t("theme_label")}
               </span>
               <div
                 role="group"
@@ -251,7 +253,7 @@ export function NavUser({
               onSelect={handleSignOut}
             >
               <LogOut />
-              Sign Out
+              {t("sign_out")}
               <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuContent>

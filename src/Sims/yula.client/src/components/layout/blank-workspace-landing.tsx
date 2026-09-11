@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Pin,
   PinOff,
@@ -102,6 +103,7 @@ export function WorkspaceLandingTemplate({
   navMenuHeaderVisible = true,
   floatingOpenButton,
 }: WorkspaceLandingTemplateProps) {
+  const t = useTranslations("WorkspaceLanding")
   const pathname = usePathname();
   const router = useRouter();
 
@@ -145,7 +147,7 @@ export function WorkspaceLandingTemplate({
             <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-xs font-semibold text-foreground/90">
-                  İşlem Bekleyenler
+                  {t("pending_actions_title")}
                 </h2>
                 <span className="text-[10px] text-muted-foreground/60">
                   ({data.pendingActions.length})
@@ -205,7 +207,7 @@ export function WorkspaceLandingTemplate({
             <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-xs font-semibold text-foreground/90">
-                  Bana Atananlar
+                  {t("assigned_title")}
                 </h2>
                 <span className="text-[10px] text-muted-foreground/60">
                   ({data.assignedTasks.length})
@@ -213,7 +215,7 @@ export function WorkspaceLandingTemplate({
               </div>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
                 <UserCheck className="size-3 text-emerald-600 dark:text-emerald-400" />
-                <span>Sorumlu</span>
+                <span>{t("responsible")}</span>
               </div>
             </div>
 
@@ -239,8 +241,8 @@ export function WorkspaceLandingTemplate({
                     </p>
 
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
-                      <span>Termin: {task.deadline}</span>
-                      {task.assignedBy && <span>· Atayan: {task.assignedBy}</span>}
+                      <span>{t("deadline_label")}: {task.deadline}</span>
+                      {task.assignedBy && <span>· {t("assigned_by_label")}: {task.assignedBy}</span>}
                     </div>
                   </div>
 
@@ -319,7 +321,7 @@ export function WorkspaceLandingTemplate({
         {pinnedItems.length > 0 ? (
           <section className="space-y-2 pt-1">
             <h2 className="text-xs font-medium text-muted-foreground/75">
-              Hızlı Erişim
+              {t("quick_access_title")}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {pinnedItems.map((item) => (
@@ -344,7 +346,7 @@ export function WorkspaceLandingTemplate({
                   </Link>
                   <button
                     type="button"
-                    title="İğneyi Kaldır"
+                    title={t("pin_remove")}
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
@@ -365,7 +367,7 @@ export function WorkspaceLandingTemplate({
           <section className="space-y-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
               <Pin className="size-3 text-amber-500/80" />
-              <span>Sabitlenen Grafikler</span>
+              <span>{t("pinned_charts_title")}</span>
               <span className="text-[10px] text-muted-foreground/60">
                 ({pinnedCharts.length})
               </span>
@@ -377,7 +379,7 @@ export function WorkspaceLandingTemplate({
                   <Link
                     href={chart.sourceHref}
                     className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
-                    title="Kaynak raporu grafik sorgusuyla aç"
+                    title={t("open_source_report")}
                     onClick={() => {
                       savePinnedChartAsAiView(chart);
                       requestAiView(
@@ -397,7 +399,7 @@ export function WorkspaceLandingTemplate({
                   </Link>
                   <button
                     type="button"
-                    title="İğneyi Kaldır"
+                    title={t("pin_remove")}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

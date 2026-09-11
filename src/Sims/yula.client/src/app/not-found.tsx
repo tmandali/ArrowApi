@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AppLayout } from "@/components/layout/app-layout";
 import {
   workspaceIdFromPath,
@@ -10,15 +11,16 @@ import {
 } from "@/lib/workspace-paths";
 
 export default function NotFound() {
+  const t = useTranslations("NotFound")
   const pathname = usePathname();
   const wsId = workspaceIdFromPath(pathname || "/");
   const wsLabel = workspaceLabelFromPath(pathname || "/");
-  const homeInfo = emptyWorkspaceHome[wsId] ?? { label: "Ana Sayfa", url: "/" };
+  const homeInfo = emptyWorkspaceHome[wsId] ?? { label: t("back_home"), url: "/" };
 
   const buttonText =
     wsId === "system"
-      ? "Ana Sayfaya Dön"
-      : `${wsLabel} Workspace Ana Sayfasına Dön`;
+      ? t("back_home")
+      : t("back_workspace", { wsLabel });
 
   return (
     <AppLayout>
@@ -26,9 +28,9 @@ export default function NotFound() {
         <div className="space-y-4 text-center max-w-sm">
           <p className="text-7xl font-extrabold tracking-tight text-primary/20">404</p>
           <div className="space-y-1">
-            <h2 className="text-base font-semibold text-foreground">Ekran Bulunamadı</h2>
+            <h2 className="text-base font-semibold text-foreground">{t("title")}</h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Aradığınız sayfa kaldırılmış, adı değiştirilmiş veya henüz eklenmemiş olabilir.
+              {t("description")}
             </p>
           </div>
           <div className="pt-2">

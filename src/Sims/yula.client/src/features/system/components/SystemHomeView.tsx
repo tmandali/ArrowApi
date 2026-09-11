@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { SquarePen, Settings } from "lucide-react";
 import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
@@ -19,12 +20,13 @@ import { YULA } from "@/components/layout/yula-brand-data";
  * Kayıtlı başlık yoksa "Yeni Sohbet" gösterilir.
  */
 function YulaSessionHeaderTitle({ displayName }: { displayName: string }) {
+  const t = useTranslations("SystemHome")
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
   const activeConv = activeId
     ? conversations.find((c) => c.id === activeId)
     : undefined;
-  const chatName = activeConv?.title?.trim() || "Yeni Sohbet";
+  const chatName = activeConv?.title?.trim() || t("empty_chat_title");
   const shortNo = activeId
     ? (activeId.split("-").pop() || activeId).slice(-6).toUpperCase()
     : null;
@@ -45,6 +47,7 @@ function YulaSessionHeaderTitle({ displayName }: { displayName: string }) {
  * Başlık sağı aksiyonları: Yeni Sohbet + (ajan seçiliyse) Ajan Ayarları.
  */
 function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
+  const t = useTranslations("SystemHome")
   const router = useRouter();
   const yula = useOptionalYulaChat();
 
@@ -68,11 +71,11 @@ function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
         variant="outline"
         className="h-7 px-2.5 text-xs"
         onClick={handleNewChat}
-        title="Yeni Sohbet Başlat"
-        aria-label="Yeni Sohbet Başlat"
+        title={t("new_chat_btn")}
+        aria-label={t("new_chat_btn")}
       >
         <SquarePen className="size-3.5" />
-        <span className="hidden sm:inline">Yeni Sohbet</span>
+        <span className="hidden sm:inline">{t("new_chat_short")}</span>
       </Button>
       {agentId ? (
         <Button
@@ -81,8 +84,8 @@ function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
           variant="ghost"
           className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
           onClick={handleSettings}
-          title="Ajan Ayarları"
-          aria-label="Ajan Ayarları"
+          title={t("agent_settings_btn")}
+          aria-label={t("agent_settings_btn")}
         >
           <Settings className="size-3.5" />
         </Button>

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { NavUser } from "@/components/layout/nav-user"
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
@@ -25,6 +26,7 @@ const DEFAULT_USER = {
  * search, notifications + user on the right.
  */
 export function AppHeader({ className }: { className?: string }) {
+  const t = useTranslations("AppHeader")
   const router = useRouter()
   const activeWorkspaceId = useActiveWorkspaceId()
   const workspaceName = activeWorkspaceId
@@ -77,7 +79,7 @@ export function AppHeader({ className }: { className?: string }) {
         type="button"
         onClick={handleBrandClick}
         className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left transition-opacity hover:opacity-80"
-        title="Modül ana sayfası"
+        title={t("module_home")}
       >
         <span
           className="shrink-0 text-sm font-semibold tracking-tight text-primary dark:text-sidebar-primary"

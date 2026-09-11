@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Check, Pencil, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
@@ -47,13 +48,14 @@ export function YulaAgentCards({
     [agents, workspaceId, showAll],
   );
 
+  const t = useTranslations("WorkspaceLanding")
   const isLanding = variant === "landing";
 
   return (
     <div className={cn("w-full max-w-3xl px-3 pt-2 animate-in fade-in-50 slide-in-from-bottom-2 duration-300", className)}>
       {isLanding ? (
         <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-muted-foreground/80">
-          <span>Ajanlar</span>
+          <span>{t("assigned_title")}</span>
           <span className="text-[10px] text-muted-foreground/60">({inScope.length})</span>
         </div>
       ) : (

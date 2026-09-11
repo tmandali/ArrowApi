@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   Popover,
   PopoverContent,
@@ -82,7 +83,7 @@ export function WorkspaceNotificationPopover() {
     const pending = pendingJobs.map((job) => ({
       id: `pending-${job.id}`,
       title: job.title,
-      description: `${job.status} — işlem devam ediyor…`,
+      description: `${job.status} — ${t("notification_running")}`,
       time: formatNotificationTime(createdAtMs(job.createdAt)),
       unread: true,
       type: job.notificationType as WorkspaceNotificationType,
@@ -146,11 +147,13 @@ export function WorkspaceNotificationPopover() {
     }
   }
 
+  const t = useTranslations("Notifications")
+
   const getWorkspaceTitle = () => {
-    if (key === "/accounting") return "Financial Notifications"
-    if (key === "/stock") return "Stock Notifications"
-    if (key === "/manufacturing") return "Manufacturing Notifications"
-    return "Subcontracting Notifications"
+    if (key === "/accounting") return t("financial_title")
+    if (key === "/stock") return t("stock_title")
+    if (key === "/manufacturing") return t("manufacturing_title")
+    return t("subcontracting_title")
   }
 
   return (
@@ -160,8 +163,8 @@ export function WorkspaceNotificationPopover() {
           type="button"
           variant="ghost"
           size="icon-lg"
-          title="Notification"
-          aria-label="Notification"
+          title={t("delete_notification")}
+          aria-label={t("delete_notification")}
           className="relative shrink-0 text-muted-foreground hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
         >
           <Bell className="size-4 shrink-0" />
@@ -198,7 +201,7 @@ export function WorkspaceNotificationPopover() {
                 onClick={handleMarkAllAsRead}
               >
                 <CheckCheck className="size-3.5" />
-                Mark all
+                {t("mark_all_read")}
               </Button>
             ) : null}
             {readCount > 0 ? (
@@ -210,7 +213,7 @@ export function WorkspaceNotificationPopover() {
                 onClick={handleClearRead}
               >
                 <Trash2 className="size-3.5" />
-                Clear read
+                {t("clear_read")}
               </Button>
             ) : null}
           </div>
@@ -220,7 +223,7 @@ export function WorkspaceNotificationPopover() {
           <div className="divide-y">
             {displayNotifications.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted-foreground">
-                Bu çalışma alanında bildirim bulunmuyor.
+                {t("empty_state")}
               </div>
             ) : (
               displayNotifications.map((item) => (
@@ -257,8 +260,8 @@ export function WorkspaceNotificationPopover() {
                       {!item.pending ? (
                         <button
                           type="button"
-                          title="Bildirimi sil"
-                          aria-label="Bildirimi sil"
+                          title={t("delete_notification")}
+                          aria-label={t("delete_notification")}
                           className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
                           onClick={(e) => handleDismissNotification(e, item)}
                         >

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   PinOff,
   Package,
@@ -64,6 +65,7 @@ export function WorkspacePinnedItemsGrid({
   className,
   mode = "pins",
 }: WorkspacePinnedItemsGridProps) {
+  const t = useTranslations("PinnedItems")
   const { workspace: metaWorkspace } = useWorkspaceSearchMeta();
   const workspace = propWorkspace || metaWorkspace;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(workspace);
@@ -144,7 +146,7 @@ export function WorkspacePinnedItemsGrid({
             <div className="flex items-center shrink-0">
               <button
                 type="button"
-                title="İğneyi Kaldır"
+                title={t("unpin")}
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();

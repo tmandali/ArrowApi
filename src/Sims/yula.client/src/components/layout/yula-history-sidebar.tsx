@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { isConversationVisibleForAgent, formatPathnameLabel, extractAgentIdFromPath } from "@/lib/workspace-paths";
@@ -25,7 +26,7 @@ export interface YulaHistorySidebarProps {
   onSelectConversation?: () => void;
 }
 
-function groupConversationsByDate(items: YulaConversation[]) {
+function groupConversationsByDate(items: YulaConversation[], t: ReturnType<typeof import("next-intl").useTranslations>) {
   const now = new Date();
   const todayStart = new Date(
     now.getFullYear(),
@@ -55,10 +56,10 @@ function groupConversationsByDate(items: YulaConversation[]) {
   }
 
   return [
-    { label: "Bugün", items: today },
-    { label: "Dün", items: yesterday },
-    { label: "Geçen Hafta", items: lastWeek },
-    { label: "Daha Eski", items: older },
+    { label: t("group_today"), items: today },
+    { label: t("group_yesterday"), items: yesterday },
+    { label: t("group_last_week"), items: lastWeek },
+    { label: t("group_older"), items: older },
   ].filter((group) => group.items.length > 0);
 }
 
@@ -66,6 +67,7 @@ export function YulaHistorySidebar({
   className,
   onSelectConversation,
 }: YulaHistorySidebarProps) {
+  const t = useTranslations("HistorySidebar")
   const router = useRouter();
   const currentPathname = usePathname();
   const { setOpen } = useWorkspaceAiChat();
@@ -82,7 +84,7 @@ export function YulaHistorySidebar({
   const [editingTitle, setEditingTitle] = React.useState("");
   const [confirmClear, setConfirmClear] = React.useState(false);
 
-  const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
+  const screenLabel = formatPathnameLabel(currentPathname) || t("screen_placeholder");
   const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
   const currentAgentId = extractAgentIdFromPath(currentPathname) ?? storeActiveAgentId ?? null;
 
@@ -98,8 +100,8 @@ export function YulaHistorySidebar({
   }, [conversations, currentPathname, currentAgentId, searchQuery]);
 
   const grouped = React.useMemo(
-    () => groupConversationsByDate(filteredSessions),
-    [filteredSessions]
+    () => groupConversationsByDate(filteredSessions, t),
+    [filteredSessions, t]
   );
 
   const handleStartRename = (
@@ -155,7 +157,7 @@ export function YulaHistorySidebar({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Ekran sohbetlerinde ara..."
+            placeholder={t("search_ph")}
             className="w-full rounded-lg border-0 bg-muted/40 py-1.5 pl-8 pr-2.5 text-[11px] outline-none placeholder:text-muted-foreground/50 focus:bg-muted/60 focus:ring-1 focus:ring-primary/20 transition-colors"
           />
           {searchQuery ? (
@@ -177,8 +179,8 @@ export function YulaHistorySidebar({
             <MessageSquare className="size-7 text-muted-foreground/30" />
             <p className="max-w-[200px]">
               {searchQuery
-                ? "Aramayla eşleşen sohbet bulunamadı."
-                : `${screenLabel} ekranına ait henüz bir yazışma bulunmuyor.`}
+                ? t("search_no_results")
+                : t("search_no_conversations", { screenLabel })}
             </p>
           </div>
         ) : (
@@ -238,7 +240,7 @@ export function YulaHistorySidebar({
                             type="submit"
                             onClick={(e) => handleSaveRename(e, session.id)}
                             className="p-1 rounded text-primary hover:bg-muted transition-colors"
-                            title="Kaydet"
+                            title={t("save")}
                           >
                             <Check className="size-3.5" />
                           </button>
@@ -246,7 +248,7 @@ export function YulaHistorySidebar({
                             type="button"
                             onClick={handleCancelRename}
                             className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                            title="İptal"
+                            title={t("cancel")}
                           >
                             <X className="size-3.5" />
                           </button>
@@ -279,7 +281,7 @@ export function YulaHistorySidebar({
                                 handleStartRename(e, session.id, session.title)
                               }
                               className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
-                              title="Yeniden adlandır"
+                            title={t("rename")}
                             >
                               <Pencil className="size-3" />
                             </button>
@@ -287,7 +289,7 @@ export function YulaHistorySidebar({
                               type="button"
                               onClick={(e) => handleDelete(e, session.id)}
                               className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
-                              title="Sohbeti sil"
+                            title={t("delete_conv")}
                             >
                               <Trash2 className="size-3" />
                             </button>
@@ -305,10 +307,10 @@ export function YulaHistorySidebar({
 
       {/* Footer Actions */}
       <div className="shrink-0 p-2.5 flex items-center justify-between text-[11px] text-muted-foreground/60 bg-transparent border-t border-border/30">
-        <span className="font-medium">{filteredSessions.length} sohbet</span>
+              <span className="font-medium">{t("count_conversations", { count: filteredSessions.length })}</span>
         {confirmClear ? (
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-destructive font-medium">Emin misiniz?</span>
+              <span className="text-[10px] text-destructive font-medium">{t("confirm_clear_ask")}</span>
             <button
               type="button"
               onClick={() => {
@@ -332,10 +334,10 @@ export function YulaHistorySidebar({
             type="button"
             onClick={() => setConfirmClear(true)}
             className="hover:text-destructive transition-colors flex items-center gap-1 text-[10.5px] font-medium"
-            title="Tüm sohbet geçmişini temizle"
+            title={t("clear_btn")}
           >
             <Trash2 className="size-3" />
-            <span>Temizle</span>
+            <span>{t("clear_btn")}</span>
           </button>
         )}
       </div>
@@ -344,6 +346,7 @@ export function YulaHistorySidebar({
 }
 
 export function YulaHistoryMainView({ className }: { className?: string }) {
+  const t = useTranslations("HistorySidebar")
   const router = useRouter();
   const currentPathname = usePathname();
   const { setOpen } = useWorkspaceAiChat();
@@ -361,7 +364,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const [editingTitle, setEditingTitle] = React.useState("");
   const [confirmClear, setConfirmClear] = React.useState(false);
 
-  const screenLabel = formatPathnameLabel(currentPathname) || "Bu Ekran";
+  const screenLabel = formatPathnameLabel(currentPathname) || t("screen_placeholder");
   const mainStoreActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
   const mainCurrentAgentId =
     extractAgentIdFromPath(currentPathname) ?? mainStoreActiveAgentId ?? null;
@@ -379,8 +382,8 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   }, [conversations, searchQuery, mainCurrentAgentId]);
 
   const grouped = React.useMemo(
-    () => groupConversationsByDate(filteredSessions),
-    [filteredSessions]
+    () => groupConversationsByDate(filteredSessions, t),
+    [filteredSessions, t]
   );
 
   const handleSelect = (id: string, target?: YulaConversation) => {
@@ -440,7 +443,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 pb-3 mb-2">
           <div className="flex items-center gap-2 shrink-0">
             <History className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Sohbet Geçmişi</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t("header_title")}</h2>
             <span className="text-xs font-medium text-muted-foreground/60">({filteredSessions.length})</span>
           </div>
 
@@ -456,7 +459,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
               className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
             >
               <X className="size-3.5" />
-              <span>Yazışmaya Dön</span>
+              <span>{t("back_to_chat")}</span>
             </Button>
           </div>
         </div>
@@ -468,8 +471,8 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
               <MessageSquare className="size-8 text-muted-foreground/30" />
               <span>
                 {searchQuery
-                  ? `"${searchQuery}" aramasıyla eşleşen sohbet bulunamadı.`
-                  : `${screenLabel} ekranına ait henüz bir yazışma bulunmuyor.`}
+                  ? `"${searchQuery}" ${t("search_no_results").toLowerCase()}`
+                  : `${screenLabel} ${t("search_no_conversations").toLowerCase()}`}
               </span>
             </div>
           ) : (
@@ -517,7 +520,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                               type="submit"
                               onClick={(e) => handleSaveRename(e, session.id)}
                               className="p-1 rounded text-primary hover:bg-muted transition-colors"
-                              title="Kaydet"
+                              title={t("save")}
                             >
                               <Check className="size-3.5" />
                             </button>
@@ -528,7 +531,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                                 setEditingId(null);
                               }}
                               className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                              title="İptal"
+                              title={t("cancel")}
                             >
                               <X className="size-3.5" />
                             </button>
@@ -561,7 +564,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                                   handleStartRename(e, session.id, session.title)
                                 }
                                 className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
-                                title="Yeniden adlandır"
+                              title={t("rename")}
                               >
                                 <Pencil className="size-3" />
                               </button>
@@ -569,7 +572,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                                 type="button"
                                 onClick={(e) => handleDelete(e, session.id)}
                                 className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
-                                title="Sohbeti sil"
+                              title={t("delete_conv")}
                               >
                                 <Trash2 className="size-3" />
                               </button>
@@ -587,10 +590,10 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
 
         {/* Footer Actions */}
         <div className="shrink-0 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] text-muted-foreground/60">
-          <span className="font-medium">{filteredSessions.length} sohbet</span>
+            <span className="font-medium">{t("count_conversations", { count: filteredSessions.length })}</span>
           {confirmClear ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-destructive font-medium">Tümü silinsin mi?</span>
+               <span className="text-[10px] text-destructive font-medium">{t("confirm_delete_all")}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -599,14 +602,14 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                 }}
                 className="px-2 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground font-medium text-[10px] transition-colors"
               >
-                Evet
+                {t("yes")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmClear(false)}
                 className="px-2 py-0.5 rounded bg-muted hover:bg-accent text-[10px] font-medium transition-colors"
               >
-                Hayır
+                {t("no")}
               </button>
             </div>
           ) : (
@@ -614,10 +617,10 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
               type="button"
               onClick={() => setConfirmClear(true)}
               className="hover:text-destructive transition-colors flex items-center gap-1 text-[10.5px] font-medium"
-              title="Tüm sohbet geçmişini temizle"
+              title={t("clear_btn")}
             >
               <Trash2 className="size-3" />
-              <span>Geçmişi Temizle</span>
+              <span>{t("clear_btn")}</span>
             </button>
           )}
         </div>

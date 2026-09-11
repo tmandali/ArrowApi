@@ -3,6 +3,7 @@
 // Workspace AI Dock component
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { agentSessionPath, isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
 import { useUserAgentsStore } from "@/lib/stores/user-agents"
 import {
@@ -58,6 +59,7 @@ type WorkspaceAiDockProps = {
 }
 
 function YulaNewChatButton() {
+  const t = useTranslations("AiDock")
   // Dock başlığı oturum hazır olmadan da mount olabilir (defaultOpen) —
   // tıklama anında oturum hazırdır; yine de null-güvenli tutulur.
   const { newConversation } = useOptionalYulaChat() ?? {}
@@ -77,8 +79,8 @@ function YulaNewChatButton() {
       variant="ghost"
       className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
       onClick={handleNew}
-      title="Yeni Sohbet Başlat"
-      aria-label="Yeni Sohbet Başlat"
+      title={t("new_chat")}
+      aria-label={t("new_chat")}
     >
       <SquarePen className="size-3.5" />
     </Button>
@@ -93,6 +95,7 @@ function YulaNewChatButton() {
  * sayfaya bağlar (aktif sohbet korunur, yeni sohbet açılmaz).
  */
 function YulaOpenInMainButton() {
+  const t = useTranslations("AiDock")
   const router = useRouter()
   const dockAgent = useDockAgent()
 
@@ -126,8 +129,8 @@ function YulaOpenInMainButton() {
       variant="ghost"
       className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
       onClick={handleOpen}
-      title="Ana ekranda devam et"
-      aria-label="Ana ekranda devam et"
+      title={t("continue_main")}
+      aria-label={t("continue_main")}
     >
       <Maximize2 className="size-3.5" />
     </Button>
@@ -184,6 +187,7 @@ function DockAgentIcon({ agentId, className }: { agentId?: string | null; classN
  * ve ajan ayrımı için taze sohbet açılır.
  */
 function DockAgentSwitch() {
+  const t = useTranslations("AiDock")
   const pathname = usePathname()
   const agents = useUserAgentsStore((s) => s.agents)
   const activeAgentId = useUserAgentsStore((s) => s.activeAgentId)
@@ -236,7 +240,7 @@ function DockAgentSwitch() {
                 className="flex cursor-pointer items-center gap-2 text-xs"
               >
                 <YulaMarkIcon className="size-4 shrink-0" />
-                <span className="flex-1 truncate">Yula (varsayılan)</span>
+                <span className="flex-1 truncate">{t("continue_main")}</span>
                 {currentId === null ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
               </CommandItem>
               {inScope.map((a) => (
@@ -273,6 +277,7 @@ function DockHeaderTitle() {
 
 /** Paneli kapatma ikonu (başlık-butonu collapse'unun yerine). */
 function DockCollapseButton({ onCollapse }: { onCollapse: () => void }) {
+  const t = useTranslations("AiDock")
   return (
     <Button
       type="button"
@@ -280,8 +285,8 @@ function DockCollapseButton({ onCollapse }: { onCollapse: () => void }) {
       variant="ghost"
       className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
       onClick={onCollapse}
-      title="Paneli kapat"
-      aria-label="Paneli kapat"
+      title={t("close_panel")}
+      aria-label={t("close_panel")}
     >
       <PanelRightClose className="size-3.5" />
     </Button>
@@ -289,6 +294,7 @@ function DockCollapseButton({ onCollapse }: { onCollapse: () => void }) {
 }
 
 export function YulaScreenHistoryButton() {
+  const t = useTranslations("AiDock")
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const historyFilter = useChatsStore((s) => s.historyFilter)
   const toggleHistory = useChatsStore((s) => s.toggleHistory)
@@ -317,8 +323,8 @@ export function YulaScreenHistoryButton() {
           : "text-muted-foreground hover:text-foreground"
       )}
       onClick={() => toggleHistory("screen")}
-      title={`Bu Ekranın Yazışmaları (${screenCount})`}
-      aria-label={`Bu Ekranın Yazışmaları (${screenCount})`}
+      title={t("toggle_history_show")}
+      aria-label={t("toggle_history_show")}
     >
       <History className="size-3.5" />
       {screenCount > 0 ? (
@@ -331,6 +337,7 @@ export function YulaScreenHistoryButton() {
 }
 
 export function YulaHistoryToggle() {
+  const t = useTranslations("AiDock")
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const historyFilter = useChatsStore((s) => s.historyFilter)
   const toggleHistory = useChatsStore((s) => s.toggleHistory)
@@ -349,8 +356,8 @@ export function YulaHistoryToggle() {
           : "text-muted-foreground hover:text-foreground"
       )}
       onClick={() => toggleHistory("all")}
-      title={isHistoryOpen ? "Sohbet Geçmişini Gizle" : "Sohbet Geçmişini Göster"}
-      aria-label={isHistoryOpen ? "Sohbet Geçmişini Gizle" : "Sohbet Geçmişini Göster"}
+      title={isHistoryOpen ? t("toggle_history_hide") : t("toggle_history_show")}
+      aria-label={isHistoryOpen ? t("toggle_history_hide") : t("toggle_history_show")}
     >
       <History className="size-3.5" />
     </Button>

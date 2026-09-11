@@ -1,7 +1,9 @@
 import { usePathname, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 export function useWorkspaceSearchMeta() {
   const pathname = usePathname()
+  const t = useTranslations("WorkspaceSearch")
 
   const workspace =
     pathname.startsWith("/accounting") || pathname.startsWith("/financial-reports")
@@ -14,16 +16,18 @@ export function useWorkspaceSearchMeta() {
             ? "subcontracting"
             : "all"
 
-  const placeholder =
+  const key =
     workspace === "accounting"
-      ? "Muhasebe & Finans modülleri ve sohbet geçmişinde ara..."
+      ? "search_accounting"
       : workspace === "stock"
-        ? "Stock modülleri ve sohbet geçmişinde ara..."
+        ? "search_stock"
         : workspace === "manufacturing"
-          ? "Manufacturing & BOM modülleri ve sohbet geçmişinde ara..."
+          ? "search_manufacturing"
           : workspace === "subcontracting"
-            ? "Fason & Satış modülleri ve sohbet geçmişinde ara..."
-            : "Modül, rapor ve sohbet geçmişinde ara..."
+            ? "search_subcontracting"
+            : "search_all"
+
+  const placeholder = t(key)
 
   return { workspace, placeholder }
 }

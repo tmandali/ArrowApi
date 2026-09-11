@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Sparkles,
   Package,
@@ -89,6 +90,7 @@ function SearchResultRow({
   onHover,
   onTogglePin,
 }: SearchResultRowProps) {
+  const t = useTranslations("SearchMainView")
   const isEditingConv = isEditing && !!item.conversationId;
 
   return (
@@ -126,7 +128,7 @@ function SearchResultRow({
             type="submit"
             onClick={(e) => onSaveRename(e, item.conversationId!)}
             className="p-1 rounded text-primary hover:bg-muted transition-colors"
-            title="Kaydet"
+            title={t("save")}
           >
             <Check className="size-3" />
           </button>
@@ -137,7 +139,7 @@ function SearchResultRow({
               onCancelEdit();
             }}
             className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-            title="İptal"
+            title={t("cancel")}
           >
             <X className="size-3" />
           </button>
@@ -161,8 +163,8 @@ function SearchResultRow({
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             <button
               type="button"
-              title="Yeniden Adlandır"
-              aria-label="Yeniden Adlandır"
+              title={t("rename")}
+              aria-label={t("rename")}
               onClick={(e) => onStartRename(e, item.conversationId!, item.title)}
               className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
             >
@@ -170,8 +172,8 @@ function SearchResultRow({
             </button>
             <button
               type="button"
-              title="Yazışmayı Sil"
-              aria-label="Yazışmayı Sil"
+              title={t("delete_conversation")}
+              aria-label={t("delete_conversation")}
               onClick={(e) => {
                 e.stopPropagation();
                 if (item.conversationId) {
@@ -201,7 +203,7 @@ function SearchResultRow({
         {item.source === "conversation" ? null : (
           <button
             type="button"
-            title={itemIsPinned ? "İğneyi Kaldır" : "Ana Ekrana İğnele"}
+            title={itemIsPinned ? t("unpin") : t("pin_home")}
             onClick={onTogglePin}
             className={cn(
               "rounded p-1 bg-transparent border-0 outline-none transition-all cursor-pointer",
@@ -219,6 +221,7 @@ function SearchResultRow({
 }
 
 export function WorkspaceSearchMainView({ className }: { className?: string }) {
+  const t = useTranslations("SearchMainView")
   const router = useRouter();
   const { setOpen, query, setQuery } = useWorkspaceSearch();
   const { workspace } = useWorkspaceSearchMeta();
@@ -411,9 +414,9 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
               {config.name}
             </span>
             {query.trim() ? (
-              <span>"{query}" Sonuçları ({flatItems.length})</span>
+              <span>{t("search_results", { query })} ({flatItems.length})</span>
             ) : (
-              <span>Menüler & Sohbetler ({flatItems.length})</span>
+              <span>{t("menu_chats")} ({flatItems.length})</span>
             )}
           </span>
 
@@ -424,7 +427,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
               setQuery("");
             }}
             className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer bg-transparent border-0 outline-none"
-            title="Aramayı Kapat (ESC)"
+            title={t("close_search")}
           >
             <X className="size-3.5 text-muted-foreground/70 group-hover:text-foreground" />
             <kbd className="font-mono text-[9px] text-muted-foreground/70 bg-muted/60 px-1 py-0.5 rounded border-0 font-medium">
@@ -439,7 +442,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
             <div className="flex-1 overflow-y-auto overscroll-contain no-scrollbar">
               <div className="py-12 text-center text-xs text-muted-foreground/70 font-medium flex flex-col items-center justify-center gap-2">
                 <Loader2 className="size-6 animate-spin text-amber-500/90" />
-                <p>Sonuçlar getiriliyor...</p>
+                <p>{t("results_loading")}</p>
               </div>
             </div>
           ) : isIdle ? (
@@ -448,21 +451,21 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                 <Sparkles className="size-8 text-primary/40" />
                 {query.trim() ? (
                   <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
-                    <span className="font-semibold text-foreground">"{query}"</span> için uygun bir modül veya yazışma bulunamadı.
+                    <span className="font-semibold text-foreground">"{query}"</span> {t("no_result_found", { query })}
                   </p>
                 ) : (
                   <p className="max-w-[340px] leading-relaxed text-[12.5px] text-foreground/80 text-center">
-                    Henüz bir yazışma bulunmuyor. Yula ile sohbet başlattığınızda yazışmalarınız burada listelenir.
+                    {t("no_conversation_yet")}
                   </p>
                 )}
                 <p className="max-w-[360px] text-[11.5px] text-muted-foreground/75 leading-relaxed text-center">
-                  Yazdığınızda modül, rapor ve sohbet geçmişinde arama yapılır; tam hatırlamıyorsanız yapmak istediğiniz işi tarif edin (ör:{" "}
+                  {t("search_hint")} (ör:{" "}
                   {config.examples.map((ex, i) => (
                     <React.Fragment key={ex}>
                       {i > 0 ? ", " : ""}
                       <span className="text-primary font-medium">"{ex}"</span>
                     </React.Fragment>
-                  ))}). Sol kolon menü/modül, sağ kolon sohbet geçmişi eşleşmelerini listeler.
+                  ))}). {t("menus_label").toLowerCase()} sol kolon, {t("chats_label").toLowerCase()} sağ kolon eşleşmeleri listeler.
                 </p>
               </div>
             </div>
@@ -473,14 +476,14 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                 <div className="flex shrink-0 items-center justify-between border-b px-3 py-1.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                     <Package className="size-3" />
-                    Menüler
+                    {t("menus_label")}
                   </span>
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">{menuCount}</span>
                 </div>
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-1 no-scrollbar">
                   {menuGroups.length === 0 ? (
                     <div className="py-10 text-center text-[11px] text-muted-foreground/60">
-                      Modül bulunamadı.
+                      {t("no_modules")}
                     </div>
                   ) : (
                     renderColumnGroups(menuGroups, true)
@@ -493,14 +496,14 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                 <div className="flex shrink-0 items-center justify-between border-b px-3 py-1.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                     <MessagesSquare className="size-3" />
-                    Sohbet Geçmişi
+                    {t("chats_label")}
                   </span>
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">{chatCount}</span>
                 </div>
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-1 no-scrollbar">
                   {chatGroups.length === 0 ? (
                     <div className="py-10 text-center text-[11px] text-muted-foreground/60">
-                      {query.trim() ? "Yazışma bulunamadı." : "Henüz bir yazışma bulunmuyor."}
+                      {query.trim() ? t("no_chats_found") : t("no_chats_yet")}
                     </div>
                   ) : (
                     renderColumnGroups(chatGroups, false)

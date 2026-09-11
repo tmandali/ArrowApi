@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Bot, Settings, SquarePen, Trash2 } from "lucide-react";
 import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
@@ -56,6 +57,7 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
   const yula = useOptionalYulaChat();
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
+  const t = useTranslations("SystemHome")
   const deleteConversation = useChatsStore((s) => s.deleteConversation);
   const hasSavedConversation = activeId
     ? conversations.some((c) => c.id === activeId)
@@ -85,11 +87,11 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
         variant="outline"
         className="h-7 px-2.5 text-xs"
         onClick={handleNewChat}
-        title="Yeni Sohbet Başlat"
-        aria-label="Yeni Sohbet Başlat"
+        title={t("new_chat_btn")}
+        aria-label={t("new_chat_btn")}
       >
         <SquarePen className="size-3.5" />
-        <span className="hidden sm:inline">Yeni Sohbet</span>
+        <span className="hidden sm:inline">{t("new_chat_short")}</span>
       </Button>
       <Button
         type="button"
@@ -98,8 +100,8 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
         className="size-7 shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-40"
         onClick={handleDeleteChat}
         disabled={!hasSavedConversation}
-        title="Sohbeti sil"
-        aria-label="Sohbeti sil"
+        title={t("delete_conv")}
+        aria-label={t("delete_conv")}
       >
         <Trash2 className="size-3.5" />
       </Button>
@@ -109,8 +111,8 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
         variant="ghost"
         className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
         onClick={handleSettings}
-        title="Ajan Ayarları"
-        aria-label="Ajan Ayarları"
+        title={t("agent_settings_btn")}
+        aria-label={t("agent_settings_btn")}
       >
         <Settings className="size-3.5" />
       </Button>
