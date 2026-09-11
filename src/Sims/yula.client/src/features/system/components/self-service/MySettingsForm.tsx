@@ -157,6 +157,12 @@ function mapLanguageToUi(value: unknown): ProfileLanguage | undefined {
   return undefined
 }
 
+function syncLocaleCookie(lang: ProfileLanguage): void {
+  if (typeof document === "undefined") return
+  const code = lang === "turkish" ? "tr" : "en"
+  document.cookie = `NEXT_LOCALE=${code}; path=/; max-age=31536000`
+}
+
 function mapTimeZoneToUi(value: unknown): ProfileTimeZone | undefined {
   if (typeof value !== "string") return undefined
   const v = value.trim().toLowerCase()
@@ -350,6 +356,7 @@ export function MySettingsForm() {
       effort: normalizeEffort(aiThinkingLevel) ?? undefined,
     })
     void saveSecret(aiApiKey)
+    syncLocaleCookie(profileLanguage)
     void putSettingsToApi({
       email: profileEmail,
       fullName: profileFullName,
@@ -380,6 +387,7 @@ export function MySettingsForm() {
       thinkingLevel: aiThinkingLevel,
       systemFacts,
     })
+    syncLocaleCookie(profileLanguage)
     setProfileSaved(true)
     setTimeout(() => setProfileSaved(false), 2500)
   }

@@ -20,6 +20,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { LocaleSwitcher } from "@/components/common/locale-switcher"
 import { useJobSession } from "@/features/auth/hooks/use-job-session"
 import { useActiveCompany } from "@/features/company/hooks/use-active-company"
 import { emptySubscribe } from "@/hooks/use-mounted"
@@ -35,6 +36,7 @@ import {
   Moon,
   Monitor,
   LogOut,
+  Languages,
 } from "lucide-react"
 
 const themes = [
@@ -86,6 +88,24 @@ export function NavUser({
     : "NB"
 
   const activeTheme = mounted ? (theme ?? "system") : "system"
+
+  const [defaultLang, setDefaultLang] = React.useState<"tr" | "en" | null>(null)
+  React.useEffect(() => {
+    let active = true
+    fetch("/api/my/settings?userId=local", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return
+        const row = data?.settings
+        if (row?.language) {
+          const v = row.language.trim().toLowerCase()
+          if (v === "tr" || v === "turkish" || v === "türkçe") setDefaultLang("tr")
+          else if (v === "en" || v === "english") setDefaultLang("en")
+        }
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   const handleSignOut = () => {
     clearJobSession()
@@ -183,10 +203,17 @@ export function NavUser({
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem
-              className="cursor-default justify-between gap-3 focus:bg-transparent"
-              onSelect={(event) => event.preventDefault()}
-            >
+            <DropdownMenuItem className="cursor-default justify-between gap-3 focus:bg-transparent" onSelect={(event) => event.preventDefault()}>
+              <span className="flex items-center gap-2">
+                <Languages className="size-3.5" />
+                Language
+              </span>
+              <LocaleSwitcher defaultLocale={defaultLang} />
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem className="cursor-default justify-between gap-3 focus:bg-transparent" onSelect={(event) => event.preventDefault()}>
               <span className="flex items-center gap-2">
                 <Palette />
                 Theme

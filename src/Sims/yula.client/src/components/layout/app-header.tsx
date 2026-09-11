@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { NavUser } from "@/components/layout/nav-user"
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
-import { LocaleSwitcher } from "@/components/common/locale-switcher"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
 import {
   workspaceRootPathByWorkspace,
@@ -97,7 +96,6 @@ export function AppHeader({ className }: { className?: string }) {
         <WorkspaceSearchTrigger />
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-        <LocaleSwitcher />
         <WorkspaceNotificationPopover />
         <NavUser user={headerUser} />
       </div>
