@@ -6,7 +6,9 @@ import {
   getDefaultModel,
   getDefaultEmbeddingModel,
   getAzureDeployments,
+  getAgnesModels,
   getVectorDimension,
+  DEFAULT_AGNES_BASE_URL,
   DEFAULT_OLLAMA_URL,
   type AIProviderType,
 } from "./yula-config";
@@ -40,6 +42,8 @@ let localChatBoundBase = "";
 let cloudInstance: ReturnType<typeof createAzure> | ReturnType<typeof createOpenAI> | null =
   null;
 let cloudBoundKey = "";
+let agnesInstance: ReturnType<typeof createOpenAI> | null = null;
+let agnesBoundKey = "";
 
 function getOllamaProvider(baseUrl?: string) {
   const keepAlive = process.env.OLLAMA_KEEP_ALIVE ?? "30m";
@@ -80,6 +84,28 @@ function getOllamaProvider(baseUrl?: string) {
     });
   }
   return localChatInstance;
+}
+
+/**
+ * Agnes AI — OpenAI-uyumlu gateway (docs: agnes-ai cid1 + opencode cid7).
+ * Base URL her zaman `/v1` ile biter (`/v1/chat/completions` yazılmaz);
+ * auth `Authorization: Bearer <AGNES_API_KEY>` (Bearer öneki key'e eklenmez).
+ * Ayrı `@ai-sdk/openai-compatible` paketi yerine mevcut `createOpenAI`
+ * kullanılır — tel protokolü aynı (chat completions + tools + vision).
+ */
+function getAgnesProvider(baseUrl?: string): ReturnType<typeof createOpenAI> {
+  const resolved = (
+    baseUrl ||
+    process.env.AGNES_BASE_URL ||
+    DEFAULT_AGNES_BASE_URL
+  ).replace(/\/+$/, "");
+  const apiKey = process.env.AGNES_API_KEY ?? "";
+  const key = `${resolved}:${apiKey.length > 0 ? "set" : "empty"}`;
+  if (!agnesInstance || agnesBoundKey !== key) {
+    agnesBoundKey = key;
+    agnesInstance = createOpenAI({ baseURL: resolved, apiKey });
+  }
+  return agnesInstance;
 }
 
 function getCloudProvider(
@@ -125,6 +151,12 @@ export function getYulaLanguageModel(
     case "azure":
     case "openai":
       return getCloudProvider(provider, options?.baseUrl)(activeModel);
+    case "agnes":
+      // Agnes: Chat Completions yolu kullanılır. SDK'nın varsayılan
+      // Responses API'si (`provider(model)`) Agnes'in `reasoning` öğesi
+      // şekliyle uyumsuzdur (HTTP 200'de bile parse hatası verir);
+      // `.chat(model)` Chat Completions (`/v1/chat/completions`) kullanır.
+      return getAgnesProvider(options?.baseUrl).chat(activeModel);
     case "ollama":
       return getOllamaProvider(options?.baseUrl)(activeModel);
     default: {
@@ -148,6 +180,8 @@ export function getYulaEmbeddingModel(
     case "azure":
     case "openai":
       return getCloudProvider(provider, options?.baseUrl).textEmbeddingModel(activeModel);
+    case "agnes":
+      return getAgnesProvider(options?.baseUrl).textEmbeddingModel(activeModel);
     case "ollama":
       return getOllamaProvider(options?.baseUrl).embedding(activeModel);
     default: {
@@ -164,7 +198,7 @@ export function getYulaProviderInfo(provider: AIProviderType = getActiveProvider
     defaultModel: getDefaultModel(provider),
     defaultEmbeddingModel: getDefaultEmbeddingModel(provider),
     vectorDimension: getVectorDimension(provider),
-    isCloud: provider === "azure" || provider === "openai",
+    isCloud: provider === "azure" || provider === "openai" || provider === "agnes",
   };
 }
 
@@ -285,6 +319,29 @@ export async function getAvailableProviderModels(options?: {
         hasThinking: true,
       },
     ];
+    const uniqueMap = new Map<string, ProviderModelCapability>();
+    models.forEach((m) => uniqueMap.set(m.name, m));
+    return Array.from(uniqueMap.values());
+  }
+
+  if (provider === "agnes") {
+    // Agnes modelleri: tool-calling + vision + streaming destekler (cid7).
+    // Liste sağlayıcı varsayılanı + bilinen modeller + AGNES_MODELS
+    // ekstralarından beslenir (getAgnesModels).
+    const models: ProviderModelCapability[] = getAgnesModels().map((name, index) => ({
+      name,
+      model: name,
+      description: index === 0 ? `Agnes (${name})` : `Agnes ${name}`,
+      provider: "agnes",
+      tag: index === 0 ? "Agnes" : "Agnes Pro",
+      capabilities: {
+        hasThinking: true,
+        hasVision: true,
+        hasTools: true,
+        isCloud: true,
+      },
+      hasThinking: true,
+    }));
     const uniqueMap = new Map<string, ProviderModelCapability>();
     models.forEach((m) => uniqueMap.set(m.name, m));
     return Array.from(uniqueMap.values());

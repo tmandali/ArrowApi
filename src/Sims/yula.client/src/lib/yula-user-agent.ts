@@ -194,6 +194,7 @@ export const AGENT_PROVIDER_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "azure", label: "Azure Foundry" },
   { id: "ollama", label: "Ollama (yerel)" },
   { id: "openai", label: "OpenAI" },
+  { id: "agnes", label: "Agnes" },
 ];
 
 /** Dinamik grid araç grubunu temsil eden jeton */

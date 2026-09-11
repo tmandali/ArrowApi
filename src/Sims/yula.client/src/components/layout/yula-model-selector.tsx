@@ -55,6 +55,24 @@ const MODEL_METADATA_MAP: Record<string, { name: string; tag?: string; descripti
     description: "Derin düşünce adımları ve mantık yürütme",
     hasThinking: true,
   },
+  "agnes-2.5-flash": {
+    name: "Agnes 2.5 Flash",
+    tag: "Agnes",
+    description: "Agnes AI kodlama + agent workflow modeli (512K context)",
+    hasThinking: true,
+  },
+  "agnes-3.0-flash": {
+    name: "Agnes 3.0 Flash",
+    tag: "Agnes",
+    description: "Yeni nesil Agnes kodlama + tool orchestration modeli",
+    hasThinking: true,
+  },
+  "agnes-2.5-pro": {
+    name: "Agnes 2.5 Pro",
+    tag: "Agnes Pro",
+    description: "İleri akıl yürütme, kodlama ve uzun bağlam analizi",
+    hasThinking: true,
+  },
   "gemma4:12b-mlx": {
     name: "Gemma 4 12B MLX",
     tag: "Fast MLX",
@@ -151,6 +169,19 @@ function formatModelOption(id: string): ModelOption {
 
   // Dinamik etiket türetme (Ollama model isimleri için akıllı etiketler)
   let derivedTag = "Yerel";
+  if (cleanId.startsWith("agnes")) {
+    return {
+      id,
+      name: id,
+      tag: cleanId.includes("pro") ? "Agnes Pro" : "Agnes",
+      description: "Agnes AI bulut modeli",
+      hasThinking: true,
+      hasVision: true,
+      hasTools: true,
+      hasAudio,
+      isMlx,
+    };
+  }
   if (isMlx) {
     if (cleanId.includes("12b") || cleanId.includes("9b") || cleanId.includes("7b") || cleanId.includes("small") || cleanId.includes("fast")) {
       derivedTag = "Fast MLX";

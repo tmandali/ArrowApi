@@ -99,6 +99,10 @@ function isModelVisionCapable(
   provider: ReturnType<typeof resolveProvider>,
 ): boolean {
   const lower = modelName.toLowerCase();
+  if (provider === "agnes") {
+    // Agnes: image_url girdisi + tool-calling destekler (cid7).
+    return true;
+  }
   if (provider === "azure" || provider === "openai") {
     return !lower.includes("o1-mini") && !lower.includes("o3-mini");
   }

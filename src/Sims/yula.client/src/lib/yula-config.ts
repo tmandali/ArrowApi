@@ -1,10 +1,20 @@
-export type AIProviderType = "azure" | "ollama" | "openai";
+export type AIProviderType = "azure" | "ollama" | "openai" | "agnes";
 
 export const PROVIDER_LABELS: Record<AIProviderType, string> = {
   azure: "Microsoft Foundry",
   ollama: "Ollama",
   openai: "OpenAI",
+  agnes: "Agnes",
 };
+
+/** Agnes AI gateway (OpenAI-uyumlu). Kaynak: agnes-ai docs cid1/cid7. */
+export const DEFAULT_AGNES_BASE_URL = "https://apihub.agnes-ai.com/v1";
+export const DEFAULT_AGNES_MODEL = "agnes-2.5-flash";
+/** Sağlayıcı bazında bilinen Agnes modelleri (seçicide env'siz görünür). */
+export const DEFAULT_AGNES_MODELS: readonly string[] = [
+  "agnes-2.5-flash",
+  "agnes-3.0-flash",
+] as const;
 
 /** İstekte / ayarda gelen ad (foundry ≡ azure). */
 export function normalizeProvider(requested?: string | null): AIProviderType | undefined {
@@ -12,6 +22,7 @@ export function normalizeProvider(requested?: string | null): AIProviderType | u
   if (r === "azure" || r === "foundry") return "azure";
   if (r === "ollama") return "ollama";
   if (r === "openai") return "openai";
+  if (r === "agnes") return "agnes";
   return undefined;
 }
 
@@ -32,6 +43,10 @@ function hasOpenAiEnv(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
+function hasAgnesEnv(): boolean {
+  return Boolean(process.env.AGNES_API_KEY);
+}
+
 function hasOllamaEnv(): boolean {
   return Boolean(process.env.OLLAMA_URL || process.env.OLLAMA_MODEL);
 }
@@ -41,6 +56,7 @@ export function listConfiguredProviders(): AIProviderType[] {
   const out: AIProviderType[] = [];
   if (hasAzureEnv()) out.push("azure");
   if (hasOpenAiEnv()) out.push("openai");
+  if (hasAgnesEnv()) out.push("agnes");
   if (hasOllamaEnv()) out.push("ollama");
   if (out.length === 0) out.push(getActiveProvider());
   return out;
@@ -53,6 +69,7 @@ export function getActiveProvider(): AIProviderType {
   );
   if (fromEnv) return fromEnv;
   if (hasAzureEnv()) return "azure";
+  if (hasAgnesEnv() && !hasAzureEnv() && !hasOpenAiEnv()) return "agnes";
   if (hasOpenAiEnv() && !hasAzureEnv()) return "openai";
   if (hasOllamaEnv()) return "ollama";
   if (hasOpenAiEnv()) return "openai";
@@ -68,6 +85,9 @@ export function getDefaultModel(provider: AIProviderType = getActiveProvider()):
   }
   if (provider === "openai") {
     return process.env.OPENAI_MODEL ?? "gpt-4o";
+  }
+  if (provider === "agnes") {
+    return process.env.AGNES_MODEL ?? DEFAULT_AGNES_MODEL;
   }
   return (
     process.env.OLLAMA_MODEL ??
@@ -90,6 +110,23 @@ export function getAzureDeployments(): string[] {
   return [primary, ...extras];
 }
 
+/** Agnes'te kullanılabilir model adları (sıra korunur).
+ *  Birincil model sağlayıcı varsayılanıdır (`AGNES_MODEL`, yoksa
+ *  `agnes-2.5-flash`); ardından bilinen modeller, en sonda `AGNES_MODELS`
+ *  env'inden ekstralar (`"agnes-2.5-pro,..."` gibi virgüllü liste) gelir. */
+export function getAgnesModels(): string[] {
+  const primary = getDefaultModel("agnes");
+  const extras = (process.env.AGNES_MODELS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const out = [primary];
+  for (const name of [...DEFAULT_AGNES_MODELS, ...extras]) {
+    if (name !== primary && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
 /** Varsayılan embedding modeli. */
 export function getDefaultEmbeddingModel(provider: AIProviderType = getActiveProvider()): string {
   if (provider === "azure") {
@@ -97,6 +134,9 @@ export function getDefaultEmbeddingModel(provider: AIProviderType = getActivePro
   }
   if (provider === "openai") {
     return process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+  }
+  if (provider === "agnes") {
+    return process.env.AGNES_EMBEDDING_MODEL ?? "text-embedding-3-small";
   }
   return (
     process.env.OLLAMA_EMBEDDING_MODEL ??
@@ -113,7 +153,7 @@ export function getVectorDimension(provider: AIProviderType = getActiveProvider(
     const dim = Number(rawDim);
     if (!Number.isNaN(dim) && dim > 0) return dim;
   }
-  return provider === "azure" || provider === "openai" ? 1536 : 384;
+  return provider === "azure" || provider === "openai" || provider === "agnes" ? 1536 : 384;
 }
 
 export const DEFAULT_YULA_MODEL = getDefaultModel();

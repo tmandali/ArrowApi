@@ -74,7 +74,7 @@ import { normalizeEffort } from "@/lib/yula-reasoning"
 import { writeYulaClientAiConfig } from "@/lib/yula-ai-client-config"
 
 export interface AiProviderConfig {
-  provider: "ollama" | "azure" | "google" | "openai"
+  provider: "ollama" | "azure" | "google" | "openai" | "agnes"
   model: string
   endpoint?: string
   apiKey?: string
@@ -234,6 +234,9 @@ export function MySettingsForm() {
     } else if (newProvider === "openai") {
       setAiModel("gpt-4o-mini")
       setAiEndpoint("https://api.openai.com/v1")
+    } else if (newProvider === "agnes") {
+      setAiModel("agnes-2.5-flash")
+      setAiEndpoint("https://apihub.agnes-ai.com/v1")
     }
   }
 
@@ -546,6 +549,7 @@ export function MySettingsForm() {
                                 <SelectItem value="azure">Microsoft Foundry (Azure OpenAI)</SelectItem>
                                 <SelectItem value="ollama">Yerel Ollama (Gemma 4 / Llama 3 / Offline)</SelectItem>
                                 <SelectItem value="openai">OpenAI / Custom OpenAI-Compatible</SelectItem>
+                                <SelectItem value="agnes">Agnes (agnes-2.5-flash)</SelectItem>
                                 <SelectItem value="google">Google AI SDK (Gemini 2.5 Flash / Pro)</SelectItem>
                               </SelectContent>
                             </Select>

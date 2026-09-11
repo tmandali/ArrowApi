@@ -582,7 +582,18 @@ function ChatInstance({
             toolName: "worker",
             label: "HTTP /api/agent/chat",
             isLive: true,
-            input: { phase, model: useChatsStore.getState().model },
+            // Sunucu çözümüyle aynı öncelik (ajan pini > sohbet > genel):
+            // ham store modeli değil, efektif kimlik loglanır.
+            input: {
+              phase,
+              provider:
+                activeAgent?.provider || aiConfig.provider || "(sunucu varsayılanı)",
+              model:
+                activeAgent?.model ||
+                useChatsStore.getState().model ||
+                aiConfig.model ||
+                "(sunucu varsayılanı)",
+            },
           });
 
           return {
