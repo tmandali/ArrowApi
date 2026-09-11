@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   try {
     json = await req.json();
   } catch {
-    return Response.json({ error: "Geçersiz JSON gövdesi" }, { status: 400 });
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const parse = SystemUserUpsertValidation.safeParse(json);
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get("id")?.trim();
   if (!id) {
-    return Response.json({ error: "id gerekli" }, { status: 400 });
+    return Response.json({ error: "id is required" }, { status: 400 });
   }
   try {
     await db.delete(appUsersSchema).where(eq(appUsersSchema.id, id));

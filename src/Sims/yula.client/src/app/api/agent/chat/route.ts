@@ -172,7 +172,7 @@ async function prepareModelMessages(
         } else {
           content.push({
             type: "text",
-            text: `\n[Görsel Eklendi: Yerel "${activeModel}" modeli görüntü işleme (Vision) sürücüsüne sahip değildir. Görsel okuma için lütfen Vision destekli bir model seçiniz.]`,
+            text: `\n[Image attached: The local "${activeModel}" model has no vision capability. Please select a vision-capable model to read images.]`,
           });
         }
       } else {

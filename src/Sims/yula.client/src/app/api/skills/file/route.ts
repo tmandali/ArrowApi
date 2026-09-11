@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const ext = path.extname(relPath).toLowerCase();
   if (!relPath || !ALLOWED_EXTENSIONS.has(ext)) {
     return NextResponse.json(
-      { error: "Yalnızca skills altındaki .mjs/.md/.txt/.json dosyaları okunur." },
+      { error: "Only .mjs/.md/.txt/.json files under skills/ can be read." },
       { status: 400 },
     );
   }
