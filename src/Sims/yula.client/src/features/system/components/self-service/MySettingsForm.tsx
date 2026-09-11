@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useLocale, useTranslations } from "next-intl"
+import { emitLocaleChange } from "@/lib/locale-events"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell"
@@ -340,13 +341,17 @@ export function MySettingsForm() {
 
   /**
    * Dil kaydedildiğinde: cookie'yi senkronize et; hedef locale mevcut sayfadan
-   * farklıysa sayfa yenilensin (UI yeni dile geçsin). Combo değişiminde
-   * otomatik reload YOK — yalnız kayıt anında.
+   * farklıysa `yula:locale-changed` yayını yap ve ~150 ms sonra sayfa
+   * yenilensin (UI yeni dile geçsin). Combo değişiminde otomatik reload YOK —
+   * yalnız kayıt anında. Dinleyiciler bu pencerede YALNIZ senkron kalıcılık
+   * işlemleri yapar (`setState` yasak; bkz. `locale-events.ts` sözleşmesi).
    */
   const applyLanguageChange = (lang: ProfileLanguage) => {
     syncLocaleCookie(lang)
     const code = lang === "turkish" ? "tr" : "en"
-    if (code !== locale) window.location.reload()
+    if (code === locale) return
+    emitLocaleChange(code)
+    setTimeout(() => window.location.reload(), 150)
   }
 
   const handleSaveAiConfig = () => {
