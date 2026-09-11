@@ -159,24 +159,48 @@ export function isConversationVisibleForAgent(
   return isConversationOnScreen(c.pathname, currentPath)
 }
 
-function reportScreenLabel(pathname: string): string | null {
-  if (pathname.startsWith("/agents/") || pathname.startsWith("/agent/")) return "Ajan"
-  if (pathname.includes("/stock/stock-balance")) return "Stok Bakiye"
-  if (pathname.includes("/stock/stock-analytics")) return "Stok Analiz"
-  if (pathname.includes("/stock/retail-sales-report")) return "Perakende Satış"
-  if (pathname.includes("/stock/stock-ledger")) return "Stok Ekstre"
-  if (pathname.includes("/stock/item")) return "Stok Kartı"
-  if (pathname.includes("/system/users")) return "Kullanıcılar"
-  if (pathname.includes("/system/agents")) return "Ajan Ayarları"
-  if (pathname.includes("/system/skills")) return "Skill Ayarları"
+/**
+ * Ekran adı → `ScreenLabels` mesaj anahtarı (dil-bağımsız slug).
+ * Çözümleme render katmanında `ScreenLabels` namespace'üyle yapılır;
+ * resolver verilmeyen çağrıranlara TR varsayılan map ile düşer.
+ */
+function reportScreenLabelKey(pathname: string): string | null {
+  if (pathname.startsWith("/agents/") || pathname.startsWith("/agent/")) return "agents"
+  if (pathname.includes("/stock/stock-balance")) return "stock_balance"
+  if (pathname.includes("/stock/stock-analytics")) return "stock_analytics"
+  if (pathname.includes("/stock/retail-sales-report")) return "retail_sales"
+  if (pathname.includes("/stock/stock-ledger")) return "stock_ledger"
+  if (pathname.includes("/stock/item")) return "stock_item"
+  if (pathname.includes("/system/users")) return "system_users"
+  if (pathname.includes("/system/agents")) return "system_agents"
+  if (pathname.includes("/system/skills")) return "system_skills"
   return null
 }
 
-export function formatPathnameLabel(pathname?: string): string | null {
+/** Locale-bağımsız fallback (resolver verilmeyen çağrıranlar için; TR kaynak). */
+const SCREEN_LABEL_DEFAULTS: Record<string, string> = {
+  agents: "Ajan",
+  stock_balance: "Stok Bakiye",
+  stock_analytics: "Stok Analiz",
+  retail_sales: "Perakende Satış",
+  stock_ledger: "Stok Ekstre",
+  stock_item: "Stok Kartı",
+  system_users: "Kullanıcılar",
+  system_agents: "Ajan Ayarları",
+  system_skills: "Skill Ayarları",
+}
+
+export function formatPathnameLabel(
+  pathname?: string,
+  resolveLabel?: (key: string) => string
+): string | null {
   if (!pathname || isWorkspaceHomePath(pathname.split("?")[0] || "/")) return null
   const jobId = extractJobIdFromHref(pathname)
-  const named = reportScreenLabel(pathname)
-  if (named) {
+  const labelKey = reportScreenLabelKey(pathname)
+  if (labelKey) {
+    const named = resolveLabel
+      ? resolveLabel(labelKey)
+      : SCREEN_LABEL_DEFAULTS[labelKey] ?? labelKey
     return jobId ? `${named} · ${jobId.slice(0, 8)}` : named
   }
   const parts = pathname.split("/").filter(Boolean)

@@ -1443,5 +1443,24 @@
     "lint_bypass": "Onay atlama dayatması: \"sormadan çalıştır\", \"onaysız\" gibi ifadeler faz duvarıyla çelişir — destructive/bulk işlemlerde model yine de onay ister.",
     "lint_tool_ban": "Araç yasağı: azınlık rapor/analiz istekleri araçsız cevaplanamaz — model yine de gerekli aracı çağırır. Kısıtlama gerekiyorsa araç allowlist''ini kullanın.",
     "lint_single_lang": "Tek-dil dayatması: bağlam zehirlenmesine yol açar — yanıt dili her zaman kullanıcının dilini yansıtır. Bu cümleyi kaldırın."
+  },
+  "SystemNav": {
+    "home": "Ana Ekran & Yula AI",
+    "my_settings": "Hesabım & Ayarlarım",
+    "system_users": "Tüm Kullanıcılar (Admin)",
+    "system_agents": "Ajan Ayarları",
+    "system_skills": "Skill Ayarları"
+  },
+  "ScreenLabels": {
+    "agents": "Ajan",
+    "stock_balance": "Stok Bakiye",
+    "stock_analytics": "Stok Analiz",
+    "retail_sales": "Perakende Satış",
+    "stock_ledger": "Stok Ekstre",
+    "stock_item": "Stok Kartı",
+    "system_users": "Kullanıcılar",
+    "system_agents": "Ajan Ayarları",
+    "system_skills": "Skill Ayarları",
+    "fallback": "Ekran"
   }
 }

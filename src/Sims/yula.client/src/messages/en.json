@@ -1443,5 +1443,24 @@
     "lint_bypass": "Approval bypass enforced: phrases like \"run without asking\" or \"without approval\" conflict with the phase wall — the model still requires confirmation for destructive/bulk operations.",
     "lint_tool_ban": "Tool ban: most report/analysis requests cannot be answered without tools — the model will still call the needed tool. If a restriction is needed, use the tool allowlist.",
     "lint_single_lang": "Single-language enforcement: it causes context poisoning — the response language always mirrors the user''s language. Remove this sentence."
+  },
+  "SystemNav": {
+    "home": "Home & Yula AI",
+    "my_settings": "My Account & Settings",
+    "system_users": "All Users (Admin)",
+    "system_agents": "Agent Settings",
+    "system_skills": "Skill Settings"
+  },
+  "ScreenLabels": {
+    "agents": "Agent",
+    "stock_balance": "Stock Balance",
+    "stock_analytics": "Stock Analytics",
+    "retail_sales": "Retail Sales",
+    "stock_ledger": "Stock Ledger",
+    "stock_item": "Item Card",
+    "system_users": "Users",
+    "system_agents": "Agent Settings",
+    "system_skills": "Skill Settings",
+    "fallback": "Screen"
   }
 }

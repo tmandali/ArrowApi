@@ -68,6 +68,7 @@ export function YulaHistorySidebar({
   onSelectConversation,
 }: YulaHistorySidebarProps) {
   const t = useTranslations("HistorySidebar")
+  const tScreen = useTranslations("ScreenLabels")
   const router = useRouter();
   const currentPathname = usePathname();
   const { setOpen } = useWorkspaceAiChat();
@@ -84,7 +85,7 @@ export function YulaHistorySidebar({
   const [editingTitle, setEditingTitle] = React.useState("");
   const [confirmClear, setConfirmClear] = React.useState(false);
 
-  const screenLabel = formatPathnameLabel(currentPathname) || t("screen_placeholder");
+  const screenLabel = formatPathnameLabel(currentPathname, (k) => tScreen(k)) || t("screen_placeholder");
   const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
   const currentAgentId = extractAgentIdFromPath(currentPathname) ?? storeActiveAgentId ?? null;
 
@@ -193,7 +194,7 @@ export function YulaHistorySidebar({
                 {group.items.map((session) => {
                   const isActive = session.id === activeId;
                   const isEditing = session.id === editingId;
-                  const pathLabel = formatPathnameLabel(session.pathname);
+                  const pathLabel = formatPathnameLabel(session.pathname, (k) => tScreen(k));
 
                   return (
                     <div
@@ -347,6 +348,7 @@ export function YulaHistorySidebar({
 
 export function YulaHistoryMainView({ className }: { className?: string }) {
   const t = useTranslations("HistorySidebar")
+  const tScreen = useTranslations("ScreenLabels")
   const router = useRouter();
   const currentPathname = usePathname();
   const { setOpen } = useWorkspaceAiChat();
@@ -364,7 +366,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
   const [editingTitle, setEditingTitle] = React.useState("");
   const [confirmClear, setConfirmClear] = React.useState(false);
 
-  const screenLabel = formatPathnameLabel(currentPathname) || t("screen_placeholder");
+  const screenLabel = formatPathnameLabel(currentPathname, (k) => tScreen(k)) || t("screen_placeholder");
   const mainStoreActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
   const mainCurrentAgentId =
     extractAgentIdFromPath(currentPathname) ?? mainStoreActiveAgentId ?? null;
@@ -485,7 +487,7 @@ export function YulaHistoryMainView({ className }: { className?: string }) {
                   {group.items.map((session) => {
                     const isActive = session.id === activeId;
                     const isEditing = session.id === editingId;
-                    const pathLabel = formatPathnameLabel(session.pathname);
+                    const pathLabel = formatPathnameLabel(session.pathname, (k) => tScreen(k));
 
                     return (
                       <div

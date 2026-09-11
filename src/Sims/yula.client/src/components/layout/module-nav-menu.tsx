@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
+import { useTranslations } from "next-intl"
 import {
   Collapsible,
   CollapsibleContent,
@@ -10,6 +11,19 @@ import {
 } from "@/components/ui/collapsible"
 import { getWorkspaceNavForPath } from "@/lib/workspace-nav"
 import { cn } from "@/utils/cn"
+
+/**
+ * Sistem workspace nav URL'leri → `SystemNav` mesaj anahtarı. Yalnız
+ * sistem menü öğeleri lokalize edilir; workspace (ERP domain terimleri)
+ * öğeleri veri metinleriyle aynen kalır.
+ */
+const SYSTEM_NAV_KEYS: Record<string, string> = {
+  "/": "home",
+  "/my/settings": "my_settings",
+  "/system/users": "system_users",
+  "/system/agents": "system_agents",
+  "/system/skills": "system_skills",
+}
 
 const rowClass =
   "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors"
@@ -35,6 +49,13 @@ export function ModuleNavMenu({
 }: ModuleNavMenuProps = {}) {
   const pathname = usePathname()
   const items = getWorkspaceNavForPath(pathname)
+  const tNav = useTranslations("SystemNav")
+
+  /** Sistem URL'leri mesaj kataloğundan çözülür; diğerleri veri metniyle kalır. */
+  const localizedTitle = (url: string, fallback: string): string => {
+    const key = SYSTEM_NAV_KEYS[url]
+    return key ? tNav(key) : fallback
+  }
 
   return (
     <section className={cn("flex h-full min-w-0 flex-col", className)}>
@@ -55,25 +76,25 @@ export function ModuleNavMenu({
             const isActive = item.url === pathname
             return (
               <Link
-                key={item.title}
+                key={item.url}
                 href={item.url}
                 className={cn(rowClass, isActive ? rowActiveClass : rowStyleClass)}
               >
                 <Icon className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{item.title}</span>
+                <span className="truncate">{localizedTitle(item.url, item.title)}</span>
               </Link>
             )
           }
 
           return (
             <Collapsible
-              key={item.title}
+              key={item.url}
               defaultOpen={Boolean(isChildActive)}
               className="group/nav-item"
             >
               <CollapsibleTrigger className={cn(rowClass, "w-full", rowStyleClass)}>
                 <Icon className="size-3.5 shrink-0" aria-hidden />
-                <span className="min-w-0 truncate text-left">{item.title}</span>
+                <span className="min-w-0 truncate text-left">{localizedTitle(item.url, item.title)}</span>
                 <ChevronRight
                   className="ml-auto size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/nav-item:rotate-90"
                   aria-hidden
@@ -85,11 +106,11 @@ export function ModuleNavMenu({
                     const isActive = subItem.url === pathname
                     return (
                       <Link
-                        key={subItem.title}
+                        key={subItem.url}
                         href={subItem.url}
                         className={cn(rowClass, "py-1", isActive ? rowActiveClass : rowStyleClass)}
                       >
-                        <span className="truncate">{subItem.title}</span>
+                        <span className="truncate">{localizedTitle(subItem.url, subItem.title)}</span>
                       </Link>
                     )
                   })}

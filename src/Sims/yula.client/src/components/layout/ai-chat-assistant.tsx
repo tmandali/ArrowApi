@@ -208,6 +208,7 @@ import { navigateToConversationScreen } from "@/lib/yula-history-navigation"
 
 export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = {}) {
   const t = useTranslations("ChatAssistant")
+  const tScreen = useTranslations("ScreenLabels")
   const activeId = useChatsStore((s) => s.activeId)
   const conversations = useChatsStore((s) => s.conversations)
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
@@ -221,7 +222,7 @@ export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = 
     [conversations, activeId]
   )
 
-  const screenLabel = formatPathnameLabel(pathname) || "Ekran"
+  const screenLabel = formatPathnameLabel(pathname, (k) => tScreen(k)) || tScreen("fallback")
 
   // Dock başlığı: kayıtlı başlık yoksa (New / "Yeni Sohbet") aktif ajan
   // adı gösterilir; ajan yoksa varsayılan Yula. useDockAgent ile aynı
