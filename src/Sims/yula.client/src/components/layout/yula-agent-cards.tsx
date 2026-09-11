@@ -118,7 +118,7 @@ export function YulaAgentCards({
                     {a.name}
                   </h3>
                   <span className="flex shrink-0 items-center gap-0.5">
-                    {isActive ? (
+                    {isActive && !isLanding ? (
                       <Check className="size-3.5 text-primary shrink-0" />
                     ) : null}
                     <span
