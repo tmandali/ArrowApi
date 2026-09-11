@@ -191,7 +191,7 @@ export function WorkspaceLandingTemplate({
                         {action.dueDate}
                       </span>
                     )}
-                    <div className="flex size-6 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary group-hover:bg-primary/10 transition-colors">
+                    <div className="flex size-6 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary transition-colors">
                       <ArrowUpRight className="size-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </div>
                   </div>
@@ -244,7 +244,7 @@ export function WorkspaceLandingTemplate({
                     </div>
                   </div>
 
-                  <div className="flex size-6 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary group-hover:bg-primary/10 transition-colors shrink-0">
+                  <div className="flex size-6 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0">
                     <ArrowUpRight className="size-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                   </div>
                 </Link>
