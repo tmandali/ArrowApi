@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { indexWorkspaceMenus } from "@/services/duckdb-vector";
@@ -18,6 +19,7 @@ export function StockPageForm() {
       showSearch={false}
       transparentHeader
       navOverlay
+      actions={<AIChatAssistant />}
     >
       <StockDashboard />
     </WorkspacePageShell>

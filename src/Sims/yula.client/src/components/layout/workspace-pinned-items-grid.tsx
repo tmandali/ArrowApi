@@ -18,21 +18,37 @@ import { WORKSPACE_CARDS } from "@/lib/workspace-cards";
 import { cn } from "@/utils/cn";
 
 function getCategoryIcon(category: string) {
+  return <PinnedCategoryIcon category={category} className="size-4" />;
+}
+
+/**
+ * Pinlenen menünün kategori ikonu (kendi ikonu): arama sonuçları, pin
+ * ızgarası ve landing kartları aynı eşlemeyi kullanır — AI/Sparkles
+ * ikonu yalnızca RAG-esintili sonuçlar içindir.
+ */
+export function PinnedCategoryIcon({
+  category,
+  className,
+}: {
+  category: string;
+  className?: string;
+}) {
+  const size = cn("shrink-0", className ?? "size-3.5");
   switch (category) {
     case "Katalog":
-      return <Package className="size-4 shrink-0 text-primary" />;
+      return <Package className={cn(size, "text-primary")} />;
     case "İşlemler":
-      return <Receipt className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />;
+      return <Receipt className={cn(size, "text-amber-600 dark:text-amber-400")} />;
     case "Raporlar":
-      return <BarChart2 className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />;
+      return <BarChart2 className={cn(size, "text-blue-600 dark:text-blue-400")} />;
     case "Ayarlar":
-      return <Settings className="size-4 shrink-0 text-gray-500" />;
+      return <Settings className={cn(size, "text-gray-500")} />;
     case "Seri & Parti":
-      return <Scale className="size-4 shrink-0 text-purple-600 dark:text-purple-400" />;
+      return <Scale className={cn(size, "text-purple-600 dark:text-purple-400")} />;
     case "Araçlar":
-      return <Wrench className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />;
+      return <Wrench className={cn(size, "text-emerald-600 dark:text-emerald-400")} />;
     default:
-      return <Package className="size-4 shrink-0 text-primary" />;
+      return <Package className={cn(size, "text-primary")} />;
   }
 }
 

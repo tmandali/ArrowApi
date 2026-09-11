@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Pin,
   PinOff,
@@ -11,12 +11,16 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Sparkles,
   ArrowUpRight,
   type LucideIcon,
 } from "lucide-react";
+import { PinnedCategoryIcon } from "@/components/layout/workspace-pinned-items-grid";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
+import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { YulaAgentCards } from "@/components/layout/yula-agent-cards";
+import { useUserAgentsStore } from "@/lib/stores/user-agents";
+import { filterAgentsByScope } from "@/lib/yula-user-agent";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import {
@@ -99,6 +103,7 @@ export function WorkspaceLandingTemplate({
   floatingOpenButton,
 }: WorkspaceLandingTemplateProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const detectedDef = React.useMemo(() => {
     if (propWorkspaceId) return getWorkspace(propWorkspaceId);
@@ -108,6 +113,14 @@ export function WorkspaceLandingTemplate({
   const activeId: WorkspaceId = detectedDef.id;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(activeId);
   const { pinnedCharts, unpinChart } = usePinnedCharts(activeId);
+
+  // Ajan kartları: ayarlarında bu workspace (veya global) kapsamı tanımlı
+  // ajan varsa gösterilir; kapsam dışı/hiç ajan yoksa bölüm render edilmez.
+  const agents = useUserAgentsStore((s) => s.agents);
+  const scopedAgents = React.useMemo(
+    () => filterAgentsByScope(agents, activeId),
+    [agents, activeId],
+  );
 
   const rawData = React.useMemo(() => {
     return getWorkspaceLandingData(activeId);
@@ -124,159 +137,7 @@ export function WorkspaceLandingTemplate({
     <div className="flex-1 w-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 space-y-7 transition-all duration-300 ease-in-out">
 
-        {/* 1. Sade & Sakin Karşılama Başlığı (AppHeader'da arama ve profil zaten mevcut) */}
-        <div className="space-y-1">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">
-            {data.greetingTitle}
-          </h1>
-          <p className="text-xs text-muted-foreground/75 leading-relaxed max-w-2xl">
-            {data.greetingDescription}
-          </p>
-        </div>
-
-        {/* 2. Sabitlenen Menüler (Pinned Items) - Sade pill & hafif chip görünümü */}
-        {pinnedItems.length > 0 ? (
-          <section className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
-              <Pin className="size-3 text-amber-500/80" />
-              <span>Sabitlenen Menüler</span>
-              <span className="text-[10px] text-muted-foreground/60">({pinnedItems.length})</span>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {pinnedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="group flex items-center gap-2 rounded-lg bg-muted/40 hover:bg-muted/70 px-3 py-1.5 transition-colors"
-                >
-                  <Link
-                    href={item.url}
-                    className="flex items-center gap-2 min-w-0"
-                  >
-                    <Sparkles className="size-3 text-muted-foreground/60 group-hover:text-primary transition-colors" />
-                    <span className="text-xs font-medium text-foreground/90 group-hover:text-primary transition-colors">
-                      {item.title}
-                    </span>
-                    {item.titleTr && item.titleTr !== item.title && (
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {item.titleTr}
-                      </span>
-                    )}
-                  </Link>
-
-                  <button
-                    type="button"
-                    title="İğneyi Kaldır"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      unpinItem(item.id);
-                    }}
-                    className="text-muted-foreground/40 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer pl-1"
-                  >
-                    <PinOff className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* 2b. Sabitlenen Grafikler — Yula chart pin’leri; tıklayınca kaynak rapora gider */}
-        {pinnedCharts.length > 0 ? (
-          <section className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
-              <Pin className="size-3 text-amber-500/80" />
-              <span>Sabitlenen Grafikler</span>
-              <span className="text-[10px] text-muted-foreground/60">
-                ({pinnedCharts.length})
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {pinnedCharts.map((chart) => (
-                <div key={chart.id} className="group relative">
-                  <Link
-                    href={chart.sourceHref}
-                    className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
-                    title="Kaynak raporu grafik sorgusuyla aç"
-                    onClick={() => {
-                      savePinnedChartAsAiView(chart);
-                      requestAiView(
-                        getPinnedChartViewId(chart),
-                        chart.reportScope,
-                      );
-                    }}
-                  >
-                    <YulaChartCard
-                      output={pinnedChartToOutput(chart)}
-                      compact
-                      pinEnabled={false}
-                      showGridAction={false}
-                      borderless
-                      className="transition-colors group-hover:bg-muted/40"
-                    />
-                  </Link>
-                  <button
-                    type="button"
-                    title="İğneyi Kaldır"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      unpinChart(chart.id);
-                    }}
-                    className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
-                  >
-                    <PinOff className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* 3. Soft KPI Alanı - Bordersız, sade, nefes alan metrikler */}
-        <section className="space-y-2">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {data.kpis.map((kpi) => {
-              const tone = softToneClasses[kpi.tone] ?? softToneClasses.slate;
-              const KpiIcon = kpi.icon;
-              return (
-                <div
-                  key={kpi.id}
-                  className="rounded-xl bg-muted/25 hover:bg-muted/40 p-3.5 transition-colors space-y-1.5"
-                >
-                  <div className="flex items-center justify-between gap-1 text-xs text-muted-foreground/75">
-                    <span className="line-clamp-1">{kpi.title}</span>
-                    {KpiIcon && <KpiIcon className="size-3.5 opacity-60 shrink-0" />}
-                  </div>
-
-                  <div className="text-lg font-semibold tracking-tight text-foreground">
-                    {kpi.value}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-[11px]">
-                    {kpi.change && (
-                      <span className={cn("inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-medium", tone.badge)}>
-                        {kpi.trend === "up" && <TrendingUp className="size-2.5" />}
-                        {kpi.trend === "down" && <TrendingDown className="size-2.5" />}
-                        {kpi.trend === "flat" && <Minus className="size-2.5" />}
-                        <span>{kpi.change}</span>
-                      </span>
-                    )}
-                    {kpi.subtext && (
-                      <span className="text-[10px] text-muted-foreground/60 truncate">
-                        {kpi.subtext}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 4. İşlem Bekleyenler ve Bana Atananlar - Sade, temiz, havadar liste yapısı */}
+        {/* 1. İşlem Bekleyenler ve Bana Atananlar - Sade, temiz, havadar liste yapısı */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-1">
 
           {/* Sol Kolon: İşlem Bekleyenler */}
@@ -393,38 +254,164 @@ export function WorkspaceLandingTemplate({
 
         </div>
 
-        {/* 5. Sık Kullanılan İşlemler - Sade ve narin link satırları */}
-        {data.quickShortcuts && data.quickShortcuts.length > 0 && (
+        {/* 2. Soft KPI Alanı - Bordersız, sade, nefes alan metrikler */}
+        <section className="space-y-2">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {data.kpis.map((kpi) => {
+              const tone = softToneClasses[kpi.tone] ?? softToneClasses.slate;
+              const KpiIcon = kpi.icon;
+              return (
+                <div
+                  key={kpi.id}
+                  className="rounded-xl bg-muted/25 hover:bg-muted/40 p-3.5 transition-colors space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-1 text-xs text-muted-foreground/75">
+                    <span className="line-clamp-1">{kpi.title}</span>
+                    {KpiIcon && <KpiIcon className="size-3.5 opacity-60 shrink-0" />}
+                  </div>
+
+                  <div className="text-lg font-semibold tracking-tight text-foreground">
+                    {kpi.value}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {kpi.change && (
+                      <span className={cn("inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-medium", tone.badge)}>
+                        {kpi.trend === "up" && <TrendingUp className="size-2.5" />}
+                        {kpi.trend === "down" && <TrendingDown className="size-2.5" />}
+                        {kpi.trend === "flat" && <Minus className="size-2.5" />}
+                        <span>{kpi.change}</span>
+                      </span>
+                    )}
+                    {kpi.subtext && (
+                      <span className="text-[10px] text-muted-foreground/60 truncate">
+                        {kpi.subtext}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 3. Ajan Kartları — kapsamda ajan varsa (global + bu workspace) */}
+        {scopedAgents.length > 0 ? (
+          <section>
+            <YulaAgentCards
+              workspaceId={activeId}
+              columns={4}
+              showCreate={false}
+              variant="landing"
+              onManage={(id) =>
+                router.push(
+                  id
+                    ? `/system/agents?edit=${encodeURIComponent(id)}`
+                    : "/system/agents",
+                )
+              }
+              className="max-w-full space-y-2 px-0 pt-0"
+            />
+          </section>
+        ) : null}
+
+        {/* 4. Sabitlenen Menüler - Hızlı Erişim kart görünümü */}
+        {pinnedItems.length > 0 ? (
           <section className="space-y-2 pt-1">
             <h2 className="text-xs font-medium text-muted-foreground/75">
               Hızlı Erişim
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {data.quickShortcuts.map((sc) => {
-                const ShortcutIcon = sc.icon;
-                return (
+              {pinnedItems.map((item) => (
+                <div key={item.id} className="group relative">
                   <Link
-                    key={sc.id}
-                    href={sc.url}
-                    className="group flex items-center gap-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 p-2.5 transition-colors"
+                    href={item.url}
+                    className="flex items-center gap-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 p-2.5 transition-colors"
                   >
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/60 text-muted-foreground group-hover:text-primary transition-colors">
-                      <ShortcutIcon className="size-3.5" />
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/60 transition-colors">
+                      <PinnedCategoryIcon category={item.category} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-medium text-foreground/90 group-hover:text-primary transition-colors truncate">
-                        {sc.title}
+                        {item.title}
                       </span>
-                      <span className="block text-[10px] text-muted-foreground/60 truncate">
-                        {sc.description}
-                      </span>
+                      {item.titleTr && item.titleTr !== item.title ? (
+                        <span className="block text-[10px] text-muted-foreground/60 truncate">
+                          {item.titleTr}
+                        </span>
+                      ) : null}
                     </div>
                   </Link>
-                );
-              })}
+                  <button
+                    type="button"
+                    title="İğneyi Kaldır"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      unpinItem(item.id);
+                    }}
+                    className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
+                  >
+                    <PinOff className="size-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           </section>
-        )}
+        ) : null}
+
+        {/* 4b. Sabitlenen Grafikler — Yula chart pin’leri; tıklayınca kaynak rapora gider */}
+        {pinnedCharts.length > 0 ? (
+          <section className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
+              <Pin className="size-3 text-amber-500/80" />
+              <span>Sabitlenen Grafikler</span>
+              <span className="text-[10px] text-muted-foreground/60">
+                ({pinnedCharts.length})
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {pinnedCharts.map((chart) => (
+                <div key={chart.id} className="group relative">
+                  <Link
+                    href={chart.sourceHref}
+                    className="block rounded-xl outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary/40"
+                    title="Kaynak raporu grafik sorgusuyla aç"
+                    onClick={() => {
+                      savePinnedChartAsAiView(chart);
+                      requestAiView(
+                        getPinnedChartViewId(chart),
+                        chart.reportScope,
+                      );
+                    }}
+                  >
+                    <YulaChartCard
+                      output={pinnedChartToOutput(chart)}
+                      compact
+                      pinEnabled={false}
+                      showGridAction={false}
+                      borderless
+                      className="transition-colors group-hover:bg-muted/40"
+                    />
+                  </Link>
+                  <button
+                    type="button"
+                    title="İğneyi Kaldır"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      unpinChart(chart.id);
+                    }}
+                    className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
+                  >
+                    <PinOff className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
       </div>
     </div>
@@ -440,6 +427,7 @@ export function WorkspaceLandingTemplate({
       showSearch={false}
       transparentHeader
       navOverlay
+      actions={<AIChatAssistant />}
       navMenuHeaderVisible={navMenuHeaderVisible}
       // Header'daki PagePanelTrigger menüyü açıp kapatır — overlay
       // pane'in ikinci (yüzen) açma butonu render edilmez.
