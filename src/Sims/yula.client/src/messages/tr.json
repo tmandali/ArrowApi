@@ -237,11 +237,34 @@
     "empty_chat_title": "Yeni Sohbet",
     "delete_conv": "Sohbeti sil"
   },
-  "WorkspaceSearch": {
-    "search_accounting": "Muhasebe & Finans modülleri ve sohbet geçmişinde ara...",
-    "search_stock": "Stock modülleri ve sohbet geçmişinde ara...",
-    "search_manufacturing": "Manufacturing & BOM modülleri ve sohbet geçmişinde ara...",
-    "search_subcontracting": "Fason & Satış modülleri ve sohbet geçmişinde ara...",
-    "search_all": "Modül, rapor ve sohbet geçmişinde ara..."
+  "ModuleNav": {
+    "open_menu": "Menüyü Aç (Ctrl+B)",
+    "open_menu_short": "Menüyü Aç",
+    "close_menu": "Menüyü kapat"
+  },
+  "ChatTurn": {
+    "copy_question": "Soruyu Kopyala",
+    "copy": "Kopyala",
+    "undo_edit": "Mesajı Geri Al ve Düzenle",
+    "undo_edit_short": "Geri Al ve Düzenle"
+  },
+  "ModelSelector": {
+    "select_model": "Yula AI Modeli Seç",
+    "thinking_mode": "Düşünme Modu (Thinking)",
+    "thinking_on": "Düşünme Modu Açık",
+    "thinking_off": "Düşünme Modu Kapalı"
+  },
+  "JobStarted": {
+    "job_started": "Rapor çalıştırıldı",
+    "job_id_label": "iş",
+    "open_result": "Sonuç ekranını açmak için tıklayın",
+    "open_result_btn": "Sonuçları aç"
+  },
+  "AgentManagement": {
+    "title": "Ajan Ayarları",
+    "delete_agent": "Ajanı sil",
+    "empty_state": "Henüz ajan yok — Yeni Ajan ile tanımlayın.",
+    "records": "kayıt",
+    "no_records": "kayıt yok"
   }
 }

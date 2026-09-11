@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { ReactNode } from "react"
+import { useTranslations } from "next-intl"
 import { PanelLeftOpen } from "lucide-react"
 import { ModuleNavMenu } from "@/components/layout/module-nav-menu"
 import {
@@ -57,6 +58,7 @@ export function ModuleNavPane({
   floatingOpenButton,
   overlay = false,
 }: ModuleNavPaneProps) {
+  const t = useTranslations("ModuleNav")
   const showOpenButton = floatingOpenButton ?? navMenuHeaderVisible
 
   const { open: navOpen } = usePagePanel({
@@ -113,18 +115,18 @@ export function ModuleNavPane({
             <button
               type="button"
               onClick={() => setOpen("module-nav", true)}
-              title="Menüyü Aç (Ctrl+B)"
+              title={t("open_menu")}
               className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground shadow-2xs backdrop-blur-xs transition-colors cursor-pointer"
             >
               <PanelLeftOpen className="size-3.5" />
-              <span className="sr-only">Menüyü Aç</span>
+              <span className="sr-only">{t("open_menu_short")}</span>
             </button>
           </div>
         )}
         {navOpen && (
           <button
             type="button"
-            aria-label="Menüyü kapat"
+              aria-label={t("close_menu")}
             onClick={() => setOpen("module-nav", false)}
             className="absolute inset-0 z-30 cursor-default bg-background/40 backdrop-blur-[1px]"
           />
@@ -180,11 +182,11 @@ export function ModuleNavPane({
             <button
               type="button"
               onClick={() => setOpen("module-nav", true)}
-              title="Menüyü Aç (Ctrl+B)"
+              title={t("open_menu")}
               className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground shadow-2xs backdrop-blur-xs transition-colors cursor-pointer"
             >
               <PanelLeftOpen className="size-3.5" />
-              <span className="sr-only">Menüyü Aç</span>
+              <span className="sr-only">{t("open_menu_short")}</span>
             </button>
           </div>
         )}

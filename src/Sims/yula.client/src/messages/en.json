@@ -237,6 +237,36 @@
     "empty_chat_title": "New Chat",
     "delete_conv": "Delete conversation"
   },
+  "ModuleNav": {
+    "open_menu": "Open menu (Ctrl+B)",
+    "open_menu_short": "Open menu",
+    "close_menu": "Close menu"
+  },
+  "ChatTurn": {
+    "copy_question": "Copy question",
+    "copy": "Copy",
+    "undo_edit": "Undo and edit message",
+    "undo_edit_short": "Undo and edit"
+  },
+  "ModelSelector": {
+    "select_model": "Select Yula AI Model",
+    "thinking_mode": "Thinking Mode",
+    "thinking_on": "Thinking Mode On",
+    "thinking_off": "Thinking Mode Off"
+  },
+  "JobStarted": {
+    "job_started": "Report started",
+    "job_id_label": "job",
+    "open_result": "Click to open results screen",
+    "open_result_btn": "Open results"
+  },
+  "AgentManagement": {
+    "title": "Agent Settings",
+    "delete_agent": "Delete agent",
+    "empty_state": "No agents yet — define one with New Agent.",
+    "records": "records",
+    "no_records": "no records"
+  },
   "WorkspaceSearch": {
     "search_accounting": "Search accounting & finance modules and chat history...",
     "search_stock": "Search stock modules and chat history...",

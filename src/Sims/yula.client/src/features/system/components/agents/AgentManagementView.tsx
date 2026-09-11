@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
 import { agentSessionPath } from "@/lib/workspace-paths";
 import {
@@ -25,6 +26,7 @@ import { AgentEditor, type AgentEditorHandle, type AgentEditorMode } from "./age
  * Solda ajan listesi, sağda seçili ajanın düzenleme formu.
  */
 export function AgentManagementView() {
+  const t = useTranslations("AgentManagement")
   const router = useRouter();
   const agents = useUserAgentsStore((s) => s.agents);
   const activeAgentId = useUserAgentsStore((s) => s.activeAgentId);
@@ -108,7 +110,7 @@ export function AgentManagementView() {
     <ManagementPageTemplate
       title={
         <>
-          Ajan Ayarları
+          {t("title")}
           {selection != null ? (
             <span className="font-normal text-muted-foreground"> - {detailTitle}</span>
           ) : null}
@@ -164,11 +166,11 @@ export function AgentManagementView() {
               size="sm"
               className="h-7 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => editorRef.current?.remove()}
-              title="Ajanı sil"
-              aria-label="Ajanı sil"
+              title={t("delete_agent")}
+              aria-label={t("delete_agent")}
             >
               <Trash2 className="size-3.5" />
-              Delete
+              {t("delete_agent")}
             </Button>
           ) : null}
           {(() => {
@@ -228,12 +230,12 @@ export function AgentManagementView() {
         <>
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <Bot className={panelHeaderIconClass} aria-hidden />
-            <span className={panelHeaderTitleClass}>Ajan Ayarları</span>
+            <span className={panelHeaderTitleClass}>{t("title")}</span>
           </div>
           <span className={panelHeaderSubtitleClass}>
             {agents.length > 0
-              ? `${agents.length} kayıt`
-              : "kayıt yok"}
+              ? `${agents.length} ${t("records")}`
+              : t("no_records")}
           </span>
         </>
       }
@@ -241,7 +243,7 @@ export function AgentManagementView() {
         agents.length === 0 ? (
           <div className="flex h-full min-h-48 items-center justify-center p-4">
             <p className="text-center text-[12px] text-muted-foreground">
-              Henüz ajan yok — Yeni Ajan ile tanımlayın.
+              {t("empty_state")}
             </p>
           </div>
         ) : (
@@ -271,8 +273,8 @@ export function AgentManagementView() {
                         <span
                           role="button"
                           tabIndex={0}
-                          title="Ajanı sil"
-                          aria-label={`${a.name} ajanını sil`}
+              title={t("delete_agent")}
+              aria-label={`${a.name} ${t("delete_agent")}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             handleRowDelete(a.id);

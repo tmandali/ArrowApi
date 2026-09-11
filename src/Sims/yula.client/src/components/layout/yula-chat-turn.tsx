@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
@@ -187,6 +188,7 @@ export function YulaChatTurn({
   const [userPromptOpen, setUserPromptOpen] = React.useState(false);
 
   // Kullanıcı mesajının metni
+  const t = useTranslations("ChatTurn")
   const userText = React.useMemo(() => {
     if (!userMessage) return "";
     return userMessage.parts
@@ -357,14 +359,14 @@ export function YulaChatTurn({
                   variant="ghost"
                   className="size-6 shrink-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 border-0 bg-transparent shadow-none"
                   onClick={handleCopyUserText}
-                  title="Soruyu Kopyala"
+                  title={t("copy_question")}
                 >
                   {copied ? (
                     <Check className="size-3.5 text-emerald-500" />
                   ) : (
                     <Copy className="size-3.5" />
                   )}
-                  <span className="sr-only">Kopyala</span>
+                  <span className="sr-only">{t("copy")}</span>
                 </Button>
 
                 <Button
@@ -373,10 +375,10 @@ export function YulaChatTurn({
                   variant="ghost"
                   className="size-6 shrink-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 border-0 bg-transparent shadow-none"
                   onClick={handleUndoUserMessage}
-                  title="Mesajı Geri Al ve Düzenle"
+                  title={t("undo_edit")}
                 >
                   <Undo2 className="size-3.5" />
-                  <span className="sr-only">Geri Al ve Düzenle</span>
+                  <span className="sr-only">{t("undo_edit_short")}</span>
                 </Button>
               </div>
             ) : null}

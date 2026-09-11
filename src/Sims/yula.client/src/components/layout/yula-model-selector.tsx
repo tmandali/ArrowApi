@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Check, ChevronDown, Brain, Eye, Wrench, Volume2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -209,6 +210,7 @@ function formatModelOption(id: string): ModelOption {
 }
 
 export function YulaModelSelector({ className }: { className?: string }) {
+  const t = useTranslations("ModelSelector")
   const { model, setModel, isThinkingEnabled, setThinkingEnabled } = useYulaChat();
   const [open, setOpen] = React.useState(false);
   const [installedModels, setInstalledModels] = React.useState<ModelOption[]>([]);
@@ -332,7 +334,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
             open && "bg-muted/80 text-foreground border-border/60",
             className
           )}
-          title="Yula AI Modeli Seç"
+          title={t("select_model")}
         >
           <span className="truncate max-w-[150px] font-semibold text-foreground/90">
             {activeModelInfo.name}
@@ -430,7 +432,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
         <div className="mt-1 pt-1.5 border-t border-border/60 px-2 py-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-foreground/90 select-none">
             <Brain className="size-3.5 text-primary shrink-0" />
-            <span>Düşünme Modu (Thinking)</span>
+            <span>{t("thinking_mode")}</span>
           </div>
           <button
             type="button"
@@ -441,7 +443,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
               "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
               isThinkingEnabled ? "bg-primary" : "bg-muted-foreground/30"
             )}
-            title={isThinkingEnabled ? "Düşünme Modu Açık" : "Düşünme Modu Kapalı"}
+            title={isThinkingEnabled ? t("thinking_on") : t("thinking_off")}
           >
             <span
               className={cn(
@@ -458,6 +460,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
 
 /** Yalnızca düşünme anahtarı (ajan seçiminin yanına; model seçicisiz toolbar için) */
 export function YulaThinkingToggle({ className }: { className?: string }) {
+  const t = useTranslations("ModelSelector")
   const { isThinkingEnabled, setThinkingEnabled } = useYulaChat();
   return (
     <span className={cn("inline-flex items-center gap-1", className)}>
@@ -471,7 +474,7 @@ export function YulaThinkingToggle({ className }: { className?: string }) {
           "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
           isThinkingEnabled ? "bg-primary" : "bg-muted-foreground/30"
         )}
-        title={isThinkingEnabled ? "Düşünme Modu Açık" : "Düşünme Modu Kapalı"}
+        title={isThinkingEnabled ? t("thinking_on") : t("thinking_off")}
       >
         <span
           className={cn(
