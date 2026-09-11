@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { ChevronDown, Wrench } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChatMarkdown } from "./chat-markdown";
@@ -26,6 +27,7 @@ export function ToolExecPanel({
   isError?: boolean;
   className?: string;
 }) {
+  const t = useTranslations("ToolExec")
   const [open, setOpen] = React.useState(false);
 
   const payload: Record<string, unknown> = {};
@@ -57,7 +59,7 @@ export function ToolExecPanel({
               : "text-sky-500/80 dark:text-sky-400/80",
           )}
         />
-        <span>Araç Çalıştırma</span>
+        <span>{t("tool_execution")}</span>
         <span className="font-normal text-foreground/60">· {toolName}</span>
         <ChevronDown className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/exec:rotate-180" />
       </CollapsibleTrigger>

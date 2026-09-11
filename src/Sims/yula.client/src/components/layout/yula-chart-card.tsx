@@ -168,6 +168,7 @@ export function YulaChartCard({
   showGridAction?: boolean;
   borderless?: boolean;
 }) {
+  const t = useTranslations("ChartCard")
   const parsed = React.useMemo(() => parseChartOutput(output), [output]);
   const uid = React.useId().replace(/:/g, "");
   const pathname = usePathname() ?? "/";
@@ -321,8 +322,8 @@ export function YulaChartCard({
               onClick={handleTogglePin}
               title={
                 pinned
-                  ? "Workspace ana sayfasından kaldır"
-                  : "Workspace ana sayfasına sabitle"
+                  ? t("unpin_from_home")
+                  : t("pin_to_home")
               }
               aria-pressed={pinned}
               className={cn(
@@ -339,7 +340,7 @@ export function YulaChartCard({
             <button
               type="button"
               onClick={handleShowInGrid}
-              title="Grafik sorgusu sonucunu ekrandaki gridte göster"
+              title={t("show_in_grid")}
               className="flex cursor-pointer items-center justify-center p-0.5 text-muted-foreground/70 transition-colors hover:text-orange-600 dark:hover:text-orange-400"
             >
               <Table className="size-3.5" />

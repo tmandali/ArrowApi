@@ -315,5 +315,30 @@
     "delete_execution": "Çalışmayı sil",
     "run_plural": "çalışma",
     "rows_plural": "satır"
+  },
+  "ToolExec": {
+    "tool_execution": "Araç Çalıştırma"
+  },
+  "WorkedAccordion": {
+    "worked_for": "{{timeLabel}} saniye çalıştı",
+    "step": "adım",
+    "steps": "adım"
+  },
+  "ChartCard": {
+    "unpin_from_home": "Çalışma alanı ana sayfasından kaldır",
+    "pin_to_home": "Çalışma alanı ana sayfasına sabitle",
+    "show_in_grid": "Grafik sorgusu sonucunu ekrandaki gridte göster"
+  },
+  "QuickChips": {
+    "top5_charts": "En Yüksek 5 Grafik",
+    "top5_charts_prompt": "En yüksek ilk 5 kaydı grafikle özetle",
+    "anomaly_risk": "Anomali & Risk",
+    "anomaly_risk_prompt": "/analiz",
+    "sql_analysis": "SQL Analizi & Öneri",
+    "sql_analysis_prompt": "Tabloyu SQL uzmanı gibi analiz et: profili çıkar, önerilerini ve doğrulama sorgularını paylaş",
+    "explain_columns": "Kolonları Açıkla",
+    "explain_columns_prompt": "Bu raporun kolonlarını açıkla",
+    "clear_filters": "Filtreleri Temizle",
+    "clear_filters_prompt": "Aktif filtreleri temizle ve tabloyu sıfırla"
   }
 }

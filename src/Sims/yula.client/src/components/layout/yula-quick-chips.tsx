@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { usePathname } from "next/navigation";
 import { BarChart2, RotateCcw, AlertTriangle, Package, Database, FileText } from "lucide-react";
 import { useYulaChat } from "@/hooks/use-yula-chat";
@@ -15,15 +16,16 @@ export interface QuickChip {
 }
 
 /** Sonuç evresi — slash komutlarıyla aynı iş (grid açıkken). Anomali = /analiz. */
-const RESULT_CHIPS: QuickChip[] = [
-  { label: "En Yüksek 5 Grafik", prompt: "En yüksek ilk 5 kaydı grafikle özetle", icon: BarChart2 },
-  { label: "Anomali & Risk", prompt: "/analiz", icon: AlertTriangle },
-  { label: "SQL Analizi & Öneri", prompt: "Tabloyu SQL uzmanı gibi analiz et: profili çıkar, önerilerini ve doğrulama sorgularını paylaş", icon: Database },
-  { label: "Kolonları Açıkla", prompt: "Bu raporun kolonlarını açıkla", icon: FileText },
-  { label: "Filtreleri Temizle", prompt: "Aktif filtreleri temizle ve tabloyu sıfırla", icon: RotateCcw },
+const RESULT_CHIPS_TEMPLATE: Omit<QuickChip, "prompt">[] = [
+  { labelKey: "top5_charts", icon: BarChart2 },
+  { labelKey: "anomaly_risk", icon: AlertTriangle },
+  { labelKey: "sql_analysis", icon: Database },
+  { labelKey: "explain_columns", icon: FileText },
+  { labelKey: "clear_filters", icon: RotateCcw },
 ];
 
 export function YulaQuickActionChips() {
+  const t = useTranslations("QuickChips")
   const { sendMessageText, busy } = useYulaChat();
   const pathname = usePathname();
   const selectedJobId =
@@ -33,16 +35,22 @@ export function YulaQuickActionChips() {
   const isViewingResults = isReportResultPath(pathname) || Boolean(selectedJobId);
 
   const chips = React.useMemo<QuickChip[]>(() => {
-    if (isViewingResults) return RESULT_CHIPS;
-    const path = (pathname ?? "/").split("?")[0] || "/";
+    if (isViewingResults) {
+      return RESULT_CHIPS_TEMPLATE.map((c) => ({
+        ...c,
+        label: t(c.labelKey),
+        prompt: c.labelKey === "anomaly_risk" ? "/analiz" : t(`${c.labelKey}_prompt`),
+      }))
+    }
+    const path = (pathname ?? "/").split("?")[0] || "/"
     return REGISTERED_REPORTS.filter(
       (r) => path !== r.pagePath && !path.startsWith(`${r.pagePath}/`),
     ).map<QuickChip>((r) => ({
       label: r.title,
       prompt: `${r.title} hazırla`,
       icon: Package,
-    }));
-  }, [isViewingResults, pathname]);
+    }))
+  }, [isViewingResults, pathname, t])
 
   if (chips.length === 0) return null;
 

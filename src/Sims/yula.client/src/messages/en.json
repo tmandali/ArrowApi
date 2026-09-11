@@ -315,5 +315,30 @@
     "delete_execution": "Delete execution",
     "run_plural": "run",
     "rows_plural": "row"
+  },
+  "ToolExec": {
+    "tool_execution": "Tool Execution"
+  },
+  "WorkedAccordion": {
+    "worked_for": "Worked for {{timeLabel}}s",
+    "step": "step",
+    "steps": "steps"
+  },
+  "ChartCard": {
+    "unpin_from_home": "Remove from workspace homepage",
+    "pin_to_home": "Pin to workspace homepage",
+    "show_in_grid": "Show chart query result in the on-screen grid"
+  },
+  "QuickChips": {
+    "top5_charts": "Top 5 Charts",
+    "top5_charts_prompt": "Summarize the top 5 records with charts",
+    "anomaly_risk": "Anomaly & Risk",
+    "anomaly_risk_prompt": "/analyze",
+    "sql_analysis": "SQL Analysis & Suggestions",
+    "sql_analysis_prompt": "Analyze the table like a SQL expert: profile it, share suggestions and verification queries",
+    "explain_columns": "Explain Columns",
+    "explain_columns_prompt": "Explain the columns of this report",
+    "clear_filters": "Clear Filters",
+    "clear_filters_prompt": "Clear active filters and reset the table"
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { copyToClipboard } from "@/lib/clipboard";
 import {
   ChevronRight,
@@ -47,6 +48,7 @@ export function YulaWorkedAccordion({
   conversationId,
   className,
 }: YulaWorkedAccordionProps) {
+  const t = useTranslations("WorkedAccordion")
   const [open, setOpen] = React.useState(isLive);
   const [userToggled, setUserToggled] = React.useState(false);
   const [liveTimer, setLiveTimer] = React.useState(0);
@@ -76,7 +78,7 @@ export function YulaWorkedAccordion({
   /** "Worked for" başlığı + tüm adım detayları + nihai cevap metni */
   const buildFullCopyText = (): string => {
     const sections: string[] = [];
-    sections.push(`Worked for ${timeLabel}s`);
+    sections.push(`${t("worked_for", { timeLabel })}`);
 
     steps.forEach((step, index) => {
       const lines = [`${index + 1}. ${step.label}${step.subLabel ? ` (${step.subLabel})` : ""}`];
@@ -239,7 +241,7 @@ export function YulaWorkedAccordion({
           )}
         >
           <span className="font-sans text-foreground/90 font-medium flex items-center gap-1">
-            <span>Worked for {timeLabel}s</span>
+            <span>{t("worked_for", { timeLabel })}</span>
           </span>
 
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-data-[state=open]/worked:rotate-90" />
@@ -295,7 +297,7 @@ export function YulaWorkedAccordion({
                       {phase.label}
                     </span>
                     <span className="font-mono text-[10.5px] text-muted-foreground/70">
-                      {phase.steps.length} {phase.steps.length === 1 ? "step" : "steps"}
+                      {phase.steps.length} {phase.steps.length === 1 ? t("step") : t("steps")}
                     </span>
                     <ChevronRight
                       className={cn(
