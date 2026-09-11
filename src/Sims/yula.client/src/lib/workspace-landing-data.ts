@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { ComponentType } from "react";
 import {
   TrendingUp,
@@ -55,7 +56,7 @@ export interface WorkspaceAssignedTask {
   subtitle: string;
   priority: "high" | "medium" | "low";
   priorityLabel: string;
-  deadline: string;
+  deadline?: string;
   assignedBy?: string;
   targetUrl: string;
 }
@@ -79,840 +80,287 @@ export interface WorkspaceLandingData {
   quickShortcuts: WorkspaceQuickShortcut[];
 }
 
-export const WORKSPACE_LANDING_PRESETS: Record<WorkspaceId, WorkspaceLandingData> = {
+/**
+ * Workspace landing demo verisinin METİN katmanı (`messages/<locale>.json`
+ * → `WorkspaceLanding.<workspace>` alt ağacı). Modül yalnız yapısal alanları
+ * (id, ikon, ton, trend, url, kod) tutar; okunur metinler locale'den gelir.
+ */
+export interface WorkspaceLandingText {
+  greeting: { title: string; description: string };
+  kpis: Record<
+    string,
+    { title: string; value: string; change?: string; subtext?: string }
+  >;
+  pending_actions: Record<
+    string,
+    {
+      title: string;
+      description: string;
+      status_label: string;
+      amount?: string;
+      due?: string;
+      action_label: string;
+    }
+  >;
+  assigned_tasks: Record<
+    string,
+    {
+      title: string;
+      subtitle: string;
+      priority_label: string;
+      deadline?: string;
+      assigned_by?: string;
+    }
+  >;
+  quick_shortcuts: Record<
+    string,
+    { title: string; description: string; badge?: string }
+  >;
+}
+
+interface StructuralKpi {
+  id: string;
+  trend: "up" | "down" | "flat";
+  tone: SoftTone;
+  icon?: ComponentType<{ className?: string }>;
+}
+
+interface StructuralPendingAction {
+  id: string;
+  code: string;
+  status: "urgent" | "pending" | "review";
+  actionUrl: string;
+  categoryIcon?: ComponentType<{ className?: string }>;
+}
+
+interface StructuralAssignedTask {
+  id: string;
+  priority: "high" | "medium" | "low";
+  targetUrl: string;
+}
+
+interface StructuralQuickShortcut {
+  id: string;
+  url: string;
+  icon: ComponentType<{ className?: string }>;
+}
+
+interface StructuralLanding {
+  kpis: StructuralKpi[];
+  pendingActions: StructuralPendingAction[];
+  assignedTasks: StructuralAssignedTask[];
+  quickShortcuts: StructuralQuickShortcut[];
+}
+
+/** Yapısal preset'ler — ikon/tren/ton/url/kod (metin içermez). */
+export const WORKSPACE_LANDING_STRUCTURE: Record<WorkspaceId, StructuralLanding> = {
   selling: {
-    workspaceId: "selling",
-    greetingTitle: "Satış & Müşteri Yönetimi",
-    greetingDescription: "Açık siparişler, müşteri teklifleri ve faturalanacak teslimatların anlık durumu.",
     kpis: [
-      {
-        id: "open-orders-val",
-        title: "Açık Sipariş Tutarı",
-        value: "₺482.500",
-        change: "+14.2% geçen aya göre",
-        trend: "up",
-        subtext: "18 aktif sipariş",
-        tone: "blue",
-        icon: ShoppingCart,
-      },
-      {
-        id: "to-be-invoiced",
-        title: "Faturalanacak Sevkiyatlar",
-        value: "₺126.800",
-        change: "6 teslimat bekliyor",
-        trend: "flat",
-        subtext: "İrsaliyesi kesilmiş",
-        tone: "amber",
-        icon: Receipt,
-      },
-      {
-        id: "quote-win-rate",
-        title: "Teklif Kazanma Oranı",
-        value: "%68.4",
-        change: "+5.1% bu çeyrek",
-        trend: "up",
-        subtext: "42 tekliften 29'u onaylandı",
-        tone: "emerald",
-        icon: TrendingUp,
-      },
-      {
-        id: "pending-approval",
-        title: "Onay Bekleyenler",
-        value: "5 Sipariş",
-        change: "2 adedi iskonto aşımı",
-        trend: "down",
-        subtext: "Yönetici onayı gerekli",
-        tone: "violet",
-        icon: AlertCircle,
-      },
+      { id: "open-orders-val", trend: "up", tone: "blue", icon: ShoppingCart },
+      { id: "to-be-invoiced", trend: "flat", tone: "amber", icon: Receipt },
+      { id: "quote-win-rate", trend: "up", tone: "emerald", icon: TrendingUp },
+      { id: "pending-approval", trend: "down", tone: "violet", icon: AlertCircle },
     ],
     pendingActions: [
-      {
-        id: "so-1092",
-        code: "SO-2026-0192",
-        title: "Teknosa Mağazacılık Satış Siparişi",
-        description: "150 Adet Endüstriyel Switch teslimatı için müşteri onayı alındı, sevkiyat onayı bekleniyor.",
-        status: "urgent",
-        statusLabel: "Sevke Hazır",
-        amountOrCount: "₺164.000",
-        dueDate: "Bugün 17:00",
-        actionUrl: "/selling",
-        actionLabel: "İrsaliye Oluştur",
-        categoryIcon: Truck,
-      },
-      {
-        id: "so-1088",
-        code: "SO-2026-0188",
-        title: "Arçelik Tedarik Siparişi Faturalandırma",
-        description: "Teslimat fişi (DN-2026-0045) tamamlandı, e-fatura kesilmeyi bekliyor.",
-        status: "pending",
-        statusLabel: "Faturalanacak",
-        amountOrCount: "₺92.400",
-        dueDate: "Kalan: 1 Gün",
-        actionUrl: "/selling",
-        actionLabel: "Fatura Kes",
-        categoryIcon: Receipt,
-      },
-      {
-        id: "qt-0421",
-        code: "QT-2026-0421",
-        title: "Aselsan Yıllık Yedek Parça Teklifi",
-        description: "Özel %12 iskonto tanımlandı. Satış Direktörü ikinci onayı bekleniyor.",
-        status: "review",
-        statusLabel: "Onay Bekliyor",
-        amountOrCount: "₺310.000",
-        dueDate: "Yarın",
-        actionUrl: "/selling",
-        actionLabel: "İncele & Onayla",
-        categoryIcon: FileText,
-      },
+      { id: "so-1092", code: "SO-2026-0192", status: "urgent", actionUrl: "/selling", categoryIcon: Truck },
+      { id: "so-1088", code: "SO-2026-0188", status: "pending", actionUrl: "/selling", categoryIcon: Receipt },
+      { id: "qt-0421", code: "QT-2026-0421", status: "review", actionUrl: "/selling", categoryIcon: FileText },
     ],
     assignedTasks: [
-      {
-        id: "task-sel-1",
-        title: "Koç Sistem Çerçeve Sözleşme Revizyonu",
-        subtitle: "Satış şartnamesindeki teslim sürelerini ve opsiyonları güncelle",
-        priority: "high",
-        priorityLabel: "Yüksek Öncelik",
-        deadline: "Bugün",
-        assignedBy: "Ahmet Yılmaz",
-        targetUrl: "/selling",
-      },
-      {
-        id: "task-sel-2",
-        title: "Geciken Müşteri Ödeme Takibi",
-        subtitle: "Vadesi 7 gün geçen 3 cari hesapla iletişime geç",
-        priority: "medium",
-        priorityLabel: "Orta Öncelik",
-        deadline: "2 Gün",
-        assignedBy: "Finans Departmanı",
-        targetUrl: "/selling",
-      },
-      {
-        id: "task-sel-3",
-        title: "Q3 Müşteri Memnuniyet Anketi İncelemesi",
-        subtitle: "B2B portal üzerinden gelen geri bildirimleri raporla",
-        priority: "low",
-        priorityLabel: "Normal",
-        deadline: "Bu Hafta",
-        assignedBy: "Sistem",
-        targetUrl: "/selling",
-      },
+      { id: "task-sel-1", priority: "high", targetUrl: "/selling" },
+      { id: "task-sel-2", priority: "medium", targetUrl: "/selling" },
+      { id: "task-sel-3", priority: "low", targetUrl: "/selling" },
     ],
     quickShortcuts: [
-      {
-        id: "new-sales-order",
-        title: "Yeni Satış Siparişi",
-        description: "Sipariş fişi oluştur",
-        url: "/selling",
-        icon: ShoppingCart,
-        badge: "Yeni",
-      },
-      {
-        id: "sales-analytics",
-        title: "Satış Analitiği",
-        description: "Müşteri ve bölge bazlı ciro",
-        url: "/selling/dashboard",
-        icon: BarChart3,
-      },
-      {
-        id: "delivery-tracking",
-        title: "Teslimat & İrsaliyeler",
-        description: "Açık ve sevk edilen mallar",
-        url: "/selling",
-        icon: Truck,
-      },
-      {
-        id: "customer-accounts",
-        title: "Müşteri Portföyü",
-        description: "Cari kartlar ve risk limitleri",
-        url: "/selling",
-        icon: Users,
-      },
+      { id: "new-sales-order", url: "/selling", icon: ShoppingCart },
+      { id: "sales-analytics", url: "/selling/dashboard", icon: BarChart3 },
+      { id: "delivery-tracking", url: "/selling", icon: Truck },
+      { id: "customer-accounts", url: "/selling", icon: Users },
     ],
   },
-
   stock: {
-    workspaceId: "stock",
-    greetingTitle: "Stok & Depo Operasyonları",
-    greetingDescription: "Depo giriş/çıkış hareketleri, kritik stok seviyeleri ve transfer taleplerinin genel durumu.",
     kpis: [
-      {
-        id: "critical-stock-count",
-        title: "Kritik Stok Uyarısı",
-        value: "14 Kalem",
-        change: "Asgari seviyenin altında",
-        trend: "down",
-        subtext: "Acil sipariş gerekiyor",
-        tone: "rose",
-        icon: AlertCircle,
-      },
-      {
-        id: "stock-receipts",
-        title: "Bekleyen Mal Kabuller",
-        value: "8 İrsaliye",
-        change: "4'ü gümrükten indi",
-        trend: "flat",
-        subtext: "Ana Depo Giriş",
-        tone: "blue",
-        icon: Boxes,
-      },
-      {
-        id: "warehouse-occupancy",
-        title: "Depo Doluluk Oranı",
-        value: "%78.2",
-        change: "+2.4% bu hafta",
-        trend: "up",
-        subtext: "Gebze & Tuzla depoları",
-        tone: "emerald",
-        icon: Package,
-      },
-      {
-        id: "stock-total-val",
-        title: "Aktif Stok Değeri",
-        value: "₺3.510.000",
-        change: "Dengeli maliyet",
-        trend: "flat",
-        subtext: "5 aktif lokasyonda",
-        tone: "slate",
-        icon: Scale,
-      },
+      { id: "critical-stock-count", trend: "down", tone: "rose", icon: AlertCircle },
+      { id: "stock-receipts", trend: "flat", tone: "blue", icon: Boxes },
+      { id: "warehouse-occupancy", trend: "up", tone: "emerald", icon: Package },
+      { id: "stock-total-val", trend: "flat", tone: "slate", icon: Scale },
     ],
     pendingActions: [
-      {
-        id: "stock-po-rec",
-        code: "PR-2026-0310",
-        title: "Tedarikçi Mal Kabulü - Alüminyum Profil",
-        description: "Gelen sevkiyat rampada bekliyor. Sayım ve kalite kontrol onayı verilmelidir.",
-        status: "urgent",
-        statusLabel: "Rampada Bekliyor",
-        amountOrCount: "4.200 Kg",
-        dueDate: "Kalan: 2 Saat",
-        actionUrl: "/stock/item",
-        actionLabel: "Mal Kabul Yap",
-        categoryIcon: Package,
-      },
-      {
-        id: "stock-min-reorder",
-        code: "MR-2026-0084",
-        title: "Kritik Stok Tamamlama Talebi",
-        description: "M5 Paslanmaz Vida stoğu emniyet sınırının altına düştü (Kalan: 120 adet).",
-        status: "pending",
-        statusLabel: "Sipariş Önerisi",
-        amountOrCount: "5.000 Adet",
-        dueDate: "Bugün",
-        actionUrl: "/stock/stock-balance",
-        actionLabel: "Satın Alma Aç",
-        categoryIcon: AlertCircle,
-      },
-      {
-        id: "stock-transfer",
-        code: "STE-2026-0155",
-        title: "Merkez Depo -> Üretim Deposu Transferi",
-        description: "Montaj hattı için rezerve edilen hammadde partisi transfer bekliyor.",
-        status: "review",
-        statusLabel: "Transfer Onayı",
-        amountOrCount: "18 Koli",
-        dueDate: "Yarın",
-        actionUrl: "/stock/stock-ledger",
-        actionLabel: "Hareketi Onayla",
-        categoryIcon: Truck,
-      },
+      { id: "stock-po-rec", code: "PR-2026-0310", status: "urgent", actionUrl: "/stock/item", categoryIcon: Package },
+      { id: "stock-min-reorder", code: "MR-2026-0084", status: "pending", actionUrl: "/stock/stock-balance", categoryIcon: AlertCircle },
+      { id: "stock-transfer", code: "STE-2026-0155", status: "review", actionUrl: "/stock/stock-ledger", categoryIcon: Truck },
     ],
     assignedTasks: [
-      {
-        id: "task-stk-1",
-        title: "Aylık Gebze Raf Sayım Mutabakatı",
-        subtitle: "Bölüm B-04 rafındaki elektronik komponentleri fiziksel say",
-        priority: "high",
-        priorityLabel: "Yüksek",
-        deadline: "Yarın 12:00",
-        assignedBy: "Depo Şefi",
-        targetUrl: "/stock/stock-balance",
-      },
-      {
-        id: "task-stk-2",
-        title: "Kusurlu İade Parça İncelemesi",
-        subtitle: "Müşteriden dönen 12 adet sürücü kartının durum raporu",
-        priority: "medium",
-        priorityLabel: "Orta",
-        deadline: "3 Gün",
-        assignedBy: "Kalite Güvence",
-        targetUrl: "/stock/item",
-      },
-      {
-        id: "task-stk-3",
-        title: "SKT / Raf Ömrü Kontrolü",
-        subtitle: "Kimyasal yapıştırıcıların kalan geçerlilik tarihlerini doğrula",
-        priority: "low",
-        priorityLabel: "Rutin",
-        deadline: "Bu Hafta",
-        assignedBy: "Sistem",
-        targetUrl: "/stock/stock-analytics",
-      },
+      { id: "task-stk-1", priority: "high", targetUrl: "/stock/stock-balance" },
+      { id: "task-stk-2", priority: "medium", targetUrl: "/stock/item" },
+      { id: "task-stk-3", priority: "low", targetUrl: "/stock/stock-analytics" },
     ],
     quickShortcuts: [
-      {
-        id: "stock-items",
-        title: "Stok Kartları (Items)",
-        description: "Tüm malzeme ve ürünler",
-        url: "/stock/item",
-        icon: Package,
-      },
-      {
-        id: "stock-balance",
-        title: "Stok Bakiyesi",
-        description: "Depo bazında anlık miktarlar",
-        url: "/stock/stock-balance",
-        icon: Scale,
-        badge: "WASM",
-      },
-      {
-        id: "stock-ledger",
-        title: "Stok Ekstresi (Ledger)",
-        description: "Giriş, çıkış ve maliyet hareketleri",
-        url: "/stock/stock-ledger",
-        icon: FileText,
-      },
-      {
-        id: "stock-analytics",
-        title: "Stok Analitiği",
-        description: "Devir hızı ve trendler",
-        url: "/stock/stock-analytics",
-        icon: BarChart3,
-      },
+      { id: "stock-items", url: "/stock/item", icon: Package },
+      { id: "stock-balance", url: "/stock/stock-balance", icon: Scale },
+      { id: "stock-ledger", url: "/stock/stock-ledger", icon: FileText },
+      { id: "stock-analytics", url: "/stock/stock-analytics", icon: BarChart3 },
     ],
   },
-
   accounting: {
-    workspaceId: "accounting",
-    greetingTitle: "Muhasebe & Finans Yönetimi",
-    greetingDescription: "Tahsilat ve ödeme takvimi, onay bekleyen e-faturalar ve nakit akış göstergeleri.",
     kpis: [
-      {
-        id: "receivables-due",
-        title: "Vadesi Gelen Tahsilatlar",
-        value: "₺348.000",
-        change: "Bu hafta 12 müşteri",
-        trend: "up",
-        subtext: "Planlanan nakit girişi",
-        tone: "emerald",
-        icon: TrendingUp,
-      },
-      {
-        id: "payables-due",
-        title: "Bekleyen Tedarikçi Ödemeleri",
-        value: "₺184.200",
-        change: "5 fatura onaylandı",
-        trend: "flat",
-        subtext: "Cuma günü ödeme listesi",
-        tone: "rose",
-        icon: CreditCard,
-      },
-      {
-        id: "pending-invoices",
-        title: "Onay Bekleyen e-Faturalar",
-        value: "9 Adet",
-        change: "Gelen portal kutusu",
-        trend: "flat",
-        subtext: "Eşleştirme bekleyen",
-        tone: "amber",
-        icon: Receipt,
-      },
-      {
-        id: "vat-period-days",
-        title: "KDV Beyannamesi",
-        value: "6 Gün Kaldı",
-        change: "Hesaplama tamamlandı",
-        trend: "flat",
-        subtext: "Son gönderim: 26'sı",
-        tone: "blue",
-        icon: Clock,
-      },
+      { id: "receivables-due", trend: "up", tone: "emerald", icon: TrendingUp },
+      { id: "payables-due", trend: "flat", tone: "rose", icon: CreditCard },
+      { id: "pending-invoices", trend: "flat", tone: "amber", icon: Receipt },
+      { id: "vat-period-days", trend: "flat", tone: "blue", icon: Clock },
     ],
     pendingActions: [
-      {
-        id: "acc-inv-match",
-        code: "INV-2026-884",
-        title: "Siemens Satın Alma Faturası Eşleştirme",
-        description: "İrsaliye ve PO ile gelen e-fatura arasında ₺1.200 kur farkı kontrol edilmelidir.",
-        status: "urgent",
-        statusLabel: "Mutabakat Gerekli",
-        amountOrCount: "₺74.200",
-        dueDate: "Bugün",
-        actionUrl: "/accounting",
-        actionLabel: "Mutabakat Yap",
-        categoryIcon: Receipt,
-      },
-      {
-        id: "acc-exp-approval",
-        code: "EXP-2026-0041",
-        title: "Saha Ekibi Masraf Formları Toplu Onayı",
-        description: "Satış temsilcilerinin seyahat ve konaklama harcamaları onay bekliyor.",
-        status: "pending",
-        statusLabel: "Yönetici Onayı",
-        amountOrCount: "₺18.650",
-        dueDate: "Yarın",
-        actionUrl: "/accounting",
-        actionLabel: "Masrafları Onayla",
-        categoryIcon: FileText,
-      },
-      {
-        id: "acc-bank-recon",
-        code: "BNK-2026-03",
-        title: "Garanti BBVA Otomatik Ekstre Eşleşmesi",
-        description: "Banka MT940 entegrasyonunda 4 adet tanımlanamayan cari havalesi mevcut.",
-        status: "review",
-        statusLabel: "Ekstre İnceleme",
-        amountOrCount: "₺42.000",
-        dueDate: "2 Gün",
-        actionUrl: "/accounting",
-        actionLabel: "Cariye Bağla",
-        categoryIcon: CreditCard,
-      },
+      { id: "acc-inv-match", code: "INV-2026-884", status: "urgent", actionUrl: "/accounting", categoryIcon: Receipt },
+      { id: "acc-exp-approval", code: "EXP-2026-0041", status: "pending", actionUrl: "/accounting", categoryIcon: FileText },
+      { id: "acc-bank-recon", code: "BNK-2026-03", status: "review", actionUrl: "/accounting", categoryIcon: CreditCard },
     ],
     assignedTasks: [
-      {
-        id: "task-acc-1",
-        title: "Mart Ayı Ba/Bs Formu Hazırlığı",
-        subtitle: "Hacmi ₺5.000 üzeri tedarikçiler ile mutabakat mektuplarını gönder",
-        priority: "high",
-        priorityLabel: "Kritik",
-        deadline: "2 Gün",
-        assignedBy: "Mali Müşavir",
-        targetUrl: "/accounting",
-      },
-      {
-        id: "task-acc-2",
-        title: "Kredi Kartı Slip Komisyon Denetimi",
-        subtitle: "Sanal POS komisyon kesintilerini banka oranlarıyla karşılaştır",
-        priority: "medium",
-        priorityLabel: "Orta",
-        deadline: "Bu Hafta",
-        assignedBy: "Finans Direktörü",
-        targetUrl: "/accounting",
-      },
-      {
-        id: "task-acc-3",
-        title: "Duran Varlık Amortisman Kayıtları",
-        subtitle: "Yeni alınan 2 adet CNC tezgahının amortisman fişlerini oluştur",
-        priority: "low",
-        priorityLabel: "Normal",
-        deadline: "Ay Sonu",
-        assignedBy: "Sistem",
-        targetUrl: "/accounting",
-      },
+      { id: "task-acc-1", priority: "high", targetUrl: "/accounting" },
+      { id: "task-acc-2", priority: "medium", targetUrl: "/accounting" },
+      { id: "task-acc-3", priority: "low", targetUrl: "/accounting" },
     ],
     quickShortcuts: [
-      {
-        id: "acc-general-ledger",
-        title: "Muavin & Defteri Kebir",
-        description: "Hesap planı ve hareket dökümü",
-        url: "/accounting",
-        icon: FileText,
-      },
-      {
-        id: "acc-fin-reports",
-        title: "Mali Tablolar",
-        description: "Bilanço ve Gelir Tablosu",
-        url: "/financial-reports",
-        icon: BarChart3,
-        badge: "Rapor",
-      },
-      {
-        id: "acc-sales-invoices",
-        title: "Satış Faturaları",
-        description: "e-Fatura & e-Arşiv listesi",
-        url: "/accounting",
-        icon: Receipt,
-      },
-      {
-        id: "acc-payment-plan",
-        title: "Ödeme & Tahsilat Planı",
-        description: "Nakit akışı ve vadeler",
-        url: "/accounting/dashboard",
-        icon: TrendingUp,
-      },
+      { id: "acc-general-ledger", url: "/accounting", icon: FileText },
+      { id: "acc-fin-reports", url: "/financial-reports", icon: BarChart3 },
+      { id: "acc-sales-invoices", url: "/accounting", icon: Receipt },
+      { id: "acc-payment-plan", url: "/accounting/dashboard", icon: TrendingUp },
     ],
   },
-
   manufacturing: {
-    workspaceId: "manufacturing",
-    greetingTitle: "Üretim & İmalat Yönetimi",
-    greetingDescription: "İş emirleri, operasyonel kapasite kullanımı ve hammadde reçeteleri (BOM) durumu.",
     kpis: [
-      {
-        id: "active-work-orders",
-        title: "Devam Eden İş Emirleri",
-        value: "14 Emir",
-        change: "8'i montaj safhasında",
-        trend: "up",
-        subtext: "Üretim hattı aktif",
-        tone: "blue",
-        icon: Factory,
-      },
-      {
-        id: "oee-efficiency",
-        title: "OEE Hat Verimliliği",
-        value: "%86.4",
-        change: "+3.2% hedef üstü",
-        trend: "up",
-        subtext: "Vardiya 1 performansı",
-        tone: "emerald",
-        icon: TrendingUp,
-      },
-      {
-        id: "delayed-operations",
-        title: "Geciken Operasyonlar",
-        value: "2 İstasyon",
-        change: "Hammadde bekleyen",
-        trend: "down",
-        subtext: "CNC Torna Bölümü",
-        tone: "rose",
-        icon: AlertCircle,
-      },
-      {
-        id: "scrap-rate",
-        title: "Fire / Iskonto Oranı",
-        value: "%1.4",
-        change: "Tolerans dahilinde (Max %2)",
-        trend: "flat",
-        subtext: "Aylık ortalama",
-        tone: "slate",
-        icon: ShieldCheck,
-      },
+      { id: "active-work-orders", trend: "up", tone: "blue", icon: Factory },
+      { id: "oee-efficiency", trend: "up", tone: "emerald", icon: TrendingUp },
+      { id: "delayed-operations", trend: "down", tone: "rose", icon: AlertCircle },
+      { id: "scrap-rate", trend: "flat", tone: "slate", icon: ShieldCheck },
     ],
     pendingActions: [
-      {
-        id: "mfg-wo-start",
-        code: "WO-2026-0056",
-        title: "Pano Montaj Hattı - İş Emrini Başlat",
-        description: "BOM reçetesi ve hammaddeleri rezerve edildi, üretim başlatma onayı bekliyor.",
-        status: "urgent",
-        statusLabel: "Başlatılmaya Hazır",
-        amountOrCount: "40 Ünite",
-        dueDate: "Hemen",
-        actionUrl: "/manufacturing",
-        actionLabel: "Hattı Başlat",
-        categoryIcon: Factory,
-      },
-      {
-        id: "mfg-qc-check",
-        code: "QC-2026-0112",
-        title: "1. Parti Motor Gövdesi Kalite Kontrolü",
-        description: "Talaşlı imalattan çıkan 15 parçanın tolerans ve yüzey pürüzlülük ölçümü.",
-        status: "pending",
-        statusLabel: "Numune Muayene",
-        amountOrCount: "15 Parça",
-        dueDate: "Bugün 15:30",
-        actionUrl: "/manufacturing",
-        actionLabel: "Test Girişi Yap",
-        categoryIcon: ShieldCheck,
-      },
-      {
-        id: "mfg-bom-change",
-        code: "ECO-2026-004",
-        title: "Revizyon C Reçete Mühendislik Değişikliği",
-        description: "Alternatif klemens kullanımı için BOM onayı gerekiyor.",
-        status: "review",
-        statusLabel: "Mühendislik Onayı",
-        amountOrCount: "Revizyon C",
-        dueDate: "Yarın",
-        actionUrl: "/manufacturing",
-        actionLabel: "BOM İncele",
-        categoryIcon: Layers,
-      },
+      { id: "mfg-wo-start", code: "WO-2026-0056", status: "urgent", actionUrl: "/manufacturing", categoryIcon: Factory },
+      { id: "mfg-qc-check", code: "QC-2026-0112", status: "pending", actionUrl: "/manufacturing", categoryIcon: ShieldCheck },
+      { id: "mfg-bom-change", code: "ECO-2026-004", status: "review", actionUrl: "/manufacturing", categoryIcon: Layers },
     ],
     assignedTasks: [
-      {
-        id: "task-mfg-1",
-        title: "Pres Hattı Koruyucu Bakım Planı",
-        subtitle: "Haftalık yağlama ve hidrolik basınç kontrol formunu doldur",
-        priority: "high",
-        priorityLabel: "Yüksek",
-        deadline: "Bugün",
-        assignedBy: "Bakım Şefi",
-        targetUrl: "/manufacturing",
-      },
-      {
-        id: "task-mfg-2",
-        title: "Vardiya 2 Duruş Analizi",
-        subtitle: "Dün yaşanan 45 dakikalık elektrik arızası raporu",
-        priority: "medium",
-        priorityLabel: "Orta",
-        deadline: "2 Gün",
-        assignedBy: "Üretim Müdürü",
-        targetUrl: "/manufacturing",
-      },
-      {
-        id: "task-mfg-3",
-        title: "İş İstasyonu Ergonomi Eğitimi",
-        subtitle: "Montaj operatörlerinin katılım listesini sisteme gir",
-        priority: "low",
-        priorityLabel: "Normal",
-        deadline: "Bu Hafta",
-        assignedBy: "İK / İSG",
-        targetUrl: "/manufacturing",
-      },
+      { id: "task-mfg-1", priority: "high", targetUrl: "/manufacturing" },
+      { id: "task-mfg-2", priority: "medium", targetUrl: "/manufacturing" },
+      { id: "task-mfg-3", priority: "low", targetUrl: "/manufacturing" },
     ],
     quickShortcuts: [
-      {
-        id: "mfg-work-orders",
-        title: "İş Emirleri",
-        description: "Planlanan ve aktif üretimler",
-        url: "/manufacturing",
-        icon: Factory,
-      },
-      {
-        id: "mfg-bom",
-        title: "Ürün Reçeteleri (BOM)",
-        description: "Hammadde ve operasyon ağaçları",
-        url: "/manufacturing",
-        icon: Layers,
-      },
-      {
-        id: "mfg-dashboard",
-        title: "Üretim Panosu",
-        description: "Hat verimlilikleri ve vardiyalar",
-        url: "/manufacturing/dashboard",
-        icon: BarChart3,
-      },
-      {
-        id: "mfg-maintenance",
-        title: "Bakım & İstasyonlar",
-        description: "Tezgah durumları ve bakım takvimi",
-        url: "/manufacturing",
-        icon: Wrench,
-      },
+      { id: "mfg-work-orders", url: "/manufacturing", icon: Factory },
+      { id: "mfg-bom", url: "/manufacturing", icon: Layers },
+      { id: "mfg-dashboard", url: "/manufacturing/dashboard", icon: BarChart3 },
+      { id: "mfg-maintenance", url: "/manufacturing", icon: Wrench },
     ],
   },
-
   subcontracting: {
-    workspaceId: "subcontracting",
-    greetingTitle: "Fason & Dış Tedarik Yönetimi",
-    greetingDescription: "Fasona gönderilen hammaddeler, dış işlemdeki parçalar ve kalite kabul süreçleri.",
     kpis: [
-      {
-        id: "out-for-subcontract",
-        title: "Fasonda İşlenen Parçalar",
-        value: "9 Parti",
-        change: "4 farklı atölyede",
-        trend: "flat",
-        subtext: "Kaplama & Isıl İşlem",
-        tone: "blue",
-        icon: Layers,
-      },
-      {
-        id: "pending-sub-receipt",
-        title: "Teslimatı Beklenenler",
-        value: "₺64.000",
-        change: "3 sipariş bu hafta",
-        trend: "up",
-        subtext: "Termin süresinde",
-        tone: "emerald",
-        icon: Truck,
-      },
-      {
-        id: "sub-qc-pending",
-        title: "Kalite Muayene Bekleyen",
-        value: "2 Parti",
-        change: "Fasondan teslim alındı",
-        trend: "flat",
-        subtext: "Kabul testi bekliyor",
-        tone: "amber",
-        icon: ShieldCheck,
-      },
-      {
-        id: "subcontractor-balance",
-        title: "Fasoncu Cari Bakiyesi",
-        value: "₺48.700",
-        change: "Vadesi gelmemiş",
-        trend: "flat",
-        subtext: "Düzenli mutabakat",
-        tone: "slate",
-        icon: Scale,
-      },
+      { id: "out-for-subcontract", trend: "flat", tone: "blue", icon: Layers },
+      { id: "pending-sub-receipt", trend: "up", tone: "emerald", icon: Truck },
+      { id: "sub-qc-pending", trend: "flat", tone: "amber", icon: ShieldCheck },
+      { id: "subcontractor-balance", trend: "flat", tone: "slate", icon: Scale },
     ],
     pendingActions: [
-      {
-        id: "sub-send-raw",
-        code: "SCO-2026-0034",
-        title: "Eloksal Kaplama İçin Alüminyum Gövde Sevki",
-        description: "Yıldız Kaplama atölyesine 200 adet işlenmiş gövde sevk irsaliyesi kesilmeli.",
-        status: "urgent",
-        statusLabel: "Sevkiyat Bekliyor",
-        amountOrCount: "200 Adet",
-        dueDate: "Bugün 16:00",
-        actionUrl: "/subcontracting",
-        actionLabel: "Fason Sevk Aç",
-        categoryIcon: Truck,
-      },
-      {
-        id: "sub-return-qc",
-        code: "SCR-2026-0019",
-        title: "Galvanizden Dönen Çelik Millerin Kabulü",
-        description: "Kaplama mikron kalınlığı ölçümü yapılıp depoya devredilmelidir.",
-        status: "pending",
-        statusLabel: "Giriş Kalite",
-        amountOrCount: "1.500 Adet",
-        dueDate: "Yarın",
-        actionUrl: "/subcontracting",
-        actionLabel: "Muayene Et",
-        categoryIcon: ShieldCheck,
-      },
-      {
-        id: "sub-recon",
-        code: "REC-2026-008",
-        title: "Aylık Fason Fire Oranı Mutabakatı",
-        description: "Lazer kesim atölyesi ile sac plaka fire yüzdesi mutabakatı.",
-        status: "review",
-        statusLabel: "Fire Kontrolü",
-        amountOrCount: "%3.1 Fire",
-        dueDate: "3 Gün",
-        actionUrl: "/subcontracting",
-        actionLabel: "Mutabakata Git",
-        categoryIcon: FileText,
-      },
+      { id: "sub-send-raw", code: "SCO-2026-0034", status: "urgent", actionUrl: "/subcontracting", categoryIcon: Truck },
+      { id: "sub-return-qc", code: "SCR-2026-0019", status: "pending", actionUrl: "/subcontracting", categoryIcon: ShieldCheck },
+      { id: "sub-recon", code: "REC-2026-008", status: "review", actionUrl: "/subcontracting", categoryIcon: FileText },
     ],
     assignedTasks: [
-      {
-        id: "task-sub-1",
-        title: "Yeni Fasoncu Firma Denetim Ziyareti",
-        subtitle: "Bursa OSB'deki boyahane tesisinin kalite sertifikalarını incele",
-        priority: "high",
-        priorityLabel: "Yüksek",
-        deadline: "Cuma",
-        assignedBy: "Tedarik Zinciri Müdürü",
-        targetUrl: "/subcontracting",
-      },
-      {
-        id: "task-sub-2",
-        title: "Fason Fiyat Listesi Güncellemesi",
-        subtitle: "Enerji maliyeti artışına istinaden birim fiyat tekliflerini değerlendir",
-        priority: "medium",
-        priorityLabel: "Orta",
-        deadline: "Gelecek Hafta",
-        assignedBy: "Satın Alma",
-        targetUrl: "/subcontracting",
-      },
+      { id: "task-sub-1", priority: "high", targetUrl: "/subcontracting" },
+      { id: "task-sub-2", priority: "medium", targetUrl: "/subcontracting" },
     ],
     quickShortcuts: [
-      {
-        id: "sub-orders",
-        title: "Fason İş Emirleri",
-        description: "Dışarıya verilen işler",
-        url: "/subcontracting",
-        icon: Layers,
-      },
-      {
-        id: "sub-transfers",
-        title: "Fason Hammadde Çıkışları",
-        description: "Atölyelere sevk irsaliyeleri",
-        url: "/subcontracting",
-        icon: Truck,
-      },
-      {
-        id: "sub-dashboard",
-        title: "Fason Panosu",
-        description: "Termin ve maliyet analizleri",
-        url: "/subcontracting/dashboard",
-        icon: BarChart3,
-      },
+      { id: "sub-orders", url: "/subcontracting", icon: Layers },
+      { id: "sub-transfers", url: "/subcontracting", icon: Truck },
+      { id: "sub-dashboard", url: "/subcontracting/dashboard", icon: BarChart3 },
     ],
   },
-
   system: {
-    workspaceId: "system",
-    greetingTitle: "Sistem & Çalışma Alanları",
-    greetingDescription: "Tüm kurumsal modüllere hızlı erişim, sistem sağlığı ve kullanıcı ayarları.",
     kpis: [
-      {
-        id: "active-users",
-        title: "Aktif Kullanıcılar",
-        value: "24 Kişi",
-        change: "5 departmanda çevrimiçi",
-        trend: "up",
-        subtext: "Eşzamanlı oturum",
-        tone: "blue",
-        icon: Users,
-      },
-      {
-        id: "system-status",
-        title: "Sistem Durumu",
-        value: "Sağlıklı",
-        change: "%99.98 uptime",
-        trend: "up",
-        subtext: "Tüm servisler devrede",
-        tone: "emerald",
-        icon: CheckCircle2,
-      },
-      {
-        id: "duckdb-status",
-        title: "OPFS & DuckDB Motoru",
-        value: "Aktif",
-        change: "WASM yerel önbellek",
-        trend: "flat",
-        subtext: "0 ms gecikmeli sorgular",
-        tone: "violet",
-        icon: Briefcase,
-      },
-      {
-        id: "unread-notifications",
-        title: "Sistem Bildirimleri",
-        value: "3 Yeni",
-        change: "1 güvenlik uyarısı",
-        trend: "flat",
-        subtext: "İnceleme bekliyor",
-        tone: "amber",
-        icon: AlertCircle,
-      },
+      { id: "active-users", trend: "up", tone: "blue", icon: Users },
+      { id: "system-status", trend: "up", tone: "emerald", icon: CheckCircle2 },
+      { id: "duckdb-status", trend: "flat", tone: "violet", icon: Briefcase },
+      { id: "unread-notifications", trend: "flat", tone: "amber", icon: AlertCircle },
     ],
     pendingActions: [
-      {
-        id: "sys-backup",
-        code: "SYS-BCK-01",
-        title: "Haftalık Güvenli Veritabanı Yedeği",
-        description: "Bölgesel yedekleme başarıyla tamamlandı, arşiv doğrulama bekliyor.",
-        status: "pending",
-        statusLabel: "Doğrulama",
-        amountOrCount: "4.8 GB",
-        dueDate: "Bugün",
-        actionUrl: "/my/settings",
-        actionLabel: "Doğrula",
-        categoryIcon: ShieldCheck,
-      },
+      { id: "sys-backup", code: "SYS-BCK-01", status: "pending", actionUrl: "/my/settings", categoryIcon: ShieldCheck },
     ],
     assignedTasks: [
-      {
-        id: "task-sys-1",
-        title: "Yeni Katılan Personel Yetkilendirmesi",
-        subtitle: "Depo sorumlusu için Stock ve Subcontracting izinlerini tanımla",
-        priority: "high",
-        priorityLabel: "Yüksek",
-        deadline: "Bugün",
-        assignedBy: "İK Departmanı",
-        targetUrl: "/system/users",
-      },
+      { id: "task-sys-1", priority: "high", targetUrl: "/system/users" },
     ],
     quickShortcuts: [
-      {
-        id: "sys-users",
-        title: "Kullanıcı & Rol Yönetimi",
-        description: "Erişim hakları ve roller",
-        url: "/system/users",
-        icon: Users,
-      },
-      {
-        id: "sys-my-settings",
-        title: "Kullanıcı Tercihleri",
-        description: "Profil, bildirim ve tema",
-        url: "/my/settings",
-        icon: Wrench,
-      },
+      { id: "sys-users", url: "/system/users", icon: Users },
+      { id: "sys-my-settings", url: "/my/settings", icon: Wrench },
     ],
   },
 };
 
-export function getWorkspaceLandingData(workspaceId: WorkspaceId): WorkspaceLandingData {
-  return WORKSPACE_LANDING_PRESETS[workspaceId] ?? WORKSPACE_LANDING_PRESETS.system;
+/**
+ * Mevcut locale'e göre tam landing veri nesnesini üretir (yapısal preset +
+ * `WorkspaceLanding.<workspace>` mesaj alt ağacı birleştirilir). Yalnız
+ * istemci bileşenlerinden çağrılmalıdır.
+ */
+export function useWorkspaceLandingData(workspaceId: WorkspaceId): WorkspaceLandingData {
+  const t = useTranslations("WorkspaceLanding");
+  const struct =
+    WORKSPACE_LANDING_STRUCTURE[workspaceId] ??
+    WORKSPACE_LANDING_STRUCTURE.system;
+  const raw = t.raw as unknown as Record<string, WorkspaceLandingText>;
+  const text = raw[workspaceId] ?? raw.system;
+
+  return {
+    workspaceId,
+    greetingTitle: text.greeting.title,
+    greetingDescription: text.greeting.description,
+    kpis: struct.kpis.map((k) => {
+      const s = text.kpis[k.id];
+      return {
+        id: k.id,
+        title: s?.title ?? "",
+        value: s?.value ?? "",
+        change: s?.change,
+        subtext: s?.subtext,
+        trend: k.trend,
+        tone: k.tone,
+        icon: k.icon,
+      };
+    }),
+    pendingActions: struct.pendingActions.map((a) => {
+      const s = text.pending_actions[a.id];
+      return {
+        id: a.id,
+        code: a.code,
+        title: s?.title ?? "",
+        description: s?.description ?? "",
+        status: a.status,
+        statusLabel: s?.status_label ?? "",
+        amountOrCount: s?.amount,
+        dueDate: s?.due,
+        actionUrl: a.actionUrl,
+        actionLabel: s?.action_label ?? "",
+        categoryIcon: a.categoryIcon,
+      };
+    }),
+    assignedTasks: struct.assignedTasks.map((task) => {
+      const s = text.assigned_tasks[task.id];
+      return {
+        id: task.id,
+        title: s?.title ?? "",
+        subtitle: s?.subtitle ?? "",
+        priority: task.priority,
+        priorityLabel: s?.priority_label ?? "",
+        deadline: s?.deadline,
+        assignedBy: s?.assigned_by,
+        targetUrl: task.targetUrl,
+      };
+    }),
+    quickShortcuts: struct.quickShortcuts.map((q) => {
+      const s = text.quick_shortcuts[q.id];
+      return {
+        id: q.id,
+        title: s?.title ?? "",
+        description: s?.description ?? "",
+        url: q.url,
+        icon: q.icon,
+        badge: s?.badge,
+      };
+    }),
+  };
 }

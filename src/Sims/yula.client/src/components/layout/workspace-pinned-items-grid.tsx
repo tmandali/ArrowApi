@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
-import { WORKSPACE_CARDS } from "@/lib/workspace-cards";
+import { useWorkspaceCards } from "@/lib/workspace-cards";
 import { cn } from "@/utils/cn";
 
 function getCategoryIcon(category: string) {
@@ -69,14 +69,15 @@ export function WorkspacePinnedItemsGrid({
   const { workspace: metaWorkspace } = useWorkspaceSearchMeta();
   const workspace = propWorkspace || metaWorkspace;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(workspace);
+  const cards = useWorkspaceCards();
 
   // Yula root gibi "tüm pinler" yerine çalışma alanı kutuları istenirse:
-  // pin kutusu biçimi korunarak WORKSPACE_CARDS listelenir.
+  // pin kutusu biçimi korunarak workspace kartları listelenir.
   if (mode === "workspaces") {
     return (
       <div className={cn("w-full max-w-3xl px-3 pt-2 animate-in fade-in-50 duration-200", className)}>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-          {WORKSPACE_CARDS.map((item) => {
+          {cards.map((item) => {
             const Icon = item.icon;
             return (
               <Link

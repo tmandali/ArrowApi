@@ -142,7 +142,582 @@
     "pinned_charts_title": "Pinned Charts",
     "pin_remove": "Unpin",
     "open_source_report": "Open source report with chart query",
-    "workspaces_title": "Workspaces"
+    "workspaces_title": "Workspaces",
+    "selling": {
+      "greeting": {
+        "title": "Sales & Customer Management",
+        "description": "Real-time status of open orders, customer quotes and deliveries awaiting invoicing."
+      },
+      "kpis": {
+        "open-orders-val": {
+          "title": "Open Orders Value",
+          "value": "$482,500",
+          "change": "+14.2% vs last month",
+          "subtext": "18 active orders"
+        },
+        "to-be-invoiced": {
+          "title": "Shipments to Invoice",
+          "value": "$126,800",
+          "change": "6 deliveries pending",
+          "subtext": "Delivery notes issued"
+        },
+        "quote-win-rate": {
+          "title": "Quote Win Rate",
+          "value": "68.4%",
+          "change": "+5.1% this quarter",
+          "subtext": "29 of 42 quotes accepted"
+        },
+        "pending-approval": {
+          "title": "Pending Approvals",
+          "value": "5 Orders",
+          "change": "2 with discount overflow",
+          "subtext": "Manager approval required"
+        }
+      },
+      "pending_actions": {
+        "so-1092": {
+          "title": "Teknosa Retail Sales Order",
+          "description": "Customer approval received for the 150 industrial switch delivery; shipment approval is pending.",
+          "status_label": "Ready to Ship",
+          "amount": "$164,000",
+          "due": "Today 17:00",
+          "action_label": "Create Delivery Note"
+        },
+        "so-1088": {
+          "title": "Arçelik Supply Order Invoicing",
+          "description": "Delivery note (DN-2026-0045) completed; awaiting e-invoice issuance.",
+          "status_label": "To Invoice",
+          "amount": "$92,400",
+          "due": "1 Day Left",
+          "action_label": "Cut Invoice"
+        },
+        "qt-0421": {
+          "title": "Aselsan Annual Spare Parts Quote",
+          "description": "A special 12% discount was defined. Awaiting the second approval by the Sales Director.",
+          "status_label": "Awaiting Approval",
+          "amount": "$310,000",
+          "due": "Tomorrow",
+          "action_label": "Review & Approve"
+        }
+      },
+      "assigned_tasks": {
+        "task-sel-1": {
+          "title": "Koç Systems Framework Agreement Revision",
+          "subtitle": "Update delivery times and options in the sales specification",
+          "priority_label": "High",
+          "deadline": "Today",
+          "assigned_by": "Ahmet Yılmaz"
+        },
+        "task-sel-2": {
+          "title": "Overdue Customer Payment Follow-up",
+          "subtitle": "Contact 3 customer accounts more than 7 days overdue",
+          "priority_label": "Medium",
+          "deadline": "2 Days",
+          "assigned_by": "Finance Department"
+        },
+        "task-sel-3": {
+          "title": "Q3 Customer Satisfaction Survey Review",
+          "subtitle": "Report feedback received through the B2B portal",
+          "priority_label": "Normal",
+          "deadline": "This Week",
+          "assigned_by": "System"
+        }
+      },
+      "quick_shortcuts": {
+        "new-sales-order": {
+          "title": "New Sales Order",
+          "description": "Create a sales invoice",
+          "badge": "New"
+        },
+        "sales-analytics": {
+          "title": "Sales Analytics",
+          "description": "Revenue by customer and region"
+        },
+        "delivery-tracking": {
+          "title": "Deliveries & Notes",
+          "description": "Open and shipped goods"
+        },
+        "customer-accounts": {
+          "title": "Customer Portfolio",
+          "description": "Customer accounts and credit limits"
+        }
+      }
+    },
+    "stock": {
+      "greeting": {
+        "title": "Stock & Warehouse Operations",
+        "description": "Overview of warehouse inbound/outbound movements, critical stock levels and transfer requests."
+      },
+      "kpis": {
+        "critical-stock-count": {
+          "title": "Critical Stock Alert",
+          "value": "14 Items",
+          "change": "Below minimum level",
+          "subtext": "Urgent order needed"
+        },
+        "stock-receipts": {
+          "title": "Pending Goods Receipts",
+          "value": "8 Notes",
+          "change": "4 cleared from customs",
+          "subtext": "Main warehouse inbound"
+        },
+        "warehouse-occupancy": {
+          "title": "Warehouse Occupancy",
+          "value": "78.2%",
+          "change": "+2.4% this week",
+          "subtext": "Gebze & Tuzla warehouses"
+        },
+        "stock-total-val": {
+          "title": "Active Stock Value",
+          "value": "$3,510,000",
+          "change": "Balanced cost",
+          "subtext": "Across 5 active locations"
+        }
+      },
+      "pending_actions": {
+        "stock-po-rec": {
+          "title": "Supplier Goods Receipt - Aluminum Profile",
+          "description": "Incoming shipment is waiting at the dock. Counting and quality approval are required.",
+          "status_label": "Waiting at Dock",
+          "amount": "4,200 Kg",
+          "due": "2 Hours Left",
+          "action_label": "Receive Goods"
+        },
+        "stock-min-reorder": {
+          "title": "Critical Stock Replenishment Request",
+          "description": "M5 stainless bolt stock has dropped below the safety level (remaining: 120 units).",
+          "status_label": "Order Suggestion",
+          "amount": "5,000 Units",
+          "due": "Today",
+          "action_label": "Open Purchase Order"
+        },
+        "stock-transfer": {
+          "title": "Main Warehouse -> Production Warehouse Transfer",
+          "description": "The raw material lot reserved for the assembly line is awaiting transfer.",
+          "status_label": "Transfer Approval",
+          "amount": "18 Cartons",
+          "due": "Tomorrow",
+          "action_label": "Approve Movement"
+        }
+      },
+      "assigned_tasks": {
+        "task-stk-1": {
+          "title": "Monthly Gebze Rack Count Reconciliation",
+          "subtitle": "Physically count the electronic components on rack B-04",
+          "priority_label": "High",
+          "deadline": "Tomorrow 12:00",
+          "assigned_by": "Warehouse Chief"
+        },
+        "task-stk-2": {
+          "title": "Defective Return Part Review",
+          "subtitle": "Condition report of 12 drive boards returned by the customer",
+          "priority_label": "Medium",
+          "deadline": "3 Days",
+          "assigned_by": "Quality Assurance"
+        },
+        "task-stk-3": {
+          "title": "Best-Before / Shelf-Life Check",
+          "subtitle": "Verify remaining expiry dates of chemical adhesives",
+          "priority_label": "Routine",
+          "deadline": "This Week",
+          "assigned_by": "System"
+        }
+      },
+      "quick_shortcuts": {
+        "stock-items": {
+          "title": "Stock Items (Items)",
+          "description": "All materials and products"
+        },
+        "stock-balance": {
+          "title": "Stock Balance",
+          "description": "Instant quantities per warehouse",
+          "badge": "WASM"
+        },
+        "stock-ledger": {
+          "title": "Stock Ledger",
+          "description": "Inbound, outbound and cost movements"
+        },
+        "stock-analytics": {
+          "title": "Stock Analytics",
+          "description": "Turnover rates and trends"
+        }
+      }
+    },
+    "accounting": {
+      "greeting": {
+        "title": "Accounting & Finance Management",
+        "description": "Collection and payment schedule, e-invoices awaiting approval and cash-flow indicators."
+      },
+      "kpis": {
+        "receivables-due": {
+          "title": "Receivables Due",
+          "value": "$348,000",
+          "change": "12 customers this week",
+          "subtext": "Planned cash inflow"
+        },
+        "payables-due": {
+          "title": "Pending Supplier Payments",
+          "value": "$184,200",
+          "change": "5 invoices approved",
+          "subtext": "Payment list on Friday"
+        },
+        "pending-invoices": {
+          "title": "e-Invoices Awaiting Approval",
+          "value": "9 Items",
+          "change": "Incoming portal box",
+          "subtext": "Awaiting matching"
+        },
+        "vat-period-days": {
+          "title": "VAT Return",
+          "value": "6 Days Left",
+          "change": "Calculation completed",
+          "subtext": "Last filing: 26th"
+        }
+      },
+      "pending_actions": {
+        "acc-inv-match": {
+          "title": "Siemens Purchase Invoice Matching",
+          "description": "A $1,200 currency difference between the delivery note, PO and e-invoice must be verified.",
+          "status_label": "Reconciliation Required",
+          "amount": "$74,200",
+          "due": "Today",
+          "action_label": "Reconcile"
+        },
+        "acc-exp-approval": {
+          "title": "Field Team Expense Forms Bulk Approval",
+          "description": "Travel and accommodation expenses of sales representatives are awaiting approval.",
+          "status_label": "Manager Approval",
+          "amount": "$18,650",
+          "due": "Tomorrow",
+          "action_label": "Approve Expenses"
+        },
+        "acc-bank-recon": {
+          "title": "Garanti BBVA Automatic Statement Match",
+          "description": "4 unidentified customer transfers exist in the bank MT940 integration.",
+          "status_label": "Statement Review",
+          "amount": "$42,000",
+          "due": "2 Days",
+          "action_label": "Link to Account"
+        }
+      },
+      "assigned_tasks": {
+        "task-acc-1": {
+          "title": "March P&L Statement Preparation",
+          "subtitle": "Send reconciliation letters to suppliers with volume above $5,000",
+          "priority_label": "Critical",
+          "deadline": "2 Days",
+          "assigned_by": "Tax Consultant"
+        },
+        "task-acc-2": {
+          "title": "Card Slip Commission Audit",
+          "subtitle": "Compare virtual POS commission deductions with bank rates",
+          "priority_label": "Medium",
+          "deadline": "This Week",
+          "assigned_by": "Finance Director"
+        },
+        "task-acc-3": {
+          "title": "Fixed Asset Depreciation Entries",
+          "subtitle": "Create depreciation entries for the 2 newly acquired CNC machines",
+          "priority_label": "Normal",
+          "deadline": "Month End",
+          "assigned_by": "System"
+        }
+      },
+      "quick_shortcuts": {
+        "acc-general-ledger": {
+          "title": "Subsidiary & General Ledger",
+          "description": "Chart of accounts and movement breakdown"
+        },
+        "acc-fin-reports": {
+          "title": "Financial Statements",
+          "description": "Balance sheet and income statement",
+          "badge": "Report"
+        },
+        "acc-sales-invoices": {
+          "title": "Sales Invoices",
+          "description": "e-Invoice & e-Archive list"
+        },
+        "acc-payment-plan": {
+          "title": "Payment & Collection Plan",
+          "description": "Cash flow and due dates"
+        }
+      }
+    },
+    "manufacturing": {
+      "greeting": {
+        "title": "Production & Manufacturing Management",
+        "description": "Work orders, operational capacity utilization and raw material recipe (BOM) status."
+      },
+      "kpis": {
+        "active-work-orders": {
+          "title": "Active Work Orders",
+          "value": "14 Orders",
+          "change": "8 in the assembly stage",
+          "subtext": "Production line active"
+        },
+        "oee-efficiency": {
+          "title": "OEE Line Efficiency",
+          "value": "86.4%",
+          "change": "+3.2% above target",
+          "subtext": "Shift 1 performance"
+        },
+        "delayed-operations": {
+          "title": "Delayed Operations",
+          "value": "2 Stations",
+          "change": "Awaiting raw material",
+          "subtext": "CNC Lathe Section"
+        },
+        "scrap-rate": {
+          "title": "Scrap / Allowance Rate",
+          "value": "1.4%",
+          "change": "Within tolerance (max 2%)",
+          "subtext": "Monthly average"
+        }
+      },
+      "pending_actions": {
+        "mfg-wo-start": {
+          "title": "Panel Assembly Line - Start Work Order",
+          "description": "BOM recipe and raw materials have been reserved; production start approval is pending.",
+          "status_label": "Ready to Start",
+          "amount": "40 Units",
+          "due": "Now",
+          "action_label": "Start Line"
+        },
+        "mfg-qc-check": {
+          "title": "Lot 1 Motor Housing Quality Control",
+          "description": "Tolerance and surface roughness measurement of 15 parts after machining.",
+          "status_label": "Sample Inspection",
+          "amount": "15 Parts",
+          "due": "Today 15:30",
+          "action_label": "Enter Test Result"
+        },
+        "mfg-bom-change": {
+          "title": "Rev C Recipe Engineering Change",
+          "description": "BOM approval is required for the use of alternative terminals.",
+          "status_label": "Engineering Approval",
+          "amount": "Rev C",
+          "due": "Tomorrow",
+          "action_label": "Review BOM"
+        }
+      },
+      "assigned_tasks": {
+        "task-mfg-1": {
+          "title": "Press Line Preventive Maintenance Plan",
+          "subtitle": "Fill in the weekly lubrication and hydraulic pressure inspection form",
+          "priority_label": "High",
+          "deadline": "Today",
+          "assigned_by": "Maintenance Chief"
+        },
+        "task-mfg-2": {
+          "title": "Shift 2 Downtime Analysis",
+          "subtitle": "Report of yesterday's 45-minute power failure",
+          "priority_label": "Medium",
+          "deadline": "2 Days",
+          "assigned_by": "Production Manager"
+        },
+        "task-mfg-3": {
+          "title": "Workstation Ergonomics Training",
+          "subtitle": "Enter the assembly operators' attendance list into the system",
+          "priority_label": "Normal",
+          "deadline": "This Week",
+          "assigned_by": "HR / EHS"
+        }
+      },
+      "quick_shortcuts": {
+        "mfg-work-orders": {
+          "title": "Work Orders",
+          "description": "Scheduled and active production"
+        },
+        "mfg-bom": {
+          "title": "Product Recipes (BOM)",
+          "description": "Raw material and operation trees"
+        },
+        "mfg-dashboard": {
+          "title": "Production Board",
+          "description": "Line efficiencies and shifts"
+        },
+        "mfg-maintenance": {
+          "title": "Maintenance & Stations",
+          "description": "Machine status and maintenance schedule"
+        }
+      }
+    },
+    "subcontracting": {
+      "greeting": {
+        "title": "Subcontracting & Outsourcing Management",
+        "description": "Raw materials sent to subcontractors, parts in external processing and quality acceptance processes."
+      },
+      "kpis": {
+        "out-for-subcontract": {
+          "title": "Parts in Subcontracting",
+          "value": "9 Lots",
+          "change": "At 4 different workshops",
+          "subtext": "Plating & Heat Treatment"
+        },
+        "pending-sub-receipt": {
+          "title": "Awaiting Delivery",
+          "value": "$64,000",
+          "change": "3 orders this week",
+          "subtext": "Within delivery terms"
+        },
+        "sub-qc-pending": {
+          "title": "Awaiting Quality Inspection",
+          "value": "2 Lots",
+          "change": "Received from subcontractor",
+          "subtext": "Awaiting acceptance test"
+        },
+        "subcontractor-balance": {
+          "title": "Subcontractor Account Balance",
+          "value": "$48,700",
+          "change": "Not yet due",
+          "subtext": "Regular reconciliation"
+        }
+      },
+      "pending_actions": {
+        "sub-send-raw": {
+          "title": "Anodizing - Aluminum Body Shipment",
+          "description": "An outbound delivery note must be issued for the 200 processed bodies sent to the Yıldız Plating workshop.",
+          "status_label": "Awaiting Shipment",
+          "amount": "200 Units",
+          "due": "Today 16:00",
+          "action_label": "Open Subcontracting Shipment"
+        },
+        "sub-return-qc": {
+          "title": "Acceptance of Galvanized Steel Rods Returned",
+          "description": "Coating micron thickness must be measured and the stock transferred to the warehouse.",
+          "status_label": "Inbound QC",
+          "amount": "1,500 Units",
+          "due": "Tomorrow",
+          "action_label": "Inspect"
+        },
+        "sub-recon": {
+          "title": "Monthly Subcontracting Scrap Rate Reconciliation",
+          "description": "Sheet metal scrap rate reconciliation with the laser cutting workshop.",
+          "status_label": "Scrap Control",
+          "amount": "3.1% Scrap",
+          "due": "3 Days",
+          "action_label": "Go to Reconciliation"
+        }
+      },
+      "assigned_tasks": {
+        "task-sub-1": {
+          "title": "New Subcontractor Audit Visit",
+          "subtitle": "Review the quality certificates of the paint shop facility at Bursa OSB",
+          "priority_label": "High",
+          "deadline": "Friday",
+          "assigned_by": "Supply Chain Manager"
+        },
+        "task-sub-2": {
+          "title": "Subcontracting Price List Update",
+          "subtitle": "Evaluate unit price quotes in light of the energy cost increase",
+          "priority_label": "Medium",
+          "deadline": "Next Week",
+          "assigned_by": "Purchasing"
+        }
+      },
+      "quick_shortcuts": {
+        "sub-orders": {
+          "title": "Subcontracting Orders",
+          "description": "Jobs placed with external workshops"
+        },
+        "sub-transfers": {
+          "title": "Subcontracting Raw Material Outbounds",
+          "description": "Outbound notes to the workshops"
+        },
+        "sub-dashboard": {
+          "title": "Subcontracting Board",
+          "description": "Delivery and cost analysis"
+        }
+      }
+    },
+    "system": {
+      "greeting": {
+        "title": "System & Workspaces",
+        "description": "Fast access to all corporate modules, system health and user settings."
+      },
+      "kpis": {
+        "active-users": {
+          "title": "Active Users",
+          "value": "24 People",
+          "change": "Online in 5 departments",
+          "subtext": "Concurrent sessions"
+        },
+        "system-status": {
+          "title": "System Status",
+          "value": "Healthy",
+          "change": "99.98% uptime",
+          "subtext": "All services running"
+        },
+        "duckdb-status": {
+          "title": "OPFS & DuckDB Engine",
+          "value": "Active",
+          "change": "WASM local cache",
+          "subtext": "0 ms latency queries"
+        },
+        "unread-notifications": {
+          "title": "System Notifications",
+          "value": "3 New",
+          "change": "1 security alert",
+          "subtext": "Awaiting review"
+        }
+      },
+      "pending_actions": {
+        "sys-backup": {
+          "title": "Weekly Secure Database Backup",
+          "description": "Regional backup completed successfully; archive verification is pending.",
+          "status_label": "Verification",
+          "amount": "4.8 GB",
+          "due": "Today",
+          "action_label": "Verify"
+        }
+      },
+      "assigned_tasks": {
+        "task-sys-1": {
+          "title": "Authorization of New Personnel",
+          "subtitle": "Define Stock and Subcontracting permissions for the warehouse owner",
+          "priority_label": "High",
+          "deadline": "Today",
+          "assigned_by": "HR Department"
+        }
+      },
+      "quick_shortcuts": {
+        "sys-users": {
+          "title": "User & Role Management",
+          "description": "Access rights and roles"
+        },
+        "sys-my-settings": {
+          "title": "User Preferences",
+          "description": "Profile, notifications and theme"
+        }
+      }
+    },
+    "cards": {
+      "stock": {
+        "title_lead": "Stock",
+        "title_trail": "Management",
+        "description": "Stock cards, balances, ledgers and analytical reports"
+      },
+      "selling": {
+        "title_lead": "Sales",
+        "title_trail": "Management",
+        "description": "Sales orders, customer quotes, invoices and analytics"
+      },
+      "subcontracting": {
+        "title_lead": "Subcontracting",
+        "title_trail": "Operations",
+        "description": "Internal/external subcontracting orders, notes and delivery tracking"
+      },
+      "accounting": {
+        "title_lead": "Accounting",
+        "title_trail": "& Finance",
+        "description": "Financial reports, balance sheet, P&L and general ledger"
+      },
+      "manufacturing": {
+        "title_lead": "Production",
+        "title_trail": "Planning",
+        "description": "Production plans, work orders, BOM and product recipes"
+      }
+    }
   },
   "HistorySidebar": {
     "search_ph": "Search screen conversations...",

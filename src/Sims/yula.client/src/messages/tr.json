@@ -142,7 +142,582 @@
     "pinned_charts_title": "Sabitlenen Grafikler",
     "pin_remove": "İğneyi Kaldır",
     "open_source_report": "Kaynak raporu grafik sorgusuyla aç",
-    "workspaces_title": "Çalışma Alanları"
+    "workspaces_title": "Çalışma Alanları",
+    "selling": {
+      "greeting": {
+        "title": "Satış & Müşteri Yönetimi",
+        "description": "Açık siparişler, müşteri teklifleri ve faturalanacak teslimatların anlık durumu."
+      },
+      "kpis": {
+        "open-orders-val": {
+          "title": "Açık Sipariş Tutarı",
+          "value": "₺482.500",
+          "change": "+14.2% geçen aya göre",
+          "subtext": "18 aktif sipariş"
+        },
+        "to-be-invoiced": {
+          "title": "Faturalanacak Sevkiyatlar",
+          "value": "₺126.800",
+          "change": "6 teslimat bekliyor",
+          "subtext": "İrsaliyesi kesilmiş"
+        },
+        "quote-win-rate": {
+          "title": "Teklif Kazanma Oranı",
+          "value": "%68.4",
+          "change": "+5.1% bu çeyrek",
+          "subtext": "42 tekliften 29'u onaylandı"
+        },
+        "pending-approval": {
+          "title": "Onay Bekleyenler",
+          "value": "5 Sipariş",
+          "change": "2 adedi iskonto aşımı",
+          "subtext": "Yönetici onayı gerekli"
+        }
+      },
+      "pending_actions": {
+        "so-1092": {
+          "title": "Teknosa Mağazacılık Satış Siparişi",
+          "description": "150 Adet Endüstriyel Switch teslimatı için müşteri onayı alındı, sevkiyat onayı bekleniyor.",
+          "status_label": "Sevke Hazır",
+          "amount": "₺164.000",
+          "due": "Bugün 17:00",
+          "action_label": "İrsaliye Oluştur"
+        },
+        "so-1088": {
+          "title": "Arçelik Tedarik Siparişi Faturalandırma",
+          "description": "Teslimat fişi (DN-2026-0045) tamamlandı, e-fatura kesilmeyi bekliyor.",
+          "status_label": "Faturalanacak",
+          "amount": "₺92.400",
+          "due": "Kalan: 1 Gün",
+          "action_label": "Fatura Kes"
+        },
+        "qt-0421": {
+          "title": "Aselsan Yıllık Yedek Parça Teklifi",
+          "description": "Özel %12 iskonto tanımlandı. Satış Direktörü ikinci onayı bekleniyor.",
+          "status_label": "Onay Bekliyor",
+          "amount": "₺310.000",
+          "due": "Yarın",
+          "action_label": "İncele & Onayla"
+        }
+      },
+      "assigned_tasks": {
+        "task-sel-1": {
+          "title": "Koç Sistem Çerçeve Sözleşme Revizyonu",
+          "subtitle": "Satış şartnamesindeki teslim sürelerini ve opsiyonları güncelle",
+          "priority_label": "Yüksek Öncelik",
+          "deadline": "Bugün",
+          "assigned_by": "Ahmet Yılmaz"
+        },
+        "task-sel-2": {
+          "title": "Geciken Müşteri Ödeme Takibi",
+          "subtitle": "Vadesi 7 gün geçen 3 cari hesapla iletişime geç",
+          "priority_label": "Orta Öncelik",
+          "deadline": "2 Gün",
+          "assigned_by": "Finans Departmanı"
+        },
+        "task-sel-3": {
+          "title": "Q3 Müşteri Memnuniyet Anketi İncelemesi",
+          "subtitle": "B2B portal üzerinden gelen geri bildirimleri raporla",
+          "priority_label": "Normal",
+          "deadline": "Bu Hafta",
+          "assigned_by": "Sistem"
+        }
+      },
+      "quick_shortcuts": {
+        "new-sales-order": {
+          "title": "Yeni Satış Siparişi",
+          "description": "Sipariş fişi oluştur",
+          "badge": "Yeni"
+        },
+        "sales-analytics": {
+          "title": "Satış Analitiği",
+          "description": "Müşteri ve bölge bazlı ciro"
+        },
+        "delivery-tracking": {
+          "title": "Teslimat & İrsaliyeler",
+          "description": "Açık ve sevk edilen mallar"
+        },
+        "customer-accounts": {
+          "title": "Müşteri Portföyü",
+          "description": "Cari kartlar ve risk limitleri"
+        }
+      }
+    },
+    "stock": {
+      "greeting": {
+        "title": "Stok & Depo Operasyonları",
+        "description": "Depo giriş/çıkış hareketleri, kritik stok seviyeleri ve transfer taleplerinin genel durumu."
+      },
+      "kpis": {
+        "critical-stock-count": {
+          "title": "Kritik Stok Uyarısı",
+          "value": "14 Kalem",
+          "change": "Asgari seviyenin altında",
+          "subtext": "Acil sipariş gerekiyor"
+        },
+        "stock-receipts": {
+          "title": "Bekleyen Mal Kabuller",
+          "value": "8 İrsaliye",
+          "change": "4'ü gümrükten indi",
+          "subtext": "Ana Depo Giriş"
+        },
+        "warehouse-occupancy": {
+          "title": "Depo Doluluk Oranı",
+          "value": "%78.2",
+          "change": "+2.4% bu hafta",
+          "subtext": "Gebze & Tuzla depoları"
+        },
+        "stock-total-val": {
+          "title": "Aktif Stok Değeri",
+          "value": "₺3.510.000",
+          "change": "Dengeli maliyet",
+          "subtext": "5 aktif lokasyonda"
+        }
+      },
+      "pending_actions": {
+        "stock-po-rec": {
+          "title": "Tedarikçi Mal Kabulü - Alüminyum Profil",
+          "description": "Gelen sevkiyat rampada bekliyor. Sayım ve kalite kontrol onayı verilmelidir.",
+          "status_label": "Rampada Bekliyor",
+          "amount": "4.200 Kg",
+          "due": "Kalan: 2 Saat",
+          "action_label": "Mal Kabul Yap"
+        },
+        "stock-min-reorder": {
+          "title": "Kritik Stok Tamamlama Talebi",
+          "description": "M5 Paslanmaz Vida stoğu emniyet sınırının altına düştü (Kalan: 120 adet).",
+          "status_label": "Sipariş Önerisi",
+          "amount": "5.000 Adet",
+          "due": "Bugün",
+          "action_label": "Satın Alma Aç"
+        },
+        "stock-transfer": {
+          "title": "Merkez Depo -> Üretim Deposu Transferi",
+          "description": "Montaj hattı için rezerve edilen hammadde partisi transfer bekliyor.",
+          "status_label": "Transfer Onayı",
+          "amount": "18 Koli",
+          "due": "Yarın",
+          "action_label": "Hareketi Onayla"
+        }
+      },
+      "assigned_tasks": {
+        "task-stk-1": {
+          "title": "Aylık Gebze Raf Sayım Mutabakatı",
+          "subtitle": "Bölüm B-04 rafındaki elektronik komponentleri fiziksel say",
+          "priority_label": "Yüksek",
+          "deadline": "Yarın 12:00",
+          "assigned_by": "Depo Şefi"
+        },
+        "task-stk-2": {
+          "title": "Kusurlu İade Parça İncelemesi",
+          "subtitle": "Müşteriden dönen 12 adet sürücü kartının durum raporu",
+          "priority_label": "Orta",
+          "deadline": "3 Gün",
+          "assigned_by": "Kalite Güvence"
+        },
+        "task-stk-3": {
+          "title": "SKT / Raf Ömrü Kontrolü",
+          "subtitle": "Kimyasal yapıştırıcıların kalan geçerlilik tarihlerini doğrula",
+          "priority_label": "Rutin",
+          "deadline": "Bu Hafta",
+          "assigned_by": "Sistem"
+        }
+      },
+      "quick_shortcuts": {
+        "stock-items": {
+          "title": "Stok Kartları (Items)",
+          "description": "Tüm malzeme ve ürünler"
+        },
+        "stock-balance": {
+          "title": "Stok Bakiyesi",
+          "description": "Depo bazında anlık miktarlar",
+          "badge": "WASM"
+        },
+        "stock-ledger": {
+          "title": "Stok Ekstresi (Ledger)",
+          "description": "Giriş, çıkış ve maliyet hareketleri"
+        },
+        "stock-analytics": {
+          "title": "Stok Analitiği",
+          "description": "Devir hızı ve trendler"
+        }
+      }
+    },
+    "accounting": {
+      "greeting": {
+        "title": "Muhasebe & Finans Yönetimi",
+        "description": "Tahsilat ve ödeme takvimi, onay bekleyen e-faturalar ve nakit akış göstergeleri."
+      },
+      "kpis": {
+        "receivables-due": {
+          "title": "Vadesi Gelen Tahsilatlar",
+          "value": "₺348.000",
+          "change": "Bu hafta 12 müşteri",
+          "subtext": "Planlanan nakit girişi"
+        },
+        "payables-due": {
+          "title": "Bekleyen Tedarikçi Ödemeleri",
+          "value": "₺184.200",
+          "change": "5 fatura onaylandı",
+          "subtext": "Cuma günü ödeme listesi"
+        },
+        "pending-invoices": {
+          "title": "Onay Bekleyen e-Faturalar",
+          "value": "9 Adet",
+          "change": "Gelen portal kutusu",
+          "subtext": "Eşleştirme bekleyen"
+        },
+        "vat-period-days": {
+          "title": "KDV Beyannamesi",
+          "value": "6 Gün Kaldı",
+          "change": "Hesaplama tamamlandı",
+          "subtext": "Son gönderim: 26'sı"
+        }
+      },
+      "pending_actions": {
+        "acc-inv-match": {
+          "title": "Siemens Satın Alma Faturası Eşleştirme",
+          "description": "İrsaliye ve PO ile gelen e-fatura arasında ₺1.200 kur farkı kontrol edilmelidir.",
+          "status_label": "Mutabakat Gerekli",
+          "amount": "₺74.200",
+          "due": "Bugün",
+          "action_label": "Mutabakat Yap"
+        },
+        "acc-exp-approval": {
+          "title": "Saha Ekibi Masraf Formları Toplu Onayı",
+          "description": "Satış temsilcilerinin seyahat ve konaklama harcamaları onay bekliyor.",
+          "status_label": "Yönetici Onayı",
+          "amount": "₺18.650",
+          "due": "Yarın",
+          "action_label": "Masrafları Onayla"
+        },
+        "acc-bank-recon": {
+          "title": "Garanti BBVA Otomatik Ekstre Eşleşmesi",
+          "description": "Banka MT940 entegrasyonunda 4 adet tanımlanamayan cari havalesi mevcut.",
+          "status_label": "Ekstre İnceleme",
+          "amount": "₺42.000",
+          "due": "2 Gün",
+          "action_label": "Cariye Bağla"
+        }
+      },
+      "assigned_tasks": {
+        "task-acc-1": {
+          "title": "Mart Ayı Ba/Bs Formu Hazırlığı",
+          "subtitle": "Hacmi ₺5.000 üzeri tedarikçiler ile mutabakat mektuplarını gönder",
+          "priority_label": "Kritik",
+          "deadline": "2 Gün",
+          "assigned_by": "Mali Müşavir"
+        },
+        "task-acc-2": {
+          "title": "Kredi Kartı Slip Komisyon Denetimi",
+          "subtitle": "Sanal POS komisyon kesintilerini banka oranlarıyla karşılaştır",
+          "priority_label": "Orta",
+          "deadline": "Bu Hafta",
+          "assigned_by": "Finans Direktörü"
+        },
+        "task-acc-3": {
+          "title": "Duran Varlık Amortisman Kayıtları",
+          "subtitle": "Yeni alınan 2 adet CNC tezgahının amortisman fişlerini oluştur",
+          "priority_label": "Normal",
+          "deadline": "Ay Sonu",
+          "assigned_by": "Sistem"
+        }
+      },
+      "quick_shortcuts": {
+        "acc-general-ledger": {
+          "title": "Muavin & Defteri Kebir",
+          "description": "Hesap planı ve hareket dökümü"
+        },
+        "acc-fin-reports": {
+          "title": "Mali Tablolar",
+          "description": "Bilanço ve Gelir Tablosu",
+          "badge": "Rapor"
+        },
+        "acc-sales-invoices": {
+          "title": "Satış Faturaları",
+          "description": "e-Fatura & e-Arşiv listesi"
+        },
+        "acc-payment-plan": {
+          "title": "Ödeme & Tahsilat Planı",
+          "description": "Nakit akışı ve vadeler"
+        }
+      }
+    },
+    "manufacturing": {
+      "greeting": {
+        "title": "Üretim & İmalat Yönetimi",
+        "description": "İş emirleri, operasyonel kapasite kullanımı ve hammadde reçeteleri (BOM) durumu."
+      },
+      "kpis": {
+        "active-work-orders": {
+          "title": "Devam Eden İş Emirleri",
+          "value": "14 Emir",
+          "change": "8'i montaj safhasında",
+          "subtext": "Üretim hattı aktif"
+        },
+        "oee-efficiency": {
+          "title": "OEE Hat Verimliliği",
+          "value": "%86.4",
+          "change": "+3.2% hedef üstü",
+          "subtext": "Vardiya 1 performansı"
+        },
+        "delayed-operations": {
+          "title": "Geciken Operasyonlar",
+          "value": "2 İstasyon",
+          "change": "Hammadde bekleyen",
+          "subtext": "CNC Torna Bölümü"
+        },
+        "scrap-rate": {
+          "title": "Fire / Iskonto Oranı",
+          "value": "%1.4",
+          "change": "Tolerans dahilinde (Max %2)",
+          "subtext": "Aylık ortalama"
+        }
+      },
+      "pending_actions": {
+        "mfg-wo-start": {
+          "title": "Pano Montaj Hattı - İş Emrini Başlat",
+          "description": "BOM reçetesi ve hammaddeleri rezerve edildi, üretim başlatma onayı bekliyor.",
+          "status_label": "Başlatılmaya Hazır",
+          "amount": "40 Ünite",
+          "due": "Hemen",
+          "action_label": "Hattı Başlat"
+        },
+        "mfg-qc-check": {
+          "title": "1. Parti Motor Gövdesi Kalite Kontrolü",
+          "description": "Talaşlı imalattan çıkan 15 parçanın tolerans ve yüzey pürüzlülük ölçümü.",
+          "status_label": "Numune Muayene",
+          "amount": "15 Parça",
+          "due": "Bugün 15:30",
+          "action_label": "Test Girişi Yap"
+        },
+        "mfg-bom-change": {
+          "title": "Revizyon C Reçete Mühendislik Değişikliği",
+          "description": "Alternatif klemens kullanımı için BOM onayı gerekiyor.",
+          "status_label": "Mühendislik Onayı",
+          "amount": "Revizyon C",
+          "due": "Yarın",
+          "action_label": "BOM İncele"
+        }
+      },
+      "assigned_tasks": {
+        "task-mfg-1": {
+          "title": "Pres Hattı Koruyucu Bakım Planı",
+          "subtitle": "Haftalık yağlama ve hidrolik basınç kontrol formunu doldur",
+          "priority_label": "Yüksek",
+          "deadline": "Bugün",
+          "assigned_by": "Bakım Şefi"
+        },
+        "task-mfg-2": {
+          "title": "Vardiya 2 Duruş Analizi",
+          "subtitle": "Dün yaşanan 45 dakikalık elektrik arızası raporu",
+          "priority_label": "Orta",
+          "deadline": "2 Gün",
+          "assigned_by": "Üretim Müdürü"
+        },
+        "task-mfg-3": {
+          "title": "İş İstasyonu Ergonomi Eğitimi",
+          "subtitle": "Montaj operatörlerinin katılım listesini sisteme gir",
+          "priority_label": "Normal",
+          "deadline": "Bu Hafta",
+          "assigned_by": "İK / İSG"
+        }
+      },
+      "quick_shortcuts": {
+        "mfg-work-orders": {
+          "title": "İş Emirleri",
+          "description": "Planlanan ve aktif üretimler"
+        },
+        "mfg-bom": {
+          "title": "Ürün Reçeteleri (BOM)",
+          "description": "Hammadde ve operasyon ağaçları"
+        },
+        "mfg-dashboard": {
+          "title": "Üretim Panosu",
+          "description": "Hat verimlilikleri ve vardiyalar"
+        },
+        "mfg-maintenance": {
+          "title": "Bakım & İstasyonlar",
+          "description": "Tezgah durumları ve bakım takvimi"
+        }
+      }
+    },
+    "subcontracting": {
+      "greeting": {
+        "title": "Fason & Dış Tedarik Yönetimi",
+        "description": "Fasona gönderilen hammaddeler, dış işlemdeki parçalar ve kalite kabul süreçleri."
+      },
+      "kpis": {
+        "out-for-subcontract": {
+          "title": "Fasonda İşlenen Parçalar",
+          "value": "9 Parti",
+          "change": "4 farklı atölyede",
+          "subtext": "Kaplama & Isıl İşlem"
+        },
+        "pending-sub-receipt": {
+          "title": "Teslimatı Beklenenler",
+          "value": "₺64.000",
+          "change": "3 sipariş bu hafta",
+          "subtext": "Termin süresinde"
+        },
+        "sub-qc-pending": {
+          "title": "Kalite Muayene Bekleyen",
+          "value": "2 Parti",
+          "change": "Fasondan teslim alındı",
+          "subtext": "Kabul testi bekliyor"
+        },
+        "subcontractor-balance": {
+          "title": "Fasoncu Cari Bakiyesi",
+          "value": "₺48.700",
+          "change": "Vadesi gelmemiş",
+          "subtext": "Düzenli mutabakat"
+        }
+      },
+      "pending_actions": {
+        "sub-send-raw": {
+          "title": "Eloksal Kaplama İçin Alüminyum Gövde Sevki",
+          "description": "Yıldız Kaplama atölyesine 200 adet işlenmiş gövde sevk irsaliyesi kesilmeli.",
+          "status_label": "Sevkiyat Bekliyor",
+          "amount": "200 Adet",
+          "due": "Bugün 16:00",
+          "action_label": "Fason Sevk Aç"
+        },
+        "sub-return-qc": {
+          "title": "Galvanizden Dönen Çelik Millerin Kabulü",
+          "description": "Kaplama mikron kalınlığı ölçümü yapılıp depoya devredilmelidir.",
+          "status_label": "Giriş Kalite",
+          "amount": "1.500 Adet",
+          "due": "Yarın",
+          "action_label": "Muayene Et"
+        },
+        "sub-recon": {
+          "title": "Aylık Fason Fire Oranı Mutabakatı",
+          "description": "Lazer kesim atölyesi ile sac plaka fire yüzdesi mutabakatı.",
+          "status_label": "Fire Kontrolü",
+          "amount": "%3.1 Fire",
+          "due": "3 Gün",
+          "action_label": "Mutabakata Git"
+        }
+      },
+      "assigned_tasks": {
+        "task-sub-1": {
+          "title": "Yeni Fasoncu Firma Denetim Ziyareti",
+          "subtitle": "Bursa OSB'deki boyahane tesisinin kalite sertifikalarını incele",
+          "priority_label": "Yüksek",
+          "deadline": "Cuma",
+          "assigned_by": "Tedarik Zinciri Müdürü"
+        },
+        "task-sub-2": {
+          "title": "Fason Fiyat Listesi Güncellemesi",
+          "subtitle": "Enerji maliyeti artışına istinaden birim fiyat tekliflerini değerlendir",
+          "priority_label": "Orta",
+          "deadline": "Gelecek Hafta",
+          "assigned_by": "Satın Alma"
+        }
+      },
+      "quick_shortcuts": {
+        "sub-orders": {
+          "title": "Fason İş Emirleri",
+          "description": "Dışarıya verilen işler"
+        },
+        "sub-transfers": {
+          "title": "Fason Hammadde Çıkışları",
+          "description": "Atölyelere sevk irsaliyeleri"
+        },
+        "sub-dashboard": {
+          "title": "Fason Panosu",
+          "description": "Termin ve maliyet analizleri"
+        }
+      }
+    },
+    "system": {
+      "greeting": {
+        "title": "Sistem & Çalışma Alanları",
+        "description": "Tüm kurumsal modüllere hızlı erişim, sistem sağlığı ve kullanıcı ayarları."
+      },
+      "kpis": {
+        "active-users": {
+          "title": "Aktif Kullanıcılar",
+          "value": "24 Kişi",
+          "change": "5 departmanda çevrimiçi",
+          "subtext": "Eşzamanlı oturum"
+        },
+        "system-status": {
+          "title": "Sistem Durumu",
+          "value": "Sağlıklı",
+          "change": "%99.98 uptime",
+          "subtext": "Tüm servisler devrede"
+        },
+        "duckdb-status": {
+          "title": "OPFS & DuckDB Motoru",
+          "value": "Aktif",
+          "change": "WASM yerel önbellek",
+          "subtext": "0 ms gecikmeli sorgular"
+        },
+        "unread-notifications": {
+          "title": "Sistem Bildirimleri",
+          "value": "3 Yeni",
+          "change": "1 güvenlik uyarısı",
+          "subtext": "İnceleme bekliyor"
+        }
+      },
+      "pending_actions": {
+        "sys-backup": {
+          "title": "Haftalık Güvenli Veritabanı Yedeği",
+          "description": "Bölgesel yedekleme başarıyla tamamlandı, arşiv doğrulama bekliyor.",
+          "status_label": "Doğrulama",
+          "amount": "4.8 GB",
+          "due": "Bugün",
+          "action_label": "Doğrula"
+        }
+      },
+      "assigned_tasks": {
+        "task-sys-1": {
+          "title": "Yeni Katılan Personel Yetkilendirmesi",
+          "subtitle": "Depo sorumlusu için Stock ve Subcontracting izinlerini tanımla",
+          "priority_label": "Yüksek",
+          "deadline": "Bugün",
+          "assigned_by": "İK Departmanı"
+        }
+      },
+      "quick_shortcuts": {
+        "sys-users": {
+          "title": "Kullanıcı & Rol Yönetimi",
+          "description": "Erişim hakları ve roller"
+        },
+        "sys-my-settings": {
+          "title": "Kullanıcı Tercihleri",
+          "description": "Profil, bildirim ve tema"
+        }
+      }
+    },
+    "cards": {
+      "stock": {
+        "title_lead": "Stok",
+        "title_trail": "Yönetimi",
+        "description": "Stok kartları, bakiyeler, ekstreler ve analitik raporlar"
+      },
+      "selling": {
+        "title_lead": "Satış",
+        "title_trail": "Yönetimi",
+        "description": "Satış siparişleri, müşteri teklifleri, faturalar ve analitik"
+      },
+      "subcontracting": {
+        "title_lead": "Fason",
+        "title_trail": "İşlemleri",
+        "description": "İç/dış fason siparişleri, irsaliyeler ve teslimat takibi"
+      },
+      "accounting": {
+        "title_lead": "Muhasebe",
+        "title_trail": "& Finans",
+        "description": "Finansal raporlar, bilanço, kâr/zarar ve genel mizan"
+      },
+      "manufacturing": {
+        "title_lead": "Üretim",
+        "title_trail": "Planlama",
+        "description": "Üretim planları, iş emirleri, BOM ve ürün reçeteleri"
+      }
+    }
   },
   "HistorySidebar": {
     "search_ph": "Ekran sohbetlerinde ara...",

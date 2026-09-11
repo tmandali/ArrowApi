@@ -35,7 +35,7 @@ import { getWorkspaceForPath, getWorkspace } from "@/lib/workspace-registry";
 import {
   type WorkspaceLandingData,
   type SoftTone,
-  getWorkspaceLandingData,
+  useWorkspaceLandingData,
 } from "@/lib/workspace-landing-data";
 import type { WorkspaceId } from "@/types";
 import { cn } from "@/utils/cn";
@@ -124,9 +124,7 @@ export function WorkspaceLandingTemplate({
     [agents, activeId],
   );
 
-  const rawData = React.useMemo(() => {
-    return getWorkspaceLandingData(activeId);
-  }, [activeId]);
+  const rawData = useWorkspaceLandingData(activeId);
 
   const data: WorkspaceLandingData = React.useMemo(() => {
     return {

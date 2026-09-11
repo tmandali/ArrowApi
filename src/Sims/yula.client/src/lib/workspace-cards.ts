@@ -1,4 +1,5 @@
-import * as React from "react";
+import { useTranslations } from "next-intl";
+import type { ComponentType } from "react";
 import {
   Package,
   ShoppingCart,
@@ -14,53 +15,72 @@ export interface WorkspaceCardItem {
   titleTrail: string;
   description: string;
   url: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }
 
-export const WORKSPACE_CARDS: WorkspaceCardItem[] = [
+/**
+ * Workspace kartlarının yapısal alanları (id, ad, url, ikon). Görüntülenen
+ * metinler `messages/<locale>.json` → `WorkspaceLanding.cards.<id>` alt
+ * ağacından gelir (dil kilitli değildir).
+ */
+export const WORKSPACE_CARDS_STRUCTURE: Omit<
+  WorkspaceCardItem,
+  "titleLead" | "titleTrail" | "description"
+>[] = [
   {
     id: "stock",
     name: "Stock",
-    titleLead: "Stok",
-    titleTrail: "Yönetimi",
-    description: "Stok kartları, bakiyeler, ekstreler ve analitik raporlar",
     url: "/stock",
     icon: Package,
   },
   {
     id: "selling",
     name: "Selling",
-    titleLead: "Satış",
-    titleTrail: "Yönetimi",
-    description: "Satış siparişleri, müşteri teklifleri, faturalar ve analitik",
     url: "/selling",
     icon: ShoppingCart,
   },
   {
     id: "subcontracting",
     name: "Subcontracting",
-    titleLead: "Fason",
-    titleTrail: "İşlemleri",
-    description: "İç/dış fason siparişleri, irsaliyeler ve teslimat takibi",
     url: "/subcontracting",
     icon: RefreshCw,
   },
   {
     id: "accounting",
     name: "Accounting",
-    titleLead: "Muhasebe",
-    titleTrail: "& Finans",
-    description: "Finansal raporlar, bilanço, kâr/zarar ve genel mizan",
     url: "/accounting",
     icon: BarChart2,
   },
   {
     id: "manufacturing",
     name: "Manufacturing",
-    titleLead: "Üretim",
-    titleTrail: "Planlama",
-    description: "Üretim planları, iş emirleri, BOM ve ürün reçeteleri",
     url: "/manufacturing",
     icon: Factory,
   },
 ];
+
+export interface WorkspaceCardText {
+  title_lead: string;
+  title_trail: string;
+  description: string;
+}
+
+/**
+ * Mevcut locale'e göre tam workspace kart listesini üretir. Yalnız istemci
+ * bileşenlerinden çağrılmalıdır.
+ */
+export function useWorkspaceCards(): WorkspaceCardItem[] {
+  const t = useTranslations("WorkspaceLanding");
+  const raw = t.raw as unknown as {
+    cards: Record<string, WorkspaceCardText>;
+  };
+  return WORKSPACE_CARDS_STRUCTURE.map((card) => {
+    const s = raw.cards[card.id];
+    return {
+      ...card,
+      titleLead: s?.title_lead ?? card.name,
+      titleTrail: s?.title_trail ?? "",
+      description: s?.description ?? "",
+    };
+  });
+}
