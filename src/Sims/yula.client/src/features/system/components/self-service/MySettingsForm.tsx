@@ -341,17 +341,33 @@ export function MySettingsForm() {
 
   /**
    * Dil kaydedildiğinde: cookie'yi senkronize et; hedef locale mevcut sayfadan
-   * farklıysa `yula:locale-changed` yayını yap ve ~150 ms sonra sayfa
-   * yenilensin (UI yeni dile geçsin). Combo değişiminde otomatik reload YOK —
-   * yalnız kayıt anında. Dinleyiciler bu pencerede YALNIZ senkron kalıcılık
-   * işlemleri yapar (`setState` yasak; bkz. `locale-events.ts` sözleşmesi).
+   * farklıysa `yula:locale-changed` yayını yap ve sayfa yenilensin (UI yeni
+   * dile geçsin). Combo değişiminde otomatik reload YOK — yalnız kayıt anında.
+   * Dinleyiciler bu pencerede YALNIZ senkron kalıcılık işlemleri yapar
+   * (`setState` yasak; bkz. `locale-events.ts` sözleşmesi).
+   *
+   * `persisted` parametresi: DB kalıcılığı (PUT + secret) tamamlanana dek
+   * reload tetiklenmez — dil değişikliği + in-flight isteklerin eşzamanlı
+   * abort'u Turbopack dev sunucusunda yarış hatası üretmesin. Ağ çökse bile
+   * 3 sn üst sınır sonrası reload garantili (suzma davranış bozulmaz).
+   * Dil değişmediyse hiç reload olmaz; gecikme etkisizdir.
    */
-  const applyLanguageChange = (lang: ProfileLanguage) => {
+  const applyLanguageChange = (
+    lang: ProfileLanguage,
+    persisted?: Promise<unknown>,
+  ) => {
     syncLocaleCookie(lang)
     const code = lang === "turkish" ? "tr" : "en"
     if (code === locale) return
     emitLocaleChange(code)
-    setTimeout(() => window.location.reload(), 150)
+    // `persisted` (PUT + secret) biter bitmez reload; takılırsa 3 sn üst sınırdan
+    // sonra yine reload — in-flight abort yarışı oluşmaz, suzma bozulmaz.
+    // (persisted zaten `.catch(() => undefined)` ile hiç reddetmez; cap reddetmez.
+    //  `Promise.race` = ikisinin önceki çözüleni → "bitti YADA zaman doldu".)
+    const cap = new Promise<void>((r) => window.setTimeout(r, 3000))
+    void Promise.race([persisted ?? Promise.resolve(), cap]).then(() => {
+      window.setTimeout(() => window.location.reload(), 150)
+    })
   }
 
   const handleSaveAiConfig = () => {
@@ -372,9 +388,10 @@ export function MySettingsForm() {
       endpoint: aiEndpoint,
       effort: normalizeEffort(aiThinkingLevel) ?? undefined,
     })
-    void saveSecret(aiApiKey)
-    applyLanguageChange(profileLanguage)
-    void putSettingsToApi({
+    // Kalıcılık promise'leri: dil değiştiyse reload bunları bekler
+    // (in-flight abort yarışı oluşmasın; `applyLanguageChange` sözleşmesi).
+    const secretP = saveSecret(aiApiKey).catch(() => undefined)
+    const putP = putSettingsToApi({
       email: profileEmail,
       fullName: profileFullName,
       language: profileLanguage,
@@ -384,7 +401,8 @@ export function MySettingsForm() {
       aiEndpoint,
       thinkingLevel: aiThinkingLevel,
       systemFacts,
-    })
+    }).catch(() => undefined)
+    applyLanguageChange(profileLanguage, Promise.all([secretP, putP]))
     setAiSaved(true)
     setTimeout(() => setAiSaved(false), 2500)
   }
@@ -393,7 +411,8 @@ export function MySettingsForm() {
   const handleSaveProfile = () => {
     const full = profileFullName.trim() || `${profileFirstName} ${profileLastName}`.trim()
     if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) return
-    void putSettingsToApi({
+    // Dil değiştiyse reload, PUT tamamlanana dek bekler (abort yarışı yok).
+    const putP = putSettingsToApi({
       email: profileEmail.trim(),
       fullName: full,
       language: profileLanguage,
@@ -403,8 +422,8 @@ export function MySettingsForm() {
       aiEndpoint,
       thinkingLevel: aiThinkingLevel,
       systemFacts,
-    })
-    applyLanguageChange(profileLanguage)
+    }).catch(() => undefined)
+    applyLanguageChange(profileLanguage, putP)
     setProfileSaved(true)
     setTimeout(() => setProfileSaved(false), 2500)
   }
