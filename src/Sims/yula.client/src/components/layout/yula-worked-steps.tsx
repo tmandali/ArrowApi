@@ -3,6 +3,7 @@
 import {
   yulaToolPartInfo,
   isFailedToolInfo,
+  isDedupeSkipOutput,
   type YulaToolPartInfo,
 } from "@/lib/yula-tool-info";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
@@ -183,6 +184,10 @@ export function extractWorkedSteps(
 
     if (part.type === "text") {
       const raw = (part as { text?: string }).text ?? "";
+      // Salt-boşluk metin (araç çağrıları arası model formatlaması) satır
+      // üretmez — normal akış gürültüsüdür. Yalnız sanitizer'ın GERÇEK
+      // içeriği yediği durum raporlanır (sızıntı/çöp sinyali).
+      if (!raw.trim()) return;
       const text = sanitizeAssistantText(raw);
       if (text.trim()) return;
       pushStep({
@@ -589,6 +594,20 @@ export function extractWorkedSteps(
             ? (raw[0] as { prompt?: unknown }).prompt
             : undefined;
         const count = Array.isArray(raw) ? raw.length : 0;
+        // Aynı adımdaki yinelenen soru bastırıldıysa dürüst etiketle
+        // (kırmızı "hata" değil, kasıtlı eleme).
+        if (isDedupeSkipOutput(info)) {
+          pushStep({
+            id: info.toolCallId,
+            kind: "confirmation",
+            label: "Duplicate question suppressed",
+            subLabel: "same-step repeat — first question set kept",
+            isLive: false,
+            isError: false,
+            info,
+          });
+          break;
+        }
         pushStep({
           id: info.toolCallId,
           kind: "confirmation",

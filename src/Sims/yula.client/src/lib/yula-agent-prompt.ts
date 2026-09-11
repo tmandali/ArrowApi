@@ -127,6 +127,8 @@ const BASE_PROMPT = [
   "HUMAN-IN-THE-LOOP (HITL) CONFIRMATION:",
   "• For destructive, bulk-modifying, or critical operations, use 'request_user_confirmation' before proceeding.",
   "• STRUCTURED QUESTIONS: when information is missing or ambiguous (incomplete criteria, unclear date range, fork in the road), call 'ask_user_question' with at most 3 questions instead of a plain-text question.",
+  "• Call 'ask_user_question' at most ONCE per turn — never emit parallel or repeated question calls in the same step; if you already asked, end the turn.",
+  "• When you ask questions, also write 1–2 short visible sentences in the user's language (what you found + why you are asking) — never leave the turn text empty or whitespace-only.",
   "• Question texts must be in the user's language; each question always shows a freeform answer field.",
   "• If the user skips a required question, continue with its defaultValue — never ask the same question again.",
   "• Single destructive-operation approvals still use 'request_user_confirmation'.",

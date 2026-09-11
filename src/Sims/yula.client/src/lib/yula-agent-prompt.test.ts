@@ -103,6 +103,18 @@ describe("buildSystemPrompt agent katmanı", () => {
     );
   });
 
+  it("soru kuralı tur başına tek çağrı + görünür özet içerir", () => {
+    const prompt = buildSystemPrompt({ pathname: "/" });
+    assert.ok(
+      prompt.includes("at most ONCE per turn"),
+      "tek-soru kuralı olmalı",
+    );
+    assert.ok(
+      prompt.includes("never leave the turn text empty"),
+      "boş-tur yasağı olmalı",
+    );
+  });
+
   it("skill envanteri bölümü yalnızca liste doluyken çıkar", () => {
     const empty = buildSystemPrompt({ pathname: "/", agent: testAgent });
     assert.ok(!empty.includes("USER SKILLS (on-device"), "boşken çıkmamalı");

@@ -20,12 +20,15 @@ export interface YulaChatContextValue
   /** Durdurulan/hatalı yanıtı yeniden dene (SDK regenerate/sendMessage seçimi) */
   retryResponse: () => Promise<void>;
   /** dynamic-tool parçasını istemcide çalıştırıp akışı devam ettirir */
-  runPendingTool: (part: {
-    toolCallId: string;
-    toolName: string;
-    input?: unknown;
-    state?: string;
-  }) => void;
+  runPendingTool: (
+    part: {
+      toolCallId: string;
+      toolName: string;
+      input?: unknown;
+      state?: string;
+    },
+    opts?: { skipAsDuplicate?: string },
+  ) => void;
   conversations: YulaConversation[];
   activeId: string;
   selectConversation: (id: string) => void;

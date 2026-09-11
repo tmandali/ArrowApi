@@ -64,6 +64,55 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
   return null;
 }
 
+/**
+ * Yinelenen araç yürütmeyi kesen kanonik işaret — aynı turda aynı imzayla
+ * yeniden çağrılan araca çıktı olarak verilir; model "değişmez, tekrar
+ * çağırma" sinyalini okur. Kullanıcıya gösterilen metinlerde (fallback
+ * balon / sessiz-tur uyarısı) GERÇEK hata sayılmaz — kasıtlı bastırmadır.
+ */
+export const DEDUPE_SKIP_MARKER =
+  "This tool call was skipped as a duplicate in this turn";
+
+export function isDedupeSkipOutput(info: YulaToolPartInfo): boolean {
+  return (
+    typeof info.errorText === "string" &&
+    info.errorText.startsWith(DEDUPE_SKIP_MARKER)
+  );
+}
+
+/**
+ * Aynı adımda yinelenen `ask_user_question` çağrılarını bulur.
+ * Model bazen tek adımda paralel iki soru çağrısı üretir (ikisi de çalışırsa
+ * çift soru kartı çıkar); adım başına yalnız İLK çağrı yaşar, sonrakiler
+ * bastırılmalıdır. Adım sınırı `step-start` parçalarıdır; farklı adım/mesajdaki
+ * sorular (kullanıcı cevaplayıp model devam sorusu sorarsa) etkilenmez.
+ * Dönüş: bastırılacak toolCallId kümesi.
+ */
+export function findDuplicateQuestionCallIds(
+  messages: Array<{ role?: string; parts?: unknown[] }>,
+): Set<string> {
+  const duplicates = new Set<string>();
+  for (const message of messages) {
+    if (message?.role !== "assistant" || !Array.isArray(message.parts)) continue;
+    // Adım bloklarına böl (step-start = sınır).
+    const blocks: YulaToolPartInfo[][] = [[]];
+    for (const part of message.parts) {
+      if ((part as { type?: string })?.type === "step-start") {
+        blocks.push([]);
+        continue;
+      }
+      const info = yulaToolPartInfo(part);
+      if (info) blocks[blocks.length - 1].push(info);
+    }
+    for (const block of blocks) {
+      const asks = block.filter((i) => i.toolName === "ask_user_question");
+      // İlk çağrı (durumu ne olursa olsun) yaşar; sonrakiler yinelenendir.
+      for (const extra of asks.slice(1)) duplicates.add(extra.toolCallId);
+    }
+  }
+  return duplicates;
+}
+
 export function isFailedToolInfo(info: YulaToolPartInfo): boolean {
   if (info.state === "output-error") return true;
   if (info.state === "output-available" && info.output && typeof info.output === "object") {

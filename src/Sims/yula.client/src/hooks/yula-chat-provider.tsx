@@ -9,6 +9,8 @@ import {
   yulaToolPartInfo,
   isFailedToolInfo,
   SERVER_EXECUTED_TOOLS,
+  DEDUPE_SKIP_MARKER,
+  findDuplicateQuestionCallIds,
 } from "@/lib/yula-tool-info";
 import {
   YulaChatContext,
@@ -135,8 +137,7 @@ function stableSignature(value: unknown): string {
     .join(",")}}`;
 }
 
-/** Dedupe sinyali — hata metni bu önekle başlar (predicate ile paylaşılır). */
-const DEDUPE_SKIP_MARKER = "This tool was already executed with the same input in this turn";
+
 
 /** Wait for arrival at the target pathname so the apply→navigate chain resumes with fresh context. */
 function waitForPathname(target: string, timeoutMs = 7000): Promise<boolean> {
@@ -796,15 +797,32 @@ function ChatInstance({
   }, [status, chat.messages, conversationId, saveMessages, renameFromFirstMessage]);
 
   const runPendingTool = React.useCallback(
-    async (part: {
-      toolCallId: string;
-      toolName: string;
-      input?: unknown;
-      state?: string;
-    }) => {
+    async (
+      part: {
+        toolCallId: string;
+        toolName: string;
+        input?: unknown;
+        state?: string;
+      },
+      opts?: { skipAsDuplicate?: string },
+    ) => {
       if (part.state && part.state !== "input-available") return;
       // Sunucu-execute araçlar istemcide koşmaz (çift yürütme + bozuk resubmit).
       if (SERVER_EXECUTED_TOOLS.has(part.toolName)) return;
+      // Aynı-adım yinelenen soru: koşturmadan dedupe çıktısıyla kapat
+      // (kart render edilmez, tur terminal kalır, modele tekrar sinyali gider).
+      if (opts?.skipAsDuplicate) {
+        console.info(
+          `[Yula Agent Loop] aynı adımdaki yinelenen soru çağrısı atlandı → ${part.toolCallId}`,
+        );
+        chat.addToolOutput({
+          tool: part.toolName as keyof YulaTools,
+          toolCallId: part.toolCallId,
+          state: "output-error",
+          errorText: opts.skipAsDuplicate,
+        });
+        return;
+      }
       // Yürütme tamamen patlarsa bile SDK kanonik hata çıktısı ekle
       // (state:"output-error" + errorText) — aksi halde satır "Çalışıyor…"da
       // asılı kalır ve resubmit hatalı geçmişle sunucuda patlar.
@@ -1000,6 +1018,11 @@ function ChatInstance({
     );
     if (pending.length === 0) return;
     pending.forEach((info) => handledToolsRef.current.add(info.toolCallId));
+    // Aynı adımda yinelenen soru çağrıları: model bazen tek adımda paralel
+    // iki `ask_user_question` üretir — ikisi de çalışırsa çift soru kartı
+    // çıkar. Adım başına yalnız ilk soru yaşar, sonrakiler koşturulmadan
+    // dedupe çıktısıyla kapatılır (kart render edilmez, tur terminal kalır).
+    const duplicateAskIds = findDuplicateQuestionCallIds(chat.messages);
 
     void (async () => {
       setIsExecutingTools(true);
@@ -1011,12 +1034,23 @@ function ChatInstance({
           console.info(
             `[Yula Agent Loop] adım ${toolStepCountSinceLastUser(chat.messages) + 1}/${MAX_AUTO_STEPS} → ${info.toolName}`,
           );
-          await runPendingTool({
-            toolCallId: info.toolCallId,
-            toolName: info.toolName,
-            input: info.input,
-            state: info.state,
-          });
+          await runPendingTool(
+            {
+              toolCallId: info.toolCallId,
+              toolName: info.toolName,
+              input: info.input,
+              state: info.state,
+            },
+            info.toolName === "ask_user_question" &&
+              duplicateAskIds.has(info.toolCallId)
+              ? {
+                  skipAsDuplicate:
+                    DEDUPE_SKIP_MARKER +
+                    " (a previous ask_user_question call in the same step was kept). " +
+                    "Do not call ask_user_question again; end your turn with a short visible summary instead.",
+                }
+              : undefined,
+          );
         }
       } finally {
         setIsExecutingTools(false);

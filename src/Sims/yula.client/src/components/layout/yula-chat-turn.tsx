@@ -11,6 +11,7 @@ import { useYulaChat } from "@/hooks/use-yula-chat";
 import {
   yulaToolPartInfo,
   isFailedToolInfo,
+  isDedupeSkipOutput,
   type YulaToolPartInfo,
 } from "@/lib/yula-tool-info";
 import { stripMarkdownTables } from "@/lib/markdown-table-strip";
@@ -97,7 +98,12 @@ function SilentTurnFallback({
   onRetry: () => void;
   lang: YulaUiLang;
 }) {
-  const failed = toolParts.filter((i) => isFailedToolInfo(i));
+  // Kasıtlı dedupe bastırmaları gerçek hata değildir — sessiz-tur
+  // uyarısında raporlanmaz (aksi halde yinelenen soru elenince yersiz
+  // kırmızı kutu çıkardı).
+  const failed = toolParts.filter(
+    (i) => isFailedToolInfo(i) && !isDedupeSkipOutput(i),
+  );
   const hasScreenOk = toolParts.some(
     (i) => SCREEN_TOOLS.has(i.toolName) && !isFailedToolInfo(i) && i.state === "output-available",
   );
@@ -255,12 +261,19 @@ export function YulaChatTurn({
   }, [assistantMessage, hasSqlCard]);
 
   // Metin yazılmayan turlarda son başarılı araç çıktısının "message" alanı
-  // görünür yanıt olarak kullanılır (LLM, terminal ekran araçlarından sonra yazmaz)
+  // görünür yanıt olarak kullanılır (LLM, terminal ekran araçlarından sonra yazmaz).
+  // Soru araçları hariç: soru kartı zaten render edilir; sistem-İngilizcesi
+  // "message" alanları kullanıcı balonuna sızmamalıdır.
   const streamErrorText = assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined;
   let fallbackToolText = "";
   if (!assistantText.trim() && !streamErrorText) {
     for (let i = toolParts.length - 1; i >= 0; i--) {
       const info = toolParts[i];
+      if (
+        info.toolName === "ask_user_question" ||
+        info.toolName === "request_user_confirmation"
+      )
+        continue;
       if (info.state !== "output-available" || isFailedToolInfo(info)) continue;
       const out = info.output as { message?: unknown } | undefined;
       if (typeof out?.message === "string" && out.message.trim()) {
