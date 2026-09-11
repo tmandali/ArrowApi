@@ -107,19 +107,15 @@ export function AgentSessionView() {
   const agent = useUserAgentsStore((s) => s.agents.find((a) => a.id === agentId));
   const setActiveAgentId = useUserAgentsStore((s) => s.setActiveAgentId);
   // Persist rehydrate olmadan liste boş gelir — "bulunamadı" flash'ını
-  // önlemek için hazır olana kadar bekle. NOT: sunucu ön-render'ında
-  // `window` yoktur; zustand persist erken döner ve store'da `.persist`
-  // oluşmaz — bu yüzden erişim SSR-güvenli (?.) olmalı. İlk render iki
-  // ortamda da `false` verir (hydration uyumsuzluğu yok); istemcide effect
-  // içinde gerçek durum okunur. Başlangıç değeri lazy okunur, effect yalnız
-  // bitmemiş hydration'a abone olur (senkron setState yok).
-  const [hydrated, setHydrated] = React.useState(
+  // önlemek için hazır olana kadar bekle. NOT: hydration eşleşmesi için
+  // sunucu anlık görüntüsü her zaman `false` döner; istemci gerçek durumu
+  // hydration SONRASI okur (mismatch yok, tearing yok).
+  const hydrated = React.useSyncExternalStore(
+    (onChange) =>
+      useUserAgentsStore.persist?.onFinishHydration(onChange) ?? (() => {}),
     () => useUserAgentsStore.persist?.hasHydrated() ?? false,
+    () => false,
   );
-  React.useEffect(() => {
-    if (useUserAgentsStore.persist?.hasHydrated()) return;
-    return useUserAgentsStore.persist?.onFinishHydration(() => setHydrated(true));
-  }, []);
 
   // URL oturumu global seçimi besler (provider da aynı kuralı uygular).
   React.useEffect(() => {
@@ -173,6 +169,7 @@ export function AgentSessionView() {
       showSearch={false}
       transparentHeader
       actions={<AgentSessionHeaderActions agentId={agent.id} />}
+      navOverlay
     >
       <AIChatPanel mode="main" />
     </WorkspacePageShell>

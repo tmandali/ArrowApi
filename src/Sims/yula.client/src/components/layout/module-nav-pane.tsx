@@ -32,6 +32,12 @@ type ModuleNavPaneProps = {
    * Belirtilmezse navMenuHeaderVisible ile aynı değeri alır (header visible true ise açma butonu da true olur).
    */
   floatingOpenButton?: boolean
+  /**
+   * Overlay modu: menü içeriği itmez, solda kart olarak üstte açılır.
+   * İçerik genişliği sabit kalır — aç/kapa ekranı sağa kaydırmaz.
+   * Ortalanmış ana ekranlar (ajan oturumu) için kullanılır.
+   */
+  overlay?: boolean
 }
 
 /**
@@ -49,6 +55,7 @@ export function ModuleNavPane({
   className,
   navMenuHeaderVisible = false,
   floatingOpenButton,
+  overlay = false,
 }: ModuleNavPaneProps) {
   const showOpenButton = floatingOpenButton ?? navMenuHeaderVisible
 
@@ -74,6 +81,71 @@ export function ModuleNavPane({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [navOpen, setOpen])
+
+  // Overlay'de Escape ile kapatma
+  React.useEffect(() => {
+    if (!overlay || !navOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        setOpen("module-nav", false)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [overlay, navOpen, setOpen])
+
+  // Overlay modu: menü içerik genişliğini değiştirmez — solda üstte açılır.
+  // Çekmece her zaman mounted kalır (translate ile gizlenir), böylece
+  // aç/kapa ortalanmış içeriği sağa kaydırmaz.
+  if (overlay) {
+    return (
+      <div
+        className={cn(
+          pageContentGutterClass,
+          "relative min-h-0 min-w-0 flex-1",
+          className
+        )}
+      >
+        <div className="flex h-full min-h-0 min-w-0 flex-col">{children}</div>
+        {!navOpen && showOpenButton && (
+          <div className="absolute left-2 top-2 z-20">
+            <button
+              type="button"
+              onClick={() => setOpen("module-nav", true)}
+              title="Menüyü Aç (Ctrl+B)"
+              className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground shadow-2xs backdrop-blur-xs transition-colors cursor-pointer"
+            >
+              <PanelLeftOpen className="size-3.5" />
+              <span className="sr-only">Menüyü Aç</span>
+            </button>
+          </div>
+        )}
+        {navOpen && (
+          <button
+            type="button"
+            aria-label="Menüyü kapat"
+            onClick={() => setOpen("module-nav", false)}
+            className="absolute inset-0 z-30 cursor-default bg-background/40 backdrop-blur-[1px]"
+          />
+        )}
+        <div
+          className={cn(
+            "absolute bottom-2 left-2 top-0 z-40 w-60 transition-transform duration-200 ease-out",
+            navOpen
+              ? "translate-x-0"
+              : "pointer-events-none -translate-x-[110%]"
+          )}
+          aria-hidden={!navOpen}
+          inert={!navOpen}
+        >
+          <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/60 bg-card/80 shadow-lg backdrop-blur-md">
+            <ModuleNavMenu headerVisible />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <ResizablePanelGroup

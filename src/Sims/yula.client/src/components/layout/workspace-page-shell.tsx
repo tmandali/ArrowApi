@@ -35,6 +35,11 @@ type WorkspacePageShellProps = {
   navMenuHeaderVisible?: boolean
   /** Menü kapalıyken açma butonunun gösterilip gösterilmeyeceği (varsayılan: isNavMenuHeaderVisible). */
   floatingOpenButton?: boolean
+  /**
+   * Nav menü overlay modu: menü içeriği itmez, solda üstte açılır.
+   * Ortalanmış ana ekranlarda (ajan oturumu) aç/kapa kaymasını önler.
+   */
+  navOverlay?: boolean
 }
 
 /**
@@ -58,6 +63,7 @@ export function WorkspacePageShell({
   contentClassName,
   navMenuHeaderVisible,
   floatingOpenButton,
+  navOverlay = false,
 }: WorkspacePageShellProps) {
   // Page header gizlendiğinde (ana sayfalar/panolar) menü kapatma butonu erişilebilir olsun
   const isNavMenuHeaderVisible = navMenuHeaderVisible ?? hideHeader;
@@ -86,6 +92,7 @@ export function WorkspacePageShell({
         <ModuleNavPane
           navMenuHeaderVisible={isNavMenuHeaderVisible}
           floatingOpenButton={floatingOpenButton ?? isNavMenuHeaderVisible}
+          overlay={navOverlay}
         >
           {children}
         </ModuleNavPane>
