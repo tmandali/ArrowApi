@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { Check, Filter, FilePlus2, Trash2, X } from "lucide-react";
 import { useUserSkillsStore, ensureExampleSkill } from "@/lib/stores/user-skills";
+import { localizeUserSkills } from "@/lib/yula-user-skill";
 import type { UserSkill } from "@/lib/yula-user-skill";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
 import { SkillEditor, type SkillEditorHandle, type SkillDetailFileTab, type SkillEditorMode } from "./skill-editor";
@@ -25,6 +26,7 @@ type Selection = { id: string | null; readOnly?: boolean } | null;
  */
 export function SkillManagementView() {
   const t = useTranslations("SkillManagement")
+  const ts = useTranslations("Skills")
   const userSkills = useUserSkillsStore((s) => s.skills);
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
 
@@ -64,12 +66,22 @@ export function SkillManagementView() {
           ? "view"
           : "edit";
 
+  // Sistem (yerleşik) skill metinleri `Skills` namespace'inden yerel dilde;
+  // kullanıcı skill'leri de görünümda lokalize edilir — düzenleme formu
+  // her zaman raw store metnini kullanır (kullanıcının kendi içeriği).
+  const localizedUserSkills = React.useMemo(
+    () => localizeUserSkills(userSkills, ts),
+    [userSkills, ts],
+  );
   const systemSkills: Array<UserSkill & { readOnly: boolean }> =
     React.useMemo(
-      () => BUILT_IN_USER_SKILLS.map((s) => ({ ...s, readOnly: true as const })),
-      [],
+      () =>
+        localizeUserSkills(BUILT_IN_USER_SKILLS, ts).map(
+          (s) => ({ ...s, readOnly: true as const }),
+        ),
+      [ts],
     );
-  const listed = tab === "user" ? userSkills : systemSkills;
+  const listed = tab === "user" ? localizedUserSkills : systemSkills;
 
   const selectedSkill =
     selection?.id != null
@@ -268,8 +280,8 @@ export function SkillManagementView() {
                                       <span
                                         role="button"
                                         tabIndex={0}
-                                        title="Skill'i sil"
-                                        aria-label={`/${s.slash} skill'ini sil`}
+                                        title={t("delete_skill")}
+                                        aria-label={t("delete_skill_aria", { slash: s.slash })}
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           handleRowDelete(s.id);

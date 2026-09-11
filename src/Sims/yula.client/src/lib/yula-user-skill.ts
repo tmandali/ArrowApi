@@ -143,6 +143,40 @@ export function getEffectiveUserSkills(
   return filterSkillsByScope([...builtIns, ...storeSkills], workspaceId);
 }
 
+/**
+ * `Skills` next-intl ad alanından görünür metni (label/description)
+ * çözümleyen yerleşik/örnek skill adları. Slash token'ları dil-bağımsız
+ * stabil key olarak kalır; prompt/gövde domain içeriktir → kaynak dilde
+ * (TR) saklanır, LLM katmanına oradan gider.
+ */
+const LOCALIZABLE_SKILL_SLASHES = [
+  "ay-kapanis",
+  "sayim-fark",
+  "rapor-kalite",
+  "gunluk-ozet",
+];
+
+/**
+ * Skill görünüm metinlerini yerel dilde döndürür — saf.
+ * Kullanıcının kendisi düzenlediği skill metinleri bu listedeki slash
+ * adlarıyla çakışabilir; örnek skill metni düzenlenirse görünümde
+ * namespace karşılığı gösterilir (yaygın olmayan kenar durum).
+ */
+export function localizeUserSkills(
+  skills: UserSkill[],
+  t: (key: string) => string,
+): UserSkill[] {
+  return skills.map((s) =>
+    LOCALIZABLE_SKILL_SLASHES.includes(s.slash)
+      ? {
+          ...s,
+          label: t(`${s.slash}.label`),
+          description: t(`${s.slash}.description`),
+        }
+      : s,
+  );
+}
+
 /** Kapsamsız TAM envanter (slash'e göre tekil; yerleşikler öncelikli) — saf. */
 export function getAllUserSkillsInventory(
   storeSkills: UserSkill[],

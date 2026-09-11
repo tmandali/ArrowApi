@@ -1012,7 +1012,9 @@
     "cancel": "Vazgeç",
     "skill": "skill",
     "no_skills_yet": "Henüz kullanıcı skill'i yok — Yeni Skill ile tanımlayın.",
-    "select_or_create": "Soldan bir skill seçin veya + ile oluşturun."
+    "select_or_create": "Soldan bir skill seçin veya + ile oluşturun.",
+    "delete_skill": "Skill''i sil",
+    "delete_skill_aria": "/{slash} skill''ini sil"
   },
   "ChatAssistant": {
     "greeting": "Hoş geldiniz",
@@ -1350,5 +1352,23 @@
       "prompt": "Rapor şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
     },
     "user_skill_default": "Kullanıcı skill'i"
+  },
+  "Skills": {
+    "ay-kapanis": {
+      "label": "Ay kapanış kontrolü",
+      "description": "Ay sonu rapor setini sırayla kontrol eder ve eksikleri çalıştırır"
+    },
+    "sayim-fark": {
+      "label": "Sayım fark analizi",
+      "description": "Fiziksel sayım ile sistem stoku arasındaki farkları analiz eder"
+    },
+    "rapor-kalite": {
+      "label": "Rapor kalite turu",
+      "description": "Açık tabloyu profiller, anomalileri doğrular ve raporlar"
+    },
+    "gunluk-ozet": {
+      "label": "Günlük özet",
+      "description": "Açık raporun güncel verisinden günün öne çıkanlarını özetler"
+    }
   }
 }

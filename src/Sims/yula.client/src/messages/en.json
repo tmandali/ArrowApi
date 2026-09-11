@@ -1012,7 +1012,9 @@
     "cancel": "Cancel",
     "skill": "skill",
     "no_skills_yet": "No user skills yet — define one with New Skill.",
-    "select_or_create": "Select a skill from the left or create one with +"
+    "select_or_create": "Select a skill from the left or create one with +",
+    "delete_skill": "Delete skill",
+    "delete_skill_aria": "Delete /{slash} skill"
   },
   "ChatAssistant": {
     "greeting": "Welcome",
@@ -1350,5 +1352,23 @@
       "prompt": "Interpret the report schema and its required fields, and suggest 1-2 options."
     },
     "user_skill_default": "User skill"
+  },
+  "Skills": {
+    "ay-kapanis": {
+      "label": "Month-end close check",
+      "description": "Runs the end-of-month report set in order and executes the missing items"
+    },
+    "sayim-fark": {
+      "label": "Count variance analysis",
+      "description": "Analyzes differences between physical counts and system stock"
+    },
+    "rapor-kalite": {
+      "label": "Report quality pass",
+      "description": "Profiles the open table, verifies anomalies, and reports them"
+    },
+    "gunluk-ozet": {
+      "label": "Daily summary",
+      "description": "Summarizes the day's highlights from the open report's latest data"
+    }
   }
 }
