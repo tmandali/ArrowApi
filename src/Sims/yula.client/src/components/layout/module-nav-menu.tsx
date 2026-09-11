@@ -2,14 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, PanelLeftClose } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { getWorkspaceNavForPath } from "@/lib/workspace-nav"
-import { usePagePanelContext } from "@/context/page-panel-context"
 import { cn } from "@/utils/cn"
 
 const rowClass =
@@ -19,8 +18,7 @@ const rowActiveClass = "bg-primary/10 text-primary font-medium"
 
 export type ModuleNavMenuProps = {
   /**
-   * Menü tepesindeki kapatma butonu / başlık alanının görünürlüğü.
-   * Varsayılan: false (header ve buton gösterilmez).
+   * @deprecated Menüyü kapat butonu kaldırıldı — yoksayılır, geriye uyumluluk için tutulur.
    */
   headerVisible?: boolean
   className?: string
@@ -33,33 +31,16 @@ export type ModuleNavMenuProps = {
  * içeriyorsa açılır.
  */
 export function ModuleNavMenu({
-  headerVisible = false,
   className,
 }: ModuleNavMenuProps = {}) {
   const pathname = usePathname()
   const items = getWorkspaceNavForPath(pathname)
-  const { setOpen } = usePagePanelContext()
 
   return (
     <section className={cn("flex h-full min-w-0 flex-col", className)}>
-      {headerVisible && (
-        <div className="flex h-7 shrink-0 items-center justify-end px-1.5 pt-1">
-          <button
-            type="button"
-            onClick={() => setOpen("module-nav", false)}
-            title="Menüyü Kapat (Ctrl+B)"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-          >
-            <PanelLeftClose className="size-3.5" />
-            <span className="sr-only">Menüyü Kapat</span>
-          </button>
-        </div>
-      )}
-
       <nav
         className={cn(
-          "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-1.5",
-          headerVisible && "pt-0.5"
+          "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-1.5"
         )}
         aria-label="Module menu"
       >

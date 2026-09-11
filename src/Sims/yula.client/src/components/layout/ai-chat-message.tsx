@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { useYulaChat } from "@/hooks/use-yula-chat";
@@ -9,6 +9,7 @@ import { cn } from "@/utils/cn";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { ChatMarkdown, FileOpenChip } from "./chat-markdown";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
+import { criteriaStaticTitles } from "@/lib/yula-actions";
 import { yulaToolPartInfo } from "@/lib/yula-tool-info";
 import { extractSourceTable } from "@/lib/yula-source-table";
 
@@ -16,14 +17,21 @@ type AiChatMessageProps = {
   message: YulaMessage;
   isLive?: boolean;
   className?: string;
+  /**
+   * Metin-içi "çalıştır" tıklaması önce buraya delege edilir; true dönerse
+   * doğrudan koştu sayılır, false/undefined ise metin prompt olarak gider.
+   */
+  onRunReport?: () => boolean;
 };
 
 function FormattedAssistantText({
   text,
   message,
+  onRunReport,
 }: {
   text: string
   message?: YulaMessage
+  onRunReport?: () => boolean
 }) {
   const router = useRouter();
   const navigate = (
@@ -39,6 +47,12 @@ function FormattedAssistantText({
   };
 
   const { sendMessageText: sendPrompt } = useYulaChat()
+  const pathname = usePathname()
+  // Aktif raporun kriter başlıkları: yankı maddeleri statik render edilir.
+  const staticTitles = React.useMemo(
+    () => criteriaStaticTitles(pathname),
+    [pathname],
+  )
 
   // Turun analizinin üretildiği kaynak tablo (bulgu tıklamaları aktif
   // view'a değil buraya gider) — run_expert_sql FROM izlerinden çıkarılır.
@@ -164,6 +178,8 @@ function FormattedAssistantText({
         sourceTable={sourceTable}
         onPrompt={sendPrompt}
         onNavigateReport={navigateToReportOrJob}
+        onRunReport={onRunReport}
+        staticTitles={staticTitles}
       />
     </div>
   )
@@ -173,10 +189,12 @@ function TextPart({
   text,
   role,
   message,
+  onRunReport,
 }: {
   text: string
   role: YulaMessage["role"]
   message?: YulaMessage
+  onRunReport?: () => boolean
 }) {
   if (!text) return null
   const displayText =
@@ -219,13 +237,20 @@ function TextPart({
     )
   }
 
-  return <FormattedAssistantText text={displayText} message={message} />
+  return (
+    <FormattedAssistantText
+      text={displayText}
+      message={message}
+      onRunReport={onRunReport}
+    />
+  )
 }
 
 /** Avatar-free message row — user bubble right, assistant text left (reasoning is in Worked for Xs). */
 export function AiChatMessage({
   message,
   className,
+  onRunReport,
 }: AiChatMessageProps) {
   const isUser = message.role === "user"
 
@@ -245,6 +270,7 @@ export function AiChatMessage({
               text={part.text}
               role={message.role}
               message={message}
+              onRunReport={onRunReport}
             />
           )
         }

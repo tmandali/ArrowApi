@@ -5,6 +5,43 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/utils/cn";
 import { stripSkillFrontmatter } from "@/lib/skill-discovery";
+import { CodeBlock } from "@/components/ui/code-block";
+
+/** `pre` altındaki `<code class="language-x">` gövdesinden ham metin + dil çıkarır. */
+function extractDocCodeDetails(children: React.ReactNode): {
+  text: string;
+  language?: string;
+} {
+  let text = "";
+  let language: string | undefined;
+  const extract = (node: React.ReactNode): void => {
+    if (typeof node === "string") {
+      text += node;
+      return;
+    }
+    if (typeof node === "number") {
+      text += String(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(extract);
+      return;
+    }
+    if (React.isValidElement(node) && node.props) {
+      const props = node.props as {
+        className?: string;
+        children?: React.ReactNode;
+      };
+      if (props.className) {
+        const langMatch = props.className.match(/language-([a-zA-Z0-9_-]+)/);
+        if (langMatch) language = langMatch[1];
+      }
+      if (props.children) extract(props.children);
+    }
+  };
+  extract(children);
+  return { text: text.replace(/\n$/, ""), language };
+}
 
 const mdComponents: Components = {
   h1: ({ children }) => (
@@ -35,11 +72,17 @@ const mdComponents: Components = {
       {children}
     </code>
   ),
-  pre: ({ children }) => (
-    <pre className="overflow-auto rounded-md bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => {
+    const { text, language } = extractDocCodeDetails(children);
+    if (!text) return null;
+    return (
+      <CodeBlock
+        value={text}
+        language={language ?? "markdown"}
+        className="my-1 border-border/40"
+      />
+    );
+  },
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-border pl-2.5 text-muted-foreground">
       {children}

@@ -141,8 +141,10 @@ export function lintAgentInstructions(instructions: string): string[] {
   if (
     hits([
       /onay(sız|siz| almadan| istemeden| beklemeden)/,
-      /sormadan\s+(çalıştır|calistir|başlat|kos|koş|yap|uygula|sil|gönder)/,
-      /her\s+zaman\s+(çalıştır|calistir|başlat|kos|koş|yap|uygula)/,
+      // Olumsuzluk eki hariç: "sormadan çalıştırma / yapmayın" yasaklayıcıdır,
+      // dayatma değildir (negation guard).
+      /sormadan\s+(çalıştır|calistir|başlat|kos|koş|yap|uygula|sil|gönder)(?!m[ae](\b|y[ıiuü]n\b))/,
+      /her\s+zaman\s+(çalıştır|calistir|başlat|kos|koş|yap|uygula)(?!m[ae](\b|y[ıiuü]n\b))/,
       /without\s+(asking|confirmation|approval)/,
       /always\s+(run|execute|start|apply|delete|send)/,
       /never\s+ask\b/,

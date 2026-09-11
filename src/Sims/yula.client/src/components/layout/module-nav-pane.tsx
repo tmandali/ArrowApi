@@ -23,13 +23,13 @@ type ModuleNavPaneProps = {
   children: ReactNode
   className?: string
   /**
-   * Nav menü tepesindeki kapatma butonu / başlık alanının görünürlüğü.
-   * Varsayılan: false (header ve buton gösterilmez).
+   * @deprecated Menüyü kapat butonu kaldırıldı — yoksayılır, geriye uyumluluk için tutulur.
+   * Menü kapatma PagePanelTrigger / Ctrl+B / overlay backdrop ile yapılır.
    */
   navMenuHeaderVisible?: boolean
   /**
    * Menü kapalıyken sol üstte açma butonu gösterilip gösterilmeyeceği.
-   * Belirtilmezse navMenuHeaderVisible ile aynı değeri alır (header visible true ise açma butonu da true olur).
+   * Belirtilmezse navMenuHeaderVisible ile aynı değeri alır.
    */
   floatingOpenButton?: boolean
   /**
@@ -140,7 +140,7 @@ export function ModuleNavPane({
           inert={!navOpen}
         >
           <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/60 bg-card/80 shadow-lg backdrop-blur-md">
-            <ModuleNavMenu headerVisible />
+            <ModuleNavMenu />
           </div>
         </div>
       </div>
@@ -163,7 +163,7 @@ export function ModuleNavPane({
           groupResizeBehavior="preserve-pixel-size"
           className="flex min-h-0 min-w-0 flex-col"
         >
-          <ModuleNavMenu headerVisible={navMenuHeaderVisible} />
+          <ModuleNavMenu />
         </ResizablePanel>
       ) : null}
       {navOpen ? (

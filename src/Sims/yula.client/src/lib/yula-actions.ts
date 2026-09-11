@@ -2,6 +2,11 @@
  * Bilinen rapor/ekran aksiyonları — kapalı enum (rapor adları veridir,
  * kelime listesi değildir). Hem sohbet renderer'ı hem entity plugin kullanır.
  */
+import {
+  reportScopeFromPath,
+  isReportResultPath,
+} from "@/lib/workspace-paths";
+import { findReport } from "@/features/reports/report-registry";
 
 export interface KnownSystemAction {
   pattern: RegExp
@@ -25,7 +30,7 @@ export const KNOWN_SYSTEM_ACTIONS: KnownSystemAction[] = [
     scope: "retail-sales-report",
   },
   {
-    pattern: /stok analiti(?:k|ği|ğini|kleri|klerinin)?(?:\s+raporu|\s+raporları|\s+raporunu)?|stock analytics(?:\s+report)?/i,
+    pattern: /stok analiz(?:\s+raporu|\s+raporları|\s+raporunu)?|stok analiti(?:k|ği|ğini|kleri|klerinin)?(?:\s+raporu|\s+raporları|\s+raporunu)?|stock analytics(?:\s+report)?/i,
     prompt: "Stok Analitik Raporu hazırla",
     label: "Stok Analitik Raporu",
     scope: "stock-analytics",
@@ -150,6 +155,76 @@ export const KNOWN_SYSTEM_ACTIONS: KnownSystemAction[] = [
   },
 ]
 
+
+/**
+ * Run-onay dedektörü: asistan "çalıştır" önerdiyse tek tıkla çalıştırmaya
+ * bağlanır. Modelin bold-bullet formatına uyup uymadığına bakılmaz —
+ * deterministik metin eşleşmesidir. Dönüş: tıklamada gönderilecek kullanıcı
+ * mesajı (yoksa null → buton render edilmez).
+ * DİL NOTU: desenler iki dillidir çünkü KULLANICIYA dönük balonu tarar
+ * (asistan TR kullanıcıya Türkçe yazar); modele giden hiçbir metin Türkçe
+ * değildir — istemci-içi matcher'dır (bkz. report-run-intent.ts emsali).
+ */
+/** Run-onay cümle kalıbı — buton varken metin-içi çift tıklamayı bastırır. */
+export const RUN_CONFIRM_PHRASE_RE = /run the report|run it|raporu çalıştır(ın)?/i;
+
+export function isRunConfirmPhrase(text: string | undefined | null): boolean {
+  return Boolean(text && RUN_CONFIRM_PHRASE_RE.test(text));
+}
+
+/**
+ * Kriter yankısı başlıkları: rapor kriter ekranında modelin doldurduğu
+ * alanları ("Hareket Tarihi: ...", "Şirket Kodu: ...") yankılayan maddeler
+ * bulgu değildir — tıklanabilir yapılmaz, statik render edilir.
+ * Dönüş: küçük harfli başlık kümesi (şema title + key).
+ */
+export function criteriaStaticTitles(pathname: string): string[] {
+  const scope = reportScopeFromPath(pathname);
+  if (!scope) return [];
+  const meta = findReport(scope);
+  const props = meta?.criteriaSchema?.properties ?? {};
+  const titles = new Set<string>();
+  for (const [key, prop] of Object.entries(props)) {
+    titles.add(key.toLowerCase());
+    const title = (prop as { title?: unknown }).title;
+    if (typeof title === "string" && title.trim()) {
+      titles.add(title.trim().toLowerCase());
+    }
+  }
+  return [...titles];
+}
+const ALREADY_RUNNING_RE = /başlatıldı|started|queued|çalışıyor|running|hazırlandı/i;
+
+export interface RunConfirmationAction {
+  /** Tıklamada gidecek kullanıcı mesajı (yedek yol: agent döngüsü). */
+  prompt: string;
+  /** Ekranın Run akışına delege için rapor scope'u. */
+  scope: string;
+}
+
+export function runConfirmationClickPrompt(args: {
+  /** Asistan turunun görünür metni (sanitize edilmiş birleşik metin). */
+  text: string;
+  /** Aktif sayfa yolu (kriter ekranı mı?). */
+  pathname: string;
+  /** Tur dili: "en" dışında Türkçe varsayılır. */
+  lang: string;
+  /** Turda run_job zaten çalıştıysa true (çift çalıştırma önlenir). */
+  hasExecutedRun: boolean;
+}): RunConfirmationAction | null {
+  if (args.hasExecutedRun) return null;
+  if (!isRunConfirmPhrase(args.text)) return null;
+  // Zaten koşan/biten işin onayıysa buton gösterme.
+  if (ALREADY_RUNNING_RE.test(args.text)) return null;
+  // Yalnız kayıth raporun kriter ekranında (sonuç ekranında değil).
+  const scope = reportScopeFromPath(args.pathname);
+  if (!scope || !findReport(scope)) return null;
+  if (isReportResultPath(args.pathname)) return null;
+  return {
+    prompt: args.lang === "en" ? "Run the report" : "Raporu çalıştır",
+    scope,
+  };
+}
 
 /** Tırnak içi komut önerisi tespiti — teknik araç adları ve rapor adları hariç. */
 export function isPromptSentenceLike(candidate: string): boolean {

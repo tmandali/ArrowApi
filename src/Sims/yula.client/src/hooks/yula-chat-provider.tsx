@@ -1555,6 +1555,8 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // Sohbet geçmişini RAG vektör store'a indeksle (ilk yükleme + her yeni
   // sohbet/kayıtta artımlı). Ana sayfa araması menülerle birlikte geçmişi de
   // semantik arayabilsin diye. duckdb-vector'ü tembel yükle (WASM).
+  // Ardından yetim taraması: önceki oturumdan kalma silinmiş konuşma
+  // vektörleri tabloyu kirletmesin (boş liste asla purge etmez — guard yukarıda).
   React.useEffect(() => {
     if (conversations.length === 0) return;
     const store = useChatsStore.getState();
@@ -1569,11 +1571,20 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       }))
       .filter((i) => i.snippet.trim().length > 0);
     if (items.length === 0) return;
-    void import("@/services/duckdb-vector").then(({ indexConversationHistory }) => {
-      void indexConversationHistory(items).catch(() => {
-        // Geçmiş indeksleme best-effort
-      });
-    });
+    void import("@/services/duckdb-vector").then(
+      ({ indexConversationHistory, purgeOrphanConversationVectors }) => {
+        void indexConversationHistory(items)
+          .then(() =>
+            purgeOrphanConversationVectors(
+              useChatsStore.getState().conversations.map((c) => c.id),
+            ),
+          )
+          .catch((err) => {
+            // Geçmiş indeksleme/temizlik best-effort — ama görünür olsun.
+            console.warn("[Yula RAG] geçmiş indeksleme/temizlik başarısız:", err);
+          });
+      },
+    );
   }, [conversations]);
 
   const router = useRouter();

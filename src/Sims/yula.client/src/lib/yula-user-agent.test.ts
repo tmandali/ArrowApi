@@ -97,4 +97,14 @@ describe("lintAgentInstructions", () => {
     assert.ok(lintAgentInstructions(AGENT_LINT_SAMPLES.toolBan).length > 0);
     assert.ok(lintAgentInstructions(AGENT_LINT_SAMPLES.singleLanguage).length > 0);
   });
+  it("does not flag prohibitive negation (sormadan çalıştırma = önce sor)", async () => {
+    const { lintAgentInstructions } = await import("./yula-user-agent.ts");
+    assert.equal(
+      lintAgentInstructions("Emin olmadığın filtreyi sormadan çalıştırma; önce sor.").length,
+      0,
+    );
+    assert.ok(
+      lintAgentInstructions("Kullanıcıya sormadan çalıştır.").length > 0,
+    );
+  });
 });

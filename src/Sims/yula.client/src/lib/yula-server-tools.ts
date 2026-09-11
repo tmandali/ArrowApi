@@ -34,12 +34,17 @@ export interface YulaGridToolContext {
  */
 const reportSchemaTool = tool({
   description: [
-    "Return the active report's JSON schema: criteria fields (name, type, required, options),",
+    "Return a report's JSON schema: criteria fields (name, type, required, options),",
     "column definitions (owner descriptions) and report metadata.",
     "Call when the user asks about schema, available criteria, report definition, or column meanings.",
+    "When a report screen is open, omit 'report' to read the active report. When NO report screen is open",
+    "(e.g. agent session), pass 'report' explicitly with the target scope from the RAG routing context",
+    "or report catalog — without it the lookup fails.",
     "Summarize the output as a markdown table; use criteria field names verbatim in run_job criteria.",
   ].join(" "),
-  inputSchema: z.object({}),
+  inputSchema: z.object({
+    report: z.string().optional().describe("Report scope — REQUIRED when no report screen is open; omit only to read the active report."),
+  }),
   outputSchema: z.object({
     status: z.string(),
     report: z
@@ -84,10 +89,11 @@ const reportSchemaTool = tool({
 })
 
 /** Per-request tool context (SDK: description functions + toolsContext).
- *  Resolved in the chat route from the active screen/report scope. */
+ *  Resolved in the chat route from the active screen/report scope.
+ *  Null scope/title = no active report on this screen (never invent one). */
 export const reportToolContextSchema = z.object({
-  reportScope: z.string(),
-  reportTitle: z.string(),
+  reportScope: z.string().nullable(),
+  reportTitle: z.string().nullable(),
   requiredFields: z.array(z.string()),
   availableReports: z.string(),
 });
@@ -95,8 +101,8 @@ export const reportToolContextSchema = z.object({
 export type ReportToolContext = z.infer<typeof reportToolContextSchema>;
 
 const FALLBACK_TOOL_CONTEXT: ReportToolContext = {
-  reportScope: "stock-balance",
-  reportTitle: "report",
+  reportScope: null,
+  reportTitle: null,
   requiredFields: [],
   availableReports: "",
 };
@@ -120,6 +126,20 @@ function toolContextOf(options?: {
     availableReports:
       typeof c?.availableReports === "string" ? c.availableReports : "",
   };
+}
+
+/**
+ * Active-report sentence for dynamic descriptions. Unknown scope is stated
+ * explicitly so the model identifies the target first instead of assuming
+ * a default report.
+ */
+function activeReportLine(ctx: ReportToolContext): string {
+  if (ctx.reportScope) return `Active report: '${ctx.reportScope}'.`;
+  return (
+    "No active report on this screen — identify the target report first " +
+    "(RAG routing context / report catalog + 'get_report_schema'), then pass " +
+    "its scope explicitly. Never assume a default report."
+  );
 }
 
 /**
@@ -426,23 +446,23 @@ export const STATIC_TOOLS = {
       description: ({ context }) => {
         const ctx = toolContextOf({ context });
         const required =
-          ctx.requiredFields.length > 0
+          ctx.reportScope && ctx.requiredFields.length > 0
             ? ` Required criteria for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
             : "";
         return [
-          `EXECUTE a report: start a backend job and select the new job as running on the execution screen. Active report: '${ctx.reportScope}'.`,
+          `EXECUTE a report: start a backend job and select the new job as running on the execution screen. ${activeReportLine(ctx)}`,
           ctx.availableReports ? `Available reports: ${ctx.availableReports}.` : undefined,
           "Call ONLY on an explicit run request: 'run the report', 'run', 'execute', 'start the job' (e.g. 'run for last week').",
           "Bare slots such as 'prepare', 'show', 'fetch' or a lone date/status ('last week' / 'yesterday') are NOT enough — do NOT call this tool; offer suggestions or wait for approval for apply_criteria.",
           "For existing-report checks ('prepare', 'any existing', 'same criteria') do NOT call this tool — use 'find_matching_report'.",
           "For VIEWING an existing job/results (e.g. 'open the last report', 'latest results', 'most recent job') do NOT call this tool — use 'open_last_report'.",
-          `Use only for new report executions; never for filtering the open table.${required}`,
+          `Use only for new report executions; never for filtering the open table. Always pass 'report' explicitly (REQUIRED, never omit).${required}`,
         ]
           .filter(Boolean)
           .join(" ");
       },
       inputSchema: z.object({
-        report: z.enum(REGISTERED_REPORTS.map((r) => r.scope) as [string, ...string[]]).default("stock-balance").describe("Report scope"),
+        report: z.enum(REGISTERED_REPORTS.map((r) => r.scope) as [string, ...string[]]).describe("Report scope (REQUIRED — always pass explicitly)"),
         criteria: z.record(z.string(), z.unknown()).default({}).describe("Report criteria (e.g. kayitTarihi, durum)"),
         presetTitle: z.string().optional().describe("Executed suggestion / preset title"),
       }),
@@ -475,19 +495,19 @@ export const STATIC_TOOLS = {
       description: ({ context }) => {
         const ctx = toolContextOf({ context });
         const required =
-          ctx.requiredFields.length > 0
+          ctx.reportScope && ctx.requiredFields.length > 0
             ? ` Required fields for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
             : "";
         return [
           "Apply the requested or suggested criteria (date ranges, filters, status, etc.) to the criteria form on the active screen; does NOT start a job.",
           "Call when the user wants to fill, edit, update, or adjust criteria (e.g. 'update criteria to last week', 'fill the form', 'set the date', 'apply suggestion 1', 'set yesterday').",
-          `Always send the COMPLETE criteria set including all required schema fields: first read the live draft via 'get_current_criteria', preserve values the user already set, then apply the merged object. Never send a partial object that drops required fields.${required}`,
+          `Always pass 'report' explicitly (REQUIRED, never omit) with the COMPLETE criteria set including all required schema fields: first read the live draft via 'get_current_criteria', preserve values the user already set, then apply the merged object. Never send a partial object that drops required fields. ${activeReportLine(ctx)}${required}`,
           "Do NOT call on bare values with no action verb (user typed only 'last week' or 'yesterday' alone); offer suggestion chips instead.",
           "The form is filled and highlighted on screen; the user can then run the report with the 'Run' button.",
         ].join(" ");
       },
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        report: z.string().describe("Report scope (REQUIRED — always pass explicitly)"),
         criteria: z.record(z.string(), z.unknown()).describe("Criteria to fill into the form"),
         presetTitle: z.string().optional().describe("Applied suggestion title"),
       }),
@@ -495,6 +515,7 @@ export const STATIC_TOOLS = {
         status: z.string(),
         updatedKeys: z.array(z.string()).optional(),
         missingRequired: z.array(z.string()).optional(),
+        navigateTo: z.string().optional(),
         message: z.string().optional(),
         reason: z.string().optional(),
         hint: z.string().optional(),
@@ -549,7 +570,7 @@ export const STATIC_TOOLS = {
         return [
           "Open the user's MOST RECENT report job WITHOUT re-running it: locate the stored job and navigate to its result table.",
           "Call for requests like 'open the last report', 'show the latest report', 'last results', 'most recent job', 'previous report'.",
-          `This tool never starts a new job — it navigates to an existing job's result screen (active report: '${ctx.reportScope}'). Use run_job for new executions.`,
+          `This tool never starts a new job — it navigates to an existing job's result screen. ${activeReportLine(ctx)} Use run_job for new executions.`,
         ].join(" ");
       },
       inputSchema: z.object({
@@ -572,12 +593,12 @@ export const STATIC_TOOLS = {
     validate_criteria_input: tool({
       description: [
         "Validate user-provided or form criteria against the schema and D365/BC rules (Criteria Input Engine).",
-        "Checks date and number ranges ('..', '10..20', '2026-01-01..2026-08-31'), relative dates ('dün', 'bugün', 'geçen hafta'),",
+        "Checks date and number ranges ('..', '10..20', '2026-01-01..2026-08-31'), relative dates ('yesterday', 'today', 'last week'),",
         "options (enum) and required fields. Returns errors, warnings, and suggestions.",
         "Call when the user provides criteria, asks to validate them ('is this valid?', 'is this criteria correct?'), or before execution for verification.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        report: z.string().describe("Report scope (REQUIRED — always pass explicitly)"),
         criteria: z.record(z.string(), z.unknown()).default({}).describe("Criteria to validate"),
         partial: z.boolean().default(false).describe("Check only provided fields (do not treat missing required fields as errors)"),
       }),
@@ -612,7 +633,7 @@ export const STATIC_TOOLS = {
         "Report the form's current values, missing required fields, and format errors.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        report: z.string().describe("Report scope (REQUIRED — always pass explicitly)"),
       }),
       outputSchema: z.object({
         status: z.string(),
@@ -646,7 +667,7 @@ export const STATIC_TOOLS = {
         "Does not compare criteria; use 'find_matching_report' to check for an existing report with the same criteria.",
       ].join(" "),
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        report: z.string().describe("Report scope (REQUIRED — always pass explicitly)"),
         limit: z.number().default(10).describe("Maximum number of jobs to list"),
       }),
       outputSchema: z.object({
@@ -668,18 +689,18 @@ export const STATIC_TOOLS = {
       description: ({ context }) => {
         const ctx = toolContextOf({ context });
         const required =
-          ctx.requiredFields.length > 0
+          ctx.reportScope && ctx.requiredFields.length > 0
             ? ` Required fields for '${ctx.reportScope}': ${ctx.requiredFields.join(", ")}.`
             : "";
         return [
           "Check whether a completed or running job with the SAME normalized criteria already exists; never starts a job.",
           "Call FIRST on prepare-type requests ('prepare the report', check existing, same criteria) — before filling any form or asking the user. Merge user-provided values with the live draft from 'get_current_criteria' so required fields are complete.",
           "If matched and completed, open it via returned navigateTo. If no match, fill the form via 'apply_criteria' and ask for confirmation before run_job.",
-          `Use 'open_last_report' for latest job regardless of criteria, 'run_job' only for explicit new runs.${required}`,
+          `Always pass 'report' explicitly (REQUIRED, never omit). Use 'open_last_report' for latest job regardless of criteria, 'run_job' only for explicit new runs. ${activeReportLine(ctx)}${required}`,
         ].join(" ");
       },
       inputSchema: z.object({
-        report: z.string().default("stock-balance").describe("Report scope (e.g. stock-balance)"),
+        report: z.string().describe("Report scope (REQUIRED — always pass explicitly)"),
         criteria: z
           .record(z.string(), z.unknown())
           .default({})

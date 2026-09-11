@@ -23,8 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
+import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import {
   ChevronRight,
   ChevronDown,
@@ -40,7 +40,7 @@ import {
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
-import { pageHeaderCardClass, pageHeaderShellClass, panelCardClass } from "@/components/layout/panel-chrome";
+import { panelCardClass } from "@/components/layout/panel-chrome";
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
@@ -145,28 +145,17 @@ export function ItemFormShell({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {searchOpen ? null : (
-      <div className={pageHeaderShellClass}>
-      <header
-        className={cn(
-          pageHeaderCardClass,
-          "justify-between gap-1.5 sm:gap-2"
-        )}
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:gap-2">
-          <PagePanelTrigger
-            className="-ml-1 shrink-0"
-            separatorClassName="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:mr-2 sm:block"
-          />
-          <PageHeaderTitle>W6ED16Z8-HDN</PageHeaderTitle>
-          {!isLedgerVariant ? (
+      <WorkspacePageHeader
+        showSearch={false}
+        startExtra={
+          !isLedgerVariant ? (
             <Badge className="ml-2 hidden shrink-0 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium sm:inline-flex">
               Variant
             </Badge>
-          ) : null}
-        </div>
-
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
+          ) : null
+        }
+        actions={
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
           {isLedgerVariant ? (
             <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <Button
@@ -257,10 +246,11 @@ export function ItemFormShell({
               <AIChatAssistant />
             </div>
           )}
-        </div>
-      </header>
-      </div>
-      )}
+          </div>
+        }
+      >
+        <PageHeaderTitle>W6ED16Z8-HDN</PageHeaderTitle>
+      </WorkspacePageHeader>
 
       {!searchOpen && showBanner && !isLedgerVariant ? (
         <WorkspaceBanner tone="info" onDismiss={() => setShowBanner(false)}>

@@ -43,11 +43,15 @@ import {
   CircleAlert,
   FileCode,
   FileText,
+  Globe,
+  History,
   Plus,
   RotateCw,
   Square,
   X,
 } from "lucide-react"
+import { getWorkspace } from "@/lib/workspace-registry"
+import type { WorkspaceId } from "@/types"
 import { AgentAvatar } from "@/features/system/components/agents/agent-avatar"
 import { agentInitials } from "@/features/system/components/agents/agent-initials"
 
@@ -176,8 +180,28 @@ function isFailedToolInfo(info: {
   )
 }
 
+/**
+ * Kısa göreli zaman ("az önce", "5 dk önce", "1 sa önce", "3 gün önce").
+ * Geçmiş öneri satırının yanında rozet olarak gösterilir.
+ */
+function formatHistoryAgo(createdAt: number): string {
+  const diffMs = Date.now() - createdAt
+  const minutes = Math.max(0, Math.floor(diffMs / 60_000))
+  if (minutes < 1) return "az önce"
+  if (minutes < 60) return `${minutes} dk önce`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} sa önce`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} gün önce`
+  if (days < 30) return `${Math.floor(days / 7)} hf önce`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} ay önce`
+  return `${Math.floor(months / 12)} yıl önce`
+}
+
 import { useMounted } from "@/hooks/use-mounted"
 import { formatDate, greetingFor } from "@/lib/welcome-format"
+import { navigateToConversationScreen } from "@/lib/yula-history-navigation"
 
 export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = {}) {
   const activeId = useChatsStore((s) => s.activeId)
@@ -380,10 +404,14 @@ function AIChatPanelSession({
   } | null>(null)
   const [selectedIndex, setSelectedIndex] = React.useState(0)
   const [prevCommandInput, setPrevCommandInput] = React.useState("")
+  const [historyIndex, setHistoryIndex] = React.useState(0)
+  const [historyClosed, setHistoryClosed] = React.useState(false)
   // Girdi değişince komut seçimini başa al — render sırasında state ayarlama.
   if (prevCommandInput !== input) {
     setPrevCommandInput(input)
     setSelectedIndex(0)
+    setHistoryIndex(0)
+    setHistoryClosed(false)
   }
   const [isAtBottom, setIsAtBottom] = React.useState(true)
 
@@ -490,6 +518,82 @@ function AIChatPanelSession({
   const paletteItemCount = (commandMatches?.length ?? 0) + (showNewAgentItem ? 1 : 0)
   const isNewAgentSelected =
     showNewAgentItem && selectedIndex === (commandMatches?.length ?? 0)
+  // Ajan geçmişi önerileri: yazdıkça bu ajanın kendi kayıtlarındaki
+  // kullanıcı sorularından ilk 10 eşleşme (ok tuşlarıyla gezilir).
+  // YulaHistoryMainView ile aynı ajan ayrımı: (c.agentId ?? null) eşleşmesi.
+  const historyConversations = useChatsStore((s) => s.conversations)
+  const historyMessagesById = useChatsStore((s) => s.messagesById)
+  const historyAgentId = effectiveAgent?.id ?? null
+  const historySuggestions = React.useMemo(() => {
+    const q = input.trim().toLowerCase()
+    if (!q || q.length < 2 || input.startsWith("/")) return []
+    const seen = new Set<string>()
+    const out: Array<{ text: string; title: string; createdAt: number; convId: string }> = []
+    const sorted = [...historyConversations]
+      .filter((c) => (c.agentId ?? null) === (historyAgentId ?? null))
+      .sort((a, b) => b.createdAt - a.createdAt)
+    for (const conv of sorted) {
+      const msgs = historyMessagesById[conv.id] ?? []
+      if (msgs.length > 0) {
+        for (let i = msgs.length - 1; i >= 0 && out.length < 10; i -= 1) {
+          const m = msgs[i]
+          if (m.role !== "user") continue
+          const text = m.parts
+            .filter((p) => p.type === "text")
+            .map((p) => (p as { text?: string }).text ?? "")
+            .join("\n")
+            .trim()
+          if (!text || text.length < 2) continue
+          const key = text.toLowerCase()
+          if (key === q || seen.has(key)) continue
+          if (!key.includes(q)) continue
+          seen.add(key)
+          out.push({ text, title: conv.title || text.slice(0, 40), createdAt: conv.createdAt, convId: conv.id })
+          if (out.length >= 10) break
+        }
+      } else {
+        // Henüz mesajı yüklenmemiş kayıt: başlık üzerinden eşleşme.
+        const title = (conv.title || "").trim()
+        if (!title || title === "Yeni Sohbet") continue
+        const key = title.toLowerCase()
+        if (key === q || seen.has(key)) continue
+        if (!key.includes(q)) continue
+        seen.add(key)
+        out.push({ text: title, title, createdAt: conv.createdAt, convId: conv.id })
+      }
+      if (out.length >= 10) break
+    }
+    return out
+  }, [input, historyConversations, historyMessagesById, historyAgentId])
+  const showHistory =
+    !showCommands &&
+    !historyClosed &&
+    historySuggestions.length > 0 &&
+    !selectedCommand &&
+    !pastedChip
+  // Geçmiş öneri seçimi: girdiyi doldurmak yerine kayıtlı sohbeti açar
+  // (geçmiş panelindeki seçimle aynı akış: seç + ekrana git).
+  const openHistoryConversation = React.useCallback(
+    (convId: string) => {
+      const store = useChatsStore.getState()
+      const session = store.conversations.find((c) => c.id === convId)
+      if (!session) return
+      setInput("")
+      setHistoryClosed(true)
+      setHistoryIndex(0)
+      store.selectConversation(convId)
+      navigateToConversationScreen(
+        session,
+        (href) => {
+          router.push(href)
+        },
+        store.messagesById[convId],
+      )
+      store.setHistoryOpen(false)
+      store.setSearchingHistory(false)
+    },
+    [router],
+  )
   const hasUserMessages = messages.some((message) => message.role === "user")
   const showCenteredIntro = (centeredIntro || (isMainMode && isHomePath)) && !hasUserMessages
 
@@ -551,6 +655,7 @@ function AIChatPanelSession({
       setInput("")
       setSelectedCommand(null)
       setPastedChip(null)
+      setHistoryClosed(true)
       return
     }
 
@@ -560,6 +665,7 @@ function AIChatPanelSession({
       setSelectedCommand(null)
       setPastedChip(null)
       setAttachments([])
+      setHistoryClosed(true)
       return
     }
 
@@ -582,6 +688,7 @@ function AIChatPanelSession({
     setSelectedCommand(null)
     setPastedChip(null)
     setAttachments([])
+    setHistoryClosed(true)
   }
 
   const handleSend = () => {
@@ -594,6 +701,7 @@ function AIChatPanelSession({
       setInput("")
       setSelectedCommand(null)
       setPastedChip(null)
+      setHistoryClosed(true)
       return
     }
     if (command.id === "attach" || command.slash === "dosya") {
@@ -601,6 +709,7 @@ function AIChatPanelSession({
       setInput("")
       setSelectedCommand(null)
       setPastedChip(null)
+      setHistoryClosed(true)
       return
     }
     setSelectedCommand(command)
@@ -707,6 +816,46 @@ function AIChatPanelSession({
             </CommandList>
           </Command>
         </div>
+      ) : showHistory ? (
+        <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
+          <div className="px-2.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            Geçmişten öneriler
+          </div>
+          <Command shouldFilter={false} className="p-1 pt-0.5">
+            <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
+              <CommandGroup className="p-0">
+                {historySuggestions.map((s, idx) => {
+                  const isSelected = idx === historyIndex
+                  return (
+                    <CommandItem
+                      key={`${s.convId}-${s.text.slice(0, 48)}-${idx}`}
+                      value={s.text}
+                      onSelect={() => openHistoryConversation(s.convId)}
+                      onMouseMove={() => {
+                        if (!isSelected) setHistoryIndex(idx)
+                      }}
+                      data-selected={isSelected ? "true" : undefined}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
+                        isSelected
+                          ? "bg-accent text-accent-foreground font-medium"
+                          : "hover:bg-accent/80"
+                      )}
+                    >
+                      <History className="size-3.5 text-primary shrink-0" />
+                      <span className="truncate flex-1 min-w-0 text-foreground">
+                        {s.text.length > 120 ? `${s.text.slice(0, 120)}…` : s.text}
+                      </span>
+                      <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70">
+                        {formatHistoryAgo(s.createdAt)}
+                      </span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </div>
       ) : null}
 
       {isLoading ? (
@@ -791,6 +940,35 @@ function AIChatPanelSession({
                 if (event.key === "Escape") {
                   event.preventDefault()
                   setInput("")
+                  return
+                }
+              }
+
+              if (showHistory) {
+                if (event.key === "ArrowDown") {
+                  event.preventDefault()
+                  setHistoryIndex((prev) => (prev + 1) % historySuggestions.length)
+                  return
+                }
+                if (event.key === "ArrowUp") {
+                  event.preventDefault()
+                  setHistoryIndex(
+                    (prev) =>
+                      (prev - 1 + historySuggestions.length) % historySuggestions.length,
+                  )
+                  return
+                }
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault()
+                  const target = historySuggestions[historyIndex] ?? historySuggestions[0]
+                  if (target) {
+                    openHistoryConversation(target.convId)
+                  }
+                  return
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault()
+                  setHistoryClosed(true)
                   return
                 }
               }
@@ -993,6 +1171,14 @@ function AIChatPanelSession({
                         ? YULA.emptyDescription
                         : "Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada"}
                   </p>
+                  {effectiveAgent ? (
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/75">
+                      <Globe className="size-3.5 shrink-0" />
+                      {effectiveAgent.scope && effectiveAgent.scope !== "global"
+                        ? `${getWorkspace(effectiveAgent.scope as WorkspaceId).title || getWorkspace(effectiveAgent.scope as WorkspaceId).name} alanında çalışır`
+                        : "Tüm çalışma alanlarında çalışır"}
+                    </p>
+                  ) : null}
                   {agentInference ? (
                     <p
                       className="font-mono text-[10.5px] text-muted-foreground/70"

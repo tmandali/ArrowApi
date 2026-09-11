@@ -132,12 +132,21 @@ async function ensureGridSpec(): Promise<
     for (let attempt = 0; attempt < 5; attempt++) {
       const cols = await duckDbClient.describeTable(tableName);
       if (cols.length > 0) {
+        // Self-heal kaydı ekrandan türetir; rapor varsayımı yazılmaz.
+        const { REGISTERED_REPORTS } = await import(
+          "@/features/reports/report-registry"
+        );
+        const pathOnly = href.split("?")[0] || "";
+        const regHit = REGISTERED_REPORTS.find((r) =>
+          pathOnly.startsWith(r.pagePath),
+        );
         store.register({
           tableName,
-          title: "Stok Bakiye Raporu",
+          title: regHit?.title ?? "Report",
           columns: cols.map((c) => c.name),
           rowCount: null,
-          reportScope: "stock-balance",
+          reportScope:
+            store.screen?.reportScope ?? regHit?.scope ?? "unknown",
         });
         return useYulaGridStore.getState().spec;
       }
@@ -506,21 +515,34 @@ async function profileGrid(): Promise<unknown> {
  * (kriter alanları + kolon tanımları + üstveri). Model çıktıyı markdown tablo
  * olarak özetler; kriter alan adları run_job criteria'sında aynen kullanılır.
  */
-async function getReportSchema(): Promise<unknown> {
+async function getReportSchema(explicitScope?: string): Promise<unknown> {
   const storeState = useYulaGridStore.getState()
   const spec = storeState.spec
   const screen = storeState.screen
   const pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  const { REGISTERED_REPORTS: ALL_REPORTS } = await import(
+    "@/features/reports/report-registry"
+  );
+  const explicit = explicitScope?.trim();
+  if (explicit && !findReport(explicit)) {
+    return {
+      status: "error",
+      error: `Unknown report: '${explicit}'.`,
+      hint: "Pick a scope from the RAG routing context or report catalog.",
+    }
+  }
   const scope =
+    explicit ||
     spec?.reportScope ||
     screen?.reportScope ||
-    (pathname.includes("/stock/stock-balance") ? "stock-balance" : undefined)
+    ALL_REPORTS.find((r) => pathname.startsWith(r.pagePath))?.scope ||
+    undefined
   const report = scope ? findReport(scope) : undefined
   if (!report) {
     return {
       status: "error",
       error: "Active report schema not found.",
-      hint: "Try again when a report criteria or results screen is open.",
+      hint: "Pass 'report' explicitly with the target scope, or try again when a report criteria or results screen is open.",
     }
   }
 
@@ -1322,7 +1344,14 @@ export async function executeClientTool(
   const args = (input ?? {}) as Record<string, unknown>;
   switch (toolName) {
     case "run_job": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return {
+          status: "validation-error",
+          errors: ["'report' (report scope) is required — identify the target report first, never assume a default."],
+          hint: "Use the RAG routing context or report catalog + 'get_report_schema', then pass the scope explicitly.",
+        };
+      }
       const meta =
         (
           await import("@/features/reports/report-registry")
@@ -1441,7 +1470,15 @@ export async function executeClientTool(
       }
     }
     case "apply_criteria": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return {
+          status: "error",
+          reason: "missing-report-scope",
+          message: "'report' (report scope) is required — identify the target report first, never assume a default.",
+          hint: "Use the RAG routing context or report catalog + 'get_report_schema', then pass the scope explicitly.",
+        };
+      }
       const criteriaObj = (args.criteria ?? {}) as Record<string, unknown>;
       try {
         const { applyCriteriaToDraft } = await import(
@@ -1466,10 +1503,19 @@ export async function executeClientTool(
           );
           return !row || !row.value.trim();
         });
+        // Deterministic next action: when the draft was filled outside the
+        // report screen, hand the model the exact target path so the chain
+        // continues with navigate_to_page in the SAME turn (no guessing).
+        const currentPath =
+          typeof window !== "undefined" ? window.location.pathname : "";
+        const targetPath = findReport(scope)?.pagePath;
+        const navigateTo =
+          targetPath && currentPath !== targetPath ? targetPath : undefined;
         return {
           status: "ok",
           updatedKeys: res.updatedKeys,
           missingRequired,
+          navigateTo,
           message:
             missingRequired.length > 0
               ? `Criteria applied to the draft form. Still missing required criteria: ${missingRequired.join(", ")}. Ask the user for them explicitly before running.`
@@ -1554,12 +1600,22 @@ export async function executeClientTool(
         for (const job of Object.values(useActiveJobsStore.getState().jobs)) {
           if (scope && (job.name ?? "").toLowerCase() !== scope) continue;
           if (candidates.some((c) => c.jobId === job.id)) continue;
+          // Href'i job'un kendi rapor kaydından çöz; çözülemeyen job'a
+          // gidilemez (varsayılan rapor yolu yazılmaz).
+          const inFlightScope = (job.name ?? "").toLowerCase();
+          const inFlightReport = REGISTERED_REPORTS.find(
+            (r) => r.scope === inFlightScope,
+          );
+          const inFlightHref =
+            job.href ??
+            (inFlightReport ? `${inFlightReport.pagePath}/${job.id}` : undefined);
+          if (!inFlightHref) continue;
           candidates.push({
             jobId: job.id,
             status: job.status,
             createdAt: job.createdAt ?? "",
             title: job.title || job.name,
-            href: job.href ?? `${"/stock/stock-balance"}/${job.id}`,
+            href: inFlightHref,
           });
         }
 
@@ -1589,7 +1645,7 @@ export async function executeClientTool(
     case "run_expert_sql":
       return runExpertSql(args);
     case "get_report_schema":
-      return getReportSchema();
+      return getReportSchema(typeof args.report === "string" ? args.report : undefined);
     case "visualize_grid_data":
       return visualizeGrid(args);
     case "set_grid_query":
@@ -1724,7 +1780,17 @@ export async function executeClientTool(
       return await exportGridData(format);
     }
     case "validate_criteria_input": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return {
+          valid: false,
+          scope: "unknown",
+          reportTitle: "unknown",
+          summary: "'report' (report scope) is required — identify the target report first, never assume a default.",
+          errors: [{ field: "report", fieldTitle: "Report", message: "'report' is required." }],
+          warnings: [],
+        };
+      }
       const { findReport } = await import("@/features/reports/report-registry");
       const meta = findReport(scope);
       if (!meta) {
@@ -1743,7 +1809,19 @@ export async function executeClientTool(
       return validateCriteriaInput(meta.fullSchema, criteriaObj, { scope, partial });
     }
     case "get_current_criteria": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return {
+          status: "error",
+          scope: "unknown",
+          reportTitle: "unknown",
+          valid: false,
+          summary: "'report' (report scope) is required — identify the target report first, never assume a default.",
+          instance: {},
+          errors: [{ field: "report", fieldTitle: "Report", message: "'report' is required." }],
+          warnings: [],
+        };
+      }
       const { evaluateCurrentDraftCriteria } = await import("@/features/report-criteria");
       try {
         const res = evaluateCurrentDraftCriteria(scope);
@@ -1771,7 +1849,10 @@ export async function executeClientTool(
       }
     }
     case "find_matching_report": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return { status: "error", error: "'report' (report scope) is required — identify the target report first, never assume a default." };
+      }
       const rawCriteria = { ...((args.criteria ?? {}) as Record<string, unknown>) };
       try {
         const { findReport } = await import("@/features/reports/report-registry");
@@ -1890,7 +1971,14 @@ export async function executeClientTool(
       }
     }
     case "list_report_executions": {
-      const scope = String(args.report ?? "stock-balance");
+      const scope = String(args.report ?? "");
+      if (!scope) {
+        return {
+          status: "error",
+          executions: [],
+          message: "'report' (report scope) is required — identify the target report first, never assume a default.",
+        };
+      }
       const limit =
         typeof args.limit === "number"
           ? Math.min(10, Math.max(1, args.limit))

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
@@ -23,6 +24,8 @@ import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 import { copyToClipboard } from "@/lib/clipboard";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { describeYulaStreamError } from "@/lib/yula-stream-error";
+import { runConfirmationClickPrompt } from "@/lib/yula-actions";
+import { triggerReportRun } from "@/lib/report-run-bus";
 import {
   detectUserLanguage,
   pickLang,
@@ -179,6 +182,7 @@ export function YulaChatTurn({
   conversationId,
 }: YulaChatTurnProps) {
   const yula = useYulaChat();
+  const pathname = usePathname();
   const [copied, setCopied] = React.useState(false);
   const [userPromptOpen, setUserPromptOpen] = React.useState(false);
 
@@ -295,6 +299,31 @@ export function YulaChatTurn({
           parts: [{ type: "text", text: fallbackToolText }],
         } as unknown as YulaMessage)
       : undefined;
+
+  // Run-onay delegesi: turda "çalıştır" önerisi varsa (kriter ekranı, iş
+  // henüz koşmadı) metin-içi "Raporu çalıştır" tıklaması ÖNCE ekranın kendi
+  // Run akışına delege eder (report-run-bus); kayıtlı çalıştırıcı yoksa
+  // yedek yol olarak run mesajı kullanıcı mesajı gibi gider.
+  const runAction = React.useMemo(() => {
+    if (!assistantMessage) return null;
+    const hasExecutedRun = toolParts.some(
+      (i) =>
+        i.toolName === "run_job" &&
+        i.state === "output-available" &&
+        !isFailedToolInfo(i),
+    );
+    return runConfirmationClickPrompt({
+      text: assistantText,
+      pathname,
+      lang: turnLang,
+      hasExecutedRun,
+    });
+  }, [assistantMessage, toolParts, assistantText, pathname, turnLang]);
+
+  const handleRunReportClick = React.useCallback((): boolean => {
+    if (!runAction) return false;
+    return triggerReportRun(runAction.scope);
+  }, [runAction]);
 
   return (
     <div className="group/turn relative flex flex-col gap-2.5 py-2">
@@ -425,9 +454,13 @@ export function YulaChatTurn({
           <AiChatMessage
             message={displayAssistantMessage}
             isLive={isLive}
+            onRunReport={runAction ? handleRunReportClick : undefined}
           />
         ) : fallbackMessage ? (
-          <AiChatMessage message={fallbackMessage} />
+          <AiChatMessage
+            message={fallbackMessage}
+            onRunReport={runAction ? handleRunReportClick : undefined}
+          />
         ) : null}
 
         {isLive ? (

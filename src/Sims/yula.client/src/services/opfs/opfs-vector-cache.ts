@@ -79,6 +79,27 @@ export class OpfsVectorCache {
       // dosya yoksa sorun değil
     }
   }
+
+  /** Silinen sohbetlerin hayalet vektörlerini düşürür (id listesi). */
+  async remove(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    const current = await this.getAll()
+    let changed = false
+    for (const id of ids) {
+      if (current.delete(id)) changed = true
+    }
+    if (!changed || !this.isSupported()) return
+    try {
+      const root = await navigator.storage.getDirectory()
+      const fileHandle = await root.getFileHandle(OPFS_VECTOR_CACHE_FILE, { create: true })
+      const writable = await fileHandle.createWritable()
+      const obj = Object.fromEntries(current)
+      await writable.write(JSON.stringify(obj))
+      await writable.close()
+    } catch (err) {
+      console.warn("[OpfsVectorCache] Vektör silme diske yazılamadı:", err)
+    }
+  }
 }
 
 export const opfsVectorCache = new OpfsVectorCache()

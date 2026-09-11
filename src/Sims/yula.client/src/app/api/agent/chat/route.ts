@@ -236,11 +236,33 @@ export async function POST(req: Request) {
       (context?.screen?.reportScope
         ? findReport(context.screen.reportScope)
         : undefined);
-    const schemaRequired = (activeReport?.fullSchema as { required?: unknown })
+    // Ajan oturumu gibi rapor-dışı ekranda aktif rapor yoktur; o zaman
+    // toolContext stock-balance varsayılanına düşer ve modeli yanlış rapora
+    // yönlendirir. RAG router-hit varsa hedef rapor oradan çözülür.
+    const routerHitMeta =
+      activeReport || phase !== "workspace"
+        ? undefined
+        : (context?.ragContext ?? []).find(
+            (item) =>
+              typeof item.metadata === "object" &&
+              item.metadata !== null &&
+              (item.metadata as Record<string, unknown>).type ===
+                "report_router" &&
+              typeof (item.metadata as Record<string, unknown>).scope ===
+                "string",
+          )?.metadata;
+    const routerReport =
+      !activeReport && routerHitMeta
+        ? findReport(
+            (routerHitMeta as Record<string, unknown>).scope as string,
+          )
+        : undefined;
+    const resolvedReport = activeReport ?? routerReport;
+    const schemaRequired = (resolvedReport?.fullSchema as { required?: unknown })
       ?.required;
     const toolContext: ReportToolContext = {
-      reportScope: activeReport?.scope ?? "stock-balance",
-      reportTitle: activeReport?.title ?? "report",
+      reportScope: resolvedReport?.scope ?? null,
+      reportTitle: resolvedReport?.title ?? null,
       requiredFields: Array.isArray(schemaRequired)
         ? (schemaRequired as unknown[]).filter(
             (f): f is string => typeof f === "string",

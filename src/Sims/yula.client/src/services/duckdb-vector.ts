@@ -575,6 +575,133 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
   return conversationIndexInFlight;
 }
 
+/**
+ * Silinen sohbetlerin hayalet vektörlerini düşürür (oturum tablosu +
+ * OPFS embedding önbelleği + oturum-içi indeks seti). Sohbet store'undan
+ * silme, vektör katmanına yansımıyordu — silinmiş konuşmalar RAG
+ * top-K'yu doldurup rapor yönlendirme kayıtlarını dışlıyordu.
+ *
+ * Silme DOĞRULAMALIDIR: DELETE sonrası satırlar okunur, kalan varsa store
+ * yeniden hazırlanıp bir kez daha denenir; hâlâ kalıyorsa hata fırlatılır
+ * (çağıran sessize gömmek yerine loglar). Tablo hiç yoksa silinecek bir
+ * şey yoktur — başarı sayılır.
+ */
+export async function removeConversationVectors(ids: string[]): Promise<void> {
+  const targets = ids.filter(Boolean);
+  if (targets.length === 0) return;
+  for (const id of targets) conversationIndexedIds.delete(id);
+  const vecIds = targets.map((id) => `conv_${id}`);
+  try {
+    await opfsVectorCache.remove(vecIds);
+  } catch (err) {
+    console.warn("[Vector Store] OPFS vektör silme başarısız:", err);
+  }
+  const list = vecIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(", ");
+  const deleteSql = `DELETE FROM ${VECTOR_TABLE_NAME} WHERE id IN (${list});`;
+  const countSql = `SELECT id FROM ${VECTOR_TABLE_NAME} WHERE id IN (${list});`;
+  const isMissingTable = (err: unknown) =>
+    String(err).includes("does not exist") ||
+    String(err).includes("yula_rag_embeddings");
+  try {
+    await duckDbClient.executeCustomSql(deleteSql);
+  } catch (err) {
+    if (isMissingTable(err)) return;
+    throw err;
+  }
+  // Doğrulama: satır kaldıysa bir kez daha dene (WASM yarışına karşı).
+  let remaining: string[] = [];
+  try {
+    const rows = await duckDbClient.executeCustomSql(countSql);
+    remaining = (Array.isArray(rows) ? rows : []).map((r) =>
+      String((r as Record<string, unknown>).id ?? ""),
+    );
+  } catch (err) {
+    if (isMissingTable(err)) return;
+    throw err;
+  }
+  if (remaining.length > 0) {
+    await initVectorStore();
+    try {
+      await duckDbClient.executeCustomSql(deleteSql);
+      const rows = await duckDbClient.executeCustomSql(countSql);
+      remaining = (Array.isArray(rows) ? rows : []).map((r) =>
+        String((r as Record<string, unknown>).id ?? ""),
+      );
+    } catch (err) {
+      if (!isMissingTable(err)) throw err;
+      return;
+    }
+  }
+  if (remaining.length > 0) {
+    throw new Error(
+      `Vektör silme doğrulanamadı, kalan satırlar: ${remaining.join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Tabloda kalıp store'da olmayan sohbet vektörlerini temizler.
+ * Silinen id'lerin listesini döndürür (spike teşhisi + tek seferlik tamir).
+ */
+export async function purgeOrphanConversationVectors(
+  existingIds: string[],
+): Promise<string[]> {
+  const keep = new Set(existingIds);
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const res = await duckDbClient.executeCustomSql(
+      `SELECT id FROM ${VECTOR_TABLE_NAME} WHERE scope = 'chats';`,
+    );
+    if (Array.isArray(res)) rows = res;
+  } catch {
+    return [];
+  }
+  const orphans = rows
+    .map((r) => String(r.id ?? ""))
+    .filter((id) => id.startsWith("conv_") && !keep.has(id.slice(5)));
+  if (orphans.length > 0) {
+    await removeConversationVectors(orphans.map((o) => o.slice(5)));
+  }
+  return orphans;
+}
+
+/**
+ * Sohbet turu RAG bağlamı — tier-çeşitli seçim. Ham top-K saf distance
+ * sıralamasında near-duplicate sohbet geçmişi rapor yönlendirme
+ * kayıtlarını dışlayabiliyordu (limit 3'ün tamamı conversation oluyordu).
+ * Geniş aday havuzundan katman kotasıyla seçer: önce report_router,
+ * sonra diğer workspace/global kayıtlar, en fazla 1 konuşma dolgusu.
+ */
+export async function searchChatRagContext(
+  queryText: string,
+  limit = 3,
+  filter?: RagSearchFilter,
+): Promise<RagVectorItem[]> {
+  const pool = await searchVectorContext(
+    queryText,
+    Math.max(limit, 10),
+    filter ?? {},
+  );
+  if (pool.length === 0) return [];
+  const isConversation = (r: RagVectorItem) => {
+    const meta = r.metadata as { type?: string } | null;
+    return (
+      meta?.type === "conversation" || (r.tier === "user" && r.scope === "chats")
+    );
+  };
+  const isRouter = (r: RagVectorItem) =>
+    (r.metadata as { type?: string } | null)?.type === "report_router";
+  const routers = pool.filter(isRouter);
+  const others = pool.filter((r) => !isRouter(r) && !isConversation(r));
+  const convos = pool.filter(isConversation);
+  const out: RagVectorItem[] = [];
+  for (const r of [...routers, ...others, ...convos.slice(0, 1)]) {
+    if (out.length >= limit) break;
+    if (!out.some((o) => o.id === r.id)) out.push(r);
+  }
+  return out;
+}
+
 async function insertOrReplaceVector(item: {
   id: string;
   scope: string;

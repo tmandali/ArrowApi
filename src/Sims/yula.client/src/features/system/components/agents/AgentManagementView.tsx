@@ -16,7 +16,7 @@ import {
   panelHeaderTitleClass,
 } from "@/components/layout/panel-chrome";
 import { cn } from "@/utils/cn";
-import { Bot, Check, FilePlus2, Filter, Trash2, X } from "lucide-react";
+import { Bot, Check, FilePlus2, Filter, Loader2, Trash2, X } from "lucide-react";
 import { useUserAgentsStore, ensureExampleAgent } from "@/lib/stores/user-agents";
 import { AgentEditor, type AgentEditorHandle, type AgentEditorMode } from "./agent-editor";
 
@@ -37,19 +37,20 @@ export function AgentManagementView() {
 
   const editorRef = React.useRef<AgentEditorHandle | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(true);
-  // Kaydet geri bildirimi (kısa süreli "Kaydedildi" rozeti).
-  const [justSaved, setJustSaved] = React.useState(false);
-  const savedTimer = React.useRef<number | null>(null);
+  // Kaydet basışı geri bildirimi (buton içi spinner).
+  const [isSaving, setIsSaving] = React.useState(false);
+  const savingTimer = React.useRef<number | null>(null);
   React.useEffect(
     () => () => {
-      if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
+      if (savingTimer.current !== null) window.clearTimeout(savingTimer.current);
     },
     [],
   );
-  const flashSaved = () => {
-    setJustSaved(true);
-    if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
-    savedTimer.current = window.setTimeout(() => setJustSaved(false), 2500);
+  const handleSave = () => {
+    editorRef.current?.save();
+    setIsSaving(true);
+    if (savingTimer.current !== null) window.clearTimeout(savingTimer.current);
+    savingTimer.current = window.setTimeout(() => setIsSaving(false), 800);
   };
   // Yeni kayda geçerken bırakılan seçim — Vazgeç buraya döner.
   const lastSelectionRef = React.useRef<{ id: string | null } | null>(null);
@@ -204,23 +205,21 @@ export function AgentManagementView() {
             );
           })()}
           {selection != null ? (
-            <span className="flex items-center gap-1.5">
-              {justSaved ? (
-                <span className="text-[11px] font-medium text-green-600 dark:text-green-400">
-                  Kaydedildi
-                </span>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
-                onClick={() => editorRef.current?.save()}
+                onClick={handleSave}
+                disabled={isSaving}
               >
-                <Check className="size-3.5" />
+                {isSaving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
                 Kaydet
               </Button>
-            </span>
           ) : null}
           <AIChatAssistant />
         </>
@@ -356,7 +355,6 @@ export function AgentManagementView() {
             editorRef={editorRef}
           onSaved={(id) => {
             setSelection({ id });
-            flashSaved();
           }}
           onDeleted={() => setSelection(null)}
         />

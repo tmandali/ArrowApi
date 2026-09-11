@@ -33,6 +33,7 @@ import { DetailFormLayout } from "@/components/layout/detail-form-layout";
 import { DetailAsidePanel, type DetailMetaRow } from "@/components/layout/detail-aside";
 import { formatMetaDate } from "@/utils/format";
 import { AgentImageUpload } from "./agent-image-upload";
+import { MarkdownDoc } from "./skill-markdown-doc";
 import {
   fileDotClass,
   fileKindForName,
@@ -604,16 +605,18 @@ export function AgentEditor({
             ))}
           </div>
         ) : null}
+        {isRO ? (
+          <MarkdownDoc value={agentMd} className="min-h-[60vh] flex-1" />
+        ) : (
         <Textarea
           value={agentMd}
-          onChange={isRO ? undefined : (e) => setAgentMd(e.target.value)}
+          onChange={(e) => setAgentMd(e.target.value)}
           placeholder="Kısa yaz, önce özet tablo ver, teknik detaya girme…"
-          disabled={isRO}
-           readOnly={isRO}
            rows={1}
            aria-label="AGENT.md ham markdown"
             className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
         />
+        )}
       </TabsContent>
     </>
   );

@@ -14,12 +14,14 @@ import { useYulaGridStore } from "@/lib/stores/grid";
 import {
   KNOWN_SYSTEM_ACTIONS,
   isPromptSentenceLike,
+  isRunConfirmPhrase,
   type KnownSystemAction,
 } from "@/lib/yula-actions";
 
 export type { KnownSystemAction };
 import { parseColonTitleLine, extractFindingFilterPrompt } from "@/lib/finding-actions";
 import { buildFindingDrillPrompt } from "@/lib/yula-finding-drill";
+import { findReport } from "@/features/reports/report-registry";
 
 /**
  * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
@@ -146,6 +148,15 @@ function remarkYulaEntities() {
   };
 }
 
+/**
+ * Kayıtlı rapor aksiyonu → rapor ekranı yolu (katalog listesinde tıklama
+ * "X hazırla" mesajı göndermek yerine ekranı açar). Scope kayıtsızsa null.
+ */
+function reportPageForAction(action: { scope?: string } | undefined): string | null {
+  if (!action?.scope) return null
+  return findReport(action.scope)?.pagePath ?? null
+}
+
 /* ------------------------------- blok parsing ------------------------------ */
 
 interface MarkdownBlockNode {
@@ -170,6 +181,16 @@ export interface ChatMarkdownCallbacks {
   columns: string[]
   /** Turun analizinin üretildiği kaynak tablo (yoksa aktif view kullanılır) */
   sourceTable?: string | null
+  /**
+   * Metin-içi "çalıştır" tıklaması önce buraya delege edilir (ekranın Run
+   * akışı); true dönerse koştu sayılır, aksi halde metin prompt olarak gider.
+   */
+  onRunReport?: () => boolean
+  /**
+   * Kriter yankısı başlıkları (küçük harf): bu başlıklı maddeler bulgu
+   * değildir, statik render edilir (tıklama yok).
+   */
+  staticTitles?: string[]
 }
 
 /* ----------------------------- blok renderları ---------------------------- */
@@ -236,6 +257,23 @@ function renderBulletedItem(
   if (!parsed) return null
 
   const { title: itemTitle, desc: itemDesc } = parsed
+  // Kriter yankısı ("Hareket Tarihi: ...") bulgu değildir — statik satır.
+  if (cb.staticTitles?.includes(itemTitle.trim().toLowerCase())) {
+    return (
+      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
+        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
+        <div className="flex-1 leading-relaxed text-[12px]">
+          <span className="mr-1.5 inline align-baseline text-[12px] font-semibold text-foreground">
+            {itemTitle}:
+          </span>
+          <span className="text-foreground/90 line-clamp-2 break-words">{itemDesc}</span>
+        </div>
+      </div>
+    )
+  }
+  // "Çalıştır" başlığı doğrudan koşar (ekranın Run akışı); delege yoksa
+  // eski bulgu/aksiyon çözümüne düşer.
+  const isRunTitle = isRunConfirmPhrase(itemTitle)
   const knownAction = KNOWN_SYSTEM_ACTIONS.find((a) => a.pattern.test(itemTitle))
   // Bulgu tıklaması iki kademeli çözülür: önce yapısal filtre çıkarımı
   // (ucuz, deterministik grid filtresi), çıkarılamazsa başlık + açıklamayı
@@ -255,13 +293,29 @@ function renderBulletedItem(
       buildFindingDrillPrompt(findingText))
     : buildFindingDrillPrompt(findingText, pinnedTable)
 
+  // Kayıtlı rapor adı: tıklama prompt göndermek yerine rapor ekranını açar.
+  const knownPage = knownAction ? reportPageForAction(knownAction) : null
+  const titleClass = cn(
+    "mr-1.5 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors",
+  )
+
   return (
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
       <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
       <div className="flex-1 leading-relaxed text-[12px]">
+        {knownAction && knownPage && !isRunTitle ? (
+          <Link
+            href={knownPage}
+            title={`"${itemTitle}" rapor ekranını açmak için tıklayın`}
+            className={titleClass}
+          >
+            {itemTitle}:
+          </Link>
+        ) : (
         <button
           type="button"
           onClick={() => {
+            if (isRunTitle && cb.onRunReport?.()) return
             if (knownAction) {
               if (cb.isExecutionConfirmation) {
                 const navigated = cb.onNavigateReport(knownAction.label)
@@ -272,13 +326,16 @@ function renderBulletedItem(
             }
             cb.onPrompt(findingClickPrompt)
           }}
-          title={`"${findingClickPrompt}" olarak sormak için tıklayın`}
-          className={cn(
-            "mr-1.5 inline border-0 bg-transparent p-0 text-left align-baseline text-[12px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors",
-          )}
+          title={
+            isRunTitle && cb.onRunReport
+              ? "Raporu doğrudan çalıştırmak için tıklayın"
+              : `"${findingClickPrompt}" olarak sormak için tıklayın`
+          }
+          className={titleClass}
         >
           {itemTitle}:
         </button>
+        )}
         <span className="text-foreground/90 line-clamp-2 break-words">{itemDesc}</span>
       </div>
     </div>
@@ -309,13 +366,25 @@ function renderPlainBullet(
           {boldParts.map((bp, bIdx) => {
             if (bp.startsWith("**") && bp.endsWith("**")) {
               const boldText = bp.slice(2, -2).trim()
-              if (cb?.onPrompt && boldText.length > 1) {
+              const isRunBold = isRunConfirmPhrase(boldText)
+              // Kriter yankısı bold'u da statik kalır (tıklama yok).
+              const isStaticBold = Boolean(
+                cb?.staticTitles?.includes(boldText.toLowerCase()),
+              )
+              if (cb?.onPrompt && boldText.length > 1 && !isStaticBold) {
                 return (
                   <button
                     key={bIdx}
                     type="button"
-                    onClick={() => cb.onPrompt(boldText)}
-                    title={`"${boldText}" komutunu çalıştırmak için tıklayın`}
+                    onClick={() => {
+                      if (isRunBold && cb.onRunReport?.()) return
+                      cb.onPrompt(boldText)
+                    }}
+                    title={
+                      isRunBold && cb.onRunReport
+                        ? "Raporu doğrudan çalıştırmak için tıklayın"
+                        : `"${boldText}" komutunu çalıştırmak için tıklayın`
+                    }
                     className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline"
                   >
                     {boldText}
@@ -358,7 +427,9 @@ function renderPlainBullet(
     )
   }
 
-  // Standart düz madde: Eğer öneri/aksiyon cümlesiyse tıklanabilir aksiyon düğmesi yap
+  // Standart düz madde: Eğer öneri/aksiyon cümlesiyse tıklanabilir aksiyon düğmesi yap.
+  // Run cümlesi önce doğrudan koşmaya çalışır (ekranın Run akışı).
+  const isRunBullet = isRunConfirmPhrase(cleanBulletText)
   const isActionLike =
     isPromptSentenceLike(cleanBulletText) ||
     /(?:filtrele|özetle|çıkar|analiz|grafik|hesapla|göster|listele|hazırla|yap|incele|sorgula|çalıştır|calistir|run|execute|başlat)/i.test(cleanBulletText)
@@ -367,12 +438,19 @@ function renderPlainBullet(
     return (
       <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
         <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
-        <button
-          type="button"
-          onClick={() => cb.onPrompt(cleanBulletText)}
-          title={`"${cleanBulletText}" komutunu çalıştırmak için tıklayın`}
-          className="flex-1 leading-snug text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors line-clamp-2"
-        >
+          <button
+            type="button"
+            onClick={() => {
+              if (isRunBullet && cb.onRunReport?.()) return
+              cb.onPrompt(cleanBulletText)
+            }}
+            title={
+              isRunBullet && cb.onRunReport
+                ? "Raporu doğrudan çalıştırmak için tıklayın"
+                : `"${cleanBulletText}" komutunu çalıştırmak için tıklayın`
+            }
+            className="flex-1 leading-snug text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors line-clamp-2"
+          >
           {cleanBulletText}
         </button>
       </div>
@@ -620,6 +698,20 @@ function ChatMarkdownLink({
     const [promptEnc, labelEnc] = href.slice("yula-report:".length).split("|")
     const prompt = decodeURIComponent(promptEnc ?? "")
     const label = decodeURIComponent(labelEnc ?? "")
+    // Kayıtlı rapor: "X hazırla" mesajı göndermek yerine ekranı açar.
+    const action = KNOWN_SYSTEM_ACTIONS.find((a) => a.prompt === prompt)
+    const page = reportPageForAction(action)
+    if (page) {
+      return (
+        <Link
+          href={page}
+          title={`${label} rapor ekranını açmak için tıklayın`}
+          className="inline cursor-pointer bg-transparent p-0 text-left align-baseline font-semibold text-foreground transition-colors hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
+        >
+          {children}
+        </Link>
+      )
+    }
     return (
       <button
         type="button"
@@ -850,6 +942,8 @@ export function ChatMarkdown({
   sourceTable,
   onPrompt,
   onNavigateReport,
+  onRunReport,
+  staticTitles,
   className,
 }: {
   text: string
@@ -858,12 +952,14 @@ export function ChatMarkdown({
   sourceTable?: string | null
   onPrompt: (text: string) => void
   onNavigateReport: (reportTitle: string) => boolean
+  onRunReport?: () => boolean
+  staticTitles?: string[]
   className?: string
 }) {
   const blocks = React.useMemo(() => parseMarkdownBlocks(text), [text])
   const callbacks = React.useMemo<ChatMarkdownCallbacks>(
-    () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable }),
-    [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable],
+    () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles }),
+    [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles],
   )
 
   return (

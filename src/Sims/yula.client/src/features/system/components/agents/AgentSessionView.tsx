@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Bot, Settings, SquarePen } from "lucide-react";
+import { Bot, Settings, SquarePen, Trash2 } from "lucide-react";
 import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
@@ -45,13 +45,21 @@ function AgentSessionHeaderTitle({
 }
 
 /**
- * Başlık sağı aksiyonları: Yeni Sohbet + (custom ajan ise) Ajan Ayarları.
+ * Başlık sağı aksiyonları: Yeni Sohbet + Sohbeti Sil + (custom ajan ise) Ajan Ayarları.
  * Bu ekran yalnız custom user-ajan oturumudur (/agents/<id>), bu yüzden
  * ayar butonu her zaman gösterilir — ajan düzenleme sayfasına gider.
+ * Silme yalnız kayıtlı konuşmada aktiftir (kaydet + vektör temizliği
+ * store içinde yapılır; sonrası taze sohbete düşer).
  */
 function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
   const router = useRouter();
   const yula = useOptionalYulaChat();
+  const activeId = useChatsStore((s) => s.activeId);
+  const conversations = useChatsStore((s) => s.conversations);
+  const deleteConversation = useChatsStore((s) => s.deleteConversation);
+  const hasSavedConversation = activeId
+    ? conversations.some((c) => c.id === activeId)
+    : false;
 
   const handleNewChat = () => {
     if (yula) {
@@ -59,6 +67,10 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
     } else {
       useChatsStore.getState().newConversation();
     }
+  };
+
+  const handleDeleteChat = () => {
+    if (activeId && hasSavedConversation) deleteConversation(activeId);
   };
 
   const handleSettings = () => {
@@ -78,6 +90,18 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
       >
         <SquarePen className="size-3.5" />
         <span className="hidden sm:inline">Yeni Sohbet</span>
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-7 shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-40"
+        onClick={handleDeleteChat}
+        disabled={!hasSavedConversation}
+        title="Sohbeti sil"
+        aria-label="Sohbeti sil"
+      >
+        <Trash2 className="size-3.5" />
       </Button>
       <Button
         type="button"

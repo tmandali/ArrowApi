@@ -107,17 +107,36 @@ export const useChatsStore = create<ChatsState>()(
 
       selectConversation: (id) => set({ activeId: id, isSearchingHistory: false }),
 
-      deleteConversation: (id) =>
+      deleteConversation: (id) => {
+        // Vektör katmanı temizliği: silinen sohbetin hayalet embedding'i
+        // RAG top-K'yu doldurmasın (duckdb-vector tembel yüklenir).
+        // Hata sessize gömülmez (console.warn) + yetim taramasıyla uzlaşılır.
+        void import("@/services/duckdb-vector")
+          .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
+            try {
+              await removeConversationVectors([id]);
+            } catch (err) {
+              console.warn("[Yula chats] vektör silme başarısız:", err);
+            }
+            try {
+              const remaining = get().conversations.map((c) => c.id);
+              await purgeOrphanConversationVectors(remaining);
+            } catch (err) {
+              console.warn("[Yula chats] yetim vektör taraması başarısız:", err);
+            }
+          })
+          .catch((err) => {
+            console.warn("[Yula chats] vektör modülü yüklenemedi:", err);
+          });
         set((s) => {
           const conversations = s.conversations.filter((c) => c.id !== id);
           const messagesById = { ...s.messagesById };
           delete messagesById[id];
-          const activeId =
-            s.activeId === id
-              ? conversations[0]?.id ?? makeId()
-              : s.activeId;
+          // Silinen aktif sohbette başka kayda geçmek yerine taze sohbet açılır.
+          const activeId = s.activeId === id ? makeId() : s.activeId;
           return { conversations, messagesById, activeId };
-        }),
+        });
+      },
 
       renameConversation: (id, title) =>
         set((s) => ({
@@ -165,6 +184,25 @@ export const useChatsStore = create<ChatsState>()(
         }),
 
       clearAllConversations: () => {
+        const ids = get().conversations.map((c) => c.id);
+        if (ids.length > 0) {
+          void import("@/services/duckdb-vector")
+            .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
+              try {
+                await removeConversationVectors(ids);
+              } catch (err) {
+                console.warn("[Yula chats] toplu vektör silme başarısız:", err);
+              }
+              try {
+                await purgeOrphanConversationVectors([]);
+              } catch (err) {
+                console.warn("[Yula chats] yetim vektör taraması başarısız:", err);
+              }
+            })
+            .catch((err) => {
+              console.warn("[Yula chats] vektör modülü yüklenemedi:", err);
+            });
+        }
         set({
           conversations: [],
           activeId: makeId(),

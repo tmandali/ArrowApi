@@ -105,7 +105,7 @@ export function YulaWorkedAccordion({
 
   const handleCopyAnswer = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!message) return;
+    if (!message && steps.length === 0) return;
     const fullText = buildFullCopyText();
     if (!fullText.trim()) return;
     const success = await copyToClipboard(fullText);
@@ -245,12 +245,13 @@ export function YulaWorkedAccordion({
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-data-[state=open]/worked:rotate-90" />
         </CollapsibleTrigger>
 
-        {/* Worked For Satırının En Sağındaki Çerçevesiz Transparan Hover Kopyalama Butonu */}
-        {!isLive && hasTextContent ? (
+        {/* Worked For Satırının En Sağındaki Çerçevesiz Transparan Hover Kopyalama Butonu —
+            her turda görünür (adım izi ve/veya cevap metni varsa) */}
+        {!isLive && (hasTextContent || steps.length > 0) ? (
           <button
             type="button"
             onClick={handleCopyAnswer}
-            title={copiedAnswer ? "Cevap Kopyalandı" : "Tüm Cevap Metnini Kopyala"}
+            title={copiedAnswer ? "Tur İzi Kopyalandı" : "Tur İzini Kopyala (adımlar + cevap)"}
             className="ml-auto flex items-center justify-center p-0.5 rounded-md border-0 bg-transparent text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/worked:opacity-100 transition-opacity cursor-pointer select-none"
           >
             {copiedAnswer ? (
