@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react"
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -263,6 +264,7 @@ type AIChatPanelProps = {
  * Uygulama kabuğu bu durumdan BAĞIMSIZ açılır — bekleme yalnız panel içidir.
  */
 function ChatSessionFallback() {
+  const t = useTranslations("ChatAssistant")
   const [isStuck, setIsStuck] = React.useState(false)
   React.useEffect(() => {
     const timer = setTimeout(() => setIsStuck(true), 4000)
@@ -314,6 +316,7 @@ function AIChatPanelSession({
   belowInput,
   aboveInput,
 }: AIChatPanelProps = {}) {
+  const t = useTranslations("ChatAssistant")
   const isSearchingHistory = useChatsStore((s) => s.isSearchingHistory)
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const yula = useYulaChat()

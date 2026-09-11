@@ -100,11 +100,13 @@ export function SystemUsersView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   React.useEffect(() => {
     void fetchUsers();
-  }, [fetchUsers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredUsers = users.filter(
     (u) =>

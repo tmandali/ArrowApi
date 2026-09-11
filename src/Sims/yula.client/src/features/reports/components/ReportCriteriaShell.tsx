@@ -165,7 +165,7 @@ export function ReportCriteriaShell({
         result.errors.length > 1 ? ` (+${result.errors.length - 1})` : ""
       return `${first}${extra}`
     },
-    []
+    [t]
   )
 
   const handleCriteriaSubmit = React.useCallback(async () => {
@@ -226,6 +226,7 @@ export function ReportCriteriaShell({
     formatValidationBanner,
     mode,
     onJobCreated,
+    t,
   ])
 
   // Run tuşunun aynısını AI'a aç: jenerik run_job aracı bu otobüsü tetikler.

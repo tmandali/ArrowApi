@@ -295,7 +295,7 @@ export function SkillEditor({
       { value: "global", label: t("scope_global") },
       ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
     ],
-    [],
+    [t],
   );
 
   // SKILL.md önizlemesi: yerleşiklerde paketlenmiş tam dosya, kullanıcılarda

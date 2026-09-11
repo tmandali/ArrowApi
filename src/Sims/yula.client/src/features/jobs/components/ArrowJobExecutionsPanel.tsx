@@ -101,9 +101,11 @@ function formatWhen(value?: string | null): string {
 function ExecutionStatusMark({
   status,
   onDelete,
+  t,
 }: {
   status: string
   onDelete?: () => void
+  t: ReturnType<typeof useTranslations>
 }) {
   switch (status) {
     case "Completed": {
@@ -444,7 +446,7 @@ export function ArrowJobExecutionsPanel({
         if (!signal?.aborted && !options?.silent) setLoading(false)
       }
     },
-    [jobsEndpoint]
+    [jobsEndpoint, t]
   )
 
   const handleRefresh = React.useCallback(async () => {
@@ -916,7 +918,7 @@ export function ArrowJobExecutionsPanel({
       }
       return e
     })
-  }, [rawProgressEvents, selectedJob, isTerminal])
+  }, [rawProgressEvents, selectedJob, isTerminal, t])
 
   const [internalViewMode, setInternalViewMode] = React.useState<"result" | "detail">("result")
   const currentViewMode = viewMode ?? internalViewMode
@@ -1096,7 +1098,7 @@ export function ArrowJobExecutionsPanel({
         setDeleting(false)
       }
     },
-    [deleteTargetId, selectedId, deleting, removeTrackedJob, onJobDeleted, loadList]
+    [deleteTargetId, selectedId, deleting, removeTrackedJob, onJobDeleted, loadList, t]
   )
 
   const detailLines = React.useMemo(() => {
@@ -1164,6 +1166,7 @@ export function ArrowJobExecutionsPanel({
     progressEvents,
     opfsDetail,
     opfsLoading,
+    t,
   ])
 
   const running =
@@ -1305,6 +1308,7 @@ export function ArrowJobExecutionsPanel({
                           >
                             <ExecutionStatusMark
                               status={job.status}
+                              t={t}
                               onDelete={() => {
                                 setDeleteError(null)
                                 setDeleteTargetId(job.id)
@@ -1404,7 +1408,7 @@ export function ArrowJobExecutionsPanel({
                       ? t("loading_request")
                       : selectedId
                         ? selectedId
-                        : t("status_meta_request")}}
+                        : t("status_meta_request")}
                   </span>
                   {selectedId ? (
                     <button

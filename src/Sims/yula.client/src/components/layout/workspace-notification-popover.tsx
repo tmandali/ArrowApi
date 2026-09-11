@@ -79,6 +79,8 @@ export function WorkspaceNotificationPopover() {
     [jobs, key]
   )
 
+  const t = useTranslations("Notifications")
+
   const displayNotifications = React.useMemo<DisplayNotification[]>(() => {
     const pending = pendingJobs.map((job) => ({
       id: `pending-${job.id}`,
@@ -111,7 +113,7 @@ export function WorkspaceNotificationPopover() {
       }))
 
     return [...pending, ...live]
-  }, [notifications, pendingJobs, key])
+  }, [notifications, pendingJobs, key, t])
 
   const unreadCount = displayNotifications.filter((n) => n.unread).length
   const readCount = displayNotifications.filter(
@@ -146,8 +148,6 @@ export function WorkspaceNotificationPopover() {
       removeNotification(item.id)
     }
   }
-
-  const t = useTranslations("Notifications")
 
   const getWorkspaceTitle = () => {
     if (key === "/accounting") return t("financial_title")
