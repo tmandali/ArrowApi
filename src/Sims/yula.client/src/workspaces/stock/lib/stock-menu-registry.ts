@@ -56,10 +56,13 @@ export const WORKSPACE_SEARCH_CONFIGS: Record<string, WorkspaceSearchConfig> = {
     examples: ["inward order", "fason teslimat", "purchase order"],
   },
   selling: {
-    workspace: "subcontracting",
-    name: "Subcontracting",
-    nameTr: "Fason & Tedarik",
-    examples: ["inward order", "fason teslimat", "purchase order"],
+    workspace: "selling",
+    name: "Selling",
+    nameTr: "Satış",
+    // Satış araması kapsamı fason modülünü de içerir (use-workspace-rag-search
+    // isItemInWorkspace cross kuralı); örnekler o kapsamda eşleşen
+    // terimler + genel satısta terimler taşır.
+    examples: ["fason sipariş", "fason teslimat", "fason mal kabul"],
   },
 };
 
