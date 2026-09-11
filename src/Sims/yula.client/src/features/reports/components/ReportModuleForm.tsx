@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { useSearchParams } from "next/navigation"
-import { Ban, FileText, Loader2, Table2, Trash2 } from "lucide-react"
+import { Ban, FileText, Loader2, Table2, Trash2, Share2 } from "lucide-react"
 import { sameJobId, useArrowJobRunner, type ArrowJobStatus } from "@/features/jobs"
 import {
   selectPendingJobByName,
