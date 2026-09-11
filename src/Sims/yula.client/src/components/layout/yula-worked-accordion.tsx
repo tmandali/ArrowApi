@@ -49,6 +49,7 @@ export function YulaWorkedAccordion({
   className,
 }: YulaWorkedAccordionProps) {
   const t = useTranslations("WorkedAccordion")
+  const ws = useTranslations("WorkedSteps")
   const [open, setOpen] = React.useState(isLive);
   const [userToggled, setUserToggled] = React.useState(false);
   const [liveTimer, setLiveTimer] = React.useState(0);
@@ -154,8 +155,8 @@ export function YulaWorkedAccordion({
 
   const steps = React.useMemo(() => {
     void traceRev; // turn-trace izi modül seviyesinde değişir; rev değişince yeniden hesap
-    return extractWorkedSteps(message, isLive, userMessage, conversationId);
-  }, [message, isLive, userMessage, conversationId, traceRev]);
+    return extractWorkedSteps(message, isLive, userMessage, conversationId, ws);
+  }, [message, isLive, userMessage, conversationId, traceRev, ws]);
 
   // groupStepsByPhase O(n) ve ucuz — memo'suz hesaplanır (React Compiler uyumu)
   const phases = groupStepsByPhase(steps);
@@ -253,7 +254,7 @@ export function YulaWorkedAccordion({
           <button
             type="button"
             onClick={handleCopyAnswer}
-            title={copiedAnswer ? "Tur İzi Kopyalandı" : "Tur İzini Kopyala (adımlar + cevap)"}
+            title={copiedAnswer ? ws("tour_copy_done") : ws("tour_copy")}
             className="ml-auto flex items-center justify-center p-0.5 rounded-md border-0 bg-transparent text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/worked:opacity-100 transition-opacity cursor-pointer select-none"
           >
             {copiedAnswer ? (

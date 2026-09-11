@@ -5,6 +5,7 @@ import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marked } from "marked";
+import { useTranslations } from "next-intl";
 import { Check, Copy, FileSpreadsheet, ChevronDown, Table, Sparkles } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { CodeBlock } from "@/components/ui/code-block";
@@ -39,6 +40,9 @@ import { findReport } from "@/features/reports/report-registry";
 
 const FILE_TOKEN_RE = /\[\[file:(.+?)\|(.+?)\]\]/g;
 const QUOTE_RE = /(["“])([^"“”\n]{4,120}?)(["”])/g;
+
+/** Saft render yardımcılarına `useTranslations("ChatMarkdown")` taşınır. */
+type ChatMarkdownT = ReturnType<typeof useTranslations>;
 
 function buildEntityRegex(): RegExp {
   const sorted = [...KNOWN_SYSTEM_ACTIONS].sort(
@@ -200,6 +204,7 @@ function renderConfirmationLine(
   trimmed: string,
   lIdx: number,
   cb: ChatMarkdownCallbacks,
+  t: ChatMarkdownT,
 ): React.ReactNode {
   const confirmationMatch = trimmed.match(
     /^([✓📊⚡]\s*)?(\*\*)?([A-Za-zÇĞİÖŞÜçğıöşü0-9\s&/()_-]{3,70}?)(?:\s+Report Started|\s+Raporu Başlatıldı|\s+Raporu Hazırlandı)?(\*\*)?\s*:\s*(.*)$/iu,
@@ -234,7 +239,7 @@ function renderConfirmationLine(
           const navigated = cb.onNavigateReport(reportTitle)
           if (!navigated) cb.onPrompt(`${reportTitle} hazırla`)
         }}
-        title={`${reportTitle} ${cb.isExecutionConfirmation ? "canlı sonuçlarını açmak" : "işlemini başlatmak"} için tıklayın`}
+        title={cb.isExecutionConfirmation ? t("open_live_results", { title: reportTitle }) : t("start_process", { title: reportTitle })}
         className="group mr-1 inline-flex cursor-pointer items-center gap-0.5 align-baseline font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 hover:underline"
       >
         <span>{reportTitle}:</span>
@@ -252,6 +257,7 @@ function renderBulletedItem(
   line: string,
   lIdx: string,
   cb: ChatMarkdownCallbacks,
+  t: ChatMarkdownT,
 ): React.ReactNode {
   const parsed = parseColonTitleLine(line)
   if (!parsed) return null
@@ -306,7 +312,7 @@ function renderBulletedItem(
         {knownAction && knownPage && !isRunTitle ? (
           <Link
             href={knownPage}
-            title={`"${itemTitle}" rapor ekranını açmak için tıklayın`}
+            title={t("open_report_screen", { title: itemTitle })}
             className={titleClass}
           >
             {itemTitle}:
@@ -328,8 +334,8 @@ function renderBulletedItem(
           }}
           title={
             isRunTitle && cb.onRunReport
-              ? "Raporu doğrudan çalıştırmak için tıklayın"
-              : `"${findingClickPrompt}" olarak sormak için tıklayın`
+              ? t("run_report")
+              : t("ask_finding", { prompt: findingClickPrompt })
           }
           className={titleClass}
         >
@@ -347,9 +353,10 @@ function renderPlainBullet(
   line: string,
   lIdx: string,
   cb?: ChatMarkdownCallbacks,
+  t?: ChatMarkdownT,
 ): React.ReactNode {
-  if (cb) {
-    const titled = renderBulletedItem(line, lIdx, cb)
+  if (cb && t) {
+    const titled = renderBulletedItem(line, lIdx, cb, t)
     if (titled) return titled
   }
   const cleanBulletText = line.trim().replace(/^([-*•●]|\d+\.)\s+/, "").trim()
@@ -382,8 +389,8 @@ function renderPlainBullet(
                     }}
                     title={
                       isRunBold && cb.onRunReport
-                        ? "Raporu doğrudan çalıştırmak için tıklayın"
-                        : `"${boldText}" komutunu çalıştırmak için tıklayın`
+                        ? t ? t("run_report") : ""
+                        : t ? t("run_cmd", { cmd: boldText }) : ""
                     }
                     className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline"
                   >
@@ -416,7 +423,7 @@ function renderPlainBullet(
           <button
             type="button"
             onClick={() => cb.onPrompt(titleText)}
-            title={`"${titleText}" komutunu çalıştırmak için tıklayın`}
+            title={t ? t("run_cmd", { cmd: titleText }) : ""}
             className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline mr-1"
           >
             {titleText}
@@ -446,8 +453,8 @@ function renderPlainBullet(
             }}
             title={
               isRunBullet && cb.onRunReport
-                ? "Raporu doğrudan çalıştırmak için tıklayın"
-                : `"${cleanBulletText}" komutunu çalıştırmak için tıklayın`
+                ? t ? t("run_report") : ""
+                : t ? t("run_cmd", { cmd: cleanBulletText }) : ""
             }
             className="flex-1 leading-snug text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors line-clamp-2"
           >
@@ -555,6 +562,7 @@ function extractCodeDetails(children: React.ReactNode): { text: string; language
 }
 
 function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
+  const t = useTranslations("ChatMarkdown")
   const [copied, setCopied] = React.useState(false)
   const [open, setOpen] = React.useState(true)
   const { text, language } = React.useMemo(() => extractCodeDetails(children), [children])
@@ -608,7 +616,7 @@ function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
             {langTitle}
           </span>
           <span className="text-[10px] text-muted-foreground/60 font-mono">
-            ({lineCount} satır)
+            ({t("line_count", { count: lineCount })})
           </span>
         </div>
 
@@ -617,7 +625,7 @@ function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
             <button
               type="button"
               onClick={handleShowInGrid}
-              title="Grid'de Göster (Tabloda Çalıştır)"
+              title={t("show_in_grid")}
               className="rounded-md p-0.5 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 transition-colors cursor-pointer select-none"
             >
               <Table className="size-3.5 shrink-0" />
@@ -627,7 +635,7 @@ function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
           <button
             type="button"
             onClick={handleCopy}
-            title={copied ? "Kopyalandı" : "Kodu kopyala"}
+            title={copied ? t("code_copied") : t("copy_code")}
             className="rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
           >
             {copied ? (
@@ -674,6 +682,7 @@ function ChatMarkdownLink({
   href?: string
   children?: React.ReactNode
 }) {
+  const t = useTranslations("ChatMarkdown")
   const { onPrompt, onNavigateReport, isExecutionConfirmation } =
     useChatMarkdownCallbacks()
 
@@ -685,7 +694,7 @@ function ChatMarkdownLink({
       <button
         type="button"
         onClick={() => onPrompt(prompt)}
-        title={`"${prompt}" komutunu çalıştırmak için tıklayın`}
+        title={t("run_cmd", { cmd: prompt })}
         className="inline-flex items-center gap-1.5 my-0.5 mx-1 px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 font-medium text-[11.5px] border border-orange-500/25 transition-all cursor-pointer select-none align-middle hover:scale-[1.02] active:scale-[0.98]"
       >
         <Sparkles className="size-3 shrink-0 text-orange-500" />
@@ -705,7 +714,7 @@ function ChatMarkdownLink({
       return (
         <Link
           href={page}
-          title={`${label} rapor ekranını açmak için tıklayın`}
+          title={t("open_report_screen", { title: label })}
           className="inline cursor-pointer bg-transparent p-0 text-left align-baseline font-semibold text-foreground transition-colors hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
         >
           {children}
@@ -722,7 +731,7 @@ function ChatMarkdownLink({
           }
           onPrompt(prompt)
         }}
-        title={`${label} ${isExecutionConfirmation ? "sonuçlarını açmak" : "raporunu açmak"} için tıklayın`}
+        title={isExecutionConfirmation ? t("open_report_results", { title: label }) : t("open_report_screen", { title: label })}
         className="inline cursor-pointer bg-transparent p-0 text-left align-baseline font-semibold text-foreground transition-colors hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
       >
         {children}
@@ -788,6 +797,7 @@ function ChatMarkdownLink({
 
 /** Yatay bar kartındaki "En Yüksek 5" tablosu gibi dış kullanımlar için file çipi */
 export function FileOpenChip({ path, label }: { path: string; label: string }) {
+  const t = useTranslations("ChatMarkdown")
   const [failed, setFailed] = React.useState(false)
 
   const open = async () => {
@@ -795,7 +805,7 @@ export function FileOpenChip({ path, label }: { path: string; label: string }) {
       window.open(`/api/yula-exports/${encodeURIComponent(path)}`, "_blank")
       setFailed(false)
     } catch (err) {
-      console.warn("[FileChip] açılamadı:", err)
+      console.warn("[FileChip] Could not open the file:", err)
       setFailed(true)
     }
   }
@@ -804,7 +814,7 @@ export function FileOpenChip({ path, label }: { path: string; label: string }) {
     <button
       type="button"
       onClick={open}
-      title={failed ? `Açılamadı — yol: ${path}` : path}
+      title={failed ? t("file_failed", { path }) : path}
       className={cn(
         "mx-0.5 inline-flex max-w-64 items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 align-middle text-[11px] font-medium shadow-xs transition-colors",
         failed
@@ -827,6 +837,7 @@ export function CriteriaApplyChip({
   children?: React.ReactNode
 }) {
   const [applied, setApplied] = React.useState(false)
+  const t = useTranslations("ChatMarkdown")
 
   const handleApply = async () => {
     try {
@@ -837,7 +848,7 @@ export function CriteriaApplyChip({
       setApplied(true)
       setTimeout(() => setApplied(false), 3000)
     } catch (err) {
-      console.warn("[CriteriaApplyChip] Kriter uygulanamadı:", err)
+      console.warn("[CriteriaApplyChip] Criteria could not be applied:", err)
     }
   }
 
@@ -845,7 +856,7 @@ export function CriteriaApplyChip({
     <button
       type="button"
       onClick={handleApply}
-      title="Bu önerilen kriterleri ekrandaki kriter tablosuna uygula"
+      title={t("apply_criteria_desc")}
       className={cn(
         "inline-flex items-center gap-1.5 my-1 mx-1 px-2.5 py-1 rounded-md text-[11.5px] font-medium border transition-all cursor-pointer select-none align-middle shadow-xs hover:scale-[1.02] active:scale-[0.98]",
         applied
@@ -860,7 +871,7 @@ export function CriteriaApplyChip({
       )}
       <span className="font-semibold">{children}</span>
       <span className="text-[10px] opacity-85 underline ml-0.5 font-normal">
-        {applied ? "(Kriterlere Uygulandı ✓)" : "(Kriterlere Uygula)"}
+        {applied ? t("criteria_applied") : t("criteria_apply")}
       </span>
     </button>
   )
@@ -896,17 +907,18 @@ function renderBlock(
   block: MarkdownBlockNode,
   key: number,
   cb: ChatMarkdownCallbacks,
+  t: ChatMarkdownT,
 ): React.ReactNode {
   const trimmed = block.raw.trim()
   if (!trimmed) return null
 
   // 3a — onay satırı (paragraf bloğu, tek satır)
-  const confirmation = renderConfirmationLine(trimmed, key, cb)
+  const confirmation = renderConfirmationLine(trimmed, key, cb, t)
   if (confirmation) return confirmation
 
   const titleDesc = parseColonTitleLine(trimmed)
   if (titleDesc && (block.type === "paragraph" || block.type === "heading")) {
-    return renderBulletedItem(trimmed, String(key), cb)
+    return renderBulletedItem(trimmed, String(key), cb, t)
   }
 
   // Paragraf veya liste satırlarında bullet kontrolü:
@@ -917,9 +929,9 @@ function renderBlock(
         {lines.map((line, li) => {
           const trimmedLine = line.trim()
           if (/^([-*•●]|\d+\.)\s+/.test(trimmedLine)) {
-            const bullet = renderBulletedItem(trimmedLine, `${key}-${li}`, cb)
+            const bullet = renderBulletedItem(trimmedLine, `${key}-${li}`, cb, t)
             if (bullet) return bullet
-            const plain = renderPlainBullet(trimmedLine, `${key}-${li}`, cb)
+            const plain = renderPlainBullet(trimmedLine, `${key}-${li}`, cb, t)
             if (plain) return plain
           }
           return (
@@ -957,6 +969,7 @@ export function ChatMarkdown({
   className?: string
 }) {
   const blocks = React.useMemo(() => parseMarkdownBlocks(text), [text])
+  const t = useTranslations("ChatMarkdown")
   const callbacks = React.useMemo<ChatMarkdownCallbacks>(
     () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles }),
     [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles],
@@ -966,7 +979,7 @@ export function ChatMarkdown({
     <ChatMarkdownCallbacksContext.Provider value={callbacks}>
       <div className={cn("space-y-1 text-[12px] text-foreground/90", className)}>
         {blocks.map((block, i) => (
-          <React.Fragment key={i}>{renderBlock(block, i, callbacks)}</React.Fragment>
+          <React.Fragment key={i}>{renderBlock(block, i, callbacks, t)}</React.Fragment>
         ))}
       </div>
     </ChatMarkdownCallbacksContext.Provider>

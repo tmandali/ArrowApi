@@ -6,11 +6,16 @@ import {
   isDedupeSkipOutput,
   type YulaToolPartInfo,
 } from "@/lib/yula-tool-info";
+import type { useTranslations } from "next-intl";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { resolveYulaSlashCommand } from "@/components/layout/yula-commands";
 import { getTurnTrace } from "@/lib/yula-turn-trace";
 import type { TurnTraceStep } from "@/lib/yula-turn-trace";
+
+/** Modül-seviyesi adım üreticileri hook kullanamadığından, bileşen tarafı
+ * `useTranslations("WorkedSteps")`'ı buraya taşır. */
+export type WorkedStepsT = ReturnType<typeof useTranslations>;
 
 export interface WorkedStepItem {
   id: string;
@@ -98,8 +103,11 @@ export function extractWorkedSteps(
   isLiveStreaming?: boolean,
   userMessage?: YulaMessage,
   conversationId?: string,
+  t?: WorkedStepsT,
 ): WorkedStepItem[] {
   const steps: WorkedStepItem[] = [];
+  const L = (key: Parameters<WorkedStepsT>[0], values?: Parameters<WorkedStepsT>[1]) =>
+    t ? t(key, values) : "";
 
   if (conversationId) {
     // Tüm aşama izleri görünür: İstek alındı, Phase, RAG, Araç seti, HTTP, hatalar
@@ -128,7 +136,7 @@ export function extractWorkedSteps(
         toolName: "slash_command",
         state: "output-available",
         input: { command: cmdName, prompt: userText },
-        output: { status: "ok", message: `${cmdName} (${matchedCmd.label}) çalıştırıldı.` },
+        output: { status: "ok", message: L("cmd_executed", { cmd: cmdName, label: matchedCmd.label }) },
       },
     });
   }
@@ -139,8 +147,8 @@ export function extractWorkedSteps(
         id: "live-initial-planning",
         kind: "thought",
         label: "Thinking & reasoning...",
-        subLabel: "Planlama yapılıyor...",
-        detailText: "Kullanıcı talebi ve ekran durumu inceleniyor, uygun işlem ve analiz adımları belirleniyor...",
+        subLabel: L("planning_sub"),
+        detailText: L("planning_detail"),
         isLive: true,
       });
     }
@@ -149,6 +157,7 @@ export function extractWorkedSteps(
 
   // step-start işaretine göre güncel LLM adımı; parçalar bu adıma bağlanır
   let currentStep = -1;
+
   const pushStep = (s: WorkedStepItem) =>
     steps.push({ ...s, stepIndex: currentStep < 0 ? 0 : currentStep });
 
@@ -171,11 +180,11 @@ export function extractWorkedSteps(
             ? "Thinking & reasoning..."
             : text.trim()
               ? `Thought for ${approxDuration}s`
-              : "Thought (boş / gizlendi)"
+              : "Thought (empty / hidden)"
           : `Reasoning (${meta})`,
         subLabel: `${approxDuration}s`,
         durationSec: approxDuration,
-        detailText: text || raw || "Düşünce metni yok veya sanitizer sildi.",
+        detailText: text || raw || L("thought_no_text"),
         isLive: isLiveStreaming,
         isError: !text.trim() && Boolean(raw.trim()),
       });
@@ -193,9 +202,9 @@ export function extractWorkedSteps(
       pushStep({
         id: `${message.id}-text-hidden-${index}`,
         kind: "thought",
-        label: raw.trim() ? "Model text gizlendi (sanitizer)" : "Model text boş",
+        label: raw.trim() ? L("model_text_hidden") : L("model_text_empty"),
         subLabel: isLiveStreaming ? "Streaming..." : "no visible bubble",
-        detailText: raw.slice(0, 2000) || "(part.text boş)",
+        detailText: raw.slice(0, 2000) || L("part_text_empty"),
         isLive: isLiveStreaming,
         isError: Boolean(raw.trim()),
         info: {
@@ -296,9 +305,9 @@ export function extractWorkedSteps(
         let displayExpr = "";
         if (!isReset) {
           if (op === "empty") {
-            displayExpr = `${field} (boş olanlar)`;
+            displayExpr = L("filter_empty_values", { field });
           } else if (op === "notEmpty") {
-            displayExpr = `${field} (dolu olanlar)`;
+            displayExpr = L("filter_filled_values", { field });
           } else if (op === "gt" || val.startsWith(">")) {
             const cleanVal = val.replace(/^>/, "").trim();
             displayExpr = `${field} > ${cleanVal}`;
@@ -332,12 +341,12 @@ export function extractWorkedSteps(
       case "set_grid_sort": {
         const col = typeof inputObj.column === "string" ? inputObj.column : "";
         const dir = typeof inputObj.direction === "string" ? inputObj.direction : "asc";
-        const dirText = dir === "none" ? "Doğal sıra" : dir === "asc" ? "Artan (A-Z)" : "Azalan (Z-A)";
+        const dirText = dir === "none" ? L("sort_natural") : dir === "asc" ? L("sort_asc") : L("sort_desc");
         pushStep({
           id: info.toolCallId,
           kind: "edited",
-          label: dir === "none" ? `Sıralama kaldırıldı: ${col}` : `Sıralandı: ${col} (${dirText})`,
-          subLabel: isPending ? "Tablo sıralanıyor..." : dirText,
+          label: dir === "none" ? L("sort_removed", { col }) : L("sort_applied", { col, dir: dirText }),
+          subLabel: isPending ? L("sorting") : dirText,
           isLive: isPending,
           isError,
           info,
@@ -347,14 +356,14 @@ export function extractWorkedSteps(
       case "configure_grid_columns": {
         const visible = Array.isArray(inputObj.visibleColumns) ? inputObj.visibleColumns : null;
         const hidden = Array.isArray(inputObj.hiddenColumns) ? inputObj.hiddenColumns : null;
-        let label = "Kolonlar düzenlendi";
-        if (visible) label = `${visible.length} kolon gösteriliyor`;
-        else if (hidden) label = `${hidden.length} kolon gizlendi`;
+        let label = L("cols_edited");
+        if (visible) label = L("cols_shown", { count: visible.length });
+        else if (hidden) label = L("cols_hidden", { count: hidden.length });
         pushStep({
           id: info.toolCallId,
           kind: "edited",
           label,
-          subLabel: isPending ? "Kolon görünürlüğü ayarlanıyor..." : undefined,
+          subLabel: isPending ? L("cols_setting") : undefined,
           isLive: isPending,
           isError,
           info,
@@ -366,8 +375,8 @@ export function extractWorkedSteps(
         pushStep({
           id: info.toolCallId,
           kind: "edited",
-          label: `Kolonlar sabitlendi: ${cols.join(", ")}`,
-          subLabel: isPending ? "Kolonlar sabitleniyor..." : "Sticky",
+          label: L("cols_pinned", { cols: cols.join(", ") }),
+          subLabel: isPending ? L("cols_pinning") : "Sticky",
           isLive: isPending,
           isError,
           info,
@@ -380,9 +389,9 @@ export function extractWorkedSteps(
         pushStep({
           id: info.toolCallId,
           kind: "edited",
-          label: `${count} kolona filtre uygulandı`,
+          label: L("filters_applied", { count }),
           subLabel: isPending
-            ? "Filtreler uygulanıyor..."
+            ? L("filters_applying")
             : Object.entries(filters)
                 .map(([k, v]) => `${k}:${v}`)
                 .join(", "),
@@ -396,8 +405,8 @@ export function extractWorkedSteps(
         pushStep({
           id: info.toolCallId,
           kind: "edited",
-          label: "Grid görünümü sıfırlandı",
-          subLabel: isPending ? "Varsayılan düzene dönülüyor..." : "Varsayılan",
+          label: L("grid_reset"),
+          subLabel: isPending ? L("grid_resetting") : L("default"),
           isLive: isPending,
           isError,
           info,
@@ -409,8 +418,8 @@ export function extractWorkedSteps(
         pushStep({
           id: info.toolCallId,
           kind: "edited",
-          label: `Dışa aktarıldı (${fmt})`,
-          subLabel: isPending ? "Dosya hazırlanıyor ve indiriliyor..." : `${fmt} indirildi`,
+          label: L("exported", { fmt }),
+          subLabel: isPending ? L("exporting") : L("exported_fmt", { fmt }),
           isLive: isPending,
           isError,
           info,
@@ -439,12 +448,12 @@ export function extractWorkedSteps(
               toolName: "sql_autocorrect",
               state: isPending ? "input-available" : "output-available",
               input: {
-                note: "Kullanıcı sorgusu tablo şemasına uyarlandı",
+                note: L("sql_note"),
               },
               output: {
                 status: "ok",
                 correctedSql: sql,
-                note: "Serbest dilli sorgu tablo şemasına, kolon isimlerine ve ISO tarihine otomatik uyarlandı.",
+                note: L("sql_note_detail"),
               },
             },
           });
@@ -519,7 +528,7 @@ export function extractWorkedSteps(
             id: info.toolCallId,
             kind: "explored",
             label: "Skipped criteria apply: incomplete intent",
-            subLabel: "Waiting for confirmation (forma doldur / uygula)",
+            subLabel: L("confirm_waiting"),
             isLive: isPending,
             isError,
             info,
@@ -742,8 +751,8 @@ export function extractWorkedSteps(
       id: `${message?.id ?? "live"}-initial-planning`,
       kind: "thought",
       label: "Thinking & reasoning...",
-      subLabel: "Planlama yapılıyor...",
-      detailText: "Kullanıcı talebi ve ekran durumu inceleniyor, uygun işlem ve analiz adımları belirleniyor...",
+      subLabel: L("planning_sub"),
+      detailText: L("planning_detail"),
       isLive: true,
     });
   }

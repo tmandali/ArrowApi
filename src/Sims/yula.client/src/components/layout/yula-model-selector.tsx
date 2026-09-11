@@ -30,95 +30,83 @@ export interface ModelOption {
   isMlx?: boolean;
 }
 
-/** Bilinen modeller için görünüm ve etiket sözlüğü (yalnızca sistemde yüklü ise kullanılır) */
-const MODEL_METADATA_MAP: Record<string, { name: string; tag?: string; description?: string; hasThinking?: boolean }> = {
+/** Bilinen modeller için görünüm ve etiket sözlüğü (yalnızca sistemde yüklü ise kullanılır).
+ * UI metinleri (description) messages/ katalogundan çözülür — bu harita yalnız
+ * dil-bağımsız model kimlik verisi (name/tag) taşır. */
+const MODEL_METADATA_MAP: Record<string, { name: string; tag?: string; hasThinking?: boolean }> = {
   "gpt-5.4": {
     name: "GPT-5.4",
     tag: "Azure Foundry",
-    description: "Microsoft Foundation yüksek kapasiteli akıl yürütme modeli",
     hasThinking: true,
   },
   "gpt-4o": {
     name: "GPT-4o",
     tag: "Azure / OpenAI",
-    description: "Yüksek hızlı ve çok modlu (multimodal) model",
     hasThinking: false,
   },
   "gpt-4o-mini": {
     name: "GPT-4o Mini",
     tag: "Fast",
-    description: "Hızlı ve verimli hafif model",
     hasThinking: false,
   },
   "o3-mini": {
     name: "o3-mini",
     tag: "Thinking",
-    description: "Derin düşünce adımları ve mantık yürütme",
     hasThinking: true,
   },
   "agnes-2.5-flash": {
     name: "Agnes 2.5 Flash",
     tag: "Agnes",
-    description: "Agnes AI kodlama + agent workflow modeli (512K context)",
     hasThinking: true,
   },
   "agnes-3.0-flash": {
     name: "Agnes 3.0 Flash",
     tag: "Agnes",
-    description: "Yeni nesil Agnes kodlama + tool orchestration modeli",
     hasThinking: true,
   },
   "agnes-2.5-pro": {
     name: "Agnes 2.5 Pro",
     tag: "Agnes Pro",
-    description: "İleri akıl yürütme, kodlama ve uzun bağlam analizi",
     hasThinking: true,
   },
   "gemma4:12b-mlx": {
     name: "Gemma 4 12B MLX",
     tag: "Fast MLX",
-    description: "Apple Silicon MLX hızlandırılmış yerel Ollama modeli",
     hasThinking: true,
   },
   "gemma4:27b-mlx": {
     name: "Gemma 4 27B MLX",
     tag: "Medium MLX",
-    description: "Dengeli MLX akıl yürütme ve raporlama modeli",
     hasThinking: true,
   },
   "gemma4-mlx": {
     name: "Gemma 4 MLX",
     tag: "MLX",
-    description: "Yerel Gemma 4 MLX modeli",
     hasThinking: true,
   },
   "llama3.3:70b": {
     name: "Llama 3.3 (70B)",
     tag: "Pro",
-    description: "Yüksek kapasiteli akıl yürütme",
     hasThinking: true,
   },
   "qwen2.5:32b": {
     name: "Qwen 2.5 (32B)",
     tag: "Medium",
-    description: "Güçlü SQL ve kod yeteneği",
     hasThinking: true,
   },
   "deepseek-r1:14b": {
     name: "DeepSeek R1 (14B)",
     tag: "Thinking",
-    description: "Derin düşünce adımları",
     hasThinking: true,
   },
   "gemini-3.6-flash": {
     name: "Gemini 3.6 Flash",
     tag: "Medium",
-    description: "Hızlı bulut modeli",
     hasThinking: false,
   },
 };
 
-function formatModelOption(id: string): ModelOption {
+function formatModelOption(id: string, t: ReturnType<typeof useTranslations>): ModelOption {
   const cleanId = id.trim().toLowerCase();
   const metaKey = Object.keys(MODEL_METADATA_MAP).find(
     (k) => cleanId === k || cleanId.startsWith(k) || k.startsWith(cleanId) || cleanId.includes(k.split(":")[0])
@@ -155,11 +143,14 @@ function formatModelOption(id: string): ModelOption {
     cleanId.includes("whisper");
 
   if (meta) {
+    const modelDesc = metaKey
+      ? ((t.raw("model_desc") ?? {}) as Record<string, string>)[metaKey]
+      : undefined;
     return {
       id,
       name: meta.name,
       tag: meta.tag,
-      description: meta.description,
+      description: modelDesc,
       hasThinking: meta.hasThinking ?? isThinkingModel,
       hasVision,
       hasTools,
@@ -169,13 +160,13 @@ function formatModelOption(id: string): ModelOption {
   }
 
   // Dinamik etiket türetme (Ollama model isimleri için akıllı etiketler)
-  let derivedTag = "Yerel";
+  let derivedTag = t("tag_local");
   if (cleanId.startsWith("agnes")) {
     return {
       id,
       name: id,
       tag: cleanId.includes("pro") ? "Agnes Pro" : "Agnes",
-      description: "Agnes AI bulut modeli",
+      description: t("agnes_cloud_desc"),
       hasThinking: true,
       hasVision: true,
       hasTools: true,
@@ -257,7 +248,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
         }
 
         const list = data.models.map((m) => {
-          const opt = formatModelOption(m.name);
+          const opt = formatModelOption(m.name, t);
           if (m.capabilities) {
             if (typeof m.capabilities.hasThinking === "boolean") opt.hasThinking = m.capabilities.hasThinking;
             if (typeof m.capabilities.hasVision === "boolean") opt.hasVision = m.capabilities.hasVision;
@@ -284,14 +275,18 @@ export function YulaModelSelector({ className }: { className?: string }) {
           if (fallback) setModel(fallback);
         }
       } catch (err) {
-        console.warn("[Yula Model Selector] Model listesi alınamadı:", err);
+        console.warn("[Yula Model Selector] Could not fetch model list:", err);
       }
     }
     void fetchModels();
     return () => {
       active = false;
     };
+  /* eslint-disable react-hooks/exhaustive-deps -- `t` is intentionally omitted from this effect's
+     dep array: next-intl v4 returns a new TFunction each render; including it would re-run the
+     fetch effect on every render. */
   }, [model, setModel, provider, isThinkingEnabled]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Yalnızca aktif sağlayıcının gerçek model listesi gösterilir; eski/uyumsuz
   // model listeye eklenmez (activeModelInfo fallback'i tetikte adını gösterir).
@@ -299,8 +294,8 @@ export function YulaModelSelector({ className }: { className?: string }) {
     if (installedModels.length > 0) {
       return installedModels;
     }
-    return [formatModelOption(model || "gpt-5.4")];
-  }, [installedModels, model]);
+    return [formatModelOption(model || "gpt-5.4", t)];
+  }, [installedModels, model, t]);
 
   // Düşünme modu anahtarı (Switch) AÇIK iken YALNIZCA düşünme destekli modeller listelenir
   const displayedModels = React.useMemo(() => {
@@ -349,7 +344,7 @@ export function YulaModelSelector({ className }: { className?: string }) {
         className="w-64 p-1.5 shadow-xl border border-border/80 bg-popover/95 backdrop-blur-md rounded-xl z-50 animate-in fade-in-0 zoom-in-95"
       >
         <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Sağlayıcı
+          {t("provider_label")}
         </div>
         {availableProviders.length > 0 ? (
           <div className="space-y-0.5 pb-1.5 mb-1 border-b border-border/60">
@@ -405,19 +400,19 @@ export function YulaModelSelector({ className }: { className?: string }) {
                   <span className="truncate">{m.name}</span>
                   <div className="flex items-center gap-1 shrink-0 opacity-85">
                     {m.hasThinking ? (
-                      <Brain className="size-3 text-primary/80 shrink-0" aria-label="Düşünme (Thinking)" />
+                      <Brain className="size-3 text-primary/80 shrink-0" aria-label={t("aria_thinking")} />
                     ) : null}
                     {m.hasVision ? (
-                      <Eye className="size-3 text-amber-500/80 shrink-0" aria-label="Görsel Okuma (Vision)" />
+                      <Eye className="size-3 text-amber-500/80 shrink-0" aria-label={t("aria_vision")} />
                     ) : null}
                     {m.hasTools ? (
-                      <Wrench className="size-3 text-blue-500/80 shrink-0" aria-label="Araç Çağırma (Tools)" />
+                      <Wrench className="size-3 text-blue-500/80 shrink-0" aria-label={t("aria_tools")} />
                     ) : null}
                     {m.hasAudio ? (
-                      <Volume2 className="size-3 text-purple-500/80 shrink-0" aria-label="Ses / İşitme (Audio)" />
+                      <Volume2 className="size-3 text-purple-500/80 shrink-0" aria-label={t("aria_audio")} />
                     ) : null}
                     {m.isMlx ? (
-                      <Cpu className="size-3 text-emerald-500/80 shrink-0" aria-label="Apple MLX Donanım İvmesi" />
+                      <Cpu className="size-3 text-emerald-500/80 shrink-0" aria-label={t("aria_mlx")} />
                     ) : null}
                   </div>
                 </div>

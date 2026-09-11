@@ -144,8 +144,8 @@ export function AIChatAssistant({
         onOpenChange={handleOpenChange}
         iconOnly
         icon={YulaMarkIcon}
-        aria-label={isHomePage ? "Yeni Sohbet Başlat" : YULA.ariaLabel}
-        title={isHomePage ? "Yeni Sohbet Başlat" : YULA.name}
+        aria-label={isHomePage ? t("new_chat_start") : t("yula_aria")}
+        title={isHomePage ? t("new_chat_start") : YULA.name}
         className={cn(
           "group/ai size-7 border-none bg-transparent text-primary shadow-none hover:bg-transparent focus-visible:ring-0 active:scale-95 [&_svg]:!size-5",
           open && "bg-transparent hover:bg-transparent"
@@ -186,19 +186,19 @@ function isFailedToolInfo(info: {
  * Kısa göreli zaman ("az önce", "5 dk önce", "1 sa önce", "3 gün önce").
  * Geçmiş öneri satırının yanında rozet olarak gösterilir.
  */
-function formatHistoryAgo(createdAt: number): string {
+function formatHistoryAgo(createdAt: number, t: (key: string, values?: Record<string, string | number | Date>) => string): string {
   const diffMs = Date.now() - createdAt
   const minutes = Math.max(0, Math.floor(diffMs / 60_000))
-  if (minutes < 1) return "az önce"
-  if (minutes < 60) return `${minutes} dk önce`
+  if (minutes < 1) return t("history_just_now")
+  if (minutes < 60) return t("history_minutes", { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} sa önce`
+  if (hours < 24) return t("history_hours", { count: hours })
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} gün önce`
-  if (days < 30) return `${Math.floor(days / 7)} hf önce`
+  if (days < 7) return t("history_days", { count: days })
+  if (days < 30) return t("history_weeks", { count: Math.floor(days / 7) })
   const months = Math.floor(days / 30)
-  if (months < 12) return `${months} ay önce`
-  return `${Math.floor(months / 12)} yıl önce`
+  if (months < 12) return t("history_months", { count: months })
+  return t("history_years", { count: Math.floor(months / 12) })
 }
 
 import { useMounted } from "@/hooks/use-mounted"
@@ -206,6 +206,7 @@ import { formatDate, greetingFor } from "@/lib/welcome-format"
 import { navigateToConversationScreen } from "@/lib/yula-history-navigation"
 
 export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = {}) {
+  const t = useTranslations("ChatAssistant")
   const activeId = useChatsStore((s) => s.activeId)
   const conversations = useChatsStore((s) => s.conversations)
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
@@ -232,7 +233,7 @@ export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = 
 
   let titleText: string = YULA.name
   if (isHistoryOpen || isSearchingHistory) {
-    titleText = isWorkspaceHomePath(pathname) ? "Sohbet Geçmişi" : `${screenLabel} Yazışmaları`
+    titleText = isWorkspaceHomePath(pathname) ? t("history_title") : t("screen_chats", { screen: screenLabel })
   } else if (activeConv?.title && activeConv.title !== "Yeni Sohbet") {
     titleText = activeConv.title
   } else if (dockAgentName) {
@@ -278,10 +279,7 @@ function ChatSessionFallback() {
           <span>{t("app_load_failed")}</span>
         </div>
         <p className="max-w-md text-center text-xs opacity-70">
-          Sohbet oturumu başlatılamadı; bu genellikle sunucu yeniden
-          başlatıldıktan sonra eski sekmenin bağlantısının kopmasından
-          (hydration hatası) kaynaklanır. Ayrıntılar için tarayıcı
-          konsoluna bakabilirsiniz.
+          {t("session_error_desc")}
         </p>
         <button
           type="button"
@@ -289,14 +287,14 @@ function ChatSessionFallback() {
           className="inline-flex h-8 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-accent"
         >
           <RotateCw className="size-3.5" aria-hidden />
-          Sayfayı yenile
+          {t("reload_btn")}
         </button>
       </div>
     )
   }
   return (
     <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
-      Sohbet hazırlanıyor…
+      {t("session_preparing")}
     </div>
   )
 }
@@ -451,7 +449,7 @@ function AIChatPanelSession({
       ? React.createElement(icon, { className: "size-16 text-yula-accent" })
       : null
   }, [isYulaRoot, pathname])
-  const introDescription = `${workspaceLabel} çalışma alanınızda — ${YULA.emptyDescription}`
+  const introDescription = t("yula_intro", { workspace: workspaceLabel, desc: t("yula_empty_desc") })
 
   const isLoading = isProcessing
   const selectedJobId =
@@ -486,18 +484,18 @@ function AIChatPanelSession({
     const providerId = effectiveAgent.provider || aiConfig.provider || ""
     const providerLabel =
       AGENT_PROVIDER_OPTIONS.find((p) => p.id === providerId)?.label ??
-      (providerId || "Sunucu varsayılanı")
-    const providerText = `${providerLabel}${effectiveAgent.provider ? "" : " (genel)"}`
+      (providerId || t("inference_server_default"))
+    const providerText = `${providerLabel}${effectiveAgent.provider ? "" : ` ${t("inference_general")}`}`
     const model = effectiveAgent.model || chatsModel || aiConfig.model || ""
-    const modelText = `${model || "varsayılan model"}${effectiveAgent.model ? "" : " (genel)"}`
+    const modelText = `${model || t("inference_model_default")}${effectiveAgent.model ? "" : ` ${t("inference_general")}`}`
     const effort = effectiveAgent.effort || aiConfig.effort || null
     const effortText = effort
-      ? `efor: ${effort}${effectiveAgent.effort ? "" : " (genel)"}`
-      : "efor: genel"
+      ? `${t("inference_effort")}: ${effort}${effectiveAgent.effort ? "" : ` ${t("inference_general")}`}`
+      : `${t("inference_effort")}: ${t("inference_general")}`
     const thinkingOn = effectiveAgent.thinking ?? isThinkingEnabled
-    const thinkingText = `düşünme: ${thinkingOn ? "açık" : "kapalı"}${effectiveAgent.thinking === undefined ? " (genel)" : ""}`
+    const thinkingText = `${t("inference_thinking")}: ${thinkingOn ? t("inference_on") : t("inference_off")}${effectiveAgent.thinking === undefined ? ` ${t("inference_general")}` : ""}`
     return `${providerText} · ${modelText} · ${effortText} · ${thinkingText}`
-  }, [effectiveAgent, chatsModel, isThinkingEnabled])
+  }, [effectiveAgent, chatsModel, isThinkingEnabled, t])
   // Komut menüsündeki skill'ler ajanın seçtikleridir (açık seçim kapsamı
   // ezer; seçili ajan + boş liste = skill komutu yok).
   const userSkillCommands = React.useMemo(
@@ -761,7 +759,7 @@ function AIChatPanelSession({
           <Command shouldFilter={false} className="p-1">
             <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
               <CommandEmpty className="py-2 text-[11px] text-muted-foreground text-center">
-                Komut bulunamadı
+                {t("command_empty")}
               </CommandEmpty>
               <CommandGroup className="p-0">
                 {(commandMatches ?? []).map((command, idx) => {
@@ -809,10 +807,10 @@ function AIChatPanelSession({
                   >
                     <Plus className="size-3.5 text-primary shrink-0" />
                     <span className="font-semibold text-foreground shrink-0">
-                      Ajan oluştur
+                      {t("agent_create")}
                     </span>
                     <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
-                      Yönetim sayfasını aç
+                      {t("agent_manage_open")}
                     </span>
                   </CommandItem>
                 ) : null}
@@ -823,7 +821,7 @@ function AIChatPanelSession({
       ) : showHistory ? (
         <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
           <div className="px-2.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-            Geçmişten öneriler
+            {t("history_suggestions")}
           </div>
           <Command shouldFilter={false} className="p-1 pt-0.5">
             <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
@@ -851,7 +849,7 @@ function AIChatPanelSession({
                         {s.text.length > 120 ? `${s.text.slice(0, 120)}…` : s.text}
                       </span>
                       <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70">
-                        {formatHistoryAgo(s.createdAt)}
+                        {formatHistoryAgo(s.createdAt, t)}
                       </span>
                     </CommandItem>
                   )
@@ -864,7 +862,7 @@ function AIChatPanelSession({
 
       {isLoading ? (
         <p className="px-1 text-[11px] text-muted-foreground">
-          Yula hâlâ yanıtlıyor. Bitene kadar yeni mesaj gönderilemez; gerekirse Durdur.
+          {t("still_answering")}
         </p>
       ) : null}
       <form
@@ -905,7 +903,7 @@ function AIChatPanelSession({
                     current.filter((item) => item.id !== file.id)
                   )
                 }
-                aria-label={`${file.name} ekini kaldır`}
+                aria-label={t("remove_attachment", { name: file.name })}
               >
                 <X className="size-3" />
               </button>
@@ -1016,8 +1014,8 @@ function AIChatPanelSession({
               if (isMultiLine || isLong) {
                 event.preventDefault()
                 const preview = lines.length > 5
-                  ? `Paste (${lines.length} satır)`
-                  : `Paste (${pastedText.trim().length} karakter)`
+                  ? t("paste_lines", { count: lines.length })
+                  : t("paste_chars", { count: pastedText.trim().length })
 
                 setPastedChip({
                   id: `paste-${Date.now()}`,
@@ -1029,7 +1027,7 @@ function AIChatPanelSession({
             placeholder={
               selectedCommand || pastedChip
                 ? t("input_placeholder_secondary")
-                : YULA.placeholder
+                : t("yula_placeholder")
             }
             className="flex-1 min-w-[120px] min-h-[28px] max-h-32 resize-none border-0 bg-transparent px-1 py-1 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
           />
@@ -1083,7 +1081,7 @@ function AIChatPanelSession({
               size="icon"
               disabled={!canSubmit}
               className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90 transition-all"
-              aria-label="Gönder"
+              aria-label={t("send_aria")}
             >
               <ArrowUp className="size-3.5" />
             </Button>
@@ -1172,14 +1170,14 @@ function AIChatPanelSession({
                     {effectiveAgent
                       ? effectiveAgent.description || t("speaking_with_agent")
                       : workspaceRootIcon
-                        ? YULA.emptyDescription
+                        ? t("yula_empty_desc")
                         : t("yula_description")}
                   </p>
                   {effectiveAgent ? (
                     <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/75">
                       <Globe className="size-3.5 shrink-0" />
                       {effectiveAgent.scope && effectiveAgent.scope !== "global"
-                        ? `${getWorkspace(effectiveAgent.scope as WorkspaceId).title || getWorkspace(effectiveAgent.scope as WorkspaceId).name} alanında çalışır`
+                        ? t("works_in_workspace", { workspace: getWorkspace(effectiveAgent.scope as WorkspaceId).title || getWorkspace(effectiveAgent.scope as WorkspaceId).name })
                         : t("works_in_all_workspaces")}
                     </p>
                   ) : null}
@@ -1223,7 +1221,7 @@ function AIChatPanelSession({
                 <YulaMarkIcon className="size-full" />
               </div>
               <h2 className="text-lg font-semibold tracking-tight text-primary dark:text-sidebar-primary">
-                {YULA.emptyTitle}
+                {t("yula_empty_title")}
               </h2>
               <p className="mt-1 max-w-md text-center text-sm text-muted-foreground">
                 {introDescription}
@@ -1307,7 +1305,7 @@ function AIChatPanelSession({
                 variant="outline"
                 className="absolute bottom-2 left-1/2 size-7 -translate-x-1/2 rounded-full bg-background shadow-md"
                 onClick={() => scrollToBottom()}
-                aria-label="Alta kaydır"
+                aria-label={t("scroll_down_aria")}
               >
                 <ArrowDown className="size-3.5" />
               </Button>
