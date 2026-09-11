@@ -304,7 +304,7 @@ export function AgentEditor({
               <FormGrid twoColClass="@[40rem]/agent-detail:grid-cols-2">
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Ajan adı
+                    {t("agent_name")}
                   </FieldLabel>
                   <Input
                     value={name}
@@ -317,7 +317,7 @@ export function AgentEditor({
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Kapsam
+                    {t("scope_label")}
                   </FieldLabel>
                   <CriteriaSimpleCombobox
                     variant="form"
@@ -334,7 +334,7 @@ export function AgentEditor({
 
               <Field>
                 <FieldLabel className="text-xs text-muted-foreground">
-                  Açıklama
+                  {t("description_label")}
                 </FieldLabel>
                 <Textarea
                   value={description}
@@ -349,7 +349,7 @@ export function AgentEditor({
 
               <Field>
                 <FieldLabel className="text-xs text-muted-foreground">
-                  Araç erişimi (boş = tüm araçlar)
+                  {t("tools_access")}
                 </FieldLabel>
                 <CriteriaSimpleCombobox
                   multiple
@@ -367,11 +367,11 @@ export function AgentEditor({
 
               <Field>
                 <FieldLabel className="text-xs text-muted-foreground">
-                  Skill seti (boş = skill yok)
+                  {t("skill_set")}
                 </FieldLabel>
                 {skillInventory.length === 0 ? (
                   <p className="text-[11.5px] text-muted-foreground">
-                    Tanımlı skill yok.
+                    {t("no_skills_defined")}
                   </p>
                 ) : (
                   <CriteriaSimpleCombobox
@@ -395,7 +395,7 @@ export function AgentEditor({
               <FormGrid twoColClass="@[40rem]/agent-detail:grid-cols-2">
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Sağlayıcı
+                    {t("provider_label")}
                   </FieldLabel>
                   <CriteriaSimpleCombobox
                     variant="form"
@@ -417,7 +417,7 @@ export function AgentEditor({
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Model (boş = varsayılan)
+                    {t("model_label")}
                   </FieldLabel>
                   {customModel ? (
                     <span className="flex items-center gap-1.5">
@@ -460,7 +460,7 @@ export function AgentEditor({
                       options={[
                         { value: "", label: t("default") },
                         ...(model && !providerModels.includes(model)
-                          ? [{ value: "__saved__", label: `${model} (kayıtlı)` }]
+                          ? [{ value: "__saved__", label: t("model_saved", { model }) }]
                           : []),
                         ...providerModels.map((id) => ({ value: id, label: id })),
                         { value: "__custom__", label: t("custom_model_placeholder") },
@@ -473,7 +473,7 @@ export function AgentEditor({
 
               <Field>
                 <FieldLabel className="text-xs text-muted-foreground">
-                  Düşünme
+                  {t("thinking_label")}
                 </FieldLabel>
                 <CriteriaSimpleCombobox
                   variant="form"
@@ -493,7 +493,7 @@ export function AgentEditor({
               {selectedSupportsEffort ? (
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Efor (reasoning depth)
+                    {t("effort_label")}
                   </FieldLabel>
                   <CriteriaSimpleCombobox
                     variant="form"
@@ -513,7 +513,7 @@ export function AgentEditor({
                 </Field>
               ) : (
                 <p className="text-[11.5px] text-muted-foreground">
-                  Seçili model efor (reasoning) desteklemiyor — efor seçimi gizli.
+                  {t("effort_unsupported_hint")}
                 </p>
               )}
 
@@ -615,7 +615,7 @@ export function AgentEditor({
           onChange={(e) => setAgentMd(e.target.value)}
           placeholder={t("instructions_placeholder")}
            rows={1}
-           aria-label="AGENT.md ham markdown"
+           aria-label={t("agent_md_aria")}
             className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
         />
         )}

@@ -992,7 +992,20 @@
     "tool_select_placeholder": "Araç seç…",
     "skill_select_placeholder": "Skill seç… (seçilmezse ajan skill kullanmaz)",
     "model_placeholder": "gpt-5.4",
-    "instructions_placeholder": "Kısa yaz, önce özet tablo ver, teknik detaya girme…"
+    "instructions_placeholder": "Kısa yaz, önce özet tablo ver, teknik detaya girme…",
+    "agent_name": "Ajan adı",
+    "scope_label": "Kapsam",
+    "description_label": "Açıklama",
+    "tools_access": "Araç erişimi (boş = tüm araçlar)",
+    "skill_set": "Skill seti (boş = skill yok)",
+    "no_skills_defined": "Tanımlı skill yok.",
+    "provider_label": "Sağlayıcı",
+    "model_label": "Model (boş = varsayılan)",
+    "model_saved": "{model} (kayıtlı)",
+    "thinking_label": "Düşünme",
+    "effort_label": "Efor (reasoning depth)",
+    "effort_unsupported_hint": "Seçili model efor (reasoning) desteklemiyor — efor seçimi gizli.",
+    "agent_md_aria": "AGENT.md ham markdown"
   },
   "SkillEditor": {
     "file_size_exceeded": "Toplam dosya boyutu 200K karakteri geçemez.",
@@ -1005,7 +1018,18 @@
     "attachments": "Ek dosyalar",
     "prompt_placeholder": "Son 7 günün satış özetini çıkar: \\{\\{input\\}\\}",
     "runs_in_server_sandbox": "Sunucu sandbox'ında çalışır",
-    "runs_in_server_sandbox_detail": "Sunucu sandbox'ında çalışır (run_skill_script)."
+    "runs_in_server_sandbox_detail": "Sunucu sandbox'ında çalışır (run_skill_script).",
+    "slash_label": "Slash adı",
+    "slash_example": "ornek-skill",
+    "scope_label": "Kapsam",
+    "title_label": "Başlık",
+    "description_label": "Açıklama",
+    "skill_md_aria": "SKILL.md ham markdown",
+    "skill_md_not_found": "SKILL.md bulunamadı.",
+    "file_content_aria": "{name} ham metin",
+    "loading": "Yükleniyor…",
+    "script_badge": "betik",
+    "remove": "Kaldır"
   },
   "SkillManagement": {
     "new_skill": "Yeni skill",

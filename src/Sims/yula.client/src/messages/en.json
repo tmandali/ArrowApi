@@ -992,7 +992,20 @@
     "tool_select_placeholder": "Select a tool…",
     "skill_select_placeholder": "Select a skill… (agent won’t use skills if none selected)",
     "model_placeholder": "gpt-5.4",
-    "instructions_placeholder": "Write concisely — give a summary table first, then go into technical details…"
+    "instructions_placeholder": "Write concisely — give a summary table first, then go into technical details…",
+    "agent_name": "Agent name",
+    "scope_label": "Scope",
+    "description_label": "Description",
+    "tools_access": "Tool access (empty = all tools)",
+    "skill_set": "Skill set (empty = no skills)",
+    "no_skills_defined": "No skills defined.",
+    "provider_label": "Provider",
+    "model_label": "Model (empty = default)",
+    "model_saved": "{model} (saved)",
+    "thinking_label": "Thinking",
+    "effort_label": "Effort (reasoning depth)",
+    "effort_unsupported_hint": "The selected model does not support effort (reasoning) — the effort picker is hidden.",
+    "agent_md_aria": "AGENT.md raw markdown"
   },
   "SkillEditor": {
     "file_size_exceeded": "Total file size cannot exceed 200K characters.",
@@ -1005,7 +1018,18 @@
     "attachments": "Attachments",
     "prompt_placeholder": "Generate a summary of the last 7 days of sales: \\{\\{input\\}\\}",
     "runs_in_server_sandbox": "Runs in server sandbox",
-    "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script)."
+    "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script).",
+    "slash_label": "Slash name",
+    "slash_example": "example-skill",
+    "scope_label": "Scope",
+    "title_label": "Title",
+    "description_label": "Description",
+    "skill_md_aria": "SKILL.md raw markdown",
+    "skill_md_not_found": "SKILL.md not found.",
+    "file_content_aria": "{name} raw content",
+    "loading": "Loading…",
+    "script_badge": "script",
+    "remove": "Remove"
   },
   "SkillManagement": {
     "new_skill": "New skill",
