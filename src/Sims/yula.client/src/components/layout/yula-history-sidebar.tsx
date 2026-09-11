@@ -319,14 +319,14 @@ export function YulaHistorySidebar({
               }}
               className="px-1.5 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground font-medium text-[10px] transition-colors"
             >
-              Evet
+              {t("confirm_yes")}
             </button>
             <button
               type="button"
               onClick={() => setConfirmClear(false)}
               className="px-1.5 py-0.5 rounded bg-muted hover:bg-accent text-[10px] font-medium transition-colors"
             >
-              Hayır
+              {t("confirm_no")}
             </button>
           </div>
         ) : (

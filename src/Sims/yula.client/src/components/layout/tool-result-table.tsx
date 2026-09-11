@@ -3,15 +3,16 @@
 import * as React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { TableProperties } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 const numberFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 });
 
-function formatCell(value: unknown): string {
+function formatCell(value: unknown, yesLabel: string, noLabel: string): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "number") return numberFmt.format(value);
-  if (typeof value === "boolean") return value ? "Evet" : "Hayır";
+  if (typeof value === "boolean") return value ? yesLabel : noLabel;
   const s = String(value);
   return s.length > 120 ? `${s.slice(0, 117)}…` : s;
 }
@@ -29,6 +30,7 @@ export function ToolResultTable({
   output: unknown;
   className?: string;
 }) {
+  const t = useTranslations("ToolResultTable");
   const parsed = React.useMemo(() => {
     const o =
       typeof output === "object" && output !== null
@@ -61,9 +63,9 @@ export function ToolResultTable({
     if (!parsed.querySql) return;
     try {
       const { useYulaGridStore } = await import("@/lib/stores/grid");
-      useYulaGridStore.getState().setCustomQuerySql(parsed.querySql, "Yula AI Özel Sorgu");
+      useYulaGridStore.getState().setCustomQuerySql(parsed.querySql, t("custom_query_label"));
     } catch (err) {
-      console.warn("[ToolResultTable] Could not set grid query:", err);
+      console.warn("[ToolResultTable] Could not set the grid query:", err);
     }
   };
 
@@ -90,7 +92,7 @@ export function ToolResultTable({
                   typeof row[c] === "number" && "tabular-nums",
                 )}
               >
-                {formatCell(row[c])}
+                {formatCell(row[c], t("yes"), t("no"))}
               </span>
             </div>
           ))}
@@ -130,7 +132,7 @@ export function ToolResultTable({
                         "text-right tabular-nums",
                     )}
                   >
-                    {formatCell(row[c])}
+                    {formatCell(row[c], t("yes"), t("no"))}
                   </TableCell>
                 ))}
               </TableRow>
@@ -140,7 +142,7 @@ export function ToolResultTable({
       </div>
       <div className="flex h-8 items-center justify-between border-t bg-muted/40 px-2.5">
         <span className="text-[11px] font-medium leading-none text-muted-foreground">
-          {parsed.rowCount} kayıt listelendi
+          {t("records_listed", { count: parsed.rowCount })}
         </span>
         {parsed.querySql && (
           <Button
@@ -150,7 +152,7 @@ export function ToolResultTable({
             onClick={handleLoadInGrid}
           >
             <TableProperties className="size-3.5" />
-            Ana Tabloda Göster
+            {t("show_main_table")}
           </Button>
         )}
       </div>

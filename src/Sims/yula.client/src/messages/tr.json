@@ -717,7 +717,10 @@
         "title_trail": "Planlama",
         "description": "Üretim planları, iş emirleri, BOM ve ürün reçeteleri"
       }
-    }
+    },
+    "agent_session": "{name} ile ayrı oturumda konuş",
+    "agent_identity_fallback": "Özel ajan kimliği",
+    "agent_identity_desc": "Talimat + araç + skill setiyle kendi kimliğini tanımla"
   },
   "HistorySidebar": {
     "search_ph": "Ekran sohbetlerinde ara...",
@@ -734,7 +737,9 @@
     "group_yesterday": "Dün",
     "group_last_week": "Geçen Hafta",
     "group_older": "Daha Eski",
-    "screen_placeholder": "Bu Ekran"
+    "screen_placeholder": "Bu Ekran",
+    "confirm_yes": "Evet",
+    "confirm_no": "Hayır"
   },
   "SearchMainView": {
     "save": "Kaydet",
@@ -755,7 +760,10 @@
     "chats_label": "Sohbet Geçmişi",
     "no_chats_found": "Yazışma bulunamadı.",
     "no_chats_yet": "Henüz bir yazışma bulunmuyor.",
-    "click_or_enter": "Gitmek için tıklayın veya Enter'a basın"
+    "click_or_enter": "Gitmek için tıklayın veya Enter'a basın",
+    "match_score": "%{score} Eşleşme",
+    "items_count": "{count} öğe",
+    "examples_sentence": "(ör: {examples}). Sol kolon {menus} eşleşmelerini, sağ kolon {chats} eşleşmelerini listeler."
   },
   "NavUser": {
     "company_label": "Şirket",
@@ -793,7 +801,12 @@
     "continue_main": "Ana ekranda devam et",
     "toggle_history_show": "Sohbet Geçmişini Göster",
     "toggle_history_hide": "Sohbet Geçmişini Gizle",
-    "close_panel": "Paneli kapat"
+    "close_panel": "Paneli kapat",
+    "agent_search": "Ajan ara…",
+    "no_results": "Sonuç yok.",
+    "agent_default": "Yula varsayılan",
+    "change_agent_tooltip": "{name} — ajanı değiştir",
+    "change_agent_aria": "Ajanı değiştir"
   },
   "PinnedItems": {
     "unpin": "İğneyi Kaldır"
@@ -1257,5 +1270,40 @@
     "apply_criteria_desc": "Bu önerilen kriterleri ekrandaki kriter tablosuna uygula",
     "criteria_applied": "(Kriterlere Uygulandı ✓)",
     "criteria_apply": "(Kriterlere Uygula)"
+  },
+  "Welcome": {
+    "description": "Yula, yol gösteren ışık veren anlamına gelir. Size yardımcı olmak için burada"
+  },
+  "CodeBlock": {
+    "copy": "Kodu / JSON''ı Kopyala",
+    "copied": "Kopyalandı"
+  },
+  "PromptChips": {
+    "more_suggestions": "{count} öneri daha"
+  },
+  "ToolResultTable": {
+    "yes": "Evet",
+    "no": "Hayır",
+    "custom_query_label": "Yula AI Özel Sorgu",
+    "records_listed": "{count} kayıt listelendi",
+    "show_main_table": "Ana Tabloda Göster"
+  },
+  "CompanySwitch": {
+    "title": "Şirket geçişi",
+    "preparing": "Şirket bağlamı hazırlanıyor…",
+    "remounting": "Workspace yeniden yükleniyor…",
+    "loading": "Modüller lazy-load ediliyor…",
+    "finishing": "Geçiş tamamlanıyor…"
+  },
+  "PagePanelTrigger": {
+    "open_panel": "{title} panelini aç",
+    "close_panel": "{title} panelini kapat"
+  },
+  "Greeting": {
+    "night": "İyi geceler",
+    "morning": "Günaydın",
+    "afternoon": "İyi günler",
+    "evening": "İyi akşamlar",
+    "fallback": "Hoş geldiniz"
   }
 }

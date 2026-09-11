@@ -7,18 +7,11 @@ import { Spinner } from "@/components/ui/spinner"
 import {
   selectSwitchTargetCompany,
   useCompanyStore,
-  type CompanySwitchPhase,
 } from "@/store/slices/company-store"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { useNotificationsStore } from "@/store/slices/notifications-store"
+import { useTranslations } from "next-intl"
 import { cn } from "@/utils/cn"
-
-const PHASE_LABEL: Record<CompanySwitchPhase, string> = {
-  preparing: "Şirket bağlamı hazırlanıyor…",
-  remounting: "Workspace yeniden yükleniyor…",
-  loading: "Modüller lazy-load ediliyor…",
-  finishing: "Geçiş tamamlanıyor…",
-}
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => {
@@ -30,6 +23,7 @@ function wait(ms: number) {
  * Full-screen company switch gate: progress + target company, then remounts workspace.
  */
 export function CompanySwitchOverlay() {
+  const t = useTranslations("CompanySwitch")
   const transition = useCompanyStore((state) => state.switchTransition)
   const target = useCompanyStore(selectSwitchTargetCompany)
   const applyCompanySwitch = useCompanyStore((state) => state.applyCompanySwitch)
@@ -128,14 +122,14 @@ export function CompanySwitchOverlay() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Şirket geçişi
+              {t("title")}
             </p>
             <p className="truncate text-base font-semibold text-foreground">
               {label}
             </p>
             <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Spinner className="size-3.5" />
-              {PHASE_LABEL[transition.phase]}
+              {t(transition.phase)}
             </p>
           </div>
           <span className="tabular-nums text-sm font-medium text-foreground">

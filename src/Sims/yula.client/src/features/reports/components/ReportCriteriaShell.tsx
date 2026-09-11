@@ -128,15 +128,15 @@ export function ReportCriteriaShell({
     tools: [
       {
         name: "apply_criteria",
-        description: "Şemayı ve zorunlu alanları gözeterek önerilen kriterleri ekrandaki forma doldurur.",
+        description: "Fills the criteria form on screen with suggested criteria, taking the schema and required fields into account.",
       },
       {
         name: "find_matching_report",
-        description: "Aynı normalize kriterde tamamlanmış/çalışan iş var mı kontrol eder; job başlatmaz.",
+        description: "Checks whether a completed or running job exists for the same normalized criteria; it does not start a job.",
       },
       {
         name: "run_job",
-        description: "Stok Bakiye Raporu için şemayı ve zorunlu alanları gözeterek job başlatır ve execution listesinde yeni işi seçili/çalışır gösterir.",
+        description: `Starts a job for the ${title} report, taking the schema and required fields into account, and shows the new job selected/running in the execution list.`,
       },
     ],
   })

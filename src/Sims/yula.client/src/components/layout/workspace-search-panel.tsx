@@ -202,7 +202,7 @@ export function WorkspaceSearchResults({
             <Loader2 className="size-3 animate-spin" /> {t("results_loading")}
           </span>
         ) : (
-          <span className="text-[10px] text-muted-foreground/60">{results.length} öğe</span>
+          <span className="text-[10px] text-muted-foreground/60">{t("items_count", { count: results.length })}</span>
         )}
       </div>
 
@@ -252,7 +252,7 @@ export function WorkspaceSearchResults({
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1">
-                      <Sparkles className="size-2.5" /> %{item.score} Eşleşme
+                      <Sparkles className="size-2.5" /> {t("match_score", { score: item.score })}
                     </Badge>
                   )}
                 </div>

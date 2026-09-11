@@ -221,8 +221,8 @@ function DockAgentSwitch() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={dockAgent ? `${dockAgent.name} — ajanı değiştir` : "Yula — ajanı değiştir"}
-          aria-label="Ajanı değiştir"
+          title={dockAgent ? t("change_agent_tooltip", { name: dockAgent.name }) : t("change_agent_tooltip", { name: "Yula" })}
+          aria-label={t("change_agent_aria")}
           className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-muted/60"
         >
           <DockAgentIcon agentId={currentId} />
@@ -230,12 +230,12 @@ function DockAgentSwitch() {
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1">
         <Command>
-          <CommandInput placeholder="Ajan ara…" className="text-xs" />
+          <CommandInput placeholder={t("agent_search")} className="text-xs" />
           <CommandList>
-            <CommandEmpty>Sonuç yok.</CommandEmpty>
+            <CommandEmpty>{t("no_results")}</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                value="Yula varsayılan"
+                value={t("agent_default")}
                 onSelect={() => select(null)}
                 className="flex cursor-pointer items-center gap-2 text-xs"
               >

@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Check, Copy } from "lucide-react"
 import { createHighlighter, type Highlighter } from "shiki"
+import { useTranslations } from "next-intl"
 import { useTheme } from "@/context/theme-context"
 import { cn } from "@/utils/cn"
 import { copyToClipboard } from "@/lib/clipboard"
@@ -37,6 +38,7 @@ export function CodeBlock({
   const theme = isDark ? "dark-plus" : "light-plus"
   const [html, setHtml] = React.useState("")
   const [copied, setCopied] = React.useState(false)
+  const t = useTranslations("CodeBlock")
 
   const handleCopy = React.useCallback(
     async (e: React.MouseEvent) => {
@@ -82,7 +84,7 @@ export function CodeBlock({
         <button
           type="button"
           onClick={handleCopy}
-          title={copied ? "Kopyalandı" : "Kodu / JSON'ı Kopyala"}
+          title={copied ? t("copied") : t("copy")}
           className="absolute top-1.5 right-1.5 z-10 inline-flex items-center justify-center p-1 rounded-md border-0 bg-transparent text-muted-foreground/70 opacity-0 transition-all hover:bg-muted/40 hover:text-foreground group-hover/codeblock:opacity-100 cursor-pointer backdrop-blur-xs"
         >
           {copied ? (

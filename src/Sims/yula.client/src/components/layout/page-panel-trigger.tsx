@@ -8,6 +8,7 @@ import {
   DEFAULT_PAGE_PANEL,
   usePagePanelContext,
 } from "@/context/page-panel-context"
+import { useTranslations } from "next-intl"
 import { cn } from "@/utils/cn"
 
 type PagePanelTriggerProps = {
@@ -25,12 +26,13 @@ export function PagePanelTrigger({
   separatorClassName,
 }: PagePanelTriggerProps) {
   const { registered, openById, setOpen } = usePagePanelContext()
+  const t = useTranslations("PagePanelTrigger")
 
   const panel = registered ?? DEFAULT_PAGE_PANEL
   const open = openById[panel.id] ?? panel.defaultOpen
   const label = open
-    ? `${panel.title} panelini kapat`
-    : `${panel.title} panelini aç`
+    ? t("close_panel", { title: panel.title })
+    : t("open_panel", { title: panel.title })
 
   return (
     <>

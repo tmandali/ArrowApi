@@ -75,7 +75,7 @@ export function YulaAgentCards({
               onClick={() => {
                 router.push(agentSessionPath(a.id));
               }}
-              title={`${a.name} ile ayrı oturumda konuş`}
+              title={t("agent_session", { name: a.name })}
               className={cn(
                 "group relative flex items-start gap-3 rounded-xl p-3.5 text-left transition-colors duration-200",
                 isLanding
@@ -144,7 +144,7 @@ export function YulaAgentCards({
                   </span>
                 </div>
                 <p className={cn("mt-0.5 text-[11px] line-clamp-2 leading-relaxed", isLanding ? "text-muted-foreground/70" : "text-muted-foreground")}>
-                  {a.description || "Özel ajan kimliği"}
+                  {a.description || t("agent_identity_fallback")}
                 </p>
                 {a.model && !isLanding ? (
                   <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/70">
@@ -169,7 +169,7 @@ export function YulaAgentCards({
                 Yeni ajan
               </h3>
               <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                Talimat + araç + skill setiyle kendi kimliğini tanımla
+                {t("agent_identity_desc")}
               </p>
             </div>
           </button>

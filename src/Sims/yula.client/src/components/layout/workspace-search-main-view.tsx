@@ -196,7 +196,7 @@ function SearchResultRow({
             variant="outline"
             className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1"
           >
-            <Sparkles className="size-2.5" /> %{item.score} Eşleşme
+            <Sparkles className="size-2.5" /> {t("match_score", { score: item.score })}
           </Badge>
         ) : null}
 
@@ -459,13 +459,11 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
                   </p>
                 )}
                 <p className="max-w-[360px] text-[11.5px] text-muted-foreground/75 leading-relaxed text-center">
-                  {t("search_hint")} (ör:{" "}
-                  {config.examples.map((ex, i) => (
-                    <React.Fragment key={ex}>
-                      {i > 0 ? ", " : ""}
-                      <span className="text-primary font-medium">"{ex}"</span>
-                    </React.Fragment>
-                  ))}). {t("menus_label").toLowerCase()} sol kolon, {t("chats_label").toLowerCase()} sağ kolon eşleşmeleri listeler.
+                  {t("search_hint")} {t("examples_sentence", {
+                    examples: config.examples.map((ex) => `"${ex}"`).join(", "),
+                    menus: t("menus_label"),
+                    chats: t("chats_label"),
+                  })}
                 </p>
               </div>
             </div>

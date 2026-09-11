@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react"
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -435,8 +435,10 @@ function AIChatPanelSession({
 
   const mounted = useMounted()
   const now = React.useMemo(() => new Date(), [])
-  const greeting = mounted ? greetingFor(now) : t("greeting")
-  const dateLabel = mounted ? formatDate(now) : null
+  const tGreet = useTranslations("Greeting")
+  const locale = useLocale()
+  const greeting = mounted ? greetingFor(now, tGreet) : t("greeting")
+  const dateLabel = mounted ? formatDate(now, locale) : null
 
   const workspaceLabel = workspaceLabelFromPath(pathname)
   // Karşılama ekranı workspace kökünde (ör. /stock) workspace'in kendi ikonunu

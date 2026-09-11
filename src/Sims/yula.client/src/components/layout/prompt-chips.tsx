@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { MoreHorizontal } from "lucide-react"
+import { useTranslations } from "next-intl"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,7 @@ export function PromptChipsRow({
   const wrapRef = React.useRef<HTMLDivElement>(null)
   const measureRefs = React.useRef<Array<HTMLButtonElement | null>>([])
   const [availW, setAvailW] = React.useState<number | null>(null)
+  const t = useTranslations("PromptChips")
   const [widths, setWidths] = React.useState<number[] | null>(null)
 
   React.useEffect(() => {
@@ -144,8 +146,8 @@ export function PromptChipsRow({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label={`${hidden.length} öneri daha`}
-              title={`${hidden.length} öneri daha`}
+              aria-label={t("more_suggestions", { count: hidden.length })}
+              title={t("more_suggestions", { count: hidden.length })}
               className={cn(chipClass, "shrink-0 px-2")}
             >
               <MoreHorizontal className="size-3.5 text-muted-foreground" />

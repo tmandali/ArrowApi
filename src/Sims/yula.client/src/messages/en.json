@@ -717,7 +717,10 @@
         "title_trail": "Planning",
         "description": "Production plans, work orders, BOM and product recipes"
       }
-    }
+    },
+    "agent_session": "Start a separate session with {name}",
+    "agent_identity_fallback": "Custom agent identity",
+    "agent_identity_desc": "Define your own identity with a prompt + tools + skills"
   },
   "HistorySidebar": {
     "search_ph": "Search screen conversations...",
@@ -734,7 +737,9 @@
     "group_yesterday": "Yesterday",
     "group_last_week": "Last Week",
     "group_older": "Older",
-    "screen_placeholder": "This Screen"
+    "screen_placeholder": "This Screen",
+    "confirm_yes": "Yes",
+    "confirm_no": "No"
   },
   "SearchMainView": {
     "save": "Save",
@@ -755,7 +760,10 @@
     "chats_label": "Chat History",
     "no_chats_found": "No conversations found.",
     "no_chats_yet": "No conversations yet.",
-    "click_or_enter": "Click or press Enter to navigate"
+    "click_or_enter": "Click or press Enter to navigate",
+    "match_score": "{score}% Match",
+    "items_count": "{count} items",
+    "examples_sentence": "(e.g. {examples}). Left column lists {menus} matches; right column lists {chats} matches."
   },
   "NavUser": {
     "company_label": "Company",
@@ -793,7 +801,12 @@
     "continue_main": "Continue in main screen",
     "toggle_history_show": "Show Chat History",
     "toggle_history_hide": "Hide Chat History",
-    "close_panel": "Close panel"
+    "close_panel": "Close panel",
+    "agent_search": "Search agents…",
+    "no_results": "No results.",
+    "agent_default": "Yula default",
+    "change_agent_tooltip": "{name} — change agent",
+    "change_agent_aria": "Change agent"
   },
   "PinnedItems": {
     "unpin": "Unpin"
@@ -1257,5 +1270,40 @@
     "apply_criteria_desc": "Apply these suggested criteria to the criteria table on screen",
     "criteria_applied": "(Applied to Criteria ✓)",
     "criteria_apply": "(Apply to Criteria)"
+  },
+  "Welcome": {
+    "description": "Yula means the light that guides. Here to help you"
+  },
+  "CodeBlock": {
+    "copy": "Copy code / JSON",
+    "copied": "Copied"
+  },
+  "PromptChips": {
+    "more_suggestions": "{count} more suggestions"
+  },
+  "ToolResultTable": {
+    "yes": "Yes",
+    "no": "No",
+    "custom_query_label": "Yula AI Custom Query",
+    "records_listed": "{count} records listed",
+    "show_main_table": "Show in Main Table"
+  },
+  "CompanySwitch": {
+    "title": "Company switch",
+    "preparing": "Preparing company context…",
+    "remounting": "Workspace is reloading…",
+    "loading": "Modules are lazy-loading…",
+    "finishing": "Finishing the switch…"
+  },
+  "PagePanelTrigger": {
+    "open_panel": "Open {title} panel",
+    "close_panel": "Close {title} panel"
+  },
+  "Greeting": {
+    "night": "Good night",
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening",
+    "fallback": "Welcome"
   }
 }

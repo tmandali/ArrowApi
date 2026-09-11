@@ -310,13 +310,13 @@ export function YulaQuestionnaireCard({
                 }
               />
             </QuestionnaireChoices>
-            <QuestionnaireError />
+            <QuestionnaireError>{L("Bu soruyu cevaplayın veya atlayın.", "Answer this question or skip.")}</QuestionnaireError>
           </QuestionnaireItem>
         ))}
         <QuestionnaireActions>
-          <QuestionnairePrevious />
-          <QuestionnaireSkip />
-          <QuestionnaireNext />
+          <QuestionnairePrevious>{L("Geri", "Back")}</QuestionnairePrevious>
+          <QuestionnaireSkip>{L("Atla", "Skip")}</QuestionnaireSkip>
+          <QuestionnaireNext>{L("İleri", "Next")}</QuestionnaireNext>
           <span className="flex-1" />
           <QuestionnaireSubmit>{L("Gönder", "Send")}</QuestionnaireSubmit>
         </QuestionnaireActions>
