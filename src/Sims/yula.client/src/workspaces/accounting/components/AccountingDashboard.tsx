@@ -2,12 +2,18 @@
 
 import * as React from "react";
 import { BarChart2Icon } from "lucide-react";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landing";
 
 export function AccountingDashboard() {
   return (
-    <WorkspacePageShell hideHeader>
+    <WorkspacePageShell
+      title={<PageHeaderTitle>Accounting Dashboard</PageHeaderTitle>}
+      showSearch={false}
+      transparentHeader
+      navOverlay
+    >
       <BlankWorkspaceLanding
         withoutShell
         title="Accounting Dashboard"

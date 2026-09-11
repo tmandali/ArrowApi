@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
 import {
@@ -40,7 +41,7 @@ export interface WorkspaceLandingTemplateProps {
   withoutShell?: boolean;
   /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
   navMenuHeaderVisible?: boolean;
-  /** Menü kapalıyken sol üstte açma butonunun görünürlüğü (varsayılan: true). */
+  /** Menü kapalıyken sol üstte açma butonu (varsayılan: false — header'daki toggle yeter). */
   floatingOpenButton?: boolean;
 }
 
@@ -435,9 +436,14 @@ export function WorkspaceLandingTemplate({
 
   return (
     <WorkspacePageShell
-      hideHeader
+      title={<PageHeaderTitle>{data.greetingTitle}</PageHeaderTitle>}
+      showSearch={false}
+      transparentHeader
+      navOverlay
       navMenuHeaderVisible={navMenuHeaderVisible}
-      floatingOpenButton={floatingOpenButton}
+      // Header'daki PagePanelTrigger menüyü açıp kapatır — overlay
+      // pane'in ikinci (yüzen) açma butonu render edilmez.
+      floatingOpenButton={floatingOpenButton ?? false}
     >
       {content}
     </WorkspacePageShell>
@@ -451,7 +457,7 @@ export interface BlankWorkspaceLandingProps {
   withoutShell?: boolean;
   /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
   navMenuHeaderVisible?: boolean;
-  /** Menü kapalıyken sol üstte açma butonunun görünürlüğü (varsayılan: true). */
+  /** Menü kapalıyken sol üstte açma butonu (varsayılan: false — header'daki toggle yeter). */
   floatingOpenButton?: boolean;
 }
 

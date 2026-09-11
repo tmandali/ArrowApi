@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { indexWorkspaceMenus } from "@/services/duckdb-vector";
 import { StockDashboard } from "./StockDashboard";
@@ -12,7 +13,12 @@ export function StockPageForm() {
   }, []);
 
   return (
-    <WorkspacePageShell hideHeader>
+    <WorkspacePageShell
+      title={<PageHeaderTitle>Stock Dashboard</PageHeaderTitle>}
+      showSearch={false}
+      transparentHeader
+      navOverlay
+    >
       <StockDashboard />
     </WorkspacePageShell>
   );

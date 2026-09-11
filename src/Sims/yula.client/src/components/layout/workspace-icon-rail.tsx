@@ -13,7 +13,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
-import { useWorkspaceLastPageStore } from "@/lib/stores/workspace-last-page"
 import { getRailWorkspaces } from "@/lib/workspace-registry"
 import { cn } from "@/utils/cn"
 
@@ -25,7 +24,6 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const activeWorkspaceId = useActiveWorkspaceId()
-  const lastPathById = useWorkspaceLastPageStore((s) => s.lastPathById)
   const railWorkspaces = getRailWorkspaces()
 
   return (
@@ -62,28 +60,24 @@ export function WorkspaceIconRail({ className }: { className?: string }) {
                   aria-label={workspace.name}
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => {
-                    // Bayat / bozuk localStorage kaydını temizle: last path bu workspace'e ait değilse kullanma
-                    const rawLast = lastPathById[workspace.id]
-                    const validLast =
-                      rawLast && rawLast.startsWith(`/${workspace.id}`)
-                        ? rawLast
-                        : undefined
-
-                    const target = validLast ?? workspace.url
-
-                    if (pathname !== target) {
-                      router.push(target)
-                    } else if (pathname === `/${workspace.id}`) {
-                      router.push(`/${workspace.id}/dashboard`)
+                    // Rail ikonları her zaman workspace landing sayfasını açar (kaldığı yerden devam yok)
+                    if (pathname !== workspace.url) {
+                      router.push(workspace.url)
                     }
                   }}
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                    "relative flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
+                      ? "border border-transparent bg-transparent text-primary dark:text-sidebar-primary"
                       : "border border-transparent bg-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   )}
                 >
+                  {isActive ? (
+                    <span
+                      aria-hidden
+                      className="absolute top-1/2 -left-[7px] h-5 w-1 -translate-y-1/2 rounded-full bg-primary"
+                    />
+                  ) : null}
                   {WorkspaceIcon ? <WorkspaceIcon className="size-5" /> : null}
                 </button>
               </TooltipTrigger>
