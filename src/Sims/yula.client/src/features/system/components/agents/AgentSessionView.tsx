@@ -128,6 +128,7 @@ function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
 export function AgentSessionView() {
   const params = useParams<{ agentId?: string | string[] }>();
   const router = useRouter();
+  const t = useTranslations("AgentSession");
   const raw = params?.agentId;
   const agentId = Array.isArray(raw) ? raw[0] : (raw ?? "");
   const agent = useUserAgentsStore((s) => s.agents.find((a) => a.id === agentId));
@@ -154,7 +155,7 @@ export function AgentSessionView() {
     return (
       <WorkspacePageShell hideHeader>
         <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
-          Ajan oturumu hazırlanıyor…
+          {t("preparing")}
         </div>
       </WorkspacePageShell>
     );
@@ -165,9 +166,9 @@ export function AgentSessionView() {
       <WorkspacePageShell hideHeader>
         <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-3 px-4 pt-20 text-center">
           <Bot className="size-10 text-muted-foreground/50" />
-          <h1 className="text-lg font-semibold">Ajan bulunamadı</h1>
+          <h1 className="text-lg font-semibold">{t("not_found_title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Bu kimlikte bir ajan yok (silinmiş olabilir). Ajan listesinden yenisini seçin.
+            {t("not_found_body")}
           </p>
           <div className="flex gap-2">
             <button
@@ -175,13 +176,13 @@ export function AgentSessionView() {
               onClick={() => router.push("/")}
               className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted"
             >
-              Yula&apos;ya dön
+              {t("back_to_yula")}
             </button>
             <Link
               href="/system/agents"
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
             >
-              Ajanları yönet
+              {t("manage_agents")}
             </Link>
           </div>
         </div>

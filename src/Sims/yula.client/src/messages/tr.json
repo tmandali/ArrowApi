@@ -265,7 +265,18 @@
     "delete_agent": "Ajanı sil",
     "empty_state": "Henüz ajan yok — Yeni Ajan ile tanımlayın.",
     "records": "kayıt",
-    "no_records": "kayıt yok"
+    "no_records": "kayıt yok",
+    "open_session": "Oturumu aç",
+    "back_to_default": "Varsayılana dön",
+    "new_agent": "Yeni ajan",
+    "new": "Yeni",
+    "cancel": "Vazgeç",
+    "save": "Kaydet",
+    "agent": "Ajan",
+    "tool_count": "{count} araç",
+    "skill_count": "{count} skill",
+    "no_selection": "Seçim yok",
+    "empty_detail": "Soldan bir ajan seçin veya + ile oluşturun."
   },
   "WorkspaceSearch": {
     "search_accounting": "Muhasebe & finans modüllerini ve sohbet geçmişini ara...",
@@ -339,7 +350,8 @@
     "explain_columns": "Kolonları Açıkla",
     "explain_columns_prompt": "Bu raporun kolonlarını açıkla",
     "clear_filters": "Filtreleri Temizle",
-    "clear_filters_prompt": "Aktif filtreleri temizle ve tabloyu sıfırla"
+    "clear_filters_prompt": "Aktif filtreleri temizle ve tabloyu sıfırla",
+    "prepare_prompt": "{title} hazırla"
   },
   "AgentEditor": {
     "name_clashes_with_command": "\"{{name}}\" bir komut adıyla çakışıyor — başka ad seçin.",
@@ -394,5 +406,33 @@
     "yula_description": "Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada",
     "works_in_all_workspaces": "Tüm çalışma alanlarında çalışır",
     "inference_identity": "Ajanın kullandığı çıkarım kimliği (pin > genel ayar)"
+  },
+  "AgentSession": {
+    "preparing": "Ajan oturumu hazırlanıyor…",
+    "not_found_title": "Ajan bulunamadı",
+    "not_found_body": "Bu kimlikte bir ajan yok (silinmiş olabilir). Ajan listesinden yenisini seçin.",
+    "back_to_yula": "Yula'ya dön",
+    "manage_agents": "Ajanları yönet"
+  },
+  "AgentImageUpload": {
+    "only_image": "Yalnızca görsel dosyası yüklenebilir.",
+    "too_large": "Görsel {size}KB'tan büyük olamaz.",
+    "unreadable": "\"{name}\" okunamadı.",
+    "image_name": "Ajan görseli",
+    "svg_upload": "SVG yükle",
+    "change_image": "Görseli değiştir",
+    "upload_image": "Görsel yükle",
+    "or_drag": "veya sürükle-bırak",
+    "remove_image": "Görseli kaldır"
+  },
+  "Dashboards": {
+    "accounting_title": "Muhasebe Paneli",
+    "accounting_description": "Bilanço, gelir tablosu, nakit akışı, genel mizan ve finansal ekstreler özet panosu.",
+    "selling_title": "Satış Paneli",
+    "selling_description": "Satış siparişleri, müşteri teklifleri, faturalar ve satış analitiği özet panosu.",
+    "manufacturing_title": "Üretim Paneli",
+    "manufacturing_description": "Üretim planları, iş emirleri, ürün reçeteleri (BOM), iş kartları ve kapasite özet panosu.",
+    "subcontracting_title": "Fason Paneli",
+    "subcontracting_description": "Fason üretim emirleri, dış tedarik ve fason teslimat rotalama özet panosu."
   }
 }

@@ -265,7 +265,18 @@
     "delete_agent": "Delete agent",
     "empty_state": "No agents yet — define one with New Agent.",
     "records": "records",
-    "no_records": "no records"
+    "no_records": "no records",
+    "open_session": "Open session",
+    "back_to_default": "Back to default",
+    "new_agent": "New agent",
+    "new": "New",
+    "cancel": "Cancel",
+    "save": "Save",
+    "agent": "Agent",
+    "tool_count": "{count, plural, one {# tool} other {# tools}}",
+    "skill_count": "{count, plural, one {# skill} other {# skills}}",
+    "no_selection": "No selection",
+    "empty_detail": "Pick an agent from the left or create one with +."
   },
   "WorkspaceSearch": {
     "search_accounting": "Search accounting & finance modules and chat history...",
@@ -339,7 +350,8 @@
     "explain_columns": "Explain Columns",
     "explain_columns_prompt": "Explain the columns of this report",
     "clear_filters": "Clear Filters",
-    "clear_filters_prompt": "Clear active filters and reset the table"
+    "clear_filters_prompt": "Clear active filters and reset the table",
+    "prepare_prompt": "Prepare {title}"
   },
   "AgentEditor": {
     "name_clashes_with_command": "The name \"{{name}}\" clashes with a command — please choose another.",
@@ -394,5 +406,33 @@
     "yula_description": "Yula comes with the meaning of giving direction and light. Here to help you.",
     "works_in_all_workspaces": "Works in all workspaces",
     "inference_identity": "Inference identity used by the agent (pin > general settings)"
+  },
+  "AgentSession": {
+    "preparing": "Preparing agent session…",
+    "not_found_title": "Agent not found",
+    "not_found_body": "No agent exists with this id (it may have been deleted). Pick a new one from the agent list.",
+    "back_to_yula": "Back to Yula",
+    "manage_agents": "Manage agents"
+  },
+  "AgentImageUpload": {
+    "only_image": "Only image files can be uploaded.",
+    "too_large": "Image cannot be larger than {size}KB.",
+    "unreadable": "Could not read \"{name}\".",
+    "image_name": "Agent image",
+    "svg_upload": "Upload SVG",
+    "change_image": "Change image",
+    "upload_image": "Upload image",
+    "or_drag": "or drag & drop",
+    "remove_image": "Remove image"
+  },
+  "Dashboards": {
+    "accounting_title": "Accounting Dashboard",
+    "accounting_description": "Summary dashboard for balance sheet, income statement, cash flow, general ledger and financial extracts.",
+    "selling_title": "Selling Dashboard",
+    "selling_description": "Summary dashboard for sales orders, customer quotations, invoices and sales analytics.",
+    "manufacturing_title": "Manufacturing Dashboard",
+    "manufacturing_description": "Summary dashboard for production plans, work orders, product recipes (BOM), job cards and capacity.",
+    "subcontracting_title": "Subcontracting Dashboard",
+    "subcontracting_description": "Summary dashboard for subcontracting production orders, external sourcing and delivery routing."
   }
 }

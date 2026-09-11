@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { ImageIcon, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { USER_AGENT_AVATAR_MAX_BYTES } from "@/lib/yula-user-agent";
@@ -20,10 +21,10 @@ type AgentImageUploadProps = {
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`"${file.name}" okunamadı.`));
+    reader.onerror = () => reject(new Error("unreadable"));
     reader.onload = () => {
       if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error(`"${file.name}" okunamadı.`));
+      else reject(new Error("unreadable"));
     };
     reader.readAsDataURL(file);
   });
@@ -33,7 +34,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 function downscaleRaster(dataUrl: string, maxDim = 256): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onerror = () => reject(new Error("Görsel işlenemedi."));
+    img.onerror = () => reject(new Error("process_failed"));
     img.onload = () => {
       const scale = Math.min(
         1,
@@ -70,6 +71,7 @@ export function AgentImageUpload({
 }: AgentImageUploadProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const t = useTranslations("AgentImageUpload");
 
   const applyFile = React.useCallback(
     (file: File | undefined) => {
@@ -78,12 +80,12 @@ export function AgentImageUpload({
       const looksImage =
         file.type.startsWith("image/") || /\.svg$/i.test(file.name.trim());
       if (!looksImage) {
-        onError?.("Yalnızca görsel dosyası yüklenebilir.");
+        onError?.(t("only_image"));
         return;
       }
       if (file.size > USER_AGENT_AVATAR_MAX_BYTES) {
         onError?.(
-          `Görsel ${Math.round(USER_AGENT_AVATAR_MAX_BYTES / 1024)}KB'tan büyük olamaz.`,
+          t("too_large", { size: Math.round(USER_AGENT_AVATAR_MAX_BYTES / 1024) }),
         );
         return;
       }
@@ -95,14 +97,12 @@ export function AgentImageUpload({
           // Raster görseller 256px'e indirilir (localStorage kotası için);
           // SVG vektör olduğu için aynen saklanır.
           onChange(isSvg ? dataUrl : await downscaleRaster(dataUrl));
-        } catch (err) {
-          onError?.(
-            err instanceof Error ? err.message : `"${file.name}" okunamadı.`,
-          );
+        } catch {
+          onError?.(t("unreadable", { name: file.name }));
         }
       })();
     },
-    [disabled, onChange, onError],
+    [disabled, onChange, onError, t],
   );
 
   const clearImage = React.useCallback(() => {
@@ -132,7 +132,7 @@ export function AgentImageUpload({
       <div
         role={disabled ? undefined : "button"}
         tabIndex={disabled ? undefined : 0}
-        aria-label="Ajan görseli"
+        aria-label={t("image_name")}
         onClick={openPicker}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -173,13 +173,13 @@ export function AgentImageUpload({
         {value ? (
           <AgentAvatar
             value={value}
-            name="Ajan görseli"
+            name={t("image_name")}
             className="size-full rounded-lg"
           />
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <ImageIcon className="size-8 opacity-60" />
-            <span className="text-[11px]">SVG yükle</span>
+            <span className="text-[11px]">{t("svg_upload")}</span>
           </div>
         )}
 
@@ -192,9 +192,9 @@ export function AgentImageUpload({
           >
             <Upload className="size-5" />
             <span className="text-xs font-medium">
-              {value ? "Görseli değiştir" : "Görsel yükle"}
+              {value ? t("change_image") : t("upload_image")}
             </span>
-            <span className="text-[10px] text-white/80">veya sürükle-bırak</span>
+            <span className="text-[10px] text-white/80">{t("or_drag")}</span>
           </div>
         ) : null}
       </div>
@@ -210,7 +210,7 @@ export function AgentImageUpload({
               event.stopPropagation();
               clearImage();
             }}
-            title="Görseli kaldır"
+            title={t("remove_image")}
           >
             <Trash2 className="size-3.5" />
           </Button>

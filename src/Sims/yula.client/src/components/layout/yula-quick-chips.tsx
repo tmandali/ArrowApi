@@ -15,8 +15,19 @@ export interface QuickChip {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
+/** Sonuç evresi şablonu — labelKey QuickChips ad alanına aittir. */
+type ResultChipTemplate = {
+  labelKey:
+    | "top5_charts"
+    | "anomaly_risk"
+    | "sql_analysis"
+    | "explain_columns"
+    | "clear_filters";
+  icon?: React.ComponentType<{ className?: string }>;
+};
+
 /** Sonuç evresi — slash komutlarıyla aynı iş (grid açıkken). Anomali = /analiz. */
-const RESULT_CHIPS_TEMPLATE: Omit<QuickChip, "prompt">[] = [
+const RESULT_CHIPS_TEMPLATE: ResultChipTemplate[] = [
   { labelKey: "top5_charts", icon: BarChart2 },
   { labelKey: "anomaly_risk", icon: AlertTriangle },
   { labelKey: "sql_analysis", icon: Database },
@@ -47,7 +58,7 @@ export function YulaQuickActionChips() {
       (r) => path !== r.pagePath && !path.startsWith(`${r.pagePath}/`),
     ).map<QuickChip>((r) => ({
       label: r.title,
-      prompt: `${r.title} hazırla`,
+      prompt: t("prepare_prompt", { title: r.title }),
       icon: Package,
     }))
   }, [isViewingResults, pathname, t])

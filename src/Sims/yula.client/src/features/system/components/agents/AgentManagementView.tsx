@@ -93,10 +93,10 @@ export function AgentManagementView() {
 
   const detailTitle =
     selection == null
-      ? "Seçim yok"
+      ? t("no_selection")
       : selection.id != null
-        ? (selectedAgent?.name ?? "Ajan")
-        : "Yeni ajan";
+        ? (selectedAgent?.name ?? t("agent"))
+        : t("new_agent");
 
   const detailTabs: TabbedDetailTab[] = React.useMemo(
     () => [
@@ -136,7 +136,7 @@ export function AgentManagementView() {
                         router.push(agentSessionPath(selectedAgent.id));
                       }}
                     >
-                      Oturumu aç
+                      {t("open_session")}
                     </Button>
                   ) : (
                   <Button
@@ -146,7 +146,7 @@ export function AgentManagementView() {
                     className="h-7 px-2.5 text-[11.5px]"
                     onClick={() => setActiveAgentId(null)}
                   >
-                    Varsayılana dön
+                    {t("back_to_default")}
                   </Button>
                   )}
                 </>
@@ -194,15 +194,15 @@ export function AgentManagementView() {
                     setSelection({ id: null });
                   }
                 }}
-                title={isNewMode ? "Cancel" : "New agent"}
-                aria-label={isNewMode ? "Cancel" : "New agent"}
+                title={isNewMode ? t("cancel") : t("new_agent")}
+                aria-label={isNewMode ? t("cancel") : t("new_agent")}
               >
                 {isNewMode ? (
                   <X className="size-3.5" />
                 ) : (
                   <FilePlus2 className="size-3.5" />
                 )}
-                {isNewMode ? "Cancel" : "New"}
+                {isNewMode ? t("cancel") : t("new")}
               </Button>
             );
           })()}
@@ -220,7 +220,7 @@ export function AgentManagementView() {
                 ) : (
                   <Check className="size-3.5" />
                 )}
-                Kaydet
+                {t("save")}
               </Button>
           ) : null}
           <AIChatAssistant />
@@ -298,10 +298,10 @@ export function AgentManagementView() {
                           if (a.description) return a.description;
                           const parts: string[] = [];
                           if (a.tools.length > 0) {
-                            parts.push(`${a.tools.length} araç`);
+                            parts.push(t("tool_count", { count: a.tools.length }));
                           }
                           if (a.skills.length > 0) {
-                            parts.push(`${a.skills.length} skill`);
+                            parts.push(t("skill_count", { count: a.skills.length }));
                           }
                           return parts.join(" · ");
                         })()}
@@ -326,10 +326,10 @@ export function AgentManagementView() {
         if (!selectedAgent) return undefined;
         const parts: string[] = [];
         if (selectedAgent.tools.length > 0) {
-          parts.push(`${selectedAgent.tools.length} araç`);
+          parts.push(t("tool_count", { count: selectedAgent.tools.length }));
         }
         if (selectedAgent.skills.length > 0) {
-          parts.push(`${selectedAgent.skills.length} skill`);
+          parts.push(t("skill_count", { count: selectedAgent.skills.length }));
         }
         if (parts.length === 0) return undefined;
         return (
@@ -343,7 +343,7 @@ export function AgentManagementView() {
         <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 text-center">
           <Filter className="size-5 text-muted-foreground/50" />
           <p className="max-w-60 text-[12px] text-muted-foreground">
-            Soldan bir ajan seçin veya + ile oluşturun.
+            {t("empty_detail")}
           </p>
         </div>
       }
