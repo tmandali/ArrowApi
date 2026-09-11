@@ -61,7 +61,7 @@ export function YulaAgentCards({
       ) : (
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-            Ajanlar (Agents)
+            {t("agents_title")}
           </h2>
         </div>
       )}

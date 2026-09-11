@@ -131,7 +131,7 @@ export function SkillManagementView() {
     <ManagementPageTemplate
       title={
         <>
-          Skill Ayarları
+          {t("title")}
           {selection != null ? (
             <span className="font-normal text-muted-foreground">
               {" "}
@@ -158,11 +158,11 @@ export function SkillManagementView() {
               size="sm"
               className="h-7 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => editorRef.current?.remove()}
-              title="Skill'i sil"
-              aria-label="Skill'i sil"
+              title={t("delete_skill")}
+              aria-label={t("delete_skill")}
             >
               <Trash2 className="size-3.5" />
-              Delete
+              {t("delete_skill")}
             </Button>
           ) : null}
           {(() => {
@@ -195,7 +195,7 @@ export function SkillManagementView() {
                 ) : (
                   <FilePlus2 className="size-3.5" />
                 )}
-                {isNewMode ? "Cancel" : "New"}
+                {isNewMode ? t("cancel") : t("new_skill")}
               </Button>
             );
           })()}
@@ -208,7 +208,7 @@ export function SkillManagementView() {
               onClick={() => editorRef.current?.save()}
             >
               <Check className="size-3.5" />
-              Kaydet
+              {t("save")}
             </Button>
           ) : null}
           <AIChatAssistant />
@@ -216,24 +216,24 @@ export function SkillManagementView() {
       }
       listHeader={
         <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md bg-muted/50 p-0.5">
-          {(["user", "system"] as const).map((t) => (
+          {(["user", "system"] as const).map((opt) => (
             <button
-              key={t}
+              key={opt}
               type="button"
               onClick={() => {
-                setTab(t);
+                setTab(opt);
                 setSelection(null);
               }}
               className={cn(
                 "flex-1 rounded-md px-2 py-1 text-[11.5px] font-medium capitalize transition-colors",
-                tab === t
+                tab === opt
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {t === "user"
-                ? `User (${userSkills.length})`
-                : `System (${systemSkills.length})`}
+              {opt === "user"
+                ? `${t("user_tab")} (${userSkills.length})`
+                : `${t("system_tab")} (${systemSkills.length})`}
             </button>
           ))}
         </div>

@@ -721,7 +721,8 @@
     "agent_session": "{name} ile ayrı oturumda konuş",
     "agent_identity_fallback": "Özel ajan kimliği",
     "agent_identity_desc": "Talimat + araç + skill setiyle kendi kimliğini tanımla",
-    "edit_agent": "{name} — düzenle"
+    "edit_agent": "{name} — düzenle",
+    "agents_title": "Ajanlar"
   },
   "HistorySidebar": {
     "search_ph": "Ekran sohbetlerinde ara...",
@@ -1038,7 +1039,11 @@
     "no_skills_yet": "Henüz kullanıcı skill''i yok — Yeni Skill ile tanımlayın.",
     "select_or_create": "Soldan bir skill seçin veya + ile oluşturun.",
     "delete_skill": "Skill''i sil",
-    "delete_skill_aria": "/{slash} skill''ini sil"
+    "delete_skill_aria": "/{slash} skill''ini sil",
+    "title": "Skill Ayarları",
+    "save": "Kaydet",
+    "user_tab": "Kullanıcı",
+    "system_tab": "Sistem"
   },
   "ChatAssistant": {
     "greeting": "Hoş geldiniz",

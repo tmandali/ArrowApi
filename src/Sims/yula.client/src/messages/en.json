@@ -721,7 +721,8 @@
     "agent_session": "Start a separate session with {name}",
     "agent_identity_fallback": "Custom agent identity",
     "agent_identity_desc": "Define your own identity with a prompt + tools + skills",
-    "edit_agent": "Edit {name}"
+    "edit_agent": "Edit {name}",
+    "agents_title": "Agents"
   },
   "HistorySidebar": {
     "search_ph": "Search screen conversations...",
@@ -1038,7 +1039,11 @@
     "no_skills_yet": "No user skills yet — define one with New Skill.",
     "select_or_create": "Select a skill from the left or create one with +",
     "delete_skill": "Delete skill",
-    "delete_skill_aria": "Delete /{slash} skill"
+    "delete_skill_aria": "Delete /{slash} skill",
+    "title": "Skill Settings",
+    "save": "Save",
+    "user_tab": "User",
+    "system_tab": "System"
   },
   "ChatAssistant": {
     "greeting": "Welcome",
