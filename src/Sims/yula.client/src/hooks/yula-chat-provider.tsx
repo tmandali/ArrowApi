@@ -1661,13 +1661,41 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   const isThinkingEnabled = useChatsStore((s) => s.isThinkingEnabled);
   const setThinkingEnabled = useChatsStore((s) => s.setThinkingEnabled);
 
-  const value = React.useMemo<YulaChatContextValue | null>(() => {
+  const value = React.useMemo<YulaChatContextValue>(() => {
     void helpersVersion; // sig/bump tetikleyicisi — canlı akış tazeliği
-    if (!activeId || !liveHelpers) return null;
+    if (!liveHelpers) {
+      // liveHelpers henüz yüklenmedi: minimal değer döner, panel boş kalır.
+      return {
+        messages: [],
+        status: 'ready',
+        busy: false,
+        stopped: false,
+        conversations,
+        activeId: activeId ?? '',
+        selectConversation: () => {},
+        deleteConversation: () => {},
+        newConversation: () => {},
+        model,
+        setModel: () => {},
+        isThinkingEnabled,
+        setThinkingEnabled: () => {},
+        stop: async () => {},
+        error: undefined,
+        addToolOutput: () => {},
+        isTurnActive: false,
+        responseDurations: {},
+        llmStepCounts: {},
+        streamErrorTexts: {},
+        sendMessageText: () => {},
+        undoToUserMessage: () => undefined,
+        retryResponse: async () => {},
+        runPendingTool: () => {},
+      };
+    }
     return {
       ...liveHelpers,
       conversations,
-      activeId,
+      activeId: activeId ?? '',
       selectConversation,
       deleteConversation,
       newConversation,
@@ -1688,7 +1716,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 	selectConversation,
 	deleteConversation,
 	newConversation
-]);
+  ]);
 
   return (
     <>

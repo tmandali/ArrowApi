@@ -48,6 +48,4 @@ export interface YulaChatContextValue
   llmStepCounts: Record<string, number>;
 }
 
-export const YulaChatContext = React.createContext<YulaChatContextValue | null>(
-  null,
-);
+export const YulaChatContext = React.createContext<YulaChatContextValue>({} as YulaChatContextValue);

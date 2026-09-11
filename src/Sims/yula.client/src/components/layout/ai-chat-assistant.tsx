@@ -42,13 +42,11 @@ import { cn } from "@/utils/cn"
 import {
   ArrowDown,
   ArrowUp,
-  CircleAlert,
   FileCode,
   FileText,
   Globe,
   History,
   Plus,
-  RotateCw,
   Square,
   X,
 } from "lucide-react"
@@ -261,51 +259,12 @@ type AIChatPanelProps = {
   aboveInput?: React.ReactNode
 }
 
-/**
- * Sohbet oturumu (YulaChatContext) henüz hazır değilse panel yerinde bekler:
- * kısa beklemede "hazırlanıyor", ~4 sn'yi aşarsa "yüklenemedi" + yenileme.
- * Uygulama kabuğu bu durumdan BAĞIMSIZ açılır — bekleme yalnız panel içidir.
- */
-function ChatSessionFallback() {
-  const t = useTranslations("ChatAssistant")
-  const [isStuck, setIsStuck] = React.useState(false)
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsStuck(true), 4000)
-    return () => clearTimeout(timer)
-  }, [])
-  if (isStuck) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm">
-        <div className="flex items-center gap-2 font-medium text-destructive">
-          <CircleAlert className="size-4" aria-hidden />
-          <span>{t("app_load_failed")}</span>
-        </div>
-        <p className="max-w-md text-center text-xs opacity-70">
-          {t("session_error_desc")}
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="inline-flex h-8 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium hover:bg-accent"
-        >
-          <RotateCw className="size-3.5" aria-hidden />
-          {t("reload_btn")}
-        </button>
-      </div>
-    )
-  }
-  return (
-    <div className="flex h-full items-center justify-center p-6 text-sm opacity-60">
-      {t("session_preparing")}
-    </div>
-  )
-}
-
 /** Docked or main screen panel body — avatar-free chat box with attach + slash commands. */
 export function AIChatPanel(props: AIChatPanelProps = {}) {
   const session = useOptionalYulaChat()
-  if (!session) {
-    return <ChatSessionFallback />
+  if (!session?.activeId) {
+    // activeId henüz senkron olarak set edilmediyse (ilk render anında) boş panel göster.
+    return null;
   }
   return <AIChatPanelSession {...props} />
 }
