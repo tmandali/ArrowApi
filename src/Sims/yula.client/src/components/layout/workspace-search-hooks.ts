@@ -39,9 +39,11 @@ export function useWorkspaceSearchMeta() {
         ? "stock"
         : pathname.startsWith("/manufacturing")
           ? "manufacturing"
-          : pathname.startsWith("/subcontracting") || pathname.startsWith("/selling")
+          : pathname.startsWith("/subcontracting")
             ? "subcontracting"
-            : "all"
+            : pathname.startsWith("/selling")
+              ? "selling"
+              : "all"
 
   const key =
     workspace === "accounting"
@@ -50,9 +52,11 @@ export function useWorkspaceSearchMeta() {
         ? "search_stock"
         : workspace === "manufacturing"
           ? "search_manufacturing"
-          : workspace === "subcontracting"
-            ? "search_subcontracting"
-            : "search_all"
+          : workspace === "selling"
+            ? "search_selling"
+            : workspace === "subcontracting"
+              ? "search_subcontracting"
+              : "search_all"
 
   const placeholder = t(key)
 

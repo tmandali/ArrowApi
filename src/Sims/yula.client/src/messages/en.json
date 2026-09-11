@@ -760,7 +760,8 @@
     "click_or_enter": "Click or press Enter to navigate",
     "match_score": "{score}% Match",
     "items_count": "{count} items",
-    "examples_sentence": "(e.g. {examples}). Left column lists {menus} matches; right column lists {chats} matches."
+    "examples_sentence": "(e.g. {examples}). Left column lists {menus} matches; right column lists {chats} matches.",
+    "search_scope": "Search scope: {name}"
   },
   "NavUser": {
     "company_label": "Company",
@@ -890,10 +891,11 @@
   },
   "WorkspaceSearch": {
     "search_accounting": "Search accounting & finance modules and chat history...",
-    "search_stock": "Search stock modules and chat history...",
+    "search_all": "Search modules, reports and chat history...",
     "search_manufacturing": "Search manufacturing & BOM modules and chat history...",
-    "search_subcontracting": "Search subcontracting & sales modules and chat history...",
-    "search_all": "Search modules, reports and chat history..."
+    "search_selling": "Search selling modules and chat history...",
+    "search_stock": "Search stock modules and chat history...",
+    "search_subcontracting": "Search subcontracting & sales modules and chat history..."
   },
   "ReportCriteria": {
     "validation_failed": "Validation failed",

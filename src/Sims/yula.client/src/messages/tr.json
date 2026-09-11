@@ -760,7 +760,8 @@
     "click_or_enter": "Gitmek için tıklayın veya Enter''a basın",
     "match_score": "%{score} Eşleşme",
     "items_count": "{count} öğe",
-    "examples_sentence": "(ör: {examples}). Sol kolon {menus} eşleşmelerini, sağ kolon {chats} eşleşmelerini listeler."
+    "examples_sentence": "(ör: {examples}). Sol kolon {menus} eşleşmelerini, sağ kolon {chats} eşleşmelerini listeler.",
+    "search_scope": "Arama kapsamı: {name}"
   },
   "NavUser": {
     "company_label": "Şirket",
@@ -890,10 +891,11 @@
   },
   "WorkspaceSearch": {
     "search_accounting": "Muhasebe & finans modüllerini ve sohbet geçmişini ara...",
-    "search_stock": "Stok modüllerini ve sohbet geçmişini ara...",
+    "search_all": "Modülleri, raporları ve sohbet geçmişini ara...",
     "search_manufacturing": "İmalat & BOM modüllerini ve sohbet geçmişini ara...",
-    "search_subcontracting": "Alt iş & satış modüllerini ve sohbet geçmişini ara...",
-    "search_all": "Modülleri, raporları ve sohbet geçmişini ara..."
+    "search_selling": "Satış modüllerini ve sohbet geçmişini ara...",
+    "search_stock": "Stok modüllerini ve sohbet geçmişini ara...",
+    "search_subcontracting": "Alt iş & satış modüllerini ve sohbet geçmişini ara..."
   },
   "ReportCriteria": {
     "validation_failed": "Doğrulama başarısız",

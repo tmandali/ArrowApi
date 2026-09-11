@@ -222,6 +222,7 @@ function SearchResultRow({
 export function WorkspaceSearchMainView({ className }: { className?: string }) {
   const t = useTranslations("SearchMainView")
   const tCat = useTranslations("SearchCats")
+  const tRail = useTranslations("WorkspaceRail")
   const router = useRouter();
   const { setOpen, query, setQuery } = useWorkspaceSearch();
   const { workspace } = useWorkspaceSearchMeta();
@@ -409,9 +410,11 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
             <Sparkles className="size-3.5 text-amber-500" />
             <span
               className="rounded bg-muted/50 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground/80"
-              title={`Arama kapsamı: ${config.name}`}
+              title={t("search_scope", {
+                name: tRail.has(workspace) ? tRail(workspace) : config.name,
+              })}
             >
-              {config.name}
+              {tRail.has(workspace) ? tRail(workspace) : config.name}
             </span>
             {query.trim() ? (
               <span>{t("search_results", { query })} ({flatItems.length})</span>
