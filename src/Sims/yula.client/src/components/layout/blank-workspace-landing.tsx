@@ -341,6 +341,10 @@ export function WorkspaceLandingTemplate({
                         </span>
                       ) : null}
                     </div>
+                    {/* Hızlı erişim oku: linkli kartlardaki ArrowUpRight deseni (transparent) */}
+                    <div className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary transition-colors">
+                      <ArrowUpRight className="size-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </div>
                   </Link>
                   <button
                     type="button"
@@ -350,7 +354,7 @@ export function WorkspaceLandingTemplate({
                       e.preventDefault();
                       unpinItem(item.id);
                     }}
-                    className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
+                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100 cursor-pointer"
                   >
                     <PinOff className="size-3.5" />
                   </button>
