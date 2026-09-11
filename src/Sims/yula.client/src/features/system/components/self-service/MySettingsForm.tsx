@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell"
@@ -230,6 +230,7 @@ async function putSettingsToApi(snapshot: {
 export function MySettingsForm() {
   const t = useTranslations("MySettings")
   const tc = useTranslations("Common")
+  const locale = useLocale()
   const [isEnabled, setIsEnabled] = React.useState(true)
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false)
   const [documentFollowOpen, setDocumentFollowOpen] = React.useState(false)
@@ -337,6 +338,17 @@ export function MySettingsForm() {
     }
   }, [])
 
+  /**
+   * Dil kaydedildiğinde: cookie'yi senkronize et; hedef locale mevcut sayfadan
+   * farklıysa sayfa yenilensin (UI yeni dile geçsin). Combo değişiminde
+   * otomatik reload YOK — yalnız kayıt anında.
+   */
+  const applyLanguageChange = (lang: ProfileLanguage) => {
+    syncLocaleCookie(lang)
+    const code = lang === "turkish" ? "tr" : "en"
+    if (code !== locale) window.location.reload()
+  }
+
   const handleSaveAiConfig = () => {
     const updated: AiProviderConfig = {
       provider: aiProvider,
@@ -356,7 +368,7 @@ export function MySettingsForm() {
       effort: normalizeEffort(aiThinkingLevel) ?? undefined,
     })
     void saveSecret(aiApiKey)
-    syncLocaleCookie(profileLanguage)
+    applyLanguageChange(profileLanguage)
     void putSettingsToApi({
       email: profileEmail,
       fullName: profileFullName,
@@ -387,7 +399,7 @@ export function MySettingsForm() {
       thinkingLevel: aiThinkingLevel,
       systemFacts,
     })
-    syncLocaleCookie(profileLanguage)
+    applyLanguageChange(profileLanguage)
     setProfileSaved(true)
     setTimeout(() => setProfileSaved(false), 2500)
   }
