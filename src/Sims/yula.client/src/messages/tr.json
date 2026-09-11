@@ -839,20 +839,20 @@
     "aria_audio": "Ses / İşitme (Audio)",
     "aria_mlx": "Apple MLX Donanım İvmesi",
     "model_desc": {
-      "gpt-5.4": "Microsoft Foundation yüksek kapasiteli akıl yürütme modeli",
+      "gpt-5_4": "Microsoft Foundation yüksek kapasiteli akıl yürütme modeli",
       "gpt-4o": "Yüksek hızlı ve çok modlu (multimodal) model",
       "gpt-4o-mini": "Hızlı ve verimli hafif model",
       "o3-mini": "Derin düşünce adımları ve mantık yürütme",
-      "agnes-2.5-flash": "Agnes AI kodlama + agent workflow modeli (512K context)",
-      "agnes-3.0-flash": "Yeni nesil Agnes kodlama + tool orchestration modeli",
-      "agnes-2.5-pro": "İleri akıl yürütme, kodlama ve uzun bağlam analizi",
+      "agnes-2_5-flash": "Agnes AI kodlama + agent workflow modeli (512K context)",
+      "agnes-3_0-flash": "Yeni nesil Agnes kodlama + tool orchestration modeli",
+      "agnes-2_5-pro": "İleri akıl yürütme, kodlama ve uzun bağlam analizi",
       "gemma4:12b-mlx": "Apple Silicon MLX hızlandırılmış yerel Ollama modeli",
       "gemma4:27b-mlx": "Dengeli MLX akıl yürütme ve raporlama modeli",
       "gemma4-mlx": "Yerel Gemma 4 MLX modeli",
-      "llama3.3:70b": "Yüksek kapasiteli akıl yürütme",
-      "qwen2.5:32b": "Güçlü SQL ve kod yeteneği",
+      "llama3_3:70b": "Yüksek kapasiteli akıl yürütme",
+      "qwen2_5:32b": "Güçlü SQL ve kod yeteneği",
       "deepseek-r1:14b": "Derin düşünce adımları",
-      "gemini-3.6-flash": "Hızlı bulut modeli"
+      "gemini-3_6-flash": "Hızlı bulut modeli"
     }
   },
   "JobStarted": {

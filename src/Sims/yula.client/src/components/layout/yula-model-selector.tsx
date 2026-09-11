@@ -143,8 +143,10 @@ function formatModelOption(id: string, t: ReturnType<typeof useTranslations>): M
     cleanId.includes("whisper");
 
   if (meta) {
-    const modelDesc = metaKey
-      ? ((t.raw("model_desc") ?? {}) as Record<string, string>)[metaKey]
+    // next-intl message keys cannot contain "." (nesting separator); message keys use "_" instead.
+    const safeKey = metaKey ? metaKey.replace(/\./g, "_") : undefined;
+    const modelDesc = safeKey
+      ? ((t.raw("model_desc") ?? {}) as Record<string, string>)[safeKey]
       : undefined;
     return {
       id,

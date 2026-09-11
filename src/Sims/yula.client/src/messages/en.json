@@ -839,20 +839,20 @@
     "aria_audio": "Audio",
     "aria_mlx": "Apple MLX hardware acceleration",
     "model_desc": {
-      "gpt-5.4": "High-capacity Microsoft Foundation reasoning model",
+      "gpt-5_4": "High-capacity Microsoft Foundation reasoning model",
       "gpt-4o": "Fast multimodal model",
       "gpt-4o-mini": "Fast and efficient lightweight model",
       "o3-mini": "Deep thinking steps and reasoning",
-      "agnes-2.5-flash": "Agnes AI coding + agent workflow model (512K context)",
-      "agnes-3.0-flash": "Next-gen Agnes coding + tool orchestration model",
-      "agnes-2.5-pro": "Advanced reasoning, coding and long-context analysis",
+      "agnes-2_5-flash": "Agnes AI coding + agent workflow model (512K context)",
+      "agnes-3_0-flash": "Next-gen Agnes coding + tool orchestration model",
+      "agnes-2_5-pro": "Advanced reasoning, coding and long-context analysis",
       "gemma4:12b-mlx": "Apple Silicon MLX-accelerated local Ollama model",
       "gemma4:27b-mlx": "Balanced MLX reasoning and reporting model",
       "gemma4-mlx": "Local Gemma 4 MLX model",
-      "llama3.3:70b": "High-capacity reasoning",
-      "qwen2.5:32b": "Strong SQL and coding capability",
+      "llama3_3:70b": "High-capacity reasoning",
+      "qwen2_5:32b": "Strong SQL and coding capability",
       "deepseek-r1:14b": "Deep thinking steps",
-      "gemini-3.6-flash": "Fast cloud model"
+      "gemini-3_6-flash": "Fast cloud model"
     }
   },
   "JobStarted": {
