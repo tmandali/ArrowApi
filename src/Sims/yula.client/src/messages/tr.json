@@ -340,5 +340,59 @@
     "explain_columns_prompt": "Bu raporun kolonlarını açıkla",
     "clear_filters": "Filtreleri Temizle",
     "clear_filters_prompt": "Aktif filtreleri temizle ve tabloyu sıfırla"
+  },
+  "AgentEditor": {
+    "name_clashes_with_command": "\"{{name}}\" bir komut adıyla çakışıyor — başka ad seçin.",
+    "file_size_exceeded": "Toplam dosya boyutu 200K karakteri geçemez.",
+    "created": "Oluşturuldu",
+    "last_modified": "Son düzenleme",
+    "scope_global": "Global (tüm çalışma alanları)",
+    "general_settings": "Genel ayar",
+    "back_to_list": "Listeye dön",
+    "default": "Varsayılan",
+    "custom_model_placeholder": "Özel model yaz…",
+    "enabled": "Açık",
+    "disabled": "Kapalı",
+    "low": "Düşük",
+    "medium": "Orta",
+    "high": "Yüksek",
+    "attachments": "Ek dosyalar",
+    "name_placeholder": "Muhasebe Uzmanı",
+    "description_placeholder": "Ne zaman kullanılır?",
+    "tool_select_placeholder": "Araç seç…",
+    "skill_select_placeholder": "Skill seç… (seçilmezse ajan skill kullanmaz)",
+    "model_placeholder": "gpt-5.4",
+    "instructions_placeholder": "Kısa yaz, önce özet tablo ver, teknik detaya girme…"
+  },
+  "SkillEditor": {
+    "file_size_exceeded": "Toplam dosya boyutu 200K karakteri geçemez.",
+    "scope_global": "Global (her yerde)",
+    "created": "Oluşturuldu",
+    "last_modified": "Son düzenleme",
+    "slash_placeholder": "haftalik-ozet",
+    "label_placeholder": "Haftalık özet",
+    "description_placeholder": "Ne zaman kullanılır?",
+    "attachments": "Ek dosyalar",
+    "prompt_placeholder": "Son 7 günün satış özetini çıkar: {{input}}",
+    "runs_in_server_sandbox": "Sunucu sandbox'ında çalışır",
+    "runs_in_server_sandbox_detail": "Sunucu sandbox'ında çalışır (run_skill_script)."
+  },
+  "SkillManagement": {
+    "new_skill": "Yeni skill",
+    "cancel": "Vazgeç",
+    "skill": "skill",
+    "no_skills_yet": "Henüz kullanıcı skill'i yok — Yeni Skill ile tanımlayın.",
+    "select_or_create": "Soldan bir skill seçin veya + ile oluşturun."
+  },
+  "ChatAssistant": {
+    "greeting": "Hoş geldiniz",
+    "app_load_failed": "Uygulama yüklenemedi",
+    "input_placeholder_secondary": "Ek mesaj veya parametre yazın...",
+    "show_commands": "Komut listesini göster (+)",
+    "stop": "Durdur",
+    "speaking_with_agent": "Seçili ajan kimliğiyle konuşuyorsunuz",
+    "yula_description": "Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada",
+    "works_in_all_workspaces": "Tüm çalışma alanlarında çalışır",
+    "inference_identity": "Ajanın kullandığı çıkarım kimliği (pin > genel ayar)"
   }
 }

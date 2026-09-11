@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import {
   validateUserSkill,
@@ -86,7 +87,8 @@ export function SkillEditor({
 }) {
   // Tek görünüm: `view` modu yalnızca disabled eder (ebeveyn `key` ile
   // remount ettiği için state başlangıcı her seçimde skill'den gelir).
-  const isRO = mode === "view";
+  const isRO = mode === "view"
+  const t = useTranslations("SkillEditor")
 
   const skills = useUserSkillsStore((s) => s.skills);
   const upsertSkill = useUserSkillsStore((s) => s.upsertSkill);
@@ -184,7 +186,7 @@ export function SkillEditor({
             userSkillFilesSize(next) + candidate.content.length >
             USER_SKILL_FILES_TOTAL_MAX_CHARS
           ) {
-            setFileError("Toplam dosya boyutu 200K karakteri geçemez.");
+            setFileError(t("file_size_exceeded"));
             continue;
           }
           next.push(candidate);
@@ -290,7 +292,7 @@ export function SkillEditor({
 
   const scopeOptions = React.useMemo(
     () => [
-      { value: "global", label: "Global (her yerde)" },
+      { value: "global", label: t("scope_global") },
       ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
     ],
     [],
@@ -346,12 +348,12 @@ export function SkillEditor({
       return [
         {
           key: "created",
-          title: "Oluşturuldu",
+          title: t("created"),
           detail: formatMetaDate(skill.createdAt),
         },
         {
           key: "updated",
-          title: "Son düzenleme",
+          title: t("last_modified"),
           detail: formatMetaDate(skill.updatedAt),
         },
       ];
@@ -374,7 +376,7 @@ export function SkillEditor({
               <Input
                 value={isRO ? (skill?.slash ?? slash) : slash}
                 onChange={isRO ? undefined : (e) => setSlash(e.target.value)}
-                placeholder="haftalik-ozet"
+                placeholder={t("slash_placeholder")}
                 disabled={isRO}
                 readOnly={isRO}
                 className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs font-mono data-disabled:opacity-80"
@@ -400,7 +402,7 @@ export function SkillEditor({
             <Input
               value={isRO ? (skill?.label ?? label) : label}
               onChange={isRO ? undefined : (e) => setLabel(e.target.value)}
-              placeholder="Haftalık özet"
+              placeholder={t("label_placeholder")}
               disabled={isRO}
               readOnly={isRO}
               className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs data-disabled:opacity-80"
@@ -413,7 +415,7 @@ export function SkillEditor({
             <Textarea
               value={isRO ? (skill?.description ?? description) : description}
               onChange={isRO ? undefined : (e) => setDescription(e.target.value)}
-              placeholder="Ne zaman kullanılır?"
+              placeholder={t("description_placeholder")}
               disabled={isRO}
               readOnly={isRO}
               rows={3}
@@ -440,7 +442,7 @@ export function SkillEditor({
                   >
                     <span className="flex items-center gap-2">
                       <Paperclip className="size-3.5" />
-                      Ek dosyalar
+                      {t("attachments")}
                     </span>
                     <Plus className="size-3.5" />
                   </Button>
@@ -492,7 +494,7 @@ export function SkillEditor({
           <Textarea
             value={isRO ? (skill?.prompt ?? skillMd) : skillMd}
             onChange={isRO ? undefined : (e) => setSkillMd(e.target.value)}
-            placeholder="Son 7 günün satış özetini çıkar: {{input}}"
+            placeholder={t("prompt_placeholder")}
             disabled={isRO}
              readOnly={isRO}
              rows={1}
@@ -515,7 +517,7 @@ export function SkillEditor({
             </span>
             {f.kind === "script" && isRO ? (
               <span className="text-[10.5px] text-muted-foreground">
-                Sunucu sandbox&apos;ında çalışır
+                {t("runs_in_server_sandbox")}
               </span>
             ) : null}
           </div>
@@ -548,7 +550,7 @@ export function SkillEditor({
               <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                 betik
               </span>
-              Sunucu sandbox&apos;ında çalışır (run_skill_script).
+              {t("runs_in_server_sandbox_detail")}
             </p>
           )}
           <div className="mt-1.5 flex items-center justify-between">

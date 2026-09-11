@@ -75,6 +75,7 @@ export function AIChatAssistant({
   className,
   separator = true,
 }: AIChatAssistantProps = {}) {
+  const t = useTranslations("ChatAssistant")
   const router = useRouter()
   const { open, setOpen } = useWorkspaceAiChat()
   // Araç çubuğu uygulama kabuğunda yaşar; oturum henüz hazır değilken de
@@ -272,7 +273,7 @@ function ChatSessionFallback() {
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm">
         <div className="flex items-center gap-2 font-medium text-destructive">
           <CircleAlert className="size-4" aria-hidden />
-          <span>Uygulama yüklenemedi</span>
+          <span>{t("app_load_failed")}</span>
         </div>
         <p className="max-w-md text-center text-xs opacity-70">
           Sohbet oturumu başlatılamadı; bu genellikle sunucu yeniden
@@ -433,7 +434,7 @@ function AIChatPanelSession({
 
   const mounted = useMounted()
   const now = React.useMemo(() => new Date(), [])
-  const greeting = mounted ? greetingFor(now) : "Hoş geldiniz"
+  const greeting = mounted ? greetingFor(now) : t("greeting")
   const dateLabel = mounted ? formatDate(now) : null
 
   const workspaceLabel = workspaceLabelFromPath(pathname)
@@ -1024,7 +1025,7 @@ function AIChatPanelSession({
             }}
             placeholder={
               selectedCommand || pastedChip
-                ? "Ek mesaj veya parametre yazın..."
+                ? t("input_placeholder_secondary")
                 : YULA.placeholder
             }
             className="flex-1 min-w-[120px] min-h-[28px] max-h-32 resize-none border-0 bg-transparent px-1 py-1 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
@@ -1055,8 +1056,8 @@ function AIChatPanelSession({
                 setInput((prev) => (prev.startsWith("/") ? "" : "/"))
                 requestAnimationFrame(() => textareaRef.current?.focus())
               }}
-              aria-label="Komutlar (+)"
-              title="Komut listesini göster (+)"
+              aria-label={t("show_commands")}
+              title={t("show_commands")}
             >
               <Plus className="size-3.5" />
             </Button>
@@ -1068,8 +1069,8 @@ function AIChatPanelSession({
               size="icon"
               onClick={() => void yula.stop()}
               className="size-7 rounded-full border border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-all"
-              aria-label="Durdur"
-              title="Durdur"
+              aria-label={t("stop")}
+              title={t("stop")}
             >
               <Square className="size-3 fill-current" />
             </Button>
@@ -1166,23 +1167,23 @@ function AIChatPanelSession({
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     {effectiveAgent
-                      ? effectiveAgent.description || "Seçili ajan kimliğiyle konuşuyorsunuz"
+                      ? effectiveAgent.description || t("speaking_with_agent")
                       : workspaceRootIcon
                         ? YULA.emptyDescription
-                        : "Yula, yol gösteren ışık veren anlanımına gelir. Size yardımcı olmak için burada"}
+                        : t("yula_description")}
                   </p>
                   {effectiveAgent ? (
                     <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/75">
                       <Globe className="size-3.5 shrink-0" />
                       {effectiveAgent.scope && effectiveAgent.scope !== "global"
                         ? `${getWorkspace(effectiveAgent.scope as WorkspaceId).title || getWorkspace(effectiveAgent.scope as WorkspaceId).name} alanında çalışır`
-                        : "Tüm çalışma alanlarında çalışır"}
+                        : t("works_in_all_workspaces")}
                     </p>
                   ) : null}
                   {agentInference ? (
                     <p
                       className="font-mono text-[10.5px] text-muted-foreground/70"
-                      title="Ajanın kullandığı çıkarım kimliği (pin > genel ayar)"
+                      title={t("inference_identity")}
                     >
                       {agentInference}
                     </p>

@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import {
   AGENT_TOOL_CATALOG,
@@ -87,7 +88,8 @@ export function AgentEditor({
 }) {
   // Tek görünüm: `view` modu yalnızca disabled eder (ebeveyn `key` ile
   // remount ettiği için state başlangıcı her seçimde agent'tan gelir).
-  const isRO = mode === "view";
+  const isRO = mode === "view"
+  const t = useTranslations("AgentEditor")
 
   const agents = useUserAgentsStore((s) => s.agents);
   const upsertAgent = useUserAgentsStore((s) => s.upsertAgent);
@@ -195,7 +197,7 @@ export function AgentEditor({
       (c) => c.slash.toLowerCase() === name.trim().toLowerCase(),
     );
     if (clash && agent?.name !== name.trim()) {
-      setError(`"${name.trim()}" bir komut adıyla çakışıyor — başka ad seçin.`);
+      setError(t("name_clashes_with_command", { name: name.trim() }));
       return;
     }
     const saved = upsertAgent({
@@ -253,7 +255,7 @@ export function AgentEditor({
             agentAttachmentsSize(next) + candidate.content.length >
             USER_AGENT_ATTACHMENTS_TOTAL_MAX_CHARS
           ) {
-            setError("Toplam dosya boyutu 200K karakteri geçemez.");
+            setError(t("file_size_exceeded"));
             continue;
           }
           next.push(candidate);
@@ -281,12 +283,12 @@ export function AgentEditor({
     ? [
         {
           key: "created",
-          title: "Oluşturuldu",
+          title: t("created"),
           detail: formatMetaDate(agent.createdAt),
         },
         {
           key: "updated",
-          title: "Son düzenleme",
+          title: t("last_modified"),
           detail: formatMetaDate(agent.updatedAt),
         },
       ]
@@ -307,7 +309,7 @@ export function AgentEditor({
                   <Input
                     value={name}
                     onChange={isRO ? undefined : (e) => setName(e.target.value)}
-                    placeholder="Muhasebe Uzmanı"
+                    placeholder={t("name_placeholder")}
                     disabled={isRO}
                     readOnly={isRO}
                     className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs data-disabled:opacity-80"
@@ -322,7 +324,7 @@ export function AgentEditor({
                     value={scope}
                     onChange={(v) => setScope(v || "global")}
                     options={[
-                      { value: "global", label: "Global (tüm çalışma alanları)" },
+                      { value: "global", label: t("scope_global") },
                       ...getRailWorkspaces().map((w) => ({ value: w.id, label: w.name })),
                     ]}
                     disabled={isRO}
@@ -337,7 +339,7 @@ export function AgentEditor({
                 <Textarea
                   value={description}
                   onChange={isRO ? undefined : (e) => setDescription(e.target.value)}
-                  placeholder="Ne zaman kullanılır?"
+                  placeholder={t("description_placeholder")}
                   disabled={isRO}
                   readOnly={isRO}
                   rows={3}
@@ -358,7 +360,7 @@ export function AgentEditor({
                     value: t.name,
                     label: t.label,
                   }))}
-                  placeholder="Araç seç…"
+                  placeholder={t("tool_select_placeholder")}
                   disabled={isRO}
                 />
               </Field>
@@ -384,7 +386,7 @@ export function AgentEditor({
                           ? `/${s.slash} (${s.scope})`
                           : `/${s.slash}`,
                     }))}
-                    placeholder="Skill seç… (seçilmezse ajan skill kullanmaz)"
+                    placeholder={t("skill_select_placeholder")}
                     disabled={isRO}
                   />
                 )}
@@ -408,7 +410,7 @@ export function AgentEditor({
                     }}
                     options={AGENT_PROVIDER_OPTIONS.map((p) => ({
                       value: p.id,
-                      label: p.id ? p.label : "Genel ayar",
+                      label: p.id ? p.label : t("general_settings"),
                     }))}
                     disabled={isRO}
                   />
@@ -422,7 +424,7 @@ export function AgentEditor({
                       <Input
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
-                        placeholder="gpt-5.4"
+                        placeholder={t("model_placeholder")}
                         disabled={isRO}
                         readOnly={isRO}
                         className="bg-muted/30 border-muted-foreground/20 font-mono h-9 text-xs min-w-0 flex-1 data-disabled:opacity-80"
@@ -435,7 +437,7 @@ export function AgentEditor({
                             setModel("");
                           }}
                           className="shrink-0 rounded-md px-2 py-1.5 text-[11.5px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                          title="Listeye dön"
+                          title={t("back_to_list")}
                         >
                           Liste
                         </button>
@@ -456,12 +458,12 @@ export function AgentEditor({
                         setModel(v);
                       }}
                       options={[
-                        { value: "", label: "Varsayılan" },
+                        { value: "", label: t("default") },
                         ...(model && !providerModels.includes(model)
                           ? [{ value: "__saved__", label: `${model} (kayıtlı)` }]
                           : []),
                         ...providerModels.map((id) => ({ value: id, label: id })),
-                        { value: "__custom__", label: "Özel model yaz…" },
+                        { value: "__custom__", label: t("custom_model_placeholder") },
                       ]}
                       disabled={isRO}
                     />
@@ -480,9 +482,9 @@ export function AgentEditor({
                     setThinking(v === "" ? undefined : v === "on")
                   }
                   options={[
-                    { value: "", label: "Genel ayar" },
-                    { value: "on", label: "Açık" },
-                    { value: "off", label: "Kapalı" },
+                    { value: "", label: t("general_settings") },
+                    { value: "on", label: t("enabled") },
+                    { value: "off", label: t("disabled") },
                   ]}
                   disabled={isRO}
                 />
@@ -500,11 +502,11 @@ export function AgentEditor({
                       setEffort(normalizeEffort(v ?? "") ?? undefined)
                     }
                     options={[
-                      { value: "", label: "Genel ayar" },
-                      { value: "off", label: `Kapalı (${YULA_EFFORT_LABELS.off})` },
-                      { value: "low", label: `Düşük (${YULA_EFFORT_LABELS.low})` },
-                      { value: "medium", label: `Orta (${YULA_EFFORT_LABELS.medium})` },
-                      { value: "high", label: `Yüksek (${YULA_EFFORT_LABELS.high})` },
+                      { value: "", label: t("general_settings") },
+                      { value: "off", label: `${t("disabled")} (${YULA_EFFORT_LABELS.off})` },
+                      { value: "low", label: `${t("low")} (${YULA_EFFORT_LABELS.low})` },
+                      { value: "medium", label: `${t("medium")} (${YULA_EFFORT_LABELS.medium})` },
+                      { value: "high", label: `${t("high")} (${YULA_EFFORT_LABELS.high})` },
                     ]}
                     disabled={isRO}
                   />
@@ -542,7 +544,7 @@ export function AgentEditor({
                     >
                       <span className="flex items-center gap-2">
                         <Paperclip className="size-3.5" />
-                        Ek dosyalar
+                        {t("attachments")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -611,7 +613,7 @@ export function AgentEditor({
         <Textarea
           value={agentMd}
           onChange={(e) => setAgentMd(e.target.value)}
-          placeholder="Kısa yaz, önce özet tablo ver, teknik detaya girme…"
+          placeholder={t("instructions_placeholder")}
            rows={1}
            aria-label="AGENT.md ham markdown"
             className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"

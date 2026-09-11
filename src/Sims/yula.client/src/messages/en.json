@@ -340,5 +340,59 @@
     "explain_columns_prompt": "Explain the columns of this report",
     "clear_filters": "Clear Filters",
     "clear_filters_prompt": "Clear active filters and reset the table"
+  },
+  "AgentEditor": {
+    "name_clashes_with_command": "The name \"{{name}}\" clashes with a command — please choose another.",
+    "file_size_exceeded": "Total file size cannot exceed 200K characters.",
+    "created": "Created",
+    "last_modified": "Last modified",
+    "scope_global": "Global (all workspaces)",
+    "general_settings": "General settings",
+    "back_to_list": "Back to list",
+    "default": "Default",
+    "custom_model_placeholder": "Write custom model…",
+    "enabled": "On",
+    "disabled": "Off",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "attachments": "Attachments",
+    "name_placeholder": "Accounting Expert",
+    "description_placeholder": "When should this agent be used?",
+    "tool_select_placeholder": "Select a tool…",
+    "skill_select_placeholder": "Select a skill… (agent won’t use skills if none selected)",
+    "model_placeholder": "gpt-5.4",
+    "instructions_placeholder": "Write concisely — give a summary table first, then go into technical details…"
+  },
+  "SkillEditor": {
+    "file_size_exceeded": "Total file size cannot exceed 200K characters.",
+    "scope_global": "Global (everywhere)",
+    "created": "Created",
+    "last_modified": "Last modified",
+    "slash_placeholder": "weekly-summary",
+    "label_placeholder": "Weekly Summary",
+    "description_placeholder": "When should this skill be used?",
+    "attachments": "Attachments",
+    "prompt_placeholder": "Generate a summary of the last 7 days of sales: {{input}}",
+    "runs_in_server_sandbox": "Runs in server sandbox",
+    "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script)."
+  },
+  "SkillManagement": {
+    "new_skill": "New skill",
+    "cancel": "Cancel",
+    "skill": "skill",
+    "no_skills_yet": "No user skills yet — define one with New Skill.",
+    "select_or_create": "Select a skill from the left or create one with +"
+  },
+  "ChatAssistant": {
+    "greeting": "Welcome",
+    "app_load_failed": "App failed to load",
+    "input_placeholder_secondary": "Add a message or parameters...",
+    "show_commands": "Show commands list (+)",
+    "stop": "Stop",
+    "speaking_with_agent": "You are speaking with the selected agent ID",
+    "yula_description": "Yula comes with the meaning of giving direction and light. Here to help you.",
+    "works_in_all_workspaces": "Works in all workspaces",
+    "inference_identity": "Inference identity used by the agent (pin > general settings)"
   }
 }

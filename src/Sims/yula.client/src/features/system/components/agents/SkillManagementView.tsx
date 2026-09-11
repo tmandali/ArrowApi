@@ -1,6 +1,7 @@
 "use client";
 
-import * as React from "react";
+import * as React from "react"
+import { useTranslations } from "next-intl"
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import {
@@ -23,6 +24,7 @@ type Selection = { id: string | null; readOnly?: boolean } | null;
  * Solda User/System sekmeli liste, sağda seçili skill'in düzenleme formu.
  */
 export function SkillManagementView() {
+  const t = useTranslations("SkillManagement")
   const userSkills = useUserSkillsStore((s) => s.skills);
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
 
@@ -78,7 +80,7 @@ export function SkillManagementView() {
   const detailTabLabel =
     selection?.id != null
       ? `/${selectedSkill?.slash ?? "skill"}`
-      : "Yeni skill";
+      : t("new_skill");
 
   // Satır üzeri silme (executions deseni): hover'da beliren çöp kutusu.
   const handleRowDelete = (id: string) => {
@@ -121,7 +123,7 @@ export function SkillManagementView() {
           {selection != null ? (
             <span className="font-normal text-muted-foreground">
               {" "}
-              - {selection.id != null ? `/${selectedSkill?.slash ?? "skill"}` : "Yeni skill"}
+              - {selection.id != null ? `/${selectedSkill?.slash ?? t("skill")}` : t("new_skill")}
             </span>
           ) : null}
         </>
@@ -173,8 +175,8 @@ export function SkillManagementView() {
                     setSelection({ id: null });
                   }
                 }}
-                title={isNewMode ? "Cancel" : "New skill"}
-                aria-label={isNewMode ? "Cancel" : "New skill"}
+                title={isNewMode ? t("cancel") : t("new_skill")}
+                aria-label={isNewMode ? t("cancel") : t("new_skill")}
               >
                 {isNewMode ? (
                   <X className="size-3.5" />
@@ -228,8 +230,7 @@ export function SkillManagementView() {
         listed.length === 0 ? (
           <div className="flex h-full min-h-48 items-center justify-center p-4">
             <p className="text-center text-[12px] text-muted-foreground">
-              Henüz kullanıcı skill&apos;i yok — Yeni Skill ile
-              tanımlayın.
+              {t("no_skills_yet")}
             </p>
           </div>
         ) : (
@@ -305,7 +306,7 @@ export function SkillManagementView() {
         <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 text-center">
           <Filter className="size-5 text-muted-foreground/50" />
           <p className="max-w-60 text-[12px] text-muted-foreground">
-            Soldan bir skill seçin veya + ile oluşturun.
+            {t("select_or_create")}
           </p>
         </div>
       }
