@@ -81,7 +81,7 @@ internal sealed class ArrowPushBatchesHttpContent : HttpContent
         }
 
         using ArrowStreamWriter writer = new(stream, _emptySchema, leaveOpen: true);
-        await writer.WriteBatchesAsync(Enumerable.Empty<RecordBatch>(), cancellationToken).ConfigureAwait(false);
+        await writer.WriteBatchesAsync([], cancellationToken).ConfigureAwait(false);
     }
 
     protected override bool TryComputeLength(out long length)

@@ -2,5 +2,8 @@
   "dependencies": {
     "@react-pdf/renderer": "^4.8.1",
     "date-fns": "^4.4.0"
+  },
+  "devDependencies": {
+    "@lingual/i18n-check": "^0.9.5"
   }
 }
