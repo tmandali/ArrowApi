@@ -1,9 +1,11 @@
 "use client";
 
+import * as React from "react"
 import { useRouter } from "next/navigation"
 import { NavUser } from "@/components/layout/nav-user"
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
+import { LocaleSwitcher } from "@/components/common/locale-switcher"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
 import {
   workspaceRootPathByWorkspace,
@@ -12,7 +14,7 @@ import {
 import { YULA } from "@/components/layout/yula-brand-data"
 import { cn } from "@/utils/cn"
 
-const user = {
+const DEFAULT_USER = {
   name: "Timur MANDALI",
   email: "timur.mandali@lcwaikiki.com",
   avatar: "",
@@ -29,6 +31,31 @@ export function AppHeader({ className }: { className?: string }) {
   const workspaceName = activeWorkspaceId
     ? workspaceNameById[activeWorkspaceId]
     : undefined
+
+  // Kullanıcı profili: API'den çekilir, kayıt yoksa varsayılan değerler kullanılır.
+  const [headerUser, setHeaderUser] = React.useState(DEFAULT_USER)
+  React.useEffect(() => {
+    let active = true
+    fetch("/api/my/settings?userId=local", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return
+        const row = data?.settings
+        if (row?.fullName || row?.email) {
+          setHeaderUser({
+            name: row.fullName ?? DEFAULT_USER.name,
+            email: row.email ?? DEFAULT_USER.email,
+            avatar: "",
+          })
+        }
+      })
+      .catch(() => {
+        // hata durumunda varsayılan kalır
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   // "Yula <Workspace>" marka satırı → her zaman workspace ana sayfası (landing).
   // Aktif workspace yoksa Yula ana ekranına döner.
@@ -70,8 +97,9 @@ export function AppHeader({ className }: { className?: string }) {
         <WorkspaceSearchTrigger />
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+        <LocaleSwitcher />
         <WorkspaceNotificationPopover />
-        <NavUser user={user} />
+        <NavUser user={headerUser} />
       </div>
     </header>
   )

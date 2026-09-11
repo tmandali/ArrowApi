@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell"
@@ -118,7 +119,111 @@ function persistAiConfigWithoutSecret(config: AiProviderConfig) {
   }
 }
 
+const SETTINGS_USER_ID = "local"
+const SETTINGS_API_URL = `/api/my/settings?userId=${SETTINGS_USER_ID}`
+
+type SettingsApiRow = {
+  email?: string | null
+  fullName?: string | null
+  language?: string | null
+  timeZone?: string | null
+  aiProvider?: string | null
+  aiModel?: string | null
+  aiEndpoint?: string | null
+  thinkingLevel?: string | null
+  systemFacts?: Record<string, string> | null
+}
+
+const AI_PROVIDERS: AiProviderConfig["provider"][] = ["ollama", "azure", "google", "openai", "agnes"]
+
+function normalizeApiProvider(value: unknown): AiProviderConfig["provider"] | undefined {
+  if (typeof value !== "string") return undefined
+  const v = value.trim().toLowerCase()
+  return (AI_PROVIDERS as string[]).includes(v) ? (v as AiProviderConfig["provider"]) : undefined
+}
+
+function normalizeThinking(value: unknown): NonNullable<AiProviderConfig["thinkingLevel"]> {
+  return normalizeEffort(value) ?? "low"
+}
+
+type ProfileLanguage = "english" | "turkish"
+type ProfileTimeZone = "asia-kolkata" | "europe-istanbul"
+
+function mapLanguageToUi(value: unknown): ProfileLanguage | undefined {
+  if (typeof value !== "string") return undefined
+  const v = value.trim().toLowerCase()
+  if (v === "turkish" || v === "tr" || v === "türkçe") return "turkish"
+  if (v === "english" || v === "en") return "english"
+  return undefined
+}
+
+function mapTimeZoneToUi(value: unknown): ProfileTimeZone | undefined {
+  if (typeof value !== "string") return undefined
+  const v = value.trim().toLowerCase()
+  if (v === "europe/istanbul" || v === "europe-istanbul") return "europe-istanbul"
+  if (v === "asia/kolkata" || v === "asia-kolkata") return "asia-kolkata"
+  return undefined
+}
+
+function splitFullName(full: string): { first: string; last: string } {
+  const parts = full.trim().split(/\s+/)
+  if (parts.length <= 1) return { first: parts[0] ?? "", last: "" }
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") }
+}
+
+/** API'ye tam snapshot yazar; offline/500'de sessizce localStorage'a düşer (UI kırılmaz). */
+async function putSettingsToApi(snapshot: {
+  email: string
+  fullName: string
+  language: ProfileLanguage
+  timeZone: ProfileTimeZone
+  aiProvider: AiProviderConfig["provider"]
+  aiModel: string
+  aiEndpoint: string
+  thinkingLevel: NonNullable<AiProviderConfig["thinkingLevel"]>
+  systemFacts: Record<string, string>
+}) {
+  // Kişisel tercihler (AI config, dil, tz, systemFacts) → user_settings
+  try {
+    await fetch("/api/my/settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: SETTINGS_USER_ID,
+        language: snapshot.language,
+        timeZone: snapshot.timeZone,
+        aiProvider: snapshot.aiProvider,
+        aiModel: snapshot.aiModel,
+        aiEndpoint: snapshot.aiEndpoint,
+        thinkingLevel: snapshot.thinkingLevel,
+        systemFacts: snapshot.systemFacts,
+      }),
+    })
+  } catch {
+    // offline (Tauri) veya backend kapalı — localStorage zaten yazıldı
+  }
+  // Ad/e-posta → app_users (tek kaynak)
+  try {
+    await fetch("/api/system/users", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: SETTINGS_USER_ID,
+        name: snapshot.fullName || null,
+        email: snapshot.email || null,
+        role: "System Administrator",
+        status: "Active",
+        lastActive: "Now",
+      }),
+    })
+  } catch {
+    // sessiz geç
+  }
+}
+
 export function MySettingsForm() {
+  const t = useTranslations("MySettings")
+  const tc = useTranslations("Common")
   const [isEnabled, setIsEnabled] = React.useState(true)
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false)
   const [documentFollowOpen, setDocumentFollowOpen] = React.useState(false)
@@ -146,6 +251,17 @@ export function MySettingsForm() {
   const [showApiKey, setShowApiKey] = React.useState(false)
   const [aiSaved, setAiSaved] = React.useState(false)
 
+  // User Details sekmesi — API'ye bağlı profil alanları (görünüm aynı, kontrollü input).
+  const [profileEmail, setProfileEmail] = React.useState("john.doe@demo.com")
+  const [profileFullName, setProfileFullName] = React.useState("John Doe")
+  const [profileFirstName, setProfileFirstName] = React.useState("John")
+  const [profileLastName, setProfileLastName] = React.useState("Doe")
+  const [profileUsername, setProfileUsername] = React.useState("johndoe")
+  const [profileLanguage, setProfileLanguage] = React.useState<ProfileLanguage>("english")
+  const [profileTimeZone, setProfileTimeZone] = React.useState<ProfileTimeZone>("asia-kolkata")
+  const [profileSaved, setProfileSaved] = React.useState(false)
+  const [profileLoaded, setProfileLoaded] = React.useState(false)
+
   // Güvenli depodan API anahtarı yüklendiğinde / config değiştiğinde formu
   // senkronla — render sırasında state ayarlama (effect'siz türev).
   const [syncedAiConfig, setSyncedAiConfig] = React.useState<AiProviderConfig | null>(null)
@@ -162,7 +278,8 @@ export function MySettingsForm() {
     }
   }
 
-  // API anahtarını güvenli depodan oku
+  // API anahtarını güvenli depodan oku + DB'deki ayarı çek (UI aynı kalır).
+  // API kapalıysa localStorage'daki değerle devam edilir.
   React.useEffect(() => {
     let active = true
     loadSecret().then((secret) => {
@@ -171,6 +288,44 @@ export function MySettingsForm() {
       setAiConfigState((prev) => ({ ...prev, apiKey: secret || "" }))
       setConfigHydrated(true)
     })
+    fetch(SETTINGS_API_URL, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { settings?: SettingsApiRow | null } | null) => {
+        if (!active) return
+        const row = data?.settings
+        if (row) {
+          const provider = normalizeApiProvider(row.aiProvider)
+          const thinking = normalizeThinking(row.thinkingLevel)
+          setAiConfigState((prev) => ({
+            ...prev,
+            provider: provider ?? prev.provider,
+            model: typeof row.aiModel === "string" && row.aiModel ? row.aiModel : prev.model,
+            endpoint: typeof row.aiEndpoint === "string" ? row.aiEndpoint : prev.endpoint,
+            thinkingLevel: row.thinkingLevel != null ? thinking : prev.thinkingLevel,
+          }))
+          if (row.systemFacts && typeof row.systemFacts === "object") {
+            setSystemFacts(row.systemFacts)
+          }
+          // Profil alanları — API'de kayıt varsa formu doldur (yoksa demo değerler kalır).
+          if (typeof row.email === "string" && row.email) setProfileEmail(row.email)
+          if (typeof row.fullName === "string" && row.fullName) {
+            setProfileFullName(row.fullName)
+            const split = splitFullName(row.fullName)
+            setProfileFirstName(split.first || "John")
+            setProfileLastName(split.last || "Doe")
+          }
+          const lang = mapLanguageToUi(row.language)
+          if (lang) setProfileLanguage(lang)
+          const tz = mapTimeZoneToUi(row.timeZone)
+          if (tz) setProfileTimeZone(tz)
+        }
+        // GET tamamlandı (kayıt yoksa da) — Save artık güvenli.
+        setProfileLoaded(true)
+      })
+      .catch(() => {
+        // offline — localStorage fallback
+        if (active) setProfileLoaded(true)
+      })
     return () => {
       active = false
     }
@@ -195,15 +350,74 @@ export function MySettingsForm() {
       effort: normalizeEffort(aiThinkingLevel) ?? undefined,
     })
     void saveSecret(aiApiKey)
+    void putSettingsToApi({
+      email: profileEmail,
+      fullName: profileFullName,
+      language: profileLanguage,
+      timeZone: profileTimeZone,
+      aiProvider,
+      aiModel,
+      aiEndpoint,
+      thinkingLevel: aiThinkingLevel,
+      systemFacts,
+    })
     setAiSaved(true)
     setTimeout(() => setAiSaved(false), 2500)
+  }
+
+  /** Header Save butonu — profil + AI snapshot'unu birlikte yazar. */
+  const handleSaveProfile = () => {
+    const full = profileFullName.trim() || `${profileFirstName} ${profileLastName}`.trim()
+    if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) return
+    void putSettingsToApi({
+      email: profileEmail.trim(),
+      fullName: full,
+      language: profileLanguage,
+      timeZone: profileTimeZone,
+      aiProvider,
+      aiModel,
+      aiEndpoint,
+      thinkingLevel: aiThinkingLevel,
+      systemFacts,
+    })
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 2500)
+  }
+
+  const handleFullNameChange = (value: string) => {
+    setProfileFullName(value)
+    const split = splitFullName(value)
+    if (split.first) setProfileFirstName(split.first)
+    setProfileLastName(split.last)
+  }
+
+  const handleFirstNameChange = (value: string) => {
+    setProfileFirstName(value)
+    setProfileFullName(`${value} ${profileLastName}`.trim())
+  }
+
+  const handleLastNameChange = (value: string) => {
+    setProfileLastName(value)
+    setProfileFullName(`${profileFirstName} ${value}`.trim())
   }
 
   const handleSaveSystemFact = () => {
     const k = factKey.trim()
     const v = factValue.trim()
     if (!k || !v) return
-    setSystemFacts((prev) => ({ ...prev, [k]: v }))
+    const next = { ...systemFacts, [k]: v }
+    setSystemFacts(next)
+    void putSettingsToApi({
+      email: profileEmail,
+      fullName: profileFullName,
+      language: profileLanguage,
+      timeZone: profileTimeZone,
+      aiProvider,
+      aiModel,
+      aiEndpoint,
+      thinkingLevel: aiThinkingLevel,
+      systemFacts: next,
+    })
     setFactKey("")
     setFactValue("")
     setFactSaved(true)
@@ -213,10 +427,19 @@ export function MySettingsForm() {
   const handleDeleteSystemFact = (key: string) => {
     const k = key.trim()
     if (!k) return
-    setSystemFacts((prev) => {
-      const copy = { ...prev }
-      delete copy[k]
-      return copy
+    const next = { ...systemFacts }
+    delete next[k]
+    setSystemFacts(next)
+    void putSettingsToApi({
+      email: profileEmail,
+      fullName: profileFullName,
+      language: profileLanguage,
+      timeZone: profileTimeZone,
+      aiProvider,
+      aiModel,
+      aiEndpoint,
+      thinkingLevel: aiThinkingLevel,
+      systemFacts: next,
     })
   }
 
@@ -242,18 +465,18 @@ export function MySettingsForm() {
 
   return (
     <WorkspacePageShell
-      title={<PageHeaderTitle>Profile & Settings</PageHeaderTitle>}
+      title={<PageHeaderTitle>{t("title")}</PageHeaderTitle>}
       showSearch={false}
       actions={
         <>
           <Select defaultValue="password">
               <SelectTrigger className="h-7 gap-1 px-2.5 text-xs font-normal">
-                <SelectValue placeholder="Password" />
+                <SelectValue placeholder={t("pwd_password")} />
               </SelectTrigger>
               <SelectContent align="end">
-                <SelectItem value="password">Password</SelectItem>
-                <SelectItem value="set-password">Set Password</SelectItem>
-                <SelectItem value="reset-password">Reset Password</SelectItem>
+                <SelectItem value="password">{t("pwd_password")}</SelectItem>
+                <SelectItem value="set-password">{t("pwd_set")}</SelectItem>
+                <SelectItem value="reset-password">{t("pwd_reset")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -273,13 +496,18 @@ export function MySettingsForm() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>User Permissions</DropdownMenuItem>
-                <DropdownMenuItem>Reload</DropdownMenuItem>
+                <DropdownMenuItem>{t("menu_user_permissions")}</DropdownMenuItem>
+                <DropdownMenuItem>{t("menu_reload")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" className="h-7 px-3 text-xs">
-              Save
+            <Button
+              size="sm"
+              className="h-7 px-3 text-xs"
+              onClick={handleSaveProfile}
+              disabled={!profileLoaded}
+            >
+              {profileSaved ? tc("saved") : tc("save")}
             </Button>
 
             <AIChatAssistant />
@@ -290,9 +518,9 @@ export function MySettingsForm() {
             <Tabs defaultValue="user-details" className="flex flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-primary/15 px-4 py-1 dark:border-primary/25">
                 <TabsList variant="line">
-                  <TabsTrigger value="user-details">User Details</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                  <TabsTrigger value="connections">Connections</TabsTrigger>
+                  <TabsTrigger value="user-details">{t("tab_user_details")}</TabsTrigger>
+                  <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
+                  <TabsTrigger value="connections">{t("tab_connections")}</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -305,68 +533,78 @@ export function MySettingsForm() {
                       onCheckedChange={(c) => setIsEnabled(!!c)}
                     />
                     <Label htmlFor="enabled" className="text-xs font-semibold cursor-pointer text-foreground select-none">
-                      Enabled
+                      {t("enabled")}
                     </Label>
                   </div>
 
                   <div className="space-y-4 pt-2">
-                    <h3 className="text-xs font-semibold text-foreground">Basic Info</h3>
+                    <h3 className="text-xs font-semibold text-foreground">{t("basic_info")}</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <Field>
                         <FieldLabel className="text-xs text-muted-foreground">
-                          Email <span className="text-red-500">*</span>
+                          {t("field_email")} <span className="text-red-500">*</span>
                         </FieldLabel>
                         <Input
-                          defaultValue="john.doe@demo.com"
+                          value={profileEmail}
+                          onChange={(e) => setProfileEmail(e.target.value)}
                           className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                         />
                       </Field>
 
                       <Field>
-                        <FieldLabel className="text-xs text-muted-foreground">Full Name</FieldLabel>
+                        <FieldLabel className="text-xs text-muted-foreground">{t("field_full_name")}</FieldLabel>
                         <Input
-                          defaultValue="John Doe"
+                          value={profileFullName}
+                          onChange={(e) => handleFullNameChange(e.target.value)}
                           className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                         />
                       </Field>
 
                       <Field>
-                        <FieldLabel className="text-xs text-muted-foreground">Language</FieldLabel>
-                        <Select defaultValue="english">
+                        <FieldLabel className="text-xs text-muted-foreground">{t("field_language")}</FieldLabel>
+                        <Select
+                          value={profileLanguage}
+                          onValueChange={(val: ProfileLanguage) => setProfileLanguage(val)}
+                        >
                           <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
-                            <SelectValue placeholder="Language" />
+                            <SelectValue placeholder={t("field_language")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="english">English</SelectItem>
-                            <SelectItem value="turkish">Turkish</SelectItem>
+                            <SelectItem value="english">{t("lang_english")}</SelectItem>
+                            <SelectItem value="turkish">{t("lang_turkish")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </Field>
 
                       <Field>
                         <FieldLabel className="text-xs text-muted-foreground">
-                          First Name <span className="text-red-500">*</span>
+                          {t("field_first_name")} <span className="text-red-500">*</span>
                         </FieldLabel>
                         <Input
-                          defaultValue="John"
+                          value={profileFirstName}
+                          onChange={(e) => handleFirstNameChange(e.target.value)}
                           className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                         />
                       </Field>
 
                       <Field>
-                        <FieldLabel className="text-xs text-muted-foreground">Username</FieldLabel>
+                        <FieldLabel className="text-xs text-muted-foreground">{t("field_username")}</FieldLabel>
                         <Input
-                          defaultValue="johndoe"
+                          value={profileUsername}
+                          onChange={(e) => setProfileUsername(e.target.value)}
                           className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                         />
                       </Field>
 
                       <Field>
-                        <FieldLabel className="text-xs text-muted-foreground">Time Zone</FieldLabel>
-                        <Select defaultValue="asia-kolkata">
+                        <FieldLabel className="text-xs text-muted-foreground">{t("field_time_zone")}</FieldLabel>
+                        <Select
+                          value={profileTimeZone}
+                          onValueChange={(val: ProfileTimeZone) => setProfileTimeZone(val)}
+                        >
                           <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
-                            <SelectValue placeholder="Time Zone" />
+                            <SelectValue placeholder={t("field_time_zone")} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="asia-kolkata">Asia/Kolkata</SelectItem>
@@ -376,9 +614,10 @@ export function MySettingsForm() {
                       </Field>
 
                       <Field>
-                        <FieldLabel className="text-xs text-muted-foreground">Last Name</FieldLabel>
+                        <FieldLabel className="text-xs text-muted-foreground">{t("field_last_name")}</FieldLabel>
                         <Input
-                          defaultValue="Doe"
+                          value={profileLastName}
+                          onChange={(e) => handleLastNameChange(e.target.value)}
                           className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs"
                         />
                       </Field>
@@ -388,7 +627,7 @@ export function MySettingsForm() {
                   <Separator className="my-6" />
 
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold">Comments</h3>
+                    <h3 className="text-sm font-semibold">{t("comments")}</h3>
 
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
@@ -398,7 +637,7 @@ export function MySettingsForm() {
                       </Avatar>
                       <div className="relative flex-1">
                         <Input
-                          placeholder="Type a reply / comment"
+                          placeholder={t("comment_placeholder")}
                           className="bg-muted/20 border-muted-foreground/20 h-9 text-xs pr-10"
                         />
                         <Button variant="ghost" size="icon" className="absolute right-1 top-1 size-7 text-muted-foreground hover:text-foreground">
@@ -412,9 +651,9 @@ export function MySettingsForm() {
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">Activity</h3>
+                      <h3 className="text-sm font-semibold">{t("activity")}</h3>
                       <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-                        <Plus className="size-3.5 mr-1" /> New Email
+                        <Plus className="size-3.5 mr-1" /> {t("new_email")}
                       </Button>
                     </div>
 
@@ -423,8 +662,9 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> changed the value of Username from <span className="font-medium">john</span> to <span className="font-medium">johndoe</span> ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_changed_username")}{" "}
+                            <span className="font-medium">john</span> → <span className="font-medium">johndoe</span> ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -433,8 +673,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> last edited this ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_last_edited")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -443,8 +683,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> added rows for Social Logins ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_added_rows")} {t("act_social_logins")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -453,8 +693,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> removed rows for Social Logins ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_removed_rows")} {t("act_social_logins")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -464,10 +704,10 @@ export function MySettingsForm() {
 
                 <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold text-sm text-foreground">John Doe</h4>
-                      <p className="text-muted-foreground text-xs font-mono">john.doe@demo.com</p>
-                    </div>
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground">{profileFullName}</h4>
+                        <p className="text-muted-foreground text-xs font-mono">{profileEmail}</p>
+                      </div>
                     <Button variant="ghost" size="icon" className="size-6">
                       <Copy className="size-3.5 text-muted-foreground" />
                     </Button>
@@ -479,7 +719,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <UserIcon className="size-3.5" />
-                        Assign
+                        {t("assign")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -487,7 +727,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <Paperclip className="size-3.5" />
-                        Attachments
+                        {t("attachments")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -495,7 +735,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <Share2 className="size-3.5" />
-                        Share
+                        {t("share")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -506,11 +746,11 @@ export function MySettingsForm() {
                   <div className="space-y-3 text-muted-foreground text-[11px]">
                     <div>
                       <p className="font-medium text-foreground">Administrator</p>
-                      <p>last edited this · 1 year ago</p>
+                      <p>{t("last_edited")} · {t("time_year_ago")}</p>
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Administrator</p>
-                      <p>created this · 1 year ago</p>
+                      <p>{t("created")} · {t("time_year_ago")}</p>
                     </div>
                   </div>
                 </div>
@@ -521,7 +761,7 @@ export function MySettingsForm() {
                   <div className="space-y-3">
                     <Collapsible open={yulaAiSettingsOpen} onOpenChange={setYulaAiSettingsOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Yula AI & LLM Settings</span>
+                        <span>{t("ai_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             yulaAiSettingsOpen ? "rotate-180" : ""
@@ -530,24 +770,24 @@ export function MySettingsForm() {
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 space-y-4">
                         <p className="text-xs text-muted-foreground">
-                          Yula AI'ın akıl yürütme motorunu ve model sağlayıcısını yapılandırın.
+                          {t("ai_description")}
                         </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <Field>
                             <FieldLabel className="text-xs text-muted-foreground">
-                              AI Provider
+                              {t("ai_provider")}
                             </FieldLabel>
                             <Select
                               value={aiProvider}
                               onValueChange={(val: any) => handleProviderChange(val)}
                             >
                               <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
-                                <SelectValue placeholder="Select Provider" />
+                                <SelectValue placeholder={t("ai_provider_ph")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="azure">Microsoft Foundry (Azure OpenAI)</SelectItem>
-                                <SelectItem value="ollama">Yerel Ollama (Gemma 4 / Llama 3 / Offline)</SelectItem>
+                                <SelectItem value="ollama">{t("provider_ollama")}</SelectItem>
                                 <SelectItem value="openai">OpenAI / Custom OpenAI-Compatible</SelectItem>
                                 <SelectItem value="agnes">Agnes (agnes-2.5-flash)</SelectItem>
                                 <SelectItem value="google">Google AI SDK (Gemini 2.5 Flash / Pro)</SelectItem>
@@ -557,7 +797,7 @@ export function MySettingsForm() {
 
                           <Field>
                             <FieldLabel className="text-xs text-muted-foreground">
-                              Model Name
+                              {t("ai_model")}
                             </FieldLabel>
                             <Input
                               value={aiModel}
@@ -569,7 +809,7 @@ export function MySettingsForm() {
 
                           <Field>
                             <FieldLabel className="text-xs text-muted-foreground">
-                              API / Host Endpoint URL
+                              {t("ai_endpoint")}
                             </FieldLabel>
                             <Input
                               value={aiEndpoint}
@@ -581,14 +821,14 @@ export function MySettingsForm() {
 
                           <Field>
                             <FieldLabel className="text-xs text-muted-foreground">
-                              API Key
+                              {t("ai_api_key")}
                             </FieldLabel>
                             <div className="relative">
                               <Input
                                 type={showApiKey ? "text" : "password"}
                                 value={aiApiKey}
                                 onChange={(e) => setAiApiKey(e.target.value)}
-                                placeholder={aiProvider === "ollama" ? "Not required for local model" : "sk-..."}
+                                placeholder={aiProvider === "ollama" ? t("ai_api_key_ph_local") : "sk-..."}
                                 className="bg-muted/30 border-muted-foreground/20 font-medium h-9 text-xs pr-8"
                               />
                               <button
@@ -603,7 +843,7 @@ export function MySettingsForm() {
 
                           <Field>
                             <FieldLabel className="text-xs text-muted-foreground">
-                              Düşünme Derinliği (Thinking Level)
+                              {t("ai_thinking")}
                             </FieldLabel>
                             <Select
                               value={aiThinkingLevel}
@@ -612,24 +852,24 @@ export function MySettingsForm() {
                               }
                             >
                               <SelectTrigger className="bg-muted/30 border-muted-foreground/20 h-9 text-xs font-medium">
-                                <SelectValue placeholder="Seviye seçin" />
+                                <SelectValue placeholder={t("ai_thinking_ph")} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="off">Kapalı (En hızlı)</SelectItem>
-                                <SelectItem value="low">Düşük</SelectItem>
-                                <SelectItem value="medium">Orta</SelectItem>
-                                <SelectItem value="high">Yüksek (En derin akıl yürütme)</SelectItem>
+                                <SelectItem value="off">{t("think_off")}</SelectItem>
+                                <SelectItem value="low">{t("think_low")}</SelectItem>
+                                <SelectItem value="medium">{t("think_medium")}</SelectItem>
+                                <SelectItem value="high">{t("think_high")}</SelectItem>
                               </SelectContent>
                             </Select>
                             <p className="text-[11px] text-muted-foreground">
-                              Eforu desteklemeyen modelde sunucu bu ayarı yok sayar (AI SDK portable reasoning).
+                              {t("ai_thinking_note")}
                             </p>
                           </Field>
                         </div>
 
                         <div className="flex items-center justify-between pt-1">
                           <span className="text-xs text-muted-foreground">
-                            Aktif: <strong className="text-foreground">{aiProvider.toUpperCase()}</strong> ({aiModel})
+                            {t("ai_active")} <strong className="text-foreground">{aiProvider.toUpperCase()}</strong> ({aiModel})
                           </span>
                           <Button
                             type="button"
@@ -640,10 +880,10 @@ export function MySettingsForm() {
                             {aiSaved ? (
                               <>
                                 <Check className="size-3 text-emerald-300" />
-                                Saved & Active
+                                {t("ai_saved_active")}
                               </>
                             ) : (
-                              "Save AI Configuration"
+                              t("ai_save")
                             )}
                           </Button>
                         </div>
@@ -652,7 +892,7 @@ export function MySettingsForm() {
 
                     <Collapsible open={systemFactsOpen} onOpenChange={setSystemFactsOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Yula Kalıcı Sistem Bilgileri (System Facts)</span>
+                        <span>{t("facts_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             systemFactsOpen ? "rotate-180" : ""
@@ -661,13 +901,11 @@ export function MySettingsForm() {
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 space-y-3">
                         <p className="text-xs text-muted-foreground">
-                          Yula'nın her sohbette hatırlayacağı kalıcı bilgiler (örn: varsayılan depo, para birimi,
-                          rapor tercihi). Kayıt kullanıcı onayınızla yapılır ve diskte saklanır; her task turunda
-                          sistem bağlamına eklenir.
+                          {t("facts_description")}
                         </p>
 
                         {Object.keys(systemFacts).length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">Henüz kalıcı bilgi kaydedilmedi.</p>
+                          <p className="text-xs text-muted-foreground italic">{t("facts_empty")}</p>
                         ) : (
                           <div className="space-y-1.5">
                             {Object.entries(systemFacts)
@@ -683,7 +921,7 @@ export function MySettingsForm() {
                                     variant="ghost"
                                     size="icon"
                                     className="size-6 text-muted-foreground hover:text-red-500"
-                                    aria-label={`${k} bilgisini sil`}
+                                    aria-label={t("fact_delete_aria", { key: k })}
                                     onClick={() => handleDeleteSystemFact(k)}
                                   >
                                     <Trash2 className="size-3" />
@@ -698,7 +936,7 @@ export function MySettingsForm() {
                             <Input
                               value={factKey}
                               onChange={(e) => setFactKey(e.target.value)}
-                              placeholder="Anahtar (örn: varsayılan depo)"
+                              placeholder={t("fact_key_ph")}
                               className="bg-muted/30 border-muted-foreground/20 h-9 text-xs"
                             />
                           </div>
@@ -708,7 +946,7 @@ export function MySettingsForm() {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleSaveSystemFact()
                             }}
-                            placeholder="Değer (örn: MAIN)"
+                            placeholder={t("fact_value_ph")}
                             className="flex-1 bg-muted/30 border-muted-foreground/20 h-9 text-xs"
                           />
                           <Button
@@ -721,10 +959,10 @@ export function MySettingsForm() {
                             {factSaved ? (
                               <>
                                 <Check className="size-3 text-emerald-300" />
-                                Kaydedildi
+                                {t("fact_remembered")}
                               </>
                             ) : (
-                              "Hatırla"
+                              t("fact_remember")
                             )}
                           </Button>
                         </div>
@@ -733,7 +971,7 @@ export function MySettingsForm() {
 
                     <Collapsible open={changePasswordOpen} onOpenChange={setChangePasswordOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Change Password</span>
+                        <span>{t("pwd_section_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             changePasswordOpen ? "rotate-180" : ""
@@ -741,13 +979,13 @@ export function MySettingsForm() {
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 text-xs text-muted-foreground space-y-3">
-                        <p>Old Password & New Password controls.</p>
+                        <p>{t("pwd_body")}</p>
                       </CollapsibleContent>
                     </Collapsible>
 
                     <Collapsible open={documentFollowOpen} onOpenChange={setDocumentFollowOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Document Follow</span>
+                        <span>{t("doc_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             documentFollowOpen ? "rotate-180" : ""
@@ -755,13 +993,13 @@ export function MySettingsForm() {
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 text-xs text-muted-foreground">
-                        Document follow notification preferences.
+                        {t("doc_body")}
                       </CollapsibleContent>
                     </Collapsible>
 
                     <Collapsible open={emailOpen} onOpenChange={setEmailOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Email</span>
+                        <span>{t("email_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             emailOpen ? "rotate-180" : ""
@@ -769,13 +1007,13 @@ export function MySettingsForm() {
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 text-xs text-muted-foreground">
-                        Email notification settings.
+                        {t("email_body")}
                       </CollapsibleContent>
                     </Collapsible>
 
                     <Collapsible open={workspaceOpen} onOpenChange={setWorkspaceOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Workspace</span>
+                        <span>{t("ws_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             workspaceOpen ? "rotate-180" : ""
@@ -783,13 +1021,13 @@ export function MySettingsForm() {
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 text-xs text-muted-foreground">
-                        Workspace display preferences.
+                        {t("ws_body")}
                       </CollapsibleContent>
                     </Collapsible>
 
                     <Collapsible open={appOpen} onOpenChange={setAppOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>App</span>
+                        <span>{t("app_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             appOpen ? "rotate-180" : ""
@@ -797,21 +1035,21 @@ export function MySettingsForm() {
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-3 pl-2 text-xs text-muted-foreground">
-                        App UI settings.
+                        {t("app_body")}
                       </CollapsibleContent>
                     </Collapsible>
 
                     <Collapsible open={thirdPartyAuthOpen} onOpenChange={setThirdPartyAuthOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
-                        <span>Third Party Authentication</span>
+                        <span>{t("tpa_title")}</span>
                         <ChevronDown
                           className={`size-4 text-muted-foreground transition-transform duration-200 ${
                             thirdPartyAuthOpen ? "rotate-180" : ""
                           }`}
                         />
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-4 space-y-3">
-                        <h4 className="text-xs font-medium text-muted-foreground">Social Logins</h4>
+<CollapsibleContent className="pt-4 space-y-3">
+                        <h4 className="text-xs font-medium text-muted-foreground">{t("social_logins")}</h4>
                         
                         <div className="rounded-md border bg-card overflow-hidden">
                           <Table>
@@ -835,7 +1073,7 @@ export function MySettingsForm() {
                                   <Checkbox />
                                 </TableCell>
                                 <TableCell className="font-medium text-foreground">1</TableCell>
-                                <TableCell className="font-medium text-foreground">frappe</TableCell>
+                                <TableCell className="font-medium text-foreground">{t("provider_ollama")}</TableCell>
                                 <TableCell className="text-muted-foreground"></TableCell>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
                                   4a770832b401964e1dc7d3ecd080...
@@ -856,7 +1094,7 @@ export function MySettingsForm() {
                   <Separator className="my-6" />
 
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold">Comments</h3>
+                    <h3 className="text-sm font-semibold">{t("comments")}</h3>
 
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
@@ -866,7 +1104,7 @@ export function MySettingsForm() {
                       </Avatar>
                       <div className="relative flex-1">
                         <Input
-                          placeholder="Type a reply / comment"
+                          placeholder={t("comment_placeholder")}
                           className="bg-muted/20 border-muted-foreground/20 h-9 text-xs pr-10"
                         />
                         <Button variant="ghost" size="icon" className="absolute right-1 top-1 size-7 text-muted-foreground hover:text-foreground">
@@ -880,9 +1118,9 @@ export function MySettingsForm() {
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">Activity</h3>
+                      <h3 className="text-sm font-semibold">{t("activity")}</h3>
                       <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-                        <Plus className="size-3.5 mr-1" /> New Email
+                        <Plus className="size-3.5 mr-1" /> {t("new_email")}
                       </Button>
                     </div>
 
@@ -891,8 +1129,9 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> changed the value of Username from <span className="font-medium">john</span> to <span className="font-medium">johndoe</span> ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_changed_username")}{" "}
+                            <span className="font-medium">john</span> → <span className="font-medium">johndoe</span> ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -901,8 +1140,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> last edited this ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_last_edited")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -911,8 +1150,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> added rows for Social Logins ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_added_rows")} {t("act_social_logins")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -921,8 +1160,8 @@ export function MySettingsForm() {
                         <TimelineDot />
                         <TimelineContent>
                           <TimelineTitle>
-                            <span className="font-medium">Administrator</span> removed rows for Social Logins ·{" "}
-                            <TimelineTime>1 year ago</TimelineTime>
+                            <span className="font-medium">Administrator</span> {t("act_removed_rows")} {t("act_social_logins")} ·{" "}
+                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
                           </TimelineTitle>
                         </TimelineContent>
                       </TimelineItem>
@@ -932,10 +1171,10 @@ export function MySettingsForm() {
 
                 <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold text-sm text-foreground">John Doe</h4>
-                      <p className="text-muted-foreground text-xs font-mono">john.doe@demo.com</p>
-                    </div>
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground">{profileFullName}</h4>
+                        <p className="text-muted-foreground text-xs font-mono">{profileEmail}</p>
+                      </div>
                     <Button variant="ghost" size="icon" className="size-6">
                       <Copy className="size-3.5 text-muted-foreground" />
                     </Button>
@@ -947,7 +1186,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <UserIcon className="size-3.5" />
-                        Assign
+                        {t("assign")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -955,7 +1194,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <Paperclip className="size-3.5" />
-                        Attachments
+                        {t("attachments")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -963,7 +1202,7 @@ export function MySettingsForm() {
                     <Button variant="ghost" className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground">
                       <span className="flex items-center gap-2">
                         <Share2 className="size-3.5" />
-                        Share
+                        {t("share")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -974,17 +1213,17 @@ export function MySettingsForm() {
                   <div className="space-y-3 text-muted-foreground text-[11px]">
                     <div>
                       <p className="font-medium text-foreground">Administrator</p>
-                      <p>last edited this · 1 year ago</p>
+                      <p>{t("last_edited")} · {t("time_year_ago")}</p>
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Administrator</p>
-                      <p>created this · 1 year ago</p>
+                      <p>{t("created")} · {t("time_year_ago")}</p>
                     </div>
                   </div>
                 </div>
               </TabsContent>
               <TabsContent value="connections" className="p-6 m-0 text-xs text-muted-foreground">
-                Connected Social Logins & Roles
+                {t("connections_body")}
               </TabsContent>
             </Tabs>
           </div>
