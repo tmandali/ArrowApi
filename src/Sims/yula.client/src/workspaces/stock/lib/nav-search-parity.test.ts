@@ -1,11 +1,13 @@
 /**
  * Nav-Search parity: her workspace'ın nav menüsü (routes.ts) URL'leri
- * arama katalogu (stock-menu-registry.ts) ile hizalı kalmalı.
+ * arama katalogu (workspace-search-catalog.ts) ile hizalı kalmalı.
  *
  * Yürütme: npx tsx --test src/workspaces/stock/lib/nav-search-parity.test.ts
  *
- * Nav'daki modül sayfaları (dashboard hariç) arama listesinde karşılık
- * bulamazsa test düşer — bu sayede yeni nav modülü eklenirken arama
+ * Katalog nav'dan otomatik türetildiği için parity yapısal olarak sağlanır;
+ * bu test regresyon koruması olarak kalır (özellikle overlays + özel sayfalar
+ * için): nav'daki modül sayfaları (dashboard hariç) arama listesinde
+ * karşılık bulamazsa test düşer. — bu sayede yeni nav modülü eklenirken arama
  * kataloğuyla drift oluşması derhal yakalanır.
  *
  * Not: routes.ts importları dev-time testi içindir (tsx --test); prod bundle'a
@@ -13,7 +15,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert";
-import { ALL_WORKSPACE_MENU_ITEMS } from "./stock-menu-registry.ts";
+import { ALL_WORKSPACE_MENU_ITEMS } from "../../../lib/workspace-search-catalog";
 import { accountingNav } from "../../../workspaces/accounting/routes.ts";
 import { manufacturingNav } from "../../../workspaces/manufacturing/routes.ts";
 import { sellingNav } from "../../../workspaces/selling/routes.ts";
