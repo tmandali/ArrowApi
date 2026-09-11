@@ -9,6 +9,9 @@ import {
   USER_AGENT_ATTACHMENTS_TOTAL_MAX_CHARS,
   agentAttachmentsSize,
   lintAgentInstructions,
+  localizeAgentToolCatalog,
+  localizeProviderOptions,
+  resolveValidationIssue,
   validateAgentAttachmentFile,
   validateUserAgent,
   type UserAgent,
@@ -90,6 +93,18 @@ export function AgentEditor({
   // remount ettiği için state başlangıcı her seçimde agent'tan gelir).
   const isRO = mode === "view"
   const t = useTranslations("AgentEditor")
+  const tv = useTranslations("Validation")
+
+  // Veri kataloğu label'ları render anında yerelleştirilir (tool `name` /
+  // provider `id` model katmanında dil bağımsız kalır).
+  const toolCatalog = React.useMemo(
+    () => localizeAgentToolCatalog(AGENT_TOOL_CATALOG, t),
+    [t],
+  );
+  const providerOptions = React.useMemo(
+    () => localizeProviderOptions(AGENT_PROVIDER_OPTIONS, t),
+    [t],
+  );
 
   const agents = useUserAgentsStore((s) => s.agents);
   const upsertAgent = useUserAgentsStore((s) => s.upsertAgent);
@@ -189,7 +204,7 @@ export function AgentEditor({
     if (isRO) return;
     const err = validateUserAgent({ name, instructions: agentMd }, takenNames);
     if (err) {
-      setError(err);
+      setError(resolveValidationIssue(err, tv));
       return;
     }
     // Sistem slash'larıyla çakışan ajan adı engellenir (palet karışmasın).
@@ -248,7 +263,7 @@ export function AgentEditor({
             next.map((f) => f.name),
           );
           if (err) {
-            setError(err);
+            setError(resolveValidationIssue(err, tv));
             continue;
           }
           if (
@@ -356,9 +371,9 @@ export function AgentEditor({
                   variant="form"
                   value={joinMultiValue(tools)}
                   onChange={(v) => setTools(splitMultiValue(v))}
-                  options={AGENT_TOOL_CATALOG.map((t) => ({
-                    value: t.name,
-                    label: t.label,
+                  options={toolCatalog.map((x) => ({
+                    value: x.name,
+                    label: x.label,
                   }))}
                   placeholder={t("tool_select_placeholder")}
                   disabled={isRO}
@@ -408,7 +423,7 @@ export function AgentEditor({
                         setCustomModel(false);
                       }
                     }}
-                    options={AGENT_PROVIDER_OPTIONS.map((p) => ({
+                    options={providerOptions.map((p) => ({
                       value: p.id,
                       label: p.id ? p.label : t("general_settings"),
                     }))}
@@ -597,12 +612,12 @@ export function AgentEditor({
             role="note"
             className="mb-2 shrink-0 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-3 py-2"
           >
-            {lintAgentInstructions(agentMd).map((w) => (
+            {lintAgentInstructions(agentMd).map((code) => (
               <p
-                key={w.slice(0, 32)}
+                key={code}
                 className="text-[11.5px] leading-relaxed text-amber-700 dark:text-amber-300"
               >
-                ⚠ {w}
+                ⚠ {tv(code)}
               </p>
             ))}
           </div>

@@ -88,7 +88,7 @@
     "last_edited": "last edited this",
     "created": "created this",
     "ai_title": "Yula AI & LLM Settings",
-    "ai_description": "Configure Yula AI's reasoning engine and model provider.",
+    "ai_description": "Configure Yula AI''s reasoning engine and model provider.",
     "ai_provider": "AI Provider",
     "ai_provider_ph": "Select Provider",
     "provider_ollama": "Local Ollama (Gemma 4 / Llama 3 / Offline)",
@@ -510,14 +510,14 @@
         },
         "task-mfg-2": {
           "title": "Shift 2 Downtime Analysis",
-          "subtitle": "Report of yesterday's 45-minute power failure",
+          "subtitle": "Report of yesterday''s 45-minute power failure",
           "priority_label": "Medium",
           "deadline": "2 Days",
           "assigned_by": "Production Manager"
         },
         "task-mfg-3": {
           "title": "Workstation Ergonomics Training",
-          "subtitle": "Enter the assembly operators' attendance list into the system",
+          "subtitle": "Enter the assembly operators'' attendance list into the system",
           "priority_label": "Normal",
           "deadline": "This Week",
           "assigned_by": "HR / EHS"
@@ -755,7 +755,7 @@
     "results_loading": "Loading results...",
     "no_result_found": "No module or conversation found for \"{query}\".",
     "no_conversation_yet": "No conversations yet. Start a chat with Yula and your conversations will appear here.",
-    "search_hint": "Searching modules, reports and chat history as you type; describe what you want to do if you can't remember exactly.",
+    "search_hint": "Searching modules, reports and chat history as you type; describe what you want to do if you can''t remember exactly.",
     "menus_label": "Menus",
     "no_modules": "No modules found.",
     "chats_label": "Chat History",
@@ -1131,7 +1131,7 @@
     "system": "System"
   },
   "ReportGrid": {
-    "partial_memory_title": "The browser's WebAssembly memory limit was reached — only the portion downloaded from the server is shown. The refresh button tries again.",
+    "partial_memory_title": "The browser''s WebAssembly memory limit was reached — only the portion downloaded from the server is shown. The refresh button tries again.",
     "export_preparing": "{label} is being prepared...",
     "export_format_xlsx": "Excel file",
     "export_format_parquet": "Parquet file",
@@ -1154,7 +1154,7 @@
     "filter_placeholder": "Filter…",
     "filter_input_title": "You can type a search term, space-separated words, a range (10..50), >100, or '' for empty cells",
     "excel_limit_title": "Excel Export Limit Exceeded",
-    "excel_limit_desc": "This report has {count} rows. Microsoft Excel's single-sheet limit is 1,048,576 rows, and Excel will freeze or crash with data sets over 2 million rows.",
+    "excel_limit_desc": "This report has {count} rows. Microsoft Excel''s single-sheet limit is 1,048,576 rows, and Excel will freeze or crash with data sets over 2 million rows.",
     "excel_limit_solution_label": "Suggested solution:",
     "excel_limit_solution_text": "To prevent the Excel application from freezing, please narrow the date, branch, customer or product filters so the result stays under 1–2 million rows.",
     "btn_edit_filters": "Edit Filters",
@@ -1372,7 +1372,7 @@
     },
     "report-run-job": {
       "label": "Suggest & Run",
-      "description": "Interprets the open report's schema, suggests options, and fills criteria per selection",
+      "description": "Interprets the open report''s schema, suggests options, and fills criteria per selection",
       "prompt": "Interpret the report schema and its required fields, and suggest 1-2 options."
     },
     "user_skill_default": "User skill"
@@ -1394,5 +1394,48 @@
       "label": "Daily summary",
       "description": "Summarizes the day's highlights from the open report's latest data"
     }
+  },
+  "AgentCatalog": {
+    "tool_run_job": "Run report",
+    "tool_apply_criteria": "Apply criteria",
+    "tool_find_matching_report": "Find existing report",
+    "tool_open_last_report": "Open last report",
+    "tool_list_report_executions": "Run history",
+    "tool_cancel_job": "Cancel job",
+    "tool_navigate_to_page": "Navigate to page",
+    "tool_get_report_schema": "Read schema",
+    "tool_validate_criteria_input": "Validate criteria",
+    "tool_get_current_criteria": "Read form",
+    "tool_ask_user_question": "Ask user a question",
+    "tool_suggest_next_steps": "Suggest next steps",
+    "tool_request_user_confirmation": "Request confirmation",
+    "tool_run_user_skill": "Run skill",
+    "tool_run_skill_script": "Run skill script",
+    "tool_read_skill_file": "Read skill file",
+    "tool_grid-tools": "Grid tools (table/SQL/chart)",
+    "provider_azure": "Azure Foundry",
+    "provider_ollama": "Ollama (local)",
+    "provider_openai": "OpenAI",
+    "provider_agnes": "Agnes"
+  },
+  "Validation": {
+    "agent_name_empty": "Agent name cannot be empty (e.g., Accounting Expert).",
+    "agent_name_taken": "\"{name}\" is already in use — choose a different name.",
+    "agent_instructions_empty": "Persona instructions cannot be empty — describe how the agent should behave.",
+    "file_name_empty": "File name cannot be empty.",
+    "file_name_too_long": "File name must not exceed {max} characters.",
+    "file_name_no_folder": "File name cannot include a folder path.",
+    "file_ext_only": "Only {exts} files are accepted.",
+    "file_already_added": "\"{name}\" is already attached — choose a different name.",
+    "file_is_empty": "\"{name}\" is an empty file.",
+    "file_too_large": "\"{name}\" must not exceed {max}K characters ({size}K).",
+    "skill_slash_empty": "Slash name cannot be empty (e.g., weekly-summary).",
+    "skill_slash_invalid_chars": "Slash name may contain letters, digits, hyphens, and underscores.",
+    "skill_slash_taken": "/{slash} is already in use — choose a different name.",
+    "skill_label_empty": "Title cannot be empty.",
+    "skill_prompt_empty": "Prompt text cannot be empty.",
+    "lint_bypass": "Approval bypass enforced: phrases like \"run without asking\" or \"without approval\" conflict with the phase wall — the model still requires confirmation for destructive/bulk operations.",
+    "lint_tool_ban": "Tool ban: most report/analysis requests cannot be answered without tools — the model will still call the needed tool. If a restriction is needed, use the tool allowlist.",
+    "lint_single_lang": "Single-language enforcement: it causes context poisoning — the response language always mirrors the user''s language. Remove this sentence."
   }
 }

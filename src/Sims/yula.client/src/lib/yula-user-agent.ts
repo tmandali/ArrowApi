@@ -101,26 +101,56 @@ export const USER_AGENT_ATTACHMENTS_TOTAL_MAX_CHARS = 200_000;
 /** Prompt'a (LEVEL 0) gömülen toplam üst sınır */
 export const USER_AGENT_ATTACHMENTS_PROMPT_MAX_CHARS = 24_000;
 
+/**
+ * Dil bağımsız validasyon konusu: lib fonksiyonları dil nötr `code` döner,
+ * ekran katmanı kodu `Validation` namespace'inden çözümleyerek yerelleştirir
+ * (lib'de hook/i18n olmadığı için mesaj metni lib'de tutulmaz).
+ */
+export interface ValidationIssue {
+  code: string;
+  params?: Record<string, string | number>;
+}
+
+/** Validasyon konusunu `Validation` namespace'inden mesaj metnine çevirir. */
+export function resolveValidationIssue(
+  issue: ValidationIssue | null,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string | null {
+  return issue ? t(issue.code, issue.params ?? {}) : null;
+}
+
 /** Ek dosya validasyonu — saf. */
 export function validateAgentAttachmentFile(
   file: { name: string; content: string },
   existingNames: string[],
-): string | null {
+): ValidationIssue | null {
   const name = file.name.trim();
-  if (!name) return "Dosya adı boş olamaz.";
-  if (name.length > 120) return "Dosya adı 120 karakteri geçemez.";
-  if (/[/\\]/.test(name)) return "Dosya adı klasör içeremez.";
+  if (!name) return { code: "file_name_empty" };
+  if (name.length > 120)
+    return { code: "file_name_too_long", params: { max: 120 } };
+  if (/[/\\]/.test(name)) return { code: "file_name_no_folder" };
   const lower = name.toLowerCase();
   const okExt = USER_AGENT_ATTACHMENT_EXTENSIONS.some((e) =>
     lower.endsWith(e),
   );
   if (!okExt)
-    return `Yalnızca ${USER_AGENT_ATTACHMENT_EXTENSIONS.join(", ")} okunur.`;
+    return {
+      code: "file_ext_only",
+      params: { exts: USER_AGENT_ATTACHMENT_EXTENSIONS.join(", ") },
+    };
   if (existingNames.map((n) => n.toLowerCase()).includes(lower))
-    return `"${name}" zaten ekli — başka ad seçin.`;
-  if (!file.content.trim()) return `"${name}" boş dosya.`;
+    return { code: "file_already_added", params: { name } };
+  if (!file.content.trim())
+    return { code: "file_is_empty", params: { name } };
   if (file.content.length > USER_AGENT_ATTACHMENT_MAX_CHARS)
-    return `"${name}" 32K karakteri geçemez (${(file.content.length / 1024).toFixed(1)}K).`;
+    return {
+      code: "file_too_large",
+      params: {
+        name,
+        max: USER_AGENT_ATTACHMENT_MAX_CHARS / 1024,
+        size: (file.content.length / 1024).toFixed(1),
+      },
+    };
   return null;
 }
 
@@ -131,7 +161,8 @@ export function agentAttachmentsSize(files: UserAgentAttachment[]): number {
 
 /**
  * Persona lint — saf. Talimatta faz duvarıyla çelişen dayatma varsa uyarı
- * döndürür (kaydetme engellenmez, yalnız uyarı). Sabit kalıp listesi:
+ * döndürür (kaydetme engellenmez, yalnız uyarı); bulgular `Validation`
+ * namespace kodlarıdır (dil bağımsız). Sabit kalıp listesi:
  * Türkçe + İngilizce kökler; noktalama/case duyarsız.
  */
 export function lintAgentInstructions(instructions: string): string[] {
@@ -151,9 +182,7 @@ export function lintAgentInstructions(instructions: string): string[] {
       /skip\s+(confirmation|approval)/,
     ])
   ) {
-    findings.push(
-      "Onay atlama dayatması: 'sormadan çalıştır', 'onaysız' gibi ifadeler faz duvarıyla çelişir — destructive/bulk işlemlerde model yine de onay ister.",
-    );
+    findings.push("lint_bypass");
   }
   if (
     hits([
@@ -163,9 +192,7 @@ export function lintAgentInstructions(instructions: string): string[] {
       /never\s+call\s+(any\s+)?tools?/,
     ])
   ) {
-    findings.push(
-      "Araç yasağı: azınlık rapor/analiz istekleri araçsız cevaplanamaz — model yine de gerekli aracı çağırır. Kısıtlama gerekiyorsa araç allowlist'ini kullanın.",
-    );
+    findings.push("lint_tool_ban");
   }
   if (
     hits([
@@ -175,9 +202,7 @@ export function lintAgentInstructions(instructions: string): string[] {
       /always\s+(respond|reply|answer)\s+in\s+turkish/,
     ])
   ) {
-    findings.push(
-      "Tek-dil dayatması: bağlam zehirlenmesine yol açar — yanıt dili her zaman kullanıcının dilini yansıtır. Bu cümleyi kaldırın.",
-    );
+    findings.push("lint_single_lang");
   }
   return findings;
 }
@@ -223,20 +248,41 @@ export const AGENT_TOOL_CATALOG: Array<{ name: string; label: string }> = [
   { name: GRID_TOOLS_TOKEN, label: "Grid araçları (tablo/SQL/grafik)" },
 ];
 
+/**
+ * Katalog label'larını render anında yerelleştirir (model katmanındaki tool
+ * `name` ve provider `id` dil bağımsız kalır; yalnızca görünen label
+ * `AgentCatalog` namespace'inden çözülür). `t`, AgentCatalog namespace'inden
+ * gelir.
+ */
+export function localizeAgentToolCatalog(
+  catalog: Array<{ name: string; label: string }>,
+  t: (key: string) => string,
+): Array<{ name: string; label: string }> {
+  return catalog.map((item) => ({ ...item, label: t(`tool_${item.name}`) }));
+}
+
+/** Boş `id` (genel ayar) çevrilemez — çağıran taraf özel durumunu korur. */
+export function localizeProviderOptions(
+  options: Array<{ id: string; label: string }>,
+  t: (key: string) => string,
+): Array<{ id: string; label: string }> {
+  return options.map((o) => (o.id ? { ...o, label: t(`provider_${o.id}`) } : o));
+}
+
 /** Editor validasyonu — saf. */
 export function validateUserAgent(
   draft: { name: string; instructions: string },
   takenNames: string[],
-): string | null {
+): ValidationIssue | null {
   const name = draft.name.trim();
-  if (!name) return "Ajan adı boş olamaz (örn: Muhasebe Uzmanı).";
+  if (!name) return { code: "agent_name_empty" };
   if (
     takenNames.map((n) => n.toLowerCase()).includes(name.toLowerCase())
   ) {
-    return `"${name}" zaten kullanımda — başka bir ad seçin.`;
+    return { code: "agent_name_taken", params: { name } };
   }
   if (!draft.instructions.trim())
-    return "Persona talimatı boş olamaz — ajanın nasıl davranacağını yazın.";
+    return { code: "agent_instructions_empty" };
   return null;
 }
 

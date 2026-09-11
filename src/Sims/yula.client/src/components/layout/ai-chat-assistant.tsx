@@ -19,7 +19,7 @@ import { workspaceIconFor } from "@/components/layout/workspace-brand"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { YulaAgentCards } from "@/components/layout/yula-agent-cards"
 import { useUserAgentsStore, ensureExampleAgent } from "@/lib/stores/user-agents"
-import { AGENT_PROVIDER_OPTIONS, agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agent"
+import { AGENT_PROVIDER_OPTIONS, agentScopeWorkspaceId, filterAgentsByScope, localizeProviderOptions } from "@/lib/yula-user-agent"
 import { readYulaClientAiConfig } from "@/lib/yula-ai-client-config"
 import {
   getAllYulaCommands,
@@ -316,6 +316,7 @@ function AIChatPanelSession({
   aboveInput,
 }: AIChatPanelProps = {}) {
   const t = useTranslations("ChatAssistant")
+  const tCat = useTranslations("AgentCatalog")
   const isSearchingHistory = useChatsStore((s) => s.isSearchingHistory)
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const yula = useYulaChat()
@@ -486,7 +487,9 @@ function AIChatPanelSession({
     const aiConfig = readYulaClientAiConfig()
     const providerId = effectiveAgent.provider || aiConfig.provider || ""
     const providerLabel =
-      AGENT_PROVIDER_OPTIONS.find((p) => p.id === providerId)?.label ??
+      localizeProviderOptions(AGENT_PROVIDER_OPTIONS, tCat).find(
+        (p) => p.id === providerId,
+      )?.label ??
       (providerId || t("inference_server_default"))
     const providerText = `${providerLabel}${effectiveAgent.provider ? "" : ` ${t("inference_general")}`}`
     const model = effectiveAgent.model || chatsModel || aiConfig.model || ""
@@ -498,7 +501,7 @@ function AIChatPanelSession({
     const thinkingOn = effectiveAgent.thinking ?? isThinkingEnabled
     const thinkingText = `${t("inference_thinking")}: ${thinkingOn ? t("inference_on") : t("inference_off")}${effectiveAgent.thinking === undefined ? ` ${t("inference_general")}` : ""}`
     return `${providerText} · ${modelText} · ${effortText} · ${thinkingText}`
-  }, [effectiveAgent, chatsModel, isThinkingEnabled, t])
+  }, [effectiveAgent, chatsModel, isThinkingEnabled, t, tCat])
   const tc = useTranslations("Commands")
   // Komut menüsündeki skill'ler ajanın seçtikleridir (açık seçim kapsamı
   // ezer; seçili ajan + boş liste = skill komutu yok).

@@ -40,7 +40,7 @@
     "empty_search": "Aramaya uygun kayıt yok.",
     "empty_new": "Henüz kullanıcı yok — Yeni Kullanıcı Ekle ile oluşturun.",
     "dialog_title": "Yeni Kullanıcı",
-    "dialog_description": "Kullanıcı dizine eklenir ve DB'ye yazılır.",
+    "dialog_description": "Kullanıcı dizine eklenir ve DB''ye yazılır.",
     "field_name": "Ad Soyad *",
     "field_email": "E-Posta",
     "field_role": "Rol",
@@ -88,7 +88,7 @@
     "last_edited": "son düzenledi",
     "created": "oluşturdu",
     "ai_title": "Yula AI & LLM Ayarları",
-    "ai_description": "Yula AI'ın akıl yürütme motorunu ve model sağlayıcısını yapılandırın.",
+    "ai_description": "Yula AI''ın akıl yürütme motorunu ve model sağlayıcısını yapılandırın.",
     "ai_provider": "AI Sağlayıcı",
     "ai_provider_ph": "Sağlayıcı seçin",
     "provider_ollama": "Yerel Ollama (Gemma 4 / Llama 3 / Çevrimdışı)",
@@ -107,7 +107,7 @@
     "ai_save": "AI Yapılandırmasını Kaydet",
     "ai_saved_active": "Kaydedildi & Aktif",
     "facts_title": "Yula Kalıcı Sistem Bilgileri (System Facts)",
-    "facts_description": "Yula'nın her sohbette hatırlayacağı kalıcı bilgiler (örn: varsayılan depo, para birimi, rapor tercihi). Kayıt kullanıcı onayınızla yapılır ve diskte saklanır; her task turunda sistem bağlamına eklenir.",
+    "facts_description": "Yula''nın her sohbette hatırlayacağı kalıcı bilgiler (örn: varsayılan depo, para birimi, rapor tercihi). Kayıt kullanıcı onayınızla yapılır ve diskte saklanır; her task turunda sistem bağlamına eklenir.",
     "facts_empty": "Henüz kalıcı bilgi kaydedilmedi.",
     "fact_key_ph": "Anahtar (örn: varsayılan depo)",
     "fact_value_ph": "Değer (örn: MAIN)",
@@ -165,7 +165,7 @@
           "title": "Teklif Kazanma Oranı",
           "value": "%68.4",
           "change": "+5.1% bu çeyrek",
-          "subtext": "42 tekliften 29'u onaylandı"
+          "subtext": "42 tekliften 29''u onaylandı"
         },
         "pending-approval": {
           "title": "Onay Bekleyenler",
@@ -258,7 +258,7 @@
         "stock-receipts": {
           "title": "Bekleyen Mal Kabuller",
           "value": "8 İrsaliye",
-          "change": "4'ü gümrükten indi",
+          "change": "4''ü gümrükten indi",
           "subtext": "Ana Depo Giriş"
         },
         "warehouse-occupancy": {
@@ -371,7 +371,7 @@
           "title": "KDV Beyannamesi",
           "value": "6 Gün Kaldı",
           "change": "Hesaplama tamamlandı",
-          "subtext": "Son gönderim: 26'sı"
+          "subtext": "Son gönderim: 26''sı"
         }
       },
       "pending_actions": {
@@ -452,7 +452,7 @@
         "active-work-orders": {
           "title": "Devam Eden İş Emirleri",
           "value": "14 Emir",
-          "change": "8'i montaj safhasında",
+          "change": "8''i montaj safhasında",
           "subtext": "Üretim hattı aktif"
         },
         "oee-efficiency": {
@@ -602,7 +602,7 @@
       "assigned_tasks": {
         "task-sub-1": {
           "title": "Yeni Fasoncu Firma Denetim Ziyareti",
-          "subtitle": "Bursa OSB'deki boyahane tesisinin kalite sertifikalarını incele",
+          "subtitle": "Bursa OSB''deki boyahane tesisinin kalite sertifikalarını incele",
           "priority_label": "Yüksek",
           "deadline": "Cuma",
           "assigned_by": "Tedarik Zinciri Müdürü"
@@ -761,7 +761,7 @@
     "chats_label": "Sohbet Geçmişi",
     "no_chats_found": "Yazışma bulunamadı.",
     "no_chats_yet": "Henüz bir yazışma bulunmuyor.",
-    "click_or_enter": "Gitmek için tıklayın veya Enter'a basın",
+    "click_or_enter": "Gitmek için tıklayın veya Enter''a basın",
     "match_score": "%{score} Eşleşme",
     "items_count": "{count} öğe",
     "examples_sentence": "(ör: {examples}). Sol kolon {menus} eşleşmelerini, sağ kolon {chats} eşleşmelerini listeler."
@@ -929,7 +929,7 @@
     "status_meta_request": "Durum, meta ve istek yükü",
     "refresh": "Yenile",
     "copy_guid": "GUID Kopyala",
-    "copy_report_url": "Rapor URL'sini Kopyala",
+    "copy_report_url": "Rapor URL''sini Kopyala",
     "copy_error": "Hatayı kopyala",
     "copy_to_clipboard": "Panoya kopyala",
     "delete_this_execution": "Bu çalışmayı sil?",
@@ -1017,8 +1017,8 @@
     "description_placeholder": "Ne zaman kullanılır?",
     "attachments": "Ek dosyalar",
     "prompt_placeholder": "Son 7 günün satış özetini çıkar: \\{\\{input\\}\\}",
-    "runs_in_server_sandbox": "Sunucu sandbox'ında çalışır",
-    "runs_in_server_sandbox_detail": "Sunucu sandbox'ında çalışır (run_skill_script).",
+    "runs_in_server_sandbox": "Sunucu sandbox''ında çalışır",
+    "runs_in_server_sandbox_detail": "Sunucu sandbox''ında çalışır (run_skill_script).",
     "slash_label": "Slash adı",
     "slash_example": "ornek-skill",
     "scope_label": "Kapsam",
@@ -1035,7 +1035,7 @@
     "new_skill": "Yeni skill",
     "cancel": "Vazgeç",
     "skill": "skill",
-    "no_skills_yet": "Henüz kullanıcı skill'i yok — Yeni Skill ile tanımlayın.",
+    "no_skills_yet": "Henüz kullanıcı skill''i yok — Yeni Skill ile tanımlayın.",
     "select_or_create": "Soldan bir skill seçin veya + ile oluşturun.",
     "delete_skill": "Skill''i sil",
     "delete_skill_aria": "/{slash} skill''ini sil"
@@ -1092,12 +1092,12 @@
     "preparing": "Ajan oturumu hazırlanıyor…",
     "not_found_title": "Ajan bulunamadı",
     "not_found_body": "Bu kimlikte bir ajan yok (silinmiş olabilir). Ajan listesinden yenisini seçin.",
-    "back_to_yula": "Yula'ya dön",
+    "back_to_yula": "Yula''ya dön",
     "manage_agents": "Ajanları yönet"
   },
   "AgentImageUpload": {
     "only_image": "Yalnızca görsel dosyası yüklenebilir.",
-    "too_large": "Görsel {size}KB'tan büyük olamaz.",
+    "too_large": "Görsel {size}KB''tan büyük olamaz.",
     "unreadable": "\"{name}\" okunamadı.",
     "image_name": "Ajan görseli",
     "svg_upload": "SVG yükle",
@@ -1154,7 +1154,7 @@
     "filter_placeholder": "Filtrele…",
     "filter_input_title": "Arama terimi, boşluklu kelimeler, aralık (10..50), >100 veya boş hücreler için '' yazabilirsiniz",
     "excel_limit_title": "Excel Dışa Aktarma Sınırı Aşıldı",
-    "excel_limit_desc": "Bu raporda {count} satır veri bulunmaktadır. Microsoft Excel'in tek sayfa sınırı 1.048.576 satırdır ve 2 milyonun üzerindeki veri kümelerinde Excel kilitlenmekte veya çökmektedir.",
+    "excel_limit_desc": "Bu raporda {count} satır veri bulunmaktadır. Microsoft Excel''in tek sayfa sınırı 1.048.576 satırdır ve 2 milyonun üzerindeki veri kümelerinde Excel kilitlenmekte veya çökmektedir.",
     "excel_limit_solution_label": "Önerilen Çözüm:",
     "excel_limit_solution_text": "Excel uygulamasının kilitlenmesini önlemek için lütfen tarih, şube, cari veya ürün filtrelerini daraltarak sonuçları en fazla 1-2 milyon satır ile sınırlandırın.",
     "btn_edit_filters": "Filtreleri Düzenle",
@@ -1290,7 +1290,7 @@
     "start_process": "\"{title}\" işlemini başlatmak için tıklayın",
     "open_report_results": "\"{title}\" sonuçlarını açmak için tıklayın",
     "line_count": "({count} satır)",
-    "show_in_grid": "Grid'de Göster (Tabloda Çalıştır)",
+    "show_in_grid": "Grid''de Göster (Tabloda Çalıştır)",
     "code_copied": "Kopyalandı",
     "copy_code": "Kodu kopyala",
     "file_failed": "Açılamadı — yol: {path}",
@@ -1375,7 +1375,7 @@
       "description": "Açık raporun şemasını yorumlayarak öneriler sunar, seçime göre kriterleri forma doldurur",
       "prompt": "Rapor şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
     },
-    "user_skill_default": "Kullanıcı skill'i"
+    "user_skill_default": "Kullanıcı skill''i"
   },
   "Skills": {
     "ay-kapanis": {
@@ -1394,5 +1394,48 @@
       "label": "Günlük özet",
       "description": "Açık raporun güncel verisinden günün öne çıkanlarını özetler"
     }
+  },
+  "AgentCatalog": {
+    "tool_run_job": "Rapor çalıştırma",
+    "tool_apply_criteria": "Kriter uygulama",
+    "tool_find_matching_report": "Mevcut rapor arama",
+    "tool_open_last_report": "Son raporu açma",
+    "tool_list_report_executions": "Çalışma geçmişi",
+    "tool_cancel_job": "İşi iptal etme",
+    "tool_navigate_to_page": "Sayfa gezinmesi",
+    "tool_get_report_schema": "Şema okuma",
+    "tool_validate_criteria_input": "Kriter doğrulama",
+    "tool_get_current_criteria": "Form okuma",
+    "tool_ask_user_question": "Kullanıcıya soru sorma",
+    "tool_suggest_next_steps": "Öneri sunma",
+    "tool_request_user_confirmation": "Onay isteme",
+    "tool_run_user_skill": "Skill çalıştırma",
+    "tool_run_skill_script": "Skill betiği",
+    "tool_read_skill_file": "Skill dosyası okuma",
+    "tool_grid-tools": "Grid araçları (tablo/SQL/grafik)",
+    "provider_azure": "Azure Foundry",
+    "provider_ollama": "Ollama (yerel)",
+    "provider_openai": "OpenAI",
+    "provider_agnes": "Agnes"
+  },
+  "Validation": {
+    "agent_name_empty": "Ajan adı boş olamaz (örn: Muhasebe Uzmanı).",
+    "agent_name_taken": "\"{name}\" zaten kullanımda — başka bir ad seçin.",
+    "agent_instructions_empty": "Persona talimatı boş olamaz — ajanın nasıl davranacağını yazın.",
+    "file_name_empty": "Dosya adı boş olamaz.",
+    "file_name_too_long": "Dosya adı {max} karakteri geçemez.",
+    "file_name_no_folder": "Dosya adı klasör içeremez.",
+    "file_ext_only": "Yalnızca {exts} okunur.",
+    "file_already_added": "\"{name}\" zaten ekli — başka ad seçin.",
+    "file_is_empty": "\"{name}\" boş dosya.",
+    "file_too_large": "\"{name}\" {max}K karakteri geçemez ({size}K).",
+    "skill_slash_empty": "Slash adı boş olamaz (örn: haftalik-ozet).",
+    "skill_slash_invalid_chars": "Slash adı harf, rakam, tire ve alt çizgi içerebilir.",
+    "skill_slash_taken": "/{slash} zaten kullanımda — başka bir ad seçin.",
+    "skill_label_empty": "Başlık boş olamaz.",
+    "skill_prompt_empty": "Prompt metni boş olamaz.",
+    "lint_bypass": "Onay atlama dayatması: \"sormadan çalıştır\", \"onaysız\" gibi ifadeler faz duvarıyla çelişir — destructive/bulk işlemlerde model yine de onay ister.",
+    "lint_tool_ban": "Araç yasağı: azınlık rapor/analiz istekleri araçsız cevaplanamaz — model yine de gerekli aracı çağırır. Kısıtlama gerekiyorsa araç allowlist''ini kullanın.",
+    "lint_single_lang": "Tek-dil dayatması: bağlam zehirlenmesine yol açar — yanıt dili her zaman kullanıcının dilini yansıtır. Bu cümleyi kaldırın."
   }
 }

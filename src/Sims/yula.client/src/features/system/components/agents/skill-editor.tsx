@@ -12,6 +12,7 @@ import {
   type UserSkill,
   type UserSkillFile,
 } from "@/lib/yula-user-skill";
+import { resolveValidationIssue } from "@/lib/yula-user-agent";
 import {
   BUILT_IN_SKILL_FILES,
   BUILT_IN_SKILL_SOURCES,
@@ -89,6 +90,7 @@ export function SkillEditor({
   // remount ettiği için state başlangıcı her seçimde skill'den gelir).
   const isRO = mode === "view"
   const t = useTranslations("SkillEditor")
+  const tv = useTranslations("Validation")
 
   const skills = useUserSkillsStore((s) => s.skills);
   const upsertSkill = useUserSkillsStore((s) => s.upsertSkill);
@@ -129,7 +131,7 @@ export function SkillEditor({
       takenSlashes,
     );
     if (err) {
-      setError(err);
+      setError(resolveValidationIssue(err, tv));
       return;
     }
     const saved = upsertSkill({
@@ -179,7 +181,7 @@ export function SkillEditor({
             next.map((f) => f.name),
           );
           if (err) {
-            setFileError(err);
+            setFileError(resolveValidationIssue(err, tv));
             continue;
           }
           if (

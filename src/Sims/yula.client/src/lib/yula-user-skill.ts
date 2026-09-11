@@ -3,6 +3,7 @@
  * Persist/store tarafı `lib/stores/user-skills.ts` içindedir.
  * Yerleşik skill gövdeleri `lib/built-in-skills.ts` içindedir (bundler-only).
  */
+import type { ValidationIssue } from "./yula-user-agent";
 export interface UserSkill {
   id: string;
   /** Slash tetikleyici (önsiz, örn: "haftalik-ozet") */
@@ -46,20 +47,31 @@ export const USER_SKILL_FILES_TOTAL_MAX_CHARS = 200_000;
 export function validateUserSkillFile(
   file: { name: string; content: string },
   existingNames: string[],
-): string | null {
+): ValidationIssue | null {
   const name = file.name.trim();
-  if (!name) return "Dosya adı boş olamaz.";
-  if (name.length > 120) return "Dosya adı 120 karakteri geçemez.";
-  if (/[/\\]/.test(name)) return "Dosya adı klasör içeremez.";
+  if (!name) return { code: "file_name_empty" };
+  if (name.length > 120)
+    return { code: "file_name_too_long", params: { max: 120 } };
+  if (/[/\\]/.test(name)) return { code: "file_name_no_folder" };
   const lower = name.toLowerCase();
   const okExt = USER_SKILL_FILE_EXTENSIONS.some((e) => lower.endsWith(e));
   if (!okExt)
-    return `Yalnızca ${USER_SKILL_FILE_EXTENSIONS.join(", ")} okunur.`;
+    return {
+      code: "file_ext_only",
+      params: { exts: USER_SKILL_FILE_EXTENSIONS.join(", ") },
+    };
   if (existingNames.map((n) => n.toLowerCase()).includes(lower))
-    return `"${name}" zaten ekli — başka ad seçin.`;
-  if (!file.content.trim()) return `"${name}" boş dosya.`;
+    return { code: "file_already_added", params: { name } };
+  if (!file.content.trim()) return { code: "file_is_empty", params: { name } };
   if (file.content.length > USER_SKILL_FILE_MAX_CHARS)
-    return `"${name}" 32K karakteri geçemez (${(file.content.length / 1024).toFixed(1)}K).`;
+    return {
+      code: "file_too_large",
+      params: {
+        name,
+        max: USER_SKILL_FILE_MAX_CHARS / 1024,
+        size: (file.content.length / 1024).toFixed(1),
+      },
+    };
   return null;
 }
 
@@ -199,15 +211,15 @@ const SLASH_RE = /^[a-z0-9][a-z0-9-_çğıöşü]*$/i;
 export function validateUserSkill(
   draft: { slash: string; label: string; prompt: string },
   takenSlashes: string[],
-): string | null {
+): ValidationIssue | null {
   const slash = draft.slash.trim().toLowerCase();
-  if (!slash) return "Slash adı boş olamaz (örn: haftalik-ozet).";
+  if (!slash) return { code: "skill_slash_empty" };
   if (!SLASH_RE.test(slash))
-    return "Slash adı harf, rakam, tire ve alt çizgi içerebilir.";
+    return { code: "skill_slash_invalid_chars" };
   if (takenSlashes.includes(slash))
-    return `/${slash} zaten kullanımda — başka bir ad seçin.`;
-  if (!draft.label.trim()) return "Başlık boş olamaz.";
-  if (!draft.prompt.trim()) return "Prompt metni boş olamaz.";
+    return { code: "skill_slash_taken", params: { slash } };
+  if (!draft.label.trim()) return { code: "skill_label_empty" };
+  if (!draft.prompt.trim()) return { code: "skill_prompt_empty" };
   return null;
 }
 
