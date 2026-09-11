@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Sparkles,
   Package,
@@ -91,6 +91,8 @@ function SearchResultRow({
   onTogglePin,
 }: SearchResultRowProps) {
   const t = useTranslations("SearchMainView")
+  const locale = useLocale()
+  const isTr = locale === "tr"
   const isEditingConv = isEditing && !!item.conversationId;
 
   return (
@@ -147,14 +149,10 @@ function SearchResultRow({
       ) : (
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {getCategoryIcon(item.category, !item.isExactMatch)}
+          {/* Menü adı tek dillidir: aktif locale'e göre başlık seçilir (TR → titleTr, EN → title). */}
           <span className="truncate text-xs leading-tight font-normal text-foreground/90 group-hover:text-foreground">
-            {item.title}
+            {isTr ? item.titleTr || item.title : item.title}
           </span>
-          {item.titleTr && item.titleTr !== item.title ? (
-            <span className="text-[10px] text-muted-foreground/50 truncate font-normal">
-              [{item.titleTr}]
-            </span>
-          ) : null}
         </div>
       )}
 

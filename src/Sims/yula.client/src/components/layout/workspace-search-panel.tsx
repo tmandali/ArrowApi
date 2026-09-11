@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import {
   Command,
@@ -184,6 +184,8 @@ export function WorkspaceSearchResults({
   showFooter = true,
 }: WorkspaceSearchResultsProps) {
   const t = useTranslations("SearchMainView")
+  const locale = useLocale()
+  const isTr = locale === "tr"
   const { workspace } = useWorkspaceSearchMeta()
   const { groupedResults, results, isSearching } = useWorkspaceRagSearch(query, workspace)
 
@@ -235,13 +237,8 @@ export function WorkspaceSearchResults({
                   {getCategoryIcon(item.category, !item.isExactMatch)}
                   <div className="flex flex-col min-w-0">
                     <span className="truncate text-[11.5px] leading-tight font-normal text-foreground/90 group-hover:text-foreground">
-                      {item.title}
+                      {isTr ? item.titleTr || item.title : item.title}
                     </span>
-                    {item.titleTr && item.titleTr !== item.title ? (
-                      <span className="text-[10px] text-muted-foreground/60 truncate font-normal">
-                        {item.titleTr}
-                      </span>
-                    ) : null}
                   </div>
                 </div>
 
