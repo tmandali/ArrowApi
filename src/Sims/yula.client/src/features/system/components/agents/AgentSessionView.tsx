@@ -3,10 +3,96 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Bot } from "lucide-react";
+import { Bot, Settings, SquarePen } from "lucide-react";
 import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
+import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
+import { Button } from "@/components/ui/button";
+import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
+import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
+
+/**
+ * Ajan ana ekran başlığı: "{AjanAdı} – {SohbetAdı} · #KISA_NO".
+ * KISA_NO, aktif sohbet id'sinin son 6 hanesidir (belirsizliği önler);
+ * başlık boşsa "Yeni Sohbet" gösterilir. Native tooltip'te tam id tutulur.
+ */
+function AgentSessionHeaderTitle({
+  agentName,
+}: {
+  agentName: string;
+}) {
+  const activeId = useChatsStore((s) => s.activeId);
+  const conversations = useChatsStore((s) => s.conversations);
+  const activeConv = activeId
+    ? conversations.find((c) => c.id === activeId)
+    : undefined;
+  const chatName = activeConv?.title?.trim() || "Yeni Sohbet";
+  const shortNo = activeId
+    ? (activeId.split("-").pop() || activeId).slice(-6).toUpperCase()
+    : null;
+  const chatSuffix = shortNo ? `${chatName} · #${shortNo}` : chatName;
+  const text = `${agentName} – ${chatSuffix}`;
+  return (
+    <PageHeaderTitle
+      title={activeId ? `${text} (${activeId})` : text}
+      className="font-medium text-muted-foreground"
+    >
+      <span className="font-semibold text-primary">{agentName}</span>
+      <span>{` – ${chatSuffix}`}</span>
+    </PageHeaderTitle>
+  );
+}
+
+/**
+ * Başlık sağı aksiyonları: Yeni Sohbet + (custom ajan ise) Ajan Ayarları.
+ * Bu ekran yalnız custom user-ajan oturumudur (/agents/<id>), bu yüzden
+ * ayar butonu her zaman gösterilir — ajan düzenleme sayfasına gider.
+ */
+function AgentSessionHeaderActions({ agentId }: { agentId: string }) {
+  const router = useRouter();
+  const yula = useOptionalYulaChat();
+
+  const handleNewChat = () => {
+    if (yula) {
+      yula.newConversation();
+    } else {
+      useChatsStore.getState().newConversation();
+    }
+  };
+
+  const handleSettings = () => {
+    router.push(`/system/agents?edit=${encodeURIComponent(agentId)}`);
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 px-2.5 text-xs"
+        onClick={handleNewChat}
+        title="Yeni Sohbet Başlat"
+        aria-label="Yeni Sohbet Başlat"
+      >
+        <SquarePen className="size-3.5" />
+        <span className="hidden sm:inline">Yeni Sohbet</span>
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+        onClick={handleSettings}
+        title="Ajan Ayarları"
+        aria-label="Ajan Ayarları"
+      >
+        <Settings className="size-3.5" />
+      </Button>
+    </div>
+  );
+}
 
 /**
  * Ayrı ajan oturumu (full-screen): /agents/<agentId>.
@@ -25,15 +111,14 @@ export function AgentSessionView() {
   // `window` yoktur; zustand persist erken döner ve store'da `.persist`
   // oluşmaz — bu yüzden erişim SSR-güvenli (?.) olmalı. İlk render iki
   // ortamda da `false` verir (hydration uyumsuzluğu yok); istemcide effect
-  // içinde gerçek durum okunur.
-  const [hydrated, setHydrated] = React.useState(false);
+  // içinde gerçek durum okunur. Başlangıç değeri lazy okunur, effect yalnız
+  // bitmemiş hydration'a abone olur (senkron setState yok).
+  const [hydrated, setHydrated] = React.useState(
+    () => useUserAgentsStore.persist?.hasHydrated() ?? false,
+  );
   React.useEffect(() => {
-    const persistApi = useUserAgentsStore.persist;
-    if (persistApi?.hasHydrated()) {
-      setHydrated(true);
-      return;
-    }
-    return persistApi?.onFinishHydration(() => setHydrated(true));
+    if (useUserAgentsStore.persist?.hasHydrated()) return;
+    return useUserAgentsStore.persist?.onFinishHydration(() => setHydrated(true));
   }, []);
 
   // URL oturumu global seçimi besler (provider da aynı kuralı uygular).
@@ -83,7 +168,12 @@ export function AgentSessionView() {
   }
 
   return (
-    <WorkspacePageShell hideHeader>
+    <WorkspacePageShell
+      title={<AgentSessionHeaderTitle agentName={agent.name} />}
+      showSearch={false}
+      transparentHeader
+      actions={<AgentSessionHeaderActions agentId={agent.id} />}
+    >
       <AIChatPanel mode="main" />
     </WorkspacePageShell>
   );

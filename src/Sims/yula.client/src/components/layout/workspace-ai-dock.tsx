@@ -2,8 +2,8 @@
 
 // Workspace AI Dock component
 import * as React from "react"
-import { usePathname } from "next/navigation"
-import { isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
+import { usePathname, useRouter } from "next/navigation"
+import { agentSessionPath, isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
 import { useUserAgentsStore } from "@/lib/stores/user-agents"
 import {
   AIChatPanel,
@@ -23,7 +23,8 @@ import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agent"
-import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar"
+import { AgentAvatar } from "@/features/system/components/agents/agent-avatar"
+import { agentInitials } from "@/features/system/components/agents/agent-initials"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import {
   Command,
@@ -39,7 +40,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/utils/cn"
-import { Check, History, PanelRightClose, SquarePen } from "lucide-react"
+import { Check, History, Maximize2, PanelRightClose, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -80,6 +81,55 @@ function YulaNewChatButton() {
       aria-label="Yeni Sohbet Başlat"
     >
       <SquarePen className="size-3.5" />
+    </Button>
+  )
+}
+
+/**
+ * Dock başlığındaki "ana ekranda devam et" butonu: mevcut sohbeti koruyup
+ * tam ekran ajan/Yula oturumuna taşır (ajanlı → /agents/<id>, varsayılan → /).
+ * Sayfa değişiminde taze sohbet açılmasını önlemek için push öncesi
+ * `beginConversationFollow` bayrağı kurulur; varışta provider kaydı yeni
+ * sayfaya bağlar (aktif sohbet korunur, yeni sohbet açılmaz).
+ */
+function YulaOpenInMainButton() {
+  const router = useRouter()
+  const dockAgent = useDockAgent()
+
+  const handleOpen = () => {
+    const store = useChatsStore.getState()
+    const activeId = store.activeId
+    if (!activeId) return
+    const target = dockAgent?.id ? agentSessionPath(dockAgent.id) : "/"
+    if (
+      typeof window !== "undefined" &&
+      (window.location.pathname === target ||
+        window.location.pathname + window.location.search === target)
+    ) {
+      return
+    }
+    // Boş (kayıtsız + mesajsız) sohbette follow kaydı üretme — provider
+    // zaten aynı activeId'yi korur; dolu sohbette follow zorunludur.
+    const hasRecord = store.conversations.some((c) => c.id === activeId)
+    if (hasRecord) {
+      store.beginConversationFollow(activeId)
+    }
+    store.setHistoryOpen(false)
+    store.setSearchingHistory(false)
+    router.push(target)
+  }
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+      onClick={handleOpen}
+      title="Ana ekranda devam et"
+      aria-label="Ana ekranda devam et"
+    >
+      <Maximize2 className="size-3.5" />
     </Button>
   )
 }
@@ -379,6 +429,7 @@ export function WorkspaceAiDock({
               <DockHeaderTitle />
               <YulaScreenHistoryButton />
               <YulaNewChatButton />
+              <YulaOpenInMainButton />
               <DockCollapseButton onCollapse={() => setOpen(false)} />
             </div>
           ) : null}
@@ -403,6 +454,7 @@ export function WorkspaceAiDock({
         <div className="flex min-w-0 items-center gap-0.5">
           <YulaScreenHistoryButton />
           <YulaNewChatButton />
+          <YulaOpenInMainButton />
           <DockCollapseButton onCollapse={() => setOpen(false)} />
         </div>
       }

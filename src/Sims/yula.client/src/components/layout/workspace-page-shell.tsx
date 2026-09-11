@@ -16,6 +16,8 @@ type WorkspacePageShellProps = {
    * (başlık, search ve actions atlanır).
    */
   frameless?: boolean
+  /** Transparan header — yerleşim aynı, kart zeminsiz/çerçevesiz. */
+  transparentHeader?: boolean
   /** Toolbar actions (right side of the header). */
   actions?: ReactNode
   /** Extra content in the left cluster after the breadcrumb. */
@@ -45,6 +47,7 @@ export function WorkspacePageShell({
   title,
   hideHeader = false,
   frameless = false,
+  transparentHeader = false,
   actions,
   startExtra,
   searchPlaceholder,
@@ -74,6 +77,7 @@ export function WorkspacePageShell({
           startExtra={startExtra}
           actions={actions}
           frameless={frameless}
+          transparent={transparentHeader}
         >
           {title}
         </WorkspacePageHeader>

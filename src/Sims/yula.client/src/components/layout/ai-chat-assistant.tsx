@@ -48,7 +48,8 @@ import {
   Square,
   X,
 } from "lucide-react"
-import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar"
+import { AgentAvatar } from "@/features/system/components/agents/agent-avatar"
+import { agentInitials } from "@/features/system/components/agents/agent-initials"
 
 type AIChatAssistantProps = {
   className?: string

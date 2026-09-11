@@ -102,6 +102,12 @@ export function ReportModuleForm({
   const [viewMode, setViewMode] = React.useState<"result" | "detail">("result")
   const [selectedCompleted, setSelectedCompleted] = React.useState(false)
 
+  const [canDelete, setCanDelete] = React.useState(false)
+  const deleteJobRef = React.useRef<(() => void) | null>(null)
+  const [canCancel, setCanCancel] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
+  const cancelJobRef = React.useRef<(() => void) | null>(null)
+
   const handleSelectedCompletedChange = React.useCallback(
     (isCompleted: boolean) => {
       setSelectedCompleted(isCompleted)
@@ -143,6 +149,7 @@ export function ReportModuleForm({
       return
     }
     autoQuerySelectRef.current = queryJobId
+    // eslint-disable-next-line react/set-state-in-effect -- URL query → seçim tek-atış senkronu (harici navigasyon; ref guard'lı, loop yok)
     handleJobSelect(queryJobId)
   }, [queryJobId, activeJobId, handleJobSelect])
 
@@ -189,12 +196,6 @@ export function ReportModuleForm({
     window.addEventListener("yula:open-compose", handleOpenCompose)
     return () => window.removeEventListener("yula:open-compose", handleOpenCompose)
   }, [scope, handleStartNewReport])
-
-  const [canDelete, setCanDelete] = React.useState(false)
-  const deleteJobRef = React.useRef<(() => void) | null>(null)
-  const [canCancel, setCanCancel] = React.useState(false)
-  const [cancelling, setCancelling] = React.useState(false)
-  const cancelJobRef = React.useRef<(() => void) | null>(null)
 
   const headerActions =
     selectedCompleted || canDelete || canCancel ? (

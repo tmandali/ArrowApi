@@ -7,7 +7,8 @@ import { cn } from "@/utils/cn";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { filterAgentsByScope } from "@/lib/yula-user-agent";
 import { agentSessionPath } from "@/lib/workspace-paths";
-import { AgentAvatar, agentInitials } from "@/features/system/components/agents/agent-avatar";
+import { AgentAvatar } from "@/features/system/components/agents/agent-avatar";
+import { agentInitials } from "@/features/system/components/agents/agent-initials";
 
 /**
  * Ajan kart ızgarası (workspace kartları deseni): boş sohbette gösterilir.

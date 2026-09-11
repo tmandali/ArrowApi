@@ -29,6 +29,11 @@ type WorkspacePageHeaderProps = {
    * atlanır; yalnızca menü aç/kapa (PagePanelTrigger) render edilir.
    */
   frameless?: boolean
+  /**
+   * Transparan header — yerleşim aynı kalır, kartın zemin/çerçevesi kalkar
+   * (border-transparent bg-transparent).
+   */
+  transparent?: boolean
 }
 
 /**
@@ -44,6 +49,7 @@ export function WorkspacePageHeader({
   searchPlaceholder,
   headerSearch,
   frameless = false,
+  transparent = false,
 }: WorkspacePageHeaderProps) {
   // Workspace search açıkken floating header gizlenir — arama görünümü
   // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
@@ -62,7 +68,13 @@ export function WorkspacePageHeader({
 
   return (
     <div className={cn(pageHeaderShellClass, shellClassName)}>
-      <header className={cn(pageHeaderCardClass, className)}>
+      <header
+        className={cn(
+          pageHeaderCardClass,
+          transparent && "border-transparent bg-transparent shadow-none",
+          className
+        )}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <PagePanelTrigger className="-ml-1" />
           {children}
