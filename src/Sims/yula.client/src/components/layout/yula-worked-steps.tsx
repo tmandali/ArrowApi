@@ -626,6 +626,31 @@ export function extractWorkedSteps(
         });
         break;
       }
+      case "suggest_next_steps": {
+        const raw = (inputObj as { suggestions?: unknown }).suggestions;
+        const items = Array.isArray(raw) ? raw : [];
+        const first =
+          items.length > 0
+            ? (items[0] as { title?: unknown }).title
+            : undefined;
+        pushStep({
+          id: info.toolCallId,
+          kind: "confirmation",
+          label:
+            typeof first === "string" && first
+              ? `Suggested: ${first}`
+              : "Suggested next steps",
+          subLabel: isPending
+            ? "Preparing suggestions..."
+            : items.length > 1
+              ? `${items.length} suggestions presented`
+              : "Suggestion presented",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
       case "run_user_skill": {
         const slash =
           typeof inputObj.skill === "string" && inputObj.skill

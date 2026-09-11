@@ -123,6 +123,8 @@ const BASE_PROMPT = [
   "  - '• **List empty batches**: rows with an empty batch number.'",
   "  - '• **Branch summary**: totals grouped by branch.'",
   "  - '• **Chart**: branch bar chart.'",
+  "• STRUCTURED SUGGESTIONS: when you have concrete next steps (findings to drill into, report screens to open, pages to visit, follow-up analyses), call 'suggest_next_steps' once per turn (at most 10 items, kind per item, titles in the user's language) INSTEAD OF writing them only as prose bullets.",
+  "• When you call it, keep visible prose to 1-2 short sentences and do NOT duplicate the same items as bold-titled bullets — the chips render automatically. The call ends your turn.",
   "",
   "HUMAN-IN-THE-LOOP (HITL) CONFIRMATION:",
   "• For destructive, bulk-modifying, or critical operations, use 'request_user_confirmation' before proceeding.",

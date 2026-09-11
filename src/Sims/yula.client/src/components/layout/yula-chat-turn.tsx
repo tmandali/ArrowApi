@@ -6,6 +6,7 @@ import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { YulaQuestionnaireCard } from "@/components/layout/yula-questionnaire-card";
+import { YulaSuggestionChips } from "@/components/layout/yula-suggestion-chips";
 import { YulaJobStartedCard } from "@/components/layout/yula-job-started-card";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import {
@@ -66,6 +67,8 @@ function liveStatusLabel(toolParts: YulaToolPartInfo[], lang: YulaUiLang): strin
       return L("Grafik hazırlanıyor…", "Preparing chart…");
     case "ask_user_question":
       return L("Sorular hazırlanıyor…", "Preparing questions…");
+    case "suggest_next_steps":
+      return L("Öneriler hazırlanıyor…", "Preparing suggestions…");
     case "filter_current_grid":
     case "apply_grid_filters":
       return L("Filtre uygulanıyor…", "Applying filter…");
@@ -271,7 +274,8 @@ export function YulaChatTurn({
       const info = toolParts[i];
       if (
         info.toolName === "ask_user_question" ||
-        info.toolName === "request_user_confirmation"
+        info.toolName === "request_user_confirmation" ||
+        info.toolName === "suggest_next_steps"
       )
         continue;
       if (info.state !== "output-available" || isFailedToolInfo(info)) continue;
@@ -382,6 +386,15 @@ export function YulaChatTurn({
                 info.state === "input-available") ? (
                 <YulaQuestionnaireCard
                   messageId={assistantMessage?.id}
+                  input={info.input}
+                  output={info.state === "output-available" ? info.output : undefined}
+                />
+              ) : null}
+              {info.toolName === "suggest_next_steps" &&
+              !isError &&
+              (info.state === "output-available" ||
+                info.state === "input-available") ? (
+                <YulaSuggestionChips
                   input={info.input}
                   output={info.state === "output-available" ? info.output : undefined}
                 />

@@ -211,6 +211,7 @@ function shouldContinueAfterToolOutputs(messages: YulaMessage[]): boolean {
         "open_last_report",
         "visualize_grid_data",
         "ask_user_question",
+        "suggest_next_steps",
       ].includes(i.toolName) &&
       (!isFailedToolInfo(i) || i.toolName === "ask_user_question") &&
       // Yönlendirmeli apply: zincir hedef ekranda sürecek, burada durma.

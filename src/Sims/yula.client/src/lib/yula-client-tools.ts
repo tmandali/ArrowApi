@@ -1608,6 +1608,17 @@ export async function executeClientTool(
         message: "Questions presented to the user. Wait for their answers, which arrive as a new user message.",
       };
     }
+    case "suggest_next_steps": {
+      // Yapılandırılmış öneri çipleri: şekil bozukları elenir (en fazla 10).
+      // Kart girdiden basılır (çıktı yalnız sunum onayıdır).
+      const { asSuggestions } = await import("@/lib/yula-suggestions");
+      const suggestions = asSuggestions(args);
+      return {
+        status: "presented",
+        count: suggestions.length,
+        message: "Suggestions presented to the user as clickable chips. Finding/analysis clicks arrive as a new user message; report/navigation clicks navigate in-app.",
+      };
+    }
     case "run_user_skill": {
       const slash = String(
         (args as { skill?: unknown }).skill ?? "",

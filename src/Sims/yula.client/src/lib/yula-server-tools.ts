@@ -171,6 +171,60 @@ const askUserQuestionTool = tool({
 });
 
 /**
+ * suggest_next_steps — yapılandırılmış öneri/bulgu çipleri (prose
+ * heuristiğine alternatif). Model turu kapatırken somut sonraki adımları
+ * (bulgu detayı, rapor ekranı, sayfa geçişi, takip analizi) bu tool ile
+ * bildirir; istemci JSON'dan chip basar (YulaSuggestionChips). İstemcide
+ * yürütülür (echo + present), terminaldir (ask_user_question deseni).
+ * STATIC_TOOLS ve grid araçlarında paylaşılır (her iki evrede de öneri).
+ */
+const suggestionItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("finding"),
+    title: z.string().describe("Short chip title in the user's language (max ~40 chars)"),
+    prompt: z.string().describe("Full follow-up prompt sent when the chip is clicked (user's language)"),
+  }),
+  z.object({
+    kind: z.literal("report"),
+    title: z.string().describe("Short chip title in the user's language (max ~40 chars)"),
+    scope: z.string().describe("Registered report scope (e.g. stock-balance) — the client resolves the screen"),
+    prompt: z.string().optional().describe("Fallback prompt when the scope has no registered screen"),
+  }),
+  z.object({
+    kind: z.literal("navigation"),
+    title: z.string().describe("Short chip title in the user's language (max ~40 chars)"),
+    path: z.string().describe("In-app target path (e.g. /stock, /system/agents)"),
+  }),
+  z.object({
+    kind: z.literal("analysis"),
+    title: z.string().describe("Short chip title in the user's language (max ~40 chars)"),
+    prompt: z.string().describe("Full analysis prompt sent when the chip is clicked (user's language)"),
+  }),
+]);
+
+const suggestNextStepsTool = tool({
+  description: [
+    "Present STRUCTURED follow-up suggestion chips (findings, report screens, navigation, analyses) at the end of your turn.",
+    "Call when you have concrete next steps for the user — instead of writing them ONLY as prose bullets.",
+    "At most 10 suggestions per call; every title in the user's language.",
+    "When you call this tool, keep visible prose to 1-2 short sentences and do NOT duplicate the same items as bold-titled bullets — the chips render automatically.",
+    "The call ends your turn; the user's click arrives as a new user message (finding/analysis) or an in-app navigation (report/navigation).",
+  ].join(" "),
+  inputSchema: z.object({
+    suggestions: z
+      .array(suggestionItemSchema)
+      .min(1)
+      .max(10)
+      .describe("At most 10 suggestion chips"),
+  }),
+  outputSchema: z.object({
+    status: z.literal("presented"),
+    count: z.number(),
+    message: z.string(),
+  }),
+});
+
+/**
  * run_user_skill — kullanıcının cihaz-içi skill'ini çalıştırır (cookbook:
  * agent-skills progressive disclosure). Envanter (isim/açıklama) sistem
  * prompt'undadır; tam talimat istemcide yüklenir ve çıktı olarak döner —
@@ -466,6 +520,7 @@ export const STATIC_TOOLS = {
       }),
     }),
     ask_user_question: askUserQuestionTool,
+    suggest_next_steps: suggestNextStepsTool,
     run_user_skill: runUserSkillTool,
     run_skill_script: runSkillScriptTool,
     read_skill_file: readSkillFileTool,
@@ -705,6 +760,7 @@ function gridTools(grid: YulaGridToolContext): ToolSet {
   return {
     get_report_schema: reportSchemaTool,
     ask_user_question: askUserQuestionTool,
+    suggest_next_steps: suggestNextStepsTool,
     run_user_skill: runUserSkillTool,
     run_skill_script: runSkillScriptTool,
     read_skill_file: readSkillFileTool,

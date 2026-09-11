@@ -427,6 +427,7 @@ export async function POST(req: Request) {
           "get_report_schema",
           "request_user_confirmation",
           "ask_user_question",
+          "suggest_next_steps",
         ),
       ],
     });

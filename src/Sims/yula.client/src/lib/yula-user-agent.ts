@@ -213,6 +213,7 @@ export const AGENT_TOOL_CATALOG: Array<{ name: string; label: string }> = [
   { name: "validate_criteria_input", label: "Kriter doğrulama" },
   { name: "get_current_criteria", label: "Form okuma" },
   { name: "ask_user_question", label: "Kullanıcıya soru sorma" },
+  { name: "suggest_next_steps", label: "Öneri sunma" },
   { name: "request_user_confirmation", label: "Onay isteme" },
   { name: "run_user_skill", label: "Skill çalıştırma" },
   { name: "run_skill_script", label: "Skill betiği" },
