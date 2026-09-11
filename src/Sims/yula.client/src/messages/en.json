@@ -1525,5 +1525,13 @@
     "warehouse": "Warehouse",
     "work_order": "Work Order",
     "work_order_summary": "Work Order Summary"
+  },
+  "SearchCats": {
+    "catalog": "Catalog",
+    "operations": "Operations",
+    "reports": "Reports",
+    "serial_batch": "Serial & Batch",
+    "settings": "Settings",
+    "tools": "Tools"
   }
 }

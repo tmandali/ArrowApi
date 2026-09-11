@@ -20,7 +20,7 @@ import {
   MessagesSquare,
 } from "lucide-react";
 import { useWorkspaceSearch } from "@/context/workspace-search-context";
-import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
+import { resolveCategoryLabel, useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
 import {
   useWorkspaceRagSearch,
   type WorkspaceSearchResultGroup,
@@ -91,6 +91,7 @@ function SearchResultRow({
   onTogglePin,
 }: SearchResultRowProps) {
   const t = useTranslations("SearchMainView")
+  const tCat = useTranslations("SearchCats")
   const locale = useLocale()
   const isTr = locale === "tr"
   const isEditingConv = isEditing && !!item.conversationId;
@@ -187,7 +188,7 @@ function SearchResultRow({
 
         {query.trim() && item.isExactMatch ? (
           <span className="text-[10px] text-muted-foreground/50 bg-muted/30 px-2 py-0.5 rounded font-normal">
-            {item.category}
+            {resolveCategoryLabel(item.category, tCat)}
           </span>
         ) : query.trim() && !item.isExactMatch ? (
           <Badge
@@ -220,6 +221,7 @@ function SearchResultRow({
 
 export function WorkspaceSearchMainView({ className }: { className?: string }) {
   const t = useTranslations("SearchMainView")
+  const tCat = useTranslations("SearchCats")
   const router = useRouter();
   const { setOpen, query, setQuery } = useWorkspaceSearch();
   const { workspace } = useWorkspaceSearchMeta();
@@ -351,7 +353,7 @@ export function WorkspaceSearchMainView({ className }: { className?: string }) {
       <div key={group.category} className="space-y-1">
         {showGroupHeader ? (
           <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-            {group.category}
+            {resolveCategoryLabel(group.category, tCat)}
           </div>
         ) : null}
         <div className="space-y-0.5">

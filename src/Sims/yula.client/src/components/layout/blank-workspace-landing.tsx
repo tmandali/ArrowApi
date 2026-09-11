@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Pin,
   PinOff,
@@ -104,6 +104,8 @@ export function WorkspaceLandingTemplate({
   floatingOpenButton,
 }: WorkspaceLandingTemplateProps) {
   const t = useTranslations("WorkspaceLanding")
+  const locale = useLocale()
+  const isTr = locale === "tr"
   const pathname = usePathname();
   const router = useRouter();
 
@@ -333,13 +335,8 @@ export function WorkspaceLandingTemplate({
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-medium text-foreground/90 group-hover:text-primary transition-colors truncate">
-                        {item.title}
+                        {isTr ? item.titleTr || item.title : item.title}
                       </span>
-                      {item.titleTr && item.titleTr !== item.title ? (
-                        <span className="block text-[10px] text-muted-foreground/60 truncate">
-                          {item.titleTr}
-                        </span>
-                      ) : null}
                     </div>
                     {/* Hızlı erişim oku: linkli kartlardaki ArrowUpRight deseni (transparent) */}
                     <div className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/40 group-hover:text-primary transition-colors">

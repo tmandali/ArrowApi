@@ -31,7 +31,7 @@ import {
 } from "lucide-react"
 import { emptyModulePath } from "@/lib/workspace-paths"
 import { workspaceDashboardPath } from "@/lib/workspace-nav"
-import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
+import { resolveCategoryLabel, useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
 import { useWorkspaceRagSearch } from "@/hooks/use-workspace-rag-search"
 import { cn } from "@/utils/cn"
 
@@ -184,6 +184,7 @@ export function WorkspaceSearchResults({
   showFooter = true,
 }: WorkspaceSearchResultsProps) {
   const t = useTranslations("SearchMainView")
+  const tCat = useTranslations("SearchCats")
   const locale = useLocale()
   const isTr = locale === "tr"
   const { workspace } = useWorkspaceSearchMeta()
@@ -223,7 +224,7 @@ export function WorkspaceSearchResults({
         {groupedResults.map((group) => (
           <CommandGroup
             key={group.category}
-            heading={group.category.toUpperCase()}
+            heading={resolveCategoryLabel(group.category, tCat).toUpperCase()}
             className="px-1 py-0.5 space-y-0.5"
           >
             {group.items.map((item) => (
@@ -245,7 +246,7 @@ export function WorkspaceSearchResults({
                 <div className="flex items-center gap-1 shrink-0 ml-2">
                   {item.isExactMatch ? (
                     <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md">
-                      {item.category}
+                      {resolveCategoryLabel(item.category, tCat)}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="border-amber-500/25 text-amber-600 dark:text-amber-400 bg-amber-500/10 text-[9px] px-1.5 py-0.5 font-medium rounded-md flex items-center gap-1">

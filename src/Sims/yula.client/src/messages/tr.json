@@ -1525,5 +1525,13 @@
     "sub_receipt": "İşletme Dışı Kabul",
     "sub_delivery": "İşletme Dışı Teslimatı",
     "outward_sub": "İşletme Dışı Çıkış"
+  },
+  "SearchCats": {
+    "catalog": "Katalog",
+    "operations": "İşlemler",
+    "reports": "Raporlar",
+    "serial_batch": "Seri & Parti",
+    "settings": "Ayarlar",
+    "tools": "Araçlar"
   }
 }

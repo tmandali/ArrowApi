@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   PinOff,
   Package,
@@ -14,7 +14,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
-import { useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks";
+import {
+  resolveCategoryLabel,
+  useWorkspaceSearchMeta,
+} from "@/components/layout/workspace-search-hooks";
 import { useWorkspaceCards } from "@/lib/workspace-cards";
 import { cn } from "@/utils/cn";
 
@@ -66,6 +69,9 @@ export function WorkspacePinnedItemsGrid({
   mode = "pins",
 }: WorkspacePinnedItemsGridProps) {
   const t = useTranslations("PinnedItems")
+  const tCat = useTranslations("SearchCats")
+  const locale = useLocale()
+  const isTr = locale === "tr"
   const { workspace: metaWorkspace } = useWorkspaceSearchMeta();
   const workspace = propWorkspace || metaWorkspace;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(workspace);
@@ -129,18 +135,12 @@ export function WorkspacePinnedItemsGrid({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <h3 className="text-[12px] font-medium tracking-tight text-foreground truncate group-hover:text-primary transition-colors">
-                    {item.title}
+                    {isTr ? item.titleTr || item.title : item.title}
                   </h3>
                 </div>
-                {item.titleTr && item.titleTr !== item.title ? (
-                  <p className="text-[10px] text-muted-foreground/70 truncate leading-tight">
-                    {item.titleTr}
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground/60 truncate leading-tight">
-                    {item.category}
-                  </p>
-                )}
+                <p className="text-[10px] text-muted-foreground/60 truncate leading-tight">
+                  {resolveCategoryLabel(item.category, tCat)}
+                </p>
               </div>
             </Link>
 
