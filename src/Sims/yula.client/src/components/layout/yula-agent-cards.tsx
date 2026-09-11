@@ -55,7 +55,7 @@ export function YulaAgentCards({
     <div className={cn("w-full max-w-3xl px-3 pt-2 animate-in fade-in-50 slide-in-from-bottom-2 duration-300", className)}>
       {isLanding ? (
         <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-muted-foreground/80">
-          <span>{t("assigned_title")}</span>
+          <span>{t("agents_title")}</span>
           <span className="text-[10px] text-muted-foreground/60">({inScope.length})</span>
         </div>
       ) : (
