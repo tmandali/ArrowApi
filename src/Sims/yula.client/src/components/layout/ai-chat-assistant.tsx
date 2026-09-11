@@ -184,6 +184,8 @@ export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = 
   const conversations = useChatsStore((s) => s.conversations)
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
   const isSearchingHistory = useChatsStore((s) => s.isSearchingHistory)
+  const agents = useUserAgentsStore((s) => s.agents)
+  const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId)
   const pathname = usePathname()
 
   const activeConv = React.useMemo(
@@ -193,11 +195,22 @@ export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = 
 
   const screenLabel = formatPathnameLabel(pathname) || "Ekran"
 
+  // Dock başlığı: kayıtlı başlık yoksa (New / "Yeni Sohbet") aktif ajan
+  // adı gösterilir; ajan yoksa varsayılan Yula. useDockAgent ile aynı
+  // çözüm (konuşma kaydı > global seçim) — ikon ile isim uyumlu kalır.
+  const dockAgentName = React.useMemo(() => {
+    const id = activeConv?.agentId ?? storeActiveAgentId ?? null
+    if (!id) return null
+    return agents.find((a) => a.id === id)?.name ?? null
+  }, [activeConv?.agentId, storeActiveAgentId, agents])
+
   let titleText: string = YULA.name
   if (isHistoryOpen || isSearchingHistory) {
     titleText = isWorkspaceHomePath(pathname) ? "Sohbet Geçmişi" : `${screenLabel} Yazışmaları`
-  } else if (activeConv?.title) {
+  } else if (activeConv?.title && activeConv.title !== "Yeni Sohbet") {
     titleText = activeConv.title
+  } else if (dockAgentName) {
+    titleText = dockAgentName
   }
 
   return (

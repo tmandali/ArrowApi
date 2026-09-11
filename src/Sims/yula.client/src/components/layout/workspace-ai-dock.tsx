@@ -261,7 +261,7 @@ function DockAgentSwitch() {
   )
 }
 
-/** Başlık metni + ajan değiştirici kompozisyonu (isim yazılmaz). */
+/** Başlık metni + ajan değiştirici kompozisyonu (boş sohbette ajan adı yazılır). */
 function DockHeaderTitle() {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
