@@ -775,7 +775,11 @@
     "clear_read": "Clear read",
     "delete_notification": "Delete notification",
     "empty_state": "No notifications in this workspace.",
-    "notification_running": "job in progress…"
+    "notification_running": "job in progress…",
+    "just_now": "Just now",
+    "minutes_ago": "{count, plural, one {# minute ago} other {# minutes ago}}",
+    "hours_ago": "{count, plural, one {# hour ago} other {# hours ago}}",
+    "days_ago": "{count, plural, one {# day ago} other {# days ago}}"
   },
   "HeaderSearch": {
     "search_ph": "Search chat history...",
@@ -1132,5 +1136,13 @@
     "job_not_found": "Job not found",
     "result_not_found": "Job result not found",
     "load_failed": "Could not load the result"
+  },
+  "JobSync": {
+    "report_completed": "Report completed.",
+    "job_completed": "{title} completed. Click the notification to open.",
+    "job_failed": "The operation failed.",
+    "report_failed": "An error occurred while preparing the report.",
+    "job_ready": "{title} ready",
+    "job_failed_title": "{title} failed"
   }
 }

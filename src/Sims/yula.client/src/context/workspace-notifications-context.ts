@@ -40,13 +40,20 @@ export function useWorkspaceNotifications() {
   return context
 }
 
-export function formatNotificationTime(createdAt: number) {
+/**
+ * Zaman-once etiketlerini üreten çeviri fonksiyonu (next-intl `t`).
+ * Modül seviyesinde hook kullanılamadığından çağranda `useTranslations("Notifications")`
+ * ile sağlanır.
+ */
+export type TimeAgoTranslator = (key: "just_now" | "minutes_ago" | "hours_ago" | "days_ago", values?: { count?: number }) => string
+
+export function formatNotificationTime(createdAt: number, t: TimeAgoTranslator) {
   const diffMs = Date.now() - createdAt
   const minutes = Math.max(0, Math.floor(diffMs / 60_000))
-  if (minutes < 1) return "Az önce"
-  if (minutes < 60) return `${minutes} dakika önce`
+  if (minutes < 1) return t("just_now")
+  if (minutes < 60) return t("minutes_ago", { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} saat önce`
+  if (hours < 24) return t("hours_ago", { count: hours })
   const days = Math.floor(hours / 24)
-  return `${days} gün önce`
+  return t("days_ago", { count: days })
 }

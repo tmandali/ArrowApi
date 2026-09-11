@@ -775,7 +775,11 @@
     "clear_read": "Okunanları temizle",
     "delete_notification": "Bildirimi sil",
     "empty_state": "Bu çalışma alanında bildirim bulunmuyor.",
-    "notification_running": "işlem devam ediyor…"
+    "notification_running": "işlem devam ediyor…",
+    "just_now": "Az önce",
+    "minutes_ago": "{count} dakika önce",
+    "hours_ago": "{count} saat önce",
+    "days_ago": "{count} gün önce"
   },
   "HeaderSearch": {
     "search_ph": "Sohbet geçmişinde ara...",
@@ -1132,5 +1136,13 @@
     "job_not_found": "Job bulunamadı",
     "result_not_found": "Job sonucu bulunamadı",
     "load_failed": "Sonuç yüklenemedi"
+  },
+  "JobSync": {
+    "report_completed": "Rapor tamamlandı.",
+    "job_completed": "{title} tamamlandı. Açmak için bildirime tıklayın.",
+    "job_failed": "İşlem başarısız oldu.",
+    "report_failed": "Rapor hazırlanırken bir hata oluştu.",
+    "job_ready": "{title} hazır",
+    "job_failed_title": "{title} başarısız"
   }
 }

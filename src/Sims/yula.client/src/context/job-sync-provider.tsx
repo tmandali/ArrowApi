@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react"
 import { toast } from "sonner"
 import { useWorkspaceNotifications } from "@/context/workspace-notifications-context"
@@ -35,10 +36,14 @@ function formatElapsed(ms: number): string {
   return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`
 }
 
-function reportSummary(job: TrackedJob, payload: ArrowJobEvent): string {
+function reportSummary(
+  job: TrackedJob,
+  payload: ArrowJobEvent,
+  t: (key: "report_completed", values?: undefined) => string,
+): string {
   const parts: string[] = []
   if (payload.totalRows != null) {
-    parts.push(`${payload.totalRows.toLocaleString("tr-TR")} rows`)
+    parts.push(`${payload.totalRows.toLocaleString()} rows`)
   }
   if (payload.batchCount != null) {
     parts.push(`${payload.batchCount} batches`)
@@ -50,11 +55,12 @@ function reportSummary(job: TrackedJob, payload: ArrowJobEvent): string {
       parts.push(formatElapsed(end - start))
     }
   }
-  return parts.length > 0 ? parts.join(" · ") : "Rapor tamamlandı."
+  return parts.length > 0 ? parts.join(" · ") : t("report_completed")
 }
 
 export function JobSyncProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const t = useTranslations("JobSync");
   const navigate = React.useCallback(
     (
       to: string | number,
@@ -113,10 +119,10 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
       if (payload.status === "Completed") {
         pushNotification({
           id: notificationIdForJob(job.id),
-          title: job.successTitle ?? `${job.title} Ready`,
+          title: job.successTitle ?? t("job_ready", { title: job.title }),
           description:
             job.successDescription ??
-            `${job.title} tamamlandı. Açmak için bildirime tıklayın.`,
+            t("job_completed", { title: job.title }),
           type: job.notificationType,
           href: job.href,
           workspace: job.workspace,
@@ -124,7 +130,7 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
 
         if (job.notificationType === "report" && job.href) {
           toast.success(job.title, {
-            description: reportSummary(job, payload),
+            description: reportSummary(job, payload, t),
             action: {
               label: "View",
               onClick: () => navigate(job.href!),
@@ -137,16 +143,16 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
       if (payload.status === "Failed") {
         pushNotification({
           id: notificationIdForJob(job.id),
-          title: job.failureTitle ?? `${job.title} Failed`,
-          description: payload.error || "İşlem başarısız oldu.",
+          title: job.failureTitle ?? t("job_failed_title", { title: job.title }),
+          description: payload.error || t("job_failed"),
           type: job.notificationType,
           href: job.href,
           workspace: job.workspace,
         })
 
         if (job.notificationType === "report") {
-          toast.error(job.failureTitle ?? `${job.title} Failed`, {
-            description: payload.error || "Rapor hazırlanırken bir hata oluştu.",
+          toast.error(job.failureTitle ?? t("job_failed_title", { title: job.title }), {
+            description: payload.error || t("report_failed"),
           })
         }
         return
@@ -154,7 +160,7 @@ export function JobSyncProvider({ children }: { children: React.ReactNode }) {
 
       // Cancelled: UI zaten local state ile bilgilendirilir; inbox gürültüsü yok.
     },
-    [pushNotification, navigate]
+    [pushNotification, navigate, t]
   )
 
   const finishJob = React.useCallback(
