@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { useYulaGridStore } from "@/lib/stores/grid"
 import { Spinner } from "@/components/ui/spinner"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
@@ -61,6 +62,7 @@ export function ArrowJobResultPanel({
   className,
   onError,
 }: ArrowJobResultPanelProps) {
+  const t = useTranslations("JobResultPanel")
   const fallbackTitle = title ?? "Report"
 
   const { waitUntilTerminal } = useJobSync()
@@ -108,7 +110,7 @@ export function ArrowJobResultPanel({
   const openFromLocalCache = React.useCallback(async (): Promise<boolean> => {
     const cached = await opfsReportCache.hasParquetParts(jobId)
     if (!cached) {
-      pushError("Job bulunamadı")
+      pushError(t("job_not_found"))
       return false
     }
     const report = fallbackTitle
@@ -120,7 +122,7 @@ export function ArrowJobResultPanel({
     }
     setReportUrl(`/api/arrow/jobs/${jobId}`)
     return true
-  }, [jobId, fallbackTitle, pushError])
+  }, [jobId, fallbackTitle, pushError, t])
 
   // job değişince akış durumunu başa al — render sırasında state ayarlama
   // (effect yalnızca fetch ömrünü yönetir).
@@ -231,7 +233,7 @@ export function ArrowJobResultPanel({
             if (runIdRef.current !== runId) return
             if (fresh?.name) setReportTitle(formatReportTitle(fresh.name, fallbackTitle))
             if (!fresh?.jobUrl) {
-              pushError("Job sonucu bulunamadı")
+              pushError(t("result_not_found"))
               return
             }
             setExpectedTotalRows(fresh.totalRows ?? null)
@@ -256,7 +258,7 @@ export function ArrowJobResultPanel({
         const opened = await openFromLocalCache()
         if (runIdRef.current !== runId) return
         if (!opened) {
-          pushError(errorMessage(err, "Sonuç yüklenemedi"))
+          pushError(errorMessage(err, t("load_failed")))
         }
       }
     }
@@ -265,7 +267,7 @@ export function ArrowJobResultPanel({
     return () => {
       abort.abort()
     }
-  }, [jobId, fallbackTitle, waitUntilTerminal, pushError, openFromLocalCache])
+  }, [jobId, fallbackTitle, waitUntilTerminal, pushError, openFromLocalCache, t])
 
   return (
     <div

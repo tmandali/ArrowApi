@@ -71,11 +71,13 @@ export function useScreenAgentContext(input: {
     const tools = (current.tools as Array<{ name: string; description?: string }>) || [
       {
         name: "apply_criteria",
-        description: "Rapor şemasına göre zorunlu alanları gözeterek önerilen kriterleri ekrandaki kriter formuna doldurur.",
+        description:
+          "Fills the criteria form on screen with the suggested report criteria, honoring the required fields of the report schema.",
       },
       {
         name: "run_job",
-        description: "Rapor şemasına göre zorunlu alanları gözeterek rapor job'ını başlatır ve execution ekranında yeni işi seçili/çalışır gösterir.",
+        description:
+          "Starts the report job honoring the required fields of the report schema and shows the new job selected/running on the execution screen.",
       },
     ];
 

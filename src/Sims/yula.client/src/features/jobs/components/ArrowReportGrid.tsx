@@ -1,6 +1,7 @@
 "use client";
 
 import { useYulaGridStore } from "@/lib/stores/grid";
+import { useTranslations } from "next-intl"
 import * as React from "react"
 import {
   RotateCw,
@@ -112,6 +113,7 @@ export function ArrowReportGrid({
   headerActions,
   onError,
 }: ArrowReportGridProps) {
+  const t = useTranslations("ReportGrid")
   // Uygulama-içi görünüm isteği React içinden taşınır; URL temiz kalır.
   const [pendingAiViewId, setPendingAiViewId] = React.useState<string | null>(
     () => takePendingAiView(reportScope)?.viewId ?? null,
@@ -330,7 +332,7 @@ export function ArrowReportGrid({
 
       const newView: AiSqlView = {
         id: `ai_${Date.now()}`,
-        title: saveTitle || customQueryTitle || "AI Görünümü",
+        title: saveTitle || customQueryTitle || t("ai_view_default"),
         sql: customQuerySql,
         createdAt: Date.now(),
       }
@@ -349,7 +351,7 @@ export function ArrowReportGrid({
 
       setActiveAiViewId(newView.id)
     },
-    [customQuerySql, customQueryTitle, storageKey]
+    [customQuerySql, customQueryTitle, storageKey, t]
   )
 
   const handleSelectAiView = React.useCallback(
@@ -663,7 +665,7 @@ export function ArrowReportGrid({
           selectSql: resolvedSql,
         })
         .catch((err) => {
-          console.warn(`[ArrowReportGrid] Kayıtlı görünüm (${v.name}) DuckDB view senkronizasyon hatası:`, err)
+          console.warn(`[ArrowReportGrid] Saved view (${v.name}) DuckDB view sync error:`, err)
         })
     }
   }, [duckTableName, isTableReady, isStreaming, isSavingDisk, savedViewSpecs])
@@ -715,7 +717,7 @@ export function ArrowReportGrid({
           selectSql,
         })
         .catch((err) => {
-          console.warn("[ArrowReportGrid] active_view DuckDB senkronizasyon uyarısı:", err)
+          console.warn("[ArrowReportGrid] active_view DuckDB sync warning:", err)
         })
     }, 300)
 
@@ -810,7 +812,7 @@ export function ArrowReportGrid({
     !isStreaming && !isSavingDisk && isPartial ? (
       <span
         className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 tabular-nums dark:text-amber-400"
-        title="Tarayıcı WebAssembly bellek sınırı doldu — raporun yalnızca sunucudan inen kısmı gösteriliyor. Yenile butonu tekrar dener."
+        title={t("partial_memory_title")}
       >
         <TriangleAlert className="size-3 shrink-0" />
         Partial: {formatCount(totalRows)}
@@ -883,15 +885,15 @@ export function ArrowReportGrid({
       setIsExporting(true)
       const formatLabel =
         format === "xlsx"
-          ? "Excel dosyası"
+          ? t("export_format_xlsx")
           : format === "parquet"
-          ? "Parquet dosyası"
+          ? t("export_format_parquet")
           : format === "gz"
-          ? "Gzip CSV dosyası"
-          : "CSV dosyası"
-      const exportToastId = toast.loading(`${formatLabel} hazırlanıyor...`)
+          ? t("export_format_gz")
+          : t("export_format_csv")
+      const exportToastId = toast.loading(t("export_preparing", { label: formatLabel }))
       try {
-        const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
+        const sanitizedTitle = (title && title !== "Report Result" ? title : "report")
           .toLowerCase()
           .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
           .replace(/_+/g, "_")
@@ -908,7 +910,7 @@ export function ArrowReportGrid({
             const result = await exportOpfsMergedParquet({ jobId, fileName })
             const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
             toast.success(
-              `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+              t("export_parquet_downloaded", { rows: formatCount(result.totalRows), size: sizeMb }),
               { id: exportToastId }
             )
             return
@@ -945,7 +947,7 @@ export function ArrowReportGrid({
           })
           const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
           toast.success(
-            `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            t("export_parquet_downloaded", { rows: formatCount(result.totalRows), size: sizeMb }),
             { id: exportToastId }
           )
           return
@@ -970,33 +972,33 @@ export function ArrowReportGrid({
         if (result.format === "xlsx") {
           if (result.sheetCount && result.sheetCount > 1) {
             toast.success(
-              `Excel dosyası indirildi (${result.sheetCount} sayfa / ${formatCount(result.totalRows)} satır)`,
+              t("export_excel_downloaded_sheets", { sheets: result.sheetCount, rows: formatCount(result.totalRows) }),
               { id: exportToastId }
             )
           } else {
-            toast.success(`Excel dosyası indirildi (${result.fileName})`, {
+            toast.success(t("export_excel_downloaded", { name: result.fileName }), {
               id: exportToastId,
             })
           }
         } else if (result.format === "parquet") {
           const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
           toast.success(
-            `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            t("export_parquet_downloaded", { rows: formatCount(result.totalRows), size: sizeMb }),
             { id: exportToastId }
           )
         } else if (result.format === "gz") {
           const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
           toast.success(
-            `Gzip CSV indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+            t("export_gz_downloaded", { rows: formatCount(result.totalRows), size: sizeMb }),
             { id: exportToastId }
           )
         } else {
-          toast.success(`Excel uyumlu CSV indirildi (${result.fileName})`, {
+          toast.success(t("export_csv_downloaded", { name: result.fileName }), {
             id: exportToastId,
           })
         }
       } catch (err) {
-        toast.error(`Dışa aktarma hatası: ${String(err)}`, {
+        toast.error(t("export_error", { error: String(err) }), {
           id: exportToastId,
         })
         // Eğer DuckDB Parquet oluştururken bellek (OOM) veya başka bir hata verdiyse
@@ -1005,10 +1007,10 @@ export function ArrowReportGrid({
           try {
             const hasParts = await opfsReportCache.hasParquetParts(jobId)
             if (hasParts) {
-              toast.loading("DuckDB bellek sınırına ulaşıldı, OPFS parçaları doğrudan birleştiriliyor...", {
-                id: exportToastId,
-              })
-              const sanitizedTitle = (title && title !== "Report Result" ? title : "rapor")
+                toast.loading(t("opfs_merge_loading"), {
+                  id: exportToastId,
+                })
+                const sanitizedTitle = (title && title !== "Report Result" ? title : "report")
                 .toLowerCase()
                 .replace(/[^a-z0-9ğüşıöçĞÜŞİÖÇ_]/gi, "_")
                 .replace(/_+/g, "_")
@@ -1018,7 +1020,7 @@ export function ArrowReportGrid({
               const result = await exportOpfsMergedParquet({ jobId, fileName: fallbackFileName })
               const sizeMb = (result.sizeBytes / (1024 * 1024)).toFixed(1)
               toast.success(
-                `Parquet dosyası indirildi (${formatCount(result.totalRows)} satır / ${sizeMb} MB)`,
+                t("export_parquet_downloaded", { rows: formatCount(result.totalRows), size: sizeMb }),
                 { id: exportToastId }
               )
               return
@@ -1027,7 +1029,7 @@ export function ArrowReportGrid({
             console.error("OPFS Parquet fallback error:", fallbackErr)
           }
         }
-        toast.error("Dışa aktarma başarısız oldu", { id: exportToastId })
+        toast.error(t("export_failed"), { id: exportToastId })
       } finally {
         setIsExporting(false)
       }
@@ -1049,6 +1051,7 @@ export function ArrowReportGrid({
       hiddenColumns,
       columnDuckTypes,
       booleanColumns,
+      t,
     ]
   )
 
@@ -1135,10 +1138,10 @@ export function ArrowReportGrid({
               size="sm"
               className="h-7 shrink-0 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => setHiddenColumns([])}
-              title={`${hiddenColumns.length} kolon gizlendi — tümünü göstermek için tıklayın`}
+              title={t("hidden_columns_tooltip", { count: hiddenColumns.length })}
             >
               <EyeOff className="size-3.5 shrink-0" />
-              <span>{hiddenColumns.length} gizli</span>
+              <span>{hiddenColumns.length} {t("hidden_count_badge")}</span>
               <X className="size-3 shrink-0" />
             </Button>
           ) : null}
@@ -1149,7 +1152,7 @@ export function ArrowReportGrid({
             className="size-7 shrink-0"
             onClick={() => void refresh()}
             disabled={isStreaming || isSavingDisk || isExporting}
-            title="Verileri sunucudan yeniden çek"
+            title={t("refresh_title")}
             aria-label="Refresh report"
           >
             <RotateCw className={cn("size-3.5", (isStreaming || isSavingDisk) && "animate-spin")} />
@@ -1180,7 +1183,7 @@ export function ArrowReportGrid({
                 <FileSpreadsheet className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-medium text-xs">Excel (.xlsx)</span>
-                  <span className="text-[10px] text-muted-foreground">Microsoft Excel tablosu</span>
+                  <span className="text-[10px] text-muted-foreground">{t("export_xlsx_subtitle")}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -1190,7 +1193,7 @@ export function ArrowReportGrid({
                 <Database className="size-4 text-purple-600 dark:text-purple-400 shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-medium text-xs">Apache Parquet (.parquet)</span>
-                  <span className="text-[10px] text-muted-foreground">Python, Pandas, BI — ZSTD & Hızlı</span>
+                  <span className="text-[10px] text-muted-foreground">{t("export_parquet_subtitle")}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -1201,7 +1204,7 @@ export function ArrowReportGrid({
                 <FileArchive className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-medium text-xs">CSV (.csv.gz)</span>
-                  <span className="text-[10px] text-muted-foreground">Doğrudan C++ GZIP akışı — Hızlı & Kompakt</span>
+                  <span className="text-[10px] text-muted-foreground">{t("export_gz_subtitle")}</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1235,8 +1238,8 @@ export function ArrowReportGrid({
                 val && "pr-5",
                 col.align === "right" && "text-right"
               )}
-              placeholder={index === 0 ? "Filtrele…" : undefined}
-              title="Arama terimi, boşluklu kelimeler, aralık (10..50), >100 veya boş hücreler için '' yazabilirsiniz"
+              placeholder={index === 0 ? t("filter_placeholder") : undefined}
+              title={t("filter_input_title")}
               value={val}
               onChange={(event) => setFilter(col.name, event.target.value)}
             />
@@ -1309,22 +1312,18 @@ export function ArrowReportGrid({
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="size-5 shrink-0" />
                 <DialogTitle className="text-base font-semibold">
-                  Excel Dışa Aktarma Sınırı Aşıldı
+                  {t("excel_limit_title")}
                 </DialogTitle>
               </div>
               <DialogDescription className="pt-2 text-xs leading-relaxed text-muted-foreground">
-                Bu raporda{" "}
-                <strong className="font-semibold text-foreground tabular-nums">
-                  {formatCount(exportWarning.count)} satır
-                </strong>{" "}
-                veri bulunmaktadır. Microsoft Excel&apos;in tek sayfa sınırı 1.048.576 satırdır ve 2 milyonun üzerindeki veri kümelerinde Excel kilitlenmekte veya çökmektedir.
+                {t("excel_limit_desc", { count: formatCount(exportWarning.count) })}
               </DialogDescription>
             </DialogHeader>
 
             <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
-              <p className="font-semibold">Önerilen Çözüm:</p>
+              <p className="font-semibold">{t("excel_limit_solution_label")}</p>
               <p className="mt-0.5 text-muted-foreground">
-                Excel uygulamasının kilitlenmesini önlemek için lütfen tarih, şube, cari veya ürün filtrelerini daraltarak sonuçları en fazla 1-2 milyon satır ile sınırlandırın.
+                {t("excel_limit_solution_text")}
               </p>
             </div>
 
@@ -1336,7 +1335,7 @@ export function ArrowReportGrid({
                 onClick={() => setExportWarning(null)}
               >
                 <Filter className="mr-1.5 size-3.5" />
-                Filtreleri Düzenle
+                {t("btn_edit_filters")}
               </Button>
               <Button
                 type="button"
@@ -1345,7 +1344,7 @@ export function ArrowReportGrid({
                 onClick={() => void runExport("xlsx", 1_000_000)}
               >
                 <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
-                İlk 1.000.000 (Excel)
+                {t("btn_first_million")}
               </Button>
               <Button
                 type="button"
@@ -1354,7 +1353,7 @@ export function ArrowReportGrid({
                 onClick={() => void runExport("parquet")}
               >
                 <Database className="mr-1.5 size-3.5 text-purple-400" />
-                Tümünü Parquet İndir ({formatCount(exportWarning.count)})
+                {t("btn_download_all_parquet", { count: formatCount(exportWarning.count) })}
               </Button>
             </DialogFooter>
           </>
@@ -1364,21 +1363,16 @@ export function ArrowReportGrid({
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
                 <AlertTriangle className="size-5 shrink-0" />
                 <DialogTitle className="text-base font-semibold">
-                  Büyük Veri Kümesi Uyarısı
+                  {t("big_dataset_title")}
                 </DialogTitle>
               </div>
               <DialogDescription className="pt-2 text-xs leading-relaxed text-muted-foreground">
-                Bu raporda{" "}
-                <strong className="font-semibold text-foreground tabular-nums">
-                  {formatCount(exportWarning.count)} satır
-                </strong>{" "}
-                veri bulunmaktadır. Microsoft Excel tek sayfada en fazla 1.048.576 satır desteklediği için veriniz{" "}
-                <strong className="font-semibold text-foreground">2 çalışma sayfasına</strong> (Sayfa 1 ve Sayfa 2) bölünerek aktarılacaktır.
+                {t("big_dataset_desc", { count: formatCount(exportWarning.count) })}
               </DialogDescription>
             </DialogHeader>
 
             <p className="text-xs text-muted-foreground">
-              2 çalışma sayfasından oluşan büyük dosyaları açarken bilgisayarınızda kısa süreli donma veya performans kaybı yaşanabilir.
+              {t("big_dataset_note")}
             </p>
 
             <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1388,7 +1382,7 @@ export function ArrowReportGrid({
                 size="sm"
                 onClick={() => setExportWarning(null)}
               >
-                Vazgeç / Filtrele
+                {t("btn_cancel_filter")}
               </Button>
               <Button
                 type="button"
@@ -1397,7 +1391,7 @@ export function ArrowReportGrid({
                 onClick={() => void runExport("xlsx", 1_000_000)}
               >
                 <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600 dark:text-emerald-400" />
-                İlk 1.000.000 (Excel)
+                {t("btn_first_million")}
               </Button>
               <Button
                 type="button"
@@ -1405,7 +1399,7 @@ export function ArrowReportGrid({
                 size="sm"
                 onClick={() => void runExport("xlsx")}
               >
-                2 Sayfa Olarak İndir
+                {t("btn_download_2_sheets")}
               </Button>
             </DialogFooter>
           </>

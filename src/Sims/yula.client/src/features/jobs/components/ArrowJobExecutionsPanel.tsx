@@ -1141,10 +1141,10 @@ export function ArrowJobExecutionsPanel({
       {
         label: t("opfs_cache"),
         value: opfsDetail?.hasParts
-          ? `${opfsDetail.partCount} parça (${formatBytes(opfsDetail.totalSizeBytes)})`
+          ? t("opfs_parts", { count: opfsDetail.partCount, size: formatBytes(opfsDetail.totalSizeBytes) })
           : opfsLoading
-            ? "Taranıyor…"
-            : "Yok",
+            ? t("opfs_scanning")
+            : t("opfs_none"),
       },
       {
         label: t("opfs_date"),

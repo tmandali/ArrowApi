@@ -1,4 +1,7 @@
+"use client";
+
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   ChevronDown,
   ChevronUp,
@@ -58,6 +61,7 @@ export function ColumnManagementMenu({
   disabled = false,
   disableReorder = false,
 }: ColumnManagementMenuProps) {
+  const t = useTranslations("GridColumns")
   const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
   const [columnSearch, setColumnSearch] = React.useState("")
   const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
@@ -197,8 +201,8 @@ export function ColumnManagementMenu({
           size="icon"
           className="relative size-7 shrink-0"
           disabled={disabled || columns.length === 0}
-          title="Kolonları Yönet (Görünürlük, Sıralama, Sabitleme)"
-          aria-label="Kolonları Yönet"
+          title={t("manage_title")}
+          aria-label={t("manage_aria")}
         >
           <Columns3 className="size-3.5" />
           {hiddenColumnsCount > 0 ? (
@@ -222,7 +226,7 @@ export function ColumnManagementMenu({
         <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
           <div className="flex items-center gap-1.5 font-medium text-foreground text-xs">
             <Columns3 className="size-3.5 text-muted-foreground" />
-            <span>Kolonlar</span>
+            <span>{t("columns_heading")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -233,8 +237,8 @@ export function ColumnManagementMenu({
               disabled={!canReset}
               onClick={onResetColumns}
               className="flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/70 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
-              title="Varsayılana Sıfırla"
-              aria-label="Varsayılana Sıfırla"
+              title={t("reset_default")}
+              aria-label={t("reset_default")}
             >
               <RotateCcw className="size-3" />
             </button>
@@ -343,7 +347,7 @@ export function ColumnManagementMenu({
                         : "cursor-pointer"
                     )}
                     onClick={() => !isLastVisible && toggleColumnVisibility(col.name)}
-                    title={isLastVisible ? "En az bir kolon görünür kalmalıdır" : undefined}
+                    title={isLastVisible ? t("at_least_one_visible") : undefined}
                   >
                     {!disableReorder ? (
                       <GripVertical className="size-3 text-muted-foreground/30 group-hover:text-muted-foreground/80 shrink-0 cursor-grab active:cursor-grabbing" />
@@ -389,8 +393,8 @@ export function ColumnManagementMenu({
                           onMoveColumn?.(col.name, "up")
                         }}
                         className="flex size-5 items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                        title="Bir yukarı taşı (Sola kaydır) [Alt+Yukarı]"
-                        aria-label={`${col.label} bir yukarı taşı`}
+                        title={t("move_up")}
+                        aria-label={t("move_up_aria", { label: col.label })}
                       >
                         <ChevronUp className="size-3.5" />
                       </button>
@@ -404,8 +408,8 @@ export function ColumnManagementMenu({
                           onMoveColumn?.(col.name, "down")
                         }}
                         className="flex size-5 items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                        title="Bir aşağı taşı (Sağa kaydır) [Alt+Aşağı]"
-                        aria-label={`${col.label} bir aşağı taşı`}
+                        title={t("move_down")}
+                        aria-label={t("move_down_aria", { label: col.label })}
                       >
                         <ChevronDown className="size-3.5" />
                       </button>
@@ -427,15 +431,15 @@ export function ColumnManagementMenu({
                         )}
                         title={
                           !isVisible
-                            ? "Gizli kolon sabitlenemez"
+                            ? t("hidden_column_cannot_pin")
                             : isPinned
-                            ? "Sabitlemeyi kaldır (P)"
-                            : "Sola sabitle (P)"
+                            ? t("unpin")
+                            : t("pin")
                         }
                         aria-label={
                           isPinned
-                            ? `${col.label} sabitlemesini kaldır`
-                            : `${col.label} sola sabitle`
+                            ? t("unpin_aria", { label: col.label })
+                            : t("pin_aria", { label: col.label })
                         }
                       >
                         <Pin
@@ -453,7 +457,7 @@ export function ColumnManagementMenu({
           })}
           {filteredMenuColumns.length === 0 ? (
             <div className="py-3 text-center text-xs text-muted-foreground">
-              Kolon bulunamadı
+              {t("no_columns")}
             </div>
           ) : null}
         </div>

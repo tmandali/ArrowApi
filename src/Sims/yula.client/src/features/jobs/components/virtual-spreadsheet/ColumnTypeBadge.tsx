@@ -1,4 +1,7 @@
+"use client";
+
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { Calendar } from "lucide-react"
 import { cn } from "@/utils/cn"
 import type { SpreadsheetColumn } from "./types"
@@ -17,6 +20,7 @@ export function ColumnTypeBadge({
   isPinned = false,
   className,
 }: ColumnTypeBadgeProps) {
+  const t = useTranslations("GridColumns")
   const duck = (col.duckType || "").toUpperCase()
   let kind = col.kind
 
@@ -41,6 +45,7 @@ export function ColumnTypeBadge({
   }
 
   const detailedType = col.duckType ? ` (${col.duckType})` : ""
+  const pinnedSuffix = isPinned ? t("pinned_suffix") : ""
   const badgeBaseClass = cn(
     "inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[9px] font-mono select-none transition-colors",
     isPinned
@@ -53,7 +58,7 @@ export function ColumnTypeBadge({
     return (
       <span
         className={cn(badgeBaseClass, "gap-0.5")}
-        title={`Veri Tipi: Tarih${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
+        title={t("type_date", { detail: detailedType, pinned: pinnedSuffix })}
       >
         <Calendar className="size-2.5" />
       </span>
@@ -64,7 +69,7 @@ export function ColumnTypeBadge({
     return (
       <span
         className={badgeBaseClass}
-        title={`Veri Tipi: Sayı / Tutar${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
+        title={t("type_number", { detail: detailedType, pinned: pinnedSuffix })}
       >
         123
       </span>
@@ -75,7 +80,7 @@ export function ColumnTypeBadge({
     return (
       <span
         className={badgeBaseClass}
-        title={`Veri Tipi: Mantıksal${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
+        title={t("type_boolean", { detail: detailedType, pinned: pinnedSuffix })}
       >
         bool
       </span>
@@ -85,7 +90,7 @@ export function ColumnTypeBadge({
   return (
     <span
       className={badgeBaseClass}
-      title={`Veri Tipi: Metin${detailedType}${isPinned ? " (Sabitlendi)" : ""}`}
+      title={t("type_text", { detail: detailedType, pinned: pinnedSuffix })}
     >
       Aa
     </span>

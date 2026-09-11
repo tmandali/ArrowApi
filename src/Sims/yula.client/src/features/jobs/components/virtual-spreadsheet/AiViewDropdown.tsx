@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   BookmarkPlus,
   ChevronDown,
@@ -60,8 +61,9 @@ export function AiViewDropdown({
   isViewLoading = false,
   className,
 }: AiViewDropdownProps) {
+  const t = useTranslations("GridViews")
   const isCurrentQueryActive = Boolean(currentQuerySql)
-  const defaultLabel = reportTitle || "Tüm Kayıtlar"
+  const defaultLabel = reportTitle || t("all_records")
 
   // Aktif sorgu kayıtlı mı kontrolü
   const savedMatch = isCurrentQueryActive
@@ -83,7 +85,7 @@ export function AiViewDropdown({
   const handleQuickSave = (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
-    const titleToSave = currentQueryTitle?.trim() || activeTitle || "AI Görünümü"
+    const titleToSave = currentQueryTitle?.trim() || activeTitle || t("ai_view_default")
     onSaveCurrentAiView?.(titleToSave)
   }
 
@@ -153,12 +155,12 @@ export function AiViewDropdown({
               )}
               title={
                 isViewLoading
-                  ? `Yükleniyor: ${activeTitle}`
+                  ? t("loading_view", { title: activeTitle })
                   : isCurrentQueryActive
                   ? isCurrentQuerySaved
-                    ? `Aktif Kayıtlı Görünüm: ${activeTitle}`
-                    : `Aktif Geçici AI Görünümü (Kaydedilmedi): ${activeTitle}`
-                  : `Aktif Görünüm: ${defaultLabel}`
+                    ? t("active_saved_view", { title: activeTitle })
+                    : t("active_temp_view", { title: activeTitle })
+                  : t("active_view", { label: defaultLabel })
               }
             >
               {isViewLoading ? (
@@ -177,7 +179,7 @@ export function AiViewDropdown({
               {isCurrentQueryActive && !isCurrentQuerySaved && !isViewLoading ? (
                 <span
                   className="size-1.5 rounded-full bg-amber-500 shrink-0"
-                  title="Kaydedilmedi"
+                  title={t("unsaved_badge_title")}
                 />
               ) : null}
               <ChevronDown className="size-3 text-muted-foreground/60 shrink-0 transition-transform group-data-[state=open]:rotate-180 group-hover:text-foreground" />
@@ -195,7 +197,7 @@ export function AiViewDropdown({
                         {activeTitle}
                       </div>
                       <div className="text-[10px] text-muted-foreground">
-                        Kaydedilmemiş geçici analiz
+                        {t("unsaved_temp_analysis")}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -206,7 +208,7 @@ export function AiViewDropdown({
                             handleOpenInspectSql(activeTitle, currentQuerySql, e)
                           }
                           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                          title="SQL Sorgusunu İncele"
+                          title={t("inspect_sql")}
                         >
                           <Code2 className="size-3.5" />
                         </button>
@@ -216,10 +218,10 @@ export function AiViewDropdown({
                         size="sm"
                         className="h-6 px-2 text-[11px] gap-1 shrink-0 bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600"
                         onClick={handleQuickSave}
-                        title="Görünümü kaydet"
+                        title={t("save_view")}
                       >
                         <BookmarkPlus className="size-3" />
-                        Kaydet
+                        {t("save")}
                       </Button>
                     </div>
                   </div>
@@ -240,7 +242,7 @@ export function AiViewDropdown({
                 <span className="truncate">{defaultLabel}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[10px] text-muted-foreground font-normal">Tüm Kayıtlar</span>
+                <span className="text-[10px] text-muted-foreground font-normal">{t("all_records")}</span>
                 {!isCurrentQueryActive ? <Check className="size-3.5 text-orange-600 dark:text-orange-400 shrink-0" /> : null}
               </div>
             </DropdownMenuItem>
@@ -248,7 +250,7 @@ export function AiViewDropdown({
             {aiViews.length === 0 && !isCurrentQueryActive ? (
               <div className="px-2.5 py-2 text-[11px] text-muted-foreground flex items-center gap-1.5 border-t border-border/60">
                 <Sparkles className="size-3 text-amber-500 shrink-0" />
-                <span>Yula AI ile sorgu ürettiğinizde görünümler burada listelenir.</span>
+                <span>{t("empty_views_hint")}</span>
               </div>
             ) : null}
 
@@ -297,8 +299,8 @@ export function AiViewDropdown({
                         handleConfirmRename(view.id)
                       }}
                       className="p-1 rounded text-orange-600 hover:bg-orange-500/10 dark:text-orange-400 transition-colors"
-                      title="Kaydet (Enter)"
-                      aria-label="Kaydet"
+                      title={t("save_rename_title")}
+                      aria-label={t("save")}
                     >
                       <Check className="size-3" />
                     </button>
@@ -310,8 +312,8 @@ export function AiViewDropdown({
                         handleCancelRename()
                       }}
                       className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                      title="İptal (Esc)"
-                      aria-label="İptal"
+                      title={t("cancel_title")}
+                      aria-label={t("cancel")}
                     >
                       <X className="size-3" />
                     </button>
@@ -339,8 +341,8 @@ export function AiViewDropdown({
                       type="button"
                       onClick={(e) => handleOpenInspectSql(view.title, view.sql, e)}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      title="SQL Sorgusunu İncele"
-                      aria-label="SQL Sorgusunu İncele"
+                      title={t("inspect_sql")}
+                      aria-label={t("inspect_sql")}
                     >
                       <Code2 className="size-3" />
                     </button>
@@ -348,8 +350,8 @@ export function AiViewDropdown({
                       type="button"
                       onClick={(e) => handleStartRename(view, e)}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      title="Yeniden Adlandır"
-                      aria-label="Yeniden Adlandır"
+                      title={t("rename")}
+                      aria-label={t("rename")}
                     >
                       <Pencil className="size-3" />
                     </button>
@@ -357,8 +359,8 @@ export function AiViewDropdown({
                       type="button"
                       onClick={(e) => handleDelete(view.id, e)}
                       className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title="Görünümü Sil"
-                      aria-label="Görünümü Sil"
+                      title={t("delete_view")}
+                      aria-label={t("delete_view")}
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -378,8 +380,8 @@ export function AiViewDropdown({
             size="icon"
             onClick={handleQuickSave}
             className="size-6 text-amber-700 hover:bg-amber-500/15 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-400/15 shrink-0"
-            title="Görünümü kaydet"
-            aria-label="Görünümü kaydet"
+            title={t("save_view")}
+            aria-label={t("save_view")}
           >
             <BookmarkPlus className="size-3.5" />
           </Button>
@@ -392,10 +394,10 @@ export function AiViewDropdown({
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <Code2 className="size-4 text-amber-700 dark:text-amber-400" />
-              {inspectingSql?.title} — SQL Sorgusu
+              {t("sql_dialog_title", { title: inspectingSql?.title ?? "" })}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Bu görünüm DuckDB WASM üzerinde aşağıdaki salt-okunur SQL ile üretilmiştir.
+              {t("sql_dialog_intro")}
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -412,7 +414,7 @@ export function AiViewDropdown({
               className="text-xs gap-1.5"
             >
               {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-              {copied ? "Kopyalandı!" : "Sorguyu Kopyala"}
+              {copied ? t("copied") : t("copy_query")}
             </Button>
             <Button
               type="button"
@@ -420,7 +422,7 @@ export function AiViewDropdown({
               onClick={() => setInspectingSql(null)}
               className="text-xs"
             >
-              Kapat
+              {t("close")}
             </Button>
           </DialogFooter>
         </DialogContent>

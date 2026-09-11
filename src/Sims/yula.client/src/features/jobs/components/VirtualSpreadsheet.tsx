@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   ArrowDown,
   ArrowUp,
@@ -56,6 +57,7 @@ import {
  * chrome/virtualizasyonu paylaşır; satır renderer'ı grid'e özeldir.
  */
 export function VirtualSpreadsheet<T>({
+
   columns,
   items,
   renderRow,
@@ -112,6 +114,7 @@ export function VirtualSpreadsheet<T>({
   isMaximized: controlledMaximized,
   onToggleMaximize,
 }: VirtualSpreadsheetProps<T>) {
+  const t = useTranslations("ReportGrid")
   const storeMaximized = useYulaGridStore((s) => s.isMaximized)
   const setStoreMaximized = useYulaGridStore((s) => s.setIsMaximized)
 
@@ -1326,8 +1329,8 @@ export function VirtualSpreadsheet<T>({
               className="size-7 shrink-0"
               disabled={columns.length === 0}
               onClick={() => onToggleFooterRow(!showFooterRow)}
-              title={showFooterRow ? "Alt toplam satırını gizle (Σ)" : "Alt toplam satırını göster (Σ)"}
-              aria-label={showFooterRow ? "Alt toplam satırını gizle (Σ)" : "Alt toplam satırını göster (Σ)"}
+              title={showFooterRow ? t("footer_toggle_hide") : t("footer_toggle_show")}
+              aria-label={showFooterRow ? t("footer_toggle_hide") : t("footer_toggle_show")}
             >
               <Sigma className="size-3.5" />
             </Button>
@@ -1338,8 +1341,8 @@ export function VirtualSpreadsheet<T>({
             size="icon"
             className="size-7 shrink-0"
             onClick={handleToggleMaximize}
-            title={isMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
-            aria-label={isMaximized ? "Küçült (Esc)" : "Genişletilmiş Görünüm (Maximize)"}
+            title={isMaximized ? t("unmaximize_title") : t("maximize_title")}
+            aria-label={isMaximized ? t("unmaximize_title") : t("maximize_title")}
           >
             {isMaximized ? (
               <Minimize2 className="size-3.5" />
@@ -1411,19 +1414,19 @@ export function VirtualSpreadsheet<T>({
                         let sortTooltip = col.label
                         if (canSort) {
                           if (!isSorted) {
-                            sortTooltip = `${col.label} — Sıralamak için tıkla (Artan)`
+                            sortTooltip = t("sort_click_asc", { label: col.label })
                           } else if (isAsc) {
                             sortTooltip = hasMultipleSorts
-                              ? `${col.label} — Sıralama Önceliği: ${sortPriority} (Artan). Ters çevirmek için tıkla`
-                              : `${col.label} — Ters sıralamak için tıkla (Azalan)`
+                              ? t("sort_priority_asc", { label: col.label, priority: sortPriority })
+                              : t("sort_click_desc", { label: col.label })
                           } else {
                             sortTooltip = hasMultipleSorts
-                              ? `${col.label} — Sıralama Önceliği: ${sortPriority} (Azalan). Sıralamayı kaldırmak için tıkla`
-                              : `${col.label} — Doğal sıraya dönmek için tıkla`
+                              ? t("sort_priority_desc", { label: col.label, priority: sortPriority })
+                              : t("sort_click_clear", { label: col.label })
                           }
                         }
                         if (canDrag) {
-                          sortTooltip += " (Sırasını değiştirmek için sürükleyin)"
+                          sortTooltip += t("sort_drag_hint")
                         }
 
                         return (
@@ -1471,7 +1474,7 @@ export function VirtualSpreadsheet<T>({
                                     <>
                                       <ArrowUp
                                         className="size-3 text-primary stroke-[2.5]"
-                                        aria-label="Artan sırada"
+                                        aria-label={t("aria_sorted_asc")}
                                       />
                                       {hasMultipleSorts ? (
                                         <span className="text-[9px] font-bold text-primary leading-none select-none">
@@ -1483,7 +1486,7 @@ export function VirtualSpreadsheet<T>({
                                     <>
                                       <ArrowDown
                                         className="size-3 text-primary stroke-[2.5]"
-                                        aria-label="Azalan sırada"
+                                        aria-label={t("aria_sorted_desc")}
                                       />
                                       {hasMultipleSorts ? (
                                         <span className="text-[9px] font-bold text-primary leading-none select-none">
@@ -1501,7 +1504,7 @@ export function VirtualSpreadsheet<T>({
                               role="separator"
                               aria-orientation="vertical"
                               aria-label={`Resize ${col.label} column (double-click to auto fit)`}
-                              title="Genişletmek için sürükleyin, içeriğe tam sığdırmak için çift tıklayın"
+                              title={t("col_resize_title")}
                               draggable={false}
                               onMouseEnter={() => {
                                 isHoveringSeparatorRef.current = true
@@ -1608,7 +1611,7 @@ export function VirtualSpreadsheet<T>({
                       colSpan={visibleColumns.length + 1}
                       className="py-8 text-center text-xs text-muted-foreground"
                     >
-                      Kayıt bulunamadı
+                      {t("no_records")}
                     </td>
                   </tr>
                 ) : (
