@@ -27,6 +27,9 @@ export default function SignInPage() {
   // Yönetici tarafından devre dışı bırakılan hesap (AccountStatusGuard
   // sign-out'u buraya düşer) — kullanıcıya sebep gösterilir.
   const isDeactivated = searchParams.get("reason") === "deactivated";
+  // OAuth callback hatası (auth.ts'de pages.error = "/sign-in") —
+  // tarayıcıda çıplak `?error=` yerine kartta anlamlı mesaj.
+  const oauthError = searchParams.get("error");
   // Explicit tema yoksa kart saf CSS ile sistemi izler (dark: varyantı,
   // flash yok). Explicit tema varsa kart o temaya zorlanır.
   const forceDarkCard = GOOGLE_THEME === "filled_black" || GOOGLE_THEME === "outline_dark";
@@ -72,6 +75,21 @@ export default function SignInPage() {
             {t("deactivated_notice")}
           </p>
         )}
+        {oauthError ? (
+          <p
+            role="alert"
+            className={cn(
+              "rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs",
+              forceDarkCard ? "text-red-200" : "text-red-600 dark:text-red-300",
+            )}
+          >
+            {oauthError === "OAuthAccountNotLinked" ? (
+              t("error_account_not_linked")
+            ) : (
+              t("error_oauth_generic")
+            )}
+          </p>
+        ) : null}
         {/* Tek giriş noktası: ilk girişte hesap otomatik oluşur, ayrı
             sign-up akışı yok (/sign-up buraya redirect eder). */}
         <ProviderButtons labelPrefix="sign_in" t={t} next={next} googleTheme={GOOGLE_THEME} />
