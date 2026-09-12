@@ -49,10 +49,19 @@ export function useEffectiveRole(): EffectiveRoleState {
   // uygulama tip (`@/lib/auth` Session — `user.roles` genişletmesi) cast.
   const session = sessionData as unknown as Session | null;
 
-  const ready = catalogRole !== undefined;
-  const role = catalogRole ?? (session ? "Guest" : null);
   const realmAdmin = hasRealmRole(session, APP_ADMIN_ROLE);
   const catalogAdmin = catalogRole === CATALOG_ADMIN_ROLE;
+
+  /**
+   * Ready kuralı:
+   * - Realm claim (`app-admin`) session'dan APEKTİR — session yüklenir yüklenmez
+   *   bilinen ve stabil bir kaynak: bootstrap admini catalog guard'ı beklemeden
+   *   açılır. (Account-status DB hatası / `role: null` bootstrap'ü kilitleyemez.)
+   * - Catalog yolu ise fail-closed kalır: guard'ın ilk yanıtı gelene dek
+   *   kapalı (yanıp sönme + URL ile sızıntı önlenir).
+   */
+  const ready = realmAdmin || catalogRole !== undefined;
+  const role = catalogRole ?? (session ? "Guest" : null);
 
   return { ready, role, isAdmin: realmAdmin || catalogAdmin };
 }

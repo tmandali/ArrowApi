@@ -27,7 +27,11 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (status !== "authenticated") {
+    // YENİDEN YÜKLEME: session hâlâ çözülüyor ("loading") — erken karar VERMEZ.
+    // Eski davranışta `status !== "authenticated"` "loading"'i de yakalayıp
+    // geçerli oturuma rağmen `/sign-in`'e yönlendiriyordu (F5 → sign-in).
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
       router.replace("/sign-in");
     } else if (ready && !isAdmin) {
       router.replace("/");
