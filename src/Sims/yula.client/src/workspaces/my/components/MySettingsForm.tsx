@@ -274,6 +274,13 @@ export function MySettingsForm() {
   const [profileSaved, setProfileSaved] = React.useState(false)
   const [profileLoaded, setProfileLoaded] = React.useState(false)
 
+  // Aktivite/kenar panel — mock/demo satırlar KALDIRILDI; yalnız DB'den
+  // gelen GERÇEK kayıtlar gösterilir (identity oluşum + ayarlar güncelleme).
+  const [meta, setMeta] = React.useState<{
+    identityCreatedAt: string | null
+    settingsUpdatedAt: string | null
+  } | null>(null)
+
   // Sekme derin bağlantısı: menüden `?tab=settings` (Tercihler) /
   // `?tab=user-details` (Profil) ile gelinir; sekme tıklaması da URL'yi
   // günceller (replace, scroll yok) — yenileme/derin bağlantı korunur.
@@ -289,6 +296,8 @@ export function MySettingsForm() {
     isSettingsTab(tabParam) ? tabParam : "user-details",
   )
   React.useEffect(() => {
+    // URL search-params (tab=...) ile state senkronu — legit external-sync.
+    // eslint-disable-next-line set-state-in-effect
     if (isSettingsTab(tabParam)) setActiveTab(tabParam)
   }, [tabParam])
   const handleTabChange = (v: string) => {
@@ -318,6 +327,8 @@ export function MySettingsForm() {
   React.useEffect(() => {
     let active = true
     // Kayıtlı AI config'i hydration SONRASI yükle (ilk render varsayılan).
+    // localStorage + secret-store senkronu — legit external-sync.
+    // eslint-disable-next-line set-state-in-effect
     setAiConfigState(loadStoredAiConfig())
     loadSecret().then((secret) => {
       if (!active) return
@@ -571,10 +582,6 @@ export function MySettingsForm() {
 
   // Aktivite/kenar panel — mock/demo satırlar KALDIRILDI; yalnız DB'den
   // gelen GERÇEK kayıtlar gösterilir (identity oluşum + ayarlar güncelleme).
-  const [meta, setMeta] = React.useState<{
-    identityCreatedAt: string | null
-    settingsUpdatedAt: string | null
-  } | null>(null)
   const fmtDate = (iso: string | null | undefined) =>
     iso ? new Date(iso).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-US") : "—"
   const activityTimelineItems = (

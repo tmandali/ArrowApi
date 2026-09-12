@@ -30,18 +30,13 @@ import { initGsiClient, type GsiIdClient } from "@/features/auth/lib/gsi-client"
 import { signInWithGoogleCredential } from "@/features/auth/lib/google-onesig-signin";
 
 
-export type GsiButtonTheme = "outline" | "filled_blue" | "filled_black" | "outline_dark";
+import { resolveGsiButtonTheme, type GsiButtonTheme } from "@/features/auth/lib/gsi-button-theme";
 
 /**
- * Efektif GIS temasını çözer: explicit theme kazanır, verilmezse sistem
- * temasını izler (dark → outline_dark, light → outline).
+ * Type re-export (tüketici — sign-in kartı): component dosyası yalnız
+ * component export etmeli (Fast Refresh); saf resolver lib'dedir.
  */
-export function resolveGsiButtonTheme(
-  theme: GsiButtonTheme | undefined,
-  resolvedTheme: string | undefined,
-): GsiButtonTheme {
-  return theme ?? (resolvedTheme === "dark" ? "outline_dark" : "outline");
-}
+export type { GsiButtonTheme };
 
 export interface GoogleOneTapButtonProps {
   /** GIS buton boyutu — "large" 40px'tir (shadcn h-10 ile aynı satır). */
@@ -83,7 +78,10 @@ export function GoogleOneTapButton({
   // undefined'tır; yanlış temayla ilk çizimi önlemek için mount beklenir.
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  // SSR: resolvedTheme hydration öncesi bilinmez; mount flag'i GIS
+  // butonunun yanlış temayla ilk çizimini önler (legit external-sync).
   React.useEffect(() => {
+    // eslint-disable-next-line set-state-in-effect
     setMounted(true);
   }, []);
   const effectiveTheme = resolveGsiButtonTheme(theme, mounted ? resolvedTheme : undefined);
