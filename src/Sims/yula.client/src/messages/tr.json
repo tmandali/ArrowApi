@@ -1549,6 +1549,8 @@
     "sign_in_google": "Google ile Giriş",
     "deactivated_notice": "Hesabınız bir yönetici tarafından devre dışı bırakıldı. Lütfen sistem yöneticinize başvurun.",
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
+    "provider_unreachable": "{provider} sunucusuna ulaşılamıyor. Lütfen çalıştığından emin olun ve tekrar deneyin.",
+    "provider_unreachable_hint_keycloak": "Yerel Keycloak'u başlatmak için repo kökünde `docker compose up -d` çalıştırın.",
     "forgot_password": "Şifremi Unuttum",
     "invalid_credentials": "E-posta veya şifre hatalı."
   },

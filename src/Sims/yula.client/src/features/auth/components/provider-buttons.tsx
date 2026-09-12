@@ -38,6 +38,14 @@ type Providers = NonNullable<Awaited<ReturnType<typeof getProviders>>>;
  */
 const HIDDEN_PROVIDER_IDS = new Set(["google-onesig"]);
 
+/**
+ * Self-hosted provider'lar — redirect'ten ÖNCE sağlığı preflight'lanır
+ * (`GET /api/auth/provider-health?provider=<id>`). Sunucu ulaşılmazsa
+ * kullanıcı ölü authorize URL'ine atılmaz, kartta anlamlı hata gösterilir.
+ * Google neredeyse her zaman erişilebildiği için listede YOK.
+ */
+const SELF_HOSTED_PROVIDER_IDS = new Set(["keycloak"]);
+
 /** provider id → buton görünümü. Yeni provider'lar buraya eklenir. */
 const PROVIDER_UI: Record<string, { icon: LucideIcon; variant: "default" | "outline" }> = {
   keycloak: { icon: KeyRound, variant: "default" },
@@ -50,11 +58,11 @@ interface ProviderButtonsProps {
   /**
    * Etiket anahtarını üreten prefix. Örn. `${labelPrefix}_${providerId}`
    * (sign_in_google). Bu anahtarın useTranslations'ın namespace'inde
-   * tanımlı olması gerekir.
+   * tanımlı olması gerekir. (İsteğe bağlı değerli anahtar: `t(key, vals)`.)
    */
   labelPrefix: string;
   /** Doğru namespace'de (labelPrefix'in ait olduğu) useTranslations fonksiyonu. */
-  t: (key: string) => string;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
   /** Giriş sonrası yönlendirilecek URL. */
   next?: string | null;
   /** GIS buton teması — verilmezse sistem temasını izler. */
@@ -64,6 +72,8 @@ interface ProviderButtonsProps {
 export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: ProviderButtonsProps) {
   const [providers, setProviders] = React.useState<Providers | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
+  // Self-hosted provider'a ulaşılamadıysa (preflight) kartta gösterilecek hata.
+  const [unreachableProvider, setUnreachableProvider] = React.useState<{ id: string; name: string } | null>(null);
 
   React.useEffect(() => {
     getProviders()
@@ -71,9 +81,25 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
       .catch(() => setProviders({} as Providers));
   }, []);
 
-  const handleProvider = async (id: string) => {
+  const handleProvider = async (id: string, name: string) => {
     setLoading(id);
+    setUnreachableProvider(null);
     try {
+      // Self-hosted provider (Keycloak): sunucu kapalıysa redirect ATMA —
+      // kartta "ulaşılamıyor" açıklaması göster (bkz. provider-health).
+      if (SELF_HOSTED_PROVIDER_IDS.has(id)) {
+        const health = await fetch(
+          `/api/auth/provider-health?provider=${encodeURIComponent(id)}`,
+          { cache: "no-store" },
+        )
+          .then((res) => res.json())
+          .catch(() => null);
+        if (health === null || health.reachable !== true) {
+          setUnreachableProvider({ id, name });
+          setLoading(null);
+          return;
+        }
+      }
       await signIn(id, { redirectTo: next ?? "/" }, providerSignInParams(id));
     } catch {
       setLoading(null);
@@ -125,7 +151,11 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
             // (cn() içindeki tailwind-merge h-7'yi ezer).
             className="h-10 w-full"
             type="button"
-            onClick={() => void handleProvider(p.id)}
+            onClick={() => {
+              // Preflight hata mesajında provider adı geçsin diye labelı
+              // ikinci argüman olarak taşıyoruz.
+              void handleProvider(p.id, PROVIDER_UI[p.id] ? t(`${labelPrefix}_${p.id}`) : p.name);
+            }}
             disabled={loading !== null}
           >
             {loading === p.id ? (
@@ -137,6 +167,17 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
           </Button>
         );
       })}
+      {unreachableProvider ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300"
+        >
+          <span>{t("provider_unreachable", { provider: unreachableProvider.name })}</span>
+          {unreachableProvider.id === "keycloak" ? (
+            <span className="text-red-500/80 dark:text-red-300/80">{t("provider_unreachable_hint_keycloak")}</span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
