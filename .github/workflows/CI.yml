@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: src/Sims/yula.client
+
+jobs:
+  build:
+    name: Build Next.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: src/Sims/yula.client/package-lock.json
+
+      - run: npm ci
+
+      - uses: actions/cache@v5
+        with:
+          path: src/Sims/yula.client/.next/cache
+          key: nextjs-22.x-${{ hashFiles('src/Sims/yula.client/package-lock.json') }}-${{ hashFiles('src/Sims/yula.client/src/**') }}
+
+      - run: npm run build
+
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: src/Sims/yula.client/package-lock.json
+
+      - run: npm ci
+
+      - if: github.event_name == 'pull_request'
+        name: Validate PR commits
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run check:deps
+      - run: npm run check:i18n
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: src/Sims/yula.client/package-lock.json
+
+      - run: npm ci
+      - run: npm run test:all
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: src/Sims/yula.client/package-lock.json
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e -- --project=chromium
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results
+          path: src/Sims/yula.client/test-results/
+          retention-days: 7

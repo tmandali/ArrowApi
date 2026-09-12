@@ -8,6 +8,9 @@ const config: KnipConfig = {
   ignoreDependencies: [
     '@commitlint/cli',
     '@types/js-yaml',
+    // Vitest browser-mode çekirdeği: provider (@vitest/browser-playwright)
+    // üzerinden çalışır, doğrudan import edilmez.
+    '@vitest/browser',
   ],
   // Follow CSS @import statements (tailwindcss, tw-animate-css, shadcn/tailwind.css)
   compilers: {
