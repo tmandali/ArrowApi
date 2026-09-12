@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { signOut, useSession } from "next-auth/react";
+import { useTheme } from "@/context/theme-context";
 import {
   Avatar,
   AvatarFallback,
@@ -49,6 +50,7 @@ export function NavUser() {
   const { data: session, status } = useSession();
   const { clearJobSession } = useJobSession();
   const { company, companies, beginCompanySwitch, isSwitching } = useActiveCompany();
+  const { theme, setTheme } = useTheme();
 
   // Hydration güvenli "mounted" bayrağı
   const mounted = React.useSyncExternalStore(
@@ -67,7 +69,7 @@ export function NavUser() {
         .slice(0, 2)
     : "NB";
 
-  const activeTheme = mounted ? "system" : "system";
+  const activeTheme = mounted ? (theme ?? "system") : "system";
 
   const handleSignOut = () => {
     clearJobSession();
@@ -217,7 +219,7 @@ export function NavUser() {
                 aria-label={label}
                 aria-pressed={activeTheme === value}
                 onClick={() => {
-                  // theme toggle handled by ThemeProvider directly
+                  setTheme(value);
                 }}
                 className={cn(
                   "flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground",
