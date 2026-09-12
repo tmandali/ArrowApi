@@ -141,7 +141,9 @@ export function GoogleOneTapButton({
   React.useEffect(() => {
     // Mount öncesi resolvedTheme bilinmez (hydration); yanlış temayla ilk
     // çizimi önlemek için GIS init'i mount sonrasına bırakılır.
-    if (!mounted || !clientId || !oneTapEnabled || authenticated) return;
+    // Session loading iken de beklenir: giriş yapmış kullanıcıda butonun
+    // bir anlık parlayıp kaybolması engellenir.
+    if (!mounted || status === "loading" || !clientId || !oneTapEnabled || authenticated) return;
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
@@ -171,7 +173,7 @@ export function GoogleOneTapButton({
       observer?.disconnect();
       gsiRef.current = null;
     };
-  }, [mounted, clientId, oneTapEnabled, authenticated, handleCredential, width]);
+  }, [mounted, status, clientId, oneTapEnabled, authenticated, handleCredential, width]);
 
   // Ölçülen genişlik değişince (kart/pencere resize) butonu aynı kapta
   // Keycloak w-full butonuyla birebir aynı ölçüde yeniden çiz.
@@ -184,6 +186,11 @@ export function GoogleOneTapButton({
 
   // Oturum var, env eksik ya da One Tap modu kapalı → ekran yerini kapma.
   if (authenticated || !clientId || !oneTapEnabled) return null;
+  // Session doğrulanırken buton çizilmez ama satır ölçüsü korunur (layout
+  // kaymasın, giriş yapmış kullanıcıda beyaz buton parlamasın).
+  if (status === "loading" || !mounted) {
+    return <div className={`min-h-10 bg-transparent ${className ?? ""}`} aria-hidden />;
+  }
 
   return (
     <div

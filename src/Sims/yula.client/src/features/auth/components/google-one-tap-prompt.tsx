@@ -32,7 +32,11 @@ export function GoogleOneTapPrompt() {
 
   React.useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId || !isGoogleOneTapEnabled() || status === "authenticated") {
+    // Oturum doğrulanmadan (loading) prompt AÇILMAZ: giriş yapmış kullanıcıda
+    // session geç gelirken kartın bir anlık parlaması engellenir. Status
+    // netleşince effect yeniden çalışır (deps'te status var).
+    if (status === "loading" || status === "authenticated") return;
+    if (!clientId || !isGoogleOneTapEnabled()) {
       return;
     }
     let cancelled = false;
