@@ -27,6 +27,15 @@ export function AccountStatusGuard() {
     let disposed = false;
     let inFlight = false;
 
+    // Yeni login olan kullanıcıyı ilk tam sayfa yüklemesinde app_users'a
+    // düşür (upsert). Yalnız ayarlar sayfasında çalışmadığı için
+    // /system/users listesi yeni kullanıcıları gösterebilsin. Fire-and-
+    // forget: hata guard'ı engellemez (route fail-open 200 döner).
+    void fetch("/api/auth/ensure-user", {
+      method: "POST",
+      cache: "no-store",
+    }).catch(() => undefined);
+
     const check = async () => {
       if (inFlight || disposed) return;
       inFlight = true;
