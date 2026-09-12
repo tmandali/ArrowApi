@@ -66,6 +66,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@electric-sql/pglite": "^0.5.8",
     "@electric-sql/pglite-socket": "^0.2.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

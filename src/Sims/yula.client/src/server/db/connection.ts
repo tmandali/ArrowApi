@@ -1,14 +1,25 @@
 import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { Pool } from "pg";
+import { PGlite } from "@electric-sql/pglite";
 import { Env } from "@/lib/env";
 import * as schema from "./schema";
 
 /**
- * Boilerplate `utils/DBConnection.ts` uyarlaması.
- * PGlite (local.db) ya da gerçek Postgres fark etmez — ikisi de
- * `pg` protokolü konuştuğu için aynı `Pool` ile bağlanılır.
+ * DB connection factory — ortam değişkenine göre PostgreSQL veya PGlite seçer.
+ *
+ * - `USE_PGLITE=true` → dosya-tabanlı yerel PGlite (`local.db`)
+ * - yoksa → `DATABASE_URL` ile gerçek Postgres Pool
+ *
+ * Her iki yol da `pg` protokolü konuştuğu için Drizzle ORM aynı API'yi kullanır.
  */
-export const createDbConnection = () => {
+export const createDbConnection = async () => {
+  if (Env.USE_PGLITE) {
+    const pglite = new PGlite({ dataDir: "local.db" });
+    console.log("[db] PGlite initialized (local.db)");
+    return drizzlePglite(pglite, { schema });
+  }
+
   const pool = new Pool({
     connectionString: Env.DATABASE_URL,
   });
