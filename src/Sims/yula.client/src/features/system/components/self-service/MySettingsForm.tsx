@@ -66,7 +66,6 @@ import {
   Paperclip,
   Share2,
   Copy,
-  Pencil,
   Check,
   Eye,
   EyeOff,
@@ -131,6 +130,8 @@ type SettingsApiRow = {
   aiEndpoint?: string | null
   thinkingLevel?: string | null
   systemFacts?: Record<string, string> | null
+  /** GET yanıtı tüm satırı spread eder → zaman damgaları da gelir. */
+  updatedAt?: string | null
 }
 
 const AI_PROVIDERS: AiProviderConfig["provider"][] = ["ollama", "azure", "google", "openai", "agnes"]
@@ -248,14 +249,28 @@ export function MySettingsForm() {
     React.useState<NonNullable<AiProviderConfig["thinkingLevel"]>>(aiConfig.thinkingLevel || "low")
   const [showApiKey, setShowApiKey] = React.useState(false)
 
-  // User Details sekmesi — API'ye bağlı profil alanları (görünüm aynı, kontrollü input).
-  const [profileEmail, setProfileEmail] = React.useState("john.doe@demo.com")
-  const [profileFullName, setProfileFullName] = React.useState("John Doe")
-  const [profileFirstName, setProfileFirstName] = React.useState("John")
-  const [profileLastName, setProfileLastName] = React.useState("Doe")
-  const [profileUsername, setProfileUsername] = React.useState("johndoe")
-  const [profileLanguage, setProfileLanguage] = React.useState<ProfileLanguage>("english")
-  const [profileTimeZone, setProfileTimeZone] = React.useState<ProfileTimeZone>("asia-kolkata")
+  // User Details sekmesi — API'ye bağlı profil alanları. Başlangıç BOŞ:
+  // demo/sahici sabit değer yok; form yalnızca (1) kayıtlı settings satırı,
+  // (2) kullanıcının kendi login kimliği (user_identities), (3) locale
+  // varsayılanlarından beslenir. Fetch başarısızsa alanlar boş kalır.
+  const [profileEmail, setProfileEmail] = React.useState("")
+  const [profileFullName, setProfileFullName] = React.useState("")
+  const [profileFirstName, setProfileFirstName] = React.useState("")
+  const [profileLastName, setProfileLastName] = React.useState("")
+  const [profileUsername, setProfileUsername] = React.useState("")
+  // Dil varsayılmanı EKRANIN (locale) dili olsun — kayıt/ilk açılışta form
+  // ile ekran uyumsuz kalmasın (eskiden hardcoded "english": ekran Türkçe
+  // iken form İngilizce gösterip Save ile DB'ye "english" yazıyordu).
+  // Hydration güvenli: `locale` RSC context'ten gelir (server/client aynı).
+  const [profileLanguage, setProfileLanguage] = React.useState<ProfileLanguage>(
+    locale === "tr" ? "turkish" : "english",
+  )
+  // Zaman dilimi varsayılanı da locale ile hizalı (demo "asia-kolkata" değil):
+  // tr → Europe/Istanbul, en → Asia/Kolkata. Kayıtlı değer API'den gelince
+  // formu ezer — bu yalnız ilk açılış/boş kayıt için.
+  const [profileTimeZone, setProfileTimeZone] = React.useState<ProfileTimeZone>(
+    locale === "tr" ? "europe-istanbul" : "asia-kolkata",
+  )
   const [profileSaved, setProfileSaved] = React.useState(false)
   const [profileLoaded, setProfileLoaded] = React.useState(false)
 
@@ -310,11 +325,13 @@ export function MySettingsForm() {
       setAiConfigState((prev) => ({ ...prev, apiKey: secret || "" }))
       setConfigHydrated(true)
     })
+    const loadSettings = (attempt: number) => {
     fetch(SETTINGS_API_URL, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { settings?: SettingsApiRow | null } | null) => {
+      .then((data: { settings?: SettingsApiRow | null; user?: { id?: string | null; name?: string | null; email?: string | null; language?: string | null; createdAt?: string | null } | null } | null) => {
         if (!active) return
         const row = data?.settings
+        const user = data?.user
         if (row) {
           // DB → önbellek aynası (sohbet sıcak yolu + offline buradan beslenir).
           cacheYulaClientAiConfigFromDb(row)
@@ -335,21 +352,61 @@ export function MySettingsForm() {
           if (typeof row.fullName === "string" && row.fullName) {
             setProfileFullName(row.fullName)
             const split = splitFullName(row.fullName)
-            setProfileFirstName(split.first || "John")
-            setProfileLastName(split.last || "Doe")
+            setProfileFirstName(split.first || "")
+            setProfileLastName(split.last || "")
           }
           const lang = mapLanguageToUi(row.language)
           if (lang) setProfileLanguage(lang)
           const tz = mapTimeZoneToUi(row.timeZone)
           if (tz) setProfileTimeZone(tz)
         }
-        // GET tamamlandı (kayıt yoksa da) — Save artık güvenli.
-        setProfileLoaded(true)
+        // Kullanıcının KENDİ kaydı (user_identities) — settings satırı henüz yoksa bile
+        // ad/e-posta kendi hesabından gelir (ilk girişte demo değerler KALMAZ).
+        // Dil: ayar satırı yoksa identity'nin ilk kayıt snapshot'ı tohumlamayı yapar
+        // (Accept-Language'dan — Settings'i hiç açmamış kullanıcıya da tutarlı dil).
+        const identityLang = user && !row ? mapLanguageToUi(user.language) : undefined
+        if (identityLang) setProfileLanguage(identityLang)
+        const ownEmail =
+          (typeof row?.email === "string" && row.email) ||
+          (typeof user?.email === "string" && user.email)
+        const ownName =
+          (typeof row?.fullName === "string" && row.fullName) ||
+          (typeof user?.name === "string" && user.name)
+        if (ownEmail) {
+          setProfileEmail(ownEmail)
+          // Username kayıtlı değil → hesap e-postasının local kısmından türetilir.
+          const localPart = ownEmail.split("@")[0]?.trim()
+          if (localPart) setProfileUsername(localPart)
+        }
+        if (ownName) {
+          setProfileFullName(ownName)
+          const split = splitFullName(ownName)
+          if (split.first) setProfileFirstName(split.first)
+          if (split.last) setProfileLastName(split.last)
+        }
+        // Aktivite timeline + kenar panel — GERÇEK DB kayıtları (mock yok).
+        setMeta({
+          identityCreatedAt: user?.createdAt ?? null,
+          settingsUpdatedAt: row?.updatedAt ?? null,
+        })
+        // GET tamamlandı — Save artık güvenli. İlk ziyaret yarışında
+        // (guard'ın `ensure-user` POST'u bu GET'ten önce bitmediyse
+        // identity satırı henüz yok → settings/user ikisi de null)
+        // 1 sn sonra tek retry; ikinci denemede kayıt yoksa bile yüklenmiş sayılır.
+        if (attempt > 0) {
+          setProfileLoaded(true)
+        } else {
+          const empty = !data || (!data.settings && !data.user)
+          if (empty) setTimeout(() => loadSettings(1), 1000)
+          else setProfileLoaded(true)
+        }
       })
       .catch(() => {
         // offline — localStorage fallback
         if (active) setProfileLoaded(true)
       })
+    }
+    loadSettings(0)
     return () => {
       active = false
     }
@@ -502,6 +559,58 @@ export function MySettingsForm() {
       setAiEndpoint("https://apihub.agnes-ai.com/v1")
     }
   }
+
+  // Avatar baş harfleri — kullanıcı ADINDAN türetilir (hydrated kayıt geldikçe günceller).
+  const profileInitials =
+    profileFullName
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+
+  // Aktivite/kenar panel — mock/demo satırlar KALDIRILDI; yalnız DB'den
+  // gelen GERÇEK kayıtlar gösterilir (identity oluşum + ayarlar güncelleme).
+  const [meta, setMeta] = React.useState<{
+    identityCreatedAt: string | null
+    settingsUpdatedAt: string | null
+  } | null>(null)
+  const fmtDate = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-US") : "—"
+  const activityTimelineItems = (
+    <Timeline>
+      {meta?.identityCreatedAt ? (
+        <TimelineItem>
+          <TimelineDot />
+          <TimelineContent>
+            <TimelineTitle>
+              <span className="font-medium">{t("you")}</span> {t("act_created")} ·{" "}
+              <TimelineTime>{fmtDate(meta.identityCreatedAt)}</TimelineTime>
+            </TimelineTitle>
+          </TimelineContent>
+        </TimelineItem>
+      ) : null}
+      {meta?.settingsUpdatedAt ? (
+        <TimelineItem>
+          <TimelineDot />
+          <TimelineContent>
+            <TimelineTitle>
+              {t("act_settings_updated")} ·{" "}
+              <TimelineTime>{fmtDate(meta.settingsUpdatedAt)}</TimelineTime>
+            </TimelineTitle>
+          </TimelineContent>
+        </TimelineItem>
+      ) : null}
+      {profileLoaded && (!meta?.identityCreatedAt && !meta?.settingsUpdatedAt) && (
+        <TimelineItem>
+          <TimelineDot />
+          <TimelineContent>
+            <TimelineTitle className="text-muted-foreground">{t("activity_empty")}</TimelineTitle>
+          </TimelineContent>
+        </TimelineItem>
+      )}
+    </Timeline>
+  )
 
   return (
     <WorkspacePageShell
@@ -673,7 +782,7 @@ export function MySettingsForm() {
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
                         <AvatarFallback className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-                          JD
+                          {profileInitials}
                         </AvatarFallback>
                       </Avatar>
                       <div className="relative flex-1">
@@ -698,56 +807,15 @@ export function MySettingsForm() {
                       </Button>
                     </div>
 
-                    <Timeline>
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_changed_username")}{" "}
-                            <span className="font-medium">john</span> → <span className="font-medium">johndoe</span> ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_last_edited")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_added_rows")} {t("act_social_logins")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_removed_rows")} {t("act_social_logins")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-                    </Timeline>
+                    {activityTimelineItems}
                   </div>
                 </div>
 
                 <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
                   <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-semibold text-sm text-foreground">{profileFullName}</h4>
-                        <p className="text-muted-foreground text-xs font-mono">{profileEmail}</p>
+                        <h4 className="font-semibold text-sm text-foreground">{profileFullName || "—"}</h4>
+                        <p className="text-muted-foreground text-xs font-mono">{profileEmail || "—"}</p>
                       </div>
                     <Button variant="ghost" size="icon" className="size-6">
                       <Copy className="size-3.5 text-muted-foreground" />
@@ -786,12 +854,12 @@ export function MySettingsForm() {
 
                   <div className="space-y-3 text-muted-foreground text-[11px]">
                     <div>
-                      <p className="font-medium text-foreground">Administrator</p>
-                      <p>{t("last_edited")} · {t("time_year_ago")}</p>
+                      <p className="font-medium text-foreground">{t("you")}</p>
+                      <p>{t("panel_updated")} · {fmtDate(meta?.settingsUpdatedAt)}</p>
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">Administrator</p>
-                      <p>{t("created")} · {t("time_year_ago")}</p>
+                      <p className="font-medium text-foreground">{t("you")}</p>
+                      <p>{t("panel_created")} · {fmtDate(meta?.identityCreatedAt)}</p>
                     </div>
                   </div>
                 </div>
@@ -1101,19 +1169,8 @@ export function MySettingsForm() {
                             </TableHeader>
                             <TableBody className="divide-y text-xs">
                               <TableRow>
-                                <TableCell className="text-center">
-                                  <Checkbox />
-                                </TableCell>
-                                <TableCell className="font-medium text-foreground">1</TableCell>
-                                <TableCell className="font-medium text-foreground">{t("provider_ollama")}</TableCell>
-                                <TableCell className="text-muted-foreground"></TableCell>
-                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                  4a770832b401964e1dc7d3ecd080...
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Button variant="ghost" size="icon" className="size-6 text-muted-foreground">
-                                    <Pencil className="size-3" />
-                                  </Button>
+                                <TableCell colSpan={6} className="py-3 text-center text-muted-foreground">
+                                  {t("social_empty")}
                                 </TableCell>
                               </TableRow>
                             </TableBody>
@@ -1131,7 +1188,7 @@ export function MySettingsForm() {
                     <div className="flex items-center gap-3">
                       <Avatar className="size-8">
                         <AvatarFallback className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-                          JD
+                          {profileInitials}
                         </AvatarFallback>
                       </Avatar>
                       <div className="relative flex-1">
@@ -1156,56 +1213,15 @@ export function MySettingsForm() {
                       </Button>
                     </div>
 
-                    <Timeline>
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_changed_username")}{" "}
-                            <span className="font-medium">john</span> → <span className="font-medium">johndoe</span> ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_last_edited")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_added_rows")} {t("act_social_logins")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-
-                      <TimelineItem>
-                        <TimelineDot />
-                        <TimelineContent>
-                          <TimelineTitle>
-                            <span className="font-medium">Administrator</span> {t("act_removed_rows")} {t("act_social_logins")} ·{" "}
-                            <TimelineTime>{t("time_year_ago")}</TimelineTime>
-                          </TimelineTitle>
-                        </TimelineContent>
-                      </TimelineItem>
-                    </Timeline>
+                    {activityTimelineItems}
                   </div>
                 </div>
 
                 <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
                   <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-semibold text-sm text-foreground">{profileFullName}</h4>
-                        <p className="text-muted-foreground text-xs font-mono">{profileEmail}</p>
+                        <h4 className="font-semibold text-sm text-foreground">{profileFullName || "—"}</h4>
+                        <p className="text-muted-foreground text-xs font-mono">{profileEmail || "—"}</p>
                       </div>
                     <Button variant="ghost" size="icon" className="size-6">
                       <Copy className="size-3.5 text-muted-foreground" />
@@ -1244,12 +1260,12 @@ export function MySettingsForm() {
 
                   <div className="space-y-3 text-muted-foreground text-[11px]">
                     <div>
-                      <p className="font-medium text-foreground">Administrator</p>
-                      <p>{t("last_edited")} · {t("time_year_ago")}</p>
+                      <p className="font-medium text-foreground">{t("you")}</p>
+                      <p>{t("panel_updated")} · {fmtDate(meta?.settingsUpdatedAt)}</p>
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">Administrator</p>
-                      <p>{t("created")} · {t("time_year_ago")}</p>
+                      <p className="font-medium text-foreground">{t("you")}</p>
+                      <p>{t("panel_created")} · {fmtDate(meta?.identityCreatedAt)}</p>
                     </div>
                   </div>
                 </div>

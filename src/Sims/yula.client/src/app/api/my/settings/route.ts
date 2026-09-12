@@ -1,33 +1,38 @@
 import { eq } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/server/db/client";
-import { userSettingsSchema, appUsersSchema } from "@/server/db/schema";
+import { userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
 import { SettingsPutValidation } from "@/validations/settings.validation";
-import { resolveSessionDbUserId, resolveSessionUserId, SINGLE_USER_ID } from "@/features/auth/lib/app-user-sync";
+import { resolveSessionDbUserId, resolveSessionUserId } from "@/features/auth/lib/app-user-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** UI her zaman `local` gönderir; oturum varsa login kullanıcının DB id'si,
-    oturum yoksa tek kullanıcı fallback `usr_101`. */
+/** UI her zaman `local` gönderir; oturum varsa login kullanıcının identity GUID'i,
+    oturum yoksa null (tek kullanıcı fallback'i kaldırıldı). */
 const USER_ID_LOCAL = "local";
 
-/** `local` → session kullanıcısı (saf resolver, upsert YOK) veya `usr_101`.
-    app_users upsert'i artık yalnız ensure-user akışında tetiklenir. */
-
-/** Tek kullanıcı ayarı (varsayılan `local`). UI fallback için her zaman 200 döner. */
+/** Kullanıcı ayarları (varsayılan `local`). UI fallback için her zaman 200 döner.
+    Oturum yok → boş yanıt (settings/user null) — başka kullanıcının satırına
+    düşülmez. Dil cookie senkronu artık `i18n.ts`/`locale-sync.ts` katmanında
+    (her sayfa yüklemesinde) — bu route yalnız ayarları okur. */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const clientUserId = url.searchParams.get("userId") || USER_ID_LOCAL;
     // UI'nin `local` gönderdiği yerde: oturum varsa login kullanıcı,
-    // yoksa usr_101. Açıkça başka userId verilirse o id geçer (admin ekranı).
+    // yoksa null (başka birinin satırına okuma yapılmaz).
+    // Açıkça başka userId verilirse o id geçer (admin ekranı).
     // GET salt okuma → saf resolver (upsert tetiklemez); satır henüz yoksa
-    // usr_101 fallback'i devrede (ensure-user ilk tam yüklemeye kadar).
+    // (ensure-user ilk tam yüklemeye kadar) boş yanıt döner.
     const userId =
       clientUserId === USER_ID_LOCAL
-        ? ((await resolveSessionUserId()) ?? SINGLE_USER_ID)
+        ? await resolveSessionUserId()
         : clientUserId;
+
+    if (userId === null) {
+      return Response.json({ settings: null, user: null });
+    }
 
     const [settingsRow] = await db
       .select()
@@ -35,23 +40,34 @@ export async function GET(req: Request) {
       .where(eq(userSettingsSchema.userId, userId))
       .limit(1);
 
-    const [userRow] = await db
+    const [identityRow] = await db
       .select()
-      .from(appUsersSchema)
-      .where(eq(appUsersSchema.id, userId))
+      .from(userIdentitiesSchema)
+      .where(eq(userIdentitiesSchema.id, userId))
       .limit(1);
 
-    // App user'dan ad/e-posta, settings'den config — kesişim yok, birleştirilmiş snapshot.
+    // Identity'den ad/e-posta/dil, settings'den config — kesişim yok, birleştirilmiş snapshot.
     const settings = settingsRow ?? null;
-    const user = userRow ?? null;
+    const user = identityRow ?? null;
 
     return Response.json({
       settings: settings
         ? {
             ...settings,
-            // UI'nin beklediği alanlar app_users'tan gelir.
+            // UI'nin beklediği alanlar user_identities'ten gelir.
             fullName: user?.name ?? null,
             email: user?.email ?? null,
+          }
+        : null,
+      // Kişisel kayıt — settings satırı henüz olmasa bile UI kendi kaydını
+      // (user_identities: ad/e-posta/ilk kayıt dili) gösterebilsin.
+      user: user
+        ? {
+            id: user.id,
+            name: user.name ?? null,
+            email: user.email ?? null,
+            language: user.language ?? null,
+            createdAt: user.createdAt,
           }
         : null,
     });
@@ -84,13 +100,20 @@ export async function PUT(req: Request) {
   // `google` provider'ı bizim AI çekirdekte yok — yazarken `openai`-uyumlu saklanır.
   const aiProvider = v.aiProvider === "google" ? null : v.aiProvider;
   // UI `local` gönderir → session kullanıcı; `user_settings` FK'i
-  // (`user_id → app_users.id`) için satırın varlığı şart → upsert resolver.
+  // (`user_id → user_identities.id`) için satırın varlığı şart → upsert resolver.
   // (ensure-user bunu her tam sayfa yüklemesinde zaten garanti eder; bu
   // yalnız ilk giriş + anında ayar kaydetme yarışına karşı sigorta.)
   const resolvedUserId =
     (v.userId ?? USER_ID_LOCAL) === USER_ID_LOCAL
       ? await resolveSessionDbUserId()
       : v.userId!;
+  if (resolvedUserId === null) {
+    // Session çözümlenemedi (oturum/provider yok) → sahibine yazılamaz.
+    return Response.json(
+      { error: "Oturum kullanilamadi — ayarlar kisinin DB kayidina yazilamadi." },
+      { status: 401 },
+    );
+  }
 
   try {
     const rows = await db
