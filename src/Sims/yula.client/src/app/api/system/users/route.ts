@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { eq, isNull, ne, or } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
