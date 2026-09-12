@@ -32,3 +32,30 @@ export const SystemUserUpsertValidation = z.object({
 
 export type SettingsPutInput = z.infer<typeof SettingsPutValidation>;
 export type SystemUserUpsertInput = z.infer<typeof SystemUserUpsertValidation>;
+
+/**
+ * Kimlik yetkilendirme: guest (user_id NULL) bir `user_identities` satırını
+ * katalog kaydıyla linkle. `identityId` = user_identities.id;
+ * role/status boşsa varsayılanlar (Viewer/Active).
+ */
+export const SystemUserAuthorizeValidation = z.object({
+  identityId: z.string().min(1).max(128),
+  role: z.string().max(128).optional().nullable(),
+  status: z.enum(["Active", "Inactive"]).optional().nullable(),
+  name: z.string().max(256).optional().nullable(),
+  email: z.string().email().max(256).optional().nullable(),
+});
+
+export type SystemUserAuthorizeInput = z.infer<typeof SystemUserAuthorizeValidation>;
+
+/**
+ * Cross-provider birleştirme: `targetIdentityId` login kimliği
+ * `ownerId` ana kimliğe alias'lanır (hedef satır silinir,
+ * ayarlar + katalog linki sahibine taşınır).
+ */
+export const SystemUserMergeValidation = z.object({
+  ownerId: z.string().min(1).max(128),
+  targetIdentityId: z.string().min(1).max(128),
+});
+
+export type SystemUserMergeInput = z.infer<typeof SystemUserMergeValidation>;
