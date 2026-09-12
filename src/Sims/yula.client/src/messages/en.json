@@ -819,7 +819,9 @@
     "new_chat_short": "New Chat",
     "agent_settings_btn": "Agent Settings",
     "empty_chat_title": "New Chat",
-    "delete_conv": "Delete conversation"
+    "delete_conv": "Delete conversation",
+    "google_one_tap": "Sign in with Google (One Tap)",
+    "google_signin_failed": "Google sign-in failed, please try again."
   },
   "ModuleNav": {
     "open_menu": "Open menu (Ctrl+B)",
@@ -1548,23 +1550,7 @@
     "sign_in_google": "Sign in with Google",
     "no_providers": "No account providers configured.",
     "forgot_password": "Forgot password?",
-    "no_account": "Don't have an account?",
-    "sign_up": "Sign Up",
     "invalid_credentials": "Invalid email or password."
-  },
-  "SignUp": {
-    "title": "Create Account",
-    "description": "Create a new account",
-    "name": "Full Name",
-    "email": "Email",
-    "password": "Password",
-    "sign_up": "Sign Up",
-    "sign_up_keycloak": "Sign up with Keycloak",
-    "sign_up_google": "Sign up with Google",
-    "no_providers": "No account providers configured.",
-    "has_account": "Already have an account?",
-    "sign_in": "Sign In",
-    "signup_error": "An error occurred during registration."
   },
   "ForgotPassword": {
     "title": "Reset Password",

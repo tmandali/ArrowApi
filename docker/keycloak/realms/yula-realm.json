@@ -1,0 +1,153 @@
+{
+  "realm": "yula",
+  "enabled": true,
+  "displayName": "Yula",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "sslRequired": "external",
+  "defaultSignatureAlgorithm": "RS256",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "browserFlow": "Yula Browser",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpSupportedApplications": [
+    "FreeOTP",
+    "Google Authenticator",
+    "Microsoft Authenticator"
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "app-user",
+        "description": "Standard Yula application user"
+      },
+      {
+        "name": "app-admin",
+        "description": "Yula application administrator"
+      }
+    ]
+  },
+  "authenticationFlows": [
+    {
+      "alias": "Yula Browser",
+      "description": "Username + password + mandatory TOTP (MFA for all users)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "flowAlias": "Yula Forms",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Yula Forms",
+      "description": "Password form followed by mandatory OTP form",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "yula-client",
+      "name": "Yula Client (NextAuth)",
+      "description": "Next.js frontend — NextAuth v5 Keycloak OIDC provider",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-yula-client-secret-change-me",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:56402/*##http://localhost:3000/*",
+        "use.refresh.tokens": "true"
+      },
+      "redirectUris": ["http://localhost:56402/*", "http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:56402", "http://localhost:3000"],
+      "defaultClientScopes": ["basic", "profile", "email", "roles", "web-origins"],
+      "optionalClientScopes": ["offline_access", "address", "phone", "microprofile-jwt"]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "User",
+      "email": "demo@yula.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["app-user", "default-roles-yula"]
+    },
+    {
+      "username": "yula-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Yula",
+      "lastName": "Admin",
+      "email": "admin@yula.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["app-admin", "app-user", "default-roles-yula"]
+    }
+  ]
+}

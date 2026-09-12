@@ -819,7 +819,9 @@
     "new_chat_short": "Yeni Sohbet",
     "agent_settings_btn": "Ajan Ayarları",
     "empty_chat_title": "Yeni Sohbet",
-    "delete_conv": "Sohbeti sil"
+    "delete_conv": "Sohbeti sil",
+    "google_one_tap": "Google ile giriş (One Tap)",
+    "google_signin_failed": "Google ile giriş başarısız oldu, tekrar deneyin."
   },
   "ModuleNav": {
     "open_menu": "Menüyü Aç (Ctrl+B)",
@@ -1548,23 +1550,7 @@
     "sign_in_google": "Google ile Giriş",
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "forgot_password": "Şifremi Unuttum",
-    "no_account": "Hesabınız yok mu?",
-    "sign_up": "Kayıt Ol",
     "invalid_credentials": "E-posta veya şifre hatalı."
-  },
-  "SignUp": {
-    "title": "Hesap Oluştur",
-    "description": "Yeni bir hesap oluşturun",
-    "name": "Ad Soyad",
-    "email": "E-posta",
-    "password": "Şifre",
-    "sign_up": "Kayıt Ol",
-    "sign_up_keycloak": "Keycloak ile Kayıt",
-    "sign_up_google": "Google ile Kayıt",
-    "no_providers": "Kayıt yapılabilecek hesap sağlayıcısı bulunmuyor.",
-    "has_account": "Zaten hesabınız var mı?",
-    "sign_in": "Giriş Yap",
-    "signup_error": "Kayıt sırasında bir hata oluştu."
   },
   "ForgotPassword": {
     "title": "Şifre Sıfırlama",

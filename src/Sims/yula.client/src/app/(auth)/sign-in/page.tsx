@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ProviderButtons } from "@/features/auth/components/provider-buttons";
@@ -11,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 export default function SignInPage() {
   const t = useTranslations("SignIn");
@@ -25,16 +23,9 @@ export default function SignInPage() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {/* Tek giriş noktası: ilk girişte hesap otomatik oluşur, ayrı
+            sign-up akışı yok (/sign-up buraya redirect eder). */}
         <ProviderButtons labelPrefix="sign_in" t={t} next={next} />
-
-        <Separator />
-
-        <p className="text-center text-xs text-muted-foreground">
-          {t("no_account")}{" "}
-          <Link href="/sign-up" className="text-primary underline-offset-4 hover:underline">
-            {t("sign_up")}
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );

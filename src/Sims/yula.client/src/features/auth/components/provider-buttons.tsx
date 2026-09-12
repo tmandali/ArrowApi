@@ -13,6 +13,8 @@
 import * as React from "react";
 import { getProviders, signIn } from "next-auth/react";
 import { providerSignInParams } from "@/features/auth/lib/provider-signin-params";
+import { isGoogleOneTapEnabled } from "@/features/auth/lib/google-one-tap-flag";
+import { GoogleOneTapButton } from "@/features/auth/components/google-one-tap-button";
 import { Button } from "@/components/ui/button";
 import {
   Fingerprint,
@@ -26,6 +28,16 @@ import {
 // (ClientSafeProvider bu sürümde next-auth/react'ten export edilmediği için türetiyoruz)
 type Providers = NonNullable<Awaited<ReturnType<typeof getProviders>>>;
 
+/**
+ * Sign-in ekranında GİZLİ provider'lar — getProviders() bunları döndürür
+ * ama buton olarak çizilmez:
+ *  - google-onesig: GIS credential akışının server karşılığı, butonu
+ *    GoogleOneTapButton çizer (aşağıda).
+ *  - google: One Tap modu açıkken (GOOGLE_ONE_TAP=1) OAuth redirect butonu
+ *    gizlenir — yerine listedeki GIS butonu geçer, çift buton çıkmaz.
+ */
+const HIDDEN_PROVIDER_IDS = new Set(["google-onesig"]);
+
 /** provider id → buton görünümü. Yeni provider'lar buraya eklenir. */
 const PROVIDER_UI: Record<string, { icon: LucideIcon; variant: "default" | "outline" }> = {
   keycloak: { icon: KeyRound, variant: "default" },
@@ -36,9 +48,9 @@ const FALLBACK_UI = { icon: Fingerprint, variant: "outline" as const };
 
 interface ProviderButtonsProps {
   /**
-   * Etiket anahtarını üreten prefix. Örn. sign-in sayfası "sign_in",
-   * sign-up sayfası "sign_up" → anahtar `${labelPrefix}_${providerId}`.
-   * Bu anahtarın useTranslations'ın namespace'inde tanımlı olması gerekir.
+   * Etiket anahtarını üreten prefix. Örn. `${labelPrefix}_${providerId}`
+   * (sign_in_google). Bu anahtarın useTranslations'ın namespace'inde
+   * tanımlı olması gerekir.
    */
   labelPrefix: string;
   /** Doğru namespace'de (labelPrefix'in ait olduğu) useTranslations fonksiyonu. */
@@ -75,8 +87,13 @@ export function ProviderButtons({ labelPrefix, t, next = "/" }: ProviderButtonsP
     );
   }
 
-  const available = Object.values(providers);
-  if (available.length === 0) {
+  const available = Object.values(providers).filter(
+    (p) => !HIDDEN_PROVIDER_IDS.has(p.id) && !(p.id === "google" && isGoogleOneTapEnabled()),
+  );
+  // One Tap modu: OAuth redirect butonu yerine GIS butonu listenin en üstünde.
+  // (clientId yoksa GoogleOneTapButton null döner, yer kaplamaz.)
+  const showOneTapButton = isGoogleOneTapEnabled();
+  if (available.length === 0 && !showOneTapButton) {
     return (
       <p className="text-center text-sm text-muted-foreground">{t("no_providers")}</p>
     );
@@ -84,6 +101,12 @@ export function ProviderButtons({ labelPrefix, t, next = "/" }: ProviderButtonsP
 
   return (
     <div className="flex flex-col gap-3">
+      {showOneTapButton ? (
+        <GoogleOneTapButton
+          label={t(`${labelPrefix}_google`)}
+          className="min-h-10 w-full"
+        />
+      ) : null}
       {available.map((p) => {
         const ui = PROVIDER_UI[p.id] ?? FALLBACK_UI;
         const Icon = ui.icon;
@@ -94,7 +117,10 @@ export function ProviderButtons({ labelPrefix, t, next = "/" }: ProviderButtonsP
           <Button
             key={p.id}
             variant={ui.variant}
-            className="w-full"
+            // Standart satır ölçüsü: GIS "large" butonu 40px'tir — tüm
+            // provider butonları h-10 + w-full ile aynı satırda durur
+            // (cn() içindeki tailwind-merge h-7'yi ezer).
+            className="h-10 w-full"
             type="button"
             onClick={() => void handleProvider(p.id)}
             disabled={loading !== null}

@@ -7,6 +7,15 @@ const backendUrl = process.env.BACKEND_URL ?? "http://localhost:5168";
 const computerName = process.env.COMPUTERNAME || "timurmandali2";
 
 const nextConfig: NextConfig = {
+  // Client'e açık env — Google One Tap (GIS) butonu AUTH_GOOGLE_ID'yi
+  // `NEXT_PUBLIC_GOOGLE_CLIENT_ID` olarak kullanır (build'de, .env'den okunur).
+  // Yalnızca public client id açılır; AUTH_GOOGLE_SECRET client'a ASLA verilmez.
+  // `GOOGLE_ONE_TAP=1` → `NEXT_PUBLIC_GOOGLE_ONE_TAP`: tek Google giriş noktası
+  // ana sayfadaki One Tap olur (bkz. features/auth/lib/google-one-tap-flag.ts).
+  env: {
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.AUTH_GOOGLE_ID,
+    NEXT_PUBLIC_GOOGLE_ONE_TAP: process.env.GOOGLE_ONE_TAP,
+  },
   // Makine adı ve yerel ağ (LAN) üzerinden erişimde Next.js 15/16 dev güvenlik engelini (403) kaldırır
   allowedDevOrigins: [
     "localhost",

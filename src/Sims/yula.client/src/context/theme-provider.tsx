@@ -6,12 +6,17 @@ import type { ThemeProviderProps } from "next-themes";
 
 // React 19 + Next.js 16 ile next-themes'in FOUC önleme script tag'i için fırlattığı
 // bilinen geliştirme uyarısını sustur (işlevselliği etkilemez).
+// Ayrıca GIS'in (Google One Tap) FedCM get() gösterilemediğinde bastığı zararsız
+// `[GSI_LOGGER]: FedCM get() rejects…` satırını sustur: FedCM Ağustos 2025'ten
+// beri zorunlu, bayrakla kapatılamıyor; oturum yok / FedCM engelliyse GIS bu
+// reddi konsola basar ama akış fallback butonla sürer (bkz. google-one-tap-button).
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   const origError = console.error;
   console.error = (...args: unknown[]) => {
     if (
       typeof args[0] === "string" &&
-      args[0].includes("Encountered a script tag while rendering React component")
+      (args[0].includes("Encountered a script tag while rendering React component") ||
+        (args[0].includes("[GSI_LOGGER]") && args[0].includes("FedCM get() rejects")))
     ) {
       return;
     }

@@ -1,0 +1,71 @@
+# ArrowApi — yerel altyapı (Docker Compose)
+#
+# Kullanım:
+#   docker compose up -d            # tüm servisleri ayağa kaldır
+#   docker compose ps               # durumu gör
+#   docker compose logs -f keycloak # Keycloak loglarını izle
+#   docker compose down             # durdur (veriler volume'da kalır)
+#   docker compose down -v          # durdur + verileri sil (sıfırla)
+#
+# Servisler:
+#   keycloak  → http://localhost:8080 (admin konsolu: /admin, kullanıcı: admin/admin)
+#   keycloak-db (Postgres 16, host portu 5433 — 5432'yi app'in kendi Postgres'ine bırakır)
+
+services:
+  keycloak-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+    ports:
+      - "${KEYCLOAK_DB_PORT:-5433}:5432"
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.3}
+    restart: unless-stopped
+    # --import-realm: ./docker/keycloak/realms altındaki *-realm.json dosyalarını
+    # ilk açılışta içe aktarır (realm yoksa oluşturur, varsa günceller).
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Yerel geliştirme: düz HTTP, hostname kilidi yok.
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_LOG_LEVEL: ${KEYCLOAK_LOG_LEVEL:-INFO}
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - ./docker/keycloak/realms:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak imajı minimaldir (curl/wget yok); resmi yöntem kc.sh show-config.
+      test: ["CMD-SHELL", "exec /opt/keycloak/bin/kc.sh show-config"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  keycloak-db-data:
+    name: arrowapi-keycloak-db-data
