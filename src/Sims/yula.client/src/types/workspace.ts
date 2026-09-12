@@ -21,6 +21,12 @@ export interface WorkspaceNavItem {
   icon: LucideIcon;
   isActive?: boolean;
   items?: WorkspaceNavSubItem[];
+  /**
+   * Rol kapısı: yalnızca yönetici (etkin rol `System Administrator`)
+   * görebilir. Non-admin kullanıcılar (Viewer/Guest) nav'de görmez,
+   * doğrudan URL ile gelirse `RequireAdmin` ana ekrana yönlendirir.
+   */
+  adminOnly?: boolean;
 }
 
 export interface WorkspaceDefinition {

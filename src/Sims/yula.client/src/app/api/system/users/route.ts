@@ -3,61 +3,23 @@ import * as z from "zod";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
 import { SystemUserUpsertValidation } from "@/validations/settings.validation";
+import { assertSessionAdmin } from "@/features/auth/lib/admin-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SEED_USERS = [
-  {
-    id: "usr_101",
-    name: "Timur MANDALI",
-    email: "timur.mandali@lcwaikiki.com",
-    role: "System Administrator",
-    status: "Active",
-    lastActive: "Now",
-    provider: "local",
-    providerId: null,
-  },
-  {
-    id: "usr_102",
-    name: "John Doe",
-    email: "john.doe@demo.com",
-    role: "Stock Manager",
-    status: "Active",
-    lastActive: "2 hours ago",
-    provider: null,
-    providerId: null,
-  },
-  {
-    id: "usr_103",
-    name: "Jane Smith",
-    email: "jane.smith@demo.com",
-    role: "Financial Analyst",
-    status: "Active",
-    lastActive: "1 day ago",
-    provider: null,
-    providerId: null,
-  },
-  {
-    id: "usr_104",
-    name: "Guest User",
-    email: "guest@demo.com",
-    role: "Viewer",
-    status: "Inactive",
-    lastActive: "1 month ago",
-    provider: null,
-    providerId: null,
-  },
-] as const;
-
 /**
  * Kullanıcı listesi. `Deleted` (soft-delete tombstone) satirlari katalogdan
  * gizlenir — onlar account-status guard tarafindan sign-out acisir.
- * Tablo bossa demo cekirdek veriyi eker (mevcut ekranla birebir).
+ *
+ * Katmanli kimlik modeli: `app_users` SALT YÖNETİCİ KATALOGUDUR —
+ * bos tablo DOĞRUDUR (henüz yetkilendirilmiş kimlik yok); demo ekleme
+ * KESİNLİKLE otomatik yapılmaz. Guest kimlikler `user_identities`
+ * tablosunda (user_id NULL) yaşar, buraya admin linklediğinde görünür.
  */
 export async function GET() {
   try {
-    let rows = await db
+    const rows = await db
       .select()
       .from(appUsersSchema)
       // `Deleted` tombstone'ları gizle; NULL status (kolon nullable) KALSIN.
@@ -67,10 +29,6 @@ export async function GET() {
           ne(appUsersSchema.status, "Deleted"),
         ),
       );
-    if (rows.length === 0) {
-      await db.insert(appUsersSchema).values([...SEED_USERS]);
-      rows = await db.select().from(appUsersSchema);
-    }
     return Response.json({ users: rows });
   } catch (error) {
     return Response.json(
@@ -80,8 +38,15 @@ export async function GET() {
   }
 }
 
-/** Ekleme / güncelleme (id bazında upsert). */
+/** Ekleme / güncelleme (id bazında upsert) — YALNIZCA YÖNETİCİ. */
 export async function POST(req: Request) {
+  const gate = await assertSessionAdmin();
+  if (!gate.ok) {
+    return Response.json(
+      { error: `Yetki gerektirir (neden: ${gate.reason}) — katalog yalnız yönetici tarafından yazılır.` },
+      { status: 403 },
+    );
+  }
   let json: unknown;
   try {
     json = await req.json();
@@ -147,6 +112,13 @@ export async function POST(req: Request) {
  * gizler; DB'den tam geri alma mumkun.
  */
 export async function DELETE(req: Request) {
+  const gate = await assertSessionAdmin();
+  if (!gate.ok) {
+    return Response.json(
+      { error: `Yetki gerektirir (neden: ${gate.reason}) — katalog yalnız yönetici tarafından yazılır.` },
+      { status: 403 },
+    );
+  }
   const id = new URL(req.url).searchParams.get("id")?.trim();
   if (!id) {
     return Response.json({ error: "id is required" }, { status: 400 });

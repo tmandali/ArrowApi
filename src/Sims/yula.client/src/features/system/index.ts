@@ -1,5 +1,6 @@
 export { MySettingsForm } from "./components/self-service/MySettingsForm";
 export { MySettingsForm as UserSettingsForm } from "./components/self-service/MySettingsForm";
+export { RequireAdmin } from "./components/admin-gate";
 export { SystemUsersView } from "./components/admin/SystemUsersView";
 export { SystemHomeView } from "./components/SystemHomeView";
 export { AgentManagementView } from "./components/agents/AgentManagementView";

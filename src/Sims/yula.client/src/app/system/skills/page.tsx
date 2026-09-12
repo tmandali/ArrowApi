@@ -1,11 +1,13 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { SkillManagementView } from "@/features/system";
+import { RequireAdmin, SkillManagementView } from "@/features/system";
 
 export default function SystemSkillsPage() {
   return (
     <AppLayout>
       <div className="flex h-full min-h-0 flex-1 flex-col">
-        <SkillManagementView />
+        <RequireAdmin>
+          <SkillManagementView />
+        </RequireAdmin>
       </div>
     </AppLayout>
   );

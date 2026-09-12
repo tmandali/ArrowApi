@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { useAuthRoleStore } from "@/store/slices/auth-role-store";
 
 /** Durum sorgulama sıklığı — ağ'a yük minimum: 60 sn + odaklanınca. */
 const POLL_INTERVAL_MS = 60_000;
@@ -44,7 +45,10 @@ export function AccountStatusGuard() {
           cache: "no-store",
         });
         if (disposed || !res.ok) return;
-        const data = (await res.json()) as { active?: boolean };
+        const data = (await res.json()) as { active?: boolean; role?: string | null };
+        // Etkin rol: guest ekran gating'i + admin nav filtrelemenin canlı kaynağı.
+        // Yalnız gerçek değerleri yaz — `role` boş gelirse hazır rol ezmeyecek.
+        if (data.role) useAuthRoleStore.getState().setRole(data.role);
         if (data.active === false) {
           // signOut Promise — asıl hata yönetimi sign-in kartında.
           void signOut({

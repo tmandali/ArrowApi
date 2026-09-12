@@ -1,27 +1,36 @@
 import { resolveSessionDbUserId } from "@/features/auth/lib/app-user-sync";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import { languageToLocale } from "@/server/locale-sync";
 
 /**
- * Login kullanıcısını `app_users`'a garanti eder (upsert).
+ * `POST /api/auth/ensure-user` — oturum sahibini `user_identities`'te
+ * garantile (server-only, auth gerektirir).
  *
- * `/api/my/settings` yalnız ayarlar sayfası açılınca çalıştığı için,
- * yeni bir Google/Keycloak kullanıcı login olup ayarları açmadan
- * System Users ekranına bakarsa satırı oluşmazdı. Bu route guard
- * (AccountStatusGuard) tarafından authenticated geçişinde tek sefer
- * tetiklenir → ilk tam sayfa yüklemesinde kullanıcı DB'ye düşer.
+ * Katmanlı kimlik modelinde her provider login'inde YALNIZ identity
+ * katmanı otomatik açılır:
+ * - (provider, provider_id) eşleşmede → yeni satır: uygulama GUID'i,
+ *   session profili, `lastActive = Now`.
+ * - `language`: **yalnız ilk kayıtta** istek HTTP header'ındaki
+ *   `Accept-Language` değerinden ("tr"/"en"); satır varken ASLA EZİLMEZ.
+ * - `app_users` (yönetici katalogu) burada KESİNLİKLE dokunulmaz —
+ *   yetkilendirme yalnız sistem admini System Users'ta açar;
+ *   linki olmayan kimlik GUEST moddadadır.
  *
- * Fail-open: hata durumunda 500 değil, fallback id ile 200 — login
- * asla DB hatasıyla kırılmaz.
+ * Yanıt: `{ userId: string | null }` — `user_identities.id` GUID'i.
+ * Oturumsuz istekte (guard'ın istisna yutması) `{ userId: null }`
+ * döner ve hata kodu vermez.
  */
-export async function POST() {
-  let userId: string;
+export async function POST(req: Request) {
+  let userId: string | null = null;
   try {
-    userId = await resolveSessionDbUserId();
+    // İlk kayıt dili: `Accept-Language`'ın birincil etiketi ("tr-TR" → "tr").
+    const primaryTag =
+      req.headers.get("accept-language")?.split(",")[0]?.trim().toLowerCase() ??
+      "";
+    userId = await resolveSessionDbUserId(languageToLocale(primaryTag));
   } catch (error) {
+    // Beklenmeyen hata — istek başarılı olsun: session yoksa
+    // resolveSessionDbUserId zaten null döner, burası yalnız safety net'ti.
     console.error("[ensure-user] upsert hatası:", error);
-    userId = "usr_101";
   }
   return Response.json({ userId });
 }

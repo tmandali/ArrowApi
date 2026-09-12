@@ -15,6 +15,20 @@
       "when": 1789231888364,
       "tag": "0001_vengeful_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789241799487,
+      "tag": "0002_clean_namora",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789244089622,
+      "tag": "0003_small_carnage",
+      "breakpoints": true
     }
   ]
 }

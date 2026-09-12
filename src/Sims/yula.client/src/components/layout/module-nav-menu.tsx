@@ -1,19 +1,21 @@
 "use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { ChevronRight } from "lucide-react"
-import { useTranslations } from "next-intl"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import {
   getWorkspaceForPath,
   getWorkspaceNavForPath,
-} from "@/lib/workspace-registry"
-import { cn } from "@/utils/cn"
+} from "@/lib/workspace-registry";
+import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
+import { cn } from "@/utils/cn";
 
 /**
  * Sistem workspace nav URL'leri → `SystemNav` mesaj anahtarı.
@@ -145,7 +147,15 @@ export function ModuleNavMenu({
   className,
 }: ModuleNavMenuProps = {}) {
   const pathname = usePathname()
-  const items = getWorkspaceNavForPath(pathname)
+  const { status: sessionStatus } = useSession()
+  const { ready: roleReady, isAdmin } = useEffectiveRole()
+  const allItems = getWorkspaceNavForPath(pathname)
+  // Guest kuralı: rol yetkilendirmesi yapılmamış ekranlar açık; `adminOnly`
+  // öğeler fail-closed — rol hesaplanana (`ready`) VEYA yönetici onaylanana
+  // kadar GİZLİ kalır (yanıp sönme + URL ile sızıntı önlenir).
+  const items = allItems.filter(
+    (item) => !item.adminOnly || (sessionStatus === "authenticated" && roleReady && isAdmin),
+  )
   const tNav = useTranslations("SystemNav")
   const tMenu = useTranslations("NavMenu")
   const workspaceId = getWorkspaceForPath(pathname).id

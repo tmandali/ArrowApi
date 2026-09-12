@@ -21,18 +21,21 @@ export const systemNav: WorkspaceNavItem[] = [
     icon: Settings2Icon,
   },
   {
-    title: "Tüm Kullanıcılar (Admin)",
+    title: "Tüm Kullanıcılar",
     url: "/system/users",
     icon: UserCheckIcon,
+    adminOnly: true,
   },
   {
     title: "Ajan Ayarları",
     url: "/system/agents",
     icon: BotIcon,
+    adminOnly: true,
   },
   {
     title: "Skill Ayarları",
     url: "/system/skills",
     icon: SparklesIcon,
+    adminOnly: true,
   },
 ];
