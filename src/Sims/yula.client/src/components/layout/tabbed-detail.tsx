@@ -68,7 +68,9 @@ export function TabbedDetail({
     <Tabs
       key={resetKey}
       defaultValue="genel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      // gap-0: shadcn Tabs kökü gap-2 verir; başlık çizgisiyle gövde arası
+      // 8px açılır, üst boşluk yanlardan (p-3) fazla görünür. Sıfırlanır.
+      className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden"
     >
       <div className={panelHeaderClass}>
         {showTabs ? (
@@ -120,8 +122,11 @@ export function TabbedDetail({
         ) : null}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <ScrollArea className="h-0 min-h-0 w-full flex-1">
-          <div className={cn("h-full", containerClass)}>
+        {/* data-tabbed-detail: globals.css'teki table-sarmalayıcı kilidi
+            bu ScrollArea'ya bağlanır (liste + detay yatay taşmasın). */}
+        <ScrollArea data-tabbed-detail className="h-0 min-h-0 w-full flex-1">
+          {/* flex-col: TabsContent'lerin flex-1'i canlanır, sekme gövdeyi doldurur */}
+          <div className={cn("flex h-full flex-col", containerClass)}>
             {showTabs ? children : empty}
           </div>
         </ScrollArea>

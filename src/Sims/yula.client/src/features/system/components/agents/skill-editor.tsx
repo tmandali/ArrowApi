@@ -37,6 +37,7 @@ import { formatMetaDate } from "@/utils/format";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useTabFill } from "./use-tab-fill";
 import { CriteriaSimpleCombobox } from "@/features/report-criteria";
 
 /**
@@ -107,6 +108,9 @@ export function SkillEditor({
   const [error, setError] = React.useState<string | null>(null);
   const [fileError, setFileError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Sekme gövdelerini panele kilitle (Radix table sarmalayıcı % boyları kırar).
+  const skillmdFillRef = useTabFill<HTMLDivElement>();
+  const fileFillRef = useTabFill<HTMLDivElement>();
 
   // Aynı slash farklı workspace kapsamında serbest; sistem + global +
   // aynı kapsamdakilerle çakışma yasak (kendisi hariç).
@@ -421,7 +425,7 @@ export function SkillEditor({
               disabled={isRO}
               readOnly={isRO}
               rows={3}
-              className="bg-muted/30 border-muted-foreground/20 text-xs resize-y min-h-16 whitespace-pre-wrap data-disabled:opacity-80"
+              className="bg-muted/30 border-muted-foreground/20 text-xs resize-none min-h-16 whitespace-pre-wrap data-disabled:opacity-80"
             />
           </Field>
           {!isRO && fileError ? (
@@ -491,17 +495,20 @@ export function SkillEditor({
           }
         />
       </TabsContent>
-      <TabsContent value="skillmd" className="mt-0 flex min-h-[60vh] flex-col min-w-0">
+      <TabsContent ref={skillmdFillRef} value="skillmd" className="mt-0 flex min-h-full flex-1 flex-col min-w-0">
         {skillMdPreview ? (
           <Textarea
             value={isRO ? (skill?.prompt ?? skillMd) : skillMd}
             onChange={isRO ? undefined : (e) => setSkillMd(e.target.value)}
-            placeholder={t("prompt_placeholder")}
+            // Mesaj bilerek {{input}} şablon sözdizimi içerir — t() ICU
+            // parse edip fırlatır; ham metin için t.raw() kullanılır
+            // (bkz. scripts/i18n-check-wrapper.js bilinen istisnalar).
+            placeholder={t.raw("prompt_placeholder")}
             disabled={isRO}
              readOnly={isRO}
              rows={1}
              aria-label={t("skill_md_aria")}
-             className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+             className="min-h-48 w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
           />
         ) : (
           <p className="text-[11.5px] text-muted-foreground">
@@ -510,7 +517,7 @@ export function SkillEditor({
         )}
       </TabsContent>
       {fileRows.map((f) => (
-        <TabsContent key={f.key} value={f.key} className="mt-0 flex flex-col min-w-0">
+        <TabsContent ref={fileFillRef} key={f.key} value={f.key} className="mt-0 flex min-h-full flex-1 flex-col min-w-0">
           <div className="mb-1.5 flex items-center gap-1.5">
             <span
               className={`rounded px-1.5 py-px font-mono text-[10px] font-medium ${fileChipClass(f.kind)}`}
@@ -540,9 +547,9 @@ export function SkillEditor({
                      rows={1}
                      disabled={isRO}
                      readOnly={isRO}
-                     aria-label={t("file_content_aria", { name: f.name })}
-                     className="h-full w-full rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
-                   />
+                      aria-label={t("file_content_aria", { name: f.name })}
+                      className="min-h-48 w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+                    />
           ) : scriptsLoading ? (
             <p className="text-[11.5px] text-muted-foreground">
               {t("loading")}

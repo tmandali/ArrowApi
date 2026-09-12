@@ -92,7 +92,8 @@ export function MasterDetailPage({
                   >
                     <section className={cn(panelCardClass, "h-full")}>
                       <div className={panelHeaderClass}>{listHeader}</div>
-                      <ScrollArea className="h-0 min-h-0 w-full flex-1">
+                      {/* data-tabbed-detail: globals.css table kilidi (liste yatay taşmasın) */}
+                      <ScrollArea data-tabbed-detail className="h-0 min-h-0 w-full flex-1">
                         {list}
                       </ScrollArea>
                     </section>

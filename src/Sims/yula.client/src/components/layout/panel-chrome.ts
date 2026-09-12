@@ -13,7 +13,7 @@ export const panelCardClass =
   "flex min-h-0 flex-col overflow-hidden rounded-md border bg-card shadow-none"
 
 export const panelHeaderClass =
-  "flex h-11 shrink-0 items-center justify-between gap-2 border-b border-primary/15 px-3"
+  "flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3"
 
 export const panelHeaderActionClass = "h-7 shrink-0 px-2.5 text-xs"
 
@@ -26,9 +26,8 @@ export const panelHeaderTitleClass =
 export const panelHeaderSubtitleClass =
   "truncate text-xs leading-none text-muted-foreground"
 
-/** Soft accent rule under side-dock headers (Query / Yula). */
-export const panelHeaderAccentBorderClass =
-  "border-orange-500/15 dark:border-orange-400/20"
+/** Side-dock header çizgisi — standart border dili (turuncu vurgu kaldırıldı). */
+export const panelHeaderAccentBorderClass = "border-border"
 
 /**
  * Docked side panel gutters — align with page cards under the header:

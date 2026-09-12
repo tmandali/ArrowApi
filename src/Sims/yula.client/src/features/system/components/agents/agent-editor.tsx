@@ -45,6 +45,7 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useTabFill } from "./use-tab-fill";
 import {
   CriteriaSimpleCombobox,
   joinMultiValue,
@@ -145,6 +146,8 @@ export function AgentEditor({
   const [error, setError] = React.useState<string | null>(null);
   const [providerModels, setProviderModels] = React.useState<string[]>([]);
   const [providerThinking, setProviderThinking] = React.useState<Record<string, boolean>>({});
+  // Sekme gövdesini panele kilitle (skill editörüyle aynı desen).
+  const agentmdFillRef = useTabFill<HTMLDivElement>();
 
   // Sağlayıcının gerçek model listesi (seçicideki desenin aynısı).
   // Salt-okunur görünümde ağ isteği yapılmaz. Efor kapısı için
@@ -364,7 +367,7 @@ export function AgentEditor({
                   disabled={isRO}
                   readOnly={isRO}
                   rows={3}
-                  className="bg-muted/30 border-muted-foreground/20 text-xs resize-y min-h-16 whitespace-pre-wrap data-disabled:opacity-80"
+                  className="bg-muted/30 border-muted-foreground/20 text-xs resize-none min-h-16 whitespace-pre-wrap data-disabled:opacity-80"
                 />
               </Field>
 
@@ -612,7 +615,7 @@ export function AgentEditor({
           }
         />
       </TabsContent>
-      <TabsContent value="agentmd" className="mt-0 flex min-h-[60vh] flex-col min-w-0">
+      <TabsContent ref={agentmdFillRef} value="agentmd" className="mt-0 flex min-h-full flex-1 flex-col min-w-0">
         {!isRO && lintAgentInstructions(agentMd).length > 0 ? (
           <div
             role="note"
@@ -629,15 +632,15 @@ export function AgentEditor({
           </div>
         ) : null}
         {isRO ? (
-          <MarkdownDoc value={agentMd} className="min-h-[60vh] flex-1" />
+          <MarkdownDoc value={agentMd} className="min-h-48 flex-1" />
         ) : (
         <Textarea
           value={agentMd}
           onChange={(e) => setAgentMd(e.target.value)}
           placeholder={t("instructions_placeholder")}
            rows={1}
-           aria-label={t("agent_md_aria")}
-            className="min-h-[60vh] w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
+             aria-label={t("agent_md_aria")}
+             className="min-h-48 w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
         />
         )}
       </TabsContent>

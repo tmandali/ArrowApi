@@ -262,7 +262,7 @@ export function SkillManagementView() {
                     }
                                 aria-current={selected ? "true" : undefined}
                                 className={cn(
-                                  "group flex w-full flex-col gap-1 px-4 py-2.5 text-left transition-colors hover:bg-muted/80",
+                                  "group flex w-full flex-col gap-1 overflow-hidden px-4 py-2.5 text-left transition-colors hover:bg-muted/80",
                                   selected &&
                                     "bg-primary/[0.07] hover:bg-primary/10 dark:bg-primary/15",
                                 )}
@@ -272,11 +272,6 @@ export function SkillManagementView() {
                                     /{s.slash}
                                   </span>
                                   <span className="flex shrink-0 items-center gap-1">
-                                    {(s.scope ?? "global") !== "global" ? (
-                                      <span className="rounded border border-border px-1 py-px text-[10px] font-medium text-muted-foreground">
-                                        {s.scope}
-                                      </span>
-                                    ) : null}
                                     {tab === "user" ? (
                                       <span
                                         role="button"
@@ -301,8 +296,15 @@ export function SkillManagementView() {
                                     ) : null}
                                   </span>
                                 </div>
-                    <div className="truncate text-[11px] text-muted-foreground">
-                      {s.description || s.label}
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <span className="min-w-0 truncate">
+                        {s.description || s.label}
+                      </span>
+                      {(s.scope ?? "global") !== "global" ? (
+                        <span className="shrink-0 rounded border border-border px-1 py-px text-[10px] font-medium">
+                          {s.scope}
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                 </li>

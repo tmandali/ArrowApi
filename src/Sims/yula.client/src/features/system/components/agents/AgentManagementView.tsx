@@ -258,7 +258,7 @@ export function AgentManagementView() {
                     onClick={() => setSelection({ id: a.id })}
                     aria-current={selected ? "true" : undefined}
                     className={cn(
-                      "group flex w-full flex-col gap-1 px-4 py-2.5 text-left transition-colors hover:bg-muted/80",
+                      "group flex w-full flex-col gap-1 overflow-hidden px-4 py-2.5 text-left transition-colors hover:bg-muted/80",
                       selected &&
                         "bg-primary/[0.07] hover:bg-primary/10 dark:bg-primary/15",
                     )}

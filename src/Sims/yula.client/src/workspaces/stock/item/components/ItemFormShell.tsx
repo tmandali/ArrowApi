@@ -276,7 +276,7 @@ export function ItemFormShell({
         >
         <div className={cn(panelCardClass, "min-h-0 flex-1")}>
         <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden">
-          <div className="shrink-0 border-b border-primary/15 px-3 dark:border-primary/25">
+          <div className="shrink-0 border-b border-border px-3">
             <ScrollArea type="hover" className="w-full whitespace-nowrap">
               <div className="py-1">
                 <TabsList variant="line" className="min-w-max">
@@ -461,7 +461,7 @@ export function ItemFormShell({
                   <CollapsibleContent className="pt-2 pl-6">
                     <Textarea
                       placeholder="Item description…"
-                      className="min-h-24 text-xs"
+                      className="min-h-24 text-xs resize-none"
                       defaultValue="LCW ACCESSORIES Kahverengi Deri Görünümlü Erkek Seyahat Çantası. %100 Poliüretan suni deri dış yüzey, %100 polyester astar. Fermuarlı geniş ana bölme, ön fermuarlı cep ve ayarlanabilir omuz askısı."
                     />
                   </CollapsibleContent>

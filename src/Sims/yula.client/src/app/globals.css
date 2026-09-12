@@ -176,3 +176,17 @@
     }
   }
 }
+
+/*
+ * TabbedDetail (skills/agents) liste + detay panelleri: Radix ScrollArea,
+ * viewport içeriğini ölçüm için `display: table` anonim sarmalayıcıya koyar
+ * (inline style). Table, nowrap içerikle (truncate satırlar) panelden
+ * genişleyip yatay scroll açar. Block + width:100% ile panele kilitlenir;
+ * satırlar zaten truncate tasarımlı. Inline style ancak !important ile
+ * ezilir. Kapsam: data-tabbed-detail işaretli ScrollArea'lar.
+ */
+[data-slot="scroll-area"][data-tabbed-detail] [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
