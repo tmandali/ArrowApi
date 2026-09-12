@@ -470,4 +470,4 @@ export function BlankWorkspaceLanding({
   );
 }
 
-export default BlankWorkspaceLanding;
+

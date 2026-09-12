@@ -1,0 +1,15 @@
+# Validate commit messages with Conventional Commits
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: npx --prefix src/Sims/yula.client commitlint --config src/Sims/yula.client/commitlint.config.ts --edit {1}
+
+# Validate content before committing
+pre-commit:
+  jobs:
+    - name: oxlint
+      run: npx oxlint --fix {staged_files}
+      skip_when_empty: true
+    - name: knip
+      run: cd src/Sims/yula.client && npm run check:deps
+      skip_when_empty: true

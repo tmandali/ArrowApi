@@ -16,7 +16,7 @@ export const AGGREGATION_LABELS: Record<AggregationType, string> = {
   none: "—  None",
 }
 
-export const AGGREGATION_SYMBOLS: Record<AggregationType, string> = {
+export const AGGREGATION_SHORT_LABELS: Record<AggregationType, string> = {
   sum: "Σ",
   avg: "x̄",
   min: "↓",
@@ -25,8 +25,6 @@ export const AGGREGATION_SYMBOLS: Record<AggregationType, string> = {
   distinct: "⊛",
   none: "",
 }
-
-export const AGGREGATION_SHORT_LABELS: Record<AggregationType, string> = AGGREGATION_SYMBOLS
 
 export function isColumnNumeric(col: SpreadsheetColumn): boolean {
   if (col.align === "right") return true

@@ -58,5 +58,4 @@ export async function printStockItemReport(): Promise<void> {
   });
 }
 
-// Geriye dönük uyumluluk takma adı (alias)
-export const printStockAnalyticsReport = printStockItemReport;
+
