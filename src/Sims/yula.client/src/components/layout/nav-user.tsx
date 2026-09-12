@@ -102,9 +102,9 @@ export function NavUser() {
         <Button
           variant="ghost"
           aria-label="User menu"
-          className="h-8 rounded-full px-1.5 data-[state=open]:bg-muted"
+          className="size-7 rounded-full p-0 data-[state=open]:bg-muted"
         >
-          <Avatar className="size-7 rounded-full">
+          <Avatar className="size-7 rounded-full after:border-0">
             <AvatarImage
               src={user.image ?? ""}
               alt={user.name ?? ""}
