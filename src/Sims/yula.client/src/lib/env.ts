@@ -13,9 +13,8 @@ const serverSchema = z.object({
     .default("postgresql://postgres:postgres@127.0.0.1:5432/postgres"),
   NODE_ENV: z.enum(["test", "development", "production"]).default("development"),
   USE_PGLITE: z
-    .enum(["true", "false"])
-    .optional()
-    .default("false"),
+    .preprocess((v) => v === "true", z.boolean())
+    .default(false),
 });
 
 const parsed = serverSchema.safeParse({

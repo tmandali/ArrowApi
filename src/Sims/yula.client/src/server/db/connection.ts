@@ -64,9 +64,11 @@ function createLazyPgliteConnection(): PgliteDb {
  * DB connection factory — ortam değişkenine göre PostgreSQL veya PGlite seçer.
  *
  * - `USE_PGLITE=true` → dosya-tabanlı yerel PGlite (`local.db`)
- * - yoksa → `DATABASE_URL` ile gerçek Postgres Pool
- *
- * Her iki yol da `pg` protokolü konuştuğu için Drizzle ORM aynı API'yi kullanır.
+ * - yoksa → `DATABASE_URL` ile gerçek Postgres Pool (pg protokolü).
+ *   Dev'de `db-server:file` (pglite-server) aynı `DATABASE_URL`'i 127.0.0.1:5432'de
+ *   sunar; `dev:full` bu yüzden `USE_PGLITE=false` çalıştırır — tek PGlite
+ *   instance'ı sunucu tarafında, app TCP pool ile bağlanır (çift instance +
+ *   Turbopack worker'da in-process PGlite'ın bozulması önlenir).
  */
 export const createDbConnection = async () => {
   if (Env.USE_PGLITE) {
