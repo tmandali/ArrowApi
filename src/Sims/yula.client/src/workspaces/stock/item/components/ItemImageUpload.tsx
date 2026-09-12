@@ -4,12 +4,14 @@ import * as React from "react"
 import { ImageIcon, Upload, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
+import { useTranslations } from "next-intl"
 
 type ItemImageUploadProps = {
   className?: string
 }
 
 export function ItemImageUpload({ className }: ItemImageUploadProps) {
+  const t = useTranslations("Stock")
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(
     "/images/w6ed16z8-hdn-kahverengi.jpg"
@@ -107,14 +109,14 @@ export function ItemImageUpload({ className }: ItemImageUploadProps) {
         {previewUrl ? (
           <img
             src={previewUrl}
-            alt={fileName ?? "Item image"}
+            alt={fileName ?? t("img_alt")}
             referrerPolicy="no-referrer"
             className="size-full object-cover"
           />
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <ImageIcon className="size-8 opacity-60" />
-            <span className="text-[11px]">No image</span>
+            <span className="text-[11px]">{t("img_no_image")}</span>
           </div>
         )}
 

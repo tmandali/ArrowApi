@@ -37,6 +37,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { cn } from "@/utils/cn"
+import { useTranslations } from "next-intl"
 import { GridCellCombobox } from "./GridCellCombobox"
 
 const cellInputClass =
@@ -123,6 +124,7 @@ const initialRows: TaxRow[] = [
 const EDITABLE_COL_COUNT = 5
 
 export function ItemTaxTab() {
+  const t = useTranslations("Stock")
   const [rows, setRows] = React.useState<TaxRow[]>(initialRows)
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
   const tableRef = React.useRef<HTMLDivElement>(null)
@@ -265,9 +267,9 @@ export function ItemTaxTab() {
   return (
     <div className="space-y-4 p-6">
       <div>
-        <h3 className="text-sm font-semibold">Taxes</h3>
+        <h3 className="text-sm font-semibold">{t("tax_title")}</h3>
         <p className="text-xs text-muted-foreground">
-          Will also apply for variants.
+          {t("tax_applies_variants")}
         </p>
       </div>
 
@@ -291,17 +293,17 @@ export function ItemTaxTab() {
                   />
                 </div>
               </TableHead>
-              <TableHead className={cn(headClass, "w-12")}>No.</TableHead>
+              <TableHead className={cn(headClass, "w-12")}>{t("tax_no")}</TableHead>
               <TableHead className={headClass}>
-                Item Tax Template <span className="text-red-500">*</span>
+                {t("tax_col_template")} <span className="text-red-500">*</span>
               </TableHead>
-              <TableHead className={headClass}>Tax Category</TableHead>
-              <TableHead className={headClass}>Valid From</TableHead>
+              <TableHead className={headClass}>{t("tax_category")}</TableHead>
+              <TableHead className={headClass}>{t("tax_valid_from")}</TableHead>
               <TableHead className={cn(headClass, "text-right")}>
-                Minimum Net Rate
+                {t("tax_col_min_rate")}
               </TableHead>
               <TableHead className={cn(headClass, "text-right")}>
-                Maximum Net Rate
+                {t("tax_col_max_rate")}
               </TableHead>
               <TableHead className={cn(headClass, "w-10 text-center px-0")}>
                 <div className="flex h-9 items-center justify-center">
@@ -356,7 +358,7 @@ export function ItemTaxTab() {
                       updateRow(row.id, { taxCategory: value })
                     }
                     options={taxCategoryOptions}
-                    placeholder="Tax Category"
+                    placeholder={t("tax_category")}
                     data-grid-cell={`${index}-1`}
                     className={cellInputClass}
                   />
@@ -368,7 +370,7 @@ export function ItemTaxTab() {
                     onChange={(event) =>
                       updateRow(row.id, { validFrom: event.target.value })
                     }
-                    placeholder="Valid From"
+                    placeholder={t("tax_valid_from")}
                     className={cellInputClass}
                   />
                 </TableCell>
@@ -381,7 +383,7 @@ export function ItemTaxTab() {
                         minimumNetRate: event.target.value,
                       })
                     }
-                    placeholder="Minimum Net Rate"
+                    placeholder={t("tax_col_min_rate")}
                     className={cn(cellInputClass, "text-right")}
                   />
                 </TableCell>
@@ -394,7 +396,7 @@ export function ItemTaxTab() {
                         maximumNetRate: event.target.value,
                       })
                     }
-                    placeholder="Maximum Net Rate"
+                    placeholder={t("tax_col_max_rate")}
                     className={cn(cellInputClass, "text-right")}
                   />
                 </TableCell>
@@ -425,7 +427,7 @@ export function ItemTaxTab() {
             onClick={() => addRow()}
           >
             <Plus className="size-3.5 mr-1" />
-            Add Row
+            {t("tax_add_row")}
           </Button>
         </div>
       </div>
@@ -444,7 +446,7 @@ export function ItemTaxTab() {
             <>
               <DialogHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b px-4 py-3">
                 <DialogTitle className="text-sm font-semibold">
-                  Editing Row #{editingIndex + 1}
+                  {t("tax_editing_row", { row: editingIndex + 1 })}
                 </DialogTitle>
                 <div className="flex items-center gap-1.5">
                   <Button
@@ -462,7 +464,7 @@ export function ItemTaxTab() {
                     className="h-7 text-xs"
                     onClick={insertBelow}
                   >
-                    Insert Below
+                    {t("tax_insert_below")}
                   </Button>
                   <Button
                     type="button"
@@ -471,7 +473,7 @@ export function ItemTaxTab() {
                     className="h-7 text-xs"
                     onClick={insertAbove}
                   >
-                    Insert Above
+                    {t("tax_insert_above")}
                   </Button>
                   <Button
                     type="button"
@@ -481,7 +483,7 @@ export function ItemTaxTab() {
                     onClick={duplicateRow}
                   >
                     <Copy className="size-3" />
-                    Duplicate
+                    {t("btn_duplicate")}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -491,16 +493,16 @@ export function ItemTaxTab() {
                         size="sm"
                         className="h-7 text-xs gap-1"
                       >
-                        Move
+                        {t("tax_move")}
                         <ChevronDown className="size-3" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => moveRow("up")}>
-                        Move Up
+                        {t("tax_move_up")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => moveRow("down")}>
-                        Move Down
+                        {t("tax_move_down")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -510,7 +512,7 @@ export function ItemTaxTab() {
               <div className="space-y-4 px-4 py-4">
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Item Tax Template <span className="text-red-500">*</span>
+                    {t("tax_col_template")} <span className="text-red-500">*</span>
                   </FieldLabel>
                   <GridCellCombobox
                     value={editingRow.itemTaxTemplate}
@@ -524,7 +526,7 @@ export function ItemTaxTab() {
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Tax Category
+                    {t("tax_category")}
                   </FieldLabel>
                   <GridCellCombobox
                     value={editingRow.taxCategory}
@@ -532,13 +534,13 @@ export function ItemTaxTab() {
                       updateRow(editingRow.id, { taxCategory: value })
                     }
                     options={taxCategoryOptions}
-                    placeholder="Tax Category"
+                    placeholder={t("tax_category")}
                     className="h-9 text-xs bg-muted/30"
                   />
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Valid From
+                    {t("tax_valid_from")}
                   </FieldLabel>
                   <Input
                     value={editingRow.validFrom}
@@ -552,7 +554,7 @@ export function ItemTaxTab() {
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Minimum Net Rate
+                    {t("tax_col_min_rate")}
                   </FieldLabel>
                   <Input
                     value={editingRow.minimumNetRate}
@@ -566,7 +568,7 @@ export function ItemTaxTab() {
                 </Field>
                 <Field>
                   <FieldLabel className="text-xs text-muted-foreground">
-                    Maximum Net Rate
+                    {t("tax_col_max_rate")}
                   </FieldLabel>
                   <Input
                     value={editingRow.maximumNetRate}
@@ -583,7 +585,7 @@ export function ItemTaxTab() {
               <DialogFooter className="flex-row items-center justify-between gap-3 border-t px-4 py-3 sm:justify-between">
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <Keyboard className="size-3.5" />
-                  <span>Shortcuts:</span>
+                  <span>{t("tax_shortcuts")}</span>
                   <KbdGroup>
                     <Kbd>Ctrl + Up</Kbd>
                     <Kbd>Ctrl + Down</Kbd>
@@ -597,7 +599,7 @@ export function ItemTaxTab() {
                   className="h-8 text-xs"
                   onClick={insertBelow}
                 >
-                  Insert Below
+                  {t("tax_insert_below")}
                 </Button>
               </DialogFooter>
             </>

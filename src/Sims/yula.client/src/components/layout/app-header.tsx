@@ -9,10 +9,10 @@ import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-tri
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
 import {
   workspaceRootPathByWorkspace,
-  workspaceNameById,
 } from "@/lib/workspace-nav"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { cn } from "@/utils/cn"
+import type { WorkspaceId } from "@/types"
 
 /**
  * Global top bar right of the workspace icon rail, structurally fixed in the
@@ -23,8 +23,10 @@ export function AppHeader({ className }: { className?: string }) {
   const t = useTranslations("AppHeader")
   const router = useRouter()
   const activeWorkspaceId = useActiveWorkspaceId()
+  // Workspace adı dil takımla çözülür (`AppHeader.workspace_<id>`) —
+  // registry `name`'i (English) header için yerini almıştır.
   const workspaceName = activeWorkspaceId
-    ? workspaceNameById[activeWorkspaceId]
+    ? t(`workspace_${activeWorkspaceId}` as `workspace_${WorkspaceId}`)
     : undefined
 
   // "Yula <Workspace>" marka satırı → her zaman workspace ana sayfası (landing).

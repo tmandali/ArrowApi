@@ -51,6 +51,7 @@ import { ItemTaxTab } from "./ItemTaxTab"
 import { printStockItemReport } from "../services/print-stock-report"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
+import { useTranslations } from "next-intl"
 
 export type ItemFormTab =
   | "details"
@@ -65,18 +66,18 @@ export type ItemFormTab =
   | "quality"
   | "manufacturing"
 
-const TAB_ITEMS: { value: ItemFormTab; label: string }[] = [
-  { value: "details", label: "Details" },
-  { value: "dashboard", label: "Dashboard" },
-  { value: "inventory", label: "Inventory" },
-  { value: "variants", label: "Variants" },
-  { value: "accounting", label: "Accounting" },
-  { value: "purchasing", label: "Purchasing" },
-  { value: "sales", label: "Sales" },
-  { value: "tax", label: "Tax" },
-  { value: "report", label: "Report" },
-  { value: "quality", label: "Quality" },
-  { value: "manufacturing", label: "Manufacturing" },
+const TAB_ITEMS: { value: ItemFormTab; labelKey: string }[] = [
+  { value: "details", labelKey: "tab_details" },
+  { value: "dashboard", labelKey: "tab_dashboard" },
+  { value: "inventory", labelKey: "tab_inventory" },
+  { value: "variants", labelKey: "tab_variants" },
+  { value: "accounting", labelKey: "tab_accounting" },
+  { value: "purchasing", labelKey: "tab_purchasing" },
+  { value: "sales", labelKey: "tab_sales" },
+  { value: "tax", labelKey: "tab_tax" },
+  { value: "report", labelKey: "tab_report" },
+  { value: "quality", labelKey: "tab_quality" },
+  { value: "manufacturing", labelKey: "tab_manufacturing" },
 ]
 
 const PLACEHOLDER_TABS: ItemFormTab[] = [
@@ -104,6 +105,7 @@ export function ItemFormShell({
   defaultTab,
   variant = "item",
 }: ItemFormShellProps) {
+  const t = useTranslations("Stock")
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isLedgerVariant = variant === "ledger"
 
@@ -150,7 +152,7 @@ export function ItemFormShell({
         startExtra={
           !isLedgerVariant ? (
             <Badge className="ml-2 hidden shrink-0 bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/15 dark:text-emerald-400 font-medium sm:inline-flex">
-              Variant
+              {t("badge_variant")}
             </Badge>
           ) : null
         }
@@ -163,7 +165,7 @@ export function ItemFormShell({
                 variant="outline"
                 size="icon"
                 className="size-7 shrink-0"
-                aria-label="Refresh"
+                aria-label={t("aa_refresh")}
               >
                 <RefreshCw className="size-3.5" />
               </Button>
@@ -173,7 +175,7 @@ export function ItemFormShell({
             <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
               <ButtonGroup className="hidden md:inline-flex">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-                  View
+                  {t("btn_view")}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -182,15 +184,15 @@ export function ItemFormShell({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem>Print Format</DropdownMenuItem>
-                    <DropdownMenuItem>Stock Ledger</DropdownMenuItem>
+                    <DropdownMenuItem>{t("dd_print_format")}</DropdownMenuItem>
+                    <DropdownMenuItem>{t("dd_stock_ledger")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </ButtonGroup>
 
               <ButtonGroup className="hidden sm:inline-flex">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-                  Actions
+                  {t("btn_actions")}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -199,8 +201,8 @@ export function ItemFormShell({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem>Make Stock Entry</DropdownMenuItem>
-                    <DropdownMenuItem>Open Material Request</DropdownMenuItem>
+                    <DropdownMenuItem>{t("dd_make_stock_entry")}</DropdownMenuItem>
+                    <DropdownMenuItem>{t("dd_open_material_request")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </ButtonGroup>
@@ -210,7 +212,7 @@ export function ItemFormShell({
                 size="sm"
                 className="hidden h-7 text-xs px-2.5 lg:inline-flex"
               >
-                Duplicate
+                {t("btn_duplicate")}
               </Button>
 
               <Button
@@ -218,8 +220,8 @@ export function ItemFormShell({
                 size="icon"
                 className="hidden size-7 sm:inline-flex"
                 onClick={() => void printStockItemReport()}
-                title="Print report"
-                aria-label="Print report"
+                title={t("aa_print_report")}
+                aria-label={t("aa_print_report")}
               >
                 <Printer className="size-3.5" />
               </Button>
@@ -231,17 +233,17 @@ export function ItemFormShell({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem className="md:hidden">View</DropdownMenuItem>
-                  <DropdownMenuItem className="sm:hidden">Actions</DropdownMenuItem>
-                  <DropdownMenuItem className="lg:hidden">Duplicate</DropdownMenuItem>
-                  <DropdownMenuItem className="sm:hidden" onClick={() => void printStockItemReport()}>Print</DropdownMenuItem>
-                  <DropdownMenuItem>Reload</DropdownMenuItem>
-                  <DropdownMenuItem>Delete</DropdownMenuItem>
+                  <DropdownMenuItem className="md:hidden">{t("btn_view")}</DropdownMenuItem>
+                  <DropdownMenuItem className="sm:hidden">{t("btn_actions")}</DropdownMenuItem>
+                  <DropdownMenuItem className="lg:hidden">{t("btn_duplicate")}</DropdownMenuItem>
+                  <DropdownMenuItem className="sm:hidden" onClick={() => void printStockItemReport()}>{t("btn_print")}</DropdownMenuItem>
+                  <DropdownMenuItem>{t("btn_reload")}</DropdownMenuItem>
+                  <DropdownMenuItem>{t("btn_delete")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               <Button size="sm" className="h-7 text-xs px-3">
-                Save
+                {t("btn_save")}
               </Button>
               <AIChatAssistant />
             </div>
@@ -254,11 +256,10 @@ export function ItemFormShell({
 
       {!searchOpen && showBanner && !isLedgerVariant ? (
         <WorkspaceBanner tone="info" onDismiss={() => setShowBanner(false)}>
-          This Item is a Variant of{" "}
-          <span className="font-semibold underline underline-offset-2">
-            W6ED16Z8
-          </span>{" "}
-          (Seyahat Çantası - LCW ACCESSORIES).
+          {t("variant_banner", {
+            code: t("variant_banner_code"),
+            name: t("variant_banner_name"),
+          })}
         </WorkspaceBanner>
       ) : null}
 
@@ -287,7 +288,7 @@ export function ItemFormShell({
                       if (!item) return null
                       return (
                         <TabsTrigger key={tab} value={tab}>
-                          {tabLabels?.[tab] ?? item.label}
+                          {tabLabels?.[tab] ?? t(item.labelKey)}
                         </TabsTrigger>
                       )
                     })}
@@ -307,7 +308,7 @@ export function ItemFormShell({
                 <div className="space-y-5">
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Item Name
+                      {t("f_item_name")}
                     </FieldLabel>
                     <Input
                       defaultValue="Deri Görünümlü Erkek Seyahat Çantası"
@@ -317,7 +318,7 @@ export function ItemFormShell({
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Item Group <span className="text-red-500">*</span>
+                      {t("f_item_group")} <span className="text-red-500">*</span>
                     </FieldLabel>
                     <Input
                       defaultValue="Seyahat Çantası"
@@ -327,7 +328,7 @@ export function ItemFormShell({
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Tax Code
+                      {t("f_tax_code")}
                     </FieldLabel>
                     <Input defaultValue="KDV-%10" className="bg-muted/20 border-muted-foreground/20 h-9 text-xs" />
                   </Field>
@@ -339,7 +340,7 @@ export function ItemFormShell({
                       onCheckedChange={(checked) => setIsZeroRated(!!checked)}
                     />
                     <Label htmlFor="is-zero-rated" className="text-xs cursor-pointer">
-                      Is Zero Rated
+                      {t("f_is_zero_rated")}
                     </Label>
                   </div>
 
@@ -350,13 +351,13 @@ export function ItemFormShell({
                       onCheckedChange={(checked) => setIsExempt(!!checked)}
                     />
                     <Label htmlFor="is-exempt" className="text-xs cursor-pointer">
-                      Is Exempt
+                      {t("f_is_exempt")}
                     </Label>
                   </div>
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Default Unit of Measure <span className="text-red-500">*</span>
+                      {t("f_default_uom")} <span className="text-red-500">*</span>
                     </FieldLabel>
                     <Input
                       defaultValue="Adet"
@@ -373,7 +374,7 @@ export function ItemFormShell({
                       onCheckedChange={(checked) => setDisabled(!!checked)}
                     />
                     <Label htmlFor="disabled" className="text-xs cursor-pointer">
-                      Disabled
+                      {t("f_disabled")}
                     </Label>
                   </div>
 
@@ -384,7 +385,7 @@ export function ItemFormShell({
                       onCheckedChange={(checked) => setAllowAlternative(!!checked)}
                     />
                     <Label htmlFor="allow-alternative" className="text-xs cursor-pointer">
-                      Allow Alternative Item
+                      {t("f_allow_alternative_item")}
                     </Label>
                   </div>
 
@@ -398,13 +399,13 @@ export function ItemFormShell({
                       htmlFor="maintain-stock"
                       className="text-xs cursor-pointer"
                     >
-                      Maintain Stock
+                      {t("f_maintain_stock")}
                     </Label>
                   </div>
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Valuation Rate (TRY)
+                      {t("f_valuation_rate_try")}
                     </FieldLabel>
                     <Input
                       defaultValue="1,199.99"
@@ -420,13 +421,13 @@ export function ItemFormShell({
                       onCheckedChange={(checked) => setIsFixedAsset(!!checked)}
                     />
                     <Label htmlFor="is-fixed-asset" className="text-xs">
-                      Is Fixed Asset
+                      {t("f_is_fixed_asset")}
                     </Label>
                   </div>
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Over Delivery/Receipt Allowance (%)
+                      {t("f_over_delivery_receipt_allowance")}
                     </FieldLabel>
                     <Input
                       defaultValue="0.000"
@@ -436,7 +437,7 @@ export function ItemFormShell({
 
                   <Field>
                     <FieldLabel className="text-xs text-muted-foreground">
-                      Over Billing Allowance (%)
+                      {t("f_over_billing_allowance")}
                     </FieldLabel>
                     <Input
                       defaultValue="0.000"
@@ -456,11 +457,11 @@ export function ItemFormShell({
                         descriptionOpen ? "rotate-90" : ""
                       }`}
                     />
-                    Description
+                    {t("f_description")}
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2 pl-6">
                     <Textarea
-                      placeholder="Item description…"
+                      placeholder={t("f_description_placeholder")}
                       className="min-h-24 text-xs resize-none"
                       defaultValue="LCW ACCESSORIES Kahverengi Deri Görünümlü Erkek Seyahat Çantası. %100 Poliüretan suni deri dış yüzey, %100 polyester astar. Fermuarlı geniş ana bölme, ön fermuarlı cep ve ayarlanabilir omuz askısı."
                     />
@@ -476,10 +477,10 @@ export function ItemFormShell({
                         uomOpen ? "rotate-90" : ""
                       }`}
                     />
-                    Units of Measure
+                    {t("f_units_of_measure")}
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2 pl-6 text-xs text-muted-foreground">
-                    No additional units of measure configured.
+                    {t("f_uom_empty")}
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -496,7 +497,7 @@ export function ItemFormShell({
                     >
                       <span className="flex items-center gap-2">
                         <UserPlus className="size-3.5" />
-                        Assigned To
+                        {t("f_assigned_to")}
                       </span>
                       <Plus className="size-3.5" />
                     </Button>
@@ -508,7 +509,7 @@ export function ItemFormShell({
                       >
                         <span className="flex items-center gap-2">
                           <Paperclip className="size-3.5" />
-                          Attachments
+                          {t("f_attachments")}
                         </span>
                         <Plus className="size-3.5" />
                       </Button>
@@ -554,7 +555,7 @@ export function ItemFormShell({
                 >
                   <span className="flex items-center gap-2">
                     <Tag className="size-3.5" />
-                    Tags
+                    {t("f_tags")}
                   </span>
                   <Plus className="size-3.5" />
                 </Button>
@@ -565,7 +566,7 @@ export function ItemFormShell({
                 >
                   <span className="flex items-center gap-2">
                     <UserPlus className="size-3.5" />
-                    Share
+                    {t("f_share")}
                   </span>
                   <Plus className="size-3.5" />
                 </Button>
@@ -575,12 +576,12 @@ export function ItemFormShell({
 
               <div className="space-y-3 text-muted-foreground text-[11px]">
                 <div>
-                  <p className="font-medium text-foreground">Administrator</p>
-                  <p>last edited this · 2 months ago</p>
+                  <p className="font-medium text-foreground">{t("panel_administrator")}</p>
+                  <p>{t("panel_last_edited")}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-foreground">Administrator</p>
-                  <p>created this · 2 months ago</p>
+                  <p className="font-medium text-foreground">{t("panel_administrator")}</p>
+                  <p>{t("panel_created")}</p>
                 </div>
               </div>
             </aside>
@@ -608,7 +609,7 @@ export function ItemFormShell({
               value={tab}
               className="m-0 p-3 text-xs capitalize text-muted-foreground data-[state=inactive]:hidden sm:p-4"
             >
-              {tab} content
+              {t("tab_content")} {tab}
             </TabsContent>
           ))}
           </div>

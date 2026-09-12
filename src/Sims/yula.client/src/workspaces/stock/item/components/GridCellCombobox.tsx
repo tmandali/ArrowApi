@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/command"
 import { Search, X } from "lucide-react"
 import { cn } from "@/utils/cn"
+import { useTranslations } from "next-intl"
 
 type GridCellComboboxProps = {
   value: string
@@ -37,6 +38,7 @@ export function GridCellCombobox({
   onAdvancedSearch,
   "data-grid-cell": dataGridCell,
 }: GridCellComboboxProps) {
+  const t = useTranslations("Stock")
   const [open, setOpen] = React.useState(false)
   const [width, setWidth] = React.useState<number>()
   const [query, setQuery] = React.useState("")
@@ -115,7 +117,7 @@ export function GridCellCombobox({
             <button
               type="button"
               tabIndex={-1}
-              aria-label="Clear"
+              aria-label={t("combo_clear")}
               className="absolute right-1.5 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               onMouseDown={(event) => event.preventDefault()}
               onClick={clearValue}
@@ -151,7 +153,7 @@ export function GridCellCombobox({
       >
         <Command shouldFilter={false} className="rounded-md bg-transparent p-0">
           <CommandList className="max-h-56">
-            <CommandEmpty className="py-3 text-xs">No results.</CommandEmpty>
+            <CommandEmpty className="py-3 text-xs">{t("combo_no_results")}</CommandEmpty>
             <CommandGroup className="p-0">
               {filtered.map((option) => (
                 <CommandItem

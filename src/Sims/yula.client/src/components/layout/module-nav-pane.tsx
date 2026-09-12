@@ -63,7 +63,8 @@ export function ModuleNavPane({
 
   const { open: navOpen } = usePagePanel({
     id: "module-nav",
-    title: "Menu",
+    // PagePanelTrigger tooltip'unda dil takımla çözülür ("Menü panelini kapat").
+    title: t("menu_panel"),
     defaultOpen: false,
   })
   const { setOpen } = usePagePanelContext()
