@@ -213,24 +213,6 @@ async function putSettingsToApi(snapshot: {
   } catch {
     // offline (Tauri) veya backend kapalı — önbellek aynalanmaz
     return null
-  } finally {
-    // Ad/e-posta → app_users (tek kaynak)
-    try {
-      await fetch("/api/system/users", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: SETTINGS_USER_ID,
-          name: snapshot.fullName || null,
-          email: snapshot.email || null,
-          role: "System Administrator",
-          status: "Active",
-          lastActive: "Now",
-        }),
-      })
-    } catch {
-      // sessiz geç
-    }
   }
 }
 

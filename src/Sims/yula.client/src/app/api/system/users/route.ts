@@ -74,6 +74,15 @@ export async function POST(req: Request) {
   }
 
   const v = parse.data;
+  // Legacy kalkan: eski ayarlar formu harfiyen id:"local" yazıp duplikasyon
+  // satir olusturuyordu (usr_101 + local ayni kisi). Ayarlar artik session
+  // kullanicisina cozuluyor — "local" artik gecerli bir DB id'i degil.
+  if (v.id === "local") {
+    return Response.json(
+      { error: "'local' alias artik gecerli degil — session kullanicisi otomatik cozulunur." },
+      { status: 400 },
+    );
+  }
   try {
     const rows = await db
       .insert(appUsersSchema)
