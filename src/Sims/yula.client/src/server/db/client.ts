@@ -1,4 +1,3 @@
-import { Env } from "@/lib/env";
 import { createDbConnection } from "./connection";
 
 /**
