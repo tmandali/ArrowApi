@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { signIn } from "@/lib/auth";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
