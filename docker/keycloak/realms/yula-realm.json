@@ -148,6 +148,22 @@
         }
       ],
       "realmRoles": ["app-admin", "app-user", "default-roles-yula"]
+    },
+    {
+      "username": "tmandali",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Timur",
+      "lastName": "Mandalı",
+      "email": "tmandali@gmail.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["app-admin", "app-user", "default-roles-yula"]
     }
   ]
 }
