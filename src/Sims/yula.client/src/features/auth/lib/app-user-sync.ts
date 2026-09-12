@@ -70,6 +70,8 @@ async function upsertAppUserFromSession(session: Session): Promise<void> {
  * Session kullanıcıını `app_users`'a bağlıp DB id'sini döndürür.
  * - Oturum + geçerli sub var → upsert + `session.user.id`.
  * - Yok (provider'sız tek kullanıcı modu) → `SINGLE_USER_ID` (usr_101).
+ * Bu hımban YALNIZCA `ensure-user` route kullanır — ayarlar akmında
+ * upsert tetiklenmez (ensure-user, authenticated geçışinde tetiklenir).
  */
 export async function resolveSessionDbUserId(): Promise<string> {
   try {
@@ -82,6 +84,23 @@ export async function resolveSessionDbUserId(): Promise<string> {
     }
   } catch (error) {
     console.error("[auth-sync] session çözümlemede hata — fallback usr_101:", error);
+  }
+  return SINGLE_USER_ID;
+}
+
+/**
+ * Saf resolver — DB'ye yazmaz (upsert YOK). `local` alias'ını session
+ * kullanıcısına çevirir; satır yoksa da id'yi döndürür (create edilebilir).
+ * Ayarlar rotaları (GET/PUT /api/my/settings) bunu kullanır.
+ */
+export async function resolveSessionUserId(): Promise<string> {
+  try {
+    const session = (await auth()) as Session | null;
+    if (session?.user?.id && session.user.id !== "unknown") {
+      return session.user.id;
+    }
+  } catch {
+    // session okunamadı → fallback
   }
   return SINGLE_USER_ID;
 }

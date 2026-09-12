@@ -3,7 +3,7 @@ import * as z from "zod";
 import { db } from "@/server/db/client";
 import { userSettingsSchema, appUsersSchema } from "@/server/db/schema";
 import { SettingsPutValidation } from "@/validations/settings.validation";
-import { resolveSessionDbUserId } from "@/features/auth/lib/app-user-sync";
+import { resolveSessionUserId } from "@/features/auth/lib/app-user-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
     oturum yoksa tek kullanıcı fallback `usr_101`. */
 const USER_ID_LOCAL = "local";
 
-/** `local` → session kullanıcı (upsert edilmiş) veya `usr_101`. */
+/** `local` → session kullanıcısı (saf resolver, upsert YOK) veya `usr_101`.
+    app_users upsert'i artık yalnız ensure-user akışında tetiklenir. */
 
 /** Tek kullanıcı ayarı (varsayılan `local`). UI fallback için her zaman 200 döner. */
 export async function GET(req: Request) {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     // UI'nin `local` gönderdiği yerde: oturum varsa login kullanıcı,
     // yoksa usr_101. Açıkça başka userId verilirse o id geçer (admin ekranı).
     const userId =
-      clientUserId === USER_ID_LOCAL ? await resolveSessionDbUserId() : clientUserId;
+      clientUserId === USER_ID_LOCAL ? await resolveSessionUserId() : clientUserId;
 
     const [settingsRow] = await db
       .select()
@@ -78,10 +79,10 @@ export async function PUT(req: Request) {
   const v = parse.data;
   // `google` provider'ı bizim AI çekirdekte yok — yazarken `openai`-uyumlu saklanır.
   const aiProvider = v.aiProvider === "google" ? null : v.aiProvider;
-  // UI `local` gönderir → session kullanıcı (upsert), yoksa `usr_101`.
+  // UI `local` gönderir → session kullanıcı (saf çözüm), yoksa `usr_101`.
   const resolvedUserId =
     (v.userId ?? USER_ID_LOCAL) === USER_ID_LOCAL
-      ? await resolveSessionDbUserId()
+      ? await resolveSessionUserId()
       : v.userId!;
 
   try {
