@@ -28,38 +28,13 @@ import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
 import { appRoleForSession } from "./realm-roles";
+import { normalizeProvider, sessionIdentity } from "./session-identity";
 
-export { appRoleForSession };
+export { appRoleForSession, normalizeProvider, sessionIdentity };
 
 /** Tek kullanıcı modu fallback id'si (seed kullanıcı — usr_101). */
 export const SINGLE_USER_ID = "usr_101";
 
-/**
- * Provider normalizasyonu: Google One Tap ("google-onesig") aslında Google
- * kimliğidir — aynı Google hesabı GIS butonu + One Tap ile 2 satır
- * üretmesin diye `google`'a yansır.
- */
-export function normalizeProvider(provider?: string | null): string | null {
-  if (!provider) return null;
-  const p = provider.trim().toLowerCase();
-  if (p === "google-onesig" || p === "google") return "google";
-  if (p === "keycloak") return "keycloak";
-  return p;
-}
-
-/**
- * Oturum kullanıcısının `(provider, provider_id)` kimliğini döndürür.
- * Geçerli session yoksa (provider'sız tek kullanıcı modu) null.
- */
-export function sessionIdentity(
-  session: Session | null | undefined,
-): { provider: string; providerId: string } | null {
-  const sub = session?.user?.id;
-  if (!sub || sub === "unknown") return null;
-  const provider = normalizeProvider(session?.user?.provider);
-  if (!provider) return null;
-  return { provider, providerId: sub };
-}
 
 /**
  * `(provider, provider_id)` ile satırı bulur (saf okuma — upsert YOK).
