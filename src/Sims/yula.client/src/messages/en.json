@@ -763,7 +763,8 @@
     "preferences": "Preferences",
     "manage_accounts": "Manage Accounts",
     "theme_label": "Theme",
-    "sign_out": "Sign Out"
+    "sign_out": "Sign Out",
+    "sign_in": "Sign In"
   },
   "Notifications": {
     "financial_title": "Financial Notifications",

@@ -74,8 +74,26 @@ export function NavUser() {
     signOut({ redirectTo: "/sign-in" });
   };
 
-  if (status === "loading" || !user) {
+  // SSR/hydration güvenli: ilk render'da ve oturum doğrulanırken hiç şey gösterme.
+  if (!mounted || status === "loading") {
     return null;
+  }
+
+  // Oturum yok → net bir "Giriş Yap" butonu göster (sağ üst boş kalmasın).
+  if (!user) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-2 text-xs"
+        asChild
+      >
+        <Link href="/sign-in">
+          <User className="size-4" />
+          {t("sign_in")}
+        </Link>
+      </Button>
+    );
   }
 
   return (

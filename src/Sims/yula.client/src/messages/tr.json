@@ -763,7 +763,8 @@
     "preferences": "Tercihler",
     "manage_accounts": "Hesapları Yönet",
     "theme_label": "Tema",
-    "sign_out": "Çıkış Yap"
+    "sign_out": "Çıkış Yap",
+    "sign_in": "Giriş Yap"
   },
   "Notifications": {
     "financial_title": "Finansal Bildirimler",
