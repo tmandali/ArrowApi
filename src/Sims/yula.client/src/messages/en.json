@@ -1546,6 +1546,7 @@
     "sign_in": "Sign In",
     "sign_in_keycloak": "Sign in with Keycloak",
     "sign_in_google": "Sign in with Google",
+    "no_providers": "No account providers configured.",
     "forgot_password": "Forgot password?",
     "no_account": "Don't have an account?",
     "sign_up": "Sign Up",
@@ -1560,6 +1561,7 @@
     "sign_up": "Sign Up",
     "sign_up_keycloak": "Sign up with Keycloak",
     "sign_up_google": "Sign up with Google",
+    "no_providers": "No account providers configured.",
     "has_account": "Already have an account?",
     "sign_in": "Sign In",
     "signup_error": "An error occurred during registration."

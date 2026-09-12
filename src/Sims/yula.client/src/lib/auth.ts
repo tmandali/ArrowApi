@@ -69,11 +69,19 @@ function refreshEndpoint(provider: string): {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    Keycloak({
-      clientId: process.env.AUTH_KEYCLOAK_ID!,
-      clientSecret: process.env.AUTH_KEYCLOAK_SECRET!,
-      issuer: process.env.KEYCLOAK_ISSUER!,
-    }),
+    // Koşullu: yalnızca tüm Keycloak env'leri varken register edilir.
+    // Eksik provider (placeholder env) UI'de görünmez — bkz. getProviders().
+    ...(process.env.AUTH_KEYCLOAK_ID &&
+    process.env.AUTH_KEYCLOAK_SECRET &&
+    process.env.KEYCLOAK_ISSUER
+      ? [
+          Keycloak({
+            clientId: process.env.AUTH_KEYCLOAK_ID!,
+            clientSecret: process.env.AUTH_KEYCLOAK_SECRET!,
+            issuer: process.env.KEYCLOAK_ISSUER!,
+          }),
+        ]
+      : []),
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
       ? [
           Google({

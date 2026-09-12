@@ -1546,6 +1546,7 @@
     "sign_in": "Giriş Yap",
     "sign_in_keycloak": "Keycloak ile Giriş",
     "sign_in_google": "Google ile Giriş",
+    "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "forgot_password": "Şifremi Unuttum",
     "no_account": "Hesabınız yok mu?",
     "sign_up": "Kayıt Ol",
@@ -1560,6 +1561,7 @@
     "sign_up": "Kayıt Ol",
     "sign_up_keycloak": "Keycloak ile Kayıt",
     "sign_up_google": "Google ile Kayıt",
+    "no_providers": "Kayıt yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "has_account": "Zaten hesabınız var mı?",
     "sign_in": "Giriş Yap",
     "signup_error": "Kayıt sırasında bir hata oluştu."

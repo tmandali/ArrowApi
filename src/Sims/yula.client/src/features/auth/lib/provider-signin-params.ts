@@ -15,10 +15,10 @@ export type AppProviderId = "google" | "keycloak";
 
 /**
  * Provider'ın client `signIn` çağrısına geçecek authorization parametreleri.
- * `undefined` → ek parametre yok.
+ * `undefined` → ek parametre yok. Bilinmeyen provider → undefined.
  */
 export function providerSignInParams(
-  provider: AppProviderId,
+  provider: string,
 ): SignInAuthorizationParams | undefined {
   switch (provider) {
     case "google":
