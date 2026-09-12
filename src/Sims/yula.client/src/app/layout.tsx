@@ -33,7 +33,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       className="h-full antialiased"
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <NextIntlClientProvider messages={messages}>
           <Providers>
             {/* GIS One Tap otomatik kartı: GOOGLE_ONE_TAP=1 iken ve oturum
