@@ -73,7 +73,7 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
   const [providers, setProviders] = React.useState<Providers | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
   // Self-hosted provider'a ulaşılamadıysa (preflight) kartta gösterilecek hata.
-  const [unreachableProvider, setUnreachableProvider] = React.useState<{ id: string; name: string } | null>(null);
+  const [unreachableProvider, setUnreachableProvider] = React.useState<{ name: string } | null>(null);
 
   React.useEffect(() => {
     getProviders()
@@ -95,7 +95,7 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
           .then((res) => res.json())
           .catch(() => null);
         if (health === null || health.reachable !== true) {
-          setUnreachableProvider({ id, name });
+          setUnreachableProvider({ name });
           setLoading(null);
           return;
         }
@@ -170,12 +170,9 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
       {unreachableProvider ? (
         <div
           role="alert"
-          className="flex flex-col gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300"
+          className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300"
         >
-          <span>{t("provider_unreachable", { provider: unreachableProvider.name })}</span>
-          {unreachableProvider.id === "keycloak" ? (
-            <span className="text-red-500/80 dark:text-red-300/80">{t("provider_unreachable_hint_keycloak")}</span>
-          ) : null}
+          {t("provider_unreachable", { provider: unreachableProvider.name })}
         </div>
       ) : null}
     </div>
