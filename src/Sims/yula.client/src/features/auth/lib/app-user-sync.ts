@@ -6,16 +6,24 @@
  * yerelde (drizzle → `app_users` / `user_settings`) olduğu için
  * oturum→DB bağlantısı bu modülle kurulur:
  *
- *   1. `auth()` (NextAuth v5) session'ını okur.
- *   2. Login'li kullanıcı için `app_users` satırını upsert eder
- *      (ilk girişte otomatik hesap oluşur — /sign-in kartındaki
- *      "ilk girişte hesap otomatik oluşur" akışıyla aynı mantık).
+ *   1. `auth()` (NextAuth v5) session'ını okur (sub + provider).
+ *   2. `(provider, provider_id)` eşleşmesiyle `app_users` satırını
+ *      upsert eder.
  *   3. Oturum yoksa tek kullanıcı moduna fallback: `usr_101`.
+ *
+ * KİMLİK MODELİ (design C):
+ *   - `app_users.id` = UYGULAMANIN ürettiği stabil UUID (bir kez verildikten
+ *     sonra asla değişmez; provider'dan bağımsız).
+ *   - `provider` + `provider_id` = login kimliği (Keycloak sub / Google sub).
+ *     Upsert eşleşmesi BU çift üzerine yapılır — bir provider kimliği
+ *     en fazla 1 satır üretir (unique index).
+ *   - `user_settings` FK'i uygulama GUID'ine bakar; provider değişse bile
+ *     kişisel veri kaybolmaz.
  *
  * KURAL: Bu modül Node runtime'ında çalışır (`@/server/db/client`
  * bağımlılığı). Asla client bileşeninden import etme.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
@@ -27,60 +35,135 @@ export { appRoleForSession };
 export const SINGLE_USER_ID = "usr_101";
 
 /**
- * Oturum kullanıcıını `app_users`'ta garanti eder (upsert).
- * - Yeni kayıt: profil bilgileri + rol + Active + "Now" yazar.
- * - Mevcut kayıt: yalnız boş alanları doldurur + `lastActive = Now`;
- *   `role`/`status` ASLA ezilmez (System Users ekranı tek kaynak).
+ * Provider normalizasyonu: Google One Tap ("google-onesig") aslında Google
+ * kimliğidir — aynı Google hesabı GIS butonu + One Tap ile 2 satır
+ * üretmesin diye `google`'a yansır.
+ */
+export function normalizeProvider(provider?: string | null): string | null {
+  if (!provider) return null;
+  const p = provider.trim().toLowerCase();
+  if (p === "google-onesig" || p === "google") return "google";
+  if (p === "keycloak") return "keycloak";
+  return p;
+}
+
+/**
+ * Oturum kullanıcısının `(provider, provider_id)` kimliğini döndürür.
+ * Geçerli session yoksa (provider'sız tek kullanıcı modu) null.
+ */
+export function sessionIdentity(
+  session: Session | null | undefined,
+): { provider: string; providerId: string } | null {
+  const sub = session?.user?.id;
+  if (!sub || sub === "unknown") return null;
+  const provider = normalizeProvider(session?.user?.provider);
+  if (!provider) return null;
+  return { provider, providerId: sub };
+}
+
+/**
+ * `(provider, provider_id)` ile satırı bulur (saf okuma — upsert YOK).
+ */
+async function findAppUserBySessionIdentity(identity: {
+  provider: string;
+  providerId: string;
+}) {
+  const [row] = await db
+    .select()
+    .from(appUsersSchema)
+    .where(
+      and(
+        eq(appUsersSchema.provider, identity.provider),
+        eq(appUsersSchema.providerId, identity.providerId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Oturum kullanıcısının `app_users` satırını garanti eder (upsert).
+ * - Satır yok: uygulama GUID'i (randomUUID) ile yeni kayıt; profil
+ *   bilgileri + rol + Active + "Now" yazar.
+ * - Satır var: yalnız boş alanları doldurur + `lastActive = Now`;
+ *   `role`/`status`/`id` ASLA ezilmez (System Users ekranı tek kaynak).
+ * Dönüş: satırın uygulama GUID'i (`app_users.id`).
  * Hata → loglanıp yutulur (nav/ayar akışı DB hatasıyla kırılmaz).
  */
-async function upsertAppUserFromSession(session: Session): Promise<void> {
+export async function upsertAppUserFromSession(
+  session: Session,
+): Promise<string | null> {
+  const identity = sessionIdentity(session);
+  if (!identity) return null;
   const u = session.user;
   try {
-    const [existing] = await db
-      .select()
-      .from(appUsersSchema)
-      .where(eq(appUsersSchema.id, u.id))
-      .limit(1);
+    const existing = await findAppUserBySessionIdentity(identity);
 
+    if (existing) {
+      await db
+        .update(appUsersSchema)
+        .set({
+          // Boşsa session profilden doldur; doluysa mevcut değeri KORU:
+          name: existing.name ?? (u.name ?? null),
+          email: existing.email ?? (u.email ?? null),
+          lastActive: "Now",
+        })
+        .where(eq(appUsersSchema.id, existing.id));
+      return existing.id;
+    }
+
+    // Yeni kayıt: uygulama GUID'i — provider'dan bağımsız, stabil.
+    const newId = crypto.randomUUID();
     await db
       .insert(appUsersSchema)
       .values({
-        id: u.id,
+        id: newId,
+        provider: identity.provider,
+        providerId: identity.providerId,
         name: u.name ?? null,
         email: u.email ?? null,
         role: appRoleForSession(session),
         status: "Active",
         lastActive: "Now",
       })
-      .onConflictDoUpdate({
-        target: appUsersSchema.id,
-        set: {
-          // Boşsa session profilden doldur; doluysa mevcut değeri KORU:
-          name: existing ? (u.name ?? existing.name) : (u.name ?? null),
-          email: existing ? (u.email ?? existing.email) : (u.email ?? null),
-          lastActive: "Now",
-        },
+      .onConflictDoNothing({
+        // Yarışta (parallel request) satır başka istek tarafından
+        // oluşturulduysa sessizce geç — unique(provider, provider_id).
+        target: [appUsersSchema.provider, appUsersSchema.providerId],
       });
+    const [created] = await db
+      .select({ id: appUsersSchema.id })
+      .from(appUsersSchema)
+      .where(
+        and(
+          eq(appUsersSchema.provider, identity.provider),
+          eq(appUsersSchema.providerId, identity.providerId),
+        ),
+      )
+      .limit(1);
+    return created?.id ?? newId;
   } catch (error) {
-    console.error(`[auth-sync] app_users upsert hatası (${u.id}):`, error);
+    console.error(
+      `[auth-sync] app_users upsert hatası (${identity.provider}/${identity.providerId}):`,
+      error,
+    );
+    return null;
   }
 }
 
 /**
- * Session kullanıcıını `app_users`'a bağlıp DB id'sini döndürür.
- * - Oturum + geçerli sub var → upsert + `session.user.id`.
+ * Session kullanıcısını `app_users`'a bağlıp **uygulama GUID'ini** döndürür
+ * (upsert eder — `user_settings` FK'si için satırın varlığı şart).
+ * - Oturum + geçerli provider/sub var → upsert → `app_users.id`.
  * - Yok (provider'sız tek kullanıcı modu) → `SINGLE_USER_ID` (usr_101).
- * Bu hımban YALNIZCA `ensure-user` route kullanır — ayarlar akmında
- * upsert tetiklenmez (ensure-user, authenticated geçışinde tetiklenir).
+ * Bu hımban YALNIZCA `ensure-user` + ayarlar PUT route kullanır.
  */
 export async function resolveSessionDbUserId(): Promise<string> {
   try {
-    // NextAuth v5 base Session tipine döner; extended alanlar (roles vb.)
-    // lib/auth'un session callback'inde garanti edilir — runtime güvenli cast.
     const session = (await auth()) as Session | null;
-    if (session?.user?.id && session.user.id !== "unknown") {
-      await upsertAppUserFromSession(session);
-      return session.user.id;
+    if (session) {
+      const id = await upsertAppUserFromSession(session);
+      if (id) return id;
     }
   } catch (error) {
     console.error("[auth-sync] session çözümlemede hata — fallback usr_101:", error);
@@ -89,18 +172,21 @@ export async function resolveSessionDbUserId(): Promise<string> {
 }
 
 /**
- * Saf resolver — DB'ye yazmaz (upsert YOK). `local` alias'ını session
- * kullanıcısına çevirir; satır yoksa da id'yi döndürür (create edilebilir).
- * Ayarlar rotaları (GET/PUT /api/my/settings) bunu kullanır.
+ * Saf resolver — DB'ye YAZMAZ (yalnız SELECT). `local` alias'ını session
+ * kullanıcılarının uygulama GUID'ine çevirir; henüz satırı yoksa (ilk
+ * giriş, ensure-user beklemede) null döner — çağıran taraf `local`
+ * modunda kaldığı sürece usr_101 fallback'ine düşebilir.
+ * Ayarlar GET rotası bunu kullanır (salt okuma).
  */
-export async function resolveSessionUserId(): Promise<string> {
+export async function resolveSessionUserId(): Promise<string | null> {
   try {
     const session = (await auth()) as Session | null;
-    if (session?.user?.id && session.user.id !== "unknown") {
-      return session.user.id;
-    }
+    const identity = sessionIdentity(session);
+    if (!identity) return null;
+    const row = await findAppUserBySessionIdentity(identity);
+    return row?.id ?? null;
   } catch {
-    // session okunamadı → fallback
+    // session/DB okunamadı → fallback'e bırak
+    return null;
   }
-  return SINGLE_USER_ID;
 }

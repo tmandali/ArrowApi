@@ -1,18 +1,20 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
 import { isAccountStatusActive } from "@/features/auth/lib/account-status";
+import { sessionIdentity } from "@/features/auth/lib/app-user-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Login kullanıcıanın `app_users` durum sorgusu (SADECE OKUMA — upsert yok).
+ * Login kullanıcıının `app_users` durum sorgusu (SADECE OKUMA — upsert yok).
  *
- * Provider'dan bağımsız (Keycloak/Google): session `user.id`'si (sub) ile
- * DB row'una bakar. Yönetici System Users ekranında `Inactive` yaptığında
- * istemci (AccountStatusGuard) bunu okuyup otomatik sign-out eder.
+ * Provider'dan bağımsız (Keycloak/Google): session `(provider, sub)` çifti
+ * ile DB row'una bakar (design C: `id` uygulama GUID'i, `provider_id` ham
+ * sub). Yönetici System Users ekranında `Inactive` yaptığında istemci
+ * (AccountStatusGuard) bunu okuyup otomatik sign-out eder.
  *
  * - Oturum yok / provider'sız mod → `active: true` (guard ateşlemez).
  * - Row henüz yok (ilk giriş, upsert beklemede) → `active: true`
@@ -27,11 +29,17 @@ export async function GET() {
   try {
     const session = (await auth()) as Session | null;
     userId = session?.user?.id ?? null;
-    if (userId && userId !== "unknown") {
+    const identity = sessionIdentity(session);
+    if (userId && userId !== "unknown" && identity) {
       const [row] = await db
         .select({ status: appUsersSchema.status })
         .from(appUsersSchema)
-        .where(eq(appUsersSchema.id, userId))
+        .where(
+          and(
+            eq(appUsersSchema.provider, identity.provider),
+            eq(appUsersSchema.providerId, identity.providerId),
+          ),
+        )
         .limit(1);
       status = row?.status ?? null;
       active = isAccountStatusActive(status);

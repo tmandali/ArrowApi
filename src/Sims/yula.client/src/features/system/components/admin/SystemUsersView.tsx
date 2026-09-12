@@ -55,12 +55,18 @@ type SystemUser = {
   role: string;
   status: "Active" | "Inactive";
   lastActive: string;
+  /** Login provider'ı (keycloak/google/local) — admin/manuel satırlarda null. */
+  provider: string | null;
+  /** Provider'daki ham sub (Keycloak UUID / Google sayısal). */
+  providerId: string | null;
 };
 
 const ROLE_OPTIONS = ["System Administrator", "Stock Manager", "Financial Analyst", "Viewer"] as const;
 
 function normalizeRow(row: Record<string, unknown>): SystemUser {
   const status = String(row.status ?? "Active") === "Inactive" ? "Inactive" : "Active";
+  const provider = row.provider == null ? null : String(row.provider);
+  const providerId = row.providerId == null ? null : String(row.providerId);
   return {
     id: String(row.id ?? ""),
     name: String(row.name ?? ""),
@@ -68,6 +74,8 @@ function normalizeRow(row: Record<string, unknown>): SystemUser {
     role: String(row.role ?? "Viewer"),
     status,
     lastActive: String(row.lastActive ?? ""),
+    provider,
+    providerId,
   };
 }
 
@@ -134,6 +142,8 @@ export function SystemUsersView() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           id: `usr_${Date.now()}`,
+          provider: null,
+          providerId: null,
           name,
           email: email || null,
           role: formRole,
@@ -315,6 +325,7 @@ export function SystemUsersView() {
                     <TableHead className="w-12">{t("col_id")}</TableHead>
                     <TableHead>{t("col_name")}</TableHead>
                     <TableHead>{t("col_email")}</TableHead>
+                    <TableHead>{t("col_provider")}</TableHead>
                     <TableHead>{t("col_role")}</TableHead>
                     <TableHead>{t("col_status")}</TableHead>
                     <TableHead>{t("col_last_active")}</TableHead>
@@ -325,14 +336,14 @@ export function SystemUsersView() {
                   {loading &&
                     Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={`skeleton-${i}`}>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <Skeleton className="h-6 w-full" />
                         </TableCell>
                       </TableRow>
                     ))}
                   {!loading && loadError && (
                     <TableRow>
-                      <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                         <Empty>
                           <EmptyHeader>
                             <EmptyTitle className="text-sm">{t("load_error_title")}</EmptyTitle>
@@ -347,7 +358,7 @@ export function SystemUsersView() {
                   )}
                   {!loading && !loadError && filteredUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                         <Empty>
                           <EmptyHeader>
                             <EmptyTitle className="text-sm">{t("empty_title")}</EmptyTitle>
@@ -368,6 +379,20 @@ export function SystemUsersView() {
                         <TableCell className="font-mono text-muted-foreground">{user.id}</TableCell>
                         <TableCell className="font-semibold text-foreground">{user.name}</TableCell>
                         <TableCell className="text-muted-foreground font-mono">{user.email}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {user.provider ? (
+                            <span className="inline-flex items-center gap-1.5" title={user.providerId ?? undefined}>
+                              <span className="font-mono">{user.provider}</span>
+                              {user.providerId && (
+                                <span className="text-[10px] opacity-60">
+                                  {user.providerId.length > 8 ? `${user.providerId.slice(0, 8)}…` : user.providerId}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="opacity-50">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[11px] font-medium">
                             {user.role}

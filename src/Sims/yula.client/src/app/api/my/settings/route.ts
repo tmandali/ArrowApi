@@ -3,7 +3,7 @@ import * as z from "zod";
 import { db } from "@/server/db/client";
 import { userSettingsSchema, appUsersSchema } from "@/server/db/schema";
 import { SettingsPutValidation } from "@/validations/settings.validation";
-import { resolveSessionUserId } from "@/features/auth/lib/app-user-sync";
+import { resolveSessionDbUserId, resolveSessionUserId, SINGLE_USER_ID } from "@/features/auth/lib/app-user-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +22,12 @@ export async function GET(req: Request) {
     const clientUserId = url.searchParams.get("userId") || USER_ID_LOCAL;
     // UI'nin `local` gönderdiği yerde: oturum varsa login kullanıcı,
     // yoksa usr_101. Açıkça başka userId verilirse o id geçer (admin ekranı).
+    // GET salt okuma → saf resolver (upsert tetiklemez); satır henüz yoksa
+    // usr_101 fallback'i devrede (ensure-user ilk tam yüklemeye kadar).
     const userId =
-      clientUserId === USER_ID_LOCAL ? await resolveSessionUserId() : clientUserId;
+      clientUserId === USER_ID_LOCAL
+        ? ((await resolveSessionUserId()) ?? SINGLE_USER_ID)
+        : clientUserId;
 
     const [settingsRow] = await db
       .select()
@@ -79,10 +83,13 @@ export async function PUT(req: Request) {
   const v = parse.data;
   // `google` provider'ı bizim AI çekirdekte yok — yazarken `openai`-uyumlu saklanır.
   const aiProvider = v.aiProvider === "google" ? null : v.aiProvider;
-  // UI `local` gönderir → session kullanıcı (saf çözüm), yoksa `usr_101`.
+  // UI `local` gönderir → session kullanıcı; `user_settings` FK'i
+  // (`user_id → app_users.id`) için satırın varlığı şart → upsert resolver.
+  // (ensure-user bunu her tam sayfa yüklemesinde zaten garanti eder; bu
+  // yalnız ilk giriş + anında ayar kaydetme yarışına karşı sigorta.)
   const resolvedUserId =
     (v.userId ?? USER_ID_LOCAL) === USER_ID_LOCAL
-      ? await resolveSessionUserId()
+      ? await resolveSessionDbUserId()
       : v.userId!;
 
   try {

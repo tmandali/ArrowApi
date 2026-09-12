@@ -8,6 +8,13 @@
       "when": 1789136388236,
       "tag": "0000_right_stellaris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789231888364,
+      "tag": "0001_vengeful_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

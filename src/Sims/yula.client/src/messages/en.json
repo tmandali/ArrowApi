@@ -20,6 +20,7 @@
     "col_id": "ID",
     "col_name": "Full Name",
     "col_email": "Email",
+    "col_provider": "Identity Source",
     "col_role": "Role & Permission",
     "col_status": "Status",
     "col_last_active": "Last Activity",

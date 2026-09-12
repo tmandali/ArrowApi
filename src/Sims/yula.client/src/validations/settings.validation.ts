@@ -24,6 +24,10 @@ export const SystemUserUpsertValidation = z.object({
   role: z.string().max(128).optional().nullable(),
   status: z.enum(["Active", "Inactive"]).optional().nullable(),
   lastActive: z.string().max(64).optional().nullable(),
+  /** Login provider'ı: `keycloak` | `google` | `local` | null (manuel). */
+  provider: z.string().max(64).optional().nullable(),
+  /** Provider'daki ham sub (Keycloak UUID / Google sayısal). */
+  providerId: z.string().max(128).optional().nullable(),
 });
 
 export type SettingsPutInput = z.infer<typeof SettingsPutValidation>;

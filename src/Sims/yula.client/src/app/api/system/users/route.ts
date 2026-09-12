@@ -15,6 +15,8 @@ const SEED_USERS = [
     role: "System Administrator",
     status: "Active",
     lastActive: "Now",
+    provider: "local",
+    providerId: null,
   },
   {
     id: "usr_102",
@@ -23,6 +25,8 @@ const SEED_USERS = [
     role: "Stock Manager",
     status: "Active",
     lastActive: "2 hours ago",
+    provider: null,
+    providerId: null,
   },
   {
     id: "usr_103",
@@ -31,6 +35,8 @@ const SEED_USERS = [
     role: "Financial Analyst",
     status: "Active",
     lastActive: "1 day ago",
+    provider: null,
+    providerId: null,
   },
   {
     id: "usr_104",
@@ -39,6 +45,8 @@ const SEED_USERS = [
     role: "Viewer",
     status: "Inactive",
     lastActive: "1 month ago",
+    provider: null,
+    providerId: null,
   },
 ] as const;
 
@@ -88,6 +96,8 @@ export async function POST(req: Request) {
       .insert(appUsersSchema)
       .values({
         id: v.id,
+        provider: v.provider ?? null,
+        providerId: v.providerId ?? null,
         name: v.name ?? null,
         email: v.email ?? null,
         role: v.role ?? "Viewer",
@@ -97,6 +107,8 @@ export async function POST(req: Request) {
       .onConflictDoUpdate({
         target: appUsersSchema.id,
         set: {
+          provider: v.provider ?? null,
+          providerId: v.providerId ?? null,
           name: v.name ?? null,
           email: v.email ?? null,
           role: v.role ?? "Viewer",

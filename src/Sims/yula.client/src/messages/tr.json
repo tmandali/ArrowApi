@@ -20,6 +20,7 @@
     "col_id": "ID",
     "col_name": "Ad Soyad",
     "col_email": "E-Posta",
+    "col_provider": "Kimlik Kaynağı",
     "col_role": "Rol & Yetki",
     "col_status": "Durum",
     "col_last_active": "Son Aktivite",
