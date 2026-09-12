@@ -10,6 +10,7 @@
     "db-server:file": "pglite-server -m 100 --db=local.db --run \"npm run db:migrate\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -c -- drizzle-kit migrate",
+    "db:dedupe": "dotenv -c -- tsx scripts/dedupe-guest-identities.ts",
     "db:studio": "drizzle-kit studio",
     "prebuild": "node scripts/copy-duckdb-assets.mjs && node scripts/copy-parquet-assets.mjs",
     "build": "next build",

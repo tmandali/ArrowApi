@@ -19,7 +19,7 @@
  * KURAL: Bu modül Node runtime'ında çalışır (`@/server/db/client`
  * bağımlılığı). Asla client bileşeninden import etme.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
 import { identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
@@ -97,6 +97,87 @@ async function findIdentityBySessionIdentity(identity: {
  * `language` null kalırsa locale-sync zinciri (settings > identity >
  * Accept-Language > en) devreye girer — kullanıcıyı zorlamayız.
  */
+/**
+ * Otomatik GUEST DEDUP (bekleyen toplama): aynı provider + aynı e-postaya
+ * sahip BEKLEYEN (`user_id IS NULL`) `user_identities` satırları, o ana
+ * kadarki en güncel satıra (owner) toplanır — eski satırlar silinir
+ * ("son gelen kalsın").
+ *
+ * Login upsert'i tarafından çağrılır; yalnız GUEST grubu işlenir:
+ * linkli (`user_id` dolu) satırlara ASLA dokunulmaz (onlar için manuel
+ * merge UI'ı var).
+ * - Hedef login çifti → `identity_aliases` (owner): eski sub'larla
+ *   yapılan login'ler artık alias-aware resolver üzerinden owner'a
+ *   yönlenir.
+ * - Ayarlar: owner'ın ayar satırı yoksa hedefininkiler taşınır,
+ *   varsa hedefinkiler atılır.
+ * - Hedef satırlar id ile silinir.
+ * - Hedef login çifti zaten BAŞKA bir ana kimliğin alias'ı ise o hedef
+ *   ATLANIR (manuel merge alanı). Yarış/kısıt hatasında sessiz geç —
+ *   login akışı dedup yüzünden KESİNLİKLE KIRILMAZ.
+ */
+async function consolidateGuestDupes(
+  owner: { id: string; name: string | null; email: string | null },
+  dupes: Array<{ id: string; provider: string | null; providerId: string | null }>,
+): Promise<void> {
+  const targets = dupes.filter((d) => d.provider && d.providerId);
+  if (targets.length === 0) return;
+  try {
+    await db.transaction(async (tx) => {
+      for (const dupe of targets) {
+        // Hedef login çifti başka bir owner'a alias ise çakışma —
+        // manuel merge'a bırak (o hedefi atla).
+        const [alias] = await tx
+          .select({ ownerId: identityAliasesSchema.ownerId })
+          .from(identityAliasesSchema)
+          .where(
+            and(
+              eq(identityAliasesSchema.provider, dupe.provider!),
+              eq(identityAliasesSchema.providerId, dupe.providerId!),
+            ),
+          )
+          .limit(1);
+        if (alias && alias.ownerId !== owner.id) continue;
+
+        // Ayarlar: owner'da yoksa taşı, varsa hedefin satırını at.
+        const [ownerSettings] = await tx
+          .select({ userId: userSettingsSchema.userId })
+          .from(userSettingsSchema)
+          .where(eq(userSettingsSchema.userId, owner.id))
+          .limit(1);
+        if (ownerSettings) {
+          await tx
+            .delete(userSettingsSchema)
+            .where(eq(userSettingsSchema.userId, dupe.id));
+        } else {
+          await tx
+            .update(userSettingsSchema)
+            .set({ userId: owner.id })
+            .where(eq(userSettingsSchema.userId, dupe.id));
+        }
+
+        if (!alias) {
+          await tx.insert(identityAliasesSchema).values({
+            id: crypto.randomUUID(),
+            ownerId: owner.id,
+            provider: dupe.provider!,
+            providerId: dupe.providerId!,
+          });
+        }
+        await tx
+          .delete(userIdentitiesSchema)
+          .where(eq(userIdentitiesSchema.id, dupe.id));
+      }
+    });
+    console.log(
+      `[auth-sync] guest dedup: ${targets.length} bekleyen satır "${owner.email ?? owner.name ?? owner.id}" kimliğine toplandi.`,
+    );
+  } catch (error) {
+    // Login akisi dedup yuzunden kirilmasin — logla, sessiz gec.
+    console.error("[auth-sync] guest dedup hatasi:", error);
+  }
+}
+
 async function ensureSettingsForIdentity(
   identityRow: {
     id: string;
@@ -185,6 +266,25 @@ export async function upsertIdentityFromSession(
       // seed'i yeni GUID ile aç, kimlik GUID'i yine stabil döner.
       await ensureSettingsForIdentity({ id: newId, language: language ?? null }, language);
       return newId;
+    }
+
+    // Otomatik guest dedup ("son gelen kalsın"): aynı provider + aynı
+    // e-postaya sahip BEKLEYEN satırlar bu (en güncel) satıra toplanır,
+    // eskiler alias'a dönüp silinir. Linkli satırlar asla hedef olmaz.
+    if (!row.userId && row.email && identity.provider) {
+      const dupes = await db
+        .select()
+        .from(userIdentitiesSchema)
+        .where(
+          and(
+            eq(userIdentitiesSchema.provider, identity.provider),
+            eq(userIdentitiesSchema.email, row.email),
+            isNull(userIdentitiesSchema.userId),
+            ne(userIdentitiesSchema.providerId, identity.providerId),
+            ne(userIdentitiesSchema.id, row.id),
+          ),
+        );
+      await consolidateGuestDupes(row, dupes);
     }
 
     // user_settings seed'i: mevcut satırı EZMEZ (onConflictDoNothing).
