@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
+import { providerSignInParams } from "@/features/auth/lib/provider-signin-params";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +26,7 @@ export default function SignUpPage() {
   const handleProvider = async (provider: "keycloak" | "google") => {
     setLoading(provider);
     try {
-      await signIn(provider, { redirectTo: next });
+      await signIn(provider, { redirectTo: next }, providerSignInParams(provider));
     } catch {
       setLoading(null);
     }
