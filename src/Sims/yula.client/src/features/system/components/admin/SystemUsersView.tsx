@@ -18,10 +18,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -47,7 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserPlus, Search, ShieldCheck, GitMerge, MoreVertical, CheckCircle2, XCircle, Check } from "lucide-react";
+import { Search, ShieldCheck, GitMerge, MoreVertical, CheckCircle2, XCircle, Check } from "lucide-react";
 
 type SystemUser = {
   id: string;
@@ -104,12 +103,6 @@ export function SystemUsersView() {
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [formName, setFormName] = React.useState("");
-  const [formEmail, setFormEmail] = React.useState("");
-  const [formRole, setFormRole] = React.useState<string>("Viewer");
-  const [formError, setFormError] = React.useState<string | null>(null);
-  const [saving, setSaving] = React.useState(false);
   const [rowBusyId, setRowBusyId] = React.useState<string | null>(null);
 
   // ── Sekmeler + guest (yetkilendirilmemiş kimlik) picker ──
@@ -174,48 +167,6 @@ export function SystemUsersView() {
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const handleAddUser = async () => {
-    const name = formName.trim();
-    const email = formEmail.trim();
-    if (!name) {
-      setFormError(t("name_required"));
-      return;
-    }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError(t("email_invalid"));
-      return;
-    }
-    setFormError(null);
-    setSaving(true);
-    try {
-      const res = await fetch("/api/system/users", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: `usr_${Date.now()}`,
-          provider: null,
-          providerId: null,
-          name,
-          email: email || null,
-          role: formRole,
-          status: "Active",
-          lastActive: "Now",
-        }),
-      });
-      const data = (await res.json()) as { user?: Record<string, unknown>; error?: string };
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      if (data.user) setUsers((prev) => [normalizeRow(data.user as Record<string, unknown>), ...prev]);
-      setDialogOpen(false);
-      setFormName("");
-      setFormEmail("");
-      setFormRole("Viewer");
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleToggleStatus = async (user: SystemUser) => {
     const next = user.status === "Active" ? "Inactive" : "Active";
@@ -375,79 +326,7 @@ export function SystemUsersView() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("title")}</PageHeaderTitle>}
       showSearch={false}
-      actions={
-        <>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-7 px-3 text-xs gap-1.5">
-                <UserPlus className="size-3.5" />
-                {t("add_user")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-sm">{t("dialog_title")}</DialogTitle>
-                <DialogDescription className="text-xs">
-                  {t("dialog_description")}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 py-1">
-                <div className="space-y-1.5">
-                  <Label htmlFor="new-user-name" className="text-xs">{t("field_name")}</Label>
-                  <Input
-                    id="new-user-name"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder={t("field_name").replace(" *", "")}
-                    className="h-9 text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="new-user-email" className="text-xs">{t("field_email")}</Label>
-                  <Input
-                    id="new-user-email"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    placeholder="ornek@sirket.com"
-                    className="h-9 text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">{t("field_role")}</Label>
-                  <Select value={formRole} onValueChange={setFormRole}>
-                    <SelectTrigger className="h-9 text-xs">
-                      <SelectValue placeholder={t("field_role")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLE_OPTIONS.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formError && <p className="text-xs text-red-500">{formError}</p>}
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={saving}
-                >
-                  {tc("cancel")}
-                </Button>
-                <Button size="sm" className="h-8 text-xs" onClick={handleAddUser} disabled={saving}>
-                  {saving ? tc("adding") : tc("add")}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <AIChatAssistant />
-        </>
-      }
+      actions={<AIChatAssistant />}
     >
       <div className={cn(panelCardClass, "min-h-0 flex-1 flex flex-col p-4 md:p-6 space-y-4 overflow-hidden")}>
             <div className="flex items-center justify-between gap-4">
