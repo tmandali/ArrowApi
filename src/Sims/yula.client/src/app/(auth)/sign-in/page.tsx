@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ProviderButtons } from "@/features/auth/components/provider-buttons";
+import type { GsiButtonTheme } from "@/features/auth/components/google-one-tap-button";
 import {
   Card,
   CardContent,
@@ -10,22 +11,56 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/utils/cn";
+
+/**
+ * Google buton teması override'ı — undefined = sistemi izle.
+ * Kart zemini + yazı renkleri bu değerle senkron tutulur, böylece
+ * koyu butonun etrafında beyaz kart kalmaz (ve tersi).
+ */
+const GOOGLE_THEME: GsiButtonTheme | undefined = undefined;
 
 export default function SignInPage() {
   const t = useTranslations("SignIn");
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
+  // Explicit tema yoksa kart saf CSS ile sistemi izler (dark: varyantı,
+  // flash yok). Explicit tema varsa kart o temaya zorlanır.
+  const forceDarkCard = GOOGLE_THEME === "filled_black" || GOOGLE_THEME === "outline_dark";
+  const forceLightCard = GOOGLE_THEME === "outline" || GOOGLE_THEME === "filled_blue";
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card
+      className={cn(
+        "w-full max-w-sm bg-white/70 backdrop-blur-md dark:bg-neutral-900/60",
+        forceDarkCard &&
+          "border-neutral-700/50 bg-neutral-900/70 dark:border-neutral-700/50 dark:bg-neutral-900/70",
+        forceLightCard && "bg-white/70 dark:border-white/40 dark:bg-white/70",
+      )}
+    >
       <CardHeader className="text-center">
-        <CardTitle className="text-lg font-semibold">{t("title")}</CardTitle>
-        <CardDescription>{t("description")}</CardDescription>
+        <CardTitle
+          className={cn(
+            "text-lg font-semibold",
+            forceDarkCard && "text-white dark:text-white",
+            forceLightCard && "dark:text-neutral-900",
+          )}
+        >
+          {t("title")}
+        </CardTitle>
+        <CardDescription
+          className={cn(
+            forceDarkCard && "text-neutral-400 dark:text-neutral-400",
+            forceLightCard && "dark:text-neutral-600",
+          )}
+        >
+          {t("description")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {/* Tek giriş noktası: ilk girişte hesap otomatik oluşur, ayrı
             sign-up akışı yok (/sign-up buraya redirect eder). */}
-        <ProviderButtons labelPrefix="sign_in" t={t} next={next} />
+        <ProviderButtons labelPrefix="sign_in" t={t} next={next} googleTheme={GOOGLE_THEME} />
       </CardContent>
     </Card>
   );

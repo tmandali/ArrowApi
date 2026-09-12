@@ -14,7 +14,7 @@ import * as React from "react";
 import { getProviders, signIn } from "next-auth/react";
 import { providerSignInParams } from "@/features/auth/lib/provider-signin-params";
 import { isGoogleOneTapEnabled } from "@/features/auth/lib/google-one-tap-flag";
-import { GoogleOneTapButton } from "@/features/auth/components/google-one-tap-button";
+import { GoogleOneTapButton, type GsiButtonTheme } from "@/features/auth/components/google-one-tap-button";
 import { Button } from "@/components/ui/button";
 import {
   Fingerprint,
@@ -57,9 +57,11 @@ interface ProviderButtonsProps {
   t: (key: string) => string;
   /** Giriş sonrası yönlendirilecek URL. */
   next?: string | null;
+  /** GIS buton teması — verilmezse sistem temasını izler. */
+  googleTheme?: GsiButtonTheme;
 }
 
-export function ProviderButtons({ labelPrefix, t, next = "/" }: ProviderButtonsProps) {
+export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: ProviderButtonsProps) {
   const [providers, setProviders] = React.useState<Providers | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
 
@@ -105,6 +107,7 @@ export function ProviderButtons({ labelPrefix, t, next = "/" }: ProviderButtonsP
         <GoogleOneTapButton
           label={t(`${labelPrefix}_google`)}
           className="min-h-10 w-full"
+          theme={googleTheme}
         />
       ) : null}
       {available.map((p) => {

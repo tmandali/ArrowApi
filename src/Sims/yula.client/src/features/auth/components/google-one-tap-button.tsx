@@ -22,12 +22,26 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { isGoogleOneTapEnabled } from "@/features/auth/lib/google-one-tap-flag";
 import { initGsiClient, type GsiIdClient } from "@/features/auth/lib/gsi-client";
 import { signInWithGoogleCredential } from "@/features/auth/lib/google-onesig-signin";
 
+
+export type GsiButtonTheme = "outline" | "filled_blue" | "filled_black" | "outline_dark";
+
+/**
+ * Efektif GIS temasını çözer: explicit theme kazanır, verilmezse sistem
+ * temasını izler (dark → outline_dark, light → outline).
+ */
+export function resolveGsiButtonTheme(
+  theme: GsiButtonTheme | undefined,
+  resolvedTheme: string | undefined,
+): GsiButtonTheme {
+  return theme ?? (resolvedTheme === "dark" ? "outline_dark" : "outline");
+}
 
 export interface GoogleOneTapButtonProps {
   /** GIS buton boyutu — "large" 40px'tir (shadcn h-10 ile aynı satır). */
@@ -41,6 +55,8 @@ export interface GoogleOneTapButtonProps {
   label?: string;
   /** Dış sarmalayıcıya eklenecek class. */
   className?: string;
+  /** GIS teması — verilmezse sistem temasını izler (dark → outline_dark). */
+  theme?: GsiButtonTheme;
 }
 
 export function GoogleOneTapButton({
@@ -49,6 +65,7 @@ export function GoogleOneTapButton({
   width = 336,
   label,
   className,
+  theme,
 }: GoogleOneTapButtonProps = {}) {
   const t = useTranslations("SystemHome");
   const router = useRouter();
@@ -61,6 +78,15 @@ export function GoogleOneTapButton({
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const authenticated = status === "authenticated";
+  // Tema verilmezse sistem temasını izle: dark → outline_dark (resmi koyu
+  // tema, Fill #131314), light → outline. resolvedTheme hydration öncesi
+  // undefined'tır; yanlış temayla ilk çizimi önlemek için mount beklenir.
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+  const effectiveTheme = resolveGsiButtonTheme(theme, mounted ? resolvedTheme : undefined);
   // One Tap modu env bayrağıyla açılır (GOOGLE_ONE_TAP=1); kapalıysa Google
   // girişi çizilmez — sign-in ekranındaki Google OAuth butonu görünür.
   const oneTapEnabled = isGoogleOneTapEnabled();
@@ -99,7 +125,7 @@ export function GoogleOneTapButton({
       try {
         container.innerHTML = "";
         gsi.renderButton(container, {
-          theme: "outline",
+          theme: effectiveTheme,
           size,
           width: String(Math.max(200, Math.round(pixelWidth))),
           shape: "rectangular",
@@ -109,11 +135,13 @@ export function GoogleOneTapButton({
         // GIS API arızası → buton boş kalır, UI kırılmaz.
       }
     },
-    [size],
+    [size, effectiveTheme],
   );
 
   React.useEffect(() => {
-    if (!clientId || !oneTapEnabled || authenticated) return;
+    // Mount öncesi resolvedTheme bilinmez (hydration); yanlış temayla ilk
+    // çizimi önlemek için GIS init'i mount sonrasına bırakılır.
+    if (!mounted || !clientId || !oneTapEnabled || authenticated) return;
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
@@ -143,7 +171,7 @@ export function GoogleOneTapButton({
       observer?.disconnect();
       gsiRef.current = null;
     };
-  }, [clientId, oneTapEnabled, authenticated, handleCredential, width]);
+  }, [mounted, clientId, oneTapEnabled, authenticated, handleCredential, width]);
 
   // Ölçülen genişlik değişince (kart/pencere resize) butonu aynı kapta
   // Keycloak w-full butonuyla birebir aynı ölçüde yeniden çiz.
@@ -159,15 +187,20 @@ export function GoogleOneTapButton({
 
   return (
     <div
-      // [&>iframe]:block — GIS iframe'i inline elementtir; block yapılmazsa
-      // satır baz çizgisi altında ~4px boşluk bırakır ve satır Keycloak
-      // h-10 butonundan uzun görünür.
-      className={`${className ?? "relative shrink-0"} min-h-10 [&>iframe]:block`}
+      // GIS kendi butonunu çizer — dışarıdan bg/padding/border/rounded
+      // eklenmez, buton native haliyle bırakılır. GIS bir ara div + iframe
+      // çizer; tüm katmanlar transparan bırakılır, iframe block yapılır
+      // (inline baz çizgisi boşluğu kartın zeminini göstermesin).
+      // color-scheme: light — koyu sayfada iframe canvas'ı opak beyaza
+      // dönmesin diye (toplulukta kanıtlanmış GIS dark-mode düzeltmesi);
+      // butonun kendi çizimine dokunmaz.
+      className={`relative min-h-10 bg-transparent ${className ?? ""} [&_iframe]:block [&_iframe]:!bg-transparent [&>div]:bg-transparent`}
+      style={{ colorScheme: "light" }}
       title={accessibleLabel}
       aria-label={accessibleLabel}
     >
       {/* Busy durumundayken GIS butonu geçici gizlenir, spinner gösterilir. */}
-      <div ref={containerRef} className={busy ? "hidden" : undefined} />
+      <div ref={containerRef} className={`w-full bg-transparent ${busy ? "hidden" : ""}`} />
       {busy ? (
         <div className="flex h-10 items-center px-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" />
