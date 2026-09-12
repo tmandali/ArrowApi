@@ -203,9 +203,9 @@ export function SkillManagementView() {
           {selection != null && !isReadOnly ? (
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="sm"
-              className="h-7 shrink-0 gap-1.5 border-primary/40 px-2.5 text-xs text-primary hover:bg-primary/10 hover:text-primary"
+              className="h-7 shrink-0 gap-1.5 px-2.5 text-xs"
               onClick={() => editorRef.current?.save()}
             >
               <Check className="size-3.5" />
