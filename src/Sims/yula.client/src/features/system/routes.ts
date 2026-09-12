@@ -16,9 +16,10 @@ export const systemNav: WorkspaceNavItem[] = [
     icon: HomeIcon,
   },
   {
-    title: "Hesabım & Ayarlarım",
-    url: "/my/settings",
+    title: "Sistem Ayarları",
+    url: "/settings",
     icon: Settings2Icon,
+    adminOnly: true,
   },
   {
     title: "Tüm Kullanıcılar",

@@ -35,6 +35,7 @@ import {
   extractJobIdFromHref,
   reportExecutionHref,
   reportExecutionPath,
+  workspaceIdFromPath,
 } from "@/lib/workspace-paths";
 import { cn } from "@/utils/cn";
 
@@ -123,7 +124,6 @@ function parseChartOutput(output: unknown): ParsedChart | null {
 function resolveChartSourceContext(pathname: string, search: string) {
   const screen = useYulaGridStore.getState().screen;
   const spec = useYulaGridStore.getState().spec;
-  const workspace = screen?.workspaceId?.trim() || "stock";
   const reportScope = screen?.reportScope ?? spec?.reportScope;
   const jobId =
     screen?.jobId?.trim() ||
@@ -135,6 +135,12 @@ function resolveChartSourceContext(pathname: string, search: string) {
     const meta = findReport(reportScope);
     if (meta?.pagePath) pagePath = meta.pagePath;
   }
+
+  // Ekran workspace'si ekran kaydından; kayıtsa yolun workspace'iden
+  // çözülür (canonik resolver: `getWorkspaceForPath` — unknown "system").
+  const workspace =
+    screen?.workspaceId?.trim() ||
+    workspaceIdFromPath(pagePath || pathname || "/");
 
   const sourceHref =
     jobId && pagePath

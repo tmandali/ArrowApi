@@ -363,3 +363,74 @@ export const WORKSPACE_SEARCH_CONFIGS: Record<string, WorkspaceSearchConfig> = {
     examples: ["sipariş", "teklif", "fason teslimat"],
   },
 };
+
+/**
+ * Arama paneli boş durum quick items — veri sahibi KATALOG; panel
+ * (`workspace-search-panel.tsx`) yalnızca render eder. `icon` = Lucide ikon
+ * adı (panel içindeki harita ile çözümlenir; bilinemeyen adı Package döner).
+ * URL'ler `emptyModulePath` slug sözleşmesiyle (`/accounting/balance-sheet` vb.)
+ * ve workspace root/dashboard rotalarıyla birebir eşleşmelidir.
+ */
+export interface WorkspaceQuickItem {
+  title: string;
+  url: string;
+  icon?: string;
+  /** Item'ın satır sonuna eklenen kısayol (örn. "↵"). */
+  shortcut?: string;
+}
+
+export interface WorkspaceQuickItemGroup {
+  heading: string;
+  items: WorkspaceQuickItem[];
+}
+
+export const WORKSPACE_QUICK_ITEMS: Record<string, WorkspaceQuickItemGroup[]> = {
+  accounting: [
+    {
+      heading: "FINANCIAL REPORTS PAGES",
+      items: [
+        { title: "Consolidated Report", url: "/accounting", icon: "BarChart2", shortcut: "↵" },
+        { title: "Balance Sheet", url: "/accounting/balance-sheet", icon: "FileText" },
+        { title: "Profit and Loss", url: "/accounting/profit-and-loss", icon: "TrendingUp" },
+        { title: "Cash Flow", url: "/accounting/cash-flow", icon: "DollarSign" },
+      ],
+    },
+  ],
+  stock: [
+    {
+      heading: "STOK SAYFALARI",
+      items: [
+        { title: "Stock Dashboard", url: "/stock/dashboard", icon: "Package", shortcut: "↵" },
+        { title: "Serial No and Batch Traceability", url: "/stock/serial-batch-traceability", icon: "Scale" },
+        { title: "Stock Entry", url: "/stock/stock-entry", icon: "Receipt" },
+        { title: "Delivery Note", url: "/stock/delivery-note", icon: "Truck" },
+      ],
+    },
+    {
+      heading: "STOK RAPORLARI",
+      items: [
+        { title: "Stock Ledger", url: "/stock/stock-ledger", icon: "BarChart2" },
+        { title: "Stock Balance", url: "/stock/stock-balance", icon: "BarChart2" },
+        { title: "Stock Analytics", url: "/stock/stock-analytics", icon: "BarChart2" },
+      ],
+    },
+  ],
+};
+
+/** Workspace'i quick item tanımlamamışsa gösterilen genel gruplar. */
+export const DEFAULT_WORKSPACE_QUICK_ITEMS: WorkspaceQuickItemGroup[] = [
+  {
+    heading: "GENEL SAYFALAR",
+    items: [{ title: "Stock Main", url: "/stock", icon: "Package" }],
+  },
+];
+
+/**
+ * Bildirim popover'ı: workspace route'u → i18n başlık anahtarı
+ * (namespace `Notifications`). Tanımsız route → `subcontracting_title`.
+ */
+export const WORKSPACE_NOTIFICATION_TITLE_KEYS: Record<string, string> = {
+  "/accounting": "financial_title",
+  "/stock": "stock_title",
+  "/manufacturing": "manufacturing_title",
+};

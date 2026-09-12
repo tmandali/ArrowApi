@@ -488,7 +488,7 @@ export function extractWorkedSteps(
         break;
       }
       case "run_job": {
-        const report = typeof inputObj.report === "string" ? inputObj.report : "Stock Balance";
+        const report = typeof inputObj.report === "string" ? inputObj.report : "Report";
         const preset = typeof inputObj.presetTitle === "string" ? inputObj.presetTitle : "";
         const outStatus =
           info.output && typeof info.output === "object"

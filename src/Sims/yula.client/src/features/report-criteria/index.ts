@@ -13,6 +13,7 @@ export type {
   ParsedCriteriaSchema,
   ReportAiMetadata,
   ReportAnalysisTopic,
+  YulaReportCardConfig,
 } from "./types"
 
 export { parseCriteriaSchema } from "./lib/parse-criteria-schema"

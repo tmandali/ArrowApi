@@ -154,6 +154,14 @@ interface StructuralLanding {
 
 /** Yapısal preset'ler — ikon/tren/ton/url/kod (metin içermez). */
 export const WORKSPACE_LANDING_STRUCTURE: Record<WorkspaceId, StructuralLanding> = {
+  my: {
+    kpis: [],
+    pendingActions: [],
+    assignedTasks: [],
+    quickShortcuts: [
+      { id: "my-settings", url: "/my/settings", icon: Wrench },
+    ],
+  },
   selling: {
     kpis: [
       { id: "open-orders-val", trend: "up", tone: "blue", icon: ShoppingCart },

@@ -1,5 +1,7 @@
 /**
- * @deprecated Use `@/features/system` instead.
- * Re-exported for backward compatibility.
+ * `settings` — platform çekirdeği modülü (global SİSTEM ayarları ekranı).
+ *
+ * Sınır: `/settings` = sistem ayarları. KULLANICI ayarları `/my/settings`
+ * (`my` workspace, `features/system` içeriği) ile ayrılır.
  */
-export { UserSettingsForm } from "@/features/system";
+export { SystemSettingsView } from "./components/SystemSettingsView";

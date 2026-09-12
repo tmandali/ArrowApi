@@ -1463,6 +1463,7 @@
   },
   "SystemNav": {
     "home": "Ana Ekran & Yula AI",
+    "system_settings": "Sistem Ayarları",
     "my_settings": "Hesabım & Ayarlarım",
     "system_users": "Tüm Kullanıcılar (Admin)",
     "system_agents": "Ajan Ayarları",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 
 type Step = { ok: boolean; label: string; detail?: string };
@@ -11,6 +12,9 @@ type Step = { ok: boolean; label: string; detail?: string };
  * runtime'da instantiate + query dönerse faz geçer sayılır.
  */
 export default function DuckDbSpikePage() {
+  // Geliştirme bench'i — yalnızca `NEXT_PUBLIC_ENABLE_SPIKES=true` build'lerinde erişilebilir.
+  if (process.env.NEXT_PUBLIC_ENABLE_SPIKES !== "true") notFound();
+
   const [steps, setSteps] = useState<Step[]>([]);
   const [running, setRunning] = useState(true);
 

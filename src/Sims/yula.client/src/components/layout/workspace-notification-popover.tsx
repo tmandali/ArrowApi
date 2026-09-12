@@ -24,6 +24,7 @@ import {
   resolveNotificationWorkspace,
   workspaceKeyFromPath,
 } from "@/lib/workspace"
+import { WORKSPACE_NOTIFICATION_TITLE_KEYS } from "@/lib/workspace-search-catalog"
 import { cn } from "@/utils/cn"
 import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, X } from "lucide-react"
 
@@ -150,10 +151,8 @@ export function WorkspaceNotificationPopover() {
   }
 
   const getWorkspaceTitle = () => {
-    if (key === "/accounting") return t("financial_title")
-    if (key === "/stock") return t("stock_title")
-    if (key === "/manufacturing") return t("manufacturing_title")
-    return t("subcontracting_title")
+    // Route → başlık anahtarı eşlemesi katalogda (`WORKSPACE_NOTIFICATION_TITLE_KEYS`).
+    return t(WORKSPACE_NOTIFICATION_TITLE_KEYS[key] ?? "subcontracting_title")
   }
 
   return (

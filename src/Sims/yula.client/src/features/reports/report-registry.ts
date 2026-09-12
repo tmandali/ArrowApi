@@ -1,7 +1,9 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
-import stockBalanceSchema from "@/workspaces/stock/stock-balance/schemas/stock-balance-criteria.schema.json";
-import stockAnalyticsSchema from "@/workspaces/stock/stock-analytics/schemas/stock-analytics-criteria.schema.json";
-import retailSalesSchema from "@/workspaces/stock/retail-sales-report/schemas/retail-sales-criteria.schema.json";
+import {
+  stockBalanceCriteriaSchema,
+  stockAnalyticsCriteriaSchema,
+  retailSalesCriteriaSchema,
+} from "@/workspaces/stock";
 
 export interface YulaReportMeta {
   scope: string;
@@ -28,8 +30,8 @@ export const REGISTERED_REPORTS: YulaReportMeta[] = [
     title: "Stok Bakiye Raporu",
     pagePath: "/stock/stock-balance",
     aliases: ["stok bakiye", "bakiye", "stok durumu"],
-    criteriaSchema: (stockBalanceSchema as unknown as JsonSchemaObject) as YulaReportMeta["criteriaSchema"],
-    fullSchema: stockBalanceSchema as unknown as JsonSchemaObject,
+    criteriaSchema: stockBalanceCriteriaSchema as unknown as YulaReportMeta["criteriaSchema"],
+    fullSchema: stockBalanceCriteriaSchema as unknown as JsonSchemaObject,
   },
   {
     scope: "stock-analytics",
@@ -37,8 +39,8 @@ export const REGISTERED_REPORTS: YulaReportMeta[] = [
     title: "Stok Analiz Raporu",
     pagePath: "/stock/stock-analytics",
     aliases: ["stok analiz", "analiz", "stok istatistik", "stok hareket analiz", "stock analytics"],
-    criteriaSchema: (stockAnalyticsSchema as unknown as JsonSchemaObject) as YulaReportMeta["criteriaSchema"],
-    fullSchema: stockAnalyticsSchema as unknown as JsonSchemaObject,
+    criteriaSchema: stockAnalyticsCriteriaSchema as unknown as YulaReportMeta["criteriaSchema"],
+    fullSchema: stockAnalyticsCriteriaSchema as unknown as JsonSchemaObject,
   },
   {
     scope: "retail-sales-report",
@@ -46,8 +48,8 @@ export const REGISTERED_REPORTS: YulaReportMeta[] = [
     title: "Perakende Satış Raporu",
     pagePath: "/stock/retail-sales-report",
     aliases: ["perakende satış", "retail sales", "satış raporu", "mağaza satış"],
-    criteriaSchema: (retailSalesSchema as unknown as JsonSchemaObject) as YulaReportMeta["criteriaSchema"],
-    fullSchema: retailSalesSchema as unknown as JsonSchemaObject,
+    criteriaSchema: retailSalesCriteriaSchema as unknown as YulaReportMeta["criteriaSchema"],
+    fullSchema: retailSalesCriteriaSchema as unknown as JsonSchemaObject,
   },
 ];
 

@@ -22,7 +22,10 @@ import {
 export type { KnownSystemAction };
 import { parseColonTitleLine, extractFindingFilterPrompt } from "@/lib/finding-actions";
 import { buildFindingDrillPrompt } from "@/lib/yula-finding-drill";
-import { findReport } from "@/features/reports/report-registry";
+import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
+
+/** Bozuk eksik-scope `yula-criteria:` URL'leri için varsayılan: ilk tescilli rapor (tek kaynak registry). */
+const DEFAULT_REPORT_SCOPE = REGISTERED_REPORTS[0]?.scope ?? "";
 
 /**
  * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
@@ -748,17 +751,17 @@ function ChatMarkdownLink({
 
   if (href.startsWith("yula-criteria:")) {
     const raw = href.slice("yula-criteria:".length)
-    let scope = "stock-balance"
+    let scope = DEFAULT_REPORT_SCOPE
     const criteria: Record<string, unknown> = {}
 
     try {
       if (raw.startsWith("{")) {
         const parsed = JSON.parse(decodeURIComponent(raw))
-        scope = parsed.scope || "stock-balance"
+        scope = parsed.scope || DEFAULT_REPORT_SCOPE
         Object.assign(criteria, parsed.criteria || {})
       } else {
         const [scopePart, queryPart] = raw.split("?")
-        scope = decodeURIComponent(scopePart || "stock-balance")
+        scope = decodeURIComponent(scopePart || DEFAULT_REPORT_SCOPE)
         if (queryPart) {
           const params = new URLSearchParams(queryPart)
           params.forEach((v, k) => {

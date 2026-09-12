@@ -1,54 +1,18 @@
 import { usePathname } from "next/navigation";
 import * as React from "react"
 import type { WorkspaceId } from "@/lib/workspace-nav"
+import { DOMAIN_WORKSPACE_IDS, getWorkspaceForPath } from "@/lib/workspace-registry"
 
 /**
  * Resolve the workspace id for a pathname.
- * Returns null for global (workspace-independent) pages such as /user-settings,
- * /dashboard, /login — those should keep the previously active workspace.
+ * Tek kaynak: registry'deki `getWorkspaceForPath` + `DOMAIN_WORKSPACE_IDS`.
+ * Global (workspace'den bağımsız) sayfalar — `/`, `/my`, `/system`,
+ * legacy `/user-settings`, `/sign-in` vb. — null döner; o sayfalarda
+ * "en son ziyaret edilen" domain workspace korunur.
  */
 export function workspaceIdFromPath(pathname: string): WorkspaceId | null {
-  if (
-    pathname === "/" ||
-    pathname.startsWith("/my") ||
-    pathname === "/user-settings" ||
-    pathname.startsWith("/system/") ||
-    pathname === "/system"
-  ) {
-    return null
-  }
-  if (
-    pathname === "/stock" ||
-    pathname.startsWith("/stock/") ||
-    pathname === "/landed-cost-voucher"
-  ) {
-    return "stock"
-  }
-  if (
-    pathname === "/accounting" ||
-    pathname.startsWith("/accounting/")
-  ) {
-    return "accounting"
-  }
-  if (
-    pathname === "/manufacturing" ||
-    pathname.startsWith("/manufacturing/")
-  ) {
-    return "manufacturing"
-  }
-  if (
-    pathname === "/subcontracting" ||
-    pathname.startsWith("/subcontracting/")
-  ) {
-    return "subcontracting"
-  }
-  if (
-    pathname === "/selling" ||
-    pathname.startsWith("/selling/")
-  ) {
-    return "selling"
-  }
-  return null
+  const id = getWorkspaceForPath(pathname).id
+  return DOMAIN_WORKSPACE_IDS.has(id) ? id : null
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { usePathname } from "next/navigation";
-import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/workspaces/stock/lib/stock-menu-registry";
+import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/lib/workspace-search-catalog";
 import { searchVectorContext } from "@/services/duckdb-vector";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";

@@ -11,9 +11,9 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import systemCommandsYaml from "@/features/system/agents/system.agent.yaml";
-import gridCommandsYaml from "@/features/reports/agents/grid.agent.yaml";
-import reportCommandsYaml from "@/workspaces/stock/agents/report.agent.yaml";
+import { systemAgentYaml } from "@/features/system";
+import { gridAgentYaml } from "@/features/reports";
+import { stockReportAgentYaml } from "@/workspaces/stock";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
@@ -83,14 +83,14 @@ function parseYamlCommands(yamlSource: string): YulaCommand[] {
   }
 }
 
-/** Sistem Evresi Komutları (src/features/system/agents/system.agent.yaml) */
-export const SYSTEM_COMMANDS: YulaCommand[] = parseYamlCommands(systemCommandsYaml);
+/** Sistem Evresi Komutları (features/system manifest'i — Public API) */
+export const SYSTEM_COMMANDS: YulaCommand[] = parseYamlCommands(systemAgentYaml);
 
-/** Sonuç Evresi Komutları (src/features/reports/agents/grid.agent.yaml) */
-export const GRID_COMMANDS: YulaCommand[] = parseYamlCommands(gridCommandsYaml);
+/** Sonuç Evresi Komutları (features/reports manifest'i — Public API) */
+export const GRID_COMMANDS: YulaCommand[] = parseYamlCommands(gridAgentYaml);
 
-/** Kriter Evresi Komutları (src/features/stock/agents/report.agent.yaml) */
-export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(reportCommandsYaml);
+/** Kriter Evresi Komutları (workspaces/stock manifest'i — Public API) */
+export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(stockReportAgentYaml);
 
 /**
  * Slash paleti yalnızca eylem komutlarıdır (rapor adı değil).

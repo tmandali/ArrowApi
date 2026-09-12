@@ -4,6 +4,7 @@ import { accountingWorkspace } from "@/workspaces/accounting";
 import { sellingWorkspace } from "@/workspaces/selling";
 import { manufacturingWorkspace } from "@/workspaces/manufacturing";
 import { subcontractingWorkspace } from "@/workspaces/subcontracting";
+import { myWorkspace } from "@/workspaces/my";
 import { systemWorkspace } from "@/features/system";
 
 /** Tüm tescil edilmiş workspace tanımları */
@@ -13,6 +14,7 @@ export const REGISTERED_WORKSPACES: Record<WorkspaceId, WorkspaceDefinition> = {
   selling: sellingWorkspace,
   manufacturing: manufacturingWorkspace,
   subcontracting: subcontractingWorkspace,
+  my: myWorkspace,
   system: systemWorkspace,
 };
 
@@ -26,20 +28,31 @@ export function getAllWorkspaces(): WorkspaceDefinition[] {
   return Object.values(REGISTERED_WORKSPACES);
 }
 
-/** Sol rail (ikon çubuğu) için workspace listesi */
+/**
+ * "Domain" (iş alanı) workspace'ler — sol rail ve "active workspace" kavramı
+ * yalnız bunlarda anlamlıdır. `system` (platform) ve `my` (kişisel, rail'de
+ * declare edilmez) active-workspace takibine girmez. Sıralama = rail sırası.
+ */
+export const DOMAIN_WORKSPACE_IDS: ReadonlySet<WorkspaceId> = new Set([
+  "stock",
+  "selling",
+  "subcontracting",
+  "accounting",
+  "manufacturing",
+]);
+
+/** Sol rail (ikon çubuğu) için workspace listesi — DOMAIN_WORKSPACE_IDS tek kaynağı. */
 export function getRailWorkspaces() {
-  return [
-    { id: stockWorkspace.id, name: stockWorkspace.name, url: stockWorkspace.rootPath, icon: stockWorkspace.icon },
-    { id: sellingWorkspace.id, name: sellingWorkspace.name, url: sellingWorkspace.rootPath, icon: sellingWorkspace.icon },
-    { id: subcontractingWorkspace.id, name: subcontractingWorkspace.name, url: subcontractingWorkspace.rootPath, icon: subcontractingWorkspace.icon },
-    { id: accountingWorkspace.id, name: accountingWorkspace.name, url: accountingWorkspace.rootPath, icon: accountingWorkspace.icon },
-    { id: manufacturingWorkspace.id, name: manufacturingWorkspace.name, url: manufacturingWorkspace.rootPath, icon: manufacturingWorkspace.icon },
-  ];
+  return Array.from(DOMAIN_WORKSPACE_IDS, (id) => {
+    const ws = REGISTERED_WORKSPACES[id];
+    return { id: ws.id, name: ws.name, url: ws.rootPath, icon: ws.icon };
+  });
 }
 
 /** Workspace panolarının rotaları */
 export const workspaceDashboardPathByWorkspace: Record<WorkspaceId, string> = {
   system: systemWorkspace.dashboardPath,
+  my: myWorkspace.dashboardPath,
   stock: stockWorkspace.dashboardPath,
   accounting: accountingWorkspace.dashboardPath,
   selling: sellingWorkspace.dashboardPath,
@@ -50,6 +63,7 @@ export const workspaceDashboardPathByWorkspace: Record<WorkspaceId, string> = {
 /** Workspace ana sayfalarının (root / landing) rotaları */
 export const workspaceRootPathByWorkspace: Record<WorkspaceId, string> = {
   system: systemWorkspace.rootPath,
+  my: myWorkspace.rootPath,
   stock: stockWorkspace.rootPath,
   accounting: accountingWorkspace.rootPath,
   selling: sellingWorkspace.rootPath,
@@ -60,6 +74,7 @@ export const workspaceRootPathByWorkspace: Record<WorkspaceId, string> = {
 /** Workspace ID'ye göre isim haritası */
 export const workspaceNameById: Record<WorkspaceId, string> = {
   system: systemWorkspace.name,
+  my: myWorkspace.name,
   stock: stockWorkspace.name,
   accounting: accountingWorkspace.name,
   selling: sellingWorkspace.name,
@@ -69,9 +84,16 @@ export const workspaceNameById: Record<WorkspaceId, string> = {
 
 /**
  * Verilen URL yoluna (pathname) göre ilgili workspace'i tespit eder.
+ * CANONICAL path→workspace resolver'ıdır; `lib/workspace-paths.ts`'teki
+ * `workspaceIdFromPath` / `workspaceLabelFromPath` (düşük katman lib, registry'den
+ * import edemez) bu kuralları yineler — ikisi BİRLİKTE güncellenmelidir.
  */
 export function getWorkspaceForPath(pathname: string): WorkspaceDefinition {
-  if (!pathname || pathname === "/" || pathname.startsWith("/my") || pathname.startsWith("/system") || pathname.startsWith("/user-settings")) {
+  // Legacy `/user-settings` → `/my/settings` redirect'i: hedef workspace "my".
+  if (pathname?.startsWith("/my") || pathname?.startsWith("/user-settings")) {
+    return myWorkspace;
+  }
+  if (!pathname || pathname === "/" || pathname.startsWith("/system")) {
     return systemWorkspace;
   }
   if (pathname.startsWith("/stock") || pathname === "/landed-cost-voucher") {

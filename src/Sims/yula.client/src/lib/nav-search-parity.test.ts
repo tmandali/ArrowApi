@@ -2,7 +2,7 @@
  * Nav-Search parity: her workspace'ın nav menüsü (routes.ts) URL'leri
  * arama katalogu (workspace-search-catalog.ts) ile hizalı kalmalı.
  *
- * Yürütme: npx tsx --test src/workspaces/stock/lib/nav-search-parity.test.ts
+ * Yürütme: npx tsx --test src/lib/nav-search-parity.test.ts
  *
  * Katalog nav'dan otomatik türetildiği için parity yapısal olarak sağlanır;
  * bu test regresyon koruması olarak kalır (özellikle overlays + özel sayfalar
@@ -15,12 +15,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert";
-import { ALL_WORKSPACE_MENU_ITEMS } from "../../../lib/workspace-search-catalog";
-import { accountingNav } from "../../../workspaces/accounting/routes.ts";
-import { manufacturingNav } from "../../../workspaces/manufacturing/routes.ts";
-import { sellingNav } from "../../../workspaces/selling/routes.ts";
-import { subcontractingNav } from "../../../workspaces/subcontracting/routes.ts";
-import { stockNav } from "../../../workspaces/stock/routes.ts";
+import { ALL_WORKSPACE_MENU_ITEMS } from "./workspace-search-catalog";
+import { accountingNav } from "../workspaces/accounting/routes.ts";
+import { manufacturingNav } from "../workspaces/manufacturing/routes.ts";
+import { sellingNav } from "../workspaces/selling/routes.ts";
+import { subcontractingNav } from "../workspaces/subcontracting/routes.ts";
+import { stockNav } from "../workspaces/stock/routes.ts";
 
 const WORKSPACES: Record<string, Array<{ title: string; url: string; items?: Array<{ title: string; url: string }> }>> = {
   accounting: accountingNav,
@@ -61,7 +61,7 @@ for (const workspace of Object.keys(WORKSPACES)) {
       [],
       `${workspace} nav menüsünde olup arama kataloğunda EKSİK olan URL'ler:\n` +
         missing.map((u) => `  - ${u}`).join("\n") +
-        `\nBu öğeleri src/workspaces/stock/lib/stock-menu-registry.ts içine ekleyin.`,
+        `\nBu öğeleri src/lib/workspace-search-catalog.ts içine ekleyin.`,
     );
   });
 }

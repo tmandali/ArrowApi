@@ -189,9 +189,11 @@ export function NavUser() {
               {t("preferences")}
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer">
-            <Inbox />
-            {t("manage_accounts")}
+          <DropdownMenuItem className="cursor-pointer" asChild>
+            <Link href="/my/settings">
+              <Inbox />
+              {t("manage_accounts")}
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 

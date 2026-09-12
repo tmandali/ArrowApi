@@ -27,7 +27,7 @@ import {
   type WorkspaceSearchResultItem,
 } from "@/hooks/use-workspace-rag-search";
 import { usePinnedWorkspaceItems } from "@/hooks/use-pinned-workspace-items";
-import { WORKSPACE_SEARCH_CONFIGS } from "@/workspaces/stock/lib/stock-menu-registry";
+import { WORKSPACE_SEARCH_CONFIGS } from "@/lib/workspace-search-catalog";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useYulaDockStore } from "@/lib/stores/dock";
 import { Badge } from "@/components/ui/badge";

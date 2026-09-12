@@ -29,11 +29,27 @@ import {
   Loader2,
   MessageSquare,
 } from "lucide-react"
-import { emptyModulePath } from "@/lib/workspace-paths"
-import { workspaceDashboardPath } from "@/lib/workspace-nav"
+import type { LucideIcon } from "lucide-react"
+import {
+  DEFAULT_WORKSPACE_QUICK_ITEMS,
+  WORKSPACE_QUICK_ITEMS,
+  type WorkspaceQuickItem,
+} from "@/lib/workspace-search-catalog"
 import { resolveCategoryLabel, useWorkspaceSearchMeta } from "@/components/layout/workspace-search-hooks"
 import { useWorkspaceRagSearch } from "@/hooks/use-workspace-rag-search"
 import { cn } from "@/utils/cn"
+
+/** Quick item ikon haritası — katalog `icon` alanı Lucide adıdır; bilineni kullanılır, olmayan Package düşer. */
+const QUICK_ITEM_ICONS: Record<string, LucideIcon> = {
+  Package,
+  FileText,
+  BarChart2,
+  DollarSign,
+  TrendingUp,
+  Receipt,
+  Truck,
+  Scale,
+}
 
 type WorkspaceSearchItemsProps = {
   onSelect: (url: string) => void
@@ -61,109 +77,43 @@ function getCategoryIcon(category: string, isRag = false) {
   }
 }
 
-/** Command groups for the active workspace. Must render inside a Command root. */
+/**
+ * Quick items — veri sahibi `workspace-search-catalog` (`WORKSPACE_QUICK_ITEMS`);
+ * panel yalnızca render eder. Tanımsız workspace → `DEFAULT_WORKSPACE_QUICK_ITEMS`.
+ */
 export function WorkspaceSearchItems({ onSelect }: WorkspaceSearchItemsProps) {
   const { workspace } = useWorkspaceSearchMeta()
-  const e = emptyModulePath
-
-  if (workspace === "accounting") {
-    return (
-      <>
-        <CommandGroup heading="FINANCIAL REPORTS PAGES" className="px-1 py-1">
-          <CommandItem onSelect={() => onSelect("/accounting")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <BarChart2 className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Consolidated Report</span>
-            </div>
-            <CommandShortcut className="text-[10px]">↵</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("accounting", "Balance Sheet"))} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <FileText className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Balance Sheet</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("accounting", "Profit and Loss"))} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <TrendingUp className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Profit and Loss</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("accounting", "Cash Flow"))} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <DollarSign className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Cash Flow</span>
-            </div>
-          </CommandItem>
-        </CommandGroup>
-      </>
-    )
-  }
-
-  if (workspace === "stock") {
-    return (
-      <>
-        <CommandGroup heading="STOK SAYFALARI" className="px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-          <CommandItem onSelect={() => onSelect(workspaceDashboardPath)} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Package className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Stock Dashboard</span>
-            </div>
-            <CommandShortcut className="text-[10px]">↵</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect("/stock/serial-batch-traceability")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Scale className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Serial No and Batch Traceability</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("stock", "Stock Entry"))} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Receipt className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Stock Entry</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect(e("stock", "Delivery Note"))} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Truck className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Delivery Note</span>
-            </div>
-          </CommandItem>
-        </CommandGroup>
-
-        <CommandGroup heading="STOK RAPORLARI" className="px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-          <CommandItem onSelect={() => onSelect("/stock/stock-ledger")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <BarChart2 className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Stock Ledger</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect("/stock/stock-balance")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <BarChart2 className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Stock Balance</span>
-            </div>
-          </CommandItem>
-          <CommandItem onSelect={() => onSelect("/stock/stock-analytics")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <BarChart2 className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-              <span className="truncate text-[11.5px] leading-tight font-normal">Stock Analytics</span>
-            </div>
-          </CommandItem>
-        </CommandGroup>
-      </>
-    )
-  }
+  const groups = WORKSPACE_QUICK_ITEMS[workspace] ?? DEFAULT_WORKSPACE_QUICK_ITEMS
 
   return (
-    <CommandGroup heading="GENEL SAYFALAR" className="px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-      <CommandItem onSelect={() => onSelect("/stock")} className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Package className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
-          <span className="truncate text-[11.5px] leading-tight font-normal">Stock Main</span>
-        </div>
-      </CommandItem>
-    </CommandGroup>
+    <>
+      {groups.map((group) => (
+        <CommandGroup
+          key={group.heading}
+          heading={group.heading}
+          className="px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50"
+        >
+          {group.items.map((item: WorkspaceQuickItem) => {
+            const Icon = QUICK_ITEM_ICONS[item.icon ?? ""] ?? Package
+            return (
+              <CommandItem
+                key={item.url}
+                onSelect={() => onSelect(item.url)}
+                className="group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Icon className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-foreground" />
+                  <span className="truncate text-[11.5px] leading-tight font-normal">{item.title}</span>
+                </div>
+                {item.shortcut ? (
+                  <CommandShortcut className="text-[10px]">{item.shortcut}</CommandShortcut>
+                ) : null}
+              </CommandItem>
+            )
+          })}
+        </CommandGroup>
+      ))}
+    </>
   )
 }
 

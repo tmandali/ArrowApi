@@ -11,7 +11,7 @@ import { getEmbedding, getEmbeddings, VECTOR_DIMENSION } from "@/lib/yula-embedd
 import { buildRagWhereClause } from "@/lib/rag-tier";
 import type { RagSearchFilter, RagVectorTier } from "@/lib/rag-tier";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
-import { STOCK_WORKSPACE_MENU_ITEMS } from "@/workspaces/stock/lib/stock-menu-registry";
+import { STOCK_WORKSPACE_MENU_ITEMS } from "@/lib/workspace-search-catalog";
 
 import { opfsVectorCache } from "@/services/opfs/opfs-vector-cache";
 
@@ -250,6 +250,13 @@ async function doIndexReportSchemas(): Promise<number> {
       scope: "my",
       content: "Kullanıcı Profili ve AI Ayarları (/my/settings): Giriş yapmış kullanıcının şifre, dil, saat dilimi, yerel Ollama/Gemini/Azure LLM seçimi, API key ve Yula sistem hafıza bilgileri (System Facts) burada yönetilir.",
       metadata: { type: "system_route", path: "/my/settings" },
+      tier: "global",
+    },
+    {
+      id: "system_settings",
+      scope: "system",
+      content: "Sistem Ayarları (/settings): Platform seviyesi yönetim ekranı (yalnız yönetici). Sistem kullanıcıları, ajan ayarları ve skill ayarları bölümleri burada toplanır. Kullanıcı profil/AI ayarları bu ekranda DEĞİLDİR — onlar /my/settings'te.",
+      metadata: { type: "system_route", path: "/settings" },
       tier: "global",
     },
     {

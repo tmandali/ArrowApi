@@ -1463,6 +1463,7 @@
   },
   "SystemNav": {
     "home": "Home & Yula AI",
+    "system_settings": "System Settings",
     "my_settings": "My Account & Settings",
     "system_users": "All Users (Admin)",
     "system_agents": "Agent Settings",

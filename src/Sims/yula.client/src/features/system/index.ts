@@ -1,5 +1,3 @@
-export { MySettingsForm } from "./components/self-service/MySettingsForm";
-export { MySettingsForm as UserSettingsForm } from "./components/self-service/MySettingsForm";
 export { RequireAdmin } from "./components/admin-gate";
 export { SystemUsersView } from "./components/admin/SystemUsersView";
 export { SystemHomeView } from "./components/SystemHomeView";
@@ -9,6 +7,8 @@ export { SkillManagementView } from "./components/agents/SkillManagementView";
 
 export { systemWorkspace } from "./workspace.config";
 export { systemNav, systemDashboardPath } from "./routes";
+/** Sistem Evresi slash komutları manifest'i (yula-commands Public API'den tüketir). */
+export { default as systemAgentYaml } from "./agents/system.agent.yaml";
 
 export const systemWorkspaceConfig = {
   id: "system",

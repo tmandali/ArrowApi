@@ -23,6 +23,7 @@ export function emptyModulePath(workspace: string, title: string) {
 export const emptyWorkspaceHome: Record<string, { label: string; url: string }> =
   {
     system: { label: "System", url: "/" },
+    my: { label: "My", url: "/my" },
     stock: { label: "Stock", url: "/stock" },
     selling: { label: "Selling", url: "/selling" },
     subcontracting: { label: "Subcontracting", url: "/subcontracting" },
@@ -30,13 +31,17 @@ export const emptyWorkspaceHome: Record<string, { label: string; url: string }> 
     manufacturing: { label: "Manufacturing", url: "/manufacturing" },
   }
 
-/** Human-readable workspace label for a pathname (empty-page header/Yula intro). */
+/**
+ * Human-readable workspace label for a pathname (empty-page header/Yula intro).
+ * Registry'deki `getWorkspaceForPath` (canonik resolver) ile birlikte güncellenecek
+ * (düşük katman lib olduğu için registry'den import edemez).
+ */
 export function workspaceLabelFromPath(pathname: string): string {
+  if (pathname.startsWith("/my") || pathname.startsWith("/user-settings")) return "My"
   if (
     pathname === "/" ||
-    pathname.startsWith("/my") ||
+    pathname === "/settings" ||
     pathname.startsWith("/system") ||
-    pathname.startsWith("/user-settings") ||
     pathname.startsWith("/agents") ||
     pathname.startsWith("/agent/")
   ) {
@@ -71,13 +76,17 @@ export function agentSessionPath(agentId: string): string {
   return `/agents/${encodeURIComponent(agentId)}`
 }
 
-/** Workspace ID slug for a pathname. */
+/**
+ * Workspace ID slug for a pathname.
+ * Registry'deki `getWorkspaceForPath` (canonik resolver) ile birlikte güncellenecek
+ * (düşük katman lib olduğu için registry'den import edemez).
+ */
 export function workspaceIdFromPath(pathname: string): string {
+  if (pathname.startsWith("/my") || pathname.startsWith("/user-settings")) return "my"
   if (
     pathname === "/" ||
-    pathname.startsWith("/my") ||
+    pathname === "/settings" ||
     pathname.startsWith("/system") ||
-    pathname.startsWith("/user-settings") ||
     pathname.startsWith("/agents") ||
     pathname.startsWith("/agent/")
   ) {

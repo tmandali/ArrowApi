@@ -81,6 +81,21 @@ export type JsonSchemaProperty = {
   [key: string]: unknown
 }
 
+/**
+ * Yula sohbete gömülen rapor kartı — workspace, kartlarını kendi
+ * Public API'si üzerinden (`YulaReportCardConfig[]`) declare eder; shell
+ * yalnızca toplar. scope, sayfa filtresinin scope'u ile eşleşmelidir.
+ */
+export interface YulaReportCardConfig {
+  kind: string
+  scope: string
+  workspace?: string
+  title: string
+  description?: string
+  pagePath: string
+  schema: JsonSchemaObject
+}
+
 export type CriteriaFieldKind =
   | "string"
   | "number"

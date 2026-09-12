@@ -4,6 +4,7 @@ import {
   getWorkspace,
   getAllWorkspaces,
   getRailWorkspaces,
+  DOMAIN_WORKSPACE_IDS,
   workspaceDashboardPathByWorkspace,
   workspaceRootPathByWorkspace,
   workspaceNameById,
@@ -15,6 +16,7 @@ import { accountingNav, accountingDashboardPath } from "@/workspaces/accounting"
 import { sellingNav, sellingDashboardPath } from "@/workspaces/selling";
 import { manufacturingNav, manufacturingDashboardPath } from "@/workspaces/manufacturing";
 import { subcontractingNav, subcontractingDashboardPath } from "@/workspaces/subcontracting";
+import { myNav, myDashboardPath } from "@/workspaces/my";
 import { systemNav, systemDashboardPath } from "@/features/system";
 
 export type { WorkspaceId, WorkspaceNavItem, WorkspaceNavSubItem };
@@ -24,6 +26,7 @@ export {
   getWorkspace,
   getAllWorkspaces,
   getRailWorkspaces,
+  DOMAIN_WORKSPACE_IDS,
   workspaceDashboardPathByWorkspace,
   workspaceRootPathByWorkspace,
   workspaceNameById,
@@ -41,6 +44,8 @@ export {
   sellingNav,
   manufacturingNav,
   subcontractingNav,
+  myNav,
+  myDashboardPath,
   systemNav,
   stockDashboardPath,
   accountingDashboardPath,
@@ -52,6 +57,7 @@ export {
 
 export const workspaceNavById: Record<WorkspaceId, WorkspaceNavItem[]> = {
   system: systemNav,
+  my: myNav,
   subcontracting: subcontractingNav,
   selling: sellingNav,
   accounting: accountingNav,
