@@ -18,7 +18,6 @@ import {
 import { PinnedCategoryIcon } from "@/components/layout/workspace-pinned-items-grid";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
 import { YulaAgentCards } from "@/components/layout/yula-agent-cards";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { filterAgentsByScope } from "@/lib/yula-user-agent";
@@ -428,7 +427,6 @@ export function WorkspaceLandingTemplate({
       showSearch={false}
       transparentHeader
       navOverlay
-      actions={<AIChatAssistant />}
       navMenuHeaderVisible={navMenuHeaderVisible}
       // Header'daki PagePanelTrigger menüyü açıp kapatır — overlay
       // pane'in ikinci (yüzen) açma butonu render edilmez.
