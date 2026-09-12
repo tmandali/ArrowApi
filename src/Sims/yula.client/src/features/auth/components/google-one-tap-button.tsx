@@ -6,12 +6,13 @@
  * Akış:
  *  1. `https://accounts.google.com/gsi/client` script'i dinamik yüklenir.
  *  2. `google.accounts.id.initialize({ client_id, callback })` + tıklanabilir
- *     GIS butonu (`renderButton`) çizilir. Otomatik One Tap kartı (`prompt()`)
- *     bilinçli çağrılmaz — sayfa açılışında fırlayan "Google ile devam et"
- *     kartı istenmiyor.
+ *     GIS butonu (`renderButton`) çizilir. Otomatik sağ üst kartı
+ *     (`prompt()`) bu buton değil, root layout'ta global olarak monte edilen
+ *     `GoogleOneTapPrompt` (bkz. src/app/layout.tsx) tetkler; kart no_op /
+ *     kapatılırsa bu buton fallback olarak kalır.
  *  3. Callback ID token döndürür → `signIn("google-onesig", { id_token })`
  *     (auth.ts'teki google-onesig credentials provider'ı; server'da
- *     JWT bearer ile doğrulanır).
+ *     JWT bearer ile doğrulanır — ortak yardımcı: google-onesig-signin.ts).
  *  4. Buton yalnızca oturum yokken render edilir; `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
  *     (build'de AUTH_GOOGLE_ID'den türetilir, bkz. next.config.ts) yoksa null.
  *
@@ -20,59 +21,13 @@
  */
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { isGoogleOneTapEnabled } from "@/features/auth/lib/google-one-tap-flag";
+import { initGsiClient, type GsiIdClient } from "@/features/auth/lib/gsi-client";
+import { signInWithGoogleCredential } from "@/features/auth/lib/google-onesig-signin";
 
-interface GsiCredentialResponse {
-  credential?: string;
-  select_account?: boolean;
-}
-
-interface GsiIdClient {
-  initialize: (config: {
-    client_id: string;
-    callback: (response: GsiCredentialResponse) => void;
-  }) => void;
-  renderButton: (container: HTMLElement, config?: Record<string, string>) => void;
-}
-
-declare global {
-  interface Window {
-    google?: { accounts?: { id?: GsiIdClient } };
-  }
-}
-
-const GSI_SCRIPT_ID = "gsi-client-script";
-
-function loadGsiScript(): Promise<GsiIdClient | null> {
-  return new Promise((resolve) => {
-    const existing = window.google?.accounts?.id;
-    if (existing) {
-      resolve(existing);
-      return;
-    }
-    const existingScript = document.getElementById(GSI_SCRIPT_ID) as HTMLScriptElement | null;
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(window.google?.accounts?.id ?? null), {
-        once: true,
-      });
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = GSI_SCRIPT_ID;
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.addEventListener(
-      "load",
-      () => resolve(window.google?.accounts?.id ?? null),
-      { once: true },
-    );
-    script.addEventListener("error", () => resolve(null), { once: true });
-    document.head.appendChild(script);
-  });
-}
 
 export interface GoogleOneTapButtonProps {
   /** GIS buton boyutu — "large" 40px'tir (shadcn h-10 ile aynı satır). */
@@ -120,18 +75,11 @@ export function GoogleOneTapButton({
       setFailed(false);
       try {
         // redirect:false → sonuç döner; error alanı doluysa session oluşmadı.
-        // (next-auth v5 beta tipinde credentials yanıtı daraltılamadığı için
-        // gevşek tip kullanılır.)
-        const result = (await signIn("google-onesig", { id_token: credential }, { redirect: false })) as
-          | { error?: string | null }
-          | undefined;
+        const result = await signInWithGoogleCredential(credential, router);
         if (result?.error) {
           setFailed(true);
           return;
         }
-        // Başarılı ya da değil, sunucu tarafında state değişmiş olabilir →
-        // RSC + useSession'ı tazele; oturum oluştuysa buton kendiliğinden gizlenir.
-        await router.refresh();
       } catch {
         // Ağ/sign-in hatası → buton görünür kalır, yeniden denenebilir.
         setFailed(true);
@@ -171,23 +119,15 @@ export function GoogleOneTapButton({
     let cancelled = false;
     let observer: ResizeObserver | null = null;
 
-    void loadGsiScript().then((gsi) => {
+    void initGsiClient(clientId, (credential) => {
+      if (cancelled) return;
+      void handleCredential(credential);
+    }).then((gsi) => {
       if (!gsi || cancelled) return;
-      try {
-        gsi.initialize({
-          client_id: clientId,
-          callback: (response) => {
-            if (response?.credential) void handleCredential(response.credential);
-          },
-        });
-      } catch {
-        return;
-      }
       gsiRef.current = gsi;
-      // Otomatik One Tap kartı bilinçli GÖSTERİLMEZ (prompt() çağrılmaz):
-      // sayfa açılışında "Google ile devam et" diye fırlayan kart
-      // istenmiyor. Yalnızca tıklanabilir GIS butonu çizilir
-      // (FedCM dışı klasik buton akışı — FedCM konsol gürültüsü de çıkmaz).
+      // Otomatik kart (prompt) bu butonda çağrılmaz — global olarak root
+      // layout'taki GoogleOneTapPrompt üstlenir (sayfa başına tek seferlik).
+      // Buradaki tek iş: tıklanabilir fallback butonu çizmek.
       const initial = container.offsetWidth > 0 ? container.offsetWidth : width;
       setFluidWidth((prev) => (prev === Math.round(initial) ? prev : Math.round(initial)));
       observer = new ResizeObserver((entries) => {

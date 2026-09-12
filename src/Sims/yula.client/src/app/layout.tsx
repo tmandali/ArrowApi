@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "./providers";
+import { GoogleOneTapPrompt } from "@/features/auth/components/google-one-tap-prompt";
 import "./globals.css";
 
 // Next.js App Router `metadata` exportu bu dosyada ZORUNLUDUR —
@@ -34,7 +35,14 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers>
+            {/* GIS One Tap otomatik kartı: GOOGLE_ONE_TAP=1 iken ve oturum
+                yokken her tam sayfa yüklenmesinde sağ üstte bir kez beliren
+                kartı tetkler (Providers altındadır — useSession context'i
+                gerektirir). */}
+            <GoogleOneTapPrompt />
+            {children}
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>
