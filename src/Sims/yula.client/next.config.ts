@@ -86,6 +86,12 @@ const nextConfig: NextConfig = {
         source: "/weatherforecast/:path*",
         destination: `${backendUrl}/weatherforecast/:path*`,
       },
+      // NextAuth API route'ları (sign-in, callback, session, providers) doğrudan
+      // Next.js tarafında işlenir; backend'e proxylanmaz.
+      {
+        source: "/api/auth/:path*",
+        destination: "/api/auth/:path*",
+      },
       // Yula'nın kendi route handler'ları (/api/agent/*) dosya sistemiyle
       // çözülür; dizi-formu rewrite dosyadan SONRA koşar, çakışma yoktur.
       // Kalan tüm /api/* ASP.NET'e proxylanır (eski ^/api proxy'si).

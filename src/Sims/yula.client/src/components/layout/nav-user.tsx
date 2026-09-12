@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { signOut, useSession } from "next-auth/react";
@@ -49,16 +49,6 @@ export function NavUser() {
   const { data: session, status } = useSession();
   const { clearJobSession } = useJobSession();
   const { company, companies, beginCompanySwitch, isSwitching } = useActiveCompany();
-  const router = useRouter();
-
-  const navigate = (to: string | number) => {
-    if (typeof to === "number") {
-      if (to < 0) router.back();
-      else router.forward();
-    } else {
-      void router.push(to);
-    }
-  };
 
   // Hydration güvenli "mounted" bayrağı
   const mounted = React.useSyncExternalStore(

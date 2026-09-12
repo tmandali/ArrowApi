@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { signIn } from "@/lib/auth";
@@ -18,7 +18,6 @@ import { Globe, KeyRound, Loader2 } from "lucide-react";
 
 export default function SignUpPage() {
   const t = useTranslations("SignUp");
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
   const [loading, setLoading] = React.useState<string | null>(null);
