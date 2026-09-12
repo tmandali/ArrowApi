@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
 import { emitLocaleChange } from "@/lib/locale-events"
 import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
@@ -73,7 +74,7 @@ import {
 } from "lucide-react"
 import { loadSecret, saveSecret } from "@/lib/secure-config"
 import { normalizeEffort } from "@/lib/yula-reasoning"
-import { writeYulaClientAiConfig } from "@/lib/yula-ai-client-config"
+import { cacheYulaClientAiConfigFromDb } from "@/lib/yula-ai-client-config"
 
 export interface AiProviderConfig {
   provider: "ollama" | "azure" | "google" | "openai" | "agnes"
@@ -85,14 +86,22 @@ export interface AiProviderConfig {
 
 const CONFIG_STORAGE_KEY = "yula_ai_config"
 
+/** Sunucu + ilk istemci render'ında birebir aynı başlangıç (hydration güvenli). */
+const DEFAULT_AI_CONFIG: AiProviderConfig = {
+  provider: "azure",
+  model: "gpt-5.4",
+  endpoint: "",
+  apiKey: "",
+  thinkingLevel: "low",
+}
+
+/**
+ * Önbellek okuması — formun anlık ilk değeri için. Doğruluk kaynağı DB'dir
+ * (`GET /api/my/settings`); form localStorage'a doğrudan yazmaz, PUT/GET
+ * sonrası `cacheYulaClientAiConfigFromDb` aynalar.
+ */
 function loadStoredAiConfig(): AiProviderConfig {
-  const defaults: AiProviderConfig = {
-    provider: "azure",
-    model: "gpt-5.4",
-    endpoint: "",
-    apiKey: "",
-    thinkingLevel: "low",
-  }
+  const defaults: AiProviderConfig = { ...DEFAULT_AI_CONFIG }
   if (typeof window === "undefined") return defaults
   try {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY)
@@ -107,17 +116,6 @@ function loadStoredAiConfig(): AiProviderConfig {
     // fallback
   }
   return defaults
-}
-
-function persistAiConfigWithoutSecret(config: AiProviderConfig) {
-  if (typeof window === "undefined") return
-  try {
-    const { apiKey: _apiKey, ...sanitized } = config
-    void _apiKey
-    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized))
-  } catch {
-    // storage unavailable
-  }
 }
 
 const SETTINGS_USER_ID = "local"
@@ -178,7 +176,8 @@ function splitFullName(full: string): { first: string; last: string } {
   return { first: parts[0] ?? "", last: parts.slice(1).join(" ") }
 }
 
-/** API'ye tam snapshot yazar; offline/500'de sessizce localStorage'a düşer (UI kırılmaz). */
+/** API'ye tam snapshot yazar; sunucunun döndüğü satırı verir (önbellek senkronu için).
+ * Offline/hatada null döner — çağrıcı önbelleğe dokunmaz (son iyi değer kalır). */
 async function putSettingsToApi(snapshot: {
   email: string
   fullName: string
@@ -189,10 +188,10 @@ async function putSettingsToApi(snapshot: {
   aiEndpoint: string
   thinkingLevel: NonNullable<AiProviderConfig["thinkingLevel"]>
   systemFacts: Record<string, string>
-}) {
+}): Promise<SettingsApiRow | null> {
   // Kişisel tercihler (AI config, dil, tz, systemFacts) → user_settings
   try {
-    await fetch("/api/my/settings", {
+    const res = await fetch("/api/my/settings", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -206,25 +205,32 @@ async function putSettingsToApi(snapshot: {
         systemFacts: snapshot.systemFacts,
       }),
     })
+    if (res.ok) {
+      const data = (await res.json()) as { settings?: SettingsApiRow | null }
+      return data?.settings ?? null
+    }
+    return null
   } catch {
-    // offline (Tauri) veya backend kapalı — localStorage zaten yazıldı
-  }
-  // Ad/e-posta → app_users (tek kaynak)
-  try {
-    await fetch("/api/system/users", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        id: SETTINGS_USER_ID,
-        name: snapshot.fullName || null,
-        email: snapshot.email || null,
-        role: "System Administrator",
-        status: "Active",
-        lastActive: "Now",
-      }),
-    })
-  } catch {
-    // sessiz geç
+    // offline (Tauri) veya backend kapalı — önbellek aynalanmaz
+    return null
+  } finally {
+    // Ad/e-posta → app_users (tek kaynak)
+    try {
+      await fetch("/api/system/users", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: SETTINGS_USER_ID,
+          name: snapshot.fullName || null,
+          email: snapshot.email || null,
+          role: "System Administrator",
+          status: "Active",
+          lastActive: "Now",
+        }),
+      })
+    } catch {
+      // sessiz geç
+    }
   }
 }
 
@@ -247,7 +253,9 @@ export function MySettingsForm() {
   const [factValue, setFactValue] = React.useState("")
   const [factSaved, setFactSaved] = React.useState(false)
 
-  const [aiConfig, setAiConfigState] = React.useState<AiProviderConfig>(loadStoredAiConfig)
+  // Hydration güvenliği: ilk render her zaman DEFAULT_AI_CONFIG ile olur
+  // (sunucuyla birebir); kayıtlı config mount effect'inde yüklenir.
+  const [aiConfig, setAiConfigState] = React.useState<AiProviderConfig>(DEFAULT_AI_CONFIG)
   const [configHydrated, setConfigHydrated] = React.useState(false)
 
   const [aiProvider, setAiProvider] = React.useState<AiProviderConfig["provider"]>(aiConfig.provider)
@@ -257,7 +265,6 @@ export function MySettingsForm() {
   const [aiThinkingLevel, setAiThinkingLevel] =
     React.useState<NonNullable<AiProviderConfig["thinkingLevel"]>>(aiConfig.thinkingLevel || "low")
   const [showApiKey, setShowApiKey] = React.useState(false)
-  const [aiSaved, setAiSaved] = React.useState(false)
 
   // User Details sekmesi — API'ye bağlı profil alanları (görünüm aynı, kontrollü input).
   const [profileEmail, setProfileEmail] = React.useState("john.doe@demo.com")
@@ -269,6 +276,29 @@ export function MySettingsForm() {
   const [profileTimeZone, setProfileTimeZone] = React.useState<ProfileTimeZone>("asia-kolkata")
   const [profileSaved, setProfileSaved] = React.useState(false)
   const [profileLoaded, setProfileLoaded] = React.useState(false)
+
+  // Sekme derin bağlantısı: menüden `?tab=settings` (Tercihler) /
+  // `?tab=user-details` (Profil) ile gelinir; sekme tıklaması da URL'yi
+  // günceller (replace, scroll yok) — yenileme/derin bağlantı korunur.
+  // Aynı sayfada menüden ikinci tıklamada remount olmadığı için param
+  // değişimi state'e senkronlanır.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const isSettingsTab = (v: string | null): v is "user-details" | "settings" | "yula-ai" | "connections" =>
+    v === "user-details" || v === "settings" || v === "yula-ai" || v === "connections"
+  const [activeTab, setActiveTab] = React.useState<"user-details" | "settings" | "yula-ai" | "connections">(
+    isSettingsTab(tabParam) ? tabParam : "user-details",
+  )
+  React.useEffect(() => {
+    if (isSettingsTab(tabParam)) setActiveTab(tabParam)
+  }, [tabParam])
+  const handleTabChange = (v: string) => {
+    if (!isSettingsTab(v)) return
+    setActiveTab(v)
+    router.replace(`${pathname}?tab=${v}`, { scroll: false })
+  }
 
   // Güvenli depodan API anahtarı yüklendiğinde / config değiştiğinde formu
   // senkronla — render sırasında state ayarlama (effect'siz türev).
@@ -286,10 +316,12 @@ export function MySettingsForm() {
     }
   }
 
-  // API anahtarını güvenli depodan oku + DB'deki ayarı çek (UI aynı kalır).
-  // API kapalıysa localStorage'daki değerle devam edilir.
+  // API anahtarını güvenli depodan oku + DB'deki ayarı çek (doğruluk kaynağı).
+  // Önbellek yalnızca anlık ilk değer içindir; DB gelince form + önbellek DB'den beslenir.
   React.useEffect(() => {
     let active = true
+    // Kayıtlı AI config'i hydration SONRASI yükle (ilk render varsayılan).
+    setAiConfigState(loadStoredAiConfig())
     loadSecret().then((secret) => {
       if (!active) return
       setAiApiKey(secret || "")
@@ -302,6 +334,8 @@ export function MySettingsForm() {
         if (!active) return
         const row = data?.settings
         if (row) {
+          // DB → önbellek aynası (sohbet sıcak yolu + offline buradan beslenir).
+          cacheYulaClientAiConfigFromDb(row)
           const provider = normalizeApiProvider(row.aiProvider)
           const thinking = normalizeThinking(row.thinkingLevel)
           setAiConfigState((prev) => ({
@@ -370,48 +404,23 @@ export function MySettingsForm() {
     })
   }
 
-  const handleSaveAiConfig = () => {
-    const updated: AiProviderConfig = {
+  /** Header Save butonu — DB'ye yazar, başarılıysa önbelleği DB'den aynalar.
+   * Form localStorage'a doğrudan yazmaz; secret sessionStorage'da yaşar.
+   * Bölüm içi ayrı kaydet butonu yok. */
+  const handleSaveProfile = () => {
+    const full = profileFullName.trim() || `${profileFirstName} ${profileLastName}`.trim()
+    if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) return
+    // AI snapshot — sohbet hattı önbellekten (`yula_ai_config`) okur.
+    const updatedAi: AiProviderConfig = {
       provider: aiProvider,
       model: aiModel,
       endpoint: aiEndpoint,
       apiKey: aiApiKey,
       thinkingLevel: aiThinkingLevel,
     }
-    setAiConfigState(updated)
-    persistAiConfigWithoutSecret(updated)
-    // Sohbet hattı `yula_ai_config` anahtarından okur — eforu oraya da yaz
-    // (aynı localStorage anahtarı; `effort` taşınabilir `reasoning`'e gider).
-    void writeYulaClientAiConfig({
-      provider: aiProvider === "google" ? undefined : aiProvider,
-      model: aiModel,
-      endpoint: aiEndpoint,
-      effort: normalizeEffort(aiThinkingLevel) ?? undefined,
-    })
-    // Kalıcılık promise'leri: dil değiştiyse reload bunları bekler
-    // (in-flight abort yarışı oluşmasın; `applyLanguageChange` sözleşmesi).
+    setAiConfigState(updatedAi)
+    // Dil değiştiyse reload, kalıcılık tamamlanana dek bekler (abort yarışı yok).
     const secretP = saveSecret(aiApiKey).catch(() => undefined)
-    const putP = putSettingsToApi({
-      email: profileEmail,
-      fullName: profileFullName,
-      language: profileLanguage,
-      timeZone: profileTimeZone,
-      aiProvider,
-      aiModel,
-      aiEndpoint,
-      thinkingLevel: aiThinkingLevel,
-      systemFacts,
-    }).catch(() => undefined)
-    applyLanguageChange(profileLanguage, Promise.all([secretP, putP]))
-    setAiSaved(true)
-    setTimeout(() => setAiSaved(false), 2500)
-  }
-
-  /** Header Save butonu — profil + AI snapshot'unu birlikte yazar. */
-  const handleSaveProfile = () => {
-    const full = profileFullName.trim() || `${profileFirstName} ${profileLastName}`.trim()
-    if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) return
-    // Dil değiştiyse reload, PUT tamamlanana dek bekler (abort yarışı yok).
     const putP = putSettingsToApi({
       email: profileEmail.trim(),
       fullName: full,
@@ -422,8 +431,13 @@ export function MySettingsForm() {
       aiEndpoint,
       thinkingLevel: aiThinkingLevel,
       systemFacts,
-    }).catch(() => undefined)
-    applyLanguageChange(profileLanguage, putP)
+    })
+      .then((row) => {
+        // Yalnızca DB yazımı başarılıysa önbelleği aynala (tek yön: DB → cache).
+        if (row) cacheYulaClientAiConfigFromDb(row)
+      })
+      .catch(() => undefined)
+    applyLanguageChange(profileLanguage, Promise.all([secretP, putP]))
     setProfileSaved(true)
     setTimeout(() => setProfileSaved(false), 2500)
   }
@@ -559,11 +573,12 @@ export function MySettingsForm() {
         }
       >
           <div className={cn(panelCardClass, "min-h-0 flex-1")}>
-            <Tabs defaultValue="user-details" className="flex flex-1 flex-col overflow-hidden">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-primary/15 px-4 py-1 dark:border-primary/25">
                 <TabsList variant="line">
                   <TabsTrigger value="user-details">{t("tab_user_details")}</TabsTrigger>
                   <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
+                  <TabsTrigger value="yula-ai">{t("tab_yula_ai")}</TabsTrigger>
                   <TabsTrigger value="connections">{t("tab_connections")}</TabsTrigger>
                 </TabsList>
               </div>
@@ -800,7 +815,7 @@ export function MySettingsForm() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="settings" className="flex-1 flex flex-col lg:flex-row overflow-y-auto m-0">
+              <TabsContent value="yula-ai" className="flex-1 flex flex-col lg:flex-row overflow-y-auto m-0">
                 <div className="flex-1 p-6 space-y-6">
                   <div className="space-y-3">
                     <Collapsible open={yulaAiSettingsOpen} onOpenChange={setYulaAiSettingsOpen} className="border-b pb-3">
@@ -911,29 +926,20 @@ export function MySettingsForm() {
                           </Field>
                         </div>
 
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="pt-1">
                           <span className="text-xs text-muted-foreground">
                             {t("ai_active")} <strong className="text-foreground">{aiProvider.toUpperCase()}</strong> ({aiModel})
                           </span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleSaveAiConfig}
-                            className="h-7 px-3 text-xs gap-1.5"
-                          >
-                            {aiSaved ? (
-                              <>
-                                <Check className="size-3 text-emerald-300" />
-                                {t("ai_saved_active")}
-                              </>
-                            ) : (
-                              t("ai_save")
-                            )}
-                          </Button>
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
+                  </div>
+                </div>
+              </TabsContent>
 
+              <TabsContent value="settings" className="flex-1 flex flex-col lg:flex-row overflow-y-auto m-0">
+                <div className="flex-1 p-6 space-y-6">
+                  <div className="space-y-3">
                     <Collapsible open={systemFactsOpen} onOpenChange={setSystemFactsOpen} className="border-b pb-3">
                       <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs font-semibold text-foreground hover:text-foreground/80">
                         <span>{t("facts_title")}</span>

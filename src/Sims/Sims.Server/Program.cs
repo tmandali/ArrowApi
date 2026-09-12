@@ -1,6 +1,7 @@
 using Sims.Server.Endpoints;
 using Sims.Server.Services;
 using Sims.Server.Workers;
+using Microsoft.AspNetCore.Authentication;
 using Arrow.Jobs.AspNetCore;
 using Arrow.Jobs.InMemory;
 
@@ -14,6 +15,32 @@ builder.Services.AddArrowApi(arrow =>
     arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseFileStore("arrow-jobs"));
     arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", c => c.UseFileStore("arrow-jobs"));
 });
+
+// ── Login kullanıcı → OIDC (Keycloak) JWT doğrulama ────────────────────────────
+// yula.client, session'daki Keycloak access token'ını `Authorization: Bearer`
+// ile gönderir (bkz. yula.client lib/company-headers.ts + auth-headers.ts).
+// Issuer yapılandırılırsa: token JWKS ile doğrulanır, sub/email/roles claim'leri
+// her istekte ClaimsPrincipal'da hazır (gelecek kullanıcı bazlı job scoping köprüsü).
+// Issuer boşsa YOKTU — yapılandırma yok → kimlik doğrulama kapalı, tek kullanıcı
+// modu değişmez. Endpoint'ler ayrıca `.RequireAuthorization()` taşımadığı için
+// token'ı olmayan/geçersiz istekler anonymous olarak geçmeye devam eder
+// (fallback korunur: Tauri desktop / provider'sız mod kırılmaz).
+var keycloakIssuer = builder.Configuration["Auth:KeycloakIssuer"];
+var keycloakAudience = builder.Configuration["Auth:KeycloakAudience"];
+var keycloakAuthEnabled = !string.IsNullOrWhiteSpace(keycloakIssuer);
+if (keycloakAuthEnabled)
+{
+    builder.Services.AddAuthentication()
+        .AddJwtBearer(options =>
+        {
+            // Keycloak realm issuer'ı; JWKS discovery: {issuer}/.well-known/openid-configuration
+            options.Authority = keycloakIssuer;
+            if (!string.IsNullOrWhiteSpace(keycloakAudience))
+            {
+                options.TokenValidationParameters.ValidAudience = keycloakAudience;
+            }
+        });
+}
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -29,6 +56,11 @@ builder.Services.AddSingleton<IStockBalanceService, StockBalanceService>();
 
 var app = builder.Build();
 
+if (keycloakAuthEnabled)
+{
+    app.UseAuthentication();
+}
+
 app.UseCors();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
@@ -43,6 +75,15 @@ app.UseArrowApi("/api/arrow/jobs", jobs =>
     jobs.MapJob("stock-balance");
     jobs.MapJob("retail-sales-report");
 });
+
+// OIDC köprüsü testi (GET /api/arrow/whoami): login kullanıcıyı doğrulayıp
+// claim'leri echo eder. Kimliksiz istek → authenticated:false (fallback kanıtı).
+app.MapGet("/api/arrow/whoami", (System.Security.Claims.ClaimsPrincipal user) => Results.Ok(new
+{
+    authenticated = user.Identity?.IsAuthenticated ?? false,
+    sub = user.FindFirst("sub")?.Value ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+    email = user.FindFirst("email")?.Value,
+}));
 
 app.MapStockAnalyticsEndpoints();
 

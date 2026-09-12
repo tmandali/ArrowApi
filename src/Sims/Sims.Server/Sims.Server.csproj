@@ -25,6 +25,8 @@
     <!-- StockBalance/StockAnalytics servisleri ve endpoint'leri doğrudan kullanıyor -->
     <PackageReference Include="Apache.Arrow" Version="23.0.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <!-- Keycloak (OIDC) access token doğrulaması: AddJwtBearer + /whoami köprüsü -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

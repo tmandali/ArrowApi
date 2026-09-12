@@ -3,21 +3,26 @@ import * as z from "zod";
 import { db } from "@/server/db/client";
 import { userSettingsSchema, appUsersSchema } from "@/server/db/schema";
 import { SettingsPutValidation } from "@/validations/settings.validation";
+import { resolveSessionDbUserId } from "@/features/auth/lib/app-user-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** UI her zaman `local` gönderir; gerçek DB id'si `usr_101`. */
+/** UI her zaman `local` gönderir; oturum varsa login kullanıcının DB id'si,
+    oturum yoksa tek kullanıcı fallback `usr_101`. */
 const USER_ID_LOCAL = "local";
-const USER_ID_DB = "usr_101";
+
+/** `local` → session kullanıcı (upsert edilmiş) veya `usr_101`. */
 
 /** Tek kullanıcı ayarı (varsayılan `local`). UI fallback için her zaman 200 döner. */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const clientUserId = url.searchParams.get("userId") || USER_ID_LOCAL;
-    // UI'nin `local` gönderdiği yerde gerçek id'ye dönüştür.
-    const userId = clientUserId === USER_ID_LOCAL ? USER_ID_DB : clientUserId;
+    // UI'nin `local` gönderdiği yerde: oturum varsa login kullanıcı,
+    // yoksa usr_101. Açıkça başka userId verilirse o id geçer (admin ekranı).
+    const userId =
+      clientUserId === USER_ID_LOCAL ? await resolveSessionDbUserId() : clientUserId;
 
     const [settingsRow] = await db
       .select()
@@ -73,8 +78,11 @@ export async function PUT(req: Request) {
   const v = parse.data;
   // `google` provider'ı bizim AI çekirdekte yok — yazarken `openai`-uyumlu saklanır.
   const aiProvider = v.aiProvider === "google" ? null : v.aiProvider;
-  // UI `local` gönderir, DB'de gerçek id `usr_101`.
-  const resolvedUserId = (v.userId ?? USER_ID_LOCAL) === USER_ID_LOCAL ? USER_ID_DB : v.userId!;
+  // UI `local` gönderir → session kullanıcı (upsert), yoksa `usr_101`.
+  const resolvedUserId =
+    (v.userId ?? USER_ID_LOCAL) === USER_ID_LOCAL
+      ? await resolveSessionDbUserId()
+      : v.userId!;
 
   try {
     const rows = await db

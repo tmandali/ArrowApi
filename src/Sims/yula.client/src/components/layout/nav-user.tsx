@@ -177,14 +177,14 @@ export function NavUser() {
 
         <DropdownMenuGroup>
           <DropdownMenuItem className="cursor-pointer" asChild>
-            <Link href="/user-settings">
+            <Link href="/my/settings?tab=user-details">
               <User />
               {t("profile")}
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem className="cursor-pointer" asChild>
-            <Link href="/user-settings">
+            <Link href="/my/settings?tab=settings">
               <Settings />
               {t("preferences")}
             </Link>
