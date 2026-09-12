@@ -1536,5 +1536,38 @@
     "subcontracting": "Fason & Tedarik",
     "workspaces": "Çalışma Alanları",
     "yula_aria": "Yula — Yapay Zeka Asistanı"
+  },
+  "SignIn": {
+    "title": "Hoş Geldiniz",
+    "description": "Hesabınıza giriş yapın",
+    "email": "E-posta",
+    "password": "Şifre",
+    "sign_in": "Giriş Yap",
+    "sign_in_keycloak": "Keycloak ile Giriş",
+    "sign_in_google": "Google ile Giriş",
+    "forgot_password": "Şifremi Unuttum",
+    "no_account": "Hesabınız yok mu?",
+    "sign_up": "Kayıt Ol",
+    "invalid_credentials": "E-posta veya şifre hatalı."
+  },
+  "SignUp": {
+    "title": "Hesap Oluştur",
+    "description": "Yeni bir hesap oluşturun",
+    "name": "Ad Soyad",
+    "email": "E-posta",
+    "password": "Şifre",
+    "sign_up": "Kayıt Ol",
+    "sign_up_keycloak": "Keycloak ile Kayıt",
+    "sign_up_google": "Google ile Kayıt",
+    "has_account": "Zaten hesabınız var mı?",
+    "sign_in": "Giriş Yap",
+    "signup_error": "Kayıt sırasında bir hata oluştu."
+  },
+  "ForgotPassword": {
+    "title": "Şifre Sıfırlama",
+    "description": "E-posta adresinizi girin, sıfırlama bağlantısı gönderelim.",
+    "email": "E-posta",
+    "send_link": "Bağlantı Gönder",
+    "back_to_sign_in": "Giriş sayfasına dön"
   }
 }

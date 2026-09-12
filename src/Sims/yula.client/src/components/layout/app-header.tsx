@@ -14,12 +14,6 @@ import {
 import { YULA } from "@/components/layout/yula-brand-data"
 import { cn } from "@/utils/cn"
 
-const DEFAULT_USER = {
-  name: "Timur MANDALI",
-  email: "timur.mandali@lcwaikiki.com",
-  avatar: "",
-}
-
 /**
  * Global top bar right of the workspace icon rail, structurally fixed in the
  * viewport-locked shell: brand + active workspace on the left, centered
@@ -32,31 +26,6 @@ export function AppHeader({ className }: { className?: string }) {
   const workspaceName = activeWorkspaceId
     ? workspaceNameById[activeWorkspaceId]
     : undefined
-
-  // Kullanıcı profili: API'den çekilir, kayıt yoksa varsayılan değerler kullanılır.
-  const [headerUser, setHeaderUser] = React.useState(DEFAULT_USER)
-  React.useEffect(() => {
-    let active = true
-    fetch("/api/my/settings?userId=local", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!active) return
-        const row = data?.settings
-        if (row?.fullName || row?.email) {
-          setHeaderUser({
-            name: row.fullName ?? DEFAULT_USER.name,
-            email: row.email ?? DEFAULT_USER.email,
-            avatar: "",
-          })
-        }
-      })
-      .catch(() => {
-        // hata durumunda varsayılan kalır
-      })
-    return () => {
-      active = false
-    }
-  }, [])
 
   // "Yula <Workspace>" marka satırı → her zaman workspace ana sayfası (landing).
   // Aktif workspace yoksa Yula ana ekranına döner.
@@ -99,7 +68,7 @@ export function AppHeader({ className }: { className?: string }) {
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
         <WorkspaceNotificationPopover />
-        <NavUser user={headerUser} />
+        <NavUser />
       </div>
     </header>
   )

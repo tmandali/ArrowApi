@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/theme-provider";
 import { YulaChatProvider } from "@/hooks/yula-chat-provider";
 import { PagePanelProvider } from "@/context/page-panel-provider";
 import { DocLangSync } from "@/components/app/doc-lang-sync";
+import { SessionProvider } from "next-auth/react";
 
 export function Providers({
   children,
@@ -13,20 +14,22 @@ export function Providers({
   children: ReactNode;
 }) {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <PagePanelProvider>
-        <AppProviders>
-          <YulaChatProvider>
-            <DocLangSync />
-            {children}
-          </YulaChatProvider>
-        </AppProviders>
-      </PagePanelProvider>
-    </ThemeProvider>
+    <SessionProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <PagePanelProvider>
+          <AppProviders>
+            <YulaChatProvider>
+              <DocLangSync />
+              {children}
+            </YulaChatProvider>
+          </AppProviders>
+        </PagePanelProvider>
+      </ThemeProvider>
+    </SessionProvider>
   );
 }

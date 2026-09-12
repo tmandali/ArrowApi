@@ -1536,5 +1536,38 @@
     "subcontracting": "Subcontracting",
     "workspaces": "Workspaces",
     "yula_aria": "Yula — AI Assistant"
+  },
+  "SignIn": {
+    "title": "Welcome Back",
+    "description": "Sign in to your account",
+    "email": "Email",
+    "password": "Password",
+    "sign_in": "Sign In",
+    "sign_in_keycloak": "Sign in with Keycloak",
+    "sign_in_google": "Sign in with Google",
+    "forgot_password": "Forgot password?",
+    "no_account": "Don't have an account?",
+    "sign_up": "Sign Up",
+    "invalid_credentials": "Invalid email or password."
+  },
+  "SignUp": {
+    "title": "Create Account",
+    "description": "Create a new account",
+    "name": "Full Name",
+    "email": "Email",
+    "password": "Password",
+    "sign_up": "Sign Up",
+    "sign_up_keycloak": "Sign up with Keycloak",
+    "sign_up_google": "Sign up with Google",
+    "has_account": "Already have an account?",
+    "sign_in": "Sign In",
+    "signup_error": "An error occurred during registration."
+  },
+  "ForgotPassword": {
+    "title": "Reset Password",
+    "description": "Enter your email and we will send you a reset link.",
+    "email": "Email",
+    "send_link": "Send Link",
+    "back_to_sign_in": "Back to sign in"
   }
 }
