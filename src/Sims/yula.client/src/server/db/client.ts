@@ -3,11 +3,14 @@ import { createDbConnection } from "./connection";
 /**
  * DB client singleton — Next.js hot-reload'da çoklu bağlantı açılmasını önler.
  *
- * PGlite async init olduğu için `createDbConnection()` promise döner;
- * ilk çağrıda resolve olan değeri global scope'ta tutarız.
+ * İlk modül değerlendirmesinde bağlantı SENKRON olarak başlatılır:
+ * top-level `await` resolve olan drizzle instance'ı üretilmeden module'u
+ * yüklemeyi BEKLETİR. `db` export'u dolayısıyla asla `undefined` olmaz
+ * (eski async `.then()` pattern'i cold start'ta ilk isteği 500 veriyordu:
+ * `const db = _db!` undefined'ı yakalıyordu).
  *
- * SSR/API route'ları bu modül import edildiği anda bağlantıyı başlatır;
- * sonraki tüm istekler resolve olmuş drizzle instance'ını kullanır.
+ * Sonraki HMR/isteklerde `globalThis.cachedYulaDb` dolu olduğu için
+ * yeniden init HİSSEDİLİR (çift bağlantı yok).
  */
 declare global {
   var cachedYulaDb:
@@ -15,20 +18,14 @@ declare global {
     | undefined;
 }
 
-// Module-level holder — promise resolves before any API route runs in practice
-let _db: Awaited<ReturnType<typeof createDbConnection>> | undefined =
-  globalThis.cachedYulaDb;
-
+let _db = globalThis.cachedYulaDb;
 if (!_db) {
-  createDbConnection().then((resolved) => {
-    globalThis.cachedYulaDb = resolved;
-    _db = resolved;
-  });
+  _db = await createDbConnection();
+  globalThis.cachedYulaDb = _db;
 }
 
 /**
- * Drizzle instance — available after first module evaluation.
- * In dev the promise resolves during Next.js startup; in production the
- * connection is synchronous (PostgreSQL Pool).
+ * Drizzle instance — module yüklenirken (TLA) resolve edilir; sonraki tüm
+ * import'lar hazır instance'ı alır.
  */
-export const db = _db!;
+export const db = _db;
