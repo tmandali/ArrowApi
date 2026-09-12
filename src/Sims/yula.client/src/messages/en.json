@@ -1547,6 +1547,7 @@
     "sign_in": "Sign In",
     "sign_in_keycloak": "Sign in with Keycloak",
     "sign_in_google": "Sign in with Google",
+    "deactivated_notice": "Your account has been deactivated by an administrator. Please contact your system administrator.",
     "no_providers": "No account providers configured.",
     "forgot_password": "Forgot password?",
     "invalid_credentials": "Invalid email or password."

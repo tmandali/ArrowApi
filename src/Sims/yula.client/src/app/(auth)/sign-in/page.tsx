@@ -24,6 +24,9 @@ export default function SignInPage() {
   const t = useTranslations("SignIn");
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
+  // Yönetici tarafından devre dışı bırakılan hesap (AccountStatusGuard
+  // sign-out'u buraya düşer) — kullanıcıya sebep gösterilir.
+  const isDeactivated = searchParams.get("reason") === "deactivated";
   // Explicit tema yoksa kart saf CSS ile sistemi izler (dark: varyantı,
   // flash yok). Explicit tema varsa kart o temaya zorlanır.
   const forceDarkCard = GOOGLE_THEME === "filled_black" || GOOGLE_THEME === "outline_dark";
@@ -58,6 +61,17 @@ export default function SignInPage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {isDeactivated && (
+          <p
+            role="alert"
+            className={cn(
+              "rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs",
+              forceDarkCard ? "text-amber-200" : "text-amber-600 dark:text-amber-300",
+            )}
+          >
+            {t("deactivated_notice")}
+          </p>
+        )}
         {/* Tek giriş noktası: ilk girişte hesap otomatik oluşur, ayrı
             sign-up akışı yok (/sign-up buraya redirect eder). */}
         <ProviderButtons labelPrefix="sign_in" t={t} next={next} googleTheme={GOOGLE_THEME} />

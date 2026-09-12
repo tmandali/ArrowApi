@@ -1547,6 +1547,7 @@
     "sign_in": "Giriş Yap",
     "sign_in_keycloak": "Keycloak ile Giriş",
     "sign_in_google": "Google ile Giriş",
+    "deactivated_notice": "Hesabınız bir yönetici tarafından devre dışı bırakıldı. Lütfen sistem yöneticinize başvurun.",
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "forgot_password": "Şifremi Unuttum",
     "invalid_credentials": "E-posta veya şifre hatalı."
