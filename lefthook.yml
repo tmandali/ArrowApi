@@ -8,7 +8,11 @@ commit-msg:
 pre-commit:
   jobs:
     - name: oxlint
-      run: npx oxlint --fix {staged_files}
+      # --no-error-on-unmatched-pattern: yalnızca lint-olmayan dosya
+      # (örn. lefthook.yml, .env.example, .md) staged ise "No files found"
+      # ile exit 1 vermek yerine temiz geçer; gerçek .ts/.tsx sorunlarında
+      # hata hâlâ döner.
+      run: npx oxlint --fix --no-error-on-unmatched-pattern {staged_files}
       skip_when_empty: true
     - name: knip
       run: cd src/Sims/yula.client && npm run check:deps
