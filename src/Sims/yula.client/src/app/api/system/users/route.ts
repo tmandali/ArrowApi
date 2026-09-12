@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/server/db/client";
 import { appUsersSchema } from "@/server/db/schema";
@@ -50,10 +50,23 @@ const SEED_USERS = [
   },
 ] as const;
 
-/** Kullanıcı listesi. Tablo boşsa demo çekirdek veriyi eker (mevcut ekranla birebir). */
+/**
+ * Kullanıcı listesi. `Deleted` (soft-delete tombstone) satirlari katalogdan
+ * gizlenir — onlar account-status guard tarafindan sign-out acisir.
+ * Tablo bossa demo cekirdek veriyi eker (mevcut ekranla birebir).
+ */
 export async function GET() {
   try {
-    let rows = await db.select().from(appUsersSchema);
+    let rows = await db
+      .select()
+      .from(appUsersSchema)
+      // `Deleted` tombstone'ları gizle; NULL status (kolon nullable) KALSIN.
+      .where(
+        or(
+          isNull(appUsersSchema.status),
+          ne(appUsersSchema.status, "Deleted"),
+        ),
+      );
     if (rows.length === 0) {
       await db.insert(appUsersSchema).values([...SEED_USERS]);
       rows = await db.select().from(appUsersSchema);
@@ -126,15 +139,25 @@ export async function POST(req: Request) {
   }
 }
 
-/** Silme (`?id=`). */
+/**
+ * "Silme" — YUMUSAK SİLME: fiziksel DELETE satırı kaldırıp fail-open
+ * deligi acardi (account-status satiri bulamaz → active → deaktive
+ * kullanicina da giris icin). Status `Deleted` etiketli tombstone
+ * olarak kalir: account-status guard otomatik sign-out eder, katalog
+ * gizler; DB'den tam geri alma mumkun.
+ */
 export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get("id")?.trim();
   if (!id) {
     return Response.json({ error: "id is required" }, { status: 400 });
   }
   try {
-    await db.delete(appUsersSchema).where(eq(appUsersSchema.id, id));
-    return Response.json({ ok: true, id });
+    const rows = await db
+      .update(appUsersSchema)
+      .set({ status: "Deleted", lastActive: "Now" })
+      .where(eq(appUsersSchema.id, id))
+      .returning();
+    return Response.json({ ok: true, id, softDelete: true, found: rows.length > 0 });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : String(error) },

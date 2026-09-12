@@ -209,7 +209,9 @@ export function SystemUsersView() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      // Soft-delete: satır `Deleted` tombstone olur; GET catalog zaten
+      // filtirligi dondurur → listeyi tazele.
+      await fetchUsers();
     } catch {
       // sessiz geç
     } finally {
