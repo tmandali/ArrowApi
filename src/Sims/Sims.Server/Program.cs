@@ -39,6 +39,18 @@ if (keycloakAuthEnabled)
             {
                 options.TokenValidationParameters.ValidAudience = keycloakAudience;
             }
+            // .NET 10+: authority HTTP ise metadata discovery startup'ta fırlatır
+            // ("MetadataAddress or Authority must use HTTPS unless disabled for
+            // development by setting RequireHttpsMetadata=false"). Yerel Keycloak
+            // (Development, http://localhost:8080) için HTTPS şartını yalnızca
+            // dev ortamında gevşetiriz; üretim issuer'ı https olduğundan
+            // RequireHttpsMetadata varsayılan (true) kalır.
+            if (keycloakIssuer is string issuer &&
+                !issuer.StartsWith("https", StringComparison.OrdinalIgnoreCase) &&
+                builder.Environment.IsDevelopment())
+            {
+                options.RequireHttpsMetadata = false;
+            }
         });
 }
 builder.Services.AddCors(options =>
