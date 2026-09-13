@@ -61,7 +61,7 @@ export {
   SchemaCriteriaFilter,
   type SchemaCriteriaFilterHandle,
   type SchemaCriteriaFilterProps,
-} from "./components/SchemaCriteriaFilter"
+} from "./components/criteria-filter/schema-criteria-filter"
 export {
   SchemaCriteriaFilterGroup,
   type SchemaCriteriaFilterGroupHandle,

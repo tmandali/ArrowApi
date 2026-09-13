@@ -6,10 +6,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { agentSessionPath, isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
 import { useUserAgentsStore } from "@/lib/stores/user-agents"
-import {
-  AIChatPanel,
-  AIChatPanelTitle,
-} from "@/components/layout/ai-chat-assistant"
+import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
+import { AIChatPanelTitle } from "@/components/layout/ai-chat/ai-chat-panel-title";
 import { YULA } from "@/components/layout/yula-brand-data"
 import { Button } from "@/components/ui/button"
 import {

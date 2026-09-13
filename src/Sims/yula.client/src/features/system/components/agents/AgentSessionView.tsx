@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Bot, Settings, SquarePen, Trash2 } from "lucide-react";
-import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
+import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { Button } from "@/components/ui/button";

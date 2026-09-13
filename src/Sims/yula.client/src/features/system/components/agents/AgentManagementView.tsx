@@ -9,7 +9,7 @@ import {
   DetailHistoryToggle,
   type TabbedDetailTab,
 } from "@/components/layout/tabbed-detail";
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant";
 import { Button } from "@/components/ui/button";
 import {
   panelHeaderIconClass,

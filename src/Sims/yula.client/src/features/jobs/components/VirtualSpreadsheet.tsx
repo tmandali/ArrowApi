@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { useVirtualWindow } from "@/hooks/use-virtual-window"
 import { useYulaGridStore } from "@/lib/stores/grid"
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 import {
   panelCardClass,
   panelHeaderClass,

@@ -12,7 +12,7 @@ import { readJobEndpoint } from "../lib/job-endpoint"
 import {
   SchemaCriteriaFilter,
   type SchemaCriteriaFilterHandle,
-} from "./SchemaCriteriaFilter"
+} from "./criteria-filter/schema-criteria-filter"
 
 function schemaTabId(schema: JsonSchemaObject, index: number): string {
   const raw =

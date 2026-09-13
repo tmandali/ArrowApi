@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useLocale, useTranslations } from "next-intl"
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant";
 import {
   DetailHistoryToggle,
   type TabbedDetailTab,

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { RefreshCwIcon } from "lucide-react";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { BlankWorkspaceLanding } from "@/components/layout/blank-workspace-landing";
 

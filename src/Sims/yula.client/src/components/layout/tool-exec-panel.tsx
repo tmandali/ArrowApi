@@ -4,7 +4,7 @@ import * as React from "react"
 import { useTranslations } from "next-intl"
 import { ChevronDown, Wrench } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChatMarkdown } from "./chat-markdown";
+import { ChatMarkdown } from "./chat-markdown/chat-markdown";
 import { cn } from "@/utils/cn";
 
 /**

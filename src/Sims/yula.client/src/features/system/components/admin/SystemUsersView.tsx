@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant";
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { panelCardClass } from "@/components/layout/panel-chrome";

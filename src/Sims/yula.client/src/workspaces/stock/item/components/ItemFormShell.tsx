@@ -39,7 +39,7 @@ import {
 } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
-import { AIChatAssistant } from "@/components/layout/ai-chat-assistant"
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 import { panelCardClass } from "@/components/layout/panel-chrome";
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"

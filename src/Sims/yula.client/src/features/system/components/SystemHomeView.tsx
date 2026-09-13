@@ -4,7 +4,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { SquarePen, Settings } from "lucide-react";
-import { AIChatPanel } from "@/components/layout/ai-chat-assistant";
+import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { WorkspacePinnedItemsGrid } from "@/components/layout/workspace-pinned-items-grid";

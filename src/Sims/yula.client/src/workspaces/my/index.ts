@@ -8,7 +8,7 @@ export { myNav, myDashboardPath } from "./routes";
  * `my` workspace içerik standardı gereği burada yaşar; `app/my/settings`
  * sayfası ince zarf olarak tüketir.
  */
-export { MySettingsForm } from "./components/MySettingsForm";
+export { MySettingsForm } from "./components/settings/my-settings-form";
 
 /**
  * `my` workspace oturum kapısı — `my/*` sayfaları bu bileşenle sarılır.
