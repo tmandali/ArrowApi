@@ -9,7 +9,7 @@ import { cn } from "@/utils/cn";
 const rowClass =
   "flex min-w-0 items-center rounded-md px-2 py-1.5 text-xs transition-colors"
 const rowStyleClass = "text-muted-foreground hover:bg-muted hover:text-foreground"
-const rowActiveClass = "bg-primary/10 text-primary font-medium"
+const rowActiveClass = "bg-primary/10 text-primary font-medium dark:bg-primary/15 dark:text-sidebar-primary ring-1 ring-primary/20 dark:ring-primary/30"
 
 /**
  * Rapor sayfalarının BAĞIMSIZ pane içeriği (ModuleNavPane.paneContent):
