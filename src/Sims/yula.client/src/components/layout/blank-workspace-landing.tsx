@@ -43,10 +43,6 @@ export interface WorkspaceLandingTemplateProps {
   workspaceId?: WorkspaceId;
   customData?: Partial<WorkspaceLandingData>;
   withoutShell?: boolean;
-  /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
-  navMenuHeaderVisible?: boolean;
-  /** Menü kapalıyken sol üstte açma butonu (varsayılan: false — header'daki toggle yeter). */
-  floatingOpenButton?: boolean;
 }
 
 // Gözü yormayan yumuşak pastel renk tonları (soft & muted)
@@ -99,8 +95,6 @@ export function WorkspaceLandingTemplate({
   workspaceId: propWorkspaceId,
   customData,
   withoutShell = false,
-  navMenuHeaderVisible = true,
-  floatingOpenButton,
 }: WorkspaceLandingTemplateProps) {
   const t = useTranslations("WorkspaceLanding")
   const locale = useLocale()
@@ -426,11 +420,6 @@ export function WorkspaceLandingTemplate({
       title={<PageHeaderTitle>{data.greetingTitle}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
-      navMenuHeaderVisible={navMenuHeaderVisible}
-      // Header'daki PagePanelTrigger menüyü açıp kapatır — overlay
-      // pane'in ikinci (yüzen) açma butonu render edilmez.
-      floatingOpenButton={floatingOpenButton ?? false}
     >
       {content}
     </WorkspacePageShell>
@@ -442,24 +431,16 @@ export interface BlankWorkspaceLandingProps {
   description?: string;
   icon?: LucideIcon;
   withoutShell?: boolean;
-  /** Nav menü header / kapatma butonunun görünürlüğü (workspace ana sayfalarında varsayılan: true). */
-  navMenuHeaderVisible?: boolean;
-  /** Menü kapalıyken sol üstte açma butonu (varsayılan: false — header'daki toggle yeter). */
-  floatingOpenButton?: boolean;
 }
 
 export function BlankWorkspaceLanding({
   title,
   description,
   withoutShell = false,
-  navMenuHeaderVisible = true,
-  floatingOpenButton,
 }: BlankWorkspaceLandingProps) {
   return (
     <WorkspaceLandingTemplate
       withoutShell={withoutShell}
-      navMenuHeaderVisible={navMenuHeaderVisible}
-      floatingOpenButton={floatingOpenButton}
       customData={{
         ...(title ? { greetingTitle: title } : {}),
         ...(description ? { greetingDescription: description } : {}),

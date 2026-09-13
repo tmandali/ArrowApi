@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -144,6 +145,25 @@ export type ModuleNavMenuProps = {
  * menü verisi); seçili item vurgusu yapılır, gruplar aktif sayfa
  * içeriyorsa açılır.
  */
+/**
+ * Nav başlık lokalizasyonu (SystemNav / NavMenu beyan listeleri) — rapor
+ * listesi gibi bağımsız pane içerikleri ile ana menü arasında tutarlılık
+ * için aynı kuralı dışarı açar.
+ */
+export function useNavTitleLocalizer(pathname: string) {
+  const tNav = useTranslations("SystemNav")
+  const tMenu = useTranslations("NavMenu")
+  const navKeys = NAV_MENU_KEYS[getWorkspaceForPath(pathname).id]
+
+  return (url: string, fallback: string): string => {
+    const sysKey = SYSTEM_NAV_KEYS[url]
+    if (sysKey) return tNav(sysKey)
+    const key = navKeys?.[url]
+    if (key) return tMenu(key)
+    return fallback
+  }
+}
+
 export function ModuleNavMenu({
   className,
 }: ModuleNavMenuProps = {}) {
@@ -157,23 +177,36 @@ export function ModuleNavMenu({
   const items = allItems.filter(
     (item) => !item.adminOnly || (sessionStatus === "authenticated" && roleReady && isAdmin),
   )
-  const tNav = useTranslations("SystemNav")
-  const tMenu = useTranslations("NavMenu")
-  const workspaceId = getWorkspaceForPath(pathname).id
-  const navKeys = NAV_MENU_KEYS[workspaceId]
+  const localizedTitle = useNavTitleLocalizer(pathname)
 
   /**
-   * Başlık çözümleme: sistem URL'leri → `SystemNav`; workspace URL'leri →
-   * `NavMenu` (aktif workspace beyan listesi); beyan listesinde olmayan
-   * öğeler veri metniyle (İngilizce ERP domain terimi) kalır.
+   * Grup (collapsible) açık/kapalı durumu — pathname'a duyarlı kontrollü state:
+   * iç sayfaya derin bağlantı / dış yönlendirme ile gelinince grup otomatik
+   * AÇILIR ve rapor listesi görünür (yalnız ilk mount'ta defaultOpen
+   * davranışını düzeltir). Kullanıcı el ile kapatırsa o URL'de kapalı kalır.
    */
-  const localizedTitle = (url: string, fallback: string): string => {
-    const sysKey = SYSTEM_NAV_KEYS[url]
-    if (sysKey) return tNav(sysKey)
-    const key = navKeys?.[url]
-    if (key) return tMenu(key)
-    return fallback
-  }
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({})
+  React.useEffect(() => {
+    setOpenGroups((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const item of allItems) {
+        const childActive = item.items?.some((subItem) => subItem.url === pathname) ?? false
+        if (childActive && !next[item.url]) {
+          next[item.url] = true
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [pathname, allItems])
+
+  const toggleGroup = React.useCallback(
+    (url: string, open: boolean) => {
+      setOpenGroups((prev) => (prev[url] === open ? prev : { ...prev, [url]: open }))
+    },
+    []
+  )
 
   return (
     <section className={cn("flex h-full min-w-0 flex-col", className)}>
@@ -207,7 +240,8 @@ export function ModuleNavMenu({
           return (
             <Collapsible
               key={item.url}
-              defaultOpen={Boolean(isChildActive)}
+              open={openGroups[item.url] ?? Boolean(isChildActive)}
+              onOpenChange={(open) => toggleGroup(item.url, open)}
               className="group/nav-item"
             >
               <CollapsibleTrigger className={cn(rowClass, "w-full", rowStyleClass)}>

@@ -916,6 +916,7 @@
   },
   "ReportCriteria": {
     "validation_failed": "Validation failed",
+    "reports_panel": "Reports",
     "schema_missing_endpoint": "Schema x-job-endpoint is missing",
     "job_create_failed": "Job create failed",
     "cancel": "Cancel",

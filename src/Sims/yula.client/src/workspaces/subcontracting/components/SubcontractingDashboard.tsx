@@ -15,7 +15,6 @@ export function SubcontractingDashboard() {
       title={<PageHeaderTitle>{t("subcontracting_title")}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

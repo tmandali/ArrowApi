@@ -16,15 +16,19 @@ export interface RegisteredPagePanel {
 
 export interface PagePanelContextValue {
   registered: RegisteredPagePanel | null;
+  /** Sayfa header trigger'ının varsayılan paneli: register edilmiş bir pane var mı? */
+  hasRegisteredPane: boolean;
   openById: Record<string, boolean>;
   register: (panel: RegisteredPagePanel) => void;
   unregister: (id: string) => void;
   setOpen: (id: string, open: boolean) => void;
 }
 
+// Sayfa header trigger'ının varsayılan hedefi: BAĞIMSIZ sayfa pane'i.
+// Ana nav menüyle (AppHeader "module-nav" drawer'ı) hiçbir bağlantısı yok.
 export const DEFAULT_PAGE_PANEL: RegisteredPagePanel = {
-  id: "module-nav",
-  title: "Menu",
+  id: "page-pane",
+  title: "Panel",
   defaultOpen: false,
 };
 
@@ -35,6 +39,7 @@ export function usePagePanelContext(): PagePanelContextValue {
   if (!ctx) {
     return {
       registered: DEFAULT_PAGE_PANEL,
+      hasRegisteredPane: false,
       openById: {},
       register: () => {},
       unregister: () => {},

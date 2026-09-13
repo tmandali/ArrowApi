@@ -15,7 +15,6 @@ export function AccountingDashboard() {
       title={<PageHeaderTitle>{t("accounting_title")}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

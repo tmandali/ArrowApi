@@ -31,15 +31,14 @@ type WorkspacePageShellProps = {
   className?: string
   /** Extra classes for the inner dock children container. */
   contentClassName?: string
-  /** Nav menü tepesindeki kapatma butonu / başlık alanının görünürlüğü (varsayılan: false). */
-  navMenuHeaderVisible?: boolean
-  /** Menü kapalıyken açma butonunun gösterilip gösterilmeyeceği (varsayılan: isNavMenuHeaderVisible). */
-  floatingOpenButton?: boolean
   /**
-   * Nav menü overlay modu: menü içeriği itmez, solda üstte açılır.
-   * Ortalanmış ana ekranlarda (ajan oturumu) aç/kapa kaymasını önler.
+   * ModuleNavPane'in solundaki bağımsız pane içeriği (ana nav menüden AYRI;
+   * ana menü AppHeader başlığı ile açılan overlay çekmece'dedir).
+   * Verilmezse resizable pane render edilmez.
    */
-  navOverlay?: boolean
+  paneContent?: ReactNode
+  /** Pane içeriğinin page header trigger'ı tooltip'indeki başlığı. */
+  paneTitle?: string
 }
 
 /**
@@ -61,13 +60,9 @@ export function WorkspacePageShell({
   children,
   className,
   contentClassName,
-  navMenuHeaderVisible,
-  floatingOpenButton,
-  navOverlay = false,
+  paneContent,
+  paneTitle,
 }: WorkspacePageShellProps) {
-  // Page header gizlendiğinde (ana sayfalar/panolar) menü kapatma butonu erişilebilir olsun
-  const isNavMenuHeaderVisible = navMenuHeaderVisible ?? hideHeader;
-
   return (
     <div
       className={cn(
@@ -89,11 +84,7 @@ export function WorkspacePageShell({
         </WorkspacePageHeader>
       )}
       <WorkspaceAiDock className={contentClassName}>
-        <ModuleNavPane
-          navMenuHeaderVisible={isNavMenuHeaderVisible}
-          floatingOpenButton={floatingOpenButton ?? isNavMenuHeaderVisible}
-          overlay={navOverlay}
-        >
+        <ModuleNavPane paneContent={paneContent} paneTitle={paneTitle}>
           {children}
         </ModuleNavPane>
       </WorkspaceAiDock>

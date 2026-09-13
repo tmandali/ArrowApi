@@ -1,15 +1,13 @@
 "use client";
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { NavUser } from "@/components/layout/nav-user"
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace"
-import {
-  workspaceRootPathByWorkspace,
-} from "@/lib/workspace-nav"
+import { usePagePanelContext } from "@/context/page-panel-context"
+import { Menu } from "lucide-react"
 import { YULA } from "@/components/layout/yula-brand-data"
 import { cn } from "@/utils/cn"
 import type { WorkspaceId } from "@/types"
@@ -21,22 +19,22 @@ import type { WorkspaceId } from "@/types"
  */
 export function AppHeader({ className }: { className?: string }) {
   const t = useTranslations("AppHeader")
-  const router = useRouter()
+  const tMenu = useTranslations("ModuleNav")
   const activeWorkspaceId = useActiveWorkspaceId()
+  // Ana nav menü çekmecesi (overlay) — global "module-nav" paneli.
+  // Hamburger kaldırıldı; menüyü AppHeader'daki başlık açıp kapatır.
+  const { openById, setOpen } = usePagePanelContext()
+  const navOpen = openById["module-nav"] ?? false
+  const menuLabel = navOpen ? tMenu("close_menu") : tMenu("open_menu_short")
   // Workspace adı dil takımla çözülür (`AppHeader.workspace_<id>`) —
   // registry `name`'i (English) header için yerini almıştır.
   const workspaceName = activeWorkspaceId
     ? t(`workspace_${activeWorkspaceId}` as `workspace_${WorkspaceId}`)
     : undefined
 
-  // "Yula <Workspace>" marka satırı → her zaman workspace ana sayfası (landing).
-  // Aktif workspace yoksa Yula ana ekranına döner.
+  // "Yula <Workspace>" marka satırı ana nav menüyü açıp kapatır.
   const handleBrandClick = () => {
-    router.push(
-      activeWorkspaceId
-        ? workspaceRootPathByWorkspace[activeWorkspaceId] ?? "/"
-        : "/"
-    )
+    setOpen("module-nav", !navOpen)
   }
 
   return (
@@ -46,12 +44,17 @@ export function AppHeader({ className }: { className?: string }) {
         className
       )}
     >
+      {/* Başlık: ana nav menüyü overlay çekmece olarak açıp kapatır. */}
       <button
         type="button"
         onClick={handleBrandClick}
-        className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left transition-opacity hover:opacity-80"
-        title={t("module_home")}
+        title={menuLabel}
+        aria-label={menuLabel}
+        aria-pressed={navOpen}
+        aria-expanded={navOpen}
+        className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-hidden text-left transition-opacity hover:opacity-80 cursor-pointer"
       >
+        <Menu className="size-4 shrink-0 text-primary dark:text-sidebar-primary" aria-hidden />
         <span
           className="shrink-0 text-sm font-semibold tracking-tight text-primary dark:text-sidebar-primary"
         >
@@ -68,7 +71,7 @@ export function AppHeader({ className }: { className?: string }) {
       <div className="flex min-w-0 flex-1 items-center justify-center">
         <WorkspaceSearchTrigger />
       </div>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-2">
         <WorkspaceNotificationPopover />
         <NavUser />
       </div>

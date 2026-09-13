@@ -15,7 +15,6 @@ export function SellingDashboard() {
       title={<PageHeaderTitle>{t("selling_title")}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

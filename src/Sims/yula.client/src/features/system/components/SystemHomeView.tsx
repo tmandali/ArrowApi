@@ -125,7 +125,6 @@ export function SystemHomeView() {
       actions={<YulaSessionHeaderActions agentId={displayAgentId} />}
       showSearch={false}
       transparentHeader
-      navOverlay
     >
       <AIChatPanel
         mode="main"

@@ -5,7 +5,6 @@ import { PanelLeftIcon } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
 import {
-  DEFAULT_PAGE_PANEL,
   usePagePanelContext,
 } from "@/context/page-panel-context"
 import { useTranslations } from "next-intl"
@@ -18,17 +17,22 @@ type PagePanelTriggerProps = {
 }
 
 /**
- * Header toggle for the page's registered panel (e.g. Executions on criteria
- * pages). Renders immediately using DEFAULT_PAGE_PANEL to prevent layout shift on reload.
+ * Sayfa header'ındaki BAĞIMSIZ pane toggle'ı — yalnız register edilmiş
+ * sayfa pane'i hedeflenir (ModuleNavPane + paneContent). Pane register
+ * edilmemiş sayfalarda render edilmez; ana nav menüyle (AppHeader
+ * başlığı) hiçbir bağlantısı yoktur.
  */
 export function PagePanelTrigger({
   className,
   separatorClassName,
 }: PagePanelTriggerProps) {
-  const { registered, openById, setOpen } = usePagePanelContext()
+  const { registered, hasRegisteredPane, openById, setOpen } = usePagePanelContext()
   const t = useTranslations("PagePanelTrigger")
 
-  const panel = registered ?? DEFAULT_PAGE_PANEL
+  // Bağımsız pane yoksa trigger da yok — sayfa header'i başlıkla başlar.
+  if (!hasRegisteredPane || !registered) return null
+
+  const panel = registered
   const open = openById[panel.id] ?? panel.defaultOpen
   const label = open
     ? t("close_panel", { title: panel.title })

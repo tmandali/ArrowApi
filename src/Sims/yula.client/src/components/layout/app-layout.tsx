@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { AppHeader } from "@/components/layout/app-header"
+import { MainNavDrawer } from "@/components/layout/main-nav-drawer"
+import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator"
 import { WorkspaceIconRail } from "@/components/layout/workspace-icon-rail"
 import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat"
 import { WorkspaceSearchProvider } from "@/context/workspace-search"
@@ -26,6 +28,10 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {children}
               </div>
+              {/* Rotalı geçişte ince üst şerit — boş alan flaşı yerine geçiş sinyali */}
+              <RouteTransitionIndicator />
+              {/* Ana nav menü: AppHeader başlığı ile açılan overlay çekmece */}
+              <MainNavDrawer />
             </main>
           </WorkspaceAiChatProvider>
         </div>

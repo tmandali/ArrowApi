@@ -916,6 +916,7 @@
   },
   "ReportCriteria": {
     "validation_failed": "Doğrulama başarısız",
+    "reports_panel": "Raporlar",
     "schema_missing_endpoint": "Şemada x-job-endpoint eksik",
     "job_create_failed": "İş oluşturulamadı",
     "cancel": "Vazgeç",

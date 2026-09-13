@@ -197,7 +197,6 @@ export function AgentSessionView() {
       showSearch={false}
       transparentHeader
       actions={<AgentSessionHeaderActions agentId={agent.id} />}
-      navOverlay
     >
       <AIChatPanel mode="main" />
     </WorkspacePageShell>

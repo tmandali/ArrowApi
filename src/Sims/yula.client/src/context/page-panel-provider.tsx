@@ -4,7 +4,6 @@ import * as React from "react";
 import {
   PAGE_PANEL_COOKIE_NAME,
   PAGE_PANEL_STORAGE_KEY,
-  DEFAULT_PAGE_PANEL,
   PagePanelContext,
   type PagePanelContextValue,
   type RegisteredPagePanel,
@@ -27,9 +26,8 @@ export function PagePanelProvider({
   children: React.ReactNode;
   initialOpenById?: Record<string, boolean>;
 }) {
-  const [registered, setRegistered] = React.useState<RegisteredPagePanel | null>(
-    DEFAULT_PAGE_PANEL
-  );
+  const [registered, setRegistered] =
+    React.useState<RegisteredPagePanel | null>(null);
 
   const [openById, setOpenById] = React.useState<Record<string, boolean>>(
     () => initialOpenById
@@ -40,7 +38,7 @@ export function PagePanelProvider({
   }, []);
 
   const unregister = React.useCallback((id: string) => {
-    setRegistered((current) => (current?.id === id ? DEFAULT_PAGE_PANEL : current));
+    setRegistered((current) => (current?.id === id ? null : current));
   }, []);
 
   const setOpen = React.useCallback((id: string, open: boolean) => {
@@ -50,6 +48,7 @@ export function PagePanelProvider({
   const value = React.useMemo<PagePanelContextValue>(
     () => ({
       registered,
+      hasRegisteredPane: registered !== null,
       openById,
       register,
       unregister,

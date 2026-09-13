@@ -15,7 +15,6 @@ export function ManufacturingDashboard() {
       title={<PageHeaderTitle>{t("manufacturing_title")}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

@@ -20,7 +20,6 @@ export function StockPageForm() {
       title={<PageHeaderTitle>{t("page_dashboard")}</PageHeaderTitle>}
       showSearch={false}
       transparentHeader
-      navOverlay
       actions={<AIChatAssistant />}
     >
       <StockDashboard />
