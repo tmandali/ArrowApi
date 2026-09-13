@@ -954,6 +954,7 @@
     "job_delete_failed": "Job could not be deleted",
     "cancel": "Cancel",
     "delete_execution": "Delete execution",
+    "past_jobs": "{title} history",
     "run_plural": "run",
     "rows_plural": "row",
     "opfs_parts": "{count} parts ({size})",

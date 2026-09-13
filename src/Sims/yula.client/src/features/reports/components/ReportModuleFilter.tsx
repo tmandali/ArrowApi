@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { RotateCcw } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { useAgentCriteriaStore } from "@/hooks/use-agent-criteria-bridge"
 import {
   SchemaCriteriaFilter,
@@ -80,6 +81,7 @@ export const ReportModuleFilter = React.forwardRef<
 ) {
   const composing = Boolean(jobSession?.composing)
   const criteriaLocked = Boolean(jobSession?.criteriaLocked)
+  const tExecutions = useTranslations("JobExecutions")
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
   const aiFilled = useAgentCriteriaStore(
     (state) => state.aiFilledCriteria[jobName]
@@ -129,7 +131,7 @@ export const ReportModuleFilter = React.forwardRef<
       <ArrowJobExecutionsPanel
         jobsEndpoint={jobsEndpoint}
         jobName={jobName}
-        emptyListHint={emptyListHint ?? `Past ${title} jobs`}
+        emptyListHint={emptyListHint ?? tExecutions("past_jobs", { title })}
         activeJobId={jobSession?.activeJobId}
         activeLiveStatus={jobSession?.activeLiveStatus}
         activeRequestJson={jobSession?.activeRequestJson}

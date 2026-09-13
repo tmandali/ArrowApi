@@ -954,6 +954,7 @@
     "job_delete_failed": "İş silinemedi",
     "cancel": "Vazgeç",
     "delete_execution": "Çalışmayı sil",
+    "past_jobs": "{title} geçmişi",
     "run_plural": "çalışma",
     "rows_plural": "satır",
     "opfs_parts": "{count} parça ({size})",
