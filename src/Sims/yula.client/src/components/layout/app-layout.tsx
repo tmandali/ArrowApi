@@ -36,8 +36,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           <WorkspaceAiChatProvider>
             <div className="flex min-h-0 min-w-0 flex-1 w-full overflow-hidden bg-sidebar">
               <ModuleSidebar />
-              {/* Content Frame: Header ve Sol Nav'a sıfır yanaşan, sağ ve alt kenarları yuvarlatılmış (rounded-2xl) ve çerçeveli tuval */}
-              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden mr-2 mb-2 rounded-2xl border border-border dark:border-[#232734] bg-background shadow-xs transition-colors duration-200">
+              {/* Content Frame: Üst köşeleri kavisli (rounded-t-2xl), alttan tam boy uzanan tuval */}
+              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden mr-2 rounded-t-2xl border-t border-l border-r border-border dark:border-[#232734] bg-background shadow-xs transition-colors duration-200">
                 <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                   {children}
                 </div>
