@@ -40,18 +40,18 @@ export function WorkspaceSelectorDropdown({ className }: { className?: string })
           type="button"
           aria-label="Çalışma alanı seçici"
           className={cn(
-            "flex h-7 items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 text-xs font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer",
+            "flex h-7 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2 text-xs font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30 cursor-pointer",
             className
           )}
         >
           {React.createElement(workspaceIconFor(activeWorkspaceId) ?? LayoutGrid, {
-            className: "size-3.5 shrink-0 text-orange-600 dark:text-orange-400",
+            className: "size-3.5 shrink-0 text-orange-400",
             "aria-hidden": true,
           })}
-          <span className="max-w-[130px] truncate text-xs font-medium">
+          <span className="max-w-[130px] truncate text-xs font-medium text-white">
             {activeWsName}
           </span>
-          <ChevronDown className="size-3 shrink-0 text-muted-foreground opacity-60" aria-hidden />
+          <ChevronDown className="size-3 shrink-0 text-white/60" aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56 p-1">

@@ -60,82 +60,72 @@ export function ModuleSidebar({ className }: { className?: string }) {
 
   const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
 
-  React.useEffect(() => {
-    setOpenGroups((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const item of allItems) {
-        const childActive = item.items?.some((subItem) => subItem.url === pathname) ?? false;
-        if (childActive && !next[item.url]) {
-          next[item.url] = true;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [pathname, allItems]);
-
   const toggleGroup = React.useCallback((url: string, open: boolean) => {
     setOpenGroups((prev) => (prev[url] === open ? prev : { ...prev, [url]: open }));
   }, []);
 
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state } = useSidebar();
 
   return (
     <Sidebar
       collapsible="icon"
       className={cn(
-        "top-(--header-height) h-[calc(100svh-var(--header-height))] border-r border-border/60 bg-card/60 backdrop-blur-md z-20",
+        "top-(--header-height) h-[calc(100svh-var(--header-height))] border-none group-data-[side=left]:border-none border-r-0 bg-[#13151b] z-20 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden",
         className
       )}
+      style={
+        {
+          "--sidebar": "#13151b",
+          "--sidebar-foreground": "#e5e7eb",
+          "--sidebar-border": "transparent",
+          "--sidebar-accent": "rgba(255, 255, 255, 0.08)",
+          "--sidebar-accent-foreground": "#ffffff",
+          "--sidebar-primary": "oklch(0.623 0.214 259.815)",
+          "--sidebar-primary-foreground": "#ffffff",
+        } as React.CSSProperties
+      }
     >
-      <SidebarHeader className="h-10 flex-row items-center justify-between border-b border-border/40 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-        {/* Genişletilmiş mod: Sol tarafta ikon + başlık, sağda daraltma butonu */}
-        <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
-          {React.createElement(workspaceIconFor(activeWorkspaceId) ?? LayoutGrid, {
-            className: "size-4 shrink-0 text-orange-600 dark:text-orange-400",
-            "aria-hidden": true,
-          })}
-          <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+      <SidebarHeader className="h-12 flex-row items-center overflow-hidden border-none px-2">
+        {/* Workspace ikonu: Hem açıkken hem kapalıyken sol 8px noktasında sabit durur, asla zıplamaz */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={`${activeWsName} — Menüyü Aç / Kapat`}
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-orange-400 transition-colors hover:bg-white/10 hover:text-orange-300 cursor-pointer"
+            >
+              {React.createElement(workspaceIconFor(activeWorkspaceId) ?? LayoutGrid, {
+                className: "size-4.5 shrink-0",
+                "aria-hidden": true,
+              })}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center" hidden={state !== "collapsed"}>
+            {activeWsName} (Menüyü Genişlet)
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Başlık ve daraltma butonu: Açıkken görünür, daralırken pürüzsüzce silinir */}
+        <div className="flex min-w-0 flex-1 items-center justify-between pl-2 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none">
+          <span className="truncate text-xs font-semibold tracking-tight text-white">
             {activeWsName}
           </span>
-        </div>
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          title="Menüyü Daralt"
-          aria-label="Menüyü Daralt"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground cursor-pointer group-data-[collapsible=icon]:hidden"
-        >
-          <PanelLeftClose className="size-4 shrink-0" aria-hidden />
-        </button>
-
-        {/* Küçültülmüş (İkon) modu: Genişlet ikonu yerine seçili workspace ikonu gösterilir, tıklandığında menüyü genişletir */}
-        <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                aria-label={`${activeWsName} — Menüyü Genişlet`}
-                className="flex size-8 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-sidebar-accent hover:text-orange-500 dark:text-orange-400 cursor-pointer"
-              >
-                {React.createElement(workspaceIconFor(activeWorkspaceId) ?? LayoutGrid, {
-                  className: "size-4.5 shrink-0",
-                  "aria-hidden": true,
-                })}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" align="center">
-              {activeWsName} (Menüyü Genişlet)
-            </TooltipContent>
-          </Tooltip>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Menüyü Daralt"
+            aria-label="Menüyü Daralt"
+            className="flex size-7 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
+          >
+            <PanelLeftClose className="size-4 shrink-0" aria-hidden />
+          </button>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="p-1">
-        <SidebarGroup className="p-0">
-          <SidebarMenu>
+      <SidebarContent className="overflow-x-hidden px-0">
+        <SidebarGroup className="px-2">
+          <SidebarMenu className="gap-1">
             {items.map((item) => {
               const hasChildren = Boolean(item.items && item.items.length > 0);
               const isChildActive = item.items?.some(
@@ -146,22 +136,37 @@ export function ModuleSidebar({ className }: { className?: string }) {
               if (!hasChildren) {
                 const isActive = item.url === pathname;
                 return (
-                  <SidebarMenuItem key={item.url}>
+                  <SidebarMenuItem key={item.url} className="relative">
+                    {/* Seçili durumda sol kenarda beliren mavi gösterge çizgisi */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute top-1/2 -left-1.5 h-5 w-1 -translate-y-1/2 rounded-full bg-primary z-10 transition-opacity duration-200 pointer-events-none",
+                        isActive ? "group-data-[collapsible=icon]:opacity-100 opacity-0" : "opacity-0"
+                      )}
+                    />
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
                       tooltip={title}
                       className={cn(
-                        "text-xs transition-colors",
-                        isActive && "bg-primary/10 text-primary font-medium dark:bg-primary/15 dark:text-sidebar-primary ring-1 ring-primary/20 dark:ring-primary/30"
+                        "relative text-xs transition-colors",
+                        isActive
+                          ? "bg-white/10 text-primary font-medium ring-1 ring-white/15 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:ring-0 group-data-[collapsible=icon]:text-primary"
+                          : "text-white/70 hover:bg-white/8 hover:text-white"
                       )}
                     >
-                      <Link href={item.url}>
+                      <Link href={item.url} className="flex items-center gap-2">
                         {React.createElement(item.icon, {
-                          className: "size-4 shrink-0",
+                          className: cn(
+                            "size-4.5 shrink-0 transition-colors",
+                            isActive ? "text-primary" : "text-white/70"
+                          ),
                           "aria-hidden": true,
                         })}
-                        <span className="truncate">{title}</span>
+                        <span className="truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+                          {title}
+                        </span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -173,28 +178,43 @@ export function ModuleSidebar({ className }: { className?: string }) {
                   key={item.url}
                   open={openGroups[item.url] ?? Boolean(isChildActive)}
                   onOpenChange={(open) => toggleGroup(item.url, open)}
-                  className="group/collapsible"
+                  className="group/collapsible relative w-full"
                 >
-                  <SidebarMenuItem>
+                  <SidebarMenuItem className="relative">
+                    {/* Seçili durumda sol kenarda beliren mavi gösterge çizgisi */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute top-1/2 -left-1.5 h-5 w-1 -translate-y-1/2 rounded-full bg-primary z-10 transition-opacity duration-200 pointer-events-none",
+                        isChildActive ? "group-data-[collapsible=icon]:opacity-100 opacity-0" : "opacity-0"
+                      )}
+                    />
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
                         tooltip={title}
                         isActive={isChildActive}
                         className={cn(
-                          "text-xs transition-colors",
-                          isChildActive && "font-medium text-foreground"
+                          "relative text-xs transition-colors",
+                          isChildActive
+                            ? "font-medium text-white group-data-[collapsible=icon]:text-primary group-data-[collapsible=icon]:bg-transparent"
+                            : "text-white/70 hover:bg-white/8 hover:text-white"
                         )}
                       >
                         {React.createElement(item.icon, {
-                          className: "size-4 shrink-0",
+                          className: cn(
+                            "size-4.5 shrink-0 transition-colors",
+                            isChildActive ? "text-primary" : "text-white/70"
+                          ),
                           "aria-hidden": true,
                         })}
-                        <span className="truncate">{title}</span>
-                        <ChevronRight className="ml-auto size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
+                        <span className="truncate transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+                          {title}
+                        </span>
+                        <ChevronRight className="ml-auto size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden text-white/50" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="mr-0 border-l border-border/60 pl-3">
+                      <SidebarMenuSub className="mr-0 border-l border-[#232734] pl-3">
                         {item.items?.map((subItem) => {
                           const isSubActive = subItem.url === pathname;
                           const subTitle = localizedTitle(subItem.url, subItem.title);
@@ -204,8 +224,8 @@ export function ModuleSidebar({ className }: { className?: string }) {
                                 asChild
                                 isActive={isSubActive}
                                 className={cn(
-                                  "text-xs transition-colors",
-                                  isSubActive && "bg-primary/10 text-primary font-medium dark:bg-primary/15 dark:text-sidebar-primary"
+                                  "text-xs text-white/70 transition-colors hover:bg-white/8 hover:text-white",
+                                  isSubActive && "bg-white/10 text-white font-medium"
                                 )}
                               >
                                 <Link href={subItem.url}>
