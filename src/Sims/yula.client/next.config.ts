@@ -7,6 +7,7 @@ const backendUrl = process.env.BACKEND_URL ?? "http://localhost:5168";
 const computerName = process.env.COMPUTERNAME || "timurmandali2";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@electric-sql/pglite"],
   // Client'e açık env — Google One Tap (GIS) butonu AUTH_GOOGLE_ID'yi
   // `NEXT_PUBLIC_GOOGLE_CLIENT_ID` olarak kullanır (build'de, .env'den okunur).
   // Yalnızca public client id açılır; AUTH_GOOGLE_SECRET client'a ASLA verilmez.
