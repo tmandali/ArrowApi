@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { SquarePen, Settings } from "lucide-react";
 import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
-import { WorkspacePinnedItemsGrid } from "@/components/layout/workspace-pinned-items-grid";
 import { Button } from "@/components/ui/button";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
@@ -95,15 +94,10 @@ function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
 }
 
 export function SystemHomeView() {
-  const pathname = usePathname();
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
   const agents = useUserAgentsStore((s) => s.agents);
   const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
-
-  // Yula root (/): tüm pinler yerine aynı kutu biçimiyle çalışma alanları.
-  // Workspace root'ları: o çalışma alanına ait pinler (path filtresi).
-  const isYulaRoot = pathname === "/";
 
   // Başlıktaki ad — dock başlığıyla aynı çözüm (konuşma kaydı > global
   // seçim); ajan yoksa varsayılan Yula.
@@ -126,15 +120,7 @@ export function SystemHomeView() {
       showSearch={false}
       transparentHeader
     >
-      <AIChatPanel
-        mode="main"
-        belowInput={
-          <WorkspacePinnedItemsGrid
-            mode={isYulaRoot ? "workspaces" : "pins"}
-            className="w-full"
-          />
-        }
-      />
+      <AIChatPanel mode="main" />
     </WorkspacePageShell>
   );
 }

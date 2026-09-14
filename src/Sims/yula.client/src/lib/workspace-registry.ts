@@ -115,8 +115,24 @@ export function getWorkspaceForPath(pathname: string): WorkspaceDefinition {
 }
 
 /**
+ * Verilen URL yolunun bir Domain Workspace'e ait olup olmadığını kontrol eder.
+ * Yalnızca domain workspace rotalarında (stock, selling, subcontracting, accounting, manufacturing)
+ * sol alt navigasyon (ModuleSidebar) gösterilir. Sistem ana ekranı (/) ve sistem rotaları
+ * alt menüye sahip değildir; bu menüler ana navigasyon çekmecesinde (GlobalNavDrawer) yer alır.
+ */
+export function isDomainWorkspacePath(pathname?: string | null): boolean {
+  if (!pathname || pathname === "/") return false;
+  const ws = getWorkspaceForPath(pathname);
+  return DOMAIN_WORKSPACE_IDS.has(ws.id);
+}
+
+/**
  * Verilen URL yoluna göre sol navigasyon menüsünü döndürür.
+ * Yalnızca domain workspace rotalarında ilgili menü döner; diğer sayfalarda boş döner.
  */
 export function getWorkspaceNavForPath(pathname: string): WorkspaceNavItem[] {
+  if (!isDomainWorkspacePath(pathname)) {
+    return [];
+  }
   return getWorkspaceForPath(pathname).navigation;
 }

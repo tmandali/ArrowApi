@@ -101,41 +101,43 @@ export function NavUser() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
+        <button
+          type="button"
           aria-label="User menu"
-          className="size-7 rounded-full p-0 data-[state=open]:bg-muted"
+          className="group relative flex size-8 items-center justify-center rounded-full transition-all duration-150 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=open]:ring-2 data-[state=open]:ring-primary/50 cursor-pointer"
         >
-          <Avatar className="size-7 rounded-full after:border-0">
+          <Avatar className="size-8 rounded-full ring-1 ring-sidebar-border group-hover:ring-sidebar-foreground/30 transition-all after:border-0 shadow-xs">
             <AvatarImage
               src={user.image ?? ""}
               alt={user.name ?? ""}
             />
-            <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
+            <AvatarFallback className="rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-sidebar-foreground text-xs font-semibold tracking-wider">
               {initials}
             </AvatarFallback>
           </Avatar>
-        </Button>
+          {/* Online/Aktif durumu belirteci */}
+          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-64 rounded-xl p-1.5"
+        className="w-68 rounded-xl p-1.5 shadow-xl border-border/80"
         side="bottom"
         align="end"
         sideOffset={8}
       >
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-3 px-2 py-2.5">
-            <Avatar className="h-9 w-9 rounded-full">
+          <div className="flex items-center gap-3 px-2.5 py-3 bg-muted/40 rounded-lg">
+            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border shadow-xs">
               <AvatarImage
                 src={user.image ?? ""}
                 alt={user.name ?? ""}
               />
-              <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
+              <AvatarFallback className="rounded-full bg-linear-to-br from-primary/30 to-primary/10 text-foreground text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate text-sm font-medium">
+            <div className="grid flex-1 text-left leading-tight min-w-0">
+              <span className="truncate text-sm font-medium text-foreground">
                 {user.name}
               </span>
               <span className="truncate text-xs text-muted-foreground">

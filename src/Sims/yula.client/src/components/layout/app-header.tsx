@@ -7,15 +7,12 @@ import { Menu } from "lucide-react";
 import { NavUser } from "@/components/layout/nav-user";
 import { WorkspaceNotificationPopover } from "@/components/layout/workspace-notification-popover";
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger";
-import { WorkspaceSelectorDropdown } from "@/components/layout/workspace-selector-dropdown";
 import { usePagePanelContext } from "@/context/page-panel-context";
-import { YULA } from "@/components/layout/yula-brand-data";
-import { YulaMarkIcon } from "@/components/layout/yula-brand";
 import { cn } from "@/utils/cn";
 
 /**
  * Shell Header: Full-width top bar across the top of the viewport (Google Cloud Console pattern).
- * Left: Hamburger button (opens Global Nav Drawer) + Yula Brand + Workspace Selector dropdown.
+ * Left: Hamburger button (opens Global Nav Drawer) + Title ("OmniCore").
  * Center: Global Search trigger.
  * Right: Notifications + NavUser.
  */
@@ -36,8 +33,8 @@ export function AppHeader({ className }: { className?: string }) {
         className
       )}
     >
-      {/* Sol: Hamburger + Logo + Workspace Seçici */}
-      <div className="flex shrink-0 items-center gap-1">
+      {/* Sol: Hamburger + Başlık */}
+      <div className="flex shrink-0 items-center gap-1.5">
         {/* Hamburger butonu: Sol rail ikon sütunuyla (48px / w-12) kusursuz dikey hizada */}
         <div className="flex size-12 shrink-0 items-center justify-center">
           <button
@@ -56,18 +53,12 @@ export function AppHeader({ className }: { className?: string }) {
 
         <Link
           href="/"
-          className="flex items-center gap-1.5 transition-opacity hover:opacity-85 mr-1.5"
+          className="flex items-center transition-opacity hover:opacity-85 mr-2"
         >
-          <span className="flex size-5 shrink-0 items-center justify-center text-primary dark:text-sidebar-primary">
-            <YulaMarkIcon />
-          </span>
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            {YULA.name}
+            OmniCore
           </span>
         </Link>
-
-        {/* GCP project picker tarzı workspace dropdown */}
-        <WorkspaceSelectorDropdown />
       </div>
 
       {/* Orta: Global Arama Çubuğu */}

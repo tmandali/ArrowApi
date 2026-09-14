@@ -30,7 +30,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { getWorkspaceNavForPath } from "@/lib/workspace-registry";
+import { getWorkspaceNavForPath, isDomainWorkspacePath } from "@/lib/workspace-registry";
 import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
 import { useNavTitleLocalizer } from "@/components/layout/module-nav-menu";
 import { workspaceIconFor } from "@/components/layout/workspace-brand";
@@ -47,6 +47,19 @@ export function ModuleSidebar({ className }: { className?: string }) {
   const tRail = useTranslations("WorkspaceRail");
   const localizedTitle = useNavTitleLocalizer(pathname);
 
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
+
+  const toggleGroup = React.useCallback((url: string, open: boolean) => {
+    setOpenGroups((prev) => (prev[url] === open ? prev : { ...prev, [url]: open }));
+  }, []);
+
+  const { toggleSidebar, state } = useSidebar();
+
+  // Yalnızca domain workspace rotalarında alt menü gösterilir (ana sayfa ve sistem rotalarında gösterilmez)
+  if (!isDomainWorkspacePath(pathname)) {
+    return null;
+  }
+
   const activeWsName = activeWorkspaceId
     ? (tHeader.has(`workspace_${activeWorkspaceId}` as `workspace_${WorkspaceId}`)
         ? tHeader(`workspace_${activeWorkspaceId}` as `workspace_${WorkspaceId}`)
@@ -58,13 +71,9 @@ export function ModuleSidebar({ className }: { className?: string }) {
     (item) => !item.adminOnly || (sessionStatus === "authenticated" && roleReady && isAdmin)
   );
 
-  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
-
-  const toggleGroup = React.useCallback((url: string, open: boolean) => {
-    setOpenGroups((prev) => (prev[url] === open ? prev : { ...prev, [url]: open }));
-  }, []);
-
-  const { toggleSidebar, state } = useSidebar();
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
     <Sidebar

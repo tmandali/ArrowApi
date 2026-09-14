@@ -10,7 +10,6 @@ import {
   Sparkles,
   Settings,
   UserCog,
-  Home,
   X,
 } from "lucide-react";
 import {
@@ -54,11 +53,6 @@ export function GlobalNavDrawer() {
 
   const systemLinks = [
     {
-      url: "/",
-      label: tNav("home"),
-      icon: Home,
-    },
-    {
       url: "/system/users",
       label: tNav("system_users"),
       icon: Users,
@@ -93,14 +87,18 @@ export function GlobalNavDrawer() {
         className="flex w-72 flex-col p-0 bg-sidebar border-r border-sidebar-border text-sidebar-foreground shadow-2xl z-50"
       >
         <SheetHeader className="flex h-(--header-height) shrink-0 flex-row items-center justify-between border-b border-sidebar-border px-3.5 space-y-0">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            onClick={handleClose}
+            className="flex items-center gap-2 transition-opacity hover:opacity-85"
+          >
             <span className="flex size-6 items-center justify-center text-primary dark:text-sidebar-primary">
               <YulaMarkIcon />
             </span>
-            <SheetTitle className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+            <SheetTitle className="text-sm font-semibold tracking-tight text-sidebar-foreground cursor-pointer">
               {YULA.name}
             </SheetTitle>
-          </div>
+          </Link>
           <button
             type="button"
             onClick={handleClose}
