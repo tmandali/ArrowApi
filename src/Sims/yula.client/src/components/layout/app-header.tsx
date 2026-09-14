@@ -47,6 +47,7 @@ export function AppHeader({ className }: { className?: string }) {
       {/* Başlık: ana nav menüyü overlay çekmece olarak açıp kapatır. */}
       <button
         type="button"
+        data-slot="nav-menu-toggle"
         onClick={handleBrandClick}
         title={menuLabel}
         aria-label={menuLabel}
