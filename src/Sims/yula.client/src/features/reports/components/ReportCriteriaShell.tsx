@@ -10,7 +10,6 @@ import { RecordModeChip, type RecordMode } from "@/components/layout/record-mode
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
-import { ReportListPane } from "@/features/reports/components/report-list-pane"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import type { ArrowJobStatus } from "@/features/jobs"
@@ -320,13 +319,7 @@ export function ReportCriteriaShell({
       <WorkspaceAiDock
         className={cn("overflow-hidden", "max-md:overflow-y-auto")}
       >
-        {/* Rapor sayfası için BAĞIMSIZ pane kontrolü: sayfa header trigger'ı
-            ile açılan rapor listesi (ana nav menüden ayrı). */}
-        <ModuleNavPane
-          paneContent={<ReportListPane />}
-          paneTitle={t("reports_panel")}
-          defaultOpen
-        >
+        <ModuleNavPane>
           {renderFilter(setCriteriaHandle, {
             onListError: handleListError,
           })}

@@ -164,7 +164,7 @@ export function WorkspaceNotificationPopover() {
           size="icon-lg"
           title={t("delete_notification")}
           aria-label={t("delete_notification")}
-          className="relative shrink-0 text-muted-foreground hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+          className="relative shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground aria-expanded:bg-sidebar-accent aria-expanded:text-sidebar-foreground"
         >
           <Bell className="size-4 shrink-0" />
           {unreadCount > 0 ? (

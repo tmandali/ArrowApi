@@ -32,7 +32,7 @@ export function AppHeader({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "relative z-30 flex h-(--header-height) w-full shrink-0 items-center justify-between gap-3 bg-[#13151b] text-white pl-0 pr-3 text-xs",
+        "relative z-30 flex h-(--header-height) w-full shrink-0 items-center justify-between gap-3 bg-sidebar text-sidebar-foreground pl-0 pr-3 text-xs transition-colors duration-200",
         className
       )}
     >
@@ -48,7 +48,7 @@ export function AppHeader({ className }: { className?: string }) {
             aria-label={menuLabel}
             aria-pressed={drawerOpen}
             aria-expanded={drawerOpen}
-            className="flex size-8 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
+            className="flex size-8 items-center justify-center rounded-md text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer"
           >
             <Menu className="size-4.5 shrink-0" aria-hidden />
           </button>
@@ -61,7 +61,7 @@ export function AppHeader({ className }: { className?: string }) {
           <span className="flex size-5 shrink-0 items-center justify-center text-primary dark:text-sidebar-primary">
             <YulaMarkIcon />
           </span>
-          <span className="text-sm font-semibold tracking-tight text-white">
+          <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
             {YULA.name}
           </span>
         </Link>
@@ -72,11 +72,11 @@ export function AppHeader({ className }: { className?: string }) {
 
       {/* Orta: Global Arama Çubuğu */}
       <div className="flex min-w-0 max-w-xl flex-1 items-center justify-center px-2">
-        <WorkspaceSearchTrigger className="max-w-md border-white/15 bg-white/5 text-white placeholder:text-white/50 focus-within:border-white/30 focus-within:ring-white/20" />
+        <WorkspaceSearchTrigger className="max-w-md border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground placeholder:text-muted-foreground focus-within:border-ring focus-within:ring-ring/20 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/50" />
       </div>
 
       {/* Sağ: Bildirimler + Kullanıcı Menüsü */}
-      <div className="flex shrink-0 items-center justify-end gap-2 text-white/80">
+      <div className="flex shrink-0 items-center justify-end gap-2 text-sidebar-foreground/80">
         <WorkspaceNotificationPopover />
         <NavUser />
       </div>

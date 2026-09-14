@@ -19,7 +19,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 export function AppLayout({ children }: { children?: React.ReactNode }) {
   return (
     <div
-      className="flex h-svh w-full flex-col overflow-hidden bg-background bg-gradient-to-b from-primary/[0.05] via-background to-orange-500/[0.06] dark:from-primary/15 dark:via-background dark:to-orange-500/10"
+      className="flex h-svh w-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground transition-colors duration-200"
       style={{ "--header-height": "3rem" } as React.CSSProperties}
     >
       <WorkspaceSearchProvider>
@@ -28,15 +28,16 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         {/* Global Mega Drawer triggered by hamburger */}
         <GlobalNavDrawer />
 
-        {/* Below Shell Header: Contextual Module Sidebar + Content */}
+        {/* Below Shell Header: Contextual Module Sidebar + Content Box */}
         <SidebarProvider
           defaultOpen={true}
-          className="flex min-h-0 flex-1 w-full overflow-hidden"
+          className="flex min-h-0 flex-1 w-full overflow-hidden bg-sidebar"
         >
           <WorkspaceAiChatProvider>
-            <div className="flex min-h-0 min-w-0 flex-1 w-full overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 w-full overflow-hidden bg-sidebar">
               <ModuleSidebar />
-              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              {/* Content Frame: Header ve Sol Nav'a sıfır yanaşan, sağ ve alt kenarları yuvarlatılmış (rounded-2xl) ve çerçeveli tuval */}
+              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden mr-2 mb-2 rounded-2xl border border-border dark:border-[#232734] bg-background shadow-xs transition-colors duration-200">
                 <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                   {children}
                 </div>
