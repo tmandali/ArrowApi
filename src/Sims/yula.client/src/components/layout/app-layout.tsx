@@ -1,41 +1,52 @@
 "use client";
 
-import * as React from "react"
-import { AppHeader } from "@/components/layout/app-header"
-import { MainNavDrawer } from "@/components/layout/main-nav-drawer"
-import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator"
-import { WorkspaceIconRail } from "@/components/layout/workspace-icon-rail"
-import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat"
-import { WorkspaceSearchProvider } from "@/context/workspace-search"
+import * as React from "react";
+import { AppHeader } from "@/components/layout/app-header";
+import { GlobalNavDrawer } from "@/components/layout/global-nav-drawer";
+import { ModuleSidebar } from "@/components/layout/module-sidebar";
+import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator";
+import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat";
+import { WorkspaceSearchProvider } from "@/context/workspace-search";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 /**
- * Viewport-locked shell: workspace icon rail spans the full viewport height
- * (Yula mark on top); header, page/Yula scroll live to the right of it.
- * Next karşılığı: Outlet yerine children — içerik catch-all sayfadan gelir.
+ * Google Cloud Console style viewport-locked shell:
+ * 1. Top: Full-width AppHeader with hamburger, brand, workspace dropdown, search, and user tools.
+ * 2. Hamburger Drawer: GlobalNavDrawer (overlay sheet with all workspaces & system tools).
+ * 3. Below header: SidebarProvider wrapping contextual ModuleSidebar (collapsible="icon")
+ *    and main content area with WorkspaceAiChatProvider.
  */
 export function AppLayout({ children }: { children?: React.ReactNode }) {
   return (
     <div
-      className="flex h-svh overflow-hidden bg-background bg-gradient-to-b from-primary/[0.05] via-background to-orange-500/[0.06] dark:from-primary/15 dark:via-background dark:to-orange-500/10"
+      className="flex h-svh w-full flex-col overflow-hidden bg-background bg-gradient-to-b from-primary/[0.05] via-background to-orange-500/[0.06] dark:from-primary/15 dark:via-background dark:to-orange-500/10"
       style={{ "--header-height": "3rem" } as React.CSSProperties}
     >
       <WorkspaceSearchProvider>
-        <WorkspaceIconRail />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <AppHeader />
+        {/* Full-width Shell Header across top */}
+        <AppHeader />
+        {/* Global Mega Drawer triggered by hamburger */}
+        <GlobalNavDrawer />
+
+        {/* Below Shell Header: Contextual Module Sidebar + Content */}
+        <SidebarProvider
+          defaultOpen={true}
+          className="flex min-h-0 flex-1 w-full overflow-hidden"
+        >
           <WorkspaceAiChatProvider>
-            <main className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-              <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                {children}
-              </div>
-              {/* Rotalı geçişte ince üst şerit — boş alan flaşı yerine geçiş sinyali */}
-              <RouteTransitionIndicator />
-              {/* Ana nav menü: AppHeader başlığı ile açılan overlay çekmece */}
-              <MainNavDrawer />
-            </main>
+            <div className="flex min-h-0 min-w-0 flex-1 w-full overflow-hidden">
+              <ModuleSidebar />
+              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  {children}
+                </div>
+                {/* Rotalı geçişte ince üst şerit — boş alan flaşı yerine geçiş sinyali */}
+                <RouteTransitionIndicator />
+              </main>
+            </div>
           </WorkspaceAiChatProvider>
-        </div>
+        </SidebarProvider>
       </WorkspaceSearchProvider>
     </div>
-  )
+  );
 }
