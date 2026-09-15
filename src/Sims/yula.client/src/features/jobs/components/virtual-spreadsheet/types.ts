@@ -11,7 +11,7 @@ export const cellClass =
   "p-0 border-r border-b border-border/60 last:border-r-0 align-middle"
 
 export const headClass =
-  "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
+  "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-semibold leading-none text-zinc-700 dark:text-zinc-300 bg-muted/40 align-middle"
 
 /**
  * Sanal grid'de (data-vsp-cell) seçili hücrelere uygulanan sınıflar.

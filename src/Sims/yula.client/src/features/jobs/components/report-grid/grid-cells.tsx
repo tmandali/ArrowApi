@@ -85,7 +85,7 @@ export function createRowRenderer(args: {
             >
               <div
                 className={cn(
-                  "flex h-7 min-w-0 items-center px-2 tabular-nums text-foreground",
+                  "flex h-7 min-w-0 items-center px-2 tabular-nums text-zinc-900 dark:text-zinc-50",
                   col.align === "right" && "justify-end"
                 )}
                 title={rawVal != null ? String(rawVal) : undefined}
