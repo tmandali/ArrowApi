@@ -10,17 +10,15 @@ import type { SpreadsheetColumn } from "../virtual-spreadsheet";
  * Performans: istatistikler SADECE veri kimliği değiştiğinde (yeni sorgu /
  * loadMore eklemesi → rows referansı değişir) tek geçişte hesaplanır.
  * Scroll (virtualization) rows referansını değiştirmeyeceği için sıfır maliyet.
- * Tarama MAX_STYLED_COLUMNS sütunla sınırlı; çipli kolonlarda distinct
- * erken kesilir (MAX_CHIP_DISTINCT + 1 ile break).
+ * Maliyet kolon SAYISINDAN BAĞIMSIZ sabit bütçeyle sınırlı (CELL_READ_BUDGET):
+ * örnek satır = min(MAX_STATS_ROWS, bütçe / kolon sayısı). Böylece tüm kolonlar
+ * stillenir ve kolon order'ı değiştiğinde renk katmanı değişmez.
  */
 export type ColumnStyleSpec =
   | { kind: "bar"; min: number; max: number }
   | { kind: "chip"; domain: Map<string, number> } // value → hue
   | { kind: "plain" };
 
-const MAX_STYLED_COLUMNS = 40;
-const MAX_CHIP_DISTINCT = 16;
-const MIN_CHIP_DISTINCT = 2;
 /**
  * İstatistik taraması en fazla bu kadar satırı alır.
  * Yüklü/streaming tablolarda (loadMore her batch'te rows referansını değiştirir)
@@ -28,23 +26,31 @@ const MIN_CHIP_DISTINCT = 2;
  * Bar/çip yalnızca GÖRSEL işarettir → eşit aralıklı örnek min/max için yeterlidir.
  */
 const MAX_STATS_ROWS = 20000;
+/**
+ * Toplam hücre okuma bütçesi (satır × kolon). Kolon sayısı arttıkça örneklem
+ * küçülür; maliyet her koşulda O(sabit). Renk katmanı kolon order'ından
+ * bağımsızdır → order değişiminde görsel durum korunur.
+ */
+const CELL_READ_BUDGET = 2_000_000;
+const MIN_SAMPLE_ROWS = 200;
 /** Altın açı: eşit dağarcıktan homojen renk dağılımı verir. */
 const CHIP_HUE_STEP = 137.508;
 
 /**
- * Tarama dizisi: tablo MAX_STATS_ROWS'tan küçükse tüm satırlar, büyükse eşit
+ * Tarama dizisi: tablo `cap`'ten küçükse tüm satırlar, büyükse eşit
  * aralıklı örnek (ilk + son + aradaki uçlar yakalanır).
  */
-function statsScanIndices(rows: readonly Record<string, unknown>[]): number[] {
+function statsScanIndices(rows: readonly Record<string, unknown>[], cap: number): number[] {
   const n = rows.length;
-  if (n <= MAX_STATS_ROWS) {
+  const effective = Math.min(n, cap);
+  if (n <= cap) {
     const idx = new Array(n);
     for (let i = 0; i < n; i++) idx[i] = i;
     return idx;
   }
-  const step = n / MAX_STATS_ROWS;
-  const idx: number[] = new Array(MAX_STATS_ROWS);
-  for (let i = 0; i < MAX_STATS_ROWS; i++) idx[i] = Math.floor(i * step);
+  const step = n / effective;
+  const idx: number[] = new Array(effective);
+  for (let i = 0; i < effective; i++) idx[i] = Math.floor(i * step);
   return idx;
 }
 
@@ -70,6 +76,8 @@ function chipDomain(distinct: Set<string>): Map<string, number> {
   }
   return map;
 }
+const MAX_CHIP_DISTINCT = 16;
+const MIN_CHIP_DISTINCT = 2;
 
 export function useColumnStyleStats(args: {
   rows: readonly Record<string, unknown>[];
@@ -89,10 +97,18 @@ export function useColumnStyleStats(args: {
     const specs: Record<string, ColumnStyleSpec> = {};
     if (!enabled || rows.length === 0) return specs;
 
-    for (const col of effectiveColumns.slice(0, MAX_STYLED_COLUMNS)) {
+    // Tüm kolonlar stillenir — order'dan bağımsız; kolon order'ı değişince
+    // renk katmanı değişmez. Maliyet: toplam hücre okuma bütçesi sabit.
+    const colCount = Math.max(1, effectiveColumns.length);
+    const sampleCap = Math.max(
+      MIN_SAMPLE_ROWS,
+      Math.min(MAX_STATS_ROWS, Math.floor(CELL_READ_BUDGET / colCount))
+    );
+    const scan = statsScanIndices(rows, sampleCap);
+
+    for (const col of effectiveColumns) {
       const isBool = booleanColumns.has(col.name);
       const isNumeric = numericColumns.has(col.name);
-      const scan = statsScanIndices(rows);
 
       // --- Çipli kolon: bool + düşük kardinalite string ---
       if (!isNumeric) {
