@@ -39,14 +39,22 @@ export function useGridAggregations(args: {
   const [duckDbAggregations, setDuckDbAggregations] = React.useState<ColumnAggregationValues | undefined>(undefined);
   const [showFooterRow, setShowFooterRow] = React.useState(false);
 
+  // Footer'da en az bir kolon için aktif aggregation var mı (render'da türet — setState yok).
+  const hasAny = React.useMemo(
+    () => Object.values(aggregationConfigs).some((t) => t && t !== "none"),
+    [aggregationConfigs]
+  );
+
   // DuckDB üzerinde aktif filtreler ve aggregationConfigs ile alt toplamları hesapla
   React.useEffect(() => {
-    if (!showFooterRow || !duckTableName || effectiveColumns.length === 0 || isStreaming || isSavingDisk) {
-      return;
-    }
-    const hasAny = Object.values(aggregationConfigs).some((t) => t && t !== "none");
-    if (!hasAny) {
-      setDuckDbAggregations(undefined);
+    if (
+      !showFooterRow ||
+      !duckTableName ||
+      effectiveColumns.length === 0 ||
+      !hasAny ||
+      isStreaming ||
+      isSavingDisk
+    ) {
       return;
     }
 
@@ -82,12 +90,13 @@ export function useGridAggregations(args: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [showFooterRow, duckTableName, filters, aggregationConfigs, effectiveColumns, numericColumns, booleanColumns, isStreaming, isSavingDisk]);
+  }, [showFooterRow, duckTableName, hasAny, filters, aggregationConfigs, effectiveColumns, numericColumns, booleanColumns, isStreaming, isSavingDisk]);
 
   return {
     aggregationConfigs,
     setAggregationConfigs,
-    duckDbAggregations,
+    // !hasAny iken stale state'i render'a sızmaz — kaynakta gate (setState yok).
+    duckDbAggregations: hasAny ? duckDbAggregations : undefined,
     showFooterRow,
     setShowFooterRow,
   };

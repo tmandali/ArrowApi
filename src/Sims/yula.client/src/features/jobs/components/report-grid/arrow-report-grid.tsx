@@ -50,6 +50,16 @@ export type ArrowReportGridProps = {
 };
 
 /**
+ * Kararlı boş kolon varsayılansı: modül düzeyinde tek referans.
+ * `columns` prop'u geçilmeyen rapor grid'lerinde her render'da yeni bir
+ * `[]` oluşmasını önler — yeni referans metaColumns → columnTypes →
+ * effectiveColumns → numeric/booleanColumns zincirini çalkalar ve
+ * useVisualPushdown'un useEffect bağımlılıklarını her render'da bozarak
+ * "Maximum update depth exceeded" döngüsüne yol açardı.
+ */
+const EMPTY_COLUMNS: SpreadsheetColumn[] = [];
+
+/**
  * Uygulama genelinde tüm Arrow raporları için ortak, Wasm + OPFS destekli
  * yüksek performanslı sanal spreadsheet bileşeni.
  *
@@ -60,7 +70,7 @@ export function ArrowReportGrid({
   title = "Report Result",
   jobId,
   jobUrl,
-  columns = [],
+  columns = EMPTY_COLUMNS,
   expectedTotalRows,
   showFilterRow = false,
   onShowFilterRowChange,

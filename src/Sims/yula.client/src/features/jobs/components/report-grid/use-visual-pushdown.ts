@@ -21,6 +21,13 @@ import type { ColumnVisuals } from "./use-column-style-stats";
  */
 export type VisualBounds = Record<string, { min: number; max: number }>;
 
+/**
+ * Kararlı boş sonuç: disabled durumda render tarafı bunu döndürür.
+ * Modül düzeyinde tek referans — her render'da yeni `{}` oluşmaz,
+ * setState gerektirmez (kaskat render riski yok).
+ */
+const EMPTY_BOUNDS: VisualBounds = {};
+
 function toNumber(v: unknown): number {
   if (typeof v === "number") return v;
   if (typeof v === "bigint") return Number(v);
@@ -37,6 +44,18 @@ function toNumber(v: unknown): number {
 
 function aliasFor(column: string, prefix: string): string {
   return `${prefix}_${column.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+}
+
+/** İçerik eşitliği: anahtar + min/max aynıysa yeni render tetiklemeyiz. */
+function sameBounds(a: VisualBounds, b: VisualBounds): boolean {
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    const y = b[k];
+    if (!y || a[k].min !== y.min || a[k].max !== y.max) return false;
+  }
+  return true;
 }
 
 export function useVisualPushdown(args: {
@@ -63,15 +82,22 @@ export function useVisualPushdown(args: {
 
   const [bounds, setBounds] = React.useState<VisualBounds>({});
 
+  // Yalnızca sayısal + açık görsel katmanı olan kolonlar bar ölçeğine adaydır.
+  const enabled = React.useMemo(
+    () =>
+      effectiveColumns.filter(
+        (c) => enabledColumns[c.name] && numericColumns.has(c.name)
+      ),
+    [effectiveColumns, enabledColumns, numericColumns]
+  );
+  // Sorgulanabilir mi? Kapalıyken render tarafı EMPTY_BOUNDS gösterir (setState yok).
+  const canQuery =
+    Boolean(duckTableName) && enabled.length > 0 && !isStreaming && !isSavingDisk;
+
   React.useEffect(() => {
-    // Yalnızca sayısal + açık görsel kolonlar bar ölçeğine adaydır.
-    const enabled = effectiveColumns.filter(
-      (c) => enabledColumns[c.name] && numericColumns.has(c.name)
-    );
-    if (!duckTableName || enabled.length === 0 || isStreaming || isSavingDisk) {
-      setBounds({});
-      return;
-    }
+    // Kapalı → burada state'e DEĞİNMİYORUZ (render EMPTY_BOUNDS döndürür);
+    // yalnızca asenkron pushdown sorgusu var. Senkron setState kaskadı oluşmaz.
+    if (!canQuery) return;
 
     let cancelled = false;
     const timer = setTimeout(async () => {
@@ -83,7 +109,7 @@ export function useVisualPushdown(args: {
           selectParts.push(`MIN(${safeCol}) AS "${aliasFor(c.name, "vmin")}"`);
           selectParts.push(`MAX(${safeCol}) AS "${aliasFor(c.name, "vmax")}"`);
         }
-        const escapedTable = `"${duckTableName.replace(/"/g, '""')}"`;
+        const escapedTable = `"${duckTableName!.replace(/"/g, '""')}"`;
         const sql = `SELECT ${selectParts.join(", ")} FROM ${escapedTable} ${where};`;
         const rows = await duckDbClient.executeCustomSql(sql);
         if (cancelled || !rows || rows.length === 0) return;
@@ -97,7 +123,9 @@ export function useVisualPushdown(args: {
             next[c.name] = { min, max };
           }
         }
-        if (!cancelled) setBounds(next);
+        if (!cancelled) {
+          setBounds((prev) => (sameBounds(prev, next) ? prev : next));
+        }
       } catch {
         // Tablo henüz hazır değil / geçici hata — örneklem fallback'i devrede kalır.
       }
@@ -107,7 +135,8 @@ export function useVisualPushdown(args: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [duckTableName, effectiveColumns, numericColumns, booleanColumns, filters, enabledColumns, isStreaming, isSavingDisk]);
+  }, [canQuery, duckTableName, enabled, filters, numericColumns, booleanColumns]);
 
-  return bounds;
+  // Kapalı → stale state'i göstermeyiz; açık → asenkron pushdown sonucu.
+  return canQuery ? bounds : EMPTY_BOUNDS;
 }

@@ -27,13 +27,10 @@ export function useGridColumns(args: {
     ? `report_${jobId.replace(/[^a-zA-Z0-9_]/g, "_")}`
     : "current_report";
 
-  const [describedCols, setDescribedCols] = React.useState<
-    Awaited<ReturnType<typeof duckDbClient.describeTable>> | undefined
-  >();
-
-  React.useEffect(() => {
-    setDescribedCols(undefined);
-  }, [duckTableName]);
+  const [described, setDescribed] = React.useState<{
+    table: string;
+    cols: Awaited<ReturnType<typeof duckDbClient.describeTable>>;
+  } | undefined>();
 
   React.useEffect(() => {
     if (!jobId) return;
@@ -41,7 +38,9 @@ export function useGridColumns(args: {
     void (async () => {
       try {
         const cols = await duckDbClient.describeTable(duckTableName);
-        if (!cancelled && cols.length > 0) setDescribedCols(cols);
+        if (!cancelled && cols.length > 0) {
+          setDescribed({ table: duckTableName, cols });
+        }
       } catch {
         // DESCRIBE hazır olmadıysa sezgisel map devrede kalır
       }
@@ -50,6 +49,11 @@ export function useGridColumns(args: {
       cancelled = true;
     };
   }, [duckTableName, discoveredCols.length, jobId]);
+
+  // Türetilmiş: DESCRIBE sonucu yalnızca GÜNCEL tabloya aitse kullanılır.
+  // Tablo değişince otomatik undefined → stale reset için senkron setState gerekmez.
+  const describedCols =
+    described && described.table === duckTableName ? described.cols : undefined;
 
   const columnTypes = React.useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};

@@ -60,6 +60,8 @@ export function useAiSqlViews(args: {
       if (raw) {
         const parsed = JSON.parse(raw) as AiSqlView[];
         if (Array.isArray(parsed)) {
+          // localStorage (harici sistem) → mount'ta state'e yazılır; bilinen örüntü.
+          // eslint-disable-next-line react/set-state-in-effect
           setAiViews(parsed);
         }
       }
@@ -79,6 +81,8 @@ export function useAiSqlViews(args: {
   }, [requestedAiViewId, aiViews]);
 
   // customQuerySql değiştiğinde kayıtlı görünümler içinde var mı kontrol et (oto-kayıt YAPMAZ)
+  // activeAiViewId, store'daki customQuerySql + aiViews'tan (harici kaynak) senkronize edilir.
+  /* eslint-disable react/set-state-in-effect */
   React.useEffect(() => {
     if (!customQuerySql) {
       setActiveAiViewId(null);
@@ -92,6 +96,7 @@ export function useAiSqlViews(args: {
       setActiveAiViewId(null);
     }
   }, [customQuerySql, aiViews]);
+  /* eslint-enable react/set-state-in-effect */
 
   // Kullanıcı "Kaydet" dediğinde aktif AI sorgusunu kalıcı görünümlere ekle
   const handleSaveCurrentAiView = React.useCallback(
