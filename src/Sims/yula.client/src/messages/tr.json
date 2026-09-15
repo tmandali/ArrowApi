@@ -1197,8 +1197,8 @@
     "aria_sorted_desc": "Azalan sırada",
     "col_resize_title": "Genişletmek için sürükleyin, içeriğe tam sığdırmak için çift tıklayın",
     "no_records": "Kayıt bulunamadı",
-    "footer_toggle_show": "Alt toplam satırını göster (Σ)",
-    "footer_toggle_hide": "Alt toplam satırını gizle (Σ)",
+    "footer_toggle_show": "Analitik görünümü aç: alt toplam + hücre bar/çip vurguları (Σ)",
+    "footer_toggle_hide": "Analitik görünümü kapat: grid sade kalır",
     "maximize_title": "Genişletilmiş Görünüm (Maximize)",
     "unmaximize_title": "Küçült (Esc)"
   },

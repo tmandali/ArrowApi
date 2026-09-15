@@ -76,12 +76,18 @@ export function useColumnStyleStats(args: {
   effectiveColumns: readonly SpreadsheetColumn[];
   numericColumns: Set<string>;
   booleanColumns: Set<string>;
+  /**
+   * Otomatik görsel katmanı (bar / çip / negatif vurgu) anahtarlar.
+   * Σ (istatistik) düğmesi kapalıyken grid tamamen sade görünür;
+   * sıfır tarama maliyeti (erken çıkış).
+   */
+  enabled?: boolean;
 }): Record<string, ColumnStyleSpec> {
-  const { rows, effectiveColumns, numericColumns, booleanColumns } = args;
+  const { rows, effectiveColumns, numericColumns, booleanColumns, enabled = true } = args;
 
   return React.useMemo(() => {
     const specs: Record<string, ColumnStyleSpec> = {};
-    if (rows.length === 0) return specs;
+    if (!enabled || rows.length === 0) return specs;
 
     for (const col of effectiveColumns.slice(0, MAX_STYLED_COLUMNS)) {
       const isBool = booleanColumns.has(col.name);
@@ -126,5 +132,5 @@ export function useColumnStyleStats(args: {
       }
     }
     return specs;
-  }, [rows, effectiveColumns, numericColumns, booleanColumns]);
+  }, [rows, effectiveColumns, numericColumns, booleanColumns, enabled]);
 }

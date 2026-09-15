@@ -349,11 +349,15 @@ export function ArrowReportGrid({
   const renderFilterCell = createFilterCellRenderer({ t, filters, setFilter });
   // Airtable benzeri kolon görsel kuralları: hücre bar'ı / renk çipleri / negatif vurgusu.
   // Yalnızca veri değişince (rows referansı) hesaplanır; scroll'da yeniden çalışmaz.
+  // Σ (istatistik) düğmesi: analitik görünüm anahtarı — basılıyken otomatik
+  // görsel katman (bar/çip/negatif-kırmızı) açık; kapalıyken grid tamamen sade.
+  // Kullanıcı tanımlı eşik kuralları (columnRules) bilinçli tercih olduğu için her zaman aktiftir.
   const columnStyles = useColumnStyleStats({
     rows: displayRows,
     effectiveColumns,
     numericColumns,
     booleanColumns,
+    enabled: agg.showFooterRow,
   });
 
   // Eşik tabanlı koşullu renk kuralları (kolon menüsünden düzenlenir).
