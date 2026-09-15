@@ -1050,7 +1050,7 @@ export function VirtualSpreadsheet<T>({
               <table
                 ref={bodyTableRef}
                 className={cn(
-                  "w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs",
+                  "w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs focus:outline-none",
                   // Hücre seçimi aktifken sürüklemenin native text selection üretmesini engelle
                   cellLocator && "select-none"
                 )}
