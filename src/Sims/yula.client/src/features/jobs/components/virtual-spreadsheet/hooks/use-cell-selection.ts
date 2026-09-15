@@ -38,6 +38,8 @@ export interface CellSelectionReturn {
   handleBodyCellClick: (event: React.MouseEvent<HTMLTableElement>) => void
   handleBodyMouseDown: (event: React.MouseEvent<HTMLTableElement>) => void
   handleBodyKeyDown: (event: React.KeyboardEvent<HTMLTableElement>) => void
+  /** Seçimi (aralık + aktif hücre) temizler — Esc ile de tetiklenir */
+  clearSelection: () => void
   /** Render edilen satır `<tr>` elementine data-vsp-cell attribute'larını enjekte eder */
   applyCellLocatorAttributes: (trElement: HTMLTableRowElement, rowIndex: number) => void
   /**
@@ -186,10 +188,21 @@ export function useCellSelection({
     activeCellRef.current = activeCell
   }, [activeCell])
 
+  const clearSelection = React.useCallback(() => {
+    setSelection(null)
+    setActiveCell(null)
+  }, [])
+
   const handleBodyKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLTableElement>) => {
       const currentActive = activeCellRef.current
       if (!currentActive) return
+      // Esc: seçim aralığını ve aktif hücreyi temizle
+      if (event.key === "Escape") {
+        event.stopPropagation()
+        clearSelection()
+        return
+      }
       const currentItems = displayItemsRef.current
       const maxRow = Math.max(0, currentItems.length - 1)
       const maxCol = Math.max(0, visibleColumns.length - 1)
@@ -248,7 +261,7 @@ export function useCellSelection({
         targetCell.scrollIntoView({ block: "nearest", inline: "nearest" })
       }
     },
-    [displayItemsRef, visibleColumns, selection, startSelection, bodyTableRef]
+    [displayItemsRef, visibleColumns, selection, startSelection, bodyTableRef, clearSelection]
   )
 
   // Fare ile çoklu hücre seçimi sürüklemesi
@@ -380,6 +393,7 @@ export function useCellSelection({
     handleBodyCellClick,
     handleBodyMouseDown,
     handleBodyKeyDown,
+    clearSelection,
     applyCellLocatorAttributes,
     applyRowSelectionAttributes,
   }

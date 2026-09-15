@@ -48,6 +48,8 @@ export type ArrowJobResultPanelProps = {
   className?: string
   /** Grid-level errors are surfaced here in addition to the inline banner. */
   onError?: (message: string | null) => void
+  /** Hücre seçimi / Name Box / TSV kopyalamayı açar/kapatır (varsayılan açık). */
+  cellLocator?: boolean
 }
 
 /**
@@ -61,6 +63,7 @@ export function ArrowJobResultPanel({
   title,
   className,
   onError,
+  cellLocator,
 }: ArrowJobResultPanelProps) {
   const t = useTranslations("JobResultPanel")
   const fallbackTitle = title ?? "Report"
@@ -297,6 +300,7 @@ export function ArrowJobResultPanel({
           onShowFilterRowChange={setShowFilterRow}
           columnDescriptions={columnDescriptions}
           reportScope={reportScope}
+          cellLocator={cellLocator}
           onError={pushError}
           className="min-h-0 flex-1"
         />

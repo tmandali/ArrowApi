@@ -6,11 +6,13 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Copy,
   ListFilter,
   Maximize2,
   Minimize2,
   Sigma,
   Table2,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -47,6 +49,8 @@ import {
   useColumnReorder,
   useMultiSort,
   useCellSelection,
+  colIndexToLetter,
+  letterToColIndex,
   useClientSideSort,
   useGridScrollSync,
   useColumnPersistence,
@@ -419,6 +423,11 @@ export function VirtualSpreadsheet<T>({
     handleBodyKeyDown,
     applyCellLocatorAttributes,
     applyRowSelectionAttributes,
+    selection,
+    activeCell,
+    startSelection,
+    extendSelection,
+    clearSelection,
   } = useCellSelection({
     cellLocator,
     visibleColumns,
@@ -426,6 +435,89 @@ export function VirtualSpreadsheet<T>({
     bodyTableRef,
     dataIdentity: resetKey,
   })
+
+  // ── Seçim aralığı bilgisi (Name Box) ────────────────────────────────
+  const selectionRefLabel = React.useMemo(() => {
+    if (selection) {
+      const r0 = Math.min(selection.startRow, selection.endRow)
+      const r1 = Math.max(selection.startRow, selection.endRow)
+      const c0 = Math.min(selection.startCol, selection.endCol)
+      const c1 = Math.max(selection.startCol, selection.endCol)
+      const start = `${colIndexToLetter(c0)}${r0 + 1}`
+      if (r0 === r1 && c0 === c1) return start
+      return `${start}:${colIndexToLetter(c1)}${r1 + 1}`
+    }
+    return activeCell ? `${colIndexToLetter(activeCell.col)}${activeCell.row + 1}` : null
+  }, [selection, activeCell])
+
+  const selectionSize = React.useMemo(() => {
+    if (!selection) return null
+    const rows = Math.abs(selection.endRow - selection.startRow) + 1
+    const cols = Math.abs(selection.endCol - selection.startCol) + 1
+    return { rows, cols, cells: rows * cols }
+  }, [selection])
+
+  const [nameBoxDraft, setNameBoxDraft] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    setNameBoxDraft(null)
+  }, [selectionRefLabel])
+
+  /** A1 / A1:B2 formatındaki referansı (satır/sütun aralıklarıyla) doğrular */
+  const commitNameBox = React.useCallback(() => {
+    const raw = nameBoxDraft?.trim()
+    setNameBoxDraft(null)
+    if (!raw || !cellLocator) return
+    const match = raw.toUpperCase().match(/^([A-Z]+\d+)(?::([A-Z]+\d+))?$/)
+    if (!match) return
+    const parseRef = (s: string): { r: number; c: number } | null => {
+      const refMatch = s.match(/^([A-Z]+)(\d+)$/)
+      if (!refMatch) return null
+      const r = Number(refMatch[2]) - 1
+      const c = letterToColIndex(refMatch[1])
+      if (r < 0 || c < 0) return null
+      if (r >= (displayItemsRef.current?.length ?? 0) || c >= visibleColumns.length) return null
+      return { r, c }
+    }
+    const from = parseRef(match[1])
+    if (!from) return
+    startSelection(from.r, from.c)
+    if (match[2]) {
+      const to = parseRef(match[2])
+      if (to) extendSelection(to.r, to.c)
+    }
+  }, [nameBoxDraft, cellLocator, displayItemsRef, visibleColumns, startSelection, extendSelection])
+
+  /** Seçili aralığın hücre değerlerini TSV olarak derler (Ctrl/Cmd+C ve kopyala butonu) */
+  const buildSelectionTsv = React.useCallback((): string | null => {
+    if (!selection) return null
+    const r0 = Math.min(selection.startRow, selection.endRow)
+    const r1 = Math.max(selection.startRow, selection.endRow)
+    const c0 = Math.min(selection.startCol, selection.endCol)
+    const c1 = Math.max(selection.startCol, selection.endCol)
+    const rows = displayItems as readonly Record<string, unknown>[]
+    const cols = visibleColumns.slice(c0, c1 + 1)
+    const lines: string[] = []
+    for (let r = r0; r <= r1 && r < rows.length; r += 1) {
+      const item = rows[r]
+      if (!item) continue
+      lines.push(
+        cols
+          .map((col) => {
+            const v = item[col.name]
+            if (v == null) return ""
+            if (typeof v === "object") return JSON.stringify(v)
+            return String(v)
+          })
+          .join("\t")
+      )
+    }
+    return lines.length ? lines.join("\n") : null
+  }, [selection, displayItems, visibleColumns])
+
+  const handleCopyTsv = React.useCallback(() => {
+    const text = buildSelectionTsv()
+    if (text) void navigator.clipboard?.writeText(text)
+  }, [buildSelectionTsv])
 
   // ── LocalStorage: yükleme & 250ms debounce ile kaydetme ──────────────
   const { isStorageLoadedRef } = useColumnPersistence({
@@ -694,9 +786,19 @@ export function VirtualSpreadsheet<T>({
   )
 
   const handleCopy = React.useCallback((event: React.ClipboardEvent) => {
-    const selection = window.getSelection()
-    if (!selection || selection.isCollapsed) return
-    const rawText = selection.toString()
+    // Ctrl/Cmd+C: seçili hücre aralığını TSV olarak kopyala (seçim aktifken
+    // native text selection select-none ile kapalı olduğundan tek yol bu).
+    if (cellLocator && selection) {
+      const text = buildSelectionTsv()
+      if (text) {
+        event.clipboardData.setData("text/plain", text)
+        event.preventDefault()
+      }
+      return
+    }
+    const textSelection = window.getSelection()
+    if (!textSelection || textSelection.isCollapsed) return
+    const rawText = textSelection.toString()
     if (!rawText) return
     // Tek hücre / tek satır seçiminde tarayıcının eklediği \t ve \n karakterlerini temizle
     const lines = rawText.split(/\r?\n/)
@@ -714,7 +816,7 @@ export function VirtualSpreadsheet<T>({
       event.clipboardData.setData("text/plain", cleanLines)
       event.preventDefault()
     }
-  }, [])
+  }, [cellLocator, selection, buildSelectionTsv])
 
   return (
     <div
@@ -749,6 +851,9 @@ export function VirtualSpreadsheet<T>({
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-center ml-auto">
           {headerActions}
+          {headerActions ? (
+            <span className="h-4 w-px shrink-0 bg-border/60" aria-hidden />
+          ) : null}
           {!disableColumnVisibility ? (
             <ColumnManagementMenu
               columns={columns}
@@ -796,6 +901,67 @@ export function VirtualSpreadsheet<T>({
             >
               <Sigma className="size-3.5" />
             </Button>
+          ) : null}
+          {/* Name box: hücre/aralık navigasyonu — daima görünür; A1 yazıp Enter →
+              seçer; hover'da overlay olarak TSV kopyala + temizle butonları çıkar. */}
+          {cellLocator ? (
+            <>
+              <span className="h-4 w-px shrink-0 bg-border/60" aria-hidden />
+              <div className="group/namebox relative h-7 shrink-0">
+                <input
+                  className="h-7 w-24 rounded-md border border-border/60 bg-background px-1.5 font-mono text-[11px] tabular-nums text-foreground shadow-none outline-none focus-visible:border-border disabled:opacity-50"
+                  value={nameBoxDraft ?? selectionRefLabel ?? ""}
+                  placeholder="A1"
+                  disabled={columns.length === 0}
+                  onChange={(e) => setNameBoxDraft(e.target.value)}
+                  onBlur={commitNameBox}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitNameBox()
+                    if (e.key === "Escape") {
+                      e.stopPropagation()
+                      clearSelection()
+                    }
+                  }}
+                  spellCheck={false}
+                  title={
+                    selectionSize
+                      ? `${selectionRefLabel ?? ""} — ${selectionSize.rows} × ${selectionSize.cols} · ${selectionSize.cells} hücre`
+                      : "Hücre aralığı (A1 formatı, örn. B5 veya B5:D10)"
+                  }
+                  aria-label="Hücre aralığı (A1 formatı, örn. B5 veya B5:D10)"
+                />
+                {selection ? (
+                  <div className="absolute right-0 top-0 flex h-full items-center gap-0.5 rounded-r-md bg-background pl-1 opacity-0 transition-opacity group-hover/namebox:opacity-100">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      onClick={handleCopyTsv}
+                      title="Seçili aralığı TSV olarak kopyala (Ctrl/Cmd+C)"
+                      aria-label="Seçili aralığı kopyala"
+                    >
+                      <Copy className="size-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      onClick={() => {
+                        clearSelection()
+                        setNameBoxDraft(null)
+                      }}
+                      title="Seçimi temizle (Esc)"
+                      aria-label="Seçimi temizle"
+                    >
+                      <X className="size-3" />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              <span className="h-4 w-px shrink-0 bg-border/60" aria-hidden />
+            </>
           ) : null}
           <Button
             type="button"

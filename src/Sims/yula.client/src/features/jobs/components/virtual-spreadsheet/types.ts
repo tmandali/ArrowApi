@@ -20,6 +20,28 @@ export const headClass =
  */
 export const CELL_SELECTION_RANGE_ATTR = "data-vsp-cell-selected"
 export const CELL_SELECTION_EDGE_ATTR = "data-vsp-edge"
+
+/** Sütun indexini Excel usulü harfe çevirir (0→A, 25→Z, 26→AA, ...) */
+export function colIndexToLetter(index: number): string {
+  let n = index + 1
+  let s = ""
+  while (n > 0) {
+    const rem = (n - 1) % 26
+    s = String.fromCharCode(65 + rem) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
+
+/** Excel usulü sütun harfini index'e çevirir (A→0, Z→25, AA→26, ...) */
+export function letterToColIndex(letter: string): number {
+  let n = 0
+  for (const ch of letter.toUpperCase()) {
+    n = n * 26 + (ch.charCodeAt(0) - 64)
+  }
+  return n - 1
+}
+
 export const cellSelectionActiveClass =
   "vsp-cell-active"
 

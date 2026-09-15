@@ -32,6 +32,11 @@ export type ArrowReportGridProps = {
   expectedTotalRows?: number | null;
   showFilterRow?: boolean;
   onShowFilterRowChange?: (open: boolean) => void;
+  /**
+   * Hücre seçimi / Name Box / TSV kopyalama (Yula "hücreye git" için) açık mı?
+   * Varsayılan açık; kapatacak yer `cellLocator={false}` geçirir.
+   */
+  cellLocator?: boolean;
   /** Rapor şemasının x-ai.columnDescriptions'ı — LLM kolon semantiği grounding'i */
   columnDescriptions?: Record<string, string>;
   /** Aktif raporun scope'u — get_report_schema aracının kimliği */
@@ -56,6 +61,7 @@ export function ArrowReportGrid({
   expectedTotalRows,
   showFilterRow = false,
   onShowFilterRowChange,
+  cellLocator = true,
   columnDescriptions,
   reportScope,
   className,
@@ -348,6 +354,7 @@ export function ArrowReportGrid({
         items={displayRows}
         title={title}
         subtitle={subtitle}
+        cellLocator={cellLocator}
         className={className}
         loading={isStreaming || isSavingDisk || (isLoadingQuery && displayRows.length === 0) || (effectiveColumns.length === 0 && Boolean(jobId))}
         emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
