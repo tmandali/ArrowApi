@@ -69,7 +69,7 @@ export function ArrowJobResultPanel({
 
   const [reportTitle, setReportTitle] = React.useState(fallbackTitle)
   const [error, setError] = React.useState<string | null>(null)
-  const [showFilterRow, setShowFilterRow] = React.useState(true)
+  const [showFilterRow, setShowFilterRow] = React.useState(false)
   const [reportUrl, setReportUrl] = React.useState<string | null>(null)
   const [expectedTotalRows, setExpectedTotalRows] = React.useState<number | null>(null)
   const [columnDescriptions, setColumnDescriptions] = React.useState<Record<string, string> | undefined>()

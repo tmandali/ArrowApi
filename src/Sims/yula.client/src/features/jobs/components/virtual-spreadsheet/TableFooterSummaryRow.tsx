@@ -73,12 +73,12 @@ export function TableFooterSummaryRow({
                     className={cn(
                       "group flex h-full w-full items-center gap-1 text-[11px] font-medium leading-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
                       isNumeric ? "flex-row-reverse text-right justify-between" : "text-left justify-between",
-                      currentType === "none" && (isNumeric ? "justify-end" : "justify-start")
+                      currentType === "none" && (isNumeric ? "justify-start" : "justify-end")
                     )}
                     title={
                       currentType !== "none"
                         ? `${col.label} (${AGGREGATION_LABELS[currentType]})`
-                        : `${col.label} (+)`
+                        : `${col.label} (özet seç)`
                     }
                   >
                     {currentType !== "none" ? (
@@ -94,8 +94,17 @@ export function TableFooterSummaryRow({
                         <ChevronDown className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-muted-foreground" />
                       </>
                     ) : (
-                      <span className="text-muted-foreground/30 text-xs group-hover:text-muted-foreground transition-colors select-none px-1">
-                        +
+                      <span
+                        className={cn(
+                          "pointer-events-none relative inline-flex items-center px-1 select-none",
+                          "text-[11px] font-medium leading-none"
+                        )}
+                      >
+                        {/* Boş durumda hafif Σ işareti; hover'da chevron'a (combo işareti) dönüşür. İki glif üst üste çakışır, yer kaplamaz. */}
+                        <span className="absolute inset-0 flex items-center justify-center text-[12px] font-semibold text-muted-foreground/45 transition-opacity duration-150 group-hover:opacity-0">
+                          Σ
+                        </span>
+                        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
                       </span>
                     )}
                   </button>

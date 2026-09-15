@@ -32,10 +32,10 @@ function renderFooter(overrides: Partial<typeof baseProps> = {}) {
 }
 
 describe("TableFooterSummaryRow", () => {
-  it("seçimsiz kolonda '+' tetikleyiciyi gösterir", async () => {
+  it("seçimsiz kolonda Σ tetikleyiciyi gösterir", async () => {
     await renderFooter();
 
-    const trigger = page.getByTitle("Tutar (+)");
+    const trigger = page.getByTitle("Tutar (özet seç)");
     await expect.element(trigger).toBeVisible();
   });
 
@@ -43,7 +43,7 @@ describe("TableFooterSummaryRow", () => {
     const onAggregationChange = vi.fn();
     await renderFooter({ onAggregationChange });
 
-    await page.getByTitle("Tutar (+)").click();
+    await page.getByTitle("Tutar (özet seç)").click();
     await page.getByRole("menuitem", { name: /SUM/u }).click();
 
     expect(onAggregationChange).toHaveBeenCalledWith("tutar", "sum");
