@@ -148,7 +148,7 @@ export function AiViewDropdown({
               type="button"
               aria-busy={isViewLoading || undefined}
               className={cn(
-                "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold tracking-tight transition-colors outline-none ring-0 shrink focus-visible:bg-amber-500/10",
+                "group inline-flex h-7 min-w-0 max-w-[240px] sm:max-w-[360px] md:max-w-[480px] items-center justify-start gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold leading-4 tracking-tight transition-colors outline-none ring-0 shrink focus-visible:bg-amber-500/10",
                 isCurrentQueryActive
                   ? "text-amber-900 hover:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-400/10"
                   : "text-foreground hover:bg-muted/70"
@@ -186,7 +186,7 @@ export function AiViewDropdown({
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="start" className="w-72 text-xs">
+          <DropdownMenuContent align="start" className="w-72 text-xs p-0.5">
             {/* Kaydedilmemiş Geçici Görünüm Banner'ı */}
             {isCurrentQueryActive && !isCurrentQuerySaved ? (
               <>
@@ -233,17 +233,17 @@ export function AiViewDropdown({
             <DropdownMenuItem
               onClick={() => onSelectAiView?.(null)}
               className={cn(
-                "cursor-pointer flex items-center justify-between py-1.5",
+                "cursor-pointer flex items-center justify-between py-1.5 pl-2 pr-2.5",
                 !isCurrentQueryActive && "font-semibold"
               )}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <Table2 className="size-3.5 text-orange-600/80 dark:text-orange-400/80 shrink-0" />
-                <span className="truncate">{defaultLabel}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <Table2 className="size-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/80" />
+                <span className="min-w-0 truncate">{defaultLabel}</span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="ml-2 flex shrink-0 items-center gap-1.5">
                 <span className="text-[10px] text-muted-foreground font-normal">{t("all_records")}</span>
-                {!isCurrentQueryActive ? <Check className="size-3.5 text-orange-600 dark:text-orange-400 shrink-0" /> : null}
+                {!isCurrentQueryActive ? <Check className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" /> : null}
               </div>
             </DropdownMenuItem>
 
@@ -326,21 +326,21 @@ export function AiViewDropdown({
                   key={view.id}
                   onClick={() => onSelectAiView?.(view.id)}
                   className={cn(
-                    "group cursor-pointer flex items-center justify-between py-1.5 gap-2",
+                    "group cursor-pointer flex items-center justify-between gap-2 py-1.5 pl-2 pr-2.5",
                     isSelected && "font-semibold text-amber-700 bg-amber-500/10 dark:text-amber-300 dark:bg-amber-400/10"
                   )}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Sparkles className="size-3.5 text-amber-700 shrink-0 dark:text-amber-400" />
-                    <span className="truncate">{view.title}</span>
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <Sparkles className="size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
+                    <span className="min-w-0 truncate">{view.title}</span>
                   </div>
 
                   {/* Eylem butonları */}
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <div className="flex shrink-0 items-center gap-0.5 pl-1.5 opacity-70 transition-opacity group-hover:opacity-100">
                     <button
                       type="button"
                       onClick={(e) => handleOpenInspectSql(view.title, view.sql, e)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       title={t("inspect_sql")}
                       aria-label={t("inspect_sql")}
                     >
@@ -349,7 +349,7 @@ export function AiViewDropdown({
                     <button
                       type="button"
                       onClick={(e) => handleStartRename(view, e)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       title={t("rename")}
                       aria-label={t("rename")}
                     >
@@ -358,13 +358,13 @@ export function AiViewDropdown({
                     <button
                       type="button"
                       onClick={(e) => handleDelete(view.id, e)}
-                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       title={t("delete_view")}
                       aria-label={t("delete_view")}
                     >
                       <Trash2 className="size-3" />
                     </button>
-                    {isSelected ? <Check className="size-3.5 text-amber-700 shrink-0 ml-1 dark:text-amber-400" /> : null}
+                    {isSelected ? <Check className="ml-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" /> : null}
                   </div>
                 </DropdownMenuItem>
               )

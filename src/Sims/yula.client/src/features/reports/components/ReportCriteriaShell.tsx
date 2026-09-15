@@ -317,9 +317,11 @@ export function ReportCriteriaShell({
       ) : null}
 
       <WorkspaceAiDock
-        className={cn("overflow-hidden", "max-md:overflow-y-auto")}
+        className={cn(
+          isGridMaximized ? "p-0" : "overflow-hidden max-md:overflow-y-auto"
+        )}
       >
-        <ModuleNavPane>
+        <ModuleNavPane className={isGridMaximized ? "p-0" : undefined}>
           {renderFilter(setCriteriaHandle, {
             onListError: handleListError,
           })}

@@ -1259,9 +1259,9 @@ export function VirtualSpreadsheet<T>({
   }, [])
 
   return (
-    <div className={cn(panelCardClass, "flex-1", className)} onCopy={handleCopy}>
-      <div className={panelHeaderClass}>
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden mr-2">
+    <div className={cn(panelCardClass, "flex-1", isMaximized && "rounded-none border-none", className)} onCopy={handleCopy}>
+      <div className={cn(panelHeaderClass, isMaximized && "px-1")}>
+        <div className={cn("flex min-w-0 flex-1 items-center gap-2 overflow-hidden mr-2", isMaximized && "mr-0")}>
           {aiViews !== undefined || activeAiViewId != null || Boolean(currentQuerySql) ? (
             <AiViewDropdown
               reportTitle={title}

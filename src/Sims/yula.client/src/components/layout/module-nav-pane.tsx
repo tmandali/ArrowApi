@@ -59,6 +59,9 @@ export function ModuleNavPane({
   paneTitle,
   defaultOpen = false,
 }: ModuleNavPaneProps) {
+  // pageContentGutterClass varsayılanı; dış className ile sıfırlanabilir
+  // (örn. grid genişletilmiş modda p-0). `cn` son sınıf kazanır.
+  const gutterClass = pageContentGutterClass
   const hasPane = paneContent != null
   const { openById, register, unregister } = usePagePanelContext()
 
@@ -80,18 +83,17 @@ export function ModuleNavPane({
 
   if (!hasPane) {
     return (
-      <div className={cn(pageContentGutterClass, "min-h-0 min-w-0 flex-1", className)}>
+      <div className={cn(gutterClass, "min-h-0 min-w-0 flex-1", className)}>
         <div className="flex h-full min-h-0 min-w-0 flex-col">{children}</div>
       </div>
     )
   }
-
   return (
     <ResizablePanelGroup
       orientation="horizontal"
       groupRef={groupRef}
       onLayoutChanged={onLayoutChanged}
-      className={cn(pageContentGutterClass, "min-h-0 min-w-0 flex-1", className)}
+      className={cn(gutterClass, "min-h-0 min-w-0 flex-1", className)}
     >
       {open ? (
         <ResizablePanel

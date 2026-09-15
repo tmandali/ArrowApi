@@ -28,7 +28,7 @@ export function RecordModeChip({
   return (
     <span
       className={cn(
-        "shrink-0 rounded px-1.5 py-px font-sans text-[10px] font-medium",
+        "inline-flex shrink-0 items-center rounded px-1.5 py-px font-sans text-[10px] font-medium leading-4",
         MODE_CLASS[mode],
         className,
       )}
