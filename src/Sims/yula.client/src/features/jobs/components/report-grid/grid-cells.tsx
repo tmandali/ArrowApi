@@ -7,6 +7,21 @@ import { formatGridCellValue } from "@/utils/format-cell";
 import { cn } from "@/utils/cn";
 import { cellInputClass, cellClass } from "../virtual-spreadsheet";
 import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import type { ColumnStyleSpec } from "./use-column-style-stats";
+
+/** Arrow/DuckDB hücre değerlerini sayıya çevirir (valueOf tabanlı nesneler dahil). */
+function toCellNumber(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t === "" ? NaN : Number(t);
+  }
+  if (v != null && typeof v === "object") {
+    const fo = (v as { valueOf?: unknown }).valueOf;
+    if (typeof fo === "function") return Number(fo.call(v));
+  }
+  return NaN;
+}
 
 /** Filtre hücresi render'ı (VirtualSpreadsheet renderFilterCell prop'u). */
 export function createFilterCellRenderer(args: {
@@ -57,8 +72,10 @@ export function createRowRenderer(args: {
   effectiveColumns: SpreadsheetColumn[];
   columnTypes: Record<string, string>;
   columnDuckTypes: Record<string, string>;
+  /** Airtable benzeri kolon görsel kuralları (bar / çip). Opsiyonel. */
+  columnStyles?: Record<string, ColumnStyleSpec>;
 }) {
-  const { effectiveColumns, columnTypes, columnDuckTypes } = args;
+  const { effectiveColumns, columnTypes, columnDuckTypes, columnStyles } = args;
   return (
     row: Record<string, unknown>,
     index: number,
@@ -75,6 +92,61 @@ export function createRowRenderer(args: {
             col.align,
             columnDuckTypes[col.name] ?? columnTypes[col.name]
           );
+          const spec = columnStyles?.[col.name];
+          const numVal = spec?.kind === "bar" ? toCellNumber(rawVal) : NaN;
+          const isNegative =
+            spec?.kind === "bar" && Number.isFinite(numVal) && numVal < 0;
+
+          // Bar: pozitif sol→sağa, negatif sağ→sola büyür (Airtable "show as bar").
+          let bar: React.ReactNode = null;
+          if (spec?.kind === "bar" && Number.isFinite(numVal) && numVal !== 0) {
+            const posScale = Math.max(spec.max, 0);
+            const negScale = Math.max(-spec.min, 0);
+            const pct = numVal >= 0
+              ? posScale > 0 ? (numVal / posScale) * 100 : 0
+              : negScale > 0 ? (-numVal / negScale) * 100 : 0;
+            if (pct > 0) {
+              bar = (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute top-0 bottom-0 rounded-sm",
+                    numVal >= 0 ? "left-0 bg-primary/10" : "right-0 bg-red-500/10"
+                  )}
+                  style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+              );
+            }
+          }
+
+          // Çip: düşük kardinalite değerleri Airtable tag görünümleriyle.
+          let content: React.ReactNode = (
+            <span
+              className={cn(
+                "relative truncate",
+                isNegative && "text-red-600 dark:text-red-400"
+              )}
+            >
+              {formattedVal}
+            </span>
+          );
+          if (spec?.kind === "chip" && rawVal != null && String(rawVal) !== "") {
+            const hue = spec.domain.get(String(rawVal));
+            if (hue != null) {
+              content = (
+                <span
+                  className="relative inline-flex max-w-full items-center truncate rounded-full border px-1.5 py-px text-[11px] leading-4"
+                  style={{
+                    backgroundColor: `hsl(${hue} 70% 50% / 0.12)`,
+                    borderColor: `hsl(${hue} 70% 50% / 0.35)`,
+                  }}
+                >
+                  <span className="truncate">{formattedVal}</span>
+                </span>
+              );
+            }
+          }
+
           return (
             <td
               key={col.name}
@@ -85,12 +157,13 @@ export function createRowRenderer(args: {
             >
               <div
                 className={cn(
-                  "flex h-7 min-w-0 items-center px-2 tabular-nums text-zinc-900 dark:text-zinc-50",
+                  "relative flex h-7 min-w-0 items-center px-2 tabular-nums text-zinc-900 dark:text-zinc-50",
                   col.align === "right" && "justify-end"
                 )}
                 title={rawVal != null ? String(rawVal) : undefined}
               >
-                <span className="truncate">{formattedVal}</span>
+                {bar}
+                {content}
               </div>
             </td>
           );

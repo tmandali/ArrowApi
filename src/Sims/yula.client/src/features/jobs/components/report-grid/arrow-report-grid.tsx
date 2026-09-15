@@ -23,6 +23,7 @@ import { useGridExport, type ExportFormat } from "./use-grid-export";
 import { ReportGridHeaderActions } from "./report-grid-header";
 import { ExportWarningDialog } from "./export-warning-dialog";
 import { createFilterCellRenderer, createRowRenderer } from "./grid-cells";
+import { useColumnStyleStats } from "./use-column-style-stats";
 
 export type ArrowReportGridProps = {
   title?: string;
@@ -345,7 +346,25 @@ export function ArrowReportGrid({
     (isStreaming || isSavingDisk || effectiveColumns.length === 0 ? null : countDisplay);
 
   const renderFilterCell = createFilterCellRenderer({ t, filters, setFilter });
-  const renderRow = createRowRenderer({ effectiveColumns, columnTypes, columnDuckTypes });
+  // Airtable benzeri kolon görsel kuralları: hücre bar'ı / renk çipleri / negatif vurgusu.
+  // Yalnızca veri değişince (rows referansı) hesaplanır; scroll'da yeniden çalışmaz.
+  const columnStyles = useColumnStyleStats({
+    rows: displayRows,
+    effectiveColumns,
+    numericColumns,
+    booleanColumns,
+  });
+
+  const renderRow = React.useMemo(
+    () =>
+      createRowRenderer({
+        effectiveColumns,
+        columnTypes,
+        columnDuckTypes,
+        columnStyles,
+      }),
+    [effectiveColumns, columnTypes, columnDuckTypes, columnStyles]
+  );
 
   return (
     <>
