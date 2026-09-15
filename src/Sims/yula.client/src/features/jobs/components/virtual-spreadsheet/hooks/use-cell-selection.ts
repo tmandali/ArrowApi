@@ -239,9 +239,10 @@ export function useCellSelection({
     }
   }, [extendSelection, visibleColumns])
 
-  // Hücre konumlanabilirliği: tıklanan hücreyi hafif vurgu ile konumlandırır.
-  // Yula ekran-bazlı "hücreye git / odaklan" emirleri aynı attribute'u okuyarak
-  // hücreyi bulabilir (kriter girdisindeki data-grid-cell deseni).
+  // Hücre konumlanabilirliği: tıklanan hücreyi kriter grid'indeki hücre
+  // seçimi stiliyle (şeffaf border → focus'ta 1px border-border + bg-background)
+  // konumlandırır. Yula ekran-bazlı "hücreye git / odaklan" emirleri aynı
+  // attribute'u okuyarak hücreyi bulabilir (kriter girdisindeki data-grid-cell deseni).
   React.useEffect(() => {
     if (!cellLocator) return
     const styleId = "vsp-cell-locator-style"
@@ -249,9 +250,9 @@ export function useCellSelection({
     const styleEl = document.createElement("style")
     styleEl.id = styleId
     styleEl.textContent = `
-      td[data-vsp-cell][data-vsp-cell-selected='true'] { background-color: color-mix(in srgb, var(--color-primary, #2563eb) 12%, transparent); }
-      td[data-vsp-cell].vsp-cell-active { outline: 2px solid var(--color-primary, #2563eb); outline-offset: -2px; z-index: 2; }
-      td[data-vsp-cell].vsp-cell-active::before { content: attr(data-vsp-cell); position: absolute; top: 1px; right: 4px; font-size: 9px; line-height: 1; font-weight: 600; color: var(--color-primary, #2563eb); opacity: .9; pointer-events: none; z-index: 4; }
+      td[data-vsp-cell][data-vsp-cell-selected='true'] { box-shadow: inset 0 0 0 1px var(--color-border, hsl(214 32% 91%)); }
+      td[data-vsp-cell].vsp-cell-active { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
+      td[data-vsp-cell].vsp-cell-active::before { content: attr(data-vsp-cell); position: absolute; top: 1px; right: 4px; font-size: 9px; line-height: 1; font-weight: 600; color: var(--color-muted-foreground, hsl(215 16% 47%)); opacity: .8; pointer-events: none; z-index: 4; }
     `
     document.head.appendChild(styleEl)
     return () => {
