@@ -23,7 +23,7 @@ import { useGridExport, type ExportFormat } from "./use-grid-export";
 import { ReportGridHeaderActions } from "./report-grid-header";
 import { ExportWarningDialog } from "./export-warning-dialog";
 import { createFilterCellRenderer, createRowRenderer } from "./grid-cells";
-import { useColumnStyleStats } from "./use-column-style-stats";
+import { useColumnStyleStats, type ColumnVisuals } from "./use-column-style-stats";
 import type { ConditionalColorRule } from "../virtual-spreadsheet/conditional-rules";
 
 export type ArrowReportGridProps = {
@@ -347,17 +347,29 @@ export function ArrowReportGrid({
     (isStreaming || isSavingDisk || effectiveColumns.length === 0 ? null : countDisplay);
 
   const renderFilterCell = createFilterCellRenderer({ t, filters, setFilter });
-  // Airtable benzeri kolon görsel kuralları: hücre bar'ı / renk çipleri / negatif vurgusu.
-  // Yalnızca veri değişince (rows referansı) hesaplanır; scroll'da yeniden çalışmaz.
-  // Σ (istatistik) düğmesi: analitik görünüm anahtarı — basılıyken otomatik
-  // görsel katman (bar/çip/negatif-kırmızı) açık; kapalıyken grid tamamen sade.
+  // Airtable benzeri kolon görsel katmanı (hücre bar'ı / renk çipleri).
+  // Varsayılan KAPALIdır: yalnızca kullanıcının footer menüsünden o kolon için
+  // açıkça açtığı katmanlar (columnVisuals) işlenir; açık kolon yoksa sıfır tarama.
+  // Σ (alt toplam) düğmesi artık sadece footer SATIRINI kontrol eder.
   // Kullanıcı tanımlı eşik kuralları (columnRules) bilinçli tercih olduğu için her zaman aktiftir.
+  const [columnVisuals, setColumnVisuals] = React.useState<ColumnVisuals>({});
+  const handleColumnVisualToggle = React.useCallback((column: string, next: boolean) => {
+    setColumnVisuals((prev) => {
+      const isOn = Boolean(prev[column]);
+      if (next === isOn) return prev; // değişim yok
+      const updated = { ...prev };
+      if (next) updated[column] = true;
+      else delete updated[column];
+      return updated;
+    });
+  }, []);
+
   const columnStyles = useColumnStyleStats({
     rows: displayRows,
     effectiveColumns,
     numericColumns,
     booleanColumns,
-    enabled: agg.showFooterRow,
+    enabledColumns: columnVisuals,
   });
 
   // Eşik tabanlı koşullu renk kuralları (kolon menüsünden düzenlenir).
@@ -441,6 +453,8 @@ export function ArrowReportGrid({
         aggregationConfigs={agg.aggregationConfigs}
         onAggregationConfigsChange={agg.setAggregationConfigs}
         aggregationValues={agg.duckDbAggregations}
+        columnVisuals={columnVisuals}
+        onColumnVisualToggle={handleColumnVisualToggle}
         onNeedMore={loadMore}
         hasMore={hasMore}
         loadingMore={isLoadingMore}

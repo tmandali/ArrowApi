@@ -30,6 +30,10 @@ export type TableFooterSummaryRowProps = {
   aggregationConfigs: ColumnAggregationConfig
   aggregationValues: ColumnAggregationValues
   onAggregationChange: (columnName: string, nextType: AggregationType) => void
+  /** Kolon bazında otomatik görsel katman (bar/çip) anahtarları (varsayılan: kapalı) */
+  columnVisuals?: Record<string, boolean>
+  /** Otomatik görsel katmanı bir kolon için aç/kapat */
+  onColumnVisualToggle?: (column: string, next: boolean) => void
 }
 
 export function TableFooterSummaryRow({
@@ -40,6 +44,8 @@ export function TableFooterSummaryRow({
   aggregationConfigs,
   aggregationValues,
   onAggregationChange,
+  columnVisuals,
+  onColumnVisualToggle,
 }: TableFooterSummaryRowProps) {
   return (
     <tfoot className="sticky bottom-0 z-20 bg-muted/80 backdrop-blur-xs border-t border-border/80 text-xs font-mono select-none">
@@ -114,6 +120,20 @@ export function TableFooterSummaryRow({
                     {col.label}
                   </div>
                   <DropdownMenuSeparator />
+                  {/* Otomatik görsel katman (bar/çip): varsayılan kapalı, kolon bazında açılır */}
+                  {onColumnVisualToggle ? (
+                    <DropdownMenuItem
+                      onClick={() => onColumnVisualToggle(col.name, !columnVisuals?.[col.name])}
+                      className={cn(
+                        "cursor-pointer text-xs flex items-center justify-between",
+                        columnVisuals?.[col.name] && "font-semibold text-primary bg-primary/10"
+                      )}
+                    >
+                      <span>Görsel katman (bar/çip)</span>
+                      {columnVisuals?.[col.name] ? <span className="text-[10px]">✓</span> : null}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {onColumnVisualToggle ? <DropdownMenuSeparator /> : null}
                   {available.map((type) => {
                     const isSelected = currentType === type
                     return (

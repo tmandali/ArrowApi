@@ -125,6 +125,8 @@ export function VirtualSpreadsheet<T>({
   cellLocator = true,
   columnRules,
   onColumnRulesChange,
+  columnVisuals,
+  onColumnVisualToggle,
 }: VirtualSpreadsheetProps<T>) {
   const t = useTranslations("ReportGrid")
 
@@ -1300,6 +1302,8 @@ export function VirtualSpreadsheet<T>({
                     aggregationConfigs={activeAggregationConfigs}
                     aggregationValues={computedAggregationValues}
                     onAggregationChange={handleAggregationChange}
+                    columnVisuals={columnVisuals}
+                    onColumnVisualToggle={onColumnVisualToggle}
                   />
                 ) : null}
             </table>

@@ -229,6 +229,13 @@ export type VirtualSpreadsheetProps<T> = {
   onAggregationConfigsChange?: (configs: ColumnAggregationConfig) => void
   /** Dışarıdan sağlanan hesaplanmış özet değerleri (DuckDB pushdown için) */
   aggregationValues?: ColumnAggregationValues
+  /**
+   * Kolon bazında otomatik görsel katman (bar/çip) anahtarları.
+   * Varsayılan: KAPALI — footer menüsünden kolon bazında açılır.
+   */
+  columnVisuals?: Record<string, boolean>
+  /** Otomatik görsel katmanı bir kolon için aç/kapat (footer menüsünden) */
+  onColumnVisualToggle?: (column: string, next: boolean) => void
   /** Varsayılan özet konfigürasyonu */
   defaultAggregationConfigs?: ColumnAggregationConfig
   /** AI SQL görünümleri listesi */

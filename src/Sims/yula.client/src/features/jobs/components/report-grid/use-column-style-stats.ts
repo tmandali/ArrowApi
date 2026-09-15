@@ -10,14 +10,20 @@ import type { SpreadsheetColumn } from "../virtual-spreadsheet";
  * Performans: istatistikler SADECE veri kimliği değiştiğinde (yeni sorgu /
  * loadMore eklemesi → rows referansı değişir) tek geçişte hesaplanır.
  * Scroll (virtualization) rows referansını değiştirmeyeceği için sıfır maliyet.
- * Maliyet kolon SAYISINDAN BAĞIMSIZ sabit bütçeyle sınırlı (CELL_READ_BUDGET):
- * örnek satır = min(MAX_STATS_ROWS, bütçe / kolon sayısı). Böylece tüm kolonlar
- * stillenir ve kolon order'ı değiştiğinde renk katmanı değişmez.
+ * Katman varsayılan KAPALIdır: yalnızca enabledColumns'da açık olan kolonlar
+ * işlenir; açık kolon yoksa tarama yapılmaz (sıfır maliyet).
  */
 export type ColumnStyleSpec =
   | { kind: "bar"; min: number; max: number }
   | { kind: "chip"; domain: Map<string, number> } // value → hue
   | { kind: "plain" };
+
+/**
+ * Kolon başına otomatik görsel katman (bar / çip) anahtarı.
+ * Varsayılan: TÜMÜ KAPALI — kullanıcının footer menüsünden o kolon için
+ * açıkça açtığı katmanlar işlenir; açık kolon yoksa sıfır tarama.
+ */
+export type ColumnVisuals = Record<string, boolean>;
 
 /**
  * İstatistik taraması en fazla bu kadar satırı alır.
@@ -85,28 +91,29 @@ export function useColumnStyleStats(args: {
   numericColumns: Set<string>;
   booleanColumns: Set<string>;
   /**
-   * Otomatik görsel katmanı (bar / çip / negatif vurgu) anahtarlar.
-   * Σ (istatistik) düğmesi kapalıyken grid tamamen sade görünür;
-   * sıfır tarama maliyeti (erken çıkış).
+   * Kolon başına otomatik görsel katman (bar / çip) anahtarı.
+   * Varsayılan: kapalı (tarama yok). Footer menüsünden kolon bazında açılır.
    */
-  enabled?: boolean;
+  enabledColumns?: ColumnVisuals;
 }): Record<string, ColumnStyleSpec> {
-  const { rows, effectiveColumns, numericColumns, booleanColumns, enabled = true } = args;
+  const { rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns } = args;
 
   return React.useMemo(() => {
     const specs: Record<string, ColumnStyleSpec> = {};
-    if (!enabled || rows.length === 0) return specs;
+    if (!enabledColumns || rows.length === 0) return specs;
 
-    // Tüm kolonlar stillenir — order'dan bağımsız; kolon order'ı değişince
-    // renk katmanı değişmez. Maliyet: toplam hücre okuma bütçesi sabit.
-    const colCount = Math.max(1, effectiveColumns.length);
+    // Yalnızca açık kolonlar işlenir → maliyet açık kolon sayısıyla ölçeklenir.
+    const enabledCols = effectiveColumns.filter((c) => enabledColumns[c.name]);
+    if (enabledCols.length === 0) return specs;
+
+    const colCount = Math.max(1, enabledCols.length);
     const sampleCap = Math.max(
       MIN_SAMPLE_ROWS,
       Math.min(MAX_STATS_ROWS, Math.floor(CELL_READ_BUDGET / colCount))
     );
     const scan = statsScanIndices(rows, sampleCap);
 
-    for (const col of effectiveColumns) {
+    for (const col of enabledCols) {
       const isBool = booleanColumns.has(col.name);
       const isNumeric = numericColumns.has(col.name);
 
@@ -148,5 +155,5 @@ export function useColumnStyleStats(args: {
       }
     }
     return specs;
-  }, [rows, effectiveColumns, numericColumns, booleanColumns, enabled]);
+  }, [rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns]);
 }

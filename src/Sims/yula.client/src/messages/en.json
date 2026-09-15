@@ -1197,8 +1197,8 @@
     "aria_sorted_desc": "Sorted descending",
     "col_resize_title": "Drag to resize, double-click to fit the content",
     "no_records": "No records found",
-    "footer_toggle_show": "Enable analysis view: footer summary + cell bars/chip highlights (Σ)",
-    "footer_toggle_hide": "Disable analysis view: keep the grid plain",
+    "footer_toggle_show": "Show footer summary row (Σ)",
+    "footer_toggle_hide": "Hide footer summary row",
     "maximize_title": "Expanded view (maximize)",
     "unmaximize_title": "Minimize (Esc)"
   },
