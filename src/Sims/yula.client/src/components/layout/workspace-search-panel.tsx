@@ -154,9 +154,7 @@ export function WorkspaceSearchResults({
           <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium text-[10px]">
             <Loader2 className="size-3 animate-spin" /> {t("results_loading")}
           </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/60">{t("items_count", { count: results.length })}</span>
-        )}
+        ) : null}
       </div>
 
       <CommandList className={cn("max-h-80 overflow-y-auto p-1.5 space-y-2 overscroll-contain no-scrollbar", listClassName)}>

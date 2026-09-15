@@ -29,7 +29,6 @@ export const cellSelectionActiveClass =
 export const CELL_SELECTION_STYLE = `
   td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true'] { box-shadow: inset 0 0 0 1px var(--color-border, hsl(214 32% 91%)); }
   td[data-vsp-cell].${cellSelectionActiveClass} { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
-  td[data-vsp-cell].${cellSelectionActiveClass}::before { content: attr(data-vsp-cell); position: absolute; top: 1px; right: 4px; font-size: 9px; line-height: 1; font-weight: 600; color: var(--color-muted-foreground, hsl(215 16% 47%)); opacity: .8; pointer-events: none; z-index: 4; }
 `
 
 export type AggregationType =
