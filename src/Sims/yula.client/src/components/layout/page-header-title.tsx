@@ -21,7 +21,7 @@ export function PageHeaderTitle({
     <span
       title={title}
       className={cn(
-        "block min-w-0 truncate font-semibold text-yula-accent",
+        "block min-w-0 truncate pl-2 font-semibold text-yula-accent",
         className
       )}
     >

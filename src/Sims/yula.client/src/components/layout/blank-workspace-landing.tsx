@@ -419,7 +419,6 @@ export function WorkspaceLandingTemplate({
     <WorkspacePageShell
       title={<PageHeaderTitle>{data.greetingTitle}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
     >
       {content}
     </WorkspacePageShell>

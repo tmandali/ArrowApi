@@ -118,7 +118,6 @@ export function SystemHomeView() {
       title={<YulaSessionHeaderTitle displayName={displayName} />}
       actions={<YulaSessionHeaderActions agentId={displayAgentId} />}
       showSearch={false}
-      transparentHeader
     >
       <AIChatPanel mode="main" />
     </WorkspacePageShell>

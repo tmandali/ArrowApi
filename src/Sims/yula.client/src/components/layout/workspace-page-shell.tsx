@@ -12,12 +12,10 @@ type WorkspacePageShellProps = {
   /** Hide the floating header card entirely (e.g. home screens rely on AppHeader). */
   hideHeader?: boolean
   /**
-   * Çerçevesiz/transparan header — yalnızca menü aç/kapa butonu render edilir
+   * Çerçevesiz header — yalnızca menü aç/kapa butonu render edilir
    * (başlık, search ve actions atlanır).
    */
   frameless?: boolean
-  /** Transparan header — yerleşim aynı, kart zeminsiz/çerçevesiz. */
-  transparentHeader?: boolean
   /** Toolbar actions (right side of the header). */
   actions?: ReactNode
   /** Extra content in the left cluster after the breadcrumb. */
@@ -51,7 +49,6 @@ export function WorkspacePageShell({
   title,
   hideHeader = false,
   frameless = false,
-  transparentHeader = false,
   actions,
   startExtra,
   searchPlaceholder,
@@ -78,7 +75,6 @@ export function WorkspacePageShell({
           startExtra={startExtra}
           actions={actions}
           frameless={frameless}
-          transparent={transparentHeader}
         >
           {title}
         </WorkspacePageHeader>

@@ -14,7 +14,6 @@ export function SubcontractingDashboard() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("subcontracting_title")}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

@@ -19,7 +19,6 @@ export function StockPageForm() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("page_dashboard")}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
       actions={<AIChatAssistant />}
     >
       <StockDashboard />

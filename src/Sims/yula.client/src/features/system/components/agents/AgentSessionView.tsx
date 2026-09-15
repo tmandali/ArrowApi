@@ -195,7 +195,6 @@ export function AgentSessionView() {
     <WorkspacePageShell
       title={<AgentSessionHeaderTitle agentName={agent.name} />}
       showSearch={false}
-      transparentHeader
       actions={<AgentSessionHeaderActions agentId={agent.id} />}
     >
       <AIChatPanel mode="main" />

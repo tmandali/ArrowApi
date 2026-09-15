@@ -2,10 +2,7 @@
 
 import type { ReactNode } from "react"
 
-import {
-  pageHeaderCardClass,
-  pageHeaderShellClass,
-} from "@/components/layout/panel-chrome"
+import { pageHeaderShellClass } from "@/components/layout/panel-chrome"
 import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
@@ -29,15 +26,12 @@ type WorkspacePageHeaderProps = {
    * atlanır; yalnızca menü aç/kapa (PagePanelTrigger) render edilir.
    */
   frameless?: boolean
-  /**
-   * Transparan header — yerleşim aynı kalır, kartın zemin/çerçevesi kalkar
-   * (border-transparent bg-transparent).
-   */
-  transparent?: boolean
 }
 
 /**
- * Shared page header: floating card with sidebar toggle + breadcrumb + search + actions.
+ * Shared page header: transparan, kart çerçevesiz — shell + panel trigger,
+ * başlık ve aksiyonlar düz zemine oturur. Tüm sayfalarda tek standart
+ * (genel tasarım kararı); kart/çerçeve kalıntısı ve katlanmış boşluk yok.
  */
 export function WorkspacePageHeader({
   children,
@@ -49,7 +43,6 @@ export function WorkspacePageHeader({
   searchPlaceholder,
   headerSearch,
   frameless = false,
-  transparent = false,
 }: WorkspacePageHeaderProps) {
   // Workspace search açıkken floating header gizlenir — arama görünümü
   // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
@@ -58,7 +51,7 @@ export function WorkspacePageHeader({
 
   if (frameless) {
     return (
-      <div className={cn(pageHeaderShellClass, shellClassName)}>
+      <div className={cn(pageHeaderShellClass, "p-0", shellClassName)}>
         <header className={cn("flex w-full min-w-0 items-center", className)}>
           <PagePanelTrigger className="-ml-1" />
         </header>
@@ -67,11 +60,10 @@ export function WorkspacePageHeader({
   }
 
   return (
-    <div className={cn(pageHeaderShellClass, shellClassName)}>
+    <div className={cn(pageHeaderShellClass, "p-0", shellClassName)}>
       <header
         className={cn(
-          pageHeaderCardClass,
-          transparent && "border-transparent bg-transparent shadow-none",
+          "flex h-11 w-full min-w-0 flex-row items-center gap-2 overflow-hidden px-2 text-xs",
           className
         )}
       >

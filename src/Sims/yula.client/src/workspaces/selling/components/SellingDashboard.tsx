@@ -14,7 +14,6 @@ export function SellingDashboard() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("selling_title")}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

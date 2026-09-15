@@ -14,7 +14,6 @@ export function AccountingDashboard() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("accounting_title")}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding

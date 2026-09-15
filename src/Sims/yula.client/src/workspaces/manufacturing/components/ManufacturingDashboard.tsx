@@ -14,7 +14,6 @@ export function ManufacturingDashboard() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("manufacturing_title")}</PageHeaderTitle>}
       showSearch={false}
-      transparentHeader
       actions={<AIChatAssistant />}
     >
       <BlankWorkspaceLanding
