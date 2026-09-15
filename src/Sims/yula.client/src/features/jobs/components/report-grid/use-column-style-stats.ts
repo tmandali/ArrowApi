@@ -95,8 +95,14 @@ export function useColumnStyleStats(args: {
    * Varsayılan: kapalı (tarama yok). Footer menüsünden kolon bazında açılır.
    */
   enabledColumns?: ColumnVisuals;
+  /**
+   * DuckDB pushdown ile tam veri setinden gelen MIN/MAX ölçek sınırları.
+   * Mevcuttu bar spec'ü bu TAM değerlerden üretilir (örneklem sadece
+   * pushdown yokken — streaming / tablo hazır değilken — fallback'tir).
+   */
+  pushedBounds?: Record<string, { min: number; max: number }>;
 }): Record<string, ColumnStyleSpec> {
-  const { rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns } = args;
+  const { rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns, pushedBounds } = args;
 
   return React.useMemo(() => {
     const specs: Record<string, ColumnStyleSpec> = {};
@@ -111,7 +117,13 @@ export function useColumnStyleStats(args: {
       MIN_SAMPLE_ROWS,
       Math.min(MAX_STATS_ROWS, Math.floor(CELL_READ_BUDGET / colCount))
     );
-    const scan = statsScanIndices(rows, sampleCap);
+    // Sadece gerçekten örneklem gerektiren kolon varsa tarama dizisi kur:
+    // çip adayları + pushdown sınırı olmayan sayısal kolonlar.
+    const needsSampling = enabledCols.some((c) => {
+      if (numericColumns.has(c.name)) return !pushedBounds?.[c.name];
+      return true;
+    });
+    const scan = needsSampling ? statsScanIndices(rows, sampleCap) : [];
 
     for (const col of enabledCols) {
       const isBool = booleanColumns.has(col.name);
@@ -137,6 +149,19 @@ export function useColumnStyleStats(args: {
       }
 
       // --- Bar'lı kolon: sayısal min/max ölçeği ---
+      const pushed = pushedBounds?.[col.name];
+      if (
+        pushed &&
+        Number.isFinite(pushed.min) &&
+        Number.isFinite(pushed.max) &&
+        pushed.min < pushed.max
+      ) {
+        // TAM veri seti ölçeği (DuckDB pushdown) — örneklem atlanır.
+        specs[col.name] = { kind: "bar", min: pushed.min, max: pushed.max };
+        continue;
+      }
+
+      // Fallback: örneklem min/max (pushdown yok / henüz gelmedi)
       let min = Infinity;
       let max = -Infinity;
       let any = false;
@@ -155,5 +180,5 @@ export function useColumnStyleStats(args: {
       }
     }
     return specs;
-  }, [rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns]);
+  }, [rows, effectiveColumns, numericColumns, booleanColumns, enabledColumns, pushedBounds]);
 }

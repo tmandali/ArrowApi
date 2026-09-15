@@ -24,6 +24,7 @@ import { ReportGridHeaderActions } from "./report-grid-header";
 import { ExportWarningDialog } from "./export-warning-dialog";
 import { createFilterCellRenderer, createRowRenderer } from "./grid-cells";
 import { useColumnStyleStats, type ColumnVisuals } from "./use-column-style-stats";
+import { useVisualPushdown } from "./use-visual-pushdown";
 import type { ConditionalColorRule } from "../virtual-spreadsheet/conditional-rules";
 
 export type ArrowReportGridProps = {
@@ -364,12 +365,27 @@ export function ArrowReportGrid({
     });
   }, []);
 
+  // Bar ölçeği için TAM veri seti MIN/MAX (DuckDB pushdown): 100M satırda bile
+  // bar doğru çizilir. Yalnızca açık görsel kolonlar sorgulanır; kapalıysa sıfır maliyet.
+  // Fallback: pushdown sonuç gelene kadar / başarısız olursa örneklem min/max kullanılır.
+  const visualBounds = useVisualPushdown({
+    duckTableName,
+    effectiveColumns,
+    numericColumns,
+    booleanColumns,
+    filters,
+    enabledColumns: columnVisuals,
+    isStreaming,
+    isSavingDisk,
+  });
+
   const columnStyles = useColumnStyleStats({
     rows: displayRows,
     effectiveColumns,
     numericColumns,
     booleanColumns,
     enabledColumns: columnVisuals,
+    pushedBounds: visualBounds,
   });
 
   // Eşik tabanlı koşullu renk kuralları (kolon menüsünden düzenlenir).
