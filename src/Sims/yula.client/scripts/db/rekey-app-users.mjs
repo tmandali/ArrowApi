@@ -15,7 +15,7 @@
  *       - diğer (manuel/admin) → provider null, id korunur
  *     `user_settings.user_id` FK'leri aynı işlemde yeni GUID'lere taşınır.
  *
- * ÖNKOŞUL: `npm run db:migrate` (veya dev'de `npm run db-server:file`)
+ * ÖNKOŞUL: `npm run db:migrate` (veya dev'de `npm run dev` — pglite-socket)
  * çalıştırılmış olmalı (0001 migration: provider/provider_id kolonları).
  * Dev (PGlite): next dev server KAPALI olmalı (local.db kilitli olur).
  *
@@ -57,11 +57,11 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-// CLI override'ı dosya env'ine galip gelir (ör. pglite-server açıkken
+// CLI override'ı dosya env'ine galip gelir (ör. pglite-socket açıkken
 // `USE_PGLITE=false node scripts/db/rekey-app-users.mjs`):
 const usePglite = (process.env.USE_PGLITE ?? env.USE_PGLITE) === "true";
 const databaseUrl =
-  process.env.DATABASE_URL ?? env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
+  process.env.DATABASE_URL ?? env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:15432/postgres";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NUMERIC_RE = /^\d+$/;

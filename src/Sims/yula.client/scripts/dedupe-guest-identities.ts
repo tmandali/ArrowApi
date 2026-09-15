@@ -13,8 +13,8 @@
  * sonraki kaydı korur; bu script mevcut dökümü temizler ve yeniden
  * çalıştırılabilecek kadar idempotenttir.
  *
- * Bağlantı: `DATABASE_URL` üzerinden TCP (dev:full'da pglite-server'ın
- * 127.0.0.1:5432 ucu). İkinci in-process PGlite instance'ı açmaz.
+ * Bağlantı: `DATABASE_URL` üzerinden TCP (dev'de pglite-socket'ın
+ * 127.0.0.1:15432 ucu). İkinci in-process PGlite instance'ı açmaz.
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -27,7 +27,7 @@ import {
 
 const connectionString =
   process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
+  "postgresql://postgres:postgres@127.0.0.1:15432/postgres";
 
 const pool = new Pool({ connectionString });
 const db = drizzle(pool);
