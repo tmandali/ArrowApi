@@ -1049,7 +1049,11 @@ export function VirtualSpreadsheet<T>({
             <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
               <table
                 ref={bodyTableRef}
-                className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
+                className={cn(
+                  "w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs",
+                  // Hücre seçimi aktifken sürüklemenin native text selection üretmesini engelle
+                  cellLocator && "select-none"
+                )}
                 style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
                 onClick={cellLocator ? handleBodyCellClick : undefined}
                 onMouseDown={cellLocator ? handleBodyMouseDown : undefined}
