@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ChevronRight, LayoutGrid, PanelLeftClose } from "lucide-react";
@@ -30,7 +30,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { getWorkspaceNavForPath, isDomainWorkspacePath } from "@/lib/workspace-registry";
+import { getWorkspaceNavForPath, isDomainWorkspacePath, workspaceRootPathByWorkspace, getWorkspaceForPath } from "@/lib/workspace-registry";
 import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
 import { useNavTitleLocalizer } from "@/components/layout/module-nav-menu";
 import { workspaceIconFor } from "@/components/layout/workspace-brand";
@@ -53,7 +53,13 @@ export function ModuleSidebar({ className }: { className?: string }) {
     setOpenGroups((prev) => (prev[url] === open ? prev : { ...prev, [url]: open }));
   }, []);
 
+  const router = useRouter();
   const { toggleSidebar, state } = useSidebar();
+
+  // Aktif workspace'in ana (root) sayfasına gidilecek hedef URL
+  const workspaceRootUrl = activeWorkspaceId
+    ? workspaceRootPathByWorkspace[activeWorkspaceId]
+    : getWorkspaceForPath(pathname).rootPath;
 
   // Yalnızca domain workspace rotalarında alt menü gösterilir (ana sayfa ve sistem rotalarında gösterilmez)
   if (!isDomainWorkspacePath(pathname)) {
@@ -84,14 +90,14 @@ export function ModuleSidebar({ className }: { className?: string }) {
       )}
     >
       <SidebarHeader className="h-12 flex-row items-center overflow-hidden border-none px-2">
-        {/* Workspace ikonu: Hem açıkken hem kapalıyken sol 8px noktasında sabit durur, asla zıplamaz */}
+        {/* Workspace ikonu + ismi tek tık hedefinde: ikonu tıklamak menüyü açar, ismi tıklamak workspace root'una gider */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               type="button"
               onClick={toggleSidebar}
               aria-label={`${activeWsName} — Menüyü Aç / Kapat`}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-orange-500 dark:text-orange-400 transition-colors hover:bg-sidebar-accent hover:text-orange-600 dark:hover:text-orange-300 cursor-pointer"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent/60 text-orange-500 dark:text-orange-400 transition-colors hover:bg-sidebar-accent hover:text-orange-600 dark:hover:text-orange-300 cursor-pointer"
             >
               {React.createElement(workspaceIconFor(activeWorkspaceId) ?? LayoutGrid, {
                 className: "size-4.5 shrink-0",
@@ -104,17 +110,24 @@ export function ModuleSidebar({ className }: { className?: string }) {
           </TooltipContent>
         </Tooltip>
 
-        {/* Başlık ve daraltma butonu: Açıkken görünür, daralırken pürüzsüzce silinir */}
-        <div className="flex min-w-0 flex-1 items-center justify-between pl-2 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none">
-          <span className="truncate text-xs font-semibold tracking-tight text-sidebar-foreground">
-            {activeWsName}
-          </span>
+        {/* Workspace başlığı + daraltma: başlık ikona bitişik, alanı doldurur */}
+        <div className="flex min-w-0 flex-1 items-center justify-between transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none">
+          {/* Workspace ismi: tıklanınca ilgili workspace'in root/ana sayfasına gider */}
+          <button
+            type="button"
+            onClick={() => router.push(workspaceRootUrl)}
+            className="min-w-0 flex-1 cursor-pointer rounded-md px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
+          >
+            <span className="block truncate text-base font-semibold tracking-tight text-sidebar-foreground transition-colors group-hover/name:text-foreground">
+              {activeWsName}
+            </span>
+          </button>
           <button
             type="button"
             onClick={toggleSidebar}
             title="Menüyü Daralt"
             aria-label="Menüyü Daralt"
-            className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer"
           >
             <PanelLeftClose className="size-4 shrink-0" aria-hidden />
           </button>
