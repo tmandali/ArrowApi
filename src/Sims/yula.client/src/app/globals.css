@@ -190,3 +190,11 @@
   width: 100% !important;
   min-width: 0 !important;
 }
+
+/* ── VirtualGrid: düşük kardinalite değer başına yazı rengi (--vsp-hue inline set edilir) ── */
+.vsp-chip-text {
+  color: hsl(var(--vsp-hue, 210) 65% 40%);
+}
+.dark .vsp-chip-text {
+  color: hsl(var(--vsp-hue, 210) 75% 70%);
+}

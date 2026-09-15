@@ -102,7 +102,9 @@ export function createRowRenderer(args: {
             spec?.kind === "bar" && Number.isFinite(numVal) && numVal < 0;
 
           // Bar: pozitif sol→sağa, negatif sağ→sola büyür (Airtable "show as bar").
-          let bar: React.ReactNode = null;
+          // Köşeli kutu yok: hücrenin kendi alanını boyayan gradyan (td zeminine değil,
+          // içerik div'ine arka plan olarak) — ek element, yuvarlak kutu veya inset yok.
+          let cellBgImage: React.CSSProperties | undefined;
           if (spec?.kind === "bar" && Number.isFinite(numVal) && numVal !== 0) {
             const posScale = Math.max(spec.max, 0);
             const negScale = Math.max(-spec.min, 0);
@@ -110,21 +112,21 @@ export function createRowRenderer(args: {
               ? posScale > 0 ? (numVal / posScale) * 100 : 0
               : negScale > 0 ? (-numVal / negScale) * 100 : 0;
             if (pct > 0) {
-              bar = (
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute top-0 bottom-0 rounded-sm",
-                    numVal >= 0 ? "left-0 bg-primary/10" : "right-0 bg-red-500/10"
-                  )}
-                  style={{ width: `${Math.min(pct, 100)}%` }}
-                />
-              );
+              const x = Math.min(pct, 100);
+              cellBgImage = numVal >= 0
+                ? {
+                    backgroundImage:
+                      `linear-gradient(to right, color-mix(in srgb, var(--color-primary, hsl(224 70% 50%)) 14%, transparent) ${x}%, transparent ${x}%)`,
+                  }
+                : {
+                    backgroundImage:
+                      `linear-gradient(to left, color-mix(in srgb, #ef4444 14%, transparent) ${x}%, transparent ${x}%)`,
+                  };
             }
           }
 
-          // Çip: düşük kardinalite değerleri Airtable tag görünümleriyle.
-          // Hücre arka planına eşik kuralı rengi de zemin olarak eklenir (çok hafif alfa).
+          // Düşük kardinalite değerleri: pill/çip yerine DEĞER BAŞINA YAZI RENGİ
+          // (altın açı hue haritası; light/dark uyumu globals.css'teki .vsp-chip-text'ten).
           let content: React.ReactNode = (
             <span
               className={cn(
@@ -140,13 +142,10 @@ export function createRowRenderer(args: {
             if (hue != null) {
               content = (
                 <span
-                  className="relative inline-flex max-w-full items-center truncate rounded-full border px-1.5 py-px text-[11px] leading-4"
-                  style={{
-                    backgroundColor: `hsl(${hue} 70% 50% / 0.12)`,
-                    borderColor: `hsl(${hue} 70% 50% / 0.35)`,
-                  }}
+                  className="vsp-chip-text relative truncate"
+                  style={{ ["--vsp-hue" as string]: hue }}
                 >
-                  <span className={cn("truncate", ruleHit?.text)}>{formattedVal}</span>
+                  {formattedVal}
                 </span>
               );
             }
@@ -166,9 +165,9 @@ export function createRowRenderer(args: {
                   col.align === "right" && "justify-end",
                   ruleHit?.bg
                 )}
+                style={cellBgImage}
                 title={rawVal != null ? String(rawVal) : undefined}
               >
-                {bar}
                 {content}
               </div>
             </td>
