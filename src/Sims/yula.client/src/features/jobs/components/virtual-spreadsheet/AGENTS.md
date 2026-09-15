@@ -8,9 +8,9 @@ Bu doküman, `VirtualSpreadsheet` ve alt modüllerinde (`src/features/jobs/compo
 
 ```
 src/features/jobs/components/
-├── VirtualSpreadsheet.tsx                # Ana Orkestratör: Sanal pencereleme, scroll senkronizasyonu, D&D, header & body
+├── VirtualSpreadsheet.tsx                # Ana Orkestratör: render, hook'ların birbirine bağlanması
 └── virtual-spreadsheet/
-    ├── index.ts                          # Public API: Tüm alt modüllerin barrel export kapısı
+    ├── index.ts                          # Public API: Tüm alt modüllerin + hook'lara barrel export kapısı
     ├── types.ts                          # Tip tanımları (SpreadsheetColumn, VirtualSpreadsheetProps) ve stil sabitleri
     ├── column-sizing.ts                  # Canvas 2D reflow-free metin ölçümü ve auto-fit genişlik hesaplamaları
     ├── ColumnTypeBadge.tsx               # Şema destekli veri tipi rozetleri (Sayi, Tarih, Mantiksal, Metin)
@@ -18,6 +18,18 @@ src/features/jobs/components/
     ├── TableSkeletonRows.tsx             # Ilk yukleme ve sonsuz kaydirma icin sticky destekli iskelet satirlari
     ├── TableFooterSummaryRow.tsx         # Airtable/Excel tarzi alt toplam satiri (SUM, AVG, MIN, MAX, COUNT, DISTINCT)
     ├── column-aggregations.ts            # Bellek ici ve DuckDB tek gecisli SQL alt toplam hesaplama motoru
+    ├── AiViewDropdown.tsx                # AI SQL goruntuleri secici/kayit/adi degistirme/silme dropdown'u
+    ├── hooks/                            # Ana orkestrator mantigi bu tema-temelli custom hook'lara bolunmustur
+    │   ├── index.ts                      # Hook'larin barrel export kapisı
+    │   ├── use-maximized-state.ts        # Genisletilmis/odak modu: global store, Esc tuşu, resize event yenileme
+    │   ├── use-column-persistence.ts     # localStorage'dan grid konfigürasyonunu (sira, gizli, sabit, ozet, sort, footer) yukleme orkestrasyonu
+    │   ├── use-persist-grid-state.ts     # 250ms debounce ile localStorage'a yazma; hic ayar yoksa girdiyi temizler
+    │   ├── use-column-resize.ts          # Kolon genislik state'i, pointer tabanli resize handle, Canvas 2D ile auto-fit
+    │   ├── use-column-reorder.ts         # HTML5 DnD kolon tasima, otomatik pin/unpin donusumleri, "soldan saga oncelik" senkronu
+    │   ├── use-multi-sort.ts             # Coklu kolon sirlama state'i (controlled ?? internal ?? legacy fallback) ve header tiklama dongusu
+    │   ├── use-cell-selection.ts         # Excel benzeri coklu hucre secimi + klavye navigasyonu + data-vsp-cell attribute enjeksiyonu
+    │   ├── use-client-side-sort.ts       # Kontroldusuz modda bellek ici coklu sirlama motoru
+    │   └── use-grid-scroll-sync.ts       # useVirtualWindow sarmalayici: header/body yatay sync, scrollbar genisligi, infinite scroll tetikleme
     └── tests/                            # Otomasyon testleri: npm run test:grid
         ├── filter-parser.test.mjs        # DuckDB WHERE SQL üretimi, istemci arama ve şema formatlama testleri
         ├── export-formats.test.mjs       # Excel 1M/2M limitleri, GZIP CSV ve özel görünüm dışa aktarım testleri
@@ -36,7 +48,7 @@ src/features/jobs/components/
 - **`ColumnTypeBadge.tsx`**: DuckDB şeması (`duckType`) ve türetilmiş tipe (`kind`) dayalı görsel rozet bileşenidir.
 - **`ColumnManagementMenu.tsx`**: Popover menü arayüzü, liste arama, klavye ok tuşları (`ArrowUp`/`ArrowDown`/`Enter`/`Space`/`P`), ayraç ve çift görevli hover/odak slotunu kapsüller.
 - **`TableSkeletonRows.tsx`**: Sanal tablo gövdesinde ilk yükleme ve sonsuz kaydırma sırasında sticky kolonların hizasını ve gölgesini koruyarak iskelet satırları çizer.
-- **`VirtualSpreadsheet.tsx`**: Tablonun ana bileşenidir. `useVirtualWindow` ile sadece ekranda görünen satırları render eder, dikey/yatay scroll senkronizasyonunu yönetir ve `localStorage` orkestrasyonunu yürütür.
+- **`VirtualSpreadsheet.tsx`**: Ana orkestratör bileşenidir; yalnızca render (JSX) ve hook'ları birbirine bağlamaktan sorumludur. State mantığı `hooks/` altındaki tema-temelli custom hook'lara bölünmüştür (maximize, resize, DnD reorder, multi-sort, cell selection, client-side sort, scroll sync, localStorage persistence).
 
 ---
 

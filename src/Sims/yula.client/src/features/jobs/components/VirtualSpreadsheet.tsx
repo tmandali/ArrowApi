@@ -15,9 +15,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
-import { useVirtualWindow } from "@/hooks/use-virtual-window"
-import { useYulaGridStore } from "@/lib/stores/grid"
-import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 import {
   panelCardClass,
   panelHeaderClass,
@@ -26,38 +23,46 @@ import {
   panelHeaderTitleClass,
 } from "@/components/layout/panel-chrome"
 import { cn } from "@/utils/cn"
+import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 
 export type { SpreadsheetColumn, VirtualSpreadsheetProps, ColumnSortConfigs } from "./virtual-spreadsheet"
 
 import {
   ROW_HEIGHT,
   SKELETON_ROWS,
-  MIN_COL_WIDTH,
   cellClass,
   headClass,
   type SpreadsheetColumn,
   type VirtualSpreadsheetProps,
-  type ColumnSortConfigs,
   type AggregationType,
   type ColumnAggregationConfig,
-  type GridPersistedState,
-  calculateColumnAutoFitWidth,
-  getDefaultColumnWidth,
   ColumnManagementMenu,
   TableSkeletonRows,
   TableFooterSummaryRow,
   AiViewDropdown,
   computeInMemoryAggregations,
   getDefaultAggregationForColumn,
+  useMaximizedState,
+  useColumnResize,
+  useColumnReorder,
+  useMultiSort,
+  useCellSelection,
+  useClientSideSort,
+  useGridScrollSync,
+  useColumnPersistence,
+  usePersistGridState,
 } from "./virtual-spreadsheet"
 
 /**
  * Sanal pencereli spreadsheet iskeleti: sabit header + filtre satırı + spacer'lı
  * sanal body. Stock Balance (flat) ve Stock Analytics (ağaç) grid'leri bu ortak
  * chrome/virtualizasyonu paylaşır; satır renderer'ı grid'e özeldir.
+ *
+ * State mantığı `./virtual-spreadsheet/hooks/` altındaki temaya özel
+ * custom hook'lara bölünmüştür; bu dosya yalnızca render orkestrasyonu ve
+ * hook'ların birbirine bağlanmasıyla ilgilenir.
  */
 export function VirtualSpreadsheet<T>({
-
   columns,
   items,
   renderRow,
@@ -113,48 +118,17 @@ export function VirtualSpreadsheet<T>({
   onSortConfigsChange,
   isMaximized: controlledMaximized,
   onToggleMaximize,
+  cellLocator = true,
 }: VirtualSpreadsheetProps<T>) {
   const t = useTranslations("ReportGrid")
-  const storeMaximized = useYulaGridStore((s) => s.isMaximized)
-  const setStoreMaximized = useYulaGridStore((s) => s.setIsMaximized)
 
-  const isMaximized = controlledMaximized !== undefined ? controlledMaximized : storeMaximized
+  // ── Maximize / minimize (global store + Esc tuşu) ─────────────────────
+  const { isMaximized, handleToggleMaximize } = useMaximizedState({
+    controlledMaximized,
+    onToggleMaximize,
+  })
 
-  const handleToggleMaximize = React.useCallback(() => {
-    const next = !isMaximized
-    if (onToggleMaximize) {
-      onToggleMaximize(next)
-    } else {
-      setStoreMaximized(next)
-    }
-  }, [isMaximized, onToggleMaximize, setStoreMaximized])
-
-  // Esc tuşu ile genişletilmiş moddan çıkış
-  React.useEffect(() => {
-    if (!isMaximized) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        if (onToggleMaximize) {
-          onToggleMaximize(false)
-        } else {
-          setStoreMaximized(false)
-        }
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isMaximized, onToggleMaximize, setStoreMaximized])
-
-  // Genişletilmiş moda geçildiğinde sanal pencere ölçümlerini anında tazele
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      window.dispatchEvent(new Event("resize"))
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [isMaximized])
-
-  // Kalıcı yerel depolama anahtarı (localStorage)
+  // ── Kalıcı yerel depolama anahtarı (localStorage) ──────────────────────
   const effectiveStorageKey = React.useMemo(() => {
     if (disablePersistence) return undefined
     if (storageKey) return storageKey
@@ -164,21 +138,24 @@ export function VirtualSpreadsheet<T>({
     return undefined
   }, [disablePersistence, storageKey, title])
 
-  const isStorageLoadedRef = React.useRef(false)
-  const prevStorageKeyRef = React.useRef(effectiveStorageKey)
-
-  if (prevStorageKeyRef.current !== effectiveStorageKey) {
-    prevStorageKeyRef.current = effectiveStorageKey
-    isStorageLoadedRef.current = false
-  }
+  // ── İç (uncontrolled) state'ler ───────────────────────────────────────
+  const [internalPinnedColumns, setInternalPinnedColumnsRaw] = React.useState<string[] | null>(null)
+  const setInternalPinnedColumns = React.useCallback(
+    (pinned: string[] | null) => {
+      if (onPinnedColumnsChange && pinned !== null) {
+        onPinnedColumnsChange(pinned)
+      } else {
+        setInternalPinnedColumnsRaw(pinned)
+      }
+    },
+    [onPinnedColumnsChange]
+  )
 
   // Sabitlenmiş kolonlar (Varsayılan olarak ilk pinnedColumnCount kadar kolon)
   const defaultPinnedColumns = React.useMemo(() => {
     const count = Math.max(0, pinnedColumnCount)
     return columns.slice(0, count).map((c) => c.name)
   }, [columns, pinnedColumnCount])
-
-  const [internalPinnedColumns, setInternalPinnedColumns] = React.useState<string[] | null>(null)
 
   const activePinnedColumns = React.useMemo(() => {
     if (pinnedColumns !== undefined) return pinnedColumns
@@ -333,7 +310,7 @@ export function VirtualSpreadsheet<T>({
       if (onPinnedColumnsChange) {
         onPinnedColumnsChange(nextPinned)
       } else {
-        setInternalPinnedColumns(nextPinned)
+        setInternalPinnedColumnsRaw(nextPinned)
       }
 
       if (onColumnOrderChange) {
@@ -342,408 +319,114 @@ export function VirtualSpreadsheet<T>({
         setInternalColumnOrder(nextOrder)
       }
     },
-    [pinnedSet, activePinnedColumns, orderedColumns, visibleColumns, onPinnedColumnsChange, onColumnOrderChange]
-  )
-
-  // Sürükle - bırak görsel durumları
-  const [draggedColName, setDraggedColName] = React.useState<string | null>(null)
-  const [dropTarget, setDropTarget] = React.useState<{
-    name: string
-    position: "before" | "after"
-  } | null>(null)
-  const isDraggingRef = React.useRef(false)
-  const isResizingRef = React.useRef(false)
-  const isHoveringSeparatorRef = React.useRef(false)
-  const [hoveredSeparatorCol, setHoveredSeparatorCol] = React.useState<string | null>(null)
-  const lastSeparatorClickRef = React.useRef<{ time: number; colName: string }>({
-    time: 0,
-    colName: "",
-  })
-
-  const [internalSort, setInternalSort] = React.useState<{
-    column: string | null
-    direction: "asc" | "desc" | null
-  }>({
-    column: null,
-    direction: null,
-  })
-  const [internalSortConfigs, setInternalSortConfigs] = React.useState<ColumnSortConfigs>({})
-
-  const activeSortConfigs = React.useMemo<ColumnSortConfigs>(() => {
-    if (sortConfigs !== undefined) return sortConfigs
-    if (Object.keys(internalSortConfigs).length > 0) return internalSortConfigs
-    // Fallback tekli sort props/state
-    if (sortColumn && sortDirection) {
-      return { [sortColumn]: sortDirection }
-    }
-    if (internalSort.column && internalSort.direction) {
-      return { [internalSort.column]: internalSort.direction }
-    }
-    return {}
-  }, [sortConfigs, internalSortConfigs, sortColumn, sortDirection, internalSort])
-
-  const activeSortColumn = React.useMemo(() => {
-    if (sortColumn !== undefined) return sortColumn
-    const sortedCols = orderedColumns.map((c) => c.name).filter((name) => activeSortConfigs[name])
-    return sortedCols.length > 0 ? sortedCols[0] : internalSort.column
-  }, [sortColumn, orderedColumns, activeSortConfigs, internalSort.column])
-
-  const activeSortDirection = React.useMemo(() => {
-    if (sortDirection !== undefined) return sortDirection
-    if (activeSortColumn && activeSortConfigs[activeSortColumn]) {
-      return activeSortConfigs[activeSortColumn]
-    }
-    return internalSort.direction
-  }, [sortDirection, activeSortColumn, activeSortConfigs, internalSort.direction])
-
-  const handleHeaderClick = React.useCallback(
-    (col: SpreadsheetColumn) => {
-      // Sürükleme veya boyutlandırma işlemi yeni bittiyse tıklama (sıralama) tetikleme
-      if (isDraggingRef.current || isResizingRef.current || resizeRef.current !== null) return
-      if (disableSorting || col.sortable === false) return
-
-      const currentDir = activeSortConfigs[col.name]
-      let nextDir: "asc" | "desc" | null = "asc"
-      if (currentDir === "asc") {
-        nextDir = "desc"
-      } else if (currentDir === "desc") {
-        nextDir = null
-      } else {
-        nextDir = "asc"
-      }
-
-      const nextConfigs: ColumnSortConfigs = { ...activeSortConfigs }
-      if (nextDir) {
-        nextConfigs[col.name] = nextDir
-      } else {
-        delete nextConfigs[col.name]
-      }
-
-      const orderedColNames = orderedColumns.map((c) => c.name)
-
-      if (onSortConfigsChange) {
-        onSortConfigsChange(nextConfigs, orderedColNames)
-      } else {
-        setInternalSortConfigs(nextConfigs)
-        if (onSortChange) {
-          const firstSorted = orderedColNames.find((c) => nextConfigs[c])
-          onSortChange(firstSorted ?? col.name, firstSorted ? nextConfigs[firstSorted] : null)
-        } else {
-          setInternalSort({
-            column: nextDir ? col.name : null,
-            direction: nextDir,
-          })
-        }
-      }
-    },
-    [disableSorting, activeSortConfigs, orderedColumns, onSortConfigsChange, onSortChange]
-  )
-
-  const handleDragStart = React.useCallback(
-    (event: React.DragEvent, col: SpreadsheetColumn) => {
-      // Yeniden boyutlandırma sırasında veya ayırıcı çizgiden sürüklemeyi kesinlikle engelle
-      if (
-        disableColumnReorder ||
-        resizeRef.current !== null ||
-        isResizingRef.current ||
-        isHoveringSeparatorRef.current
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const target = event.target as HTMLElement | null
-      if (target?.closest('[role="separator"]')) {
-        event.preventDefault()
-        return
-      }
-
-      isDraggingRef.current = true
-      event.dataTransfer.setData("text/plain", col.name)
-      event.dataTransfer.effectAllowed = "move"
-      setDraggedColName(col.name)
-    },
-    [disableColumnReorder]
-  )
-
-  const handleDragOver = React.useCallback(
-    (event: React.DragEvent, col: SpreadsheetColumn) => {
-      if (resizeRef.current !== null || isResizingRef.current) return
-      if (!draggedColName || draggedColName === col.name) return
-      event.preventDefault()
-      event.dataTransfer.dropEffect = "move"
-
-      const rect = event.currentTarget.getBoundingClientRect()
-      const midpoint = rect.left + rect.width / 2
-      const position: "before" | "after" = event.clientX < midpoint ? "before" : "after"
-
-      setDropTarget((prev) => {
-        if (prev?.name === col.name && prev?.position === position) return prev
-        return { name: col.name, position }
-      })
-    },
-    [draggedColName]
-  )
-
-  const handleDragLeave = React.useCallback(
-    (event: React.DragEvent, col: SpreadsheetColumn) => {
-      const related = event.relatedTarget as HTMLElement | null
-      if (!event.currentTarget.contains(related)) {
-        setDropTarget((prev) => (prev?.name === col.name ? null : prev))
-      }
-    },
-    []
-  )
-
-  const executeColumnReorder = React.useCallback(
-    (draggedName: string, targetName: string, position: "before" | "after" = "before") => {
-      const currentOrder = orderedColumns.map((c) => c.name)
-      const fromIndex = currentOrder.indexOf(draggedName)
-      if (fromIndex === -1) return
-
-      const nextOrder = [...currentOrder]
-      nextOrder.splice(fromIndex, 1)
-
-      let targetIndex = nextOrder.indexOf(targetName)
-      if (targetIndex === -1) return
-      if (position === "after") {
-        targetIndex += 1
-      }
-      nextOrder.splice(targetIndex, 0, draggedName)
-
-      const wasPinned = pinnedSet.has(draggedName)
-      const isDroppingInPinnedArea = targetIndex < effectivePinnedCount
-
-      let nextPinned = activePinnedColumns
-      if (!wasPinned && isDroppingInPinnedArea) {
-        // Unpinned kolon pinned alanına sürüklendi/taşındı -> otomatik sabitle
-        if (visibleColumns.filter((c) => pinnedSet.has(c.name)).length < visibleColumns.length - 1) {
-          nextPinned = [...activePinnedColumns, draggedName]
-        }
-      } else if (wasPinned && !isDroppingInPinnedArea) {
-        // Pinned kolon unpinned alana sürüklendi/taşındı -> sabitlemeyi kaldır
-        nextPinned = activePinnedColumns.filter((name) => name !== draggedName)
-      }
-
-      const nextPinnedSet = new Set(nextPinned)
-      const finalOrder = [
-        ...nextOrder.filter((name) => nextPinnedSet.has(name)),
-        ...nextOrder.filter((name) => !nextPinnedSet.has(name)),
-      ]
-
-      if (nextPinned !== activePinnedColumns) {
-        if (onPinnedColumnsChange) {
-          onPinnedColumnsChange(nextPinned)
-        } else {
-          setInternalPinnedColumns(nextPinned)
-        }
-      }
-
-      if (onColumnOrderChange) {
-        onColumnOrderChange(finalOrder)
-      } else {
-        setInternalColumnOrder(finalOrder)
-      }
-
-      // Çoklu sıralama aktifse ve kolon sırası değiştiyse, "soldan sağa doğru çalışır"
-      // kuralı gereğince sıralama önceliğini yeni kolon sırasına göre anında güncelle
-      if (Object.keys(activeSortConfigs).length > 1 && onSortConfigsChange) {
-        onSortConfigsChange(activeSortConfigs, finalOrder)
-      }
-    },
     [
-      orderedColumns,
       pinnedSet,
-      effectivePinnedCount,
       activePinnedColumns,
+      orderedColumns,
       visibleColumns,
       onPinnedColumnsChange,
       onColumnOrderChange,
-      activeSortConfigs,
-      onSortConfigsChange,
+      setInternalPinnedColumnsRaw,
     ]
   )
 
-  const moveColumn = React.useCallback(
-    (columnName: string, direction: "up" | "down") => {
-      const currentOrder = orderedColumns.map((c) => c.name)
-      const currentIndex = currentOrder.indexOf(columnName)
-      if (currentIndex === -1) return
+  // ── Kolon genişliği & resize / auto-fit ───────────────────────────────
+  const {
+    colWidths,
+    getColWidth,
+    resetColWidths,
+    applyStoredWidths,
+    handleResizeStart,
+    handleResizeMove,
+    handleResizeEnd,
+    handleAutoFit,
+    refs: { isResizingRef, resizeRef },
+  } = useColumnResize({
+    initialColWidths,
+    displayItems: items,
+  })
 
-      if (direction === "up" && currentIndex > 0) {
-        const targetName = currentOrder[currentIndex - 1]
-        executeColumnReorder(columnName, targetName, "before")
-      } else if (direction === "down" && currentIndex < currentOrder.length - 1) {
-        const targetName = currentOrder[currentIndex + 1]
-        executeColumnReorder(columnName, targetName, "after")
-      }
-    },
-    [orderedColumns, executeColumnReorder]
-  )
+  // ── HTML5 DnD ile kolon taşıma & otomatik pin/unpin ───────────────────
+  const reorder = useColumnReorder({
+    disableColumnReorder,
+    orderedColumns,
+    visibleColumns,
+    pinnedSet,
+    effectivePinnedCount,
+    activePinnedColumns,
+    onPinnedColumnsChange,
+    onColumnOrderChange,
+    onSortConfigsChange,
+    getActiveSortConfigs: () => (sortConfigs !== undefined ? sortConfigs : getInternalSortConfigs()),
+    setInternalPinnedColumns,
+    setInternalColumnOrder,
+    resizeGuard: { isResizingRef, resizeRef },
+  })
+  const {
+    draggedColName,
+    dropTarget,
+    hoveredSeparatorCol,
+    setHoveredSeparatorCol,
+    isDraggingRef,
+    isHoveringSeparatorRef,
+    handleDragStart,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDragEnd,
+    moveColumn,
+    executeColumnReorder,
+  } = reorder
 
-  const handleDrop = React.useCallback(
-    (event: React.DragEvent, col: SpreadsheetColumn) => {
-      event.preventDefault()
-      if (resizeRef.current !== null || isResizingRef.current) {
-        setDraggedColName(null)
-        setDropTarget(null)
-        return
-      }
-      if (!draggedColName || draggedColName === col.name) {
-        setDraggedColName(null)
-        setDropTarget(null)
-        setTimeout(() => {
-          isDraggingRef.current = false
-        }, 50)
-        return
-      }
+  // ── Çoklu sıralama ────────────────────────────────────────────────────
+  const {
+    activeSortConfigs,
+    activeSortColumn,
+    activeSortDirection,
+    handleHeaderClick,
+    handleHeaderClearSorts,
+    getInternalSortConfigs,
+  } = useMultiSort({
+    orderedColumns,
+    sortColumn,
+    sortDirection,
+    sortConfigs,
+    onSortChange,
+    onSortConfigsChange,
+    disableSorting,
+    interactionGuards: { isDraggingRef, isResizingRef, resizeRef },
+  })
 
-      const rect = event.currentTarget.getBoundingClientRect()
-      const midpoint = rect.left + rect.width / 2
-      const position: "before" | "after" = event.clientX < midpoint ? "before" : "after"
-
-      executeColumnReorder(draggedColName, col.name, position)
-
-      setDraggedColName(null)
-      setDropTarget(null)
-      setTimeout(() => {
-        isDraggingRef.current = false
-      }, 50)
-    },
-    [draggedColName, executeColumnReorder]
-  )
-
-  const handleDragEnd = React.useCallback(() => {
-    setDraggedColName(null)
-    setDropTarget(null)
-    setTimeout(() => {
-      isDraggingRef.current = false
-    }, 50)
-  }, [])
-
-  const [colWidths, setColWidths] = React.useState<
-    Record<string, string | number>
-  >({})
-  const resizeRef = React.useRef<{
-    startX: number
-    startWidth: number
-    name: string
-    moved?: boolean
-  } | null>(null)
-
-  // Başlangıç genişlikleri değişince sütun genişliklerini senkronize et
-  const initialWidthsKey = React.useMemo(
-    () => JSON.stringify(initialColWidths ?? null),
-    [initialColWidths]
-  )
-  const [syncedInitialWidthsKey, setSyncedInitialWidthsKey] = React.useState(initialWidthsKey)
-  if (syncedInitialWidthsKey !== initialWidthsKey) {
-    setSyncedInitialWidthsKey(initialWidthsKey)
-    if (!isStorageLoadedRef.current) {
-      setColWidths(initialColWidths ?? {})
-    }
-  }
-
-  // Sayfa açıldığında veya kolonlar yüklendiğinde localStorage'dan ayarları geri yükle
+  // ── Kontrollü değilse client-side sıralama ────────────────────────────
+  const { displayItems } = useClientSideSort({
+    items,
+    orderedColumns,
+    activeSortConfigs,
+    disableSorting,
+    onSortChange,
+    onSortConfigsChange,
+  })
+  const displayItemsRef = React.useRef(displayItems)
   React.useEffect(() => {
-    if (!effectiveStorageKey || typeof window === "undefined" || columns.length === 0) {
-      return
-    }
-    if (isStorageLoadedRef.current) return
+    displayItemsRef.current = displayItems
+  }, [displayItems])
 
-    try {
-      const raw = localStorage.getItem(effectiveStorageKey)
-      if (raw) {
-        const parsed = JSON.parse(raw) as GridPersistedState
-        if (parsed) {
-          const rawWidths = parsed.widths || (parsed as { colWidths?: Record<string, string | number> }).colWidths
-          if (rawWidths && typeof rawWidths === "object") {
-            setColWidths(rawWidths)
-          }
-          const rawOrder = parsed.order || (parsed as { columnOrder?: string[] }).columnOrder
-          if (Array.isArray(rawOrder) && rawOrder.length > 0) {
-            const valid = rawOrder.filter((name) =>
-              columns.some((c) => c.name === name)
-            )
-            if (valid.length > 0) {
-              const existingSet = new Set(valid)
-              const remaining = columns.filter((c) => !existingSet.has(c.name)).map((c) => c.name)
-              const fullOrder = [...valid, ...remaining]
-              if (onColumnOrderChange) {
-                onColumnOrderChange(fullOrder)
-              } else {
-                setInternalColumnOrder(fullOrder)
-              }
-            }
-          }
-          const rawHidden = parsed.hidden || (parsed as { hiddenColumns?: string[] }).hiddenColumns
-          if (Array.isArray(rawHidden)) {
-            const valid = rawHidden.filter((name) =>
-              columns.some((c) => c.name === name)
-            )
-            if (valid.length < columns.length) {
-              if (onHiddenColumnsChange) {
-                onHiddenColumnsChange(valid)
-              } else {
-                setInternalHiddenColumns(valid)
-              }
-            }
-          }
-          const rawPinned =
-            parsed.pinned !== undefined
-              ? parsed.pinned
-              : (parsed as { pinnedColumns?: string[] }).pinnedColumns
-          if (Array.isArray(rawPinned)) {
-            const valid = rawPinned.filter((name) =>
-              columns.some((c) => c.name === name)
-            )
-            if (onPinnedColumnsChange) {
-              onPinnedColumnsChange(valid)
-            } else {
-              setInternalPinnedColumns(valid)
-            }
-          }
-          if (parsed.aggregations && typeof parsed.aggregations === "object") {
-            if (onAggregationConfigsChange) {
-              onAggregationConfigsChange(parsed.aggregations)
-            } else {
-              setInternalAggregationConfigs(parsed.aggregations)
-            }
-          }
-          if (parsed.sortConfigs && typeof parsed.sortConfigs === "object") {
-            const validConfigs: ColumnSortConfigs = {}
-            for (const [col, dir] of Object.entries(parsed.sortConfigs)) {
-              if (
-                columns.some((c) => c.name === col) &&
-                (dir === "asc" || dir === "desc")
-              ) {
-                validConfigs[col] = dir
-              }
-            }
-            if (onSortConfigsChange) {
-              onSortConfigsChange(validConfigs)
-            } else {
-              setInternalSortConfigs(validConfigs)
-            }
-          } else if (parsed.sortBy !== undefined) {
-            const colExists = !parsed.sortBy || columns.some((c) => c.name === parsed.sortBy)
-            if (colExists && onSortSettingChange) {
-              onSortSettingChange(parsed.sortBy, Boolean(parsed.sortDesc))
-            } else if (colExists && onSortConfigsChange && parsed.sortBy) {
-              onSortConfigsChange({ [parsed.sortBy]: parsed.sortDesc ? "desc" : "asc" })
-            }
-          }
-          if (parsed.showFooter !== undefined && onToggleFooterRow) {
-            onToggleFooterRow(Boolean(parsed.showFooter))
-          }
-        }
-      }
-    } catch {
-      // ignore parse or quota errors
-    } finally {
-      isStorageLoadedRef.current = true
-    }
-  }, [
+  // ── Hücre seçimi / klavye navigasyonu / data-vsp-cell attribute'ları ─
+  const bodyTableRef = React.useRef<HTMLTableElement>(null)
+  const {
+    handleBodyCellClick,
+    handleBodyMouseDown,
+    handleBodyKeyDown,
+    applyCellLocatorAttributes,
+  } = useCellSelection({
+    cellLocator,
+    visibleColumns,
+    displayItemsRef,
+    bodyTableRef,
+  })
+
+  // ── LocalStorage: yükleme & 250ms debounce ile kaydetme ──────────────
+  const { isStorageLoadedRef } = useColumnPersistence({
     effectiveStorageKey,
     columns,
     onColumnOrderChange,
@@ -753,81 +436,31 @@ export function VirtualSpreadsheet<T>({
     onSortSettingChange,
     onSortConfigsChange,
     onToggleFooterRow,
-  ])
+    onColumnOrderChangeInternal: setInternalColumnOrder,
+    onHiddenColumnsChangeInternal: setInternalHiddenColumns,
+    onPinnedColumnsChangeInternal: setInternalPinnedColumnsRaw,
+    onAggregationConfigsChangeInternal: setInternalAggregationConfigs,
+    onSortConfigsChangeInternal: () => {},
+    onWidthsChangeInternal: applyStoredWidths,
+  })
 
-  // Kolon sırası, genişliği, gizlilik veya sabitleme değiştiğinde 250ms debounce ile localStorage'a kaydet
-  React.useEffect(() => {
-    if (!isStorageLoadedRef.current || !effectiveStorageKey || typeof window === "undefined") {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      const hasWidths = Object.keys(colWidths).length > 0
-      const hasOrder = Boolean(activeColumnOrder && activeColumnOrder.length > 0)
-      const hasHidden = activeHiddenColumns.length > 0
-      const isPinnedModified =
-        pinnedColumns !== undefined ||
-        internalPinnedColumns !== null ||
-        activePinnedColumns.length !== defaultPinnedColumns.length ||
-        activePinnedColumns.some((col, idx) => col !== defaultPinnedColumns[idx])
-      const hasPinned = isPinnedModified
-      const hasAggregations = Object.keys(activeAggregationConfigs).length > 0
-      const hasSortConfigs = Object.keys(activeSortConfigs).length > 0
-      const hasSort = Boolean(sortColumn) || hasSortConfigs
-      const hasFooter = Boolean(showFooterRow)
-
-      if (!hasWidths && !hasOrder && !hasHidden && !hasPinned && !hasAggregations && !hasSort && !hasFooter) {
-        try {
-          localStorage.removeItem(effectiveStorageKey)
-        } catch {}
-        return
-      }
-
-      try {
-        const data: GridPersistedState = {
-          widths: hasWidths ? colWidths : undefined,
-          order: hasOrder ? (activeColumnOrder ?? undefined) : undefined,
-          hidden: hasHidden ? activeHiddenColumns : undefined,
-          pinned: hasPinned ? activePinnedColumns : undefined,
-          aggregations: hasAggregations ? activeAggregationConfigs : undefined,
-          showFooter: hasFooter ? true : undefined,
-          sortBy: hasSort ? (activeSortColumn ?? sortColumn ?? undefined) : undefined,
-          sortDesc: hasSort ? (activeSortDirection === "desc") : undefined,
-          sortConfigs: hasSortConfigs ? activeSortConfigs : undefined,
-        }
-        localStorage.setItem(effectiveStorageKey, JSON.stringify(data))
-      } catch {
-        // ignore quota errors
-      }
-    }, 250)
-
-    return () => clearTimeout(timer)
-  }, [
+  usePersistGridState({
     effectiveStorageKey,
+    isStorageLoadedRef,
     colWidths,
     activeColumnOrder,
     activeHiddenColumns,
     activePinnedColumns,
+    defaultPinnedColumns,
     pinnedColumns,
     internalPinnedColumns,
-    defaultPinnedColumns,
     activeAggregationConfigs,
     showFooterRow,
     sortColumn,
     sortDirection,
     activeSortConfigs,
     activeSortColumn,
-    activeSortDirection,
-  ])
-
-  const getColWidth = React.useCallback(
-    (col: SpreadsheetColumn): number | string => {
-      if (colWidths[col.name] !== undefined) return colWidths[col.name]!
-      if (initialColWidths?.[col.name] !== undefined) return initialColWidths[col.name]!
-      return getDefaultColumnWidth(col)
-    },
-    [colWidths, initialColWidths]
-  )
+  })
 
   const handleResetColumns = React.useCallback(() => {
     if (onHiddenColumnsChange) {
@@ -843,17 +476,17 @@ export function VirtualSpreadsheet<T>({
     if (onPinnedColumnsChange) {
       onPinnedColumnsChange(defaultPinnedColumns)
     } else {
-      setInternalPinnedColumns(null)
+      setInternalPinnedColumnsRaw(null)
     }
     if (onSortConfigsChange) {
       onSortConfigsChange({})
     }
-    setInternalSortConfigs({})
+    handleHeaderClearSorts()
+    setInternalColumnOrder(null)
     if (onSortSettingChange) {
       onSortSettingChange(null, false)
     }
-    setInternalSort({ column: null, direction: null })
-    setColWidths(initialColWidths ?? {})
+    resetColWidths()
     if (onToggleFooterRow) {
       onToggleFooterRow(false)
     }
@@ -870,8 +503,9 @@ export function VirtualSpreadsheet<T>({
     onSortSettingChange,
     onToggleFooterRow,
     defaultPinnedColumns,
-    initialColWidths,
+    resetColWidths,
     effectiveStorageKey,
+    handleHeaderClearSorts,
   ])
 
   const canResetColumns = React.useMemo(() => {
@@ -920,8 +554,6 @@ export function VirtualSpreadsheet<T>({
     }, 0)
   }, [visibleColumns, getColWidth])
 
-
-
   // Her sabit kolonun soldan piksel mesafesini dinamik hesaplar
   const getStickyLeftOffset = React.useCallback(
     (colIndex: number) => {
@@ -936,100 +568,41 @@ export function VirtualSpreadsheet<T>({
     [effectivePinnedCount, visibleColumns, getColWidth]
   )
 
-  /**
-   * Çift tıklamayla kolonu içeriğe ve başlığa göre en uygun genişliğe otomatik sığdırır.
-   */
-  const handleAutoFit = React.useCallback(
-    (event: React.MouseEvent | React.PointerEvent, col: SpreadsheetColumn) => {
-      event.preventDefault()
-      event.stopPropagation()
-      const autoWidth = calculateColumnAutoFitWidth(col, items)
-      setColWidths((prev) => ({ ...prev, [col.name]: autoWidth }))
-    },
-    [items]
-  )
+  // ── Sanal pencere + header/body scroll senkronizasyonu ────────────────
+  const headerScrollRef = React.useRef<HTMLDivElement>(null)
+  const {
+    scrollRef,
+    handleHeaderWheel,
+    handleScroll,
+    scrollbarWidth,
+    isScrolledLeft,
+    startIndex,
+    endIndex,
+    windowRows,
+    viewportRows,
+  } = useGridScrollSync({
+    displayItems: displayItems as readonly unknown[],
+    rowHeight,
+    resetKey,
+    headerScrollRef,
+    activeSortColumn,
+    activeSortDirection,
+    hasMore,
+    loadingMore,
+    onNeedMore,
+  })
 
-  const handleResizeStart = React.useCallback(
-    (event: React.PointerEvent, col: SpreadsheetColumn) => {
-      if (event.button !== 0) return
-      event.stopPropagation()
+  const initialSkeletonCount = Math.min(10, Math.max(6, viewportRows ? viewportRows - 4 : 8))
 
-      // Çift tıklama algılama (350ms penceresi) — çift tıklamada resize ve sürükleme başlatılmaz
-      const now = Date.now()
-      if (
-        lastSeparatorClickRef.current.colName === col.name &&
-        now - lastSeparatorClickRef.current.time < 350
-      ) {
-        lastSeparatorClickRef.current = { time: 0, colName: "" }
-        resizeRef.current = null
-        isResizingRef.current = false
-        handleAutoFit(event, col)
-        return
-      }
-      lastSeparatorClickRef.current = { time: now, colName: col.name }
-
-      isResizingRef.current = true
-      isDraggingRef.current = false
-      setDraggedColName(null)
-      setDropTarget(null)
-      const th = (event.currentTarget as HTMLElement).closest("th")
-      const fallbackW = typeof getColWidth(col) === "number" ? (getColWidth(col) as number) : 100
-      const startWidth = th?.getBoundingClientRect().width || fallbackW
-      resizeRef.current = {
-        startX: event.clientX,
-        startWidth,
-        name: col.name,
-        moved: false,
-      }
-      const target = event.currentTarget as HTMLElement
-      if (target.hasPointerCapture(event.pointerId)) return
-      target.setPointerCapture(event.pointerId)
-    },
-    [getColWidth, handleAutoFit]
-  )
-
-  const handleResizeMove = React.useCallback((event: React.PointerEvent) => {
-    const ref = resizeRef.current
-    if (!ref) return
-    const delta = event.clientX - ref.startX
-    // 3px altındaki mikro titreşimleri yok say — böylece çift tıkla otomatik sığdırma temiz çalışsın
-    if (!ref.moved && Math.abs(delta) < 3) return
-    ref.moved = true
-    const width = Math.max(MIN_COL_WIDTH, ref.startWidth + delta)
-    setColWidths((prev) => ({ ...prev, [ref.name]: Math.round(width) }))
-  }, [])
-
-  const handleResizeEnd = React.useCallback((event: React.PointerEvent) => {
-    const ref = resizeRef.current
-    if (!ref) return
-    const target = event.currentTarget as HTMLElement
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId)
-    }
-    resizeRef.current = null
-    setTimeout(() => {
-      isResizingRef.current = false
-    }, 150)
-  }, [])
-
-  const colGroup = (
-    <colgroup>
-      {visibleColumns.map((col) => {
-        const w = getColWidth(col)
-        return (
-          <col
-            key={col.name}
-            style={{ width: typeof w === "number" ? `${w}px` : w }}
-          />
-        )
-      })}
-      {/* Sağ taraftaki artan boşluğu emen dolgu kolonu */}
-      <col />
-    </colgroup>
-  )
-
-  const [isScrolledLeft, setIsScrolledLeft] = React.useState(false)
-  const isScrolledLeftRef = React.useRef(false)
+  // Özet değerlerini hesapla (Dışarıdan aggregationValues verilmediyse bellek içi hesapla)
+  const computedAggregationValues = React.useMemo(() => {
+    if (aggregationValues) return aggregationValues
+    return computeInMemoryAggregations(
+      displayItems as readonly Record<string, unknown>[],
+      visibleColumns,
+      activeAggregationConfigs
+    )
+  }, [aggregationValues, displayItems, visibleColumns, activeAggregationConfigs])
 
   const renderVirtualRow = React.useCallback(
     (item: T, rowIndex: number) => {
@@ -1085,6 +658,9 @@ export function VirtualSpreadsheet<T>({
         return React.cloneElement(
           rendered,
           {
+            ref: (el: HTMLTableRowElement | null) => {
+              if (el) applyCellLocatorAttributes(el, rowIndex)
+            },
             className: cn(rendered.props.className, "group/tr"),
           } as React.HTMLAttributes<HTMLTableRowElement>,
           ...processedChildren,
@@ -1093,146 +669,23 @@ export function VirtualSpreadsheet<T>({
       }
       return rendered
     },
-    [renderRow, visibleColumns, effectivePinnedCount, getStickyLeftOffset, isScrolledLeft]
+    [renderRow, visibleColumns, effectivePinnedCount, getStickyLeftOffset, isScrolledLeft, applyCellLocatorAttributes]
   )
 
-  // Kontrolsüz (uncontrolled) modda client-side sıralama uygula
-  const displayItems = React.useMemo(() => {
-    if (onSortChange || onSortConfigsChange || disableSorting) {
-      return items
-    }
-    const sortList = orderedColumns
-      .filter((c) => activeSortConfigs[c.name])
-      .map((c) => ({
-        colName: c.name,
-        dir: activeSortConfigs[c.name] === "asc" ? 1 : -1,
-        isNum: c.align === "right",
-      }))
-
-    if (sortList.length === 0) return items
-
-    return [...items].sort((a, b) => {
-      const aObj = a as Record<string, unknown>
-      const bObj = b as Record<string, unknown>
-
-      for (const sortItem of sortList) {
-        const aVal =
-          aObj?.values && typeof aObj.values === "object"
-            ? (aObj.values as Record<string, unknown>)[sortItem.colName]
-            : aObj?.[sortItem.colName]
-        const bVal =
-          bObj?.values && typeof bObj.values === "object"
-            ? (bObj.values as Record<string, unknown>)[sortItem.colName]
-            : bObj?.[sortItem.colName]
-
-        if (aVal == null && bVal == null) continue
-        if (aVal == null) return 1
-        if (bVal == null) return -1
-
-        if (sortItem.isNum || typeof aVal === "number" || typeof bVal === "number") {
-          const numA = Number(aVal)
-          const numB = Number(bVal)
-          if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) {
-            return (numA - numB) * sortItem.dir
-          }
-        }
-
-        const cmp = String(aVal).localeCompare(String(bVal), "tr", { numeric: true })
-        if (cmp !== 0) {
-          return cmp * sortItem.dir
-        }
-      }
-      return 0
-    })
-  }, [items, onSortChange, onSortConfigsChange, disableSorting, activeSortConfigs, orderedColumns])
-
-  // Özet değerlerini hesapla (Dışarıdan aggregationValues verilmediyse bellek içi hesapla)
-  const computedAggregationValues = React.useMemo(() => {
-    if (aggregationValues) return aggregationValues
-    return computeInMemoryAggregations(
-      displayItems as readonly Record<string, unknown>[],
-      visibleColumns,
-      activeAggregationConfigs
-    )
-  }, [aggregationValues, displayItems, visibleColumns, activeAggregationConfigs])
-
-  const headerScrollRef = React.useRef<HTMLDivElement>(null)
-  const [scrollbarWidth, setScrollbarWidth] = React.useState(0)
-
-  const {
-    scrollRef,
-    onScroll,
-    reset,
-    viewportRows,
-    startIndex,
-    endIndex,
-    visible: windowRows,
-  } = useVirtualWindow(displayItems, rowHeight)
-
-  const initialSkeletonCount = Math.min(10, Math.max(6, viewportRows ? viewportRows - 4 : 8))
-
-  React.useEffect(() => {
-    reset()
-    if (headerScrollRef.current) {
-      headerScrollRef.current.scrollLeft = 0
-    }
-    isScrolledLeftRef.current = false
-    setIsScrolledLeft(false)
-  }, [resetKey, reset, activeSortColumn, activeSortDirection])
-
-  // Dikey scrollbar genişliğini ölç — başlığın sağ ucunu body scrollbar'ı ile tam hizalar
-  React.useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const updateScrollbarWidth = () => {
-      const sw = el.offsetWidth - el.clientWidth
-      setScrollbarWidth((prev) => (prev !== sw ? sw : prev))
-    }
-    updateScrollbarWidth()
-    const observer = new ResizeObserver(updateScrollbarWidth)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [scrollRef, displayItems.length, loading])
-
-  const onNeedMoreRef = React.useRef(onNeedMore)
-  React.useEffect(() => {
-    onNeedMoreRef.current = onNeedMore
-  })
-
-  const handleScroll = React.useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const el = event.currentTarget
-      // Yatay kaydırmayı kolon başlıklarına senkronize et
-      if (headerScrollRef.current && headerScrollRef.current.scrollLeft !== el.scrollLeft) {
-        headerScrollRef.current.scrollLeft = el.scrollLeft
-      }
-      const scrolled = el.scrollLeft > 2
-      if (scrolled !== isScrolledLeftRef.current) {
-        isScrolledLeftRef.current = scrolled
-        setIsScrolledLeft(scrolled)
-      }
-      const sw = el.offsetWidth - el.clientWidth
-      if (sw !== scrollbarWidth) {
-        setScrollbarWidth(sw)
-      }
-      onScroll(event)
-      if (hasMore && !loadingMore) {
-        const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight)
-        if (remaining < 300) {
-          onNeedMoreRef.current?.()
-        }
-      }
-    },
-    [onScroll, hasMore, loadingMore, scrollbarWidth]
-  )
-
-  const handleHeaderWheel = React.useCallback(
-    (event: React.WheelEvent<HTMLDivElement>) => {
-      if (event.deltaX !== 0 && scrollRef.current) {
-        scrollRef.current.scrollLeft += event.deltaX
-      }
-    },
-    [scrollRef]
+  const colGroup = (
+    <colgroup>
+      {visibleColumns.map((col) => {
+        const w = getColWidth(col)
+        return (
+          <col
+            key={col.name}
+            style={{ width: typeof w === "number" ? `${w}px` : w }}
+          />
+        )
+      })}
+      {/* Sağ taraftaki artan boşluğu emen dolgu kolonu */}
+      <col />
+    </colgroup>
   )
 
   const handleCopy = React.useCallback((event: React.ClipboardEvent) => {
@@ -1259,7 +712,11 @@ export function VirtualSpreadsheet<T>({
   }, [])
 
   return (
-    <div className={cn(panelCardClass, "flex-1", isMaximized && "rounded-none border-none", className)} onCopy={handleCopy}>
+    <div
+      className={cn(panelCardClass, "flex-1", isMaximized && "rounded-none border-none", className)}
+      onCopy={handleCopy}
+      data-cell-locator={cellLocator ? "true" : undefined}
+    >
       <div className={cn(panelHeaderClass, isMaximized && "px-1")}>
         <div className={cn("flex min-w-0 flex-1 items-center gap-2 overflow-hidden mr-2", isMaximized && "mr-0")}>
           {aiViews !== undefined || activeAiViewId != null || Boolean(currentQuerySql) ? (
@@ -1586,17 +1043,22 @@ export function VirtualSpreadsheet<T>({
           {/* Gövde Veri Satırları Alanı (Dikey scrollbar tam buradan başlar) */}
           <div
             className="min-h-0 flex-1 overflow-auto"
-            ref={scrollRef}
+            ref={scrollRef as React.RefObject<HTMLDivElement>}
             onScroll={handleScroll}
           >
             <div style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}>
               <table
+                ref={bodyTableRef}
                 className="w-full table-fixed caption-bottom border-separate border-spacing-0 text-xs"
                 style={{ width: totalTableWidth > 0 ? `${totalTableWidth}px` : "100%", minWidth: "100%" }}
+                onClick={cellLocator ? handleBodyCellClick : undefined}
+                onMouseDown={cellLocator ? handleBodyMouseDown : undefined}
+                onKeyDown={cellLocator ? handleBodyKeyDown : undefined}
+                tabIndex={cellLocator ? 0 : -1}
               >
                 {colGroup}
                 <tbody>
-                {displayItems.length === 0 && loading ? (
+                {(displayItems as readonly T[]).length === 0 && loading ? (
                   <TableSkeletonRows
                     count={initialSkeletonCount}
                     prefix="initial-skeleton"
@@ -1605,7 +1067,7 @@ export function VirtualSpreadsheet<T>({
                     isScrolledLeft={isScrolledLeft}
                     getStickyLeftOffset={getStickyLeftOffset}
                   />
-                ) : displayItems.length === 0 ? (
+                ) : (displayItems as readonly T[]).length === 0 ? (
                   <tr>
                     <td
                       colSpan={visibleColumns.length + 1}
@@ -1625,7 +1087,7 @@ export function VirtualSpreadsheet<T>({
                         <td colSpan={visibleColumns.length + 1} className="p-0 border-0" />
                       </tr>
                     ) : null}
-                    {windowRows.map((row, index) =>
+                    {(windowRows as readonly T[]).map((row, index) =>
                       renderVirtualRow(row, startIndex + index)
                     )}
                     {loadingMore && hasMore ? (
@@ -1638,11 +1100,11 @@ export function VirtualSpreadsheet<T>({
                         getStickyLeftOffset={getStickyLeftOffset}
                       />
                     ) : null}
-                    {endIndex < displayItems.length ? (
+                    {endIndex < (displayItems as readonly T[]).length ? (
                       <tr
                         aria-hidden
                         className="p-0"
-                        style={{ height: (displayItems.length - endIndex) * rowHeight }}
+                        style={{ height: ((displayItems as readonly T[]).length - endIndex) * rowHeight }}
                       >
                         <td colSpan={visibleColumns.length + 1} className="p-0 border-0" />
                       </tr>

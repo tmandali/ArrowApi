@@ -184,4 +184,11 @@ export type VirtualSpreadsheetProps<T> = {
   isMaximized?: boolean
   /** Genişletilmiş mod aç/kapat tıklandığında çağrılır */
   onToggleMaximize?: (maximized: boolean) => void
+  /**
+   * Hücre konumlanabilirlik özelliği (kriter girdisindeki data-grid-cell deseni gibi):
+   * veri hücrelerine data-vsp-cell="{rowIndex}-{colName}" attribute'u ekler.
+   * Grid içi hücreleri odaklamak / bulmak isteyen katmanlar (örn. Yula
+   * "bu satıra git" emirleri) bu attribute'u querySelector ile kullanabilir.
+   */
+  cellLocator?: boolean
 }
