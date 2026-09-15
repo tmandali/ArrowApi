@@ -1246,7 +1246,18 @@
     "pinned_suffix": " (Sabitlendi)",
     "columns_heading": "Kolonlar",
     "type_date": "Veri Tipi: Tarih{detail}{pinned}",
-    "type_text": "Veri Tipi: Metin{detail}{pinned}"
+    "type_text": "Veri Tipi: Metin{detail}{pinned}",
+    "color_rules_title": "Eşik Renk Kuralları",
+    "color_rules_open": "Eşik renk kurallarını düzenle",
+    "add_rule": "Kural ekle",
+    "remove_rule": "Kuralı sil",
+    "threshold": "Eşik",
+    "color_red": "Kırmızı",
+    "color_green": "Yeşil",
+    "color_amber": "Turuncu",
+    "color_blue": "Mavi",
+    "clear_rules": "Tümünü temizle",
+    "operator": "operatör"
   },
   "JobResultPanel": {
     "job_not_found": "Job bulunamadı",

@@ -123,6 +123,8 @@ export function VirtualSpreadsheet<T>({
   isMaximized: controlledMaximized,
   onToggleMaximize,
   cellLocator = true,
+  columnRules,
+  onColumnRulesChange,
 }: VirtualSpreadsheetProps<T>) {
   const t = useTranslations("ReportGrid")
 
@@ -856,6 +858,8 @@ export function VirtualSpreadsheet<T>({
           ) : null}
           {!disableColumnVisibility ? (
             <ColumnManagementMenu
+              columnRules={columnRules}
+              onColumnRulesChange={onColumnRulesChange}
               columns={columns}
               orderedColumns={orderedColumns}
               visibleColumns={visibleColumns}

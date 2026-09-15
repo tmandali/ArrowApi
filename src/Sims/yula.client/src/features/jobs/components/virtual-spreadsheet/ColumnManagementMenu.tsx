@@ -7,6 +7,8 @@ import {
   ChevronUp,
   Columns3,
   GripVertical,
+  Palette,
+  Plus,
   Pin,
   RotateCcw,
   Search,
@@ -23,6 +25,14 @@ import {
 import { cn } from "@/utils/cn"
 import type { SpreadsheetColumn } from "./types"
 import { ColumnTypeBadge } from "./ColumnTypeBadge"
+import {
+  ConditionalColorRule,
+  ColumnColorRules,
+  RULE_OPERATORS,
+  RULE_COLORS,
+  ruleStyleClasses,
+  createColorRule,
+} from "./conditional-rules"
 
 export interface ColumnManagementMenuProps {
   columns: readonly SpreadsheetColumn[]
@@ -43,6 +53,9 @@ export interface ColumnManagementMenuProps {
   hiddenColumnsCount: number
   disabled?: boolean
   disableReorder?: boolean
+  /** Eşik tabanlı koşullu renk kuralları (kolon adı → kurallar). */
+  columnRules?: ColumnColorRules
+  onColumnRulesChange?: (column: string, rules: ConditionalColorRule[]) => void
 }
 
 export function ColumnManagementMenu({
@@ -60,6 +73,8 @@ export function ColumnManagementMenu({
   hiddenColumnsCount,
   disabled = false,
   disableReorder = false,
+  columnRules,
+  onColumnRulesChange,
 }: ColumnManagementMenuProps) {
   const t = useTranslations("GridColumns")
   const [columnMenuOpen, setColumnMenuOpen] = React.useState(false)
@@ -67,14 +82,68 @@ export function ColumnManagementMenu({
   const [focusedColIndex, setFocusedColIndex] = React.useState<number>(-1)
   const [menuDraggedCol, setMenuDraggedCol] = React.useState<string | null>(null)
   const [menuDropTarget, setMenuDropTarget] = React.useState<string | null>(null)
+  /** Palet butonu ile açılan eşik renk kuralı editörü (kolon adı). */
+  const [rulesEditorCol, setRulesEditorCol] = React.useState<string | null>(null)
+  /** Eşik input'ları: kural id → yazı (blur/Enter'da parse edilip commit). */
+  const [thresholdDrafts, setThresholdDrafts] = React.useState<Record<string, string>>({})
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const columnItemRefs = React.useRef<(HTMLDivElement | null)[]>([])
+
+  const setRulesForColumn = React.useCallback(
+    (column: string, rules: ConditionalColorRule[]) => {
+      onColumnRulesChange?.(column, rules)
+    },
+    [onColumnRulesChange]
+  )
+
+  const updateRule = React.useCallback(
+    (column: string, ruleId: string, patch: Partial<Omit<ConditionalColorRule, "id">>) => {
+      const current = columnRules?.[column] ?? []
+      setRulesForColumn(
+        column,
+        current.map((r) => (r.id === ruleId ? { ...r, ...patch } : r))
+      )
+    },
+    [columnRules, setRulesForColumn]
+  )
+
+  const removeRule = React.useCallback(
+    (column: string, ruleId: string) => {
+      const current = columnRules?.[column] ?? []
+      setRulesForColumn(column, current.filter((r) => r.id !== ruleId))
+    },
+    [columnRules, setRulesForColumn]
+  )
+
+  const addRule = React.useCallback(
+    (column: string) => {
+      const current = columnRules?.[column] ?? []
+      setRulesForColumn(column, [...current, createColorRule()])
+    },
+    [columnRules, setRulesForColumn]
+  )
+
+  const commitThresholdDraft = React.useCallback(
+    (column: string, rule: ConditionalColorRule) => {
+      const draft = thresholdDrafts[rule.id]
+      if (draft == null) return
+      const parsed = Number(draft.trim().replace(",", "."))
+      updateRule(column, rule.id, { value: Number.isFinite(parsed) ? parsed : 0 })
+      setThresholdDrafts((prev) => {
+        const next = { ...prev }
+        delete next[rule.id]
+        return next
+      })
+    },
+    [thresholdDrafts, updateRule]
+  )
 
   const handleOpenChange = React.useCallback((open: boolean) => {
     setColumnMenuOpen(open)
     setFocusedColIndex(-1)
     setMenuDraggedCol(null)
     setMenuDropTarget(null)
+    setRulesEditorCol(null)
     if (!open) {
       setColumnSearch("")
     }
@@ -414,6 +483,29 @@ export function ColumnManagementMenu({
                         <ChevronDown className="size-3.5" />
                       </button>
 
+                      {/* Eşik Renk Kuralları (palet) */}
+                      {onColumnRulesChange ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRulesEditorCol(
+                              rulesEditorCol === col.name ? null : col.name
+                            )
+                          }}
+                          className={cn(
+                            "flex size-5 items-center justify-center rounded transition-colors",
+                            (columnRules?.[col.name] ?? []).length > 0
+                              ? "text-primary hover:bg-primary/10"
+                              : "text-muted-foreground/70 hover:text-foreground hover:bg-muted"
+                          )}
+                          title={t("color_rules_open")}
+                          aria-label={t("color_rules_open")}
+                        >
+                          <Palette className="size-3.5" />
+                        </button>
+                      ) : null}
+
                       {/* Sola Sabitle / Kaldır */}
                       <button
                         type="button"
@@ -452,6 +544,101 @@ export function ColumnManagementMenu({
                     </div>
                   </div>
                 </div>
+
+                {/* Eşik Renk Kuralı Editörü (palet ile açılır) */}
+                {rulesEditorCol === col.name && onColumnRulesChange ? (
+                  <div className="ml-5 space-y-1.5 border-l-2 border-primary/30 py-1 pl-2.5 pr-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("color_rules_title")}
+                      </span>
+                      {(columnRules?.[col.name] ?? []).length > 0 ? (
+                        <button
+                          type="button"
+                          className="text-[10px] text-muted-foreground hover:text-foreground"
+                          onClick={() => setRulesForColumn(col.name, [])}
+                        >
+                          {t("clear_rules")}
+                        </button>
+                      ) : null}
+                    </div>
+                    {(columnRules?.[col.name] ?? []).map((rule) => (
+                      <div key={rule.id} className="flex items-center gap-1">
+                        <select
+                          value={rule.op}
+                          onChange={(e) =>
+                            updateRule(col.name, rule.id, {
+                              op: e.target.value as ConditionalColorRule["op"],
+                            })
+                          }
+                          className="h-6 w-10 rounded border border-border/60 bg-background px-0.5 text-[11px]"
+                          aria-label={t("operator")}
+                        >
+                          {RULE_OPERATORS.map((op) => (
+                            <option key={op} value={op}>
+                              {op}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={thresholdDrafts[rule.id] ?? String(rule.value)}
+                          onChange={(e) =>
+                            setThresholdDrafts((prev) => ({
+                              ...prev,
+                              [rule.id]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => commitThresholdDraft(col.name, rule)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitThresholdDraft(col.name, rule)
+                          }}
+                          className="h-6 w-16 rounded border border-border/60 bg-background px-1 text-[11px] tabular-nums"
+                          placeholder={t("threshold")}
+                          aria-label={t("threshold")}
+                        />
+                        <div className="flex items-center gap-0.5">
+                          {RULE_COLORS.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              title={t(`color_${color}`)}
+                              aria-label={t(`color_${color}`)}
+                              onClick={() =>
+                                updateRule(col.name, rule.id, { color })
+                              }
+                              className={cn(
+                                "size-3.5 rounded-full transition-transform",
+                                ruleStyleClasses(color).swatch,
+                                rule.color === color
+                                  ? "ring-2 ring-foreground ring-offset-1 ring-offset-background scale-110"
+                                  : "opacity-60 hover:opacity-100"
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          title={t("remove_rule")}
+                          aria-label={t("remove_rule")}
+                          onClick={() => removeRule(col.name, rule.id)}
+                          className="flex size-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addRule(col.name)}
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Plus className="size-3" />
+                      {t("add_rule")}
+                    </button>
+                  </div>
+                ) : null}
               </React.Fragment>
             )
           })}

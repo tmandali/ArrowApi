@@ -1,5 +1,6 @@
 export * from "./types"
 export * from "./column-sizing"
+export * from "./conditional-rules"
 export * from "./ColumnTypeBadge"
 export * from "./ColumnManagementMenu"
 export * from "./TableSkeletonRows"

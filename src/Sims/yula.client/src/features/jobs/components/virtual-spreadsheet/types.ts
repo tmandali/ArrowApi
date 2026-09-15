@@ -1,4 +1,5 @@
 import type * as React from "react"
+import type { ConditionalColorRule } from "./conditional-rules"
 
 export const ROW_HEIGHT = 28
 export const SKELETON_ROWS = 3
@@ -265,4 +266,10 @@ export type VirtualSpreadsheetProps<T> = {
    * "bu satıra git" emirleri) bu attribute'u querySelector ile kullanabilir.
    */
   cellLocator?: boolean
+  /**
+   * Eşik tabanlı koşullu renk kuralları (Airtable benzeri).
+   * Kolon menüsünden düzenlenir; hücreler ilk eşleşen kuralın rengiyle boyanır.
+   */
+  columnRules?: Record<string, ConditionalColorRule[]>
+  onColumnRulesChange?: (column: string, rules: ConditionalColorRule[]) => void
 }

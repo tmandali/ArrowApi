@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { formatGridCellValue } from "@/utils/format-cell";
 import { cn } from "@/utils/cn";
 import { cellInputClass, cellClass } from "../virtual-spreadsheet";
+import { evaluateColorRules } from "../virtual-spreadsheet/conditional-rules";
 import type { SpreadsheetColumn } from "../virtual-spreadsheet";
 import type { ColumnStyleSpec } from "./use-column-style-stats";
 
@@ -74,8 +75,10 @@ export function createRowRenderer(args: {
   columnDuckTypes: Record<string, string>;
   /** Airtable benzeri kolon görsel kuralları (bar / çip). Opsiyonel. */
   columnStyles?: Record<string, ColumnStyleSpec>;
+  /** Eşik tabanlı koşullu renk kuralları (kolon adı → kurallar). Opsiyonel. */
+  columnRules?: Record<string, import("../virtual-spreadsheet/conditional-rules").ConditionalColorRule[]>;
 }) {
-  const { effectiveColumns, columnTypes, columnDuckTypes, columnStyles } = args;
+  const { effectiveColumns, columnTypes, columnDuckTypes, columnStyles, columnRules } = args;
   return (
     row: Record<string, unknown>,
     index: number,
@@ -93,6 +96,7 @@ export function createRowRenderer(args: {
             columnDuckTypes[col.name] ?? columnTypes[col.name]
           );
           const spec = columnStyles?.[col.name];
+          const ruleHit = evaluateColorRules(columnRules?.[col.name], rawVal);
           const numVal = spec?.kind === "bar" ? toCellNumber(rawVal) : NaN;
           const isNegative =
             spec?.kind === "bar" && Number.isFinite(numVal) && numVal < 0;
@@ -120,11 +124,12 @@ export function createRowRenderer(args: {
           }
 
           // Çip: düşük kardinalite değerleri Airtable tag görünümleriyle.
+          // Hücre arka planına eşik kuralı rengi de zemin olarak eklenir (çok hafif alfa).
           let content: React.ReactNode = (
             <span
               className={cn(
                 "relative truncate",
-                isNegative && "text-red-600 dark:text-red-400"
+                ruleHit?.text ?? (isNegative && "text-red-600 dark:text-red-400")
               )}
             >
               {formattedVal}
@@ -141,7 +146,7 @@ export function createRowRenderer(args: {
                     borderColor: `hsl(${hue} 70% 50% / 0.35)`,
                   }}
                 >
-                  <span className="truncate">{formattedVal}</span>
+                  <span className={cn("truncate", ruleHit?.text)}>{formattedVal}</span>
                 </span>
               );
             }
@@ -158,7 +163,8 @@ export function createRowRenderer(args: {
               <div
                 className={cn(
                   "relative flex h-7 min-w-0 items-center px-2 tabular-nums text-zinc-900 dark:text-zinc-50",
-                  col.align === "right" && "justify-end"
+                  col.align === "right" && "justify-end",
+                  ruleHit?.bg
                 )}
                 title={rawVal != null ? String(rawVal) : undefined}
               >

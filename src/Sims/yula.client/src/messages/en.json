@@ -1246,7 +1246,18 @@
     "pinned_suffix": " (pinned)",
     "columns_heading": "Columns",
     "type_date": "Data Type: Date{detail}{pinned}",
-    "type_text": "Data Type: Text{detail}{pinned}"
+    "type_text": "Data Type: Text{detail}{pinned}",
+    "color_rules_title": "Threshold Color Rules",
+    "color_rules_open": "Edit threshold color rules",
+    "add_rule": "Add rule",
+    "remove_rule": "Remove rule",
+    "threshold": "Threshold",
+    "color_red": "Red",
+    "color_green": "Green",
+    "color_amber": "Amber",
+    "color_blue": "Blue",
+    "clear_rules": "Clear all",
+    "operator": "operator"
   },
   "JobResultPanel": {
     "job_not_found": "Job not found",

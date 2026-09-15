@@ -24,6 +24,7 @@ import { ReportGridHeaderActions } from "./report-grid-header";
 import { ExportWarningDialog } from "./export-warning-dialog";
 import { createFilterCellRenderer, createRowRenderer } from "./grid-cells";
 import { useColumnStyleStats } from "./use-column-style-stats";
+import type { ConditionalColorRule } from "../virtual-spreadsheet/conditional-rules";
 
 export type ArrowReportGridProps = {
   title?: string;
@@ -355,6 +356,21 @@ export function ArrowReportGrid({
     booleanColumns,
   });
 
+  // Eşik tabanlı koşullu renk kuralları (kolon menüsünden düzenlenir).
+  // MVP: oturum içi state; kalıcılık (localStorage/store) sonraki adım.
+  const [columnRules, setColumnRules] = React.useState<Record<string, ConditionalColorRule[]>>({});
+  const handleColumnRulesChange = React.useCallback(
+    (column: string, rules: ConditionalColorRule[]) => {
+      setColumnRules((prev) => {
+        const next = { ...prev };
+        if (rules.length > 0) next[column] = rules;
+        else delete next[column];
+        return next;
+      });
+    },
+    []
+  );
+
   const renderRow = React.useMemo(
     () =>
       createRowRenderer({
@@ -362,8 +378,9 @@ export function ArrowReportGrid({
         columnTypes,
         columnDuckTypes,
         columnStyles,
+        columnRules,
       }),
-    [effectiveColumns, columnTypes, columnDuckTypes, columnStyles]
+    [effectiveColumns, columnTypes, columnDuckTypes, columnStyles, columnRules]
   );
 
   return (
@@ -374,6 +391,8 @@ export function ArrowReportGrid({
         title={title}
         subtitle={subtitle}
         cellLocator={cellLocator}
+        columnRules={columnRules}
+        onColumnRulesChange={handleColumnRulesChange}
         className={className}
         loading={isStreaming || isSavingDisk || (isLoadingQuery && displayRows.length === 0) || (effectiveColumns.length === 0 && Boolean(jobId))}
         emptyMessage={isStreaming || isSavingDisk || isLoadingQuery ? "Loading report..." : "No data found"}
