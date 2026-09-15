@@ -25,9 +25,14 @@ export const cellSelectionActiveClass =
 /**
  * Global CSS'te enjekte edilen dinamik hücre seçim stilinin kaynağı.
  * use-cell-selection.ts bu string'i document.head'e `<style>` olarak ekler.
+ *
+ * Excel benzeri deneyim: seçili aralık tek bütün olarak, grid'in gri tonuyla
+ * (muted ↔ background arası opak karışım) boyanır; aralık içinde hücre bazında
+ * çizgi çekilmez. Aktif hücre yine 1px var(--color-border) çerçeveyle işaretlenir.
+ * Opağı renk, sticky/pinned hücreler yatay kayarken alt içerik sızmasını engeller.
  */
 export const CELL_SELECTION_STYLE = `
-  td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true'] { box-shadow: inset 0 0 0 1px var(--color-border, hsl(214 32% 91%)); }
+  td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true'] { background-color: color-mix(in srgb, var(--color-muted, hsl(240 9% 89%)) 80%, var(--color-background, hsl(0 0% 100%))); }
   td[data-vsp-cell].${cellSelectionActiveClass} { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
 `
 
