@@ -418,11 +418,13 @@ export function VirtualSpreadsheet<T>({
     handleBodyMouseDown,
     handleBodyKeyDown,
     applyCellLocatorAttributes,
+    applyRowSelectionAttributes,
   } = useCellSelection({
     cellLocator,
     visibleColumns,
     displayItemsRef,
     bodyTableRef,
+    dataIdentity: resetKey,
   })
 
   // ── LocalStorage: yükleme & 250ms debounce ile kaydetme ──────────────
@@ -659,7 +661,10 @@ export function VirtualSpreadsheet<T>({
           rendered,
           {
             ref: (el: HTMLTableRowElement | null) => {
-              if (el) applyCellLocatorAttributes(el, rowIndex)
+              if (el) {
+                applyCellLocatorAttributes(el, rowIndex)
+                applyRowSelectionAttributes(el, rowIndex)
+              }
             },
             className: cn(rendered.props.className, "group/tr"),
           } as React.HTMLAttributes<HTMLTableRowElement>,
@@ -669,7 +674,7 @@ export function VirtualSpreadsheet<T>({
       }
       return rendered
     },
-    [renderRow, visibleColumns, effectivePinnedCount, getStickyLeftOffset, isScrolledLeft, applyCellLocatorAttributes]
+    [renderRow, visibleColumns, effectivePinnedCount, getStickyLeftOffset, isScrolledLeft, applyCellLocatorAttributes, applyRowSelectionAttributes]
   )
 
   const colGroup = (

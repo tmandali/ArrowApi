@@ -14,26 +14,55 @@ export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-semibold leading-none text-zinc-700 dark:text-zinc-300 bg-muted/40 align-middle"
 
 /**
- * Sanal grid'de (data-vsp-cell) seçili hücrelere uygulanan sınıflar.
- * Kriter grid'i hücre seçim stiliyle birebir uyumlu: 1px var(--color-border)
- * çerçeve, background değişmeden yalnızca kenarlık.
+ * Sanal grid'de (data-vsp-cell) seçili hücrelere uygulanan attribute'lar.
+ * - data-vsp-cell-selected: hücre seçim aralığında mı?
+ * - data-vsp-edge: hücre aralığın hangi kenarlarında? (mask: "t" "b" "l" "r")
  */
 export const CELL_SELECTION_RANGE_ATTR = "data-vsp-cell-selected"
+export const CELL_SELECTION_EDGE_ATTR = "data-vsp-edge"
 export const cellSelectionActiveClass =
   "vsp-cell-active"
+
+const CELL_EDGE_SHADOWS: Record<string, string> = {
+  t: "inset 0 1px 0 0",
+  b: "inset 0 -1px 0 0",
+  l: "inset 1px 0 0 0",
+  r: "inset -1px 0 0 0",
+}
+
+/**
+ * 15 olası kenar maskesi için 1px var(--color-border) box-shadow kuralları.
+ * Her hücreye yalnızca aralık kenarındaki kenarları çizer; iç hücrelerde çizgi
+ * kalmaz (Excel aralık çerçevesi efekti).
+ */
+function buildCellEdgeRules(): string {
+  const borderVar = "var(--color-border, hsl(214 32% 91%))"
+  const edges = ["t", "b", "l", "r"]
+  const rules: string[] = []
+  for (let i = 1; i < 16; i += 1) {
+    const mask = edges.filter((e, idx) => (i & (1 << idx)) !== 0).join("")
+    const shadow = edges
+      .filter((e, idx) => (i & (1 << idx)) !== 0)
+      .map((e) => `${CELL_EDGE_SHADOWS[e]} ${borderVar}`)
+      .join(", ")
+    rules.push(`  td[data-vsp-cell][${CELL_SELECTION_EDGE_ATTR}='${mask}'] { box-shadow: ${shadow}; }`)
+  }
+  return rules.join("\n")
+}
 
 /**
  * Global CSS'te enjekte edilen dinamik hücre seçim stilinin kaynağı.
  * use-cell-selection.ts bu string'i document.head'e `<style>` olarak ekler.
  *
- * Excel benzeri deneyim: seçili aralık tek bütün olarak, grid'in gri tonuyla
- * (muted ↔ background arası opak karışım) boyanır; aralık içinde hücre bazında
- * çizgi çekilmez. Aktif hücre yine 1px var(--color-border) çerçeveyle işaretlenir.
- * Opağı renk, sticky/pinned hücreler yatay kayarken alt içerik sızmasını engeller.
+ * Tek kutu estetiği: seçim yalnızca tek 1px kenar çizgisiyle (data-vsp-edge
+ * maskeleri) gösterilir; hücre bazında ikinci kutu (aktif hücre outline) yok.
+ * Çoklu aralıkta boyama (muted ↔ background opak karışım) içindeki kenarlar
+ * çizilmez; opak renk, sticky/pinned hücreler yatay kayarken alt içerik
+ * sızmasını engeller.
  */
 export const CELL_SELECTION_STYLE = `
   td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true'] { background-color: color-mix(in srgb, var(--color-muted, hsl(240 9% 89%)) 80%, var(--color-background, hsl(0 0% 100%))); }
-  td[data-vsp-cell].${cellSelectionActiveClass} { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
+${buildCellEdgeRules()}
 `
 
 export type AggregationType =

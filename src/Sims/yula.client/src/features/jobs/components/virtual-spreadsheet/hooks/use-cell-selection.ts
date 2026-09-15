@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   CELL_SELECTION_STYLE,
   CELL_SELECTION_RANGE_ATTR,
+  CELL_SELECTION_EDGE_ATTR,
   cellSelectionActiveClass,
   type SpreadsheetColumn,
 } from "../types"
@@ -21,6 +22,11 @@ export interface CellSelectionParams {
   /** Aktif (sıralama/filtre sonrası) satırlar — klavye nav aralığı için */
   displayItemsRef: React.MutableRefObject<readonly unknown[]>
   bodyTableRef: React.RefObject<HTMLTableElement | null>
+  /**
+   * Veri kaynağının kimliği (örn. resetKey: jobId:sql:filterKey). Değişince
+   * index tabanlı eski seçim/sürükleme geçersiz sayılır ve sıfırlanır.
+   */
+  dataIdentity?: unknown
 }
 
 export interface CellSelectionReturn {
@@ -34,6 +40,13 @@ export interface CellSelectionReturn {
   handleBodyKeyDown: (event: React.KeyboardEvent<HTMLTableElement>) => void
   /** Render edilen satır `<tr>` elementine data-vsp-cell attribute'larını enjekte eder */
   applyCellLocatorAttributes: (trElement: HTMLTableRowElement, rowIndex: number) => void
+  /**
+   * Render edilen satır `<tr>` elementine seçim aralığı attribute'larını (fill +
+   * edge maskesi) enjekte eder. Virtual grid'de satırlar scroll'da mount/unmount
+   * olduğundan görsel seçim, seçim state'i değiştiğinde değil, her satır mount'ta
+   * da yeniden uygulanmalıdır.
+   */
+  applyRowSelectionAttributes: (trElement: HTMLTableRowElement, rowIndex: number) => void
 }
 
 /**
@@ -45,11 +58,20 @@ export function useCellSelection({
   visibleColumns,
   displayItemsRef,
   bodyTableRef,
+  dataIdentity,
 }: CellSelectionParams): CellSelectionReturn {
   const [activeCell, setActiveCell] = React.useState<{ row: number; col: number } | null>(null)
   const [selection, setSelection] = React.useState<CellSelection | null>(null)
   const isSelectingRef = React.useRef(false)
   const suppressNextClickSelectRef = React.useRef(false)
+
+  // Veri kaynağı değişince (yeni job / query / filtre) index tabanlı eski seçim
+  // artık yanlış veriye işaret eder; state'i sıfırla. DOM attribute'ları
+  // markSelectionCells/applyRowSelectionAttributes selection=null'da temizler.
+  React.useEffect(() => {
+    setSelection(null)
+    setActiveCell(null)
+  }, [dataIdentity])
 
   const inSelection = React.useCallback(
     (row: number, col: number) => {
@@ -93,19 +115,33 @@ export function useCellSelection({
     const table = bodyTableRef.current
     if (!table) return
     table
-      .querySelectorAll(`td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true']`)
-      .forEach((el) => el.removeAttribute(CELL_SELECTION_RANGE_ATTR))
+      .querySelectorAll(`td[data-vsp-cell][${CELL_SELECTION_EDGE_ATTR}]`)
+      .forEach((el) => {
+        el.removeAttribute(CELL_SELECTION_RANGE_ATTR)
+        el.removeAttribute(CELL_SELECTION_EDGE_ATTR)
+      })
     if (!selection || !inSelection) return
     const r0 = Math.min(selection.startRow, selection.endRow)
     const r1 = Math.max(selection.startRow, selection.endRow)
     const c0 = Math.min(selection.startCol, selection.endCol)
     const c1 = Math.max(selection.startCol, selection.endCol)
+    // Tek hücrede kenar çizgileri seçimi zaten belli ediyor; iç boyama sadece
+    // çoklu aralıkta uygulanır (Excel'deki dolu-bant hissi).
+    const isSingleCell = r0 === r1 && c0 === c1
     for (let r = r0; r <= r1; r += 1) {
       for (let c = c0; c <= c1; c += 1) {
         const colName = visibleColumns[c]?.name
         if (!colName) continue
         const cell = table.querySelector<HTMLElement>(`td[data-vsp-cell="${r}-${colName}"]`)
-        cell?.setAttribute(CELL_SELECTION_RANGE_ATTR, "true")
+        if (!cell) continue
+        if (!isSingleCell) cell.setAttribute(CELL_SELECTION_RANGE_ATTR, "true")
+        // Hücre, aralığın hangi kenarlarında? → CSS box-shadow maskesi (içte çizgi yok)
+        let edgeMask = ""
+        if (r === r0) edgeMask += "t"
+        if (r === r1) edgeMask += "b"
+        if (c === c0) edgeMask += "l"
+        if (c === c1) edgeMask += "r"
+        cell.setAttribute(CELL_SELECTION_EDGE_ATTR, edgeMask)
       }
     }
   }, [selection, inSelection, visibleColumns, bodyTableRef])
@@ -271,6 +307,48 @@ export function useCellSelection({
     [cellLocator, visibleColumns]
   )
 
+  /**
+   * Satır bazında seçim aralığı attribute'larını yazar (fill + edge maskesi).
+   * Virtual grid'de satırlar scroll ile mount/unmount olur; görsel seçimin
+   * kaybolmaması için her satır mount'unda ref üzerinden uygulanır.
+   * Maskesi markSelectionCells ile aynı sırayla (t,b,l,r) üretilir.
+   */
+  const applyRowSelectionAttributes = React.useCallback(
+    (trElement: HTMLTableRowElement, rowIndex: number) => {
+      if (!cellLocator) return
+      const tds = Array.from(trElement.children) as HTMLElement[]
+      if (!selection) {
+        tds.forEach((td) => {
+          td.removeAttribute(CELL_SELECTION_RANGE_ATTR)
+          td.removeAttribute(CELL_SELECTION_EDGE_ATTR)
+        })
+        return
+      }
+      const r0 = Math.min(selection.startRow, selection.endRow)
+      const r1 = Math.max(selection.startRow, selection.endRow)
+      const c0 = Math.min(selection.startCol, selection.endCol)
+      const c1 = Math.max(selection.startCol, selection.endCol)
+      if (rowIndex < r0 || rowIndex > r1) {
+        tds.forEach((td) => {
+          td.removeAttribute(CELL_SELECTION_RANGE_ATTR)
+          td.removeAttribute(CELL_SELECTION_EDGE_ATTR)
+        })
+        return
+      }
+      const isSingleCell = r0 === r1 && c0 === c1
+      const vEdge = (rowIndex === r0 ? "t" : "") + (rowIndex === r1 ? "b" : "")
+      tds.forEach((td, colIndex) => {
+        const colName = visibleColumns[colIndex]?.name
+        if (!colName) return
+        if (colIndex < c0 || colIndex > c1) return
+        if (!isSingleCell) td.setAttribute(CELL_SELECTION_RANGE_ATTR, "true")
+        const hEdge = (colIndex === c0 ? "l" : "") + (colIndex === c1 ? "r" : "")
+        td.setAttribute(CELL_SELECTION_EDGE_ATTR, vEdge + hEdge)
+      })
+    },
+    [cellLocator, selection, visibleColumns]
+  )
+
   // Aktif hücre sınıfını DOM'a uygula (state değişince)
   React.useEffect(() => {
     const table = bodyTableRef.current
@@ -279,13 +357,19 @@ export function useCellSelection({
       .querySelectorAll(`td.${cellSelectionActiveClass}`)
       .forEach((el) => el.classList.remove(cellSelectionActiveClass))
     if (!activeCell) return
+    // Çoklu seçimde aralık kenarı görsel ipucunu zaten veriyor; aktif hücrenin 2px
+    // imleci dış kenarla çift çizgi oluşturmasın diye yalnızca tek hücre seçiminde çiz.
+    const isSingleCell =
+      !selection ||
+      (selection.startRow === selection.endRow && selection.startCol === selection.endCol)
+    if (!isSingleCell) return
     const colName = visibleColumns[activeCell.col]?.name
     if (!colName) return
     const target = table.querySelector<HTMLElement>(
       `td[data-vsp-cell="${activeCell.row}-${colName}"]`
     )
     target?.classList.add(cellSelectionActiveClass)
-  }, [activeCell, visibleColumns, bodyTableRef])
+  }, [activeCell, visibleColumns, bodyTableRef, selection])
 
   return {
     activeCell,
@@ -297,5 +381,6 @@ export function useCellSelection({
     handleBodyMouseDown,
     handleBodyKeyDown,
     applyCellLocatorAttributes,
+    applyRowSelectionAttributes,
   }
 }
