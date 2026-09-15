@@ -13,6 +13,25 @@ export const cellClass =
 export const headClass =
   "h-7 px-2 py-0 border-r border-b border-border/60 last:border-r-0 text-[11px] font-medium leading-none text-muted-foreground bg-muted/40 align-middle"
 
+/**
+ * Sanal grid'de (data-vsp-cell) seçili hücrelere uygulanan sınıflar.
+ * Kriter grid'i hücre seçim stiliyle birebir uyumlu: 1px var(--color-border)
+ * çerçeve, background değişmeden yalnızca kenarlık.
+ */
+export const CELL_SELECTION_RANGE_ATTR = "data-vsp-cell-selected"
+export const cellSelectionActiveClass =
+  "vsp-cell-active"
+
+/**
+ * Global CSS'te enjekte edilen dinamik hücre seçim stilinin kaynağı.
+ * use-cell-selection.ts bu string'i document.head'e `<style>` olarak ekler.
+ */
+export const CELL_SELECTION_STYLE = `
+  td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true'] { box-shadow: inset 0 0 0 1px var(--color-border, hsl(214 32% 91%)); }
+  td[data-vsp-cell].${cellSelectionActiveClass} { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
+  td[data-vsp-cell].${cellSelectionActiveClass}::before { content: attr(data-vsp-cell); position: absolute; top: 1px; right: 4px; font-size: 9px; line-height: 1; font-weight: 600; color: var(--color-muted-foreground, hsl(215 16% 47%)); opacity: .8; pointer-events: none; z-index: 4; }
+`
+
 export type AggregationType =
   | "sum"
   | "avg"

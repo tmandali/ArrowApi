@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react"
-import type {
-  ColumnSortConfigs,
-  SpreadsheetColumn,
+import {
+  CELL_SELECTION_STYLE,
+  CELL_SELECTION_RANGE_ATTR,
+  cellSelectionActiveClass,
+  type SpreadsheetColumn,
 } from "../types"
 
 export type CellSelection = {
@@ -91,8 +93,8 @@ export function useCellSelection({
     const table = bodyTableRef.current
     if (!table) return
     table
-      .querySelectorAll("td[data-vsp-cell][data-vsp-cell-selected='true']")
-      .forEach((el) => el.removeAttribute("data-vsp-cell-selected"))
+      .querySelectorAll(`td[data-vsp-cell][${CELL_SELECTION_RANGE_ATTR}='true']`)
+      .forEach((el) => el.removeAttribute(CELL_SELECTION_RANGE_ATTR))
     if (!selection || !inSelection) return
     const r0 = Math.min(selection.startRow, selection.endRow)
     const r1 = Math.max(selection.startRow, selection.endRow)
@@ -103,7 +105,7 @@ export function useCellSelection({
         const colName = visibleColumns[c]?.name
         if (!colName) continue
         const cell = table.querySelector<HTMLElement>(`td[data-vsp-cell="${r}-${colName}"]`)
-        cell?.setAttribute("data-vsp-cell-selected", "true")
+        cell?.setAttribute(CELL_SELECTION_RANGE_ATTR, "true")
       }
     }
   }, [selection, inSelection, visibleColumns, bodyTableRef])
@@ -249,11 +251,7 @@ export function useCellSelection({
     if (document.getElementById(styleId)) return
     const styleEl = document.createElement("style")
     styleEl.id = styleId
-    styleEl.textContent = `
-      td[data-vsp-cell][data-vsp-cell-selected='true'] { box-shadow: inset 0 0 0 1px var(--color-border, hsl(214 32% 91%)); }
-      td[data-vsp-cell].vsp-cell-active { outline: 1px solid var(--color-border, hsl(214 32% 91%)); outline-offset: -1px; z-index: 2; }
-      td[data-vsp-cell].vsp-cell-active::before { content: attr(data-vsp-cell); position: absolute; top: 1px; right: 4px; font-size: 9px; line-height: 1; font-weight: 600; color: var(--color-muted-foreground, hsl(215 16% 47%)); opacity: .8; pointer-events: none; z-index: 4; }
-    `
+    styleEl.textContent = CELL_SELECTION_STYLE
     document.head.appendChild(styleEl)
     return () => {
       document.getElementById(styleId)?.remove()
@@ -278,15 +276,15 @@ export function useCellSelection({
     const table = bodyTableRef.current
     if (!table) return
     table
-      .querySelectorAll("td.vsp-cell-active")
-      .forEach((el) => el.classList.remove("vsp-cell-active"))
+      .querySelectorAll(`td.${cellSelectionActiveClass}`)
+      .forEach((el) => el.classList.remove(cellSelectionActiveClass))
     if (!activeCell) return
     const colName = visibleColumns[activeCell.col]?.name
     if (!colName) return
     const target = table.querySelector<HTMLElement>(
       `td[data-vsp-cell="${activeCell.row}-${colName}"]`
     )
-    target?.classList.add("vsp-cell-active")
+    target?.classList.add(cellSelectionActiveClass)
   }, [activeCell, visibleColumns, bodyTableRef])
 
   return {
@@ -301,5 +299,3 @@ export function useCellSelection({
     applyCellLocatorAttributes,
   }
 }
-
-export type { ColumnSortConfigs }
