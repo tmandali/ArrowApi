@@ -20,7 +20,7 @@ export function ExecutionStatusMark({
         <span
           className="relative block size-4 shrink-0"
           role="img"
-          aria-label="Completed"
+          aria-label={t("status_completed")}
         >
           <CircleCheck
             className="absolute inset-0 size-4 text-primary/70 transition-opacity group-hover:opacity-0 dark:text-sidebar-primary/80"
@@ -59,7 +59,7 @@ export function ExecutionStatusMark({
         <span
           className="relative block size-4 shrink-0"
           role="img"
-          aria-label={status}
+          aria-label={t(isFailed ? "status_failed" : "status_cancelled")}
         >
           <Icon
             className={cn(
@@ -82,8 +82,8 @@ export function ExecutionStatusMark({
         <span
           role="button"
           tabIndex={-1}
-          title={`Delete ${status.toLowerCase()} execution`}
-          aria-label={`Delete ${status.toLowerCase()} execution`}
+          title={t(isFailed ? "delete_failed_execution" : "delete_cancelled_execution")}
+          aria-label={t(isFailed ? "delete_failed_execution" : "delete_cancelled_execution")}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -99,15 +99,15 @@ export function ExecutionStatusMark({
       return (
         <Loader2
           className="size-3.5 shrink-0 animate-spin text-primary/60"
-          aria-label="Running"
+          aria-label={t("status_running")}
         />
       );
     case "Queued":
       return (
         <span
           className="size-2 shrink-0 rounded-full bg-orange-500/50"
-          title="Queued"
-          aria-label="Queued"
+          title={t("status_queued")}
+          aria-label={t("status_queued")}
         />
       );
     default:

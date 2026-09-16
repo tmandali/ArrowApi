@@ -49,14 +49,14 @@ export function DeleteExecutionDialog({
           <AlertDialogDescription>
             {targetId ? (
               <>
-                Execution{" "}
+                {t("delete_execution_description_prefix")}{" "}
                 <span className="break-all font-mono text-foreground">
                   {targetId}
                 </span>{" "}
-                will be permanently removed from history.
+                {t("delete_execution_description_suffix")}
               </>
             ) : (
-              <>This execution will be permanently removed from history.</>
+              <>{t("delete_execution_description_plain")}</>
             )}
             {error ? (
               <span className="mt-2 block text-destructive">{error}</span>

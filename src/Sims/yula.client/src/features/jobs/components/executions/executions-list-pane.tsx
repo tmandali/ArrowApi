@@ -151,7 +151,16 @@ export function ExecutionsListPane({
                       </div>
                       <span
                         className="flex size-5 shrink-0 items-center justify-center"
-                        title={job.status}
+                        title={
+                          {
+                            Running: t("status_running"),
+                            Queued: t("status_queued"),
+                            Completed: t("status_completed"),
+                            Failed: t("status_failed"),
+                            Cancelled: t("status_cancelled"),
+                            Canceled: t("status_cancelled"),
+                          }[job.status] ?? job.status
+                        }
                       >
                         <ExecutionStatusMark
                           status={job.status}

@@ -68,6 +68,15 @@ export function ExecutionDetailPane({
 }) {
   const t = useTranslations("JobExecutions");
 
+  const statusLabels: Record<string, string> = {
+    Running: t("status_running"),
+    Queued: t("status_queued"),
+    Completed: t("status_completed"),
+    Failed: t("status_failed"),
+    Cancelled: t("status_cancelled"),
+    Canceled: t("status_cancelled"),
+  };
+
   if (criteriaVisible) {
     return (
       <section className={cn(panelCardClass, "h-full min-w-0")}>
@@ -104,7 +113,7 @@ export function ExecutionDetailPane({
               variant={statusTone(selectedDisplayStatus)}
               className="h-5 shrink-0 px-1.5 text-[10px]"
             >
-              {selectedDisplayStatus}
+              {statusLabels[selectedDisplayStatus] ?? selectedDisplayStatus}
             </Badge>
           ) : null}
           <div className="flex min-w-0 items-center gap-1">
@@ -189,7 +198,7 @@ export function ExecutionDetailPane({
                       >
                         <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/trigger:rotate-90" />
                         <dt className="cursor-pointer font-medium">
-                          OPFS Files ({opfsDetail.files.length})
+                          {t("opfs_files", { count: opfsDetail.files.length })}
                         </dt>
                       </button>
                     </CollapsibleTrigger>
@@ -234,7 +243,7 @@ export function ExecutionDetailPane({
             <div className="mt-3 flex min-h-0 flex-col space-y-3">
               <Marker variant="separator">
                 <MarkerContent className="text-[11px] text-muted-foreground">
-                  Request Input
+                  {t("request_input")}
                 </MarkerContent>
               </Marker>
               <CodeBlock

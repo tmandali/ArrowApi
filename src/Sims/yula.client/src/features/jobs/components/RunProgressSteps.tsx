@@ -1,4 +1,7 @@
+"use client"
+
 import { Check, X } from "lucide-react"
+import { useTranslations } from "next-intl"
 import {
   Marker,
   MarkerContent,
@@ -9,6 +12,7 @@ import {
   elapsedSinceStart,
   type RunEventItem,
 } from "@/features/jobs/run-events"
+import { formatCount } from "@/utils/format"
 import { cn } from "@/utils/cn"
 
 /**
@@ -32,12 +36,59 @@ export function RunProgressSteps({
   runningOnly?: boolean
   className?: string
 }) {
+  const t = useTranslations("JobExecutions")
+
+  const statusWords: Record<string, string> = {
+    Running: t("status_running"),
+    Queued: t("status_queued"),
+    Completed: t("status_completed"),
+    Failed: t("status_failed"),
+    Cancelled: t("status_cancelled"),
+    Canceled: t("status_cancelled"),
+  }
+  const titleByEvent: Record<string, string> = {
+    info: t("step_info"),
+    progress: t("progress"),
+    completed: t("step_completed"),
+    failed: t("step_failed"),
+    cancelled: t("step_cancelled"),
+  }
+
+  const resolveTitle = (step: RunEventItem): string => {
+    const mapped = titleByEvent[step.eventName]
+    if (mapped) return mapped
+    if (step.eventName === "status") return statusWords[step.title] ?? step.title
+    return step.title
+  }
+
+  const resolveDetail = (step: RunEventItem): string => {
+    switch (step.eventName) {
+      case "progress":
+        return step.totalRows != null
+          ? t("rows_detail", { count: formatCount(step.totalRows) })
+          : step.detail
+      case "completed":
+        return step.totalRows != null
+          ? t("rows_ready_detail", { count: formatCount(step.totalRows) })
+          : step.detail
+      case "cancelled":
+        if (step.totalRows != null && step.totalRows > 0) {
+          return t("rows_stopped_detail", { count: formatCount(step.totalRows) })
+        }
+        return t("report_stopped_detail")
+      case "failed":
+        return step.detail === "job failed" ? t("job_failed_detail") : step.detail
+      default:
+        return step.detail
+    }
+  }
+
   return (
     <div className={cn("space-y-3", !runningOnly && "mt-3", className)}>
       {!runningOnly ? (
         <Marker variant="separator">
           <MarkerContent className="text-[11px] text-muted-foreground">
-            Progress
+            {t("progress")}
           </MarkerContent>
         </Marker>
       ) : null}
@@ -46,14 +97,12 @@ export function RunProgressSteps({
           <MarkerIcon>
             <Spinner className="size-3.5" />
           </MarkerIcon>
-          <MarkerContent>Loading progress…</MarkerContent>
+          <MarkerContent>{t("loading_progress")}</MarkerContent>
         </Marker>
       ) : events.length === 0 ? (
         running ? null : (
           <Marker>
-            <MarkerContent>
-              No progress log for this run.
-            </MarkerContent>
+            <MarkerContent>{t("no_progress_log")}</MarkerContent>
           </Marker>
         )
       ) : (
@@ -89,12 +138,17 @@ export function RunProgressSteps({
                   : "text-muted-foreground"
             )
 
+            const title = resolveTitle(step)
+            const detail = resolveDetail(step)
+            // fallback artifact: "Running — status" gibi boş mesajlı status adımlarında
+            // detail = eventName düşer; bu hali görünmez kıl
+            const hideDetail = step.eventName === "status" && step.detail === "status"
             const label =
               step.eventName === "progress"
-                ? `${step.title} · ${step.detail}`
-                : step.detail
-                  ? `${step.title} — ${step.detail}`
-                  : step.title
+                ? `${title} · ${detail}`
+                : detail && !hideDetail
+                  ? `${title} — ${detail}`
+                  : title
             const elapsed = elapsedSinceStart(events, step)
 
             return (
