@@ -35,7 +35,6 @@ export type ReportModuleJobSession = Pick<
   | "listRefreshToken"
   | "onListError"
   | "viewMode"
-  | "onViewModeChange"
   | "onSelectedCompletedChange"
   | "deleteJobTriggerRef"
   | "onCanDeleteChange"
@@ -152,7 +151,6 @@ export const ReportModuleFilter = React.forwardRef<
         pendingJobs={jobSession?.pendingJobs}
         listRefreshToken={jobSession?.listRefreshToken}
         viewMode={jobSession?.viewMode}
-        onViewModeChange={jobSession?.onViewModeChange}
         onSelectedCompletedChange={jobSession?.onSelectedCompletedChange}
         deleteJobTriggerRef={jobSession?.deleteJobTriggerRef}
         onCanDeleteChange={jobSession?.onCanDeleteChange}

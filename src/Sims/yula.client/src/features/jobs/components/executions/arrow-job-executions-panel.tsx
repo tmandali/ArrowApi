@@ -107,7 +107,6 @@ export type ArrowJobExecutionsPanelProps = {
   renderResult?: (jobId: string) => React.ReactNode;
   /** Bitmiş raporlarda "result" (grid) veya "detail" kutusu görünümü */
   viewMode?: "result" | "detail";
-  onViewModeChange?: (mode: "result" | "detail") => void;
   onSelectedCompletedChange?: (isCompleted: boolean) => void;
   deleteJobTriggerRef?: React.MutableRefObject<(() => void) | null>;
   onCanDeleteChange?: (canDelete: boolean) => void;
@@ -145,7 +144,6 @@ export function ArrowJobExecutionsPanel({
   criteriaSchema: _criteriaSchema,
   renderResult,
   viewMode,
-  onViewModeChange,
   onSelectedCompletedChange,
   deleteJobTriggerRef,
   onCanDeleteChange,
@@ -422,16 +420,9 @@ export function ArrowJobExecutionsPanel({
     });
   }, [rawProgressEvents, selectedJob, isTerminal, t]);
 
-  const [internalViewMode, setInternalViewMode] = React.useState<"result" | "detail">("result");
-  const currentViewMode = viewMode ?? internalViewMode;
-
-  const setEffectiveViewMode = React.useCallback(
-    (mode: "result" | "detail") => {
-      setInternalViewMode(mode);
-      onViewModeChange?.(mode);
-    },
-    [onViewModeChange]
-  );
+  // Görünüm modu tamamen tüketici-kontrolündedir (viewMode prop'u);
+  // panonun varsayılanı tablo görünümüdür. Item seçiminde sıfırlanmaz.
+  const currentViewMode = viewMode ?? "result";
 
   const progressPhase =
     hubSnapshot?.phase ??
@@ -692,10 +683,11 @@ export function ArrowJobExecutionsPanel({
   const handleSelect = React.useCallback(
     (jobId: string, job: ArrowJobStatus) => {
       setSelectedId(jobId);
-      setEffectiveViewMode("result");
+      // Görünüm modu (tablo/detay) item seçiminde sıfırlanmaz —
+      // kullanıcının son seçiminde kalır.
       onJobSelect?.(jobId, job);
     },
-    [onJobSelect, setEffectiveViewMode]
+    [onJobSelect]
   );
 
   const handleDeleteRequest = React.useCallback((jobId: string) => {

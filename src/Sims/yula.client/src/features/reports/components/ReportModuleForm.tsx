@@ -114,7 +114,6 @@ export function ReportModuleForm({
   const handleSelectedCompletedChange = React.useCallback(
     (isCompleted: boolean) => {
       setSelectedCompleted(isCompleted)
-      if (!isCompleted) setViewMode("result")
     },
     []
   )
@@ -123,11 +122,12 @@ export function ReportModuleForm({
     setViewMode((prev) => (prev === "detail" ? "result" : "detail"))
   }, [])
 
+  // Görünüm seçimi (tablo/detay) kullanıcı tercihidir: item seçiminde
+  // sıfırlanmaz, seçili kaldığı gibi korunur.
   const handleJobSelect = React.useCallback(
     (jobId: string, job?: ArrowJobStatus) => {
       setLastJobId(null)
       setComposing(false)
-      setViewMode("result")
       handleSelectJob(job ?? jobId)
     },
     [setComposing, handleSelectJob]
@@ -158,7 +158,6 @@ export function ReportModuleForm({
 
   const handleStartNewReport = React.useCallback(() => {
     setLastJobId((prev) => prev ?? activeJobId)
-    setViewMode("result")
     setSelectedCompleted(false)
     setCanDelete(false)
     setCanCancel(false)
@@ -169,7 +168,6 @@ export function ReportModuleForm({
   const handleCancelNewReport = React.useCallback(() => {
     const restoreId = lastJobId
     setLastJobId(null)
-    setViewMode("result")
     setComposing(false)
     if (restoreId) handleSelectJob(restoreId)
   }, [lastJobId, handleSelectJob, setComposing])
@@ -304,7 +302,6 @@ export function ReportModuleForm({
             pendingJobs,
             listRefreshToken,
             viewMode,
-            onViewModeChange: setViewMode,
             onSelectedCompletedChange: handleSelectedCompletedChange,
             deleteJobTriggerRef: deleteJobRef,
             onCanDeleteChange: setCanDelete,
