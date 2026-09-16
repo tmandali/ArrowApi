@@ -4,7 +4,7 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { agentSessionPath, isWorkspaceHomePath, isConversationVisibleForAgent, extractAgentIdFromPath, isAgentSessionPath } from "@/lib/workspace-paths"
+import { agentSessionPath, isWorkspaceHomePath, isAgentSessionPath } from "@/lib/workspace-paths"
 import { useUserAgentsStore } from "@/lib/stores/user-agents"
 import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { AIChatPanelTitle } from "@/components/layout/ai-chat/ai-chat-panel-title";
@@ -273,49 +273,6 @@ function DockHeaderTitle() {
   )
 }
 
-export function YulaScreenHistoryButton() {
-  const t = useTranslations("AiDock")
-  const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
-  const historyFilter = useChatsStore((s) => s.historyFilter)
-  const toggleHistory = useChatsStore((s) => s.toggleHistory)
-  const conversations = useChatsStore((s) => s.conversations)
-  const pathname = usePathname()
-  const dockActiveAgentId = useUserAgentsStore((s) => s.activeAgentId)
-  const dockCurrentAgentId = extractAgentIdFromPath(pathname) ?? dockActiveAgentId ?? null
-
-  const screenCount = React.useMemo(() => {
-    return conversations.filter((c) =>
-      isConversationVisibleForAgent(c, pathname, dockCurrentAgentId),
-    ).length
-  }, [conversations, pathname, dockCurrentAgentId])
-
-  const isActive = isHistoryOpen && historyFilter === "screen"
-
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className={cn(
-        "relative size-7 shrink-0 transition-colors",
-        isActive
-          ? "text-primary bg-primary/10 dark:bg-primary/20"
-          : "text-muted-foreground hover:text-foreground"
-      )}
-      onClick={() => toggleHistory("screen")}
-      title={t("toggle_history_show")}
-      aria-label={t("toggle_history_show")}
-    >
-      <History className="size-3.5" />
-      {screenCount > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-primary text-[8.5px] font-bold text-primary-foreground">
-          {screenCount > 9 ? "9+" : screenCount}
-        </span>
-      ) : null}
-    </Button>
-  )
-}
-
 export function YulaHistoryToggle() {
   const t = useTranslations("AiDock")
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
@@ -414,7 +371,6 @@ export function WorkspaceAiDock({
           {!hideHeader ? (
             <div className={cn(panelHeaderClass, "gap-1")}>
               <DockHeaderTitle />
-              <YulaScreenHistoryButton />
               <YulaNewChatButton />
               <YulaOpenInMainButton />
             </div>
@@ -438,7 +394,6 @@ export function WorkspaceAiDock({
       collapseLabel={YULA.collapseLabel}
       headerActions={
         <div className="flex min-w-0 items-center gap-0.5">
-          <YulaScreenHistoryButton />
           <YulaNewChatButton />
           <YulaOpenInMainButton />
         </div>
