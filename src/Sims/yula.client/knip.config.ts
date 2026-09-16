@@ -4,6 +4,9 @@ const config: KnipConfig = {
   // Source code entry points — include CSS for Tailwind v4 @import tracking
   entry: ['src/**/*.{ts,tsx,mjs}', 'scripts/**/*.{mjs,js}', 'src/app/globals.css'],
   project: ['src/**/*.{ts,tsx,mjs,css}', 'scripts/**/*.{mjs,js}'],
+  // CLI / tooling paketi: TS kodunda import edilmez, knip bunları "unused
+  // devDependency" olarak flag'ler. (lefthook kök dizindeki lefthook.yml'ü
+  // yürütür; commitlint/oxlint script'lerden çalışır.)
   // Runtime dependencies that are not directly imported in TS (CLI tools)
   ignoreDependencies: [
     '@commitlint/cli',
