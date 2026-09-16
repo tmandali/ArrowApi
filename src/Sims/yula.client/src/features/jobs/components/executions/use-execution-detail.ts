@@ -11,6 +11,60 @@ import type { ArrowJobStatus } from "../../types";
 import { prettyJson, sameJobId } from "./execution-helpers";
 
 /**
+ * İş başına detay önbelleği: terminal (Completed/Failed/Cancelled) işlerin
+ * request JSON'u, OPFS detayı ve persisted event-log'u immutablardır. Item
+ * geçişlerinde bunları senkron enjekte etmek "boş kare" flaşını önler;
+ * ilk ziyarette bir kez yüklenir, geri dönüşte anında gösterilir.
+ */
+type DetailCacheEntry = {
+  inputJson: string;
+  opfs: OpfsJobParquetDetail | null;
+  history: RunEventItem[];
+};
+const detailCache = new Map<string, DetailCacheEntry>();
+const DETAIL_CACHE_MAX = 50;
+
+function detailCacheKey(id: string | null | undefined): string | null {
+  if (!id) return null;
+  return id.trim().toLowerCase();
+}
+
+function readDetailCache(id: string | null): DetailCacheEntry | undefined {
+  const key = detailCacheKey(id);
+  return key ? detailCache.get(key) : undefined;
+}
+
+function hasDetailCache(id: string | null | undefined): boolean {
+  const key = detailCacheKey(id);
+  return key != null && detailCache.has(key);
+}
+
+function dropDetailCache(id: string | null | undefined): void {
+  const key = detailCacheKey(id);
+  if (key) detailCache.delete(key);
+}
+
+function writeDetailCache(
+  id: string,
+  patch: Partial<DetailCacheEntry>
+): void {
+  const key = detailCacheKey(id);
+  if (!key) return;
+  const prev = detailCache.get(key) ?? {
+    inputJson: "",
+    opfs: null,
+    history: [],
+  };
+  detailCache.set(key, { ...prev, ...patch });
+  // Basit LRU: en eski anahtarları at (memory sınırlı kaldırı).
+  while (detailCache.size > DETAIL_CACHE_MAX) {
+    const oldest = detailCache.keys().next().value;
+    if (oldest == null) break;
+    detailCache.delete(oldest);
+  }
+}
+
+/**
  * Seçili işin detayı: request JSON, OPFS disk detayı ve persisted event-log.
  * Canlı akan işlerde SSE tek kaynaktır — history yüklenmez.
  */
@@ -45,14 +99,22 @@ export function useExecutionDetail(args: {
   const opfsLoading = Boolean(selectedId && opfsLoadedId !== selectedId);
 
   const bumpDetail = React.useCallback(() => {
+    // Manuel yenileme: terminal islerin donuk onbelletini at, taze cekim yap.
+    if (selectedId) dropDetailCache(selectedId);
     setDetailRefreshToken((prev) => prev + 1);
-  }, []);
+  }, [selectedId]);
 
   React.useEffect(() => {
     const abort = new AbortController();
 
     const loadDetail = async () => {
       if (!selectedId) return;
+      // Terminal isin request JSON'u degismez (immutable) — onbelletteyse
+      // refetch etme; "loading_request" baslik flaşı yeniden yasamaz.
+      if (isTerminal && readDetailCache(selectedId)?.inputJson) {
+        setDetailLoading(false);
+        return;
+      }
       setDetailLoading(true);
 
       const isActive = sameJobId(selectedId, activeJobId);
@@ -64,7 +126,9 @@ export function useExecutionDetail(args: {
         const request = await fetchJobRequest(selectedId, abort.signal);
         if (abort.signal.aborted) return;
         if (request && Object.keys(request).length > 0) {
-          setInputJson(prettyJson(request));
+          const pretty = prettyJson(request);
+          setInputJson(pretty);
+          if (isTerminal) writeDetailCache(selectedId, { inputJson: pretty });
         } else if (isActive && activeRequestJson?.trim()) {
           setInputJson(activeRequestJson);
         } else {
@@ -84,11 +148,14 @@ export function useExecutionDetail(args: {
 
     void loadDetail();
     return () => abort.abort();
-  }, [selectedId, activeJobId, activeRequestJson, detailRefreshToken]);
+  }, [selectedId, activeJobId, activeRequestJson, detailRefreshToken, isTerminal]);
 
   // Seçili işe ait OPFS yerel disk dosyalarını yükle
   React.useEffect(() => {
     if (!selectedId) return;
+    // Render-time senkronu terminal is icin OPFS'i onbelletten doldurduysa
+    // refetch gereksiz.
+    if (isTerminal && hasDetailCache(selectedId)) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -96,6 +163,7 @@ export function useExecutionDetail(args: {
         if (!cancelled) {
           setOpfsDetail(detail);
           setOpfsLoadedId(selectedId);
+          if (isTerminal) writeDetailCache(selectedId, { opfs: detail });
         }
       } catch {
         if (!cancelled) {
@@ -107,12 +175,24 @@ export function useExecutionDetail(args: {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, detailRefreshToken, selectedJob?.status]);
+  }, [selectedId, detailRefreshToken, selectedJob?.status, isTerminal]);
 
   const [syncedOpfsSelectedId, setSyncedOpfsSelectedId] = React.useState(selectedId);
   if (syncedOpfsSelectedId !== selectedId) {
     setSyncedOpfsSelectedId(selectedId);
-    setOpfsDetail(null);
+    // Terminal işler için önbellekten senkron hidratasyon → "scanning" flaşı yok.
+    const cached = isTerminal ? readDetailCache(selectedId) : undefined;
+    setOpfsDetail(cached?.opfs ?? null);
+    if (cached) setOpfsLoadedId(selectedId);
+  }
+
+  // İstek JSON'u: terminal işte cache'te varken senkron göster →
+  // önceki işin JSON'u geçici gösterilmez, yeni işin kaydedilişi anında gelir.
+  const [syncedInputJobId, setSyncedInputJobId] = React.useState<string | null>(selectedId);
+  if (syncedInputJobId !== selectedId) {
+    setSyncedInputJobId(selectedId);
+    const cached = isTerminal ? readDetailCache(selectedId) : undefined;
+    if (cached?.inputJson) setInputJson(cached.inputJson);
   }
 
   // Load persisted progress for the selected run (skip while watching live active job).
@@ -125,6 +205,11 @@ export function useExecutionDetail(args: {
     const shouldClearHistory = !selectedId || isLiveActive;
     if (shouldClearHistory) {
       setHistoryEvents([]);
+    } else {
+      // Geçişte boş kare olmasın: önceki ziyarette kaydediliş varsa onu
+      // göster, yoksa mevcut (stale) içerik yeni log'a dek korunur.
+      const cached = readDetailCache(selectedId);
+      setHistoryEvents(cached?.history ?? historyEvents);
     }
   }
 
@@ -144,7 +229,9 @@ export function useExecutionDetail(args: {
       try {
         const log = await fetchJobEventLog(selectedId, abort.signal);
         if (abort.signal.aborted) return;
-        setHistoryEvents(buildRunEventsFromLog(log));
+        const events = buildRunEventsFromLog(log);
+        setHistoryEvents(events);
+        if (isTerminal) writeDetailCache(selectedId, { history: events });
       } catch {
         if (abort.signal.aborted) return;
         setHistoryEvents([]);
