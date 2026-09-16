@@ -3,9 +3,58 @@ import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglit
 import { Pool } from "pg";
 import { PGlite } from "@electric-sql/pglite";
 import { Env } from "@/lib/env";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import * as schema from "./schema";
 
 type PgliteDb = PgliteDatabase<typeof schema>;
+
+/**
+ * In-process PGlite boot'unda eksik migrasyonları otomatik uygula.
+ *
+ * `local.db` sıfırdan oluştuğunda veya migrasyon tablosu (`_drizzle_migrations`)
+ * yokken, dev'de `migrations/*.sql` dosyalarını sırayla çalıştır.
+ * Artık pglite-socket/TCP olmadığı için migrasyonu app kendi boot'unda yapar.
+ * İdempotent: `IF NOT EXISTS` taşımayan CREATE TABLE'ler ilk çalıştırmada oluşur;
+ * sonraki açılışlarda PGlite, tabloların zaten var olduğunu görür.
+ */
+async function applyMigrationsIfAbsent(pglite: InstanceType<typeof PGlite>): Promise<void> {
+  // _drizzle_migrations tablosu yoksa PGlite sıfırdır (ilk boot).
+  const hasMigrationsTable = await pglite.query(
+    "SELECT 1 FROM pg_class WHERE relname = '_drizzle_migrations' LIMIT 1",
+  );
+  if (hasMigrationsTable.rows.length > 0) return;
+
+  const migrationsDir = join(process.cwd(), "migrations");
+  if (!existsSync(migrationsDir)) {
+    console.log("[db] migrations/ dizini yok, atlanıyor");
+    return;
+  }
+
+  const files = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  for (const file of files) {
+    const sql = readFileSync(join(migrationsDir, file), "utf8");
+    // İdempotent değilse (CREATE TABLE IF NOT EXISTS değil) hata vermezsek
+    // sonraki boot'lerde duplicate hata alırız; o yüzden ilk boot'te
+    // _drizzle_migrations tablosu elle oluşturulur.
+    await pglite.exec(sql);
+  }
+
+  // Basit migration tracking (drizzle-kit formatında tam uyumlu değil ama
+  // tekrar çalışmayı engellemek için yeterli).
+  await pglite.exec(
+    `CREATE TABLE IF NOT EXISTS _drizzle_migrations (
+       id SERIAL PRIMARY KEY,
+       hash text NOT NULL,
+       created_at timestamptz NOT NULL DEFAULT now()
+     )`,
+  );
+
+  console.log(`[db] ${files.length} migrasyon uygulandı (in-process PGlite boot)`);
+}
 
 /**
  * PGlite (yerel Postgres) lazy bağlantı — `next build` (Turbopack) için.
@@ -80,6 +129,7 @@ export const createDbConnection = async () => {
     }
     const pglite = new PGlite({ dataDir: "local.db" });
     console.log("[db] PGlite initialized (local.db)");
+    await applyMigrationsIfAbsent(pglite);
     return drizzlePglite(pglite, { schema });
   }
 
