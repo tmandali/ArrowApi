@@ -4,9 +4,37 @@ import type { ReactNode } from "react"
 
 import { pageHeaderShellClass } from "@/components/layout/panel-chrome"
 import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
+import { YulaMarkIcon } from "@/components/layout/yula-brand"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
+import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
+import { PanelRightClose } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/utils/cn"
+
+/**
+ * Page header'daki Yula dock tetikleyicisi — normalde Yula markası, hover'da
+ * kapatma ikonu; tıklama Yula dock'unu açar/kapar.
+ */
+function YulaDockTrigger() {
+  const { open, setOpen } = useWorkspaceAiChat()
+  const t = useTranslations("AiDock")
+  const label = open ? t("close_panel") : t("open_panel")
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(!open)}
+      title={label}
+      aria-label={label}
+      aria-pressed={open}
+      className="group/yula-dock relative -ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/70 transition-colors hover:text-foreground cursor-pointer"
+    >
+      <YulaMarkIcon className="size-4 transition-opacity duration-150 group-hover/yula-dock:opacity-0" />
+      <PanelRightClose className="absolute size-4 opacity-0 transition-opacity duration-150 group-hover/yula-dock:opacity-100" />
+      <span className="sr-only">{label}</span>
+    </button>
+  )
+}
 
 type WorkspacePageHeaderProps = {
   children?: ReactNode
@@ -69,6 +97,7 @@ export function WorkspacePageHeader({
       >
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <PagePanelTrigger className="-ml-1" />
+          <YulaDockTrigger />
           {children}
           {startExtra}
         </div>

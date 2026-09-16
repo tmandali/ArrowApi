@@ -811,6 +811,7 @@
     "toggle_history_show": "Show Chat History",
     "toggle_history_hide": "Hide Chat History",
     "close_panel": "Close panel",
+    "open_panel": "Open Yula panel",
     "agent_search": "Search agents…",
     "no_results": "No results.",
     "agent_default": "Yula default",

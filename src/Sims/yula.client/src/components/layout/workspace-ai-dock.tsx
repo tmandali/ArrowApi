@@ -39,7 +39,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/utils/cn"
-import { Check, History, Maximize2, PanelRightClose, SquarePen } from "lucide-react"
+import { Check, History, Maximize2, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -273,24 +273,6 @@ function DockHeaderTitle() {
   )
 }
 
-/** Paneli kapatma ikonu (başlık-butonu collapse'unun yerine). */
-function DockCollapseButton({ onCollapse }: { onCollapse: () => void }) {
-  const t = useTranslations("AiDock")
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      onClick={onCollapse}
-      title={t("close_panel")}
-      aria-label={t("close_panel")}
-    >
-      <PanelRightClose className="size-3.5" />
-    </Button>
-  )
-}
-
 export function YulaScreenHistoryButton() {
   const t = useTranslations("AiDock")
   const isHistoryOpen = useChatsStore((s) => s.isHistoryOpen)
@@ -435,7 +417,6 @@ export function WorkspaceAiDock({
               <YulaScreenHistoryButton />
               <YulaNewChatButton />
               <YulaOpenInMainButton />
-              <DockCollapseButton onCollapse={() => setOpen(false)} />
             </div>
           ) : null}
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -460,7 +441,6 @@ export function WorkspaceAiDock({
           <YulaScreenHistoryButton />
           <YulaNewChatButton />
           <YulaOpenInMainButton />
-          <DockCollapseButton onCollapse={() => setOpen(false)} />
         </div>
       }
       panel={<AIChatPanel centeredIntro={centeredIntro} />}
