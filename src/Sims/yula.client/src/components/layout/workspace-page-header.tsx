@@ -5,6 +5,7 @@ import type { ReactNode } from "react"
 import { pageHeaderShellClass } from "@/components/layout/panel-chrome"
 import { PagePanelTrigger } from "@/components/layout/page-panel-trigger"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
+import { applyYulaAgentQuery } from "@/components/layout/yula-agent-query"
 import { WorkspaceSearchTrigger } from "@/components/layout/workspace-search-trigger"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
@@ -17,13 +18,24 @@ import { cn } from "@/utils/cn"
  * kapatma ikonu; tıklama Yula dock'unu açar/kapar.
  */
 function YulaDockTrigger() {
-  const { open, setOpen } = useWorkspaceAiChat()
+  const { open, setOpen, setExpanded } = useWorkspaceAiChat()
   const t = useTranslations("AiDock")
   const label = open ? t("close_panel") : t("open_panel")
+  const handleToggle = () => {
+    if (open) {
+      // Kapatırken expand durumunu + ?yula= query'sini de temizle —
+      // sayfa session'ına eksiksiz dönüş.
+      setOpen(false)
+      setExpanded(false)
+      applyYulaAgentQuery(null)
+    } else {
+      setOpen(true)
+    }
+  }
   return (
     <button
       type="button"
-      onClick={() => setOpen(!open)}
+      onClick={handleToggle}
       title={label}
       aria-label={label}
       aria-pressed={open}

@@ -2,9 +2,9 @@
 
 // Workspace AI Dock component
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { agentSessionPath, isWorkspaceHomePath, isAgentSessionPath } from "@/lib/workspace-paths"
+import { isWorkspaceHomePath, isAgentSessionPath } from "@/lib/workspace-paths"
 import { useUserAgentsStore } from "@/lib/stores/user-agents"
 import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { AIChatPanelTitle } from "@/components/layout/ai-chat/ai-chat-panel-title";
@@ -25,6 +25,7 @@ import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agen
 import { AgentAvatar } from "@/features/system/components/agents/agent-avatar"
 import { agentInitials } from "@/features/system/components/agents/agent-initials"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
+import { applyYulaAgentQuery, readYulaAgentQuery } from "@/components/layout/yula-agent-query"
 import {
   Command,
   CommandEmpty,
@@ -86,38 +87,25 @@ function YulaNewChatButton() {
 }
 
 /**
- * Dock başlığındaki "ana ekranda devam et" butonu: mevcut sohbeti koruyup
- * tam ekran ajan/Yula oturumuna taşır (ajanlı → /agents/<id>, varsayılan → /).
- * Sayfa değişiminde taze sohbet açılmasını önlemek için push öncesi
- * `beginConversationFollow` bayrağı kurulur; varışta provider kaydı yeni
- * sayfaya bağlar (aktif sohbet korunur, yeni sohbet açılmaz).
+ * Dock başlığındaki "ana ekranda devam et" butonu: navigasyon YAPMAZ —
+ * Yula'yı sayfa İÇİNDE tam genişliğe açar (main mode); sayfa session'ı
+ * (criteria formu, grid düzeni, scroll) canlı kalır, collapse'de aynı
+ * sayfaya dönülür. Ajanlı oturumda ?yula=<agentId> yazılır (F5/paylaşım
+ * yeniden kurması için); buton main modda iken tıklanırsa dock'a döner.
  */
 function YulaOpenInMainButton() {
   const t = useTranslations("AiDock")
-  const router = useRouter()
+  const { expanded, setExpanded } = useWorkspaceAiChat()
   const dockAgent = useDockAgent()
 
   const handleOpen = () => {
-    const store = useChatsStore.getState()
-    const activeId = store.activeId
-    if (!activeId) return
-    const target = dockAgent?.id ? agentSessionPath(dockAgent.id) : "/"
-    if (
-      typeof window !== "undefined" &&
-      (window.location.pathname === target ||
-        window.location.pathname + window.location.search === target)
-    ) {
+    if (expanded) {
+      setExpanded(false)
+      applyYulaAgentQuery(null)
       return
     }
-    // Boş (kayıtsız + mesajsız) sohbette follow kaydı üretme — provider
-    // zaten aynı activeId'yi korur; dolu sohbette follow zorunludur.
-    const hasRecord = store.conversations.some((c) => c.id === activeId)
-    if (hasRecord) {
-      store.beginConversationFollow(activeId)
-    }
-    store.setHistoryOpen(false)
-    store.setSearchingHistory(false)
-    router.push(target)
+    setExpanded(true)
+    applyYulaAgentQuery(dockAgent?.id ?? null)
   }
 
   return (
@@ -329,6 +317,14 @@ export function WorkspaceAiDock({
       }
       if (startExpanded) {
         setExpanded(true)
+      }
+      // ?yula=<agentId>: F5/doğrudan bağlantıda expand + ajan durumunu
+      // yeniden kur (sayfa session'ında kal — navigasyon yok).
+      const yulaParam = readYulaAgentQuery()
+      if (yulaParam) {
+        setOpen(true)
+        setExpanded(true)
+        useUserAgentsStore.getState().setActiveAgentId(yulaParam)
       }
     }
   }, [defaultOpen, startExpanded, setOpen, setExpanded])
