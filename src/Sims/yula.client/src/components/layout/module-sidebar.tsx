@@ -118,7 +118,7 @@ export function ModuleSidebar({ className }: { className?: string }) {
             onClick={() => router.push(workspaceRootUrl)}
             className="min-w-0 flex-1 cursor-pointer rounded-md px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
           >
-            <span className="block truncate text-sm font-semibold tracking-tight text-sidebar-foreground transition-colors group-hover/name:text-foreground">
+            <span className="block truncate text-base font-semibold tracking-tight text-sidebar-foreground transition-colors group-hover/name:text-foreground">
               {activeWsName}
             </span>
           </button>

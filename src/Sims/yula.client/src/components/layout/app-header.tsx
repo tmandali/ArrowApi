@@ -55,8 +55,10 @@ export function AppHeader({ className }: { className?: string }) {
           href="/"
           className="flex items-center transition-opacity hover:opacity-85 mr-2"
         >
-          <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
-            OmniCore
+          {/* Marka: Omni (yula turuncusu) + Core (primary mavi) */}
+          <span className="text-base font-semibold tracking-tight">
+            <span className="text-orange-500 dark:text-orange-400">Omni</span>
+            <span className="text-primary">Core</span>
           </span>
         </Link>
       </div>
