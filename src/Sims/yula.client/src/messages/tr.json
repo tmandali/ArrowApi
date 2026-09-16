@@ -985,7 +985,13 @@
     "delete_cancelled_execution": "İptal edilen çalıştırmayı sil",
     "delete_execution_description_prefix": "Çalıştırma",
     "delete_execution_description_suffix": "kalıcı olarak geçmişten silinecek.",
-    "delete_execution_description_plain": "Bu çalışma kalıcı olarak geçmişten silinecek."
+    "delete_execution_description_plain": "Bu çalışma kalıcı olarak geçmişten silinecek.",
+    "cancel_job": "İptal et",
+    "cancelling": "İptal ediliyor…",
+    "cancel_running_job_title": "Çalışan işi iptal et",
+    "grid": "Tablo",
+    "show_grid": "Tabloyu göster",
+    "show_detail": "Detayı göster"
   },
   "ToolExec": {
     "tool_execution": "Araç Çalıştırma"

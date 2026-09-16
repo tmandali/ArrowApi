@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { Ban, FileText, Loader2, Table2, Trash2 } from "lucide-react"
 import { sameJobId, useArrowJobRunner, type ArrowJobStatus } from "@/features/jobs"
 import {
@@ -55,6 +56,8 @@ export function ReportModuleForm({
   workspace,
 }: ReportModuleFormProps) {
   const workspaceKey = toWorkspaceKey(workspace)
+  const tJob = useTranslations("JobExecutions")
+  const tRec = useTranslations("RecordMode")
   const jobsEndpoint = readJobEndpoint(schema) ?? `/api/arrow/jobs/${scope}`
 
   const selectPendingJob = React.useCallback(
@@ -215,15 +218,15 @@ export function ReportModuleForm({
             disabled={cancelling}
             className="h-7 gap-1.5 px-2.5 text-xs text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30"
             onClick={() => cancelJobRef.current?.()}
-            title="Çalışan işi iptal et"
-            aria-label="Çalışan işi iptal et"
+            title={tJob("cancel_running_job_title")}
+            aria-label={tJob("cancel_running_job_title")}
           >
             {cancelling ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Ban className="size-3.5" />
             )}
-            {cancelling ? "Cancelling…" : "Cancel"}
+            {cancelling ? tJob("cancelling") : tJob("cancel_job")}
           </Button>
         ) : null}
         {selectedCompleted ? (
@@ -233,18 +236,18 @@ export function ReportModuleForm({
             size="sm"
             className="h-7 gap-1.5 px-2.5 text-xs"
             onClick={handleToggleViewMode}
-            title={viewMode === "detail" ? "Show Grid" : "Show Detail"}
-            aria-label={viewMode === "detail" ? "Show Grid" : "Show Detail"}
+            title={viewMode === "detail" ? tJob("show_grid") : tJob("show_detail")}
+            aria-label={viewMode === "detail" ? tJob("show_grid") : tJob("show_detail")}
           >
             {viewMode === "detail" ? (
               <>
                 <Table2 className="size-3.5" />
-                Grid
+                {tJob("grid")}
               </>
             ) : (
               <>
                 <FileText className="size-3.5" />
-                Detail
+                {tJob("detail")}
               </>
             )}
           </Button>
@@ -256,11 +259,11 @@ export function ReportModuleForm({
             size="sm"
             className="h-7 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => deleteJobRef.current?.()}
-            title="Execution'ı sil"
-            aria-label="Execution'ı sil"
+            title={tJob("delete_execution")}
+            aria-label={tJob("delete_execution")}
           >
             <Trash2 className="size-3.5" />
-            Delete
+            {tJob("delete")}
           </Button>
         ) : null}
       </div>
@@ -274,7 +277,7 @@ export function ReportModuleForm({
       schema={schema}
       activeJobId={activeJobId}
       recordMode={composing ? "new" : "view"}
-      recordModeLabels={{ new: "New", view: "View" }}
+      recordModeLabels={{ new: tRec("new"), view: tRec("view") }}
       headerActions={headerActions}
       onJobCreated={handleJobCreated}
       onStartNewReport={handleStartNewReport}
