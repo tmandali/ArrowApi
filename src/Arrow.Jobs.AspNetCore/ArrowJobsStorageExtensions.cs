@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 /// <summary>Job dosya ve sonuç depolama extension'ları.</summary>
 public static class ArrowJobsStorageExtensions
@@ -11,12 +11,13 @@ public static class ArrowJobsStorageExtensions
     public const string DefaultFileStorePath = "arrow-jobs";
 
     /// <summary>Özel dizin; varsayılan <see cref="DefaultFileStorePath"/> zaten <c>AddArrowJob</c> ile gelir.</summary>
-    public static void UseFileStore(
+    public static IArrowJobsConfigurer UseFileStore(
         this IArrowJobsConfigurer configurer,
         string directoryPath)
     {
         ArgumentNullException.ThrowIfNull(configurer);
         RegisterFileStore(configurer.Services, directoryPath);
+        return configurer;
     }
 
     /// <summary>Özel dizin; varsayılan <see cref="DefaultFileStorePath"/> zaten <c>AddArrowJob</c> ile gelir.</summary>

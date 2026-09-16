@@ -1,7 +1,6 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.8.12023.21 stable
+VisualStudioVersion = 18.8.12023.21
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
@@ -32,6 +31,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sims.Server", "src\Sims\Sims.Server\Sims.Server.csproj", "{7CC0440E-5348-4A98-8161-E0A8AC3F9632}"
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "yula.client", "src\Sims\yula.client\yula.client.esproj", "{A39CF579-34B6-4ACD-8E74-F9FE3A193385}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arrow.Jobs.Redis.Tests", "tests\Arrow.Jobs.Redis.Tests\Arrow.Jobs.Redis.Tests.csproj", "{C7A3A1A1-0000-4000-9999-000000000001}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -205,6 +206,18 @@ Global
 		{A39CF579-34B6-4ACD-8E74-F9FE3A193385}.Release|x86.ActiveCfg = Release|Any CPU
 		{A39CF579-34B6-4ACD-8E74-F9FE3A193385}.Release|x86.Build.0 = Release|Any CPU
 		{A39CF579-34B6-4ACD-8E74-F9FE3A193385}.Release|x86.Deploy.0 = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{C7A3A1A1-0000-4000-9999-000000000001}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -223,6 +236,7 @@ Global
 		{A1220BC9-F855-4314-BD3E-15FD59E43F66} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{7CC0440E-5348-4A98-8161-E0A8AC3F9632} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{A39CF579-34B6-4ACD-8E74-F9FE3A193385} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{C7A3A1A1-0000-4000-9999-000000000001} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {41F2E730-043C-4E8C-B82B-3EE3394EBF81}

@@ -4,6 +4,7 @@ using Arrow;
 using Arrow.Data;
 using Arrow.Jobs;
 using Arrow.Jobs.InMemory;
+using Arrow.Jobs.AspNetCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
@@ -64,14 +65,14 @@ public class ParentChildJobHierarchyTests
         Guid parentId = Guid.NewGuid();
 
         // 1. Create parent context and write parent result into storage
-        var parentContext = new ArrowJobExecutionContext(parentId, hub, provider);
+        var parentContext = new DefaultArrowJobExecutionContext(parentId, hub, provider);
         string resultPath = storage.GetResultPath(parentId);
         await storage.WriteBatchesAsync(resultPath, CreateSampleBatchesAsync());
         Assert.StartsWith("inmemory://", resultPath);
 
         // 2. Create child context with parentJobId
         Guid childId = Guid.NewGuid();
-        var childContext = new ArrowJobExecutionContext(childId, hub, provider, parentJobId: parentId);
+        var childContext = new DefaultArrowJobExecutionContext(childId, hub, provider, parentJobId: parentId);
 
         Assert.Equal(parentId, childContext.ParentJobId);
 
@@ -136,7 +137,7 @@ public class ParentChildJobHierarchyTests
 
         Guid parentId = Guid.NewGuid();
         var hub = scope.ServiceProvider.GetRequiredService<IArrowJobEventHub>();
-        var parentContext = new ArrowJobExecutionContext(parentId, hub, scope.ServiceProvider);
+        var parentContext = new DefaultArrowJobExecutionContext(parentId, hub, scope.ServiceProvider);
         ArrowJobExecutionContextHolder.Current = parentContext;
 
         var pipedBatches = new List<RecordBatch>();

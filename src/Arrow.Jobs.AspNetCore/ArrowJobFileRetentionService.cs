@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 /// <summary>
 /// Disk üzerindeki eski Arrow IPC sonuç dosyalarını (.arrows) periyodik olarak temizleyen arka plan servisi.

@@ -15,6 +15,7 @@ public static class ArrowJobApiBuilderExtensions
         this IArrowApiBuilder builder,
         string name = "default",
         Action<IArrowJobsConfigurer>? configure = null)
+        where T : notnull
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddArrowJob<T>(name, configure);

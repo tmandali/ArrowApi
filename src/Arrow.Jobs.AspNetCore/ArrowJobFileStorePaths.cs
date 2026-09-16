@@ -1,4 +1,4 @@
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 internal static class ArrowJobFileStorePaths
 {

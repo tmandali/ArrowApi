@@ -1,19 +1,20 @@
 using Sims.Server.Endpoints;
 using Sims.Server.Services;
 using Sims.Server.Workers;
-using Microsoft.AspNetCore.Authentication;
 using Arrow.Jobs.AspNetCore;
-using Arrow.Jobs.InMemory;
+using Arrow.Jobs.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddArrowApi(arrow =>
 {
-    // Sonuçlar RAM'de tutulmaz; batch'ler diskteki Arrow IPC dosyasına stream edilir
-    // (büyük raporlarda bellek sabit kalır). Global singleton kayıt: bir kez yeterlidir.
-    arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", c => c.UseFileStore("arrow-jobs"));
-    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseFileStore("arrow-jobs"));
-    arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", c => c.UseFileStore("arrow-jobs"));
+    // Redis backend: store/queue/event-hub Redis'de; sonuç dosyaları diskte (Arrow IPC)
+    string? redisConn = builder.Configuration.GetConnectionString("Redis")
+        ?? throw new InvalidOperationException("'ConnectionStrings:Redis' ayarlanmamış.");
+
+    arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", c => c.UseRedis(redisConn).UseFileStore("arrow-jobs"));
+    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseRedis(redisConn).UseFileStore("arrow-jobs"));
+    arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", c => c.UseRedis(redisConn).UseFileStore("arrow-jobs"));
 });
 
 // ── Login kullanıcı → OIDC (Keycloak) JWT doğrulama ────────────────────────────
@@ -65,6 +66,11 @@ builder.Services.AddCors(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<IStockAnalyticsService, StockAnalyticsService>();
 builder.Services.AddSingleton<IStockBalanceService, StockBalanceService>();
+
+// Redis bağlantı hatası geçici bir durumda olsun (örn. sunucu devre dışı);
+// hosted service host ölmesin, backoff ile yeniden dene.
+builder.Services.Configure<Microsoft.Extensions.Hosting.HostOptions>(options =>
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
 
 var app = builder.Build();
 

@@ -1,8 +1,6 @@
 using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Jobs;
-using Dapper;
-using Microsoft.Data.SqlClient;
 using Sims.Server.Models.StockBalance;
 using Sims.Server.Services;
 using System.Runtime.CompilerServices;
@@ -15,7 +13,6 @@ namespace Sims.Server.Workers;
 /// per-batch progress event'leri satır sayısını gösterir.
 /// </summary>
 public sealed class StockBalanceArrowJobWorker(
-        IConfiguration configuration,
         IStockBalanceService service,
         IArrowJobExecutionContext context): IArrowJobWorker<StockBalanceRequest>
 {   
@@ -23,26 +20,6 @@ public sealed class StockBalanceArrowJobWorker(
         StockBalanceRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        //var cnnString = configuration.GetConnectionString("retail");
-        //await using SqlConnection cnn = new(cnnString);
-        //await cnn.OpenAsync(cancellationToken);
-
-        //var command = new CommandDefinition(
-        //    commandText: "SELECT Depo, SatisID, KasaTip, HareketBaslamaTarih, ToplamTutar, ToplamKdvTutar, GenelIskontoTutar, Islem, SonDuzenleme " +
-        //                 "FROM tb_SatisBaslik (nolock) " +
-        //                 "WHERE HareketBaslamaTarih >= @BasTarih AND HareketBaslamaTarih < @BitTarih",
-        //    parameters: new {BasTarih=DateTime.Parse("2026-01-01"), BitTarih=DateTime.Parse("2026-02-01")},
-        //    cancellationToken: cancellationToken
-        //);
-
-        //await using var reader = await cnn.ExecuteReaderAsync(command);
-        //await using var arrowReader = reader.OpenArrowReader(new ArrowConversionOptions { BatchSize = 100_000 });
-
-        //await foreach (RecordBatch batch in arrowReader.WithCancellation(cancellationToken))
-        //{
-        //    yield return batch;
-        //}
-
         int criteriaCount = request.Criteria?.Count ?? 0;
         await context.PublishInfoAsync(
             $"Preparing: received {criteriaCount} criteria field(s)",

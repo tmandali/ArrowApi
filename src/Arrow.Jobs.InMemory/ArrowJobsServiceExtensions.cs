@@ -1,17 +1,22 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.Reflection;
 
 namespace Arrow.Jobs.InMemory;
 
-/// <summary>Arrow Job DI servis kayıt extension'ları.</summary>
-public static class ArrowJobsServiceExtensions
+/// <summary>
+/// Arrow Job In-Memory backend (store/queue/hub) DI kayıt extension'ları.
+/// <para>
+/// Public yüz: <see cref="ArrowJobsInMemoryExtensions.UseInMemory{TRequest}(ArrowJobsBuilder{TRequest})"/> builder extension.
+/// <c>internal</c> <c>AddInMemoryJobServices</c> yöntemi yalnızca
+/// AspNetCore <c>AddArrowJob</c> tarafından reflection ile çağrılır.
+/// </para>
+/// </summary>
+public static class ArrowJobsInMemoryServiceExtensions
 {
     /// <summary>
-    /// Job DI kaydı (store/queue/hub/file store; worker ise hosted service).
-    /// Public giriş: <c>AddArrowJob&lt;T&gt;(path)</c> (<c>Arrow.Jobs.AspNetCore</c>).
+    /// Bir worker/request tipi için InMemory backend + worker + context kayıtları.
     /// </summary>
-    internal static IServiceCollection AddArrowJobServices<T>(
+    internal static IServiceCollection AddInMemoryJobServices<T>(
         this IServiceCollection services,
         string? name = null,
         Action<IArrowJobsConfigurer>? configure = null)
@@ -23,21 +28,19 @@ public static class ArrowJobsServiceExtensions
 
         if (requestFromWorker is not null)
         {
-            MethodInfo method = typeof(ArrowJobsServiceExtensions)
-                .GetMethod(nameof(AddArrowJobsWorkerImpl), BindingFlags.NonPublic | BindingFlags.Static)!
-                .MakeGenericMethod(requestFromWorker, type);
-
-            return (IServiceCollection)method.Invoke(null, [services, name, configure])!;
+            var workerMethod = typeof(ArrowJobsInMemoryServiceExtensions)
+                .GetMethod(nameof(AddInMemoryJobWorkerImpl), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            var workerImpl = workerMethod.MakeGenericMethod(requestFromWorker, type);
+            return (IServiceCollection)workerImpl.Invoke(null, [services, name, configure])!;
         }
 
-        MethodInfo infraMethod = typeof(ArrowJobsServiceExtensions)
-            .GetMethod(nameof(AddArrowJobsInfrastructureImpl), BindingFlags.NonPublic | BindingFlags.Static)!
-            .MakeGenericMethod(type);
-
-        return (IServiceCollection)infraMethod.Invoke(null, [services, configure])!;
+        var infraMethod = typeof(ArrowJobsInMemoryServiceExtensions)
+            .GetMethod(nameof(AddInMemoryJobInfrastructureImpl), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var infraImpl = infraMethod.MakeGenericMethod(type);
+        return (IServiceCollection)infraImpl.Invoke(null, [services, configure])!;
     }
 
-    private static IServiceCollection AddArrowJobsInfrastructureImpl<TRequest>(
+    private static IServiceCollection AddInMemoryJobInfrastructureImpl<TRequest>(
         IServiceCollection services,
         Action<IArrowJobsConfigurer>? configure)
         where TRequest : notnull
@@ -48,11 +51,11 @@ public static class ArrowJobsServiceExtensions
         if (configure is not null)
             configure(new ArrowJobsConfigurer<TRequest>(builder));
 
-        ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
+        services.RegisterJobExecutionContext<TRequest>();
         return services;
     }
 
-    private static IServiceCollection AddArrowJobsWorkerImpl<TRequest, TWorker>(
+    private static IServiceCollection AddInMemoryJobWorkerImpl<TRequest, TWorker>(
         IServiceCollection services,
         string? name,
         Action<IArrowJobsConfigurer>? configure)
@@ -65,19 +68,27 @@ public static class ArrowJobsServiceExtensions
         if (configure is not null)
             configure(new ArrowJobsConfigurer<TRequest>(builder));
 
-        ArrowJobsStorageExtensions.RegisterDefaultFileStore(services);
         if (!string.IsNullOrWhiteSpace(name))
         {
             services.AddKeyedScoped(typeof(TWorker), name);
             services.AddKeyedScoped(typeof(IArrowJobWorker<TRequest>), name, (sp, key) => sp.GetRequiredKeyedService(typeof(TWorker), key));
         }
-        services.TryAddScoped<IArrowJobExecutionContext>(sp =>
-            ArrowJobExecutionContextHolder.Current
-            ?? throw new InvalidOperationException("IArrowJobExecutionContext is only available during job execution."));
+        services.RegisterJobExecutionContext<TRequest>();
 
         services.AddScoped(typeof(TWorker));
         services.AddScoped(typeof(IArrowJobWorker<TRequest>), sp => sp.GetRequiredService(typeof(TWorker)));
-        services.AddHostedService<ArrowJobHostedService<TRequest>>();
         return services;
+    }
+
+    /// <summary>
+    /// <see cref="IArrowJobExecutionContext"/> (Abstractions'taki <c>DefaultArrowJobExecutionContext</c>)
+    /// scoped register + <see cref="ArrowJobExecutionContextHolder"/> AsyncLocal köprüsü.
+    /// </summary>
+    internal static void RegisterJobExecutionContext<TRequest>(this IServiceCollection services)
+        where TRequest : notnull
+    {
+        services.TryAddScoped<IArrowJobExecutionContext>(sp =>
+            ArrowJobExecutionContextHolder.Current
+            ?? throw new InvalidOperationException("IArrowJobExecutionContext is only available during job execution."));
     }
 }

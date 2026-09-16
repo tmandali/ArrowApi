@@ -3,7 +3,7 @@ using Apache.Arrow.Ipc;
 using Arrow.Data;
 using System.Runtime.CompilerServices;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 public sealed class FileArrowResultStorage : IArrowJobResultStorage
 {

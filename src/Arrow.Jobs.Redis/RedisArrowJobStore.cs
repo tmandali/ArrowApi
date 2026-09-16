@@ -7,8 +7,27 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
     where TRequest : notnull
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string TypeKey = typeof(TRequest).FullName ?? typeof(TRequest).Name;
+    private static readonly string TypeKey = $"{typeof(TRequest).Namespace}.{typeof(TRequest).Name}";
     private readonly IConnectionMultiplexer _redis;
+
+    /// <summary>
+    /// CAS (compare-and-swap) Lua script: job key'i yalnızca mevcut state beklendiği state'e
+    /// eşse yazılır ve state index set'i atomik taşınır. Çok instance senaryosunda
+    /// (çok process aynı Redis'e bağlı) cancel/complete yarışlarında kayıp güncellemeyi önler.
+    /// </summary>
+    /// <returns>1 = yazıldı, 0 = state uyuşmadı (yazılamadı).</returns>
+    private static string CasScript => @"
+        local v = redis.call('GET', KEYS[1])
+        if not v then return 0 end
+        local j = cjson.decode(v)
+        -- ArrowJobState enum'u JSON'da sayı olarak serileştirilir (Web defaults).
+        -- ARGV[1] beklenen state'in integer değeridir.
+        if j.state ~= tonumber(ARGV[1]) then return 0 end
+        redis.call('SET', KEYS[1], ARGV[2])
+        if tonumber(ARGV[4]) > 0 then redis.call('EXPIRE', KEYS[1], ARGV[4]) end
+        redis.call('SADD', KEYS[3], ARGV[5])
+        redis.call('SREM', KEYS[2], ARGV[5])
+        return 1";
 
     public RedisArrowJobStore(IConnectionMultiplexer redis)
     {
@@ -22,6 +41,13 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
     private static string ByTimeKey() => $"arrow:jobs:{TypeKey}:bytime";
 
     private static string StateKey(ArrowJobState state) => $"arrow:jobs:{TypeKey}:state:{state}";
+
+    /// <summary>
+    /// Terminal state'teki job kayıtlarının Redis'te tutulma süresi.
+    /// Redis sonsuz şişmesini önlemek için Completed/Failed/Cancelled job'lara
+    /// bu TTL uygulanır; Queued/Running key'ler ömürsüz kalır.
+    /// </summary>
+    private static readonly TimeSpan TerminalTtl = TimeSpan.FromDays(14);
 
     public async Task<ArrowJob<TRequest>> CreateAsync(
         TRequest request,
@@ -207,8 +233,8 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
 
         ArrowJobState previous = job.State;
         job.State = ArrowJobState.Running;
-        await SetAsync(job);
-        await IndexMoveStateAsync(job.Id, previous, job.State);
+        // CAS: cancel ile yarışta kaybolmamak için state geçişini atomik uygula.
+        await TryCasStateAsync(id, previous, job);
     }
 
     public async Task ReportProgressAsync(Guid id, int batchCount, long totalRows, CancellationToken cancellationToken = default)
@@ -230,8 +256,8 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         job.State = ArrowJobState.Completed;
         job.ResultPath = resultPath;
         job.CompletedAt = DateTimeOffset.UtcNow;
-        await SetAsync(job);
-        await IndexMoveStateAsync(job.Id, previous, job.State);
+        // CAS: yalnızca state hâlâ 'previous' ise yaz (cancel ile yarışta kaybolmaz).
+        await TryCasStateAsync(id, previous, job, TerminalTtl);
     }
 
     public async Task MarkFailedAsync(Guid id, string error, CancellationToken cancellationToken = default)
@@ -244,8 +270,7 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         job.State = ArrowJobState.Failed;
         job.Error = error;
         job.CompletedAt = DateTimeOffset.UtcNow;
-        await SetAsync(job);
-        await IndexMoveStateAsync(job.Id, previous, job.State);
+        await TryCasStateAsync(id, previous, job, TerminalTtl);
     }
 
     public async Task<bool> TryCancelAsync(Guid id, CancellationToken cancellationToken = default)
@@ -260,9 +285,8 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         ArrowJobState previous = job.State;
         job.State = ArrowJobState.Cancelled;
         job.CompletedAt = DateTimeOffset.UtcNow;
-        await SetAsync(job);
-        await IndexMoveStateAsync(job.Id, previous, job.State);
-        return true;
+        // CAS: yalnızca state hâlâ previous ise cancel kabul edilir.
+        return await TryCasStateAsync(id, previous, job, TerminalTtl);
     }
 
     public async Task<bool> TryDeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -329,6 +353,27 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         return job ?? throw new KeyNotFoundException($"Job bulunamadı: {id}");
     }
 
+    /// <summary>
+    /// State değişimini atomik CAS (Lua) ile uygular: SET + EXPIRE + state index SADD/SREM
+    /// tek Redis atomik adımda gerçekleşir; "state hâlâ expectedState ise" koşulu karşı tarafta
+    /// değerlendirilir. Uyuşmazsa 0 döner ve hiçbir key değişmez.
+    /// </summary>
+    /// <returns>1 = yazıldı, 0 = state uyuşmadı.</returns>
+    private async Task<bool> TryCasStateAsync(Guid id, ArrowJobState expectedState, ArrowJob<TRequest> newJob, TimeSpan? expires = null)
+    {
+        string idN = id.ToString("N");
+        string newJson = JsonSerializer.Serialize(newJob, JsonOptions);
+        long expiresSeconds = expires.HasValue ? (long)expires.Value.TotalSeconds : 0;
+
+        RedisResult result = await Database.ScriptEvaluateAsync(
+            CasScript,
+            new RedisKey[] { Key(id), StateKey(expectedState), StateKey(newJob.State) },
+            new RedisValue[] { ((int)expectedState).ToString(), newJson, idN, expiresSeconds.ToString(), idN });
+
+        // Lua script 1 (yazıldı) veya 0 (state uyuşmadı) döner.
+        return result.ToString() == "1";
+    }
+
     private Task SetAsync(ArrowJob<TRequest> job) =>
         Database.StringSetAsync(Key(job.Id), JsonSerializer.Serialize(job, JsonOptions));
 
@@ -337,16 +382,6 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         string id = job.Id.ToString("N");
         await Database.SortedSetAddAsync(ByTimeKey(), id, job.CreatedAt.UtcDateTime.Ticks);
         await Database.SetAddAsync(StateKey(job.State), id);
-    }
-
-    private async Task IndexMoveStateAsync(Guid id, ArrowJobState from, ArrowJobState to)
-    {
-        if (from == to)
-            return;
-
-        string idValue = id.ToString("N");
-        await Database.SetRemoveAsync(StateKey(from), idValue);
-        await Database.SetAddAsync(StateKey(to), idValue);
     }
 
     private async Task IndexRemoveAsync(ArrowJob<TRequest> job)

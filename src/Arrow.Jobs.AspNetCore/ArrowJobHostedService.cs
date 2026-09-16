@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 public sealed class ArrowJobHostedService<TRequest> : BackgroundService
     where TRequest : notnull
@@ -121,7 +121,7 @@ public sealed class ArrowJobHostedService<TRequest> : BackgroundService
 
         using AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
 
-        var context = new ArrowJobExecutionContext(jobId, _eventHub, scope.ServiceProvider, parentJobId: job.ParentJobId);
+        var context = new DefaultArrowJobExecutionContext(jobId, _eventHub, scope.ServiceProvider, parentJobId: job.ParentJobId);
         ArrowJobExecutionContextHolder.Current = context;
 
         object? worker = null;

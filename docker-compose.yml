@@ -8,8 +8,9 @@
 #   docker compose down -v          # durdur + verileri sil (sıfırla)
 #
 # Servisler:
-#   keycloak  → http://localhost:8080 (admin konsolu: /admin, kullanıcı: admin/admin)
-#   keycloak-db (Postgres 16, host portu 5433 — 5432'yi app'in kendi Postgres'ine bırakır)
+#   keycloak      → http://localhost:8080 (admin konsolu: /admin, kullanıcı: admin/admin)
+#   keycloak-db   → Postgres 16, host portu 5433 — 5432'yi app'in kendi Postgres'ine bırakır
+#   redis         → Redis 7, host portu 6379 (yerel önbellek / otomasyon geçişi)
 
 services:
   keycloak-db:
@@ -58,6 +59,8 @@ services:
     depends_on:
       keycloak-db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       # Keycloak imajı minimaldir (curl/wget yok); resmi yöntem kc.sh show-config.
       test: ["CMD-SHELL", "exec /opt/keycloak/bin/kc.sh show-config"]
@@ -66,6 +69,36 @@ services:
       retries: 5
       start_period: 90s
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:-dev-redis-password-change-me}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      # Ayrı, parola doğrulama olmadan ping (sağlık durumu) — şifreyle doğrulama
+      # için CLI'nin `-a` parametresi gerekir; healthcheck basit tutulur.
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping 2>/dev/null | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-dev-redis-password-change-me}
+
 volumes:
   keycloak-db-data:
     name: arrowapi-keycloak-db-data
+  redis-data:
+    name: arrowapi-redis-data

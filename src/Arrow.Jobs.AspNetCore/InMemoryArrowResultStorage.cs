@@ -3,7 +3,7 @@ using Apache.Arrow.Ipc;
 using Arrow.Data;
 using System.Collections.Concurrent;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs.AspNetCore;
 
 /// <summary>
 /// Arrow Job sonuçlarını diske yazmadan tamamen bellek (RAM) üzerinde Arrow IPC biçiminde saklayan depolama katmanı.

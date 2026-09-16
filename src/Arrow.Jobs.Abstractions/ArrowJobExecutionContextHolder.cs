@@ -1,4 +1,4 @@
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs;
 
 /// <summary>Çalışan job yürütme bağlamını (AsyncLocal) tutan yardımcı sınıf.</summary>
 public static class ArrowJobExecutionContextHolder

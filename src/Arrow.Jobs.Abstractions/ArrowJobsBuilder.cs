@@ -17,6 +17,7 @@ public sealed class ArrowJobsBuilder<TRequest>
     public void RemoveBackend()
     {
         Services.RemoveAll<IArrowJobStore<TRequest>>();
+        Services.RemoveAll<IArrowJobStore>();
         Services.RemoveAll<IArrowJobQueue<TRequest>>();
         // IArrowJobEventHub paylaşımlıdır; her AddJob'da silinmemeli.
     }

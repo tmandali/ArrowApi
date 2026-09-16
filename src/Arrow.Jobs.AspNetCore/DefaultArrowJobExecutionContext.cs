@@ -1,10 +1,27 @@
 using Apache.Arrow;
 using Arrow.Data;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 
-namespace Arrow.Jobs.InMemory;
+namespace Arrow.Jobs;
 
-internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
+/// <summary>
+/// Backend-agnostic <see cref="IArrowJobExecutionContext"/> implementasyonu.
+/// <para>
+/// <b>Gerçekleştirmesi:</b>
+/// <list type="bullet">
+///   <item><see cref="IArrowJobEventHub"/> üzerinden <c>info</c> event publish (worker mesajı)</item>
+///   <item><see cref="IArrowJobResultStorage"/> üzerinden parent job'ın Arrow IPC akışını okuma</item>
+///   <item>DI scope üzerinden aynı <see cref="IServiceProvider"/> içinde <c>PipeToAsync</c> ile
+///         bir sonraki <see cref="IArrowJobWorker{TNextRequest}"/>'ı inline yürütme</item>
+/// </list>
+/// Backend'e göre hiçbir dependency'si yok; sadece Abstractions'ın tanımladığı
+/// interface set'ini resolve eder. Bu sınıf <c>internal</c> — DI tarafından
+/// <see cref="IArrowJobExecutionContext"/> implementasyonu olarak register edilir,
+/// dışarıdan direkt new'lenmez.
+/// </para>
+/// </summary>
+public sealed class DefaultArrowJobExecutionContext : IArrowJobExecutionContext
 {
     private readonly Guid _jobId;
     private readonly Guid? _parentJobId;
@@ -13,7 +30,7 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
 
     private IAsyncEnumerable<RecordBatch>? _currentPipeSource;
 
-    public ArrowJobExecutionContext(
+    public DefaultArrowJobExecutionContext(
         Guid jobId,
         IArrowJobEventHub eventHub,
         IServiceProvider serviceProvider,
@@ -72,17 +89,18 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
         string jobName,
         TNextRequest request,
         IAsyncEnumerable<RecordBatch>? sourceStream = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
         where TNextRequest : notnull
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
 
-        object? workerObj = _serviceProvider.GetKeyedService(typeof(IArrowJobWorker<TNextRequest>), jobName)
-                 ?? _serviceProvider.GetKeyedService<object>(jobName)
-                 ?? _serviceProvider.GetService(typeof(IArrowJobWorker<TNextRequest>));
+        var workerType = typeof(IArrowJobWorker<TNextRequest>);
+        IArrowJobWorker<TNextRequest>? worker =
+            TryGetKeyedWorker<TNextRequest>(workerType, jobName)
+            ?? _serviceProvider.GetService(workerType) as IArrowJobWorker<TNextRequest>;
 
-        if (workerObj is not IArrowJobWorker<TNextRequest> worker)
+        if (worker is null)
         {
             throw new InvalidOperationException($"Pipe alt işçi '{jobName}' ({typeof(TNextRequest).Name}) için uygun worker servisi bulunamadı.");
         }
@@ -124,5 +142,16 @@ internal sealed class ArrowJobExecutionContext : IArrowJobExecutionContext
                 Message: message);
 
         await _eventHub.PublishAsync(_jobId, ArrowJobEventNames.Info, payload, cancellationToken);
+    }
+
+    /// <summary>
+    /// Keyed service resolve — netstandard2.0 uyumlu (IKeyedServiceProvider .NET 8+; yoksa plain resolve).
+    /// </summary>
+    private IArrowJobWorker<TNextRequest>? TryGetKeyedWorker<TNextRequest>(Type serviceType, string key)
+        where TNextRequest : notnull
+    {
+        var keyed = _serviceProvider as Microsoft.Extensions.DependencyInjection.IKeyedServiceProvider;
+        object? obj = keyed?.GetKeyedService(serviceType, key);
+        return obj as IArrowJobWorker<TNextRequest>;
     }
 }

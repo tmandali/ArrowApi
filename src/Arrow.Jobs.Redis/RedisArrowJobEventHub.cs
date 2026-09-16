@@ -37,6 +37,12 @@ public sealed class RedisArrowJobEventHub : IArrowJobEventHub
         IDatabase db = _redis.GetDatabase();
         await db.ListRightPushAsync(HistoryKey(jobId), json);
         await db.ListTrimAsync(HistoryKey(jobId), -MaxHistoryPerJob, -1);
+        // Terminal state'e geçilince event log'una da TTL ver
+        // (Redis'te EXPIRE şart — InMemory hub'dan farklı olarak Redis sonsuz şişer).
+        if (eventName is ArrowJobEventNames.Completed or ArrowJobEventNames.Failed or ArrowJobEventNames.Cancelled)
+        {
+            await db.KeyExpireAsync(HistoryKey(jobId), TimeSpan.FromDays(14));
+        }
         await _redis.GetSubscriber().PublishAsync(ChannelName(jobId), json);
     }
 
