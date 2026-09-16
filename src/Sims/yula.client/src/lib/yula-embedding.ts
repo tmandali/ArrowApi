@@ -17,6 +17,29 @@ export const VECTOR_DIMENSION = getVectorDimension();
  */
 let embedEndpointDisabled = false;
 
+/**
+ * Auth proxy (proxy.ts) 302 ile /sign-in'e yönelttiğinde fetch 200 + HTML
+ * yanıtı üretir (redirect takip edilmiş, body GET'e dönüşmüştür). Bu
+ * sağlayıcı hatası DEĞİLDİR — oturum kurulunca (sayfa yenilemesi ile)
+ * modül durumu sıfırlanır; o ana kadar istek yağmurunu kesmek için
+ * oturum boyu sessizce fallback vektörlere düşülür.
+ */
+let embedUnauthenticatedSkip = false;
+
+/** Redirect/HTML yanıtı auth-proxy hijack'ı olduğunu gösterir. */
+function isAuthRedirectResponse(res: Response): boolean {
+  const ct = res.headers.get("content-type") ?? "";
+  return res.redirected || ct.includes("text/html");
+}
+
+function skipEmbedForSession(): void {
+  if (embedUnauthenticatedSkip) return;
+  embedUnauthenticatedSkip = true;
+  console.debug(
+    "[Yula Embedding] /api/agent/embed auth yönlendirmesine takıldı (oturum kurulu değil) — bu sayfa yüklemesinde yerel fallback vektörler kullanılıyor.",
+  );
+}
+
 function isAuthOrQuotaStatus(status: number): boolean {
   return status === 401 || status === 403 || status === 429;
 }
@@ -50,7 +73,9 @@ export async function getEmbedding(text: string): Promise<number[]> {
 
   // Devre kesici: kimlik/kota hatası bir kez tespit edildiyse bu oturumda
   // tekrar ağa çıkma — 401 fırtınası ve konsol spam'i oluşmasın.
-  if (embedEndpointDisabled) return fallbackVector(trimmed);
+  if (embedEndpointDisabled || embedUnauthenticatedSkip) {
+    return fallbackVector(trimmed);
+  }
 
   try {
     const res = await fetch("/api/agent/embed", {
@@ -58,6 +83,11 @@ export async function getEmbedding(text: string): Promise<number[]> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: trimmed }),
     });
+
+    if (isAuthRedirectResponse(res)) {
+      skipEmbedForSession();
+      return fallbackVector(trimmed);
+    }
 
     if (res.ok) {
       const data = (await res.json()) as { embedding?: number[]; dimension?: number };
@@ -81,8 +111,8 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
   const validTexts = texts.map((t) => t.trim());
   if (validTexts.length === 0) return [];
 
-  if (embedEndpointDisabled) {
-    return validTexts.map((t) => fallbackVector(t));
+  if (embedEndpointDisabled || embedUnauthenticatedSkip) {
+    return validTexts.map((t) => (t ? fallbackVector(t) : new Array(VECTOR_DIMENSION).fill(0)));
   }
 
   try {
@@ -91,6 +121,11 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texts: validTexts }),
     });
+
+    if (isAuthRedirectResponse(res)) {
+      skipEmbedForSession();
+      return validTexts.map((t) => (t ? fallbackVector(t) : new Array(VECTOR_DIMENSION).fill(0)));
+    }
 
     if (res.ok) {
       const data = (await res.json()) as { embeddings?: number[][] };

@@ -32,7 +32,10 @@ export const config = {
      * - favicon.ico, icon.png, apple-icon.png, icon.svg (medya & ikonlar)
      * - sign-in, sign-up, forgot-password, login (giriş & şifre sayfaları)
      * - api/auth (NextAuth OIDC / OAuth API uç noktaları)
+     * - duckdb + parquet (public/duckdb ve public/parquet altındaki self-hosted WASM statik varlıkları;
+     *   unauthenticated ortamda da .wasm/.worker.js dosyaları HTML'a dönüşmesin,
+     *   "MIME type ('text/html') is not executable" hatası üretilmesin)
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.png|apple-icon\\.png|icon\\.svg|sign-in|sign-up|forgot-password|login|api/auth).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.png|apple-icon\\.png|icon\\.svg|sign-in|sign-up|forgot-password|login|api/auth|duckdb|parquet).*)",
   ],
 };
