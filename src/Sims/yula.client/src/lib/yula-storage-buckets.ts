@@ -23,136 +23,107 @@ export interface YulaStorageStatus {
   totalUsage: number;
 }
 
-let isBucketsInitialized = false;
+interface StorageBucket {
+  estimate: () => Promise<{ usage?: number; quota?: number }>;
+  persisted?: () => Promise<boolean>;
+  setPersisted?: (persisted: boolean) => Promise<boolean>;
+}
 
-/** Yula veri depolarını Chrome Storage Buckets API ile izole eder. */
-export async function initYulaStorageBuckets(): Promise<YulaStorageStatus> {
-  const hasSupport = typeof navigator !== "undefined" && "storageBuckets" in navigator;
+interface StorageBuckets {
+  open: (
+    name: string,
+    options?: { persisted?: boolean; expires?: number },
+  ) => Promise<StorageBucket>;
+}
 
-  if (!hasSupport) {
-    let usage = 0;
-    let quota = 0;
-    if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
-      try {
-        const est = await navigator.storage.estimate();
-        usage = est.usage ?? 0;
-        quota = est.quota ?? 0;
-      } catch {
-        // ignore
-      }
-    }
-    return {
-      hasBucketSupport: false,
-      buckets: [
-        {
-          name: "default",
-          usage,
-          quota,
-          persisted: false,
-        },
-      ],
-      totalUsage: usage,
-    };
-  }
+let initialization: Promise<YulaStorageStatus> | undefined;
 
-  const resultBuckets: StorageBucketQuota[] = [];
-  let totalUsage = 0;
+function getStorageBuckets(): StorageBuckets | undefined {
+  if (typeof navigator === "undefined") return undefined;
+
+  const storageBuckets = (navigator as Navigator & {
+    storageBuckets?: StorageBuckets;
+  }).storageBuckets;
+
+  return typeof storageBuckets?.open === "function" ? storageBuckets : undefined;
+}
+
+async function defaultStorageStatus(): Promise<YulaStorageStatus> {
+  let usage = 0;
+  let quota = 0;
 
   try {
-    // 1. Raporlar & Parquet OPFS Deposu (Silinmezlik korumalı)
-    const reportsBucket = await (navigator as unknown as {
-      storageBuckets: {
-        open: (
-          name: string,
-          options?: { persisted?: boolean },
-        ) => Promise<{
-          estimate: () => Promise<{ usage?: number; quota?: number }>;
-          setPersisted?: (p: boolean) => Promise<boolean>;
-        }>;
-      };
-    }).storageBuckets.open("yula-reports-opfs", { persisted: true });
-
-    if (reportsBucket.setPersisted) {
-      await reportsBucket.setPersisted(true).catch(() => {});
-    }
-
-    const repEst = await reportsBucket.estimate().catch(() => ({ usage: 0, quota: 0 }));
-    resultBuckets.push({
-      name: "yula-reports-opfs",
-      usage: repEst.usage ?? 0,
-      quota: repEst.quota ?? 0,
-      persisted: true,
-    });
-    totalUsage += repEst.usage ?? 0;
-
-    // 2. RAG Vektör Veritabanı Deposu (Silinmezlik korumalı)
-    const ragBucket = await (navigator as unknown as {
-      storageBuckets: {
-        open: (
-          name: string,
-          options?: { persisted?: boolean },
-        ) => Promise<{
-          estimate: () => Promise<{ usage?: number; quota?: number }>;
-          setPersisted?: (p: boolean) => Promise<boolean>;
-        }>;
-      };
-    }).storageBuckets.open("yula-rag-vectors", { persisted: true });
-
-    if (ragBucket.setPersisted) {
-      await ragBucket.setPersisted(true).catch(() => {});
-    }
-
-    const ragEst = await ragBucket.estimate().catch(() => ({ usage: 0, quota: 0 }));
-    resultBuckets.push({
-      name: "yula-rag-vectors",
-      usage: ragEst.usage ?? 0,
-      quota: ragEst.quota ?? 0,
-      persisted: true,
-    });
-    totalUsage += ragEst.usage ?? 0;
-
-    // 3. AI Önbellek Deposu (Geçici)
-    const cacheBucket = await (navigator as unknown as {
-      storageBuckets: {
-        open: (
-          name: string,
-          options?: { expires?: number },
-        ) => Promise<{
-          estimate: () => Promise<{ usage?: number; quota?: number }>;
-        }>;
-      };
-    }).storageBuckets.open("yula-ai-cache", {
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 gün
-    });
-
-    const cacheEst = await cacheBucket.estimate().catch(() => ({ usage: 0, quota: 0 }));
-    resultBuckets.push({
-      name: "yula-ai-cache",
-      usage: cacheEst.usage ?? 0,
-      quota: cacheEst.quota ?? 0,
-      persisted: false,
-    });
-    totalUsage += cacheEst.usage ?? 0;
-
-    if (!isBucketsInitialized) {
-      isBucketsInitialized = true;
-      console.info(
-        `🤖 [Storage Buckets] 3 Isolated Storage Buckets Ready (Total Usage: ${(totalUsage / 1024 / 1024).toFixed(2)} MB).`,
-        resultBuckets,
-      );
-    }
-
-    return {
-      hasBucketSupport: true,
-      buckets: resultBuckets,
-      totalUsage,
-    };
-  } catch (err) {
-    console.warn("[Storage Buckets] Bucket creation error, using default storage:", err);
-    return {
-      hasBucketSupport: false,
-      buckets: [],
-      totalUsage: 0,
-    };
+    const estimate = typeof navigator === "undefined"
+      ? undefined
+      : await navigator.storage?.estimate?.();
+    usage = estimate?.usage ?? 0;
+    quota = estimate?.quota ?? 0;
+  } catch {
+    // Storage estimation is optional and must not prevent the fallback.
   }
+
+  return {
+    hasBucketSupport: false,
+    buckets: [{ name: "default", usage, quota, persisted: false }],
+    totalUsage: usage,
+  };
+}
+
+async function bucketQuota(
+  name: string,
+  bucket: StorageBucket,
+  persisted: boolean,
+): Promise<StorageBucketQuota> {
+  const estimate = await bucket.estimate().catch(() => ({ usage: 0, quota: 0 }));
+  return {
+    name,
+    usage: estimate.usage ?? 0,
+    quota: estimate.quota ?? 0,
+    persisted,
+  };
+}
+
+async function initializeYulaStorageBuckets(): Promise<YulaStorageStatus> {
+  const storageBuckets = getStorageBuckets();
+  if (!storageBuckets) return defaultStorageStatus();
+
+  try {
+    const reportsBucket = await storageBuckets.open("yula-reports-opfs", { persisted: true });
+    const ragBucket = await storageBuckets.open("yula-rag-vectors", { persisted: true });
+    const cacheBucket = await storageBuckets.open("yula-ai-cache", {
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const persistedBuckets = [reportsBucket, ragBucket];
+    await Promise.all(
+      persistedBuckets.map((bucket) =>
+        bucket.setPersisted ? bucket.setPersisted(true).catch(() => undefined) : undefined,
+      ),
+    );
+
+    const [reports, rag, cache] = await Promise.all([
+      bucketQuota("yula-reports-opfs", reportsBucket, (await reportsBucket.persisted?.()) ?? true),
+      bucketQuota("yula-rag-vectors", ragBucket, (await ragBucket.persisted?.()) ?? true),
+      bucketQuota("yula-ai-cache", cacheBucket, false),
+    ]);
+    const buckets = [reports, rag, cache];
+    const totalUsage = buckets.reduce((total, bucket) => total + bucket.usage, 0);
+
+    console.info(
+      `🤖 [Storage Buckets] 3 Isolated Storage Buckets Ready (Total Usage: ${(totalUsage / 1024 / 1024).toFixed(2)} MB).`,
+      buckets,
+    );
+
+    return { hasBucketSupport: true, buckets, totalUsage };
+  } catch {
+    // Some Chromium embeddings expose the API but reject bucket creation.
+    // Default storage remains fully functional in that environment.
+    return defaultStorageStatus();
+  }
+}
+
+/** Yula veri depolarını Chrome Storage Buckets API ile izole eder. */
+export function initYulaStorageBuckets(): Promise<YulaStorageStatus> {
+  initialization ??= initializeYulaStorageBuckets();
+  return initialization;
 }
