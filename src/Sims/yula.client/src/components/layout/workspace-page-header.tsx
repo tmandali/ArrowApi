@@ -66,6 +66,12 @@ type WorkspacePageHeaderProps = {
    * atlanır; yalnızca menü aç/kapa (PagePanelTrigger) render edilir.
    */
   frameless?: boolean
+  /**
+   * Başlığın solundaki Yula dock tetikleyicisini gizler — ekranın aksiyon
+   * alanında zaten AIChatAssistant Yula butonu varsa çift tetikleyici
+   * hissi vermemek için (örn. rapor ekranları).
+   */
+  showYulaTrigger?: boolean
 }
 
 /**
@@ -83,6 +89,7 @@ export function WorkspacePageHeader({
   searchPlaceholder,
   headerSearch,
   frameless = false,
+  showYulaTrigger = true,
 }: WorkspacePageHeaderProps) {
   // Workspace search açıkken floating header gizlenir — arama görünümü
   // AppHeader altındaki tüm alanı kaplar (ana ekran davranışı).
@@ -109,7 +116,7 @@ export function WorkspacePageHeader({
       >
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <PagePanelTrigger className="-ml-1" />
-          <YulaDockTrigger />
+          {showYulaTrigger ? <YulaDockTrigger /> : null}
           {children}
           {startExtra}
         </div>

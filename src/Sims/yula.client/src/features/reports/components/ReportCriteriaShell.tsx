@@ -300,6 +300,7 @@ export function ReportCriteriaShell({
       {isGridMaximized ? null : (
         <WorkspacePageHeader
           showSearch={false}
+          showYulaTrigger={false}
           startExtra={
             recordMode != null ? (
               <RecordModeChip mode={recordMode} labels={recordModeLabels} />
