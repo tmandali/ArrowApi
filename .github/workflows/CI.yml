@@ -27,12 +27,14 @@ jobs:
 
       - run: npm ci
 
-      - uses: actions/cache@v5
-        with:
-          path: src/Sims/yula.client/.next/cache
-          key: nextjs-22.x-${{ hashFiles('src/Sims/yula.client/package-lock.json') }}-${{ hashFiles('src/Sims/yula.client/src/**') }}
-
       - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: next-build
+          path: src/Sims/yula.client/.next
+          retention-days: 1
 
   static:
     name: Static checks
@@ -54,7 +56,14 @@ jobs:
 
       - if: github.event_name == 'pull_request'
         name: Validate PR commits
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        # Fork/rebase'de base.sha repo'da bulunamayabilir; merge-base fallback kullan.
+        run: |
+          BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo "")
+          if [ -n "$BASE" ]; then
+            npx commitlint --from "$BASE" --to HEAD --verbose
+          else
+            echo "::warning::Could not resolve merge-base; skipping commitlint"
+          fi
 
       - run: npm run typecheck
       - run: npm run lint
@@ -77,7 +86,10 @@ jobs:
 
       - run: npm ci
       - run: npm run test:all
-      - run: npx playwright install --with-deps chromium
+
+      # @vitest/browser-playwright: chromium binary'ı. ubuntu-latest'te
+      # OS bağımlılıkları zaten preinstalled → --with-deps (sudo/apt) gerekmez.
+      - run: npx playwright install chromium
       - run: npm run test:ui
 
   e2e:
@@ -96,11 +108,17 @@ jobs:
           cache-dependency-path: src/Sims/yula.client/package-lock.json
 
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
+
+      # Build artefaktını indir → sıfırdan build'e gerek kalmaz.
+      - uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: src/Sims/yula.client/.next
+
+      - run: npx playwright install chromium
       - run: npm run test:e2e -- --project=chromium
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
