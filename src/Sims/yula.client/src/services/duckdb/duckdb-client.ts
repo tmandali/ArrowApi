@@ -50,13 +50,13 @@ class DuckDbClient {
         if (success) {
           pending.resolve(e.data)
         } else {
-          pending.reject(new Error(error || "DuckDB Worker hatası"))
+          pending.reject(new Error(error || "Veri motoru hatası"))
         }
       }
       this.worker.onerror = (err) => {
         console.error("DuckDB Worker error:", err)
         for (const [, pending] of this.pendingRequests.entries()) {
-          pending.reject(new Error(err.message || "DuckDB Worker hatası"))
+          pending.reject(new Error(err.message || "Veri motoru hatası"))
         }
         this.pendingRequests.clear()
         this.sendQueue = Promise.resolve()

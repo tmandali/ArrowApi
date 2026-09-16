@@ -46,7 +46,7 @@ export async function analyzeGrid(
     if (await gridStillStreaming(ds.tableName)) {
       return {
         status: "error",
-        error: "Rapor hâlâ DuckDB'ye yükleniyor.",
+        error: "Rapor hâlâ yükleniyor.",
         hint: "Yükleme bitince 'analiz et'i tekrar gönder.",
       };
     }
@@ -240,7 +240,7 @@ export async function profileGrid(): Promise<unknown> {
     if (await gridStillStreaming(ds.tableName)) {
       return {
         status: "error",
-        error: "Report data is still streaming to DuckDB.",
+        error: "Report data is still loading.",
         hint: "Wait until loading finishes and retry.",
       }
     }

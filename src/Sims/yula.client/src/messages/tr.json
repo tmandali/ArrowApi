@@ -326,7 +326,7 @@
         "stock-balance": {
           "title": "Stok Bakiyesi",
           "description": "Depo bazında anlık miktarlar",
-          "badge": "WASM"
+          "badge": "Yerel"
         },
         "stock-ledger": {
           "title": "Stok Ekstresi (Ledger)",
@@ -644,9 +644,9 @@
           "subtext": "Tüm servisler devrede"
         },
         "duckdb-status": {
-          "title": "OPFS & DuckDB Motoru",
+          "title": "Yerel Veri Motoru",
           "value": "Aktif",
-          "change": "WASM yerel önbellek",
+          "change": "Yerel önbellek",
           "subtext": "0 ms gecikmeli sorgular"
         },
         "unread-notifications": {
@@ -939,8 +939,8 @@
     "duration": "Süre",
     "rows": "Satır",
     "batches": "Paket",
-    "opfs_cache": "OPFS Önbellek",
-    "opfs_date": "OPFS Tarih",
+    "opfs_cache": "Yerel Önbellek",
+    "opfs_date": "Önbellek Tarihi",
     "error": "Hata",
     "loading_request": "İstek yükleniyor…",
     "status_meta_request": "Durum, meta ve istek yükü",
@@ -1167,7 +1167,7 @@
     "export_csv_downloaded": "Excel uyumlu CSV indirildi ({name})",
     "export_error": "Dışa aktarma hatası: {error}",
     "export_failed": "Dışa aktarma başarısız oldu",
-    "opfs_merge_loading": "DuckDB bellek sınırına ulaşıldı, OPFS parçaları doğrudan birleştiriliyor...",
+    "opfs_merge_loading": "Yerel bellek sınırı aşıldı, parçalar doğrudan birleştiriliyor...",
     "hidden_columns_tooltip": "{count} kolon gizlendi — tümünü göstermek için tıklayın",
     "hidden_count_badge": "gizli",
     "refresh_title": "Verileri sunucudan yeniden çek",
@@ -1218,7 +1218,7 @@
     "cancel_title": "İptal (Esc)",
     "rename": "Yeniden Adlandır",
     "delete_view": "Görünümü Sil",
-    "sql_dialog_intro": "Bu görünüm DuckDB WASM üzerinde aşağıdaki salt-okunur SQL ile üretilmiştir.",
+    "sql_dialog_intro": "Bu görünüm yerel veri motorunda aşağıdaki salt-okunur SQL ile üretilmiştir.",
     "copied": "Kopyalandı!",
     "copy_query": "Sorguyu Kopyala",
     "loading_view": "Yükleniyor: {title}",

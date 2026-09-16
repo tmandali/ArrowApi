@@ -326,7 +326,7 @@
         "stock-balance": {
           "title": "Stock Balance",
           "description": "Instant quantities per warehouse",
-          "badge": "WASM"
+          "badge": "Local"
         },
         "stock-ledger": {
           "title": "Stock Ledger",
@@ -644,9 +644,9 @@
           "subtext": "All services running"
         },
         "duckdb-status": {
-          "title": "OPFS & DuckDB Engine",
+          "title": "Local Data Engine",
           "value": "Active",
-          "change": "WASM local cache",
+          "change": "Local cache",
           "subtext": "0 ms latency queries"
         },
         "unread-notifications": {
@@ -939,8 +939,8 @@
     "duration": "Duration",
     "rows": "Rows",
     "batches": "Batches",
-    "opfs_cache": "OPFS Cache",
-    "opfs_date": "OPFS Date",
+    "opfs_cache": "Local Cache",
+    "opfs_date": "Cache Date",
     "error": "Error",
     "loading_request": "Loading request…",
     "status_meta_request": "Status, meta and request payload",
@@ -1167,7 +1167,7 @@
     "export_csv_downloaded": "Excel-compatible CSV downloaded ({name})",
     "export_error": "Export error: {error}",
     "export_failed": "Export failed",
-    "opfs_merge_loading": "DuckDB memory limit reached; merging OPFS parts directly...",
+    "opfs_merge_loading": "Local memory limit reached; merging parts directly...",
     "hidden_columns_tooltip": "{count} column(s) hidden — click to show all",
     "hidden_count_badge": "hidden",
     "refresh_title": "Re-fetch the data from the server",
@@ -1218,7 +1218,7 @@
     "cancel_title": "Cancel (Esc)",
     "rename": "Rename",
     "delete_view": "Delete view",
-    "sql_dialog_intro": "This view was produced on DuckDB WASM with the following read-only SQL.",
+    "sql_dialog_intro": "This view was produced by the local data engine using the following read-only SQL.",
     "copied": "Copied!",
     "copy_query": "Copy Query",
     "loading_view": "Loading: {title}",
