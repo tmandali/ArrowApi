@@ -15,9 +15,8 @@
  *       - diğer (manuel/admin) → provider null, id korunur
  *     `user_settings.user_id` FK'leri aynı işlemde yeni GUID'lere taşınır.
  *
- * ÖNKOŞUL: `npm run db:migrate` (veya dev'de `npm run db-server:file`)
- * çalıştırılmış olmalı (0001 migration: provider/provider_id kolonları).
- * Dev (PGlite): next dev server KAPALI olmalı (local.db kilitli olur).
+ * ÖNKOŞUL: `npm run db:migrate` çalıştırılmış olmalı
+ * (0001 migration: provider/provider_id kolonları).
  *
  * Çalıştırma (yula.client klasöründen):
  *   node scripts/db/rekey-app-users.mjs
@@ -57,9 +56,7 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-// CLI override'ı dosya env'ine galip gelir (ör. pglite-server açıkken
-// `USE_PGLITE=false node scripts/db/rekey-app-users.mjs`):
-const usePglite = (process.env.USE_PGLITE ?? env.USE_PGLITE) === "true";
+// CLI override'ı dosya env'ine galip gelir (ör. `DATABASE_URL=... node ...`):
 const databaseUrl =
   process.env.DATABASE_URL ?? env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
 
@@ -87,28 +84,14 @@ function isProviderSubId(id) {
 }
 
 async function main() {
-  let q; // (sql, params[]) => Promise<rows[]>
-  let cleanup;
-
-  if (usePglite) {
-    const { PGlite } = await import("@electric-sql/pglite");
-    const db = new PGlite(path.join(ROOT, "local.db"));
-    q = async (sql, params) => {
-      const res = await db.query(sql, params);
-      return res.rows;
-    };
-    cleanup = () => db.close();
-    console.log("Hedef: PGlite → local.db");
-  } else {
-    const { Pool } = await import("pg");
-    const pool = new Pool({ connectionString: databaseUrl });
-    q = async (sql, params) => {
-      const res = await pool.query(sql, params);
-      return res.rows;
-    };
-    cleanup = () => pool.end();
-    console.log("Hedef: Postgres →", databaseUrl.replace(/:[^:@/]+@/, ":***@"));
-  }
+  const { Pool } = await import("pg");
+  const pool = new Pool({ connectionString: databaseUrl });
+  const q = async (sql, params) => {
+    const res = await pool.query(sql, params);
+    return res.rows;
+  };
+  const cleanup = () => pool.end();
+  console.log("Hedef: Postgres →", databaseUrl.replace(/:[^:@/]+@/, ":***@"));
 
   await q("BEGIN");
   try {

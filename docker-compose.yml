@@ -10,9 +10,29 @@
 # Servisler:
 #   keycloak      → http://localhost:8080 (admin konsolu: /admin, kullanıcı: admin/admin)
 #   keycloak-db   → Postgres 16, host portu 5433 — 5432'yi app'in kendi Postgres'ine bırakır
+#   app-db        → Postgres 16, host portu 15432 (yula.client DATABASE_URL)
 #   redis         → Redis 7, host portu 6379 (yerel önbellek / otomasyon geçişi)
 
 services:
+  app-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # yula.client/.env → postgresql://postgres:postgres@127.0.0.1:15432/postgres
+    environment:
+      POSTGRES_DB: ${APP_DB_NAME:-postgres}
+      POSTGRES_USER: ${APP_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-postgres}
+    ports:
+      - "${APP_DB_PORT:-15432}:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   keycloak-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -98,6 +118,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-dev-redis-password-change-me}
 
 volumes:
+  app-db-data:
+    name: arrowapi-app-db-data
   keycloak-db-data:
     name: arrowapi-keycloak-db-data
   redis-data:

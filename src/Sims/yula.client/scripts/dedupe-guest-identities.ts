@@ -13,8 +13,8 @@
  * sonraki kaydı korur; bu script mevcut dökümü temizler ve yeniden
  * çalıştırılabilecek kadar idempotenttir.
  *
- * Bağlantı: `DATABASE_URL` üzerinden TCP (dev:full'da pglite-server'ın
- * 127.0.0.1:5432 ucu). İkinci in-process PGlite instance'ı açmaz.
+ * Bağlantı: `DATABASE_URL` üzerinden TCP Postgres (dev'de Docker Compose
+ * `app-db` servisi, 127.0.0.1:15432).
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";

@@ -72,7 +72,6 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
-    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
@@ -86,6 +85,7 @@
     "knip": "^6.35.1",
     "lefthook": "^2.1.12",
     "oxlint": "^1.80.0",
+    "raw-loader": "^4.0.2",
     "shadcn": "^4.19.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
@@ -94,7 +94,6 @@
     "vite": "^7.3.6",
     "vitest": "^5.0.1",
     "vitest-browser-react": "^2.3.0",
-    "raw-loader": "^4.0.2",
     "webpack": "^5.111.0"
   },
   "overrides": {

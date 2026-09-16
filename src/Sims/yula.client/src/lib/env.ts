@@ -12,15 +12,11 @@ const serverSchema = z.object({
     .min(1)
     .default("postgresql://postgres:postgres@127.0.0.1:5432/postgres"),
   NODE_ENV: z.enum(["test", "development", "production"]).default("development"),
-  USE_PGLITE: z
-    .preprocess((v) => v === "true", z.boolean())
-    .default(false),
 });
 
 const parsed = serverSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   NODE_ENV: process.env.NODE_ENV,
-  USE_PGLITE: process.env.USE_PGLITE,
 });
 
 if (!parsed.success) {
