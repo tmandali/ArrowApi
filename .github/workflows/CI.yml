@@ -8,7 +8,14 @@ on:
 
 defaults:
   run:
+    # `run:` step'leri yula.client dizininde çalışır.
+    # `uses:` action'ları bu working directory'yi BİLMEZ → path'lerde
+    # ${{ github.workspace }} ile repo kökü'nden tam yol göster.
     working-directory: src/Sims/yula.client
+
+env:
+  # peer dep ERESOLVE hatalarını (--legacy-peer-deps davranışı) CI'da bypass eder
+  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
 
 jobs:
   build:
@@ -27,13 +34,15 @@ jobs:
 
       - run: npm ci
 
+      - name: Clean build output
+        run: rm -rf .next
+
       - run: npm run build
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: next-build
-          path: src/Sims/yula.client/.next
+          path: ${{ github.workspace }}/src/Sims/yula.client/.next
           retention-days: 1
 
   static:
@@ -56,7 +65,7 @@ jobs:
 
       - if: github.event_name == 'pull_request'
         name: Validate PR commits
-        # Fork/rebase'de base.sha repo'da bulunamayabilir; merge-base fallback kullan.
+        # merge-base fallback: fork/rebase'de base.sha repo'da bulunamaz
         run: |
           BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo "")
           if [ -n "$BASE" ]; then
@@ -85,10 +94,11 @@ jobs:
           cache-dependency-path: src/Sims/yula.client/package-lock.json
 
       - run: npm ci
+
+      # test:all → tsx --test (Node runner) + grid testleri; playwright gerekmez
       - run: npm run test:all
 
-      # @vitest/browser-playwright: chromium binary'ı. ubuntu-latest'te
-      # OS bağımlılıkları zaten preinstalled → --with-deps (sudo/apt) gerekmez.
+      # test:ui → vitest browser mode (chromium)
       - run: npx playwright install chromium
       - run: npm run test:ui
 
@@ -109,11 +119,11 @@ jobs:
 
       - run: npm ci
 
-      # Build artefaktını indir → sıfırdan build'e gerek kalmaz.
+      # build artefaktını indir → sıfırdan build'e gerek kalmaz
       - uses: actions/download-artifact@v4
         with:
           name: next-build
-          path: src/Sims/yula.client/.next
+          path: ${{ github.workspace }}/src/Sims/yula.client/.next
 
       - run: npx playwright install chromium
       - run: npm run test:e2e -- --project=chromium
@@ -122,5 +132,5 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: src/Sims/yula.client/test-results/
+          path: ${{ github.workspace }}/src/Sims/yula.client/test-results/
           retention-days: 7
