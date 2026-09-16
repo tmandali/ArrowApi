@@ -45,7 +45,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               {/* Content Frame: Üst köşeleri kavisli (rounded-t-2xl), alttan tam boy uzanan tuval */}
               <main
                 className={cn(
-                  "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-t-2xl border-t border-l border-r border-border dark:border-[#232734] bg-background shadow-xs transition-colors duration-200",
+                  "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-t-2xl border-t border-l border-r border-border dark:border-[#232734] bg-background [background-image:var(--app-bg-gradient)] shadow-xs transition-colors duration-200",
                   hasSubNav ? "mr-2" : "mx-2"
                 )}
               >

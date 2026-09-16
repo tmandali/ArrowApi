@@ -52,7 +52,9 @@
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
+    /* Sayfa içi kutu kartları chrome (bg-sidebar) ile aynı zemi taşısın — ufak
+       saydamlıkla altındaki gradient'i hafifçe gösterir */
+    --card: color-mix(in srgb, var(--sidebar) 90%, transparent);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
@@ -84,12 +86,20 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    /* Yula kart gradient'i ile aynı renk/yoğunluk dili (135°), zemin için görünür sayılabilecek yoğunluk:
+       primary/12% → muted/28% → orange-500/12% */
+    --app-bg-gradient: linear-gradient(135deg,
+      color-mix(in srgb, var(--primary) 12%, transparent) 0%,
+      color-mix(in srgb, var(--muted) 28%, transparent) 50%,
+      color-mix(in srgb, var(--color-orange-500) 12%, transparent) 100%);
 }
 
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    /* Koyu temada da kutu kartları chrome (bg-sidebar #13151b) ile eşleşir,
+       %90 opaklıkta */
+    --card: color-mix(in srgb, var(--sidebar) 90%, transparent);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
@@ -119,6 +129,11 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: #232734;
     --sidebar-ring: oklch(0.556 0 0);
+    /* Yula kart gradient'i dark variant'i: aynı renk dili, görünür yoğunluk: primary/20% → muted/22% → orange-500/18% */
+    --app-bg-gradient: linear-gradient(135deg,
+      color-mix(in srgb, var(--primary) 20%, transparent) 0%,
+      color-mix(in srgb, var(--muted) 22%, transparent) 50%,
+      color-mix(in srgb, var(--color-orange-500) 18%, transparent) 100%);
 }
 
 @layer base {
@@ -127,6 +142,7 @@
     }
   body {
     @apply bg-background text-foreground;
+    background-image: var(--app-bg-gradient);
     }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
