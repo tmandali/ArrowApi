@@ -96,7 +96,9 @@ async function initializeYulaStorageBuckets(): Promise<YulaStorageStatus> {
 
     const persistedBuckets = [reportsBucket, ragBucket];
     await Promise.all(
-      persistedBuckets.map((bucket) => bucket.setPersisted?.(true).catch(() => undefined)),
+      persistedBuckets.map((bucket) =>
+        bucket.setPersisted ? bucket.setPersisted(true).catch(() => undefined) : undefined,
+      ),
     );
 
     const [reports, rag, cache] = await Promise.all([
