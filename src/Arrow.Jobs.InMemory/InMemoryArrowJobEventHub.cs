@@ -4,6 +4,16 @@ using System.Threading.Channels;
 
 namespace Arrow.Jobs.InMemory;
 
+// ═══════════════════════════════════════════════════════════════════════
+// REMARK (2026-09-16): Ayni "2 event" sorununun InMemory hub'daki karsiligi.
+// Progress event'leri history queue'una RPUSH yerine "ReplaceProgressInHistory"
+// ile tek kayit olarak yenilenir (Redis versiyondaki ayri-progress-key
+// tasariminin ayni mantigi). Kalici log'da hez zaman
+// [status, info..., progress(tek), terminal] kalir. Detay icin
+// src/Arrow.Jobs.Redis/RedisArrowJobEventHub.cs basindaki REMARK bloguna
+// bakin (LPOS glob kirikligi + dogrulama adimlari).
+// ═══════════════════════════════════════════════════════════════════════
+
 public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
 {
     private const int MaxHistoryPerJob = 200;
@@ -21,7 +31,12 @@ public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
             ? payload with { OccurredAt = DateTimeOffset.UtcNow }
             : payload;
         ArrowJobHubMessage message = new(eventName, stamped);
-        AppendHistory(jobId, message);
+        // Progress yüksek frekansla akar; persistent history'de tek progress entry'sini
+        // in-place yenileyerek baştaki status/info adımlarının cap ile evict edilmesini önle.
+        if (eventName is ArrowJobEventNames.Progress)
+            ReplaceProgressInHistory(jobId, message);
+        else
+            AppendHistory(jobId, message);
 
         if (!_subs.TryGetValue(jobId, out ConcurrentDictionary<Guid, ChannelWriter<ArrowJobHubMessage>>? writers))
             return default;
@@ -80,6 +95,30 @@ public sealed class InMemoryArrowJobEventHub : IArrowJobEventHub
         {
             // trim oldest
         }
+    }
+
+    private void ReplaceProgressInHistory(Guid jobId, ArrowJobHubMessage message)
+    {
+        if (!_history.TryGetValue(jobId, out ConcurrentQueue<ArrowJobHubMessage>? queue))
+        {
+            queue = new ConcurrentQueue<ArrowJobHubMessage>();
+            _history[jobId] = queue;
+        }
+
+        ConcurrentQueue<ArrowJobHubMessage> rebuilt = new();
+        while (queue.TryDequeue(out ArrowJobHubMessage? existing))
+        {
+            if (existing.EventName is not ArrowJobEventNames.Progress)
+                rebuilt.Enqueue(existing);
+        }
+        rebuilt.Enqueue(message);
+
+        while (rebuilt.Count > MaxHistoryPerJob && rebuilt.TryDequeue(out _))
+        {
+            // trim oldest
+        }
+
+        _history[jobId] = rebuilt;
     }
 
     private sealed class Subscription : IArrowJobEventSubscription

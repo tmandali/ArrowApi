@@ -62,7 +62,7 @@ public sealed class RetailSalesReportWorker(
         );
 
         await using var reader = await cnn.ExecuteReaderAsync(command);
-        await using var arrowReader = reader.OpenArrowReader(new ArrowConversionOptions { BatchSize = 10_000 });
+        await using var arrowReader = reader.OpenArrowReader(new ArrowConversionOptions { BatchSize = 100_000 });
 
         await foreach (RecordBatch batch in arrowReader.WithCancellation(cancellationToken))
         {
