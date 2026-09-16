@@ -1,8 +1,8 @@
 using Apache.Arrow;
 using Apache.Arrow.Types;
 using Arrow.Data;
-using System.Runtime.CompilerServices;
 using Sims.Server.Models.StockBalance;
+using System.Runtime.CompilerServices;
 
 namespace Sims.Server.Services;
 

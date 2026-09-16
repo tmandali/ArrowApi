@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Apache.Arrow;
 using Arrow.Http.AspNetCore.Dispatcher;
 

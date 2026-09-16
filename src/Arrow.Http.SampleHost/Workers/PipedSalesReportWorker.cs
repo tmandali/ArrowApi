@@ -1,9 +1,9 @@
-using System.Data;
-using System.Data.Common;
-using System.Runtime.CompilerServices;
 using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Jobs;
+using System.Data;
+using System.Data.Common;
+using System.Runtime.CompilerServices;
 
 namespace Arrow.Http.SampleHost.Workers;
 

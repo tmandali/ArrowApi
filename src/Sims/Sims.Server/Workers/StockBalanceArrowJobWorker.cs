@@ -1,5 +1,4 @@
 using Apache.Arrow;
-using Arrow.Data;
 using Arrow.Jobs;
 using Sims.Server.Models.StockBalance;
 using Sims.Server.Services;
@@ -14,8 +13,8 @@ namespace Sims.Server.Workers;
 /// </summary>
 public sealed class StockBalanceArrowJobWorker(
         IStockBalanceService service,
-        IArrowJobExecutionContext context): IArrowJobWorker<StockBalanceRequest>
-{   
+        IArrowJobExecutionContext context) : IArrowJobWorker<StockBalanceRequest>
+{
     public async IAsyncEnumerable<RecordBatch> Handle(
         StockBalanceRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)

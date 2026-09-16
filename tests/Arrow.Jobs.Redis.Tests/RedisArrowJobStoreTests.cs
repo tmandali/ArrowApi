@@ -1,8 +1,5 @@
-using Arrow.Jobs;
-using Arrow.Jobs.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
-using Xunit;
 
 namespace Arrow.Jobs.Redis.Tests;
 

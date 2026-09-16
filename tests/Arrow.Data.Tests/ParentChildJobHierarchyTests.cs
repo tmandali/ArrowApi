@@ -1,13 +1,9 @@
 using Apache.Arrow;
-using Apache.Arrow.Ipc;
-using Arrow;
-using Arrow.Data;
 using Arrow.Jobs;
-using Arrow.Jobs.InMemory;
 using Arrow.Jobs.AspNetCore;
+using Arrow.Jobs.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Xunit;
 
 namespace Arrow.Data.Tests;
 

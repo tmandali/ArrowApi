@@ -1,5 +1,4 @@
 using Apache.Arrow;
-using Arrow.Http.AspNetCore;
 using Sims.Server.Models.StockAnalytics;
 using Sims.Server.Services;
 

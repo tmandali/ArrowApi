@@ -1,9 +1,8 @@
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Apache.Arrow;
 using Arrow.Jobs;
 using Sims.Server.Models.StockAnalytics;
 using Sims.Server.Services;
+using System.Runtime.CompilerServices;
 
 namespace Sims.Server.Workers;
 

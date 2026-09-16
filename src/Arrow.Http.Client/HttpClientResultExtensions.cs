@@ -93,7 +93,7 @@ public static class HttpClientResultExtensions
             404 => Result<T>.NotFound(errorMessage),
             400 => Result<T>.BadRequest(errorMessage),
             409 => Result<T>.Conflict(errorMessage),
-            _   => Result<T>.Failure(errorMessage, statusCode)
+            _ => Result<T>.Failure(errorMessage, statusCode)
         };
     }
 

@@ -1,5 +1,4 @@
 using Apache.Arrow;
-using Arrow.Data;
 using System.Runtime.CompilerServices;
 
 namespace Arrow.Data;

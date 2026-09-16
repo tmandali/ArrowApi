@@ -1,8 +1,8 @@
-using System.Data;
-using System.Data.Common;
 using Apache.Arrow;
 using Arrow.Data;
 using Arrow.Http.AspNetCore;
+using System.Data;
+using System.Data.Common;
 
 namespace Arrow.Http.SampleHost.Endpoints;
 

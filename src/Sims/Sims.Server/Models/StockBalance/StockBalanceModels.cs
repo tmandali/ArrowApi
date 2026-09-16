@@ -1,8 +1,7 @@
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Apache.Arrow;
 using Arrow.Http.AspNetCore.Dispatcher;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Sims.Server.Models.StockBalance;
 

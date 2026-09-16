@@ -1,8 +1,8 @@
+using Arrow.Jobs.AspNetCore;
+using Arrow.Jobs.Redis;
 using Sims.Server.Endpoints;
 using Sims.Server.Services;
 using Sims.Server.Workers;
-using Arrow.Jobs.AspNetCore;
-using Arrow.Jobs.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 

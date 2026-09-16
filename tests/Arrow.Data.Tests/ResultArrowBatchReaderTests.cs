@@ -1,8 +1,5 @@
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
-using Arrow;
-using Arrow.Data;
-using Xunit;
 
 namespace Arrow.Data.Tests;
 

@@ -1,5 +1,4 @@
 using Arrow.Http.AspNetCore.Dispatcher;
-using Microsoft.AspNetCore.Http;
 
 namespace Arrow.Http.AspNetCore;
 
@@ -31,7 +30,7 @@ public static class ResultHttpExtensions
             404 => Results.NotFound(new { error = result.Error }),
             400 => Results.BadRequest(new { error = result.Error }),
             409 => Results.Conflict(new { error = result.Error }),
-            _   => Results.Problem(detail: result.Error, statusCode: result.StatusCode)
+            _ => Results.Problem(detail: result.Error, statusCode: result.StatusCode)
         };
     }
 }

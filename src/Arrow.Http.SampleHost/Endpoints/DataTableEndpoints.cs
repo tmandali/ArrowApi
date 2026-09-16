@@ -1,7 +1,7 @@
-using System.Data;
-using System.Data.Common;
 using Arrow.Data;
 using Arrow.Http.AspNetCore;
+using System.Data;
+using System.Data.Common;
 
 namespace Arrow.Http.SampleHost.Endpoints;
 

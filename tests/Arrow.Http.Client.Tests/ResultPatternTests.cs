@@ -1,7 +1,5 @@
-using Arrow;
 using Arrow.Http.AspNetCore;
 using Microsoft.AspNetCore.Http;
-using Xunit;
 
 namespace Arrow.Http.Client.Tests;
 

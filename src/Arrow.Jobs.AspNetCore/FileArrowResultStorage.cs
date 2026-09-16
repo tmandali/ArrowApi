@@ -1,7 +1,6 @@
 using Apache.Arrow;
 using Apache.Arrow.Ipc;
 using Arrow.Data;
-using System.Runtime.CompilerServices;
 
 namespace Arrow.Jobs.AspNetCore;
 
