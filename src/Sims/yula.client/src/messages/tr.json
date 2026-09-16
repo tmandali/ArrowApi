@@ -923,7 +923,9 @@
     "new_report": "Yeni rapor",
     "new": "Yeni",
     "run_report": "Raporu çalıştır",
-    "run": "Çalıştır"
+    "run": "Çalıştır",
+    "rerun_report": "Raporu tekrar çalıştır",
+    "rerun": "Tekrar çalıştır"
   },
   "JobExecutions": {
     "executions": "Çalışmalar",

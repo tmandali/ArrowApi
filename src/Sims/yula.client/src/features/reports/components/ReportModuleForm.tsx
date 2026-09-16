@@ -186,6 +186,13 @@ export function ReportModuleForm({
 
   const criteriaLocked = Boolean(activeJobId) && activeRunPhase === "running"
 
+  // Seçili iş terminal durumda (Completed/Failed) → header'daki Run butonu
+  // "Re-run / Tekrar çalıştır" etiketine döner (compose modunda hep "Run").
+  const selectedJobTerminal =
+    selectedCompleted ||
+    activeLiveStatus === "Completed" ||
+    activeLiveStatus === "Failed"
+
   React.useEffect(() => {
     const handleOpenCompose = (e: Event) => {
       const detail = (e as CustomEvent<{ scope?: string }>).detail
@@ -274,6 +281,7 @@ export function ReportModuleForm({
       onCancelNewReport={handleCancelNewReport}
       isNewMode={isNewMode}
       criteriaLocked={criteriaLocked}
+      rerun={selectedJobTerminal}
       renderFilter={(registerFilter, { onListError }) => (
         <ReportModuleFilter
           ref={registerFilter}

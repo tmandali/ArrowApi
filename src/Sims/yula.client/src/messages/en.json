@@ -923,7 +923,9 @@
     "new_report": "New report",
     "new": "New",
     "run_report": "Run report",
-    "run": "Run"
+    "run": "Run",
+    "rerun_report": "Re-run report",
+    "rerun": "Re-run"
   },
   "JobExecutions": {
     "executions": "Executions",

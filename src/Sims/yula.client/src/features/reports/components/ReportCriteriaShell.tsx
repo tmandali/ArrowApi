@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { FilePlus2, Loader2, Play, X } from "lucide-react"
+import { FilePlus2, Loader2, Play, RefreshCw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
@@ -56,6 +56,8 @@ export type ReportCriteriaShellProps = {
   isNewMode?: boolean
   /** Aktif job çalışıyor → header'daki Run kilitli. */
   criteriaLocked?: boolean
+  /** Seçili job terminal durumda (Completed/Failed) → Run butonu "Re-run" etiketiyle. */
+  rerun?: boolean
   /** Header sağ aksiyonlarına eklenecek özel butonlar (örn. Detail / Grid geçiş butonu). */
   headerActions?: React.ReactNode
   /**
@@ -92,6 +94,7 @@ export function ReportCriteriaShell({
   onCancelNewReport,
   isNewMode = false,
   criteriaLocked = false,
+  rerun = false,
   headerActions,
   renderFilter,
 }: ReportCriteriaShellProps) {
@@ -279,15 +282,17 @@ export function ReportCriteriaShell({
                 className="h-7 shrink-0 gap-1.5 px-2.5 text-xs"
                 disabled={submittingCriteria || criteriaLocked}
                 onClick={() => void handleCriteriaSubmit()}
-                title={t("run_report")}
-                aria-label={t("run_report")}
+                title={t(rerun ? "rerun_report" : "run_report")}
+                aria-label={t(rerun ? "rerun_report" : "run_report")}
               >
                 {submittingCriteria ? (
                   <Loader2 className="size-3.5 animate-spin" />
+                ) : rerun ? (
+                  <RefreshCw className="size-3.5" />
                 ) : (
                   <Play className="size-3.5" />
                 )}
-                {t("run")}
+                {t(rerun ? "rerun" : "run")}
               </Button>
               <AIChatAssistant />
             </div>

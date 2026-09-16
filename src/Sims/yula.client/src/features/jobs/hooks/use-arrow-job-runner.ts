@@ -359,6 +359,26 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
         setActiveRequestJson(prettyJson(req))
       })
 
+      // Bildirimli status yoksa (ör. ?jobId= derin link, eski terminal iş)
+      // sunucudan çek — header "Re-run" etiketi + phase senkronu için.
+      if (!jobStatus && !snap) {
+        void fetchJobStatus(jobId)
+          .then((job) => {
+            const s = job?.status
+            if (!s) return
+            setActiveLiveStatus(s)
+            const lower = s.toLowerCase()
+            if (lower === "completed") {
+              setActiveRunPhase("done")
+            } else if (lower === "cancelled" || lower === "canceled") {
+              setActiveRunPhase("cancelled")
+            }
+          })
+          .catch(() => {
+            /* 404 / ağ hatası: seçim durumunu bozma */
+          })
+      }
+
       const targetJob: ArrowJobStatus =
         typeof jobOrId === "string"
           ? { id: jobId, status: jobStatus || "", jobUrl: "", eventsUrl: "" }
