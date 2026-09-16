@@ -925,7 +925,9 @@
     "run_report": "Raporu çalıştır",
     "run": "Çalıştır",
     "rerun_report": "Raporu tekrar çalıştır",
-    "rerun": "Tekrar çalıştır"
+    "rerun": "Tekrar çalıştır",
+    "criteria_not_ready": "Kriterler hazır değil",
+    "clear_criteria": "Temizle"
   },
   "JobExecutions": {
     "executions": "Çalışmalar",

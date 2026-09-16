@@ -5,6 +5,7 @@ import { RotateCcw } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useAgentCriteriaStore } from "@/hooks/use-agent-criteria-bridge"
 import {
+  CRITERIA_NOT_READY_MESSAGE,
   SchemaCriteriaFilter,
   type JsonSchemaObject,
   type SchemaCriteriaFilterHandle,
@@ -82,6 +83,7 @@ export const ReportModuleFilter = React.forwardRef<
   const composing = Boolean(jobSession?.composing)
   const criteriaLocked = Boolean(jobSession?.criteriaLocked)
   const tExecutions = useTranslations("JobExecutions")
+  const tReport = useTranslations("ReportCriteria")
   const filterRef = React.useRef<SchemaCriteriaFilterHandle>(null)
   const aiFilled = useAgentCriteriaStore(
     (state) => state.aiFilledCriteria[jobName]
@@ -110,7 +112,7 @@ export const ReportModuleFilter = React.forwardRef<
           return {
             valid: false,
             instance: {},
-            errors: [{ fieldKey: "", message: "Criteria is not ready" }],
+            errors: [{ fieldKey: "", message: CRITERIA_NOT_READY_MESSAGE }],
             ajvErrors: [],
           }
         }
@@ -180,7 +182,7 @@ export const ReportModuleFilter = React.forwardRef<
             onClick={() => filterRef.current?.clear()}
           >
             <RotateCcw className="size-3.5" />
-            Clear
+            {tReport("clear_criteria")}
           </Button>
         }
         criteriaActive={composing}

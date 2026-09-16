@@ -285,6 +285,7 @@ export function ReportModuleForm({
       isNewMode={isNewMode}
       criteriaLocked={criteriaLocked}
       rerun={selectedJobTerminal}
+      rerunRequestJson={activeRequestJson}
       renderFilter={(registerFilter, { onListError }) => (
         <ReportModuleFilter
           ref={registerFilter}

@@ -925,7 +925,9 @@
     "run_report": "Run report",
     "run": "Run",
     "rerun_report": "Re-run report",
-    "rerun": "Re-run"
+    "rerun": "Re-run",
+    "criteria_not_ready": "Criteria is not ready",
+    "clear_criteria": "Clear"
   },
   "JobExecutions": {
     "executions": "Executions",

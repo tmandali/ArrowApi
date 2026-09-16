@@ -15,6 +15,8 @@ import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import type { ArrowJobStatus } from "@/features/jobs"
 import {
   assertSafeApiJobEndpoint,
+  CRITERIA_NOT_READY_MESSAGE,
+  readJobEndpoint,
   type CriteriaValidationResult,
   type JsonSchemaObject,
   type SchemaCriteriaFilterHandle,
@@ -58,6 +60,11 @@ export type ReportCriteriaShellProps = {
   criteriaLocked?: boolean
   /** Seçili job terminal durumda (Completed/Failed) → Run butonu "Re-run" etiketiyle. */
   rerun?: boolean
+  /**
+   * Seçili aktif job'ın saklanmış istek JSON'u (pretty). Result view'da
+   * kriter gridi mounted değilken Re-run bu payload'la tekrar başlatır.
+   */
+  rerunRequestJson?: string | undefined
   /** Header sağ aksiyonlarına eklenecek özel butonlar (örn. Detail / Grid geçiş butonu). */
   headerActions?: React.ReactNode
   /**
@@ -81,6 +88,22 @@ export type ReportCriteriaShellProps = {
  * orkestrasyon (`ReportModuleForm`) + kriter ekranı (`ReportCriteriaShell`)
  * + filtre (`ReportModuleFilter`) içindedir.
  */
+/**
+ * Saklanan job istek JSON'unu (pretty) kriter nesnesi olarak ayrıştırır;
+ * geçerli bir object değilse null döner.
+ */
+function parseStoredCriteria(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    /* malformed JSON — fallback uygulanmaz */
+  }
+  return null
+}
+
 export function ReportCriteriaShell({
   mode,
   title,
@@ -95,6 +118,7 @@ export function ReportCriteriaShell({
   isNewMode = false,
   criteriaLocked = false,
   rerun = false,
+  rerunRequestJson,
   headerActions,
   renderFilter,
 }: ReportCriteriaShellProps) {
@@ -163,16 +187,44 @@ export function ReportCriteriaShell({
   const formatValidationBanner = React.useCallback(
     (result: CriteriaValidationResult) => {
       if (result.valid || result.errors.length === 0) return null
-      const first = result.errors[0]?.message ?? t("validation_failed")
-      const extra =
-        result.errors.length > 1 ? ` (+${result.errors.length - 1})` : ""
-      return `${first}${extra}`
+      const first = result.errors[0]
+      if (
+        first?.fieldKey === "" &&
+        first.message === CRITERIA_NOT_READY_MESSAGE
+      ) {
+        return t("criteria_not_ready")
+      }
+      const message = first?.message ?? t("validation_failed")
+      const extra = result.errors.length > 1 ? ` (+${result.errors.length - 1})` : ""
+      return `${message}${extra}`
     },
     [t]
   )
 
   const handleCriteriaSubmit = React.useCallback(async () => {
-    const result = criteriaHandle?.submit()
+    let result = criteriaHandle?.submit() ?? null
+
+    // Re-run (seçili terminal job, result view): kriter gridi mounted değil →
+    // handle not-ready sentinel'i döndürür. Aktif job'ın saklanmış istek
+    // kriterleriyle aynı koşullarda tekrar başlat.
+    const gridNotReady =
+      !result ||
+      (result.errors.length === 1 &&
+        result.errors[0]?.fieldKey === "" &&
+        result.errors[0]?.message === CRITERIA_NOT_READY_MESSAGE)
+    if (rerun && rerunRequestJson && gridNotReady) {
+      const stored = parseStoredCriteria(rerunRequestJson)
+      if (stored) {
+        result = {
+          valid: true,
+          instance: stored,
+          errors: [],
+          ajvErrors: [],
+          jobEndpoint: readJobEndpoint(schema),
+        }
+      }
+    }
+
     if (!result) return
 
     if (!result.valid) {
@@ -229,6 +281,9 @@ export function ReportCriteriaShell({
     formatValidationBanner,
     mode,
     onJobCreated,
+    rerun,
+    rerunRequestJson,
+    schema,
     t,
   ])
 

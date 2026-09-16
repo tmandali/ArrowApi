@@ -18,6 +18,7 @@ import {
 import { cn } from "@/utils/cn"
 import type { CriteriaFieldDef } from "../types"
 import { splitRangeCellValue } from "../lib/compact-date"
+import { useDayPickerLocale } from "../lib/use-day-picker-locale"
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0")
@@ -133,6 +134,7 @@ export function CriteriaDateValueCell({
 }: CriteriaDateValueCellProps) {
   const [open, setOpen] = React.useState(false)
   const [focused, setFocused] = React.useState(false)
+  const dayPickerLocale = useDayPickerLocale()
   const rangeSplit = field.rangeSplit
   const allowsRange = Boolean(rangeSplit)
   const useCompact = true
@@ -223,6 +225,7 @@ export function CriteriaDateValueCell({
           <PopoverContent className="w-auto p-0" align="end">
             {allowsRange ? (
               <Calendar
+                locale={dayPickerLocale}
                 mode="range"
                 selected={selectedRange}
                 onSelect={(range) => {
@@ -234,6 +237,7 @@ export function CriteriaDateValueCell({
               />
             ) : (
               <Calendar
+                locale={dayPickerLocale}
                 mode="single"
                 selected={selectedSingle}
                 onSelect={commitSingle}

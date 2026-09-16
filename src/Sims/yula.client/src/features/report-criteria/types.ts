@@ -148,6 +148,14 @@ export type CriteriaFieldError = {
   keyword?: string
 }
 
+/**
+ * Stable sentinel (standard English, no UI translation) reported by the
+ * criteria grid handle when the underlying form is not mounted (e.g. the
+ * result view replaces the criteria slot). UI layers localize it via
+ * `ReportCriteria.criteria_not_ready` before showing a banner.
+ */
+export const CRITERIA_NOT_READY_MESSAGE = "Criteria is not ready"
+
 export type CriteriaValidationResult = {
   valid: boolean
   instance: Record<string, unknown>
