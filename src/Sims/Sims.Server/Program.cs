@@ -2,10 +2,8 @@ using Sims.Server.Endpoints;
 using Sims.Server.Services;
 using Sims.Server.Workers;
 using Microsoft.AspNetCore.Authentication;
-using Arrow.Jobs;
 using Arrow.Jobs.AspNetCore;
 using Arrow.Jobs.InMemory;
-using Arrow.Jobs.Postgres;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,30 +11,9 @@ builder.Services.AddArrowApi(arrow =>
 {
     // Sonuçlar RAM'de tutulmaz; batch'ler diskteki Arrow IPC dosyasına stream edilir
     // (büyük raporlarda bellek sabit kalır). Global singleton kayıt: bir kez yeterlidir.
-    //
-    // Job kalıcılığı (store): `ArrowJobs:Postgres:ConnectionString` yapılandırması varsa
-    // PostgresArrowJobStore kullanılır (dev'de yula.client'ta `npm run pglite-socket`
-    // ile ayağa kaldırılmış yerel PGlite'a Npgsql üzerinden; pglite-socket açılışta
-    // arrow_jobs şemasını otomatik uygular). Bağlantı dizesi yoksa InMemory store'a düşer.
-    string? jobsPgConnectionString = builder.Configuration["ArrowJobs:Postgres:ConnectionString"];
-
-    Action<IArrowJobsConfigurer> jobsStore = cfg => cfg.UseFileStore("arrow-jobs");
-    if (!string.IsNullOrWhiteSpace(jobsPgConnectionString))
-    {
-        string pgConnectionString = jobsPgConnectionString;
-        jobsStore = cfg =>
-        {
-            cfg.UsePostgres(pgConnectionString);
-            cfg.UseFileStore("arrow-jobs");
-        };
-    }
-    Console.WriteLine(string.IsNullOrWhiteSpace(jobsPgConnectionString)
-        ? "[jobs] Store: InMemory (ArrowJobs:Postgres:ConnectionString tanımlı değil)"
-        : "[jobs] Store: Postgres/PGlite -> " + jobsPgConnectionString.Split(';')[0]);
-
-    arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", jobsStore);
-    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", jobsStore);
-    arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", jobsStore);
+    arrow.AddJob<StockAnalyticsArrowJobWorker>("stock-analytics", c => c.UseFileStore("arrow-jobs"));
+    arrow.AddJob<StockBalanceArrowJobWorker>("stock-balance", c => c.UseFileStore("arrow-jobs"));
+    arrow.AddJob<RetailSalesReportWorker>("retail-sales-report", c => c.UseFileStore("arrow-jobs"));
 });
 
 // ── Login kullanıcı → OIDC (Keycloak) JWT doğrulama ────────────────────────────

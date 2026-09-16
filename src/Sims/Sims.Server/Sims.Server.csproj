@@ -5,14 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <SpaRoot>..\yula.client</SpaRoot>
-    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
+    <SpaProxyLaunchCommand>npm run dev:next</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:56402</SpaProxyServerUrl>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Arrow.Jobs.Abstractions\Arrow.Jobs.Abstractions.csproj" />
     <ProjectReference Include="..\..\Arrow.Jobs.AspNetCore\Arrow.Jobs.AspNetCore.csproj" />
-    <ProjectReference Include="..\..\Arrow.Jobs.Postgres\Arrow.Jobs.Postgres.csproj" />
     <ProjectReference Include="..\yula.client\yula.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

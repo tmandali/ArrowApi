@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Windows reserved device name (git 0903 artifact)
+nul
+
 # User-specific files
 *.rsuser
 *.suo

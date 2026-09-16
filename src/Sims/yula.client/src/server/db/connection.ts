@@ -65,11 +65,10 @@ function createLazyPgliteConnection(): PgliteDb {
  *
  * - `USE_PGLITE=true` → dosya-tabanlı yerel PGlite (`local.db`)
  * - yoksa → `DATABASE_URL` ile gerçek Postgres Pool (pg protokolü).
- *   Dev'de `pglite-socket` (scripts/db/pglite-socket.mjs) aynı `DATABASE_URL`'i
- *   127.0.0.1:15432'de sunar; `dev` bu yüzden `USE_PGLITE=false` çalıştırır —
- *   tek PGlite instance'ı socket sunucusunda, app ve .NET host TCP pool ile
- *   bağlanır (çift instance + Turbopack worker'da in-process PGlite'ın
- *   bozulması önlenir). İn-process mod gerekirse `USE_PGLITE=true` ile açılır.
+ *   Dev'de `db-server:file` (pglite-server) aynı `DATABASE_URL`'i 127.0.0.1:5432'de
+ *   sunar; `dev:full` bu yüzden `USE_PGLITE=false` çalıştırır — tek PGlite
+ *   instance'ı sunucu tarafında, app TCP pool ile bağlanır (çift instance +
+ *   Turbopack worker'da in-process PGlite'ın bozulması önlenir).
  */
 export const createDbConnection = async () => {
   if (Env.USE_PGLITE) {

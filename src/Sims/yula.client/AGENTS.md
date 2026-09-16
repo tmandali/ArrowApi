@@ -69,18 +69,6 @@ Apply the following steps without exception whenever a new report or agent capab
   - Zustand-based store tracks active jobs (`Queued`, `Running`, `Completed`, `Failed`, `Cancelled`) globally.
   - `isTerminalJobStatus(status)`: Confirms the job has terminated on `Completed`, `Failed`, `Cancelled` states.
 
-## 🗄️ Local Data & Job Backends (PGlite Socket)
-
-Dev data lives in a **single PGlite instance served over TCP** — while the socket host runs, no process opens `local.db` in-process (file-lock safety).
-
-- **DB connection factory (`src/server/db/connection.ts`):**
-  - `USE_PGLITE=false` (default, `.env`) → `pg` Pool over `DATABASE_URL` (`127.0.0.1:15432`, pglite-socket).
-  - `USE_PGLITE=true` → file-based in-process PGlite (`local.db`); during `next build` a lazy proxy defers booting to real drizzle operations (prevents the 13 parallel Turbopack workers lock-`local.db` and polluting the build log).
-- **Socket host (`scripts/db/pglite-socket.mjs`, `npm run pglite-socket`):** opens `local.db` (override: `PGLITE_PORT` / `PGLITE_HOST` / `PGLITE_DATA_DIR`), applies the .NET `arrow_jobs` DDL (`src/Arrow.Jobs.Postgres/Schema.sql`), runs `npm run db:migrate` (drizzle over TCP; skippable via `PGLITE_SKIP_MIGRATIONS=1`), then serves Postgres wire protocol on `127.0.0.1:15432` (env override `PGLITE_MAX_CONNECTIONS`, default 20 — keep modest; WASM is a single runtime).
-- **Dev flow:** `npm run dev` = `npm-run-all --parallel pglite-socket dev:next` (Next on 56402, DB via TCP). The .NET host (`src/Sims/Sims.Server`) points at the same socket through `ArrowJobs:Postgres:ConnectionString` (dev appsettings = `Host=127.0.0.1;Port=15432;Database=postgres;Username=postgres`).
-- **.NET job store (`src/Arrow.Jobs.Postgres`):** `PostgresArrowJobStore<TRequest>` (Npgsql) — one `arrow_jobs` table for all request types, keyed by `job_type` (assembly-qualified `TRequest` name; Redis-style `TypeKey`), request as `jsonb`; guarded state transitions (cancelled jobs are no-ops), `FindDuplicateAsync` mirrors the InMemory semantics (`state IN (queued, running) OR created_at >= @cutoff`). Registered via `UsePostgres(connectionString)` / `UsePostgres(this IArrowJobsConfigurer, ...)` — store=Postgres, queue/event hub=InMemory (single-host dev scenario: the queue is volatile by design, the store is the durable layer).
-- **DB maintenance scripts** (`scripts/db/rekey-app-users.mjs`, `scripts/dedupe-guest-identities.ts`): connect over TCP via `DATABASE_URL` and must never open a second in-process PGlite instance.
-
 ## Yula AI (chat SDK & provider)
 
 - **The chat path is provider-agnostic.** `/api/agent/chat` uses only `getYulaLanguageModel(...)` + `streamText({ model, tools, toolsContext, prepareStep })`. Tool calls never go into prompt text; `streamText({ tools })` + `extractReasoningMiddleware({ tagName: "think" })`. Responses stream via `toUIMessageStream({ messageMetadata })` + `createUIMessageStreamResponse` (`result.toUIMessageStreamResponse` is deprecated).

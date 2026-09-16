@@ -17,8 +17,6 @@ Quick summary:
 - **Workspaces will later split via module federation** (each a separate React remote);
   preserve workspace boundaries on every change, cross-workspace imports are forbidden, outsiders consume only the workspace's `index.ts` (Public API) entry point.
 - **Large Data Reports**: Shared `<ArrowReportGrid />` component with W3C OPFS local disk cache and the DuckDB WASM engine. After F5, reports open from disk with zero internet cost.
-- **Local Data Layer (PGlite as a TCP service)**: The dev source of truth is `local.db` (Postgres via WASM) exposed by `src/Sims/yula.client/scripts/db/pglite-socket.mjs` (127.0.0.1:15432, Postgres wire protocol). Both the Next.js app (`pg` pool via `DATABASE_URL`, `USE_PGLITE=false`) and the .NET host (Npgsql) connect over TCP; on boot the socket applies the `arrow_jobs` DDL and drizzle migrations. No in-process PGlite and no legacy pglite-server (:5432) dev flows.
-- **.NET Job Backend (Postgres store)**: `src/Arrow.Jobs.Postgres` — `PostgresArrowJobStore<TRequest>` (Npgsql; all request types live in one `arrow_jobs` table keyed by `job_type`, requests as `jsonb`) plus the `UsePostgres` DI extension (store=Postgres, queue/event hub=InMemory for the single-host dev scenario). `Sims.Server` selects it when `ArrowJobs:Postgres:ConnectionString` is set (dev appsettings point at pglite-socket :15432); without a connection string it falls back to the InMemory store.
 - **Tauri 2.0 Desktop & Hybrid Web**: The project runs both in the browser (`npm run dev`) and on desktop (`npm run tauri:dev`). Tauri dependencies are dynamically isolated via `isTauriEnv`.
 - **Embedded Python AI Sidecar**: Bidirectional Tool Calling over a `sys.stdin`/`sys.stdout` JSON stream with a `toolRegistry` bridge.
 - **Context-Aware & Scoped AI Agent**: 3-level hierarchical scope (Global > Workspace > Page Scope), dynamic tool registration/cleanup via `useScreenAgentContext`, bidirectional live React state sharing, State-Driven Tool Swapping (Criteria vs Results mode), Few-Shot Data Grounding (column mapping via sample rows), and smart cross-workspace routing.
@@ -32,27 +30,6 @@ Quick summary:
 - **Exploration & Sampling Limit (Max 10 Records Rule)**: In exploration queries run by Yula AI (`run_expert_sql`, `analyze_grid_data`), schema samples (`get_report_schema`, `sampleRows`), or job history lists (`list_report_executions`), **never more than 10 records** may be returned to the model/context. This prevents context bloat, token waste, and model hallucination.
 - **Plug-and-Play Workspace Report Registration**: Workspaces declare reports via `YulaReportCardConfig` and the structured `x-ai` block of the JSON Schema (`aliases`, `quickPrompts`, `columnAliases`); they auto-register with both the Fast Router and the LLM without touching AI internals.
 - **Native Auto-Updater**: Update checks never pollute the web UI — they run only through the macOS/Windows native menu (`Check for Updates...`) and Rust dialogs.
-
-### 🗄️ Dev Data & Job Persistence (PGlite Socket)
-
-The local database is a **single PGlite instance served over TCP** — no process opens `local.db` in-process while the socket host is running (file-lock safety):
-
-```
-   drizzle-kit ─────┐
-   (db:migrate)    │
-                   ▼
- .NET Sims.Server ─► pglite-socket ─► local.db (Postgres/WASM)
- (Npgsql :15432)    (Postgres wire)  ▲
- .NET Arrow jobs    127.0.0.1:15432 ─┘
- yula.client (pg pool, DATABASE_URL)
-```
-
-- `npm run dev` (in `src/Sims/yula.client`) = `npm-run-all --parallel pglite-socket dev:next`:
-  - **pglite-socket**: opens `local.db`, applies `arrow_jobs` DDL (`src/Arrow.Jobs.Postgres/Schema.sql`) and `npm run db:migrate` (drizzle over TCP), then serves Postgres wire protocol on `127.0.0.1:15432`. Env overrides: `PGLITE_PORT` / `PGLITE_HOST` / `PGLITE_DATA_DIR` / `PGLITE_SKIP_MIGRATIONS=1`.
-  - **dev:next**: `next dev` on port 56402; `.env` carries `USE_PGLITE=false` + `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:15432/postgres` (gitignored; prod sets a real Postgres URL).
-- **.NET companion**: `cd src/Sims/Sims.Server && dotnet run --environment Development` → `arrow_jobs` rows are shared with the yula UI through the same socket. Result files still stream to disk via `UseFileStore("arrow-jobs")`.
-- In-process PGlite mode (`USE_PGLITE=true`, with the build-phase lazy proxy for the Turbopack 13-worker lock problem, documented in `src/Sims/yula.client/src/server/db/connection.ts`) remains available as an env override — it is no longer the dev default.
-- DB maintenance scripts (`scripts/db/rekey-app-users.mjs`, `scripts/dedupe-guest-identities.ts`) connect over TCP via `DATABASE_URL` and must never open a second in-process PGlite instance.
 
 ### 📋 Checklist When Adding a New Report / Agent (Step by Step)
 When a new report or agent command is added to the project, apply the following steps without exception:
