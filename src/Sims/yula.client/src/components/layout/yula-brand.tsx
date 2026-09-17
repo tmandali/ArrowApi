@@ -1,6 +1,29 @@
 "use client";
 
-import { cn } from "@/utils/cn"
+import Image from "next/image";
+import { cn } from "@/utils/cn";
+
+type YulaIconProps = {
+  className?: string;
+};
+
+/**
+ * Ana ekran Yula ikonu — `public/icons/yula-icon.svg` statik SVG'si.
+ * (YulaMarkIcon'un inline SVG'sinin sabit renkli sürümü; geri almak için
+ * bu bileşeni kullanmayıp YulaMarkIcon'a dön.)
+ */
+export function YulaIcon({ className }: YulaIconProps) {
+  return (
+    <Image
+      src="/icons/yula-icon.svg"
+      alt="Yula"
+      className={cn("block shrink-0", className)}
+      width={56}
+      height={56}
+      style={{ width: "100%", height: "auto" }}
+    />
+  );
+}
 
 type YulaMarkIconProps = {
   className?: string

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Globe } from "lucide-react";
-import { YulaMarkIcon } from "@/components/layout/yula-brand";
+import { YulaIcon, YulaMarkIcon } from "@/components/layout/yula-brand";
 import { YulaAgentCards } from "@/components/layout/yula-agent-cards";
 import { AgentAvatar } from "@/features/system/components/agents/agent-avatar";
 import { agentInitials } from "@/features/system/components/agents/agent-initials";
@@ -97,7 +97,7 @@ export function ChatIntro({
             {agentInitials(effectiveAgent.name)}
           </span>
         ) : (
-          workspaceRootIcon ?? <YulaMarkIcon className="size-16" />
+          workspaceRootIcon ?? <YulaIcon className="size-16" />
         )}
         <div className="space-y-1.5">
           <h1
