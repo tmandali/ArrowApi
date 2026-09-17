@@ -99,12 +99,44 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         fail(t("image_upload_not_image"));
         return;
       }
-      if (file.size > 8 * 1024 * 1024) {
+      const isSvg =
+        file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+      // SVG vektörel: dosya küçük tut (inline gömülü varlıklar şişirebilir).
+      const maxBytes = isSvg ? 256 * 1024 : 8 * 1024 * 1024;
+      if (file.size > maxBytes) {
         fail(t("image_upload_too_big"));
         return;
       }
       try {
-        const bitmap = await createImageBitmap(file);
+        let image: CanvasImageSource & { width: number; height: number };
+        let revoke = () => {};
+        if (isSvg) {
+          // SVG yolu: <img> olarak çözümlenir (createImageBitmap SVG'
+          // desteklemez) — blob URL güvenli (data URL'de script
+          // çalışmaz; canvas'a çizilince de yalnız piksel aktarılır).
+          const text = await file.text();
+          if (!/<svg[\s>]/i.test(text)) {
+            fail(t("image_upload_generic"));
+            return;
+          }
+          const blobUrl = URL.createObjectURL(
+            new Blob([text], { type: "image/svg+xml" }),
+          );
+          const el = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = () => reject(new Error("svg decode"));
+            im.src = blobUrl;
+          });
+          revoke = () => URL.revokeObjectURL(blobUrl);
+          image = el;
+        } else {
+          image = await createImageBitmap(file);
+        }
+        // Kare yok / 0 boyutlu (görüşlü SVG) → makul varsayımla çiz.
+        const srcW = (image as { naturalWidth?: number }).naturalWidth || image.width || 256;
+        const srcH =
+          (image as { naturalHeight?: number }).naturalHeight || image.height || 256;
         const size = 256;
         const canvas = document.createElement("canvas");
         canvas.width = size;
@@ -112,13 +144,18 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           fail(t("image_upload_generic"));
+          revoke();
           return;
         }
-        const scale = Math.max(size / bitmap.width, size / bitmap.height);
-        const w = bitmap.width * scale;
-        const h = bitmap.height * scale;
-        ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
-        bitmap.close();
+        // Şeffaf arka plan — JPEG'e döşeyince beyaz zemin görünsün.
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, size, size);
+        const scale = Math.max(size / srcW, size / srcH);
+        const w = srcW * scale;
+        const h = srcH * scale;
+        ctx.drawImage(image, (size - w) / 2, (size - h) / 2, w, h);
+        if ("close" in image && image !== file) (image as { close?: () => void }).close?.();
+        revoke();
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         setBrokenSrc(null);
         setLocalUserPhoto(dataUrl);
@@ -217,7 +254,7 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,image/svg+xml"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

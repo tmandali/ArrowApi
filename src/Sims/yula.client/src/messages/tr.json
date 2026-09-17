@@ -131,7 +131,7 @@
     "image_custom_remove": "Özel resim kaldır — provider resmine dön",
     "image_upload_failed": "Profil resmi yüklenemedi",
     "image_upload_not_image": "Lütfen bir görsel dosyası seç (PNG, JPG...).",
-    "image_upload_too_big": "Dosya çok büyük — 8 MB'dan küçük bir görsel seç.",
+    "image_upload_too_big": "Dosya çok büyük — 8 MB'dan küçük bir görsel seç (SVG için 256 KB).",
     "image_upload_generic": "Görsel işlenemedi — başka bir dosya (örn. PNG/JPEG) dene."
   },
   "WorkspaceLanding": {
