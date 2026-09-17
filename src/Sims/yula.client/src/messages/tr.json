@@ -1505,7 +1505,9 @@
     "my_settings": "Hesabım & Ayarlarım",
     "system_users": "Tüm Kullanıcılar (Admin)",
     "system_agents": "Ajan Ayarları",
-    "system_skills": "Skill Ayarları"
+    "system_skills": "Skill Ayarları",
+    "system_section": "Sistem",
+    "account_section": "Oturum & Hesap"
   },
   "ScreenLabels": {
     "agents": "Ajan",

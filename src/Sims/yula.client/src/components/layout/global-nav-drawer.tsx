@@ -8,9 +8,10 @@ import {
   Users,
   Bot,
   Sparkles,
-  UserCog,
+  UserCircle,
   X,
 } from "lucide-react";
+import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
 import {
   Sheet,
   SheetContent,
@@ -33,6 +34,7 @@ export function GlobalNavDrawer() {
   const railWorkspaces = getRailWorkspaces();
   const tRail = useTranslations("WorkspaceRail");
   const tNav = useTranslations("SystemNav");
+  const { isAdmin } = useEffectiveRole();
 
   // Ctrl+B / ⌘+B toggle shortcut
   React.useEffect(() => {
@@ -50,6 +52,7 @@ export function GlobalNavDrawer() {
     setOpen("global-drawer", false);
   };
 
+  // Sistem (platform) bölümü — yalnız yöneticiye gösterilir (fail-closed).
   const systemLinks = [
     {
       url: "/system/users",
@@ -66,10 +69,14 @@ export function GlobalNavDrawer() {
       label: tNav("system_skills"),
       icon: Sparkles,
     },
+  ];
+
+  // Oturum (kişisel) bölümü — tüm oturum açan kullanıcılara gösterilir.
+  const accountLinks = [
     {
       url: "/my/settings",
       label: tNav("my_settings"),
-      icon: UserCog,
+      icon: UserCircle,
     },
   ];
 
@@ -141,13 +148,13 @@ export function GlobalNavDrawer() {
             </div>
           </div>
 
-          {/* Sistem & Platform Bölümü */}
+          {/* Oturum / Kişisel Bölümü — tüm oturum açan kullanıcılara */}
           <div>
             <div className="px-2 pb-1.5 text-[11px] font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
-              Platform & Sistem
+              {tNav("account_section")}
             </div>
             <div className="space-y-0.5">
-              {systemLinks.map((item) => {
+              {accountLinks.map((item) => {
                 const isActive = pathname === item.url;
                 return (
                   <Link
@@ -173,6 +180,41 @@ export function GlobalNavDrawer() {
               })}
             </div>
           </div>
+
+          {/* Sistem / Platform Bölümü — yalnız yöneticiye */}
+          {isAdmin && (
+            <div>
+              <div className="px-2 pb-1.5 text-[11px] font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
+                {tNav("system_section")}
+              </div>
+              <div className="space-y-0.5">
+                {systemLinks.map((item) => {
+                  const isActive = pathname === item.url;
+                  return (
+                    <Link
+                      key={item.url}
+                      href={item.url}
+                      onClick={handleClose}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-foreground font-semibold ring-1 ring-sidebar-border"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      )}
+                    >
+                      {React.createElement(item.icon, {
+                        className: cn(
+                          "size-4 shrink-0",
+                          isActive ? "text-primary dark:text-sidebar-primary" : "text-sidebar-foreground/70"
+                        ),
+                      })}
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Alt Bilgi — tema token'lariyla (light/dark ikisinde de okunur) */}
