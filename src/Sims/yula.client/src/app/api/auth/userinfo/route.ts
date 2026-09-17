@@ -19,8 +19,9 @@ export const dynamic = "force-dynamic";
  *   token arka planda tazelenir, bu istek en güncel token'la gider.
  * - Resimsiz hesaplarda Google `picture` claim'ini VERMEZ (varsayılan
  *   avatar adresi de yok) → `picture: null` dürüst sonuçtur, hata değildir.
- * - One Tap oturumunda refresh token olmadığı için token'ı düşmüşse
- *   `no_access_token` (409) döner — yeniden giriş gerekir.
+ * - Access token yok/ömrü düşmüşse ve refresh mümkün değilse
+ *   (eski, exchange'siz One Tap sessionları / exchange hatası) `no_access_token`
+ *   (409) döner — yeniden giriş gerekir.
  */
 export async function GET() {
   const session = (await auth()) as Session | null;
