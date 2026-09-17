@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * - Resimsiz hesaplarda Google `picture` claim'ini VERMEZ (varsayılan
  *   avatar adresi de yok) → `picture: null` dürüst sonuçtur, hata değildir.
  * - Access token yok/ömrü düşmüşse ve refresh mümkün değilse
- *   (eski, exchange'siz One Tap sessionları / exchange hatası) `no_access_token`
+ *   (eski One Tap sessionları / ID token ömrü dolmuşsa) `no_access_token`
  *   (409) döner — yeniden giriş gerekir.
  */
 export async function GET() {

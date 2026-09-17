@@ -229,7 +229,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       // 1b) Google One Tap (credentials): ID token, `user.accessToken`
-      //     olarak taşınır (userinfo Bearer'ı — dosya başı notu).
+      //     olarak session'a taşınır (route, One Tap session'larında
+      //     session claim'lerini döner — dosya başı notu).
       //     Not: v5 credentials sign-in'de `account` DA tanımlı gelebilir;
       //     One Tap user'ı custom `expiresAt` alanıyla AYIRT edilir
       //     (redirect akışında user bu alanı taşımaz); bu branch 1)
@@ -245,11 +246,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (oneTapUser.refreshToken) token.refreshToken = oneTapUser.refreshToken;
         token.expiresAt = oneTapUser.expiresAt;
         token.provider = "google";
-        // Sadece sign-in'de fırlar; terminalden One Tap session'ının
-        // token durumu izlenir (409/debug için).
-        console.info(
-          `[auth] one-tap jwt: accessToken(id-token)=${oneTapUser.accessToken ? "evet" : "YOK"}, expiresAt=${new Date(oneTapUser.expiresAt).toISOString()}`,
-        );
       }
 
       // 2) Token hâlâ geçerli → iş yapma.
