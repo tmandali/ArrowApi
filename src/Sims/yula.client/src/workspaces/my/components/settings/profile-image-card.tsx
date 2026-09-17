@@ -39,7 +39,7 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
   // Görüntülenecek resim: taze getirilen > session/yerel kayıt > yok
   // (initials). Yerel kayıt: önceki "Yeniden getir" başarısında saklanan
   // URL — reload sonrası da rozetle eşleşmeyi sağlar.
-  const baseImage = useLocalProfileImage(user?.image);
+  const baseImage = useLocalProfileImage(user).picture;
   const shownImage = fetchedImage ?? baseImage;
   const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
@@ -55,12 +55,21 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         setSync({ kind: "error" });
         return;
       }
-      const data = (await res.json()) as { picture?: string | null };
+      const data = (await res.json()) as {
+        picture?: string | null;
+        name?: string | null;
+        email?: string | null;
+      };
       const picture = data.picture ?? null;
       setFetchedImage(picture);
-      // Başarılı getirme → yerel kayıt: header rozeti dahil tüm
-      // uygulama aynı resimle eşleşir (bkz. local-profile-image.ts).
-      setLocalProfileImage(picture);
+      // Başarılı getirme → yerel kayıt (resim + ad/soyad + e-posta):
+      // header rozeti ve sağ panelin ad/email satırı dahil tüm uygulama
+      // aynı değerlerle eşleşir (bkz. local-profile-image.ts).
+      setLocalProfileImage({
+        picture,
+        name: data.name ?? null,
+        email: data.email ?? null,
+      });
       setSync({ kind: "fresh", at: new Date().toISOString(), hasPicture: !!picture });
     } catch {
       setSync({ kind: "error" });

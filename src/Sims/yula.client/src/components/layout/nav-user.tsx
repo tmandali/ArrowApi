@@ -142,7 +142,7 @@ export function NavUser() {
   // Rozet resmi: session'daki resmi yoksa ayarlar sayfasındaki
   // "Yeniden getir" başarısında saklanan yerel kayıt (localStorage)
   // tamamlar — resim header ile kart arasında eşleşir.
-  const badgeImage = useLocalProfileImage(user?.image);
+  const badgeImage = useLocalProfileImage(user).picture;
 
   // Otomatik tamamlama: ilk girişte session'da resim YOK ama access
   // token varsa, arka planda TEK SEFERLIK /api/auth/userinfo çağrısı
@@ -162,7 +162,15 @@ export function NavUser() {
     fetch("/api/auth/userinfo", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.picture) setLocalProfileImage(data.picture);
+        // Resim ADLA BİRLİKTE kaydedilir: sağ paneldeki ad/e-posta da
+        // provider kaynağından beslenir (bkz. local-profile-image.ts).
+        if (data && (data.picture || data.name || data.email)) {
+          setLocalProfileImage({
+            picture: data.picture ?? null,
+            name: data.name ?? null,
+            email: data.email ?? null,
+          });
+        }
       })
       .catch(() => {
         // Ağ hatası: sessizce yut — rozet baş harflerle kalır.

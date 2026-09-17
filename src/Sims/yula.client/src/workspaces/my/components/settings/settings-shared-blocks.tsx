@@ -18,6 +18,7 @@ import {
 import { formatSettingsDate } from "./settings-utils";
 import type { SettingsMeta } from "./settings-types";
 import { ProfileImageCard } from "./profile-image-card";
+import { useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
 
 /**
  * user-details + settings sekmelerinde birebir tekrar eden bloklar:
@@ -124,6 +125,13 @@ export function ProfileSidePanel({
   const provider = (session?.user as { provider?: string } | undefined)?.provider;
   const providerLabel = provider === "keycloak" ? "Keycloak" : "Google";
 
+  // Ad/e-posta: provider kaynağı — taze "Yeniden getir" kaydı veya
+  // session (giriş anı) doluysa onlar; form değeri yalnız son çare.
+  // (useLocalProfileImage: session alanı dolu > yerel kayıt > null.)
+  const providerProfile = useLocalProfileImage(session?.user ?? null);
+  const displayName = providerProfile.name || fullName || "—";
+  const displayEmail = providerProfile.email || email || "—";
+
   return (
     <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
       {/* Profil resmi: avatar + hover "Yeniden getir" + tek satır durum —
@@ -139,8 +147,8 @@ export function ProfileSidePanel({
 
       <div className="flex items-start justify-between">
         <div>
-          <h4 className="font-semibold text-sm text-foreground">{fullName || "—"}</h4>
-          <p className="text-muted-foreground text-xs font-mono">{email || "—"}</p>
+          <h4 className="font-semibold text-sm text-foreground">{displayName}</h4>
+          <p className="text-muted-foreground text-xs font-mono">{displayEmail}</p>
         </div>
         <Button variant="ghost" size="icon" className="size-6">
           <Copy className="size-3.5 text-muted-foreground" />
