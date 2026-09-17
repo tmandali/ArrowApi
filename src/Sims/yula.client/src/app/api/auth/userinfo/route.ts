@@ -46,7 +46,10 @@ export async function GET() {
   }
 
   let url: string;
-  switch (user.provider) {
+  // "google-onesig": eski (exchange öncesi) session cookie'si — NextAuth'un
+  // credentials provider damgası. provider alanı varsa Google'a sorulabilir.
+  const provider = user.provider === "google-onesig" ? "google" : user.provider;
+  switch (provider) {
     case "google":
       url = "https://openidconnect.googleapis.com/v1/userinfo";
       break;
