@@ -132,7 +132,7 @@
     "image_upload_failed": "Profile photo could not be loaded",
     "image_upload_not_image": "Please choose an image file (PNG, JPG...).",
     "image_upload_too_big": "File is too large — choose an image under 8 MB.",
-    "image_upload_generic": "Image could not be processed — try another file (e.g. PNG/JPEG).",
+    "image_upload_generic": "Image could not be processed — try another file (e.g. PNG/JPEG)."
   },
   "WorkspaceLanding": {
     "pending_actions_title": "Pending Actions",
