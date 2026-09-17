@@ -6,11 +6,6 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "@/context/theme-context";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -68,6 +63,12 @@ const PROVIDER_LABELS: Record<string, string> = {
 /**
  * Header trigger ve dropdown menüdeki rozeti aynı resim + aynı stilde gösteren
  * ortak Avatar bileşeni. "Farklı resim" algısı yaratan ring/boyut sürprizlerini önler.
+ *
+ * Radix Avatar yerine düz <img> + onError: Radix'in state makinesi, resim
+ * URL'i SONRADAN geldiğinde (ör. login sonrası localStorage kaydı) güvenilmez
+ * biçimde fallback'te kalıyordu — tooltip'teki yeşil nokta resim olduğunu
+ * söylerken rozet baş harfleri gösteriyordu. Ayna yaklaşım: profil resim
+ * kartı (profile-image-card.tsx).
  */
 function NavUserAvatar({
   image,
@@ -82,19 +83,35 @@ function NavUserAvatar({
   sizeClass?: string;
   ringClass?: string;
 }) {
+  // Yükleme hatasına düşen URL: yalnız o URL için fallback'e kal — farklı
+  // bir URL geldiğinde resim tekrar denenir.
+  const [brokenSrc, setBrokenSrc] = React.useState<string | null>(null);
+  const showImage = !!image && brokenSrc !== image;
   return (
-    <Avatar
+    <div
       className={cn(
-        "rounded-full ring-1 after:border-0 shadow-xs",
+        "relative flex items-center justify-center overflow-hidden rounded-full shadow-xs ring-1",
+        "bg-linear-to-br from-primary/25 to-primary/10",
         sizeClass,
         ringClass
       )}
     >
-      {image ? <AvatarImage src={image} alt={name ?? ""} /> : null}
-      <AvatarFallback className="rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-xs font-semibold tracking-wider text-foreground">
-        {initials}
-      </AvatarFallback>
-    </Avatar>
+      {showImage ? (
+        <img
+          src={image}
+          alt={name ?? ""}
+          onError={() => {
+            console.error("[nav-avatar] resim yüklenemedi:", image);
+            setBrokenSrc(image);
+          }}
+          className="size-full rounded-full object-cover"
+        />
+      ) : (
+        <span className="select-none text-xs font-semibold tracking-wider text-foreground">
+          {initials}
+        </span>
+      )}
+    </div>
   );
 }
 
