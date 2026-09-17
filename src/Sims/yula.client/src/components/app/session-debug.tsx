@@ -4,6 +4,10 @@ import { useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import type { Session } from "@/lib/auth";
 
+// Modül seviyesinde dedupe: remount/HMR/oturum refire'lerinde aynı
+// parmak izi en fazla 1 kez loglanır.
+let lastLoggedFingerprint = "";
+
 /**
  * Gizli dev bileşeni — SessionProvider altında bir kez render edilir
  * (providers.tsx). İlk girişte (ve kullanıcı/provider değişince) oturum
@@ -31,6 +35,8 @@ export function SessionDebug() {
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
+    if (fingerprint === lastLoggedFingerprint) return;
+    lastLoggedFingerprint = fingerprint;
     if (status === "authenticated") {
       console.info("[Yula Auth] oturum detayı", {
         provider: user?.provider ?? null,
