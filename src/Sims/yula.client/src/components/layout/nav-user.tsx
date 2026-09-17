@@ -128,29 +128,28 @@ export function NavUser() {
   const badgeImage = useLocalProfileImage(user?.image);
 
   // Otomatik tamamlama: ilk girişte session'da resim YOK ama access
-  // token varsa, arka planda tek seferlik /api/auth/userinfo çağrısı
+  // token varsa, arka planda TEK SEFERLIK /api/auth/userinfo çağrısı
   // yapılır; taze resim yerel kayda yazılır → badge kendi kendine dolar,
   // sonraki yüklemelerde kayıt sayesinde çağrı bile gerekmez. Hata
   // (örn. token ömrü dolmuş 409) sessizce yutulur — badge initials'e
-  // kalır, kullanıcı ayarlardan manuel "Yeniden getir"le dener.
+  // kalır, kullanıcı ayarlardan manuel "Yeniden getir" ile dener.
+  // Fire-once: koşullar ilk kez sağlandığında başlar; deps değişimi
+  // (session object kimliği) çağrıyı iptal ETMEZ — uçan istek her
+  // durumda tamamlanır.
   const autoFetched = React.useRef(false);
   React.useEffect(() => {
     if (!user || !user.accessToken || badgeImage || autoFetched.current) {
       return;
     }
     autoFetched.current = true;
-    let cancelled = false;
     fetch("/api/auth/userinfo", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled && data?.picture) setLocalProfileImage(data.picture);
+        if (data?.picture) setLocalProfileImage(data.picture);
       })
       .catch(() => {
         // Ağ hatası: sessizce yut — rozet baş harflerle kalır.
       });
-    return () => {
-      cancelled = true;
-    };
   }, [user, badgeImage, user?.accessToken]);
 
   const activeTheme = mounted ? (theme ?? "system") : "system";
