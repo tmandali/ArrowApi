@@ -30,8 +30,6 @@ import {
   Building2,
   Check,
   User,
-  Settings,
-  Inbox,
   Palette,
   Sun,
   Moon,
@@ -101,6 +99,9 @@ function NavUserAvatar({
 }
 
 export function NavUser() {
+  // Menü kontrollü açık/kapanır: profil başlığına tıklanınca menü
+  // KAPANIYOR (yoksa sayfa değişse de header kalıcı olunca açık kalırdı).
+  const [open, setOpen] = React.useState(false);
   const t = useTranslations("NavUser");
   const { data: session, status } = useSession();
   const { clearJobSession } = useJobSession();
@@ -192,7 +193,7 @@ export function NavUser() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       {/* Rozet tooltip'i kaldırıldı: ad/e-posta + provider etiketi artık
           yalnız ayarlar sayfasının sağ panelinde (provider kaynağından).
           Rozet artık: avatar + yeşil online noktası. */}
@@ -220,7 +221,14 @@ export function NavUser() {
         sideOffset={8}
       >
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-3 px-2.5 py-3 bg-muted/40 rounded-lg">
+          {/* Profil başlığına tıklanınca KULLANICI EKRANI (user-details)
+              açılır — eski profil/tercihler/hesaplar link item'ları
+              kaldırıldı; tek giriş noktası bu başlık. */}
+          <Link
+            href="/my/settings?tab=user-details"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-2.5 py-3 bg-muted/40 rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
+          >
             <NavUserAvatar
               image={badgeImage}
               name={user.name}
@@ -236,7 +244,7 @@ export function NavUser() {
                 {user.email}
               </span>
             </div>
-          </div>
+          </Link>
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
@@ -265,30 +273,6 @@ export function NavUser() {
               </DropdownMenuItem>
             );
           })}
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="cursor-pointer" asChild>
-            <Link href="/my/settings?tab=user-details">
-              <User />
-              {t("profile")}
-              <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer" asChild>
-            <Link href="/my/settings?tab=settings">
-              <Settings />
-              {t("preferences")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer" asChild>
-            <Link href="/my/settings">
-              <Inbox />
-              {t("manage_accounts")}
-            </Link>
-          </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
