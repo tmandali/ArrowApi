@@ -20,11 +20,13 @@ import {
 import { useJobSession } from "@/features/auth/hooks/use-job-session";
 import {
   setLocalProfileImage,
+  toAvatarSrc,
   useLocalProfileImage,
 } from "@/features/auth/lib/local-profile-image";
 import type { Session } from "@/lib/auth";
 import { useActiveCompany } from "@/features/company/hooks/use-active-company";
 import { emptySubscribe } from "@/hooks/use-mounted";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/utils/cn";
 import {
   Building2,
@@ -84,7 +86,9 @@ function NavUserAvatar({
           src={image}
           alt={name ?? ""}
           onError={() => {
-            console.error("[nav-avatar] resim yüklenemedi:", image);
+            // Proxy 404'ü (resim yok) / geçici hata: baş harfler fallback'i
+            // ZATEN doğru görünümdür — sessizce düş, konsol gürültüsü yapma.
+            console.debug("[nav-avatar] resim yüklenemedi:", image);
             setBrokenSrc(image);
           }}
           className="size-full rounded-full object-cover"
@@ -105,8 +109,21 @@ export function NavUser() {
   const t = useTranslations("NavUser");
   const { data: session, status } = useSession();
   const { clearJobSession } = useJobSession();
-  const { company, companies, beginCompanySwitch, isSwitching } = useActiveCompany();
+  const { company, companies, switchCompany, lastSwitchedAt } =
+    useActiveCompany();
   const { theme, setTheme } = useTheme();
+
+  // Şirket geçişi anlık (optimistik) yapılır — uygulama asla kilitlenmez.
+  // Geri bildirim: geçişten ~900 ms boyunca aktif şirket satırında kısa bir
+  // "senkronize" spinner'ı gösterilir; paneller kendi loading state'leri ile
+  // yenilir, bu göstergeden bağımsızdır.
+  const [syncing, setSyncing] = React.useState(false);
+  React.useEffect(() => {
+    if (!lastSwitchedAt) return;
+    setSyncing(true);
+    const timer = window.setTimeout(() => setSyncing(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [lastSwitchedAt]);
 
   // Hydration güvenli "mounted" bayrağı
   const mounted = React.useSyncExternalStore(
@@ -127,8 +144,9 @@ export function NavUser() {
 
   // Rozet resmi: session'daki resmi yoksa ayarlar sayfasındaki
   // "Yeniden getir" başarısında saklanan yerel kayıt (localStorage)
-  // tamamlar — resim header ile kart arasında eşleşir.
-  const badgeImage = useLocalProfileImage(user).picture;
+  // tamamlar. Uzak (provider) URL'ler `toAvatarSrc` ile /api/avatar
+  // proxy'sine haritalanır — ham URL'ler WebView'de kırılgan yükleniyordu.
+  const badgeImage = toAvatarSrc(useLocalProfileImage(user).picture);
 
   // Otomatik tamamlama: ilk girişte session'da resim YOK ama access
   // token varsa, arka planda TEK SEFERLIK /api/auth/userinfo çağrısı
@@ -259,8 +277,7 @@ export function NavUser() {
               <DropdownMenuItem
                 key={item.id}
                 className="cursor-pointer gap-2"
-                disabled={isSwitching}
-                onClick={() => beginCompanySwitch(item.id)}
+                onClick={() => switchCompany(item.id)}
               >
                 <Building2 />
                 <span className="flex-1 truncate">{item.name}</span>
@@ -269,7 +286,16 @@ export function NavUser() {
                     {item.abbr}
                   </span>
                 ) : null}
-                {isActive ? <Check className="size-3.5" /> : null}
+                {isActive ? (
+                  syncing ? (
+                    <Spinner
+                      className="size-3.5"
+                      aria-label={t("syncing")}
+                    />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )
+                ) : null}
               </DropdownMenuItem>
             );
           })}

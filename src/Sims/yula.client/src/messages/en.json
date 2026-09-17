@@ -782,7 +782,8 @@
     "manage_accounts": "Manage Accounts",
     "theme_label": "Theme",
     "sign_out": "Sign Out",
-    "sign_in": "Sign In"
+    "sign_in": "Sign In",
+    "syncing": "Company data is syncing…"
   },
   "Notifications": {
     "financial_title": "Financial Notifications",
@@ -1384,14 +1385,6 @@
     "records_listed": "{count} records listed",
     "show_main_table": "Show in Main Table"
   },
-  "CompanySwitch": {
-    "title": "Company switch",
-    "preparing": "Preparing company context…",
-    "remounting": "Workspace is reloading…",
-    "loading": "Modules are lazy-loading…",
-    "finishing": "Finishing the switch…",
-    "loading_with": "Loading {label}"
-  },
   "PagePanelTrigger": {
     "open_panel": "Open {title} panel",
     "close_panel": "Close {title} panel"
@@ -1808,5 +1801,8 @@
     "combo_no_results": "No results.",
     "combo_clear": "Clear",
     "data_prepare": "Data Prepare"
+  },
+  "Company": {
+    "sync_failed": "Company switch could not be saved — reverted to the previous company."
   }
 }

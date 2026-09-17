@@ -6,15 +6,13 @@ import {
 export function useActiveCompany() {
   const company = useCompanyStore(selectActiveCompany)
   const companies = useCompanyStore((state) => state.companies)
-  const setActiveCompany = useCompanyStore((state) => state.setActiveCompany)
-  const beginCompanySwitch = useCompanyStore((state) => state.beginCompanySwitch)
-  const switchTransition = useCompanyStore((state) => state.switchTransition)
+  const switchCompany = useCompanyStore((state) => state.switchCompany)
+  const lastSwitchedAt = useCompanyStore((state) => state.lastSwitchedAt)
 
   return {
     company,
     companies,
-    setActiveCompany,
-    beginCompanySwitch,
-    isSwitching: switchTransition != null,
+    switchCompany,
+    lastSwitchedAt,
   }
 }

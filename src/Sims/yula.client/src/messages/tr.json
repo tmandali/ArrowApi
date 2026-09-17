@@ -782,7 +782,8 @@
     "manage_accounts": "Hesapları Yönet",
     "theme_label": "Tema",
     "sign_out": "Çıkış Yap",
-    "sign_in": "Giriş Yap"
+    "sign_in": "Giriş Yap",
+    "syncing": "Şirket verileri senkronize ediliyor…"
   },
   "Notifications": {
     "financial_title": "Finansal Bildirimler",
@@ -1384,14 +1385,6 @@
     "records_listed": "{count} kayıt listelendi",
     "show_main_table": "Ana Tabloda Göster"
   },
-  "CompanySwitch": {
-    "title": "Şirket geçişi",
-    "preparing": "Şirket bağlamı hazırlanıyor…",
-    "remounting": "Workspace yeniden yükleniyor…",
-    "loading": "Modüller lazy-load ediliyor…",
-    "finishing": "Geçiş tamamlanıyor…",
-    "loading_with": "{label} yükleniyor"
-  },
   "PagePanelTrigger": {
     "open_panel": "{title} panelini aç",
     "close_panel": "{title} panelini kapat"
@@ -1806,5 +1799,8 @@
     "combo_no_results": "Sonuç yok.",
     "combo_clear": "Temizle",
     "data_prepare": "Veri Hazırlık"
+  },
+  "Company": {
+    "sync_failed": "Şirket geçişi sunucuya yazılamadı — önceki şirkete dönüldü."
   }
 }

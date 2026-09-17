@@ -29,6 +29,8 @@ import Keycloak from "next-auth/providers/keycloak";
 import Google from "next-auth/providers/google";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Session as NextAuthSession, User as NextAuthUser } from "next-auth";
+import type { Company } from "@/types/company";
+import { getAuthorizedCompanies } from "@/lib/company-catalog";
 
 // Session type extension (refreshToken bilinçli olarak dışarı verilmez)
 export interface Session extends NextAuthSession {
@@ -45,6 +47,20 @@ export interface Session extends NextAuthSession {
      * (bkz. features/auth/lib/realm-roles.ts).
      */
     roles?: string[];
+    /**
+     * Kullanıcının işlem yapabildiği şirketler — giriş anında Next
+     * server tarafındaki kataloğa (lib/company-catalog.ts) sorulur;
+     * Sims.Server ucu gelince katalog Bearer + sub bazlı yetki listesini
+     * backend'den çeken proxy'ye çevrilir. Katalog boşsa ([] / hata) client
+     * seed listeye düşer.
+     */
+    companies?: Company[];
+    /**
+     * Aktif şirket — session property'si (tek doğruluk kaynağı session'dır).
+     * `POST /api/companies/active` session JWT'sini bu değerle yeniden
+     * imzalar; aktif şirket istemci localStorage'unda YAŞAMAZ.
+     */
+    activeCompanyId?: string | null;
   };
 }
 
@@ -63,6 +79,23 @@ function realmRolesFromAccessToken(accessToken: string): string[] {
     const roles = payload.realm_access?.roles;
     return Array.isArray(roles) ? roles.filter((r): r is string => typeof r === "string") : [];
   } catch {
+    return [];
+  }
+}
+
+/**
+ * Kullanıcının yetkili şirketleri — şimdilik Next server tarafındaki
+ * kataloğundan (bkz. lib/company-catalog.ts). Sims.Server ucu gelince
+ * KATALOG kendisi proxy'ye çevrilir; bu çağrı ve oturum akışı değişmez.
+ */
+async function fetchUserCompanies(user?: {
+  sub?: string;
+  accessToken?: string;
+}): Promise<Company[]> {
+  try {
+    return await getAuthorizedCompanies(user);
+  } catch (error) {
+    console.error("[auth] yetkili şirketler alınamadı:", error);
     return [];
   }
 }
@@ -232,6 +265,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           account.provider === "keycloak" && typeof account.access_token === "string"
             ? realmRolesFromAccessToken(account.access_token)
             : [];
+        // Yetkili şirketler session'a taşınır (tenant property'si): giriş
+        // ANINDA bir kez kataloğa sorulur (şimdilik Next server; Sims.Server
+        // ucu gelince katalog kendisi proxy'ye döner) — her session
+        // fetch'inde değil (token refresh path'leri bu branch'e düşmez,
+        // token.companies korunur). Katalog boşsa/[] → client seed listeye
+        // düşer.
+        const companies = await fetchUserCompanies({
+          sub: token.sub ?? undefined,
+          accessToken: typeof account.access_token === "string" ? account.access_token : undefined,
+        });
+        token.companies = companies;
+        // Varsayılan aktif şirket: mevcut session'daki seçim saklıysa onu
+        // koru (yeniden girişte şirket atlaması olmasın); yoksa ilki.
+        const previousActive =
+          typeof token.activeCompanyId === "string" ? token.activeCompanyId : undefined;
+        token.activeCompanyId =
+          previousActive && companies.some((c) => c.id === previousActive)
+            ? previousActive
+            : (companies[0]?.id ?? null);
       }
 
       // 1b) Google One Tap (credentials): ID token, `user.accessToken`
@@ -353,12 +405,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           accessToken?: string;
           provider?: string;
           roles?: string[];
+          companies?: Company[];
+          activeCompanyId?: string | null;
         };
         user.accessToken = token.accessToken as string | undefined;
         user.provider = token.provider as string | undefined;
         user.roles = Array.isArray(token.roles)
           ? (token.roles as unknown[]).filter((r): r is string => typeof r === "string")
           : [];
+        // Tenant property'leri: yetkili şirketler + aktif şirket session'a
+        // taşınır — istemci bunları KAYNAK olarak kullanır, kendi
+        // localStorage'undaki değerleri değil.
+        user.companies = Array.isArray(token.companies)
+          ? (token.companies as Company[])
+          : [];
+        user.activeCompanyId =
+          typeof token.activeCompanyId === "string" ? (token.activeCompanyId as string) : null;
       }
       return session;
     },

@@ -7,6 +7,7 @@ import { YulaChatProvider } from "@/hooks/yula-chat-provider";
 import { PagePanelProvider } from "@/context/page-panel-provider";
 import { DocLangSync } from "@/components/app/doc-lang-sync";
 import { AuthHeaderSync } from "@/components/app/auth-header-sync";
+import { CompanySessionSync } from "@/components/app/company-session-sync";
 import { SessionDebug } from "@/components/app/session-debug";
 import { AccountStatusGuard } from "@/components/app/account-status-guard";
 import { SessionProvider } from "next-auth/react";
@@ -28,6 +29,7 @@ export function Providers({
           <AppProviders>
             <YulaChatProvider>
               <AuthHeaderSync />
+              <CompanySessionSync />
               <SessionDebug />
               <AccountStatusGuard />
               <DocLangSync />

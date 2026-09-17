@@ -19,7 +19,6 @@ export {
 export {
   useCompanyStore,
   selectActiveCompany,
-  selectSwitchTargetCompany,
   MOCK_COMPANIES,
 } from "./slices/company-store"
 
