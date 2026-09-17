@@ -126,7 +126,9 @@
     "tpa_title": "Üçüncü Parti Kimlik Doğrulama",
     "social_logins": "Sosyal Girişler",
     "connections_body": "Bağlı Sosyal Girişler & Roller",
-    "image_refresh": "Yeniden getir (userinfo)"
+    "image_refresh": "Yeniden getir (userinfo)",
+    "image_upload": "Kendi resmini yükle",
+    "image_custom_remove": "Özel resim kaldır — provider resmine dön"
   },
   "WorkspaceLanding": {
     "pending_actions_title": "İşlem Bekleyenler",

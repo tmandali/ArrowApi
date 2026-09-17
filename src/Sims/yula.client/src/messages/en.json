@@ -126,7 +126,9 @@
     "tpa_title": "Third Party Authentication",
     "social_logins": "Social Logins",
     "connections_body": "Connected Social Logins & Roles",
-    "image_refresh": "Refresh (userinfo)"
+    "image_refresh": "Refresh (userinfo)",
+    "image_upload": "Upload your photo",
+    "image_custom_remove": "Remove custom photo — back to provider photo"
   },
   "WorkspaceLanding": {
     "pending_actions_title": "Pending Actions",

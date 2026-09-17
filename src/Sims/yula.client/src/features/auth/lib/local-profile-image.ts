@@ -20,6 +20,11 @@ import { emptySubscribe } from "@/hooks/use-mounted";
  */
 const STORAGE_KEY = "yula.profileImage";
 
+/** Kullanıcının KENDİ yüklediği resim (data URL) — provider resminin ÜSTÜNE
+ *  bindirilir; silinince provider zinciri devreye döner. Ayrı anahtar: 
+ *  "Yeniden getir" (provider record'ı) bu kayda dokunmaz. */
+const USER_PHOTO_KEY = "yula.userPhoto";
+
 /** Kayıtlı profil: resim URL'i + ad/soyad + e-posta (boş alanlar null). */
 export interface LocalProfileRecord {
   picture: string | null;
@@ -29,7 +34,48 @@ export interface LocalProfileRecord {
 
 let cache: LocalProfileRecord | null = null;
 let initialized = false;
+let userPhotoCache: string | null = null;
+let userPhotoInitialized = false;
 const listeners = new Set<() => void>();
+
+function ensureUserPhotoInitialized() {
+  if (!userPhotoInitialized) {
+    userPhotoInitialized = true;
+    try {
+      const raw = localStorage.getItem(USER_PHOTO_KEY);
+      userPhotoCache = raw && raw.startsWith("data:image/") ? raw : null;
+    } catch {
+      userPhotoCache = null;
+    }
+  }
+}
+
+/** Kullanıcının kendi yüklediği resim (data URL; yoksa null). */
+export function getLocalUserPhoto(): string | null {
+  ensureUserPhotoInitialized();
+  return userPhotoCache;
+}
+
+/**
+ * Kendi resminin yerel kaydı: data URL (canvas ile 256×256'a küçültülmüş
+ * JPEG — localStorage kotayına sığar) ya da null (kaydı sil → provider
+ * resmine dön). Aynı canlı yayına yazılır (dinleyiciler tetiklenir).
+ */
+export function setLocalUserPhoto(dataUrl: string | null) {
+  const next = dataUrl && dataUrl.startsWith("data:image/") ? dataUrl : null;
+  ensureUserPhotoInitialized();
+  if (next === userPhotoCache) return;
+  userPhotoCache = next;
+  try {
+    if (next) localStorage.setItem(USER_PHOTO_KEY, next);
+    else localStorage.removeItem(USER_PHOTO_KEY);
+  } catch {
+    // Quota / erişim sorunu: bellek kopyası yine yayımlanır (sayfa
+    // ömrü boyunca geçerli; kalıcı kayıt yazılamadıysa sonraki
+    // yüklemede provider zinciri devrede kalır).
+  }
+  listeners.forEach((listener) => listener());
+}
 
 function readStorage(): LocalProfileRecord | null {
   try {
@@ -122,6 +168,7 @@ export function useLocalProfileImage(
   } | null,
 ): LocalProfileRecord {
   const [record, setRecord] = React.useState<LocalProfileRecord | null>(null);
+  const [userPhoto, setUserPhoto] = React.useState<string | null>(null);
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -130,7 +177,9 @@ export function useLocalProfileImage(
   React.useEffect(() => {
     const update = () => {
       ensureInitialized();
+      ensureUserPhotoInitialized();
       setRecord(cache);
+      setUserPhoto(userPhotoCache);
     };
     update();
     listeners.add(update);
@@ -141,7 +190,8 @@ export function useLocalProfileImage(
 
   const source = mounted ? record : null;
   return {
-    picture: sessionUser?.image || source?.picture || null,
+    // Öncelik: kullanıcının kendi yüklediği resim > session > yerel kayıt
+    picture: userPhoto || sessionUser?.image || source?.picture || null,
     name: sessionUser?.name || source?.name || null,
     email: sessionUser?.email || source?.email || null,
   };

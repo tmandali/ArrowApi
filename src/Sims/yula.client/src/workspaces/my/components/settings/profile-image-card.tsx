@@ -3,9 +3,9 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
-import { Loader2, RefreshCw, Check, TriangleAlert } from "lucide-react";
+import { Loader2, RefreshCw, Check, TriangleAlert, Upload, Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { setLocalProfileImage, useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
+import { setLocalProfileImage, useLocalProfileImage, setLocalUserPhoto } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
 
 /**
@@ -35,12 +35,16 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
   // resim yüklenemezse yalnız o URL için initials'e düş (yeniden getirde
   // yeni URL gelince resim tekrar denenir).
   const [brokenSrc, setBrokenSrc] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Görüntülenecek resim: taze getirilen > session/yerel kayıt > yok
-  // (initials). Yerel kayıt: önceki "Yeniden getir" başarısında saklanan
-  // URL — reload sonrası da rozetle eşleşmeyi sağlar.
-  const baseImage = useLocalProfileImage(user).picture;
-  const shownImage = fetchedImage ?? baseImage;
+  // Görüntülenecek resim: KENDİ yüklenen (data URL, provider zincirinin
+  // üstüne bindirilir) > taze getirilen > session/yerel kayıt > yok
+  // (initials).
+  const profile = useLocalProfileImage(user);
+  const hasCustomPhoto = (profile.picture ?? "").startsWith("data:image/");
+  const shownImage = hasCustomPhoto
+    ? profile.picture
+    : (fetchedImage ?? profile.picture);
   const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
   const handleRefresh = React.useCallback(async () => {
@@ -79,6 +83,40 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
     } catch {
       setSync({ kind: "error" });
     }
+  }, []);
+
+  /**
+   * Kendi resmin yükle: dosya → canvas ile 256×256 kare kırım → JPEG
+   * data URL (localStorage kotasına sığar; provider resminin ÜSTÜNE
+   * bindirilir; Trash2 ile kaldırılınca provider zinciri devre).
+   */
+  const handleUpload = React.useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 8 * 1024 * 1024) return; // pratik üst sınır
+    try {
+      const bitmap = await createImageBitmap(file);
+      const size = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const scale = Math.max(size / bitmap.width, size / bitmap.height);
+      const w = bitmap.width * scale;
+      const h = bitmap.height * scale;
+      ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
+      bitmap.close();
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      setBrokenSrc(null);
+      setLocalUserPhoto(dataUrl);
+    } catch {
+      // Yükleme hatası: sessizce yut (mevcut resim korunur).
+    }
+  }, []);
+
+  const handleRemoveCustom = React.useCallback(() => {
+    setLocalUserPhoto(null);
+    setBrokenSrc(null);
   }, []);
 
   return (
@@ -134,6 +172,43 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
             <RefreshCw className="size-3.5" />
           )}
         </button>
+      {/* Sol alt: KENDİ RESMİ butonu — özel resim yokken "yükle" (Upload),
+          varken "kaldır" (Trash2 — provider resmine döner). Özel resim
+          aktifken buton kendiliğinden görünür. */}
+      <button
+        type="button"
+        onClick={() =>
+          hasCustomPhoto ? handleRemoveCustom() : fileInputRef.current?.click()
+        }
+        title={hasCustomPhoto ? t("image_custom_remove") : t("image_upload")}
+        aria-label={hasCustomPhoto ? t("image_custom_remove") : t("image_upload")}
+        className={cn(
+          "absolute -bottom-1 -left-1 z-10 flex size-7 items-center justify-center rounded-full",
+          "bg-background ring-1 ring-border shadow-sm text-muted-foreground",
+          "hover:text-foreground transition-all cursor-pointer",
+          hasCustomPhoto
+            ? "opacity-100 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400"
+            : "opacity-0 group-hover/avatar:opacity-100 focus-visible:opacity-100",
+        )}
+      >
+        {hasCustomPhoto ? (
+          <Trash2 className="size-3.5" />
+        ) : (
+          <Upload className="size-3.5" />
+        )}
+      </button>
+      {/* Gizli dosya seçici — sol alt buton tetikler. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleUpload(file);
+          e.target.value = "";
+        }}
+      />
       </div>
     </div>
   );
