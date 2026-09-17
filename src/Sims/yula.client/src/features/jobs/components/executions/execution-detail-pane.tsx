@@ -14,7 +14,6 @@ import { CodeBlock } from "@/components/ui/code-block";
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
   panelCardClass,
@@ -60,41 +59,31 @@ function Section({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
-  React.useEffect(() => {
-    setOpen(defaultOpen);
-  }, [defaultOpen]);
 
   if (empty) return null;
 
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className="border-b border-border/60 last:border-b-0"
-    >
-      <div className="relative">
-        {/* Header — CollapsibleTrigger yerine kendimiz kontrol ediyoruz ki
-            "empty" kontrolü + defaultOpen reset mantığı çalışsın. */}
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          className={cn(
-            "flex w-full items-center gap-1.5 border-b border-border/60 bg-muted/10 px-3 py-2 text-left text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40",
-          )}
-        >
-          {open ? (
-            <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
-          )}
-          {icon}
-          <span className="truncate">{title}</span>
-          {badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
-        </button>
-        <CollapsibleContent>
-          <div className="px-3 py-2">{children}</div>
-        </CollapsibleContent>
-      </div>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      {/* Header: yalnız üst bölümle ayırır (ilk dışa açıkken üst border zaten yok).
+          Collapsed durumda alt border'ı yalnız header'ın kendisi taşır —
+          CollapsibleContent yok, padding yok, kalın çizgi yok. */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          "flex w-full items-center gap-1.5 border-b border-border/60 bg-muted/10 px-3 py-2 text-left text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40",
+        )}
+      >
+        {open ? (
+          <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+        )}
+        {icon}
+        <span className="truncate">{title}</span>
+        {badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
+      </button>
+      {open ? <CollapsibleContent>{children}</CollapsibleContent> : null}
     </Collapsible>
   );
 }
@@ -235,6 +224,7 @@ export function ExecutionDetailPane({
             defaultOpen={true}
             empty={summaryLines.length === 0 && !errorLine}
           >
+            <div className="px-3 py-2">
             <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
               {summaryLines.map((line) => (
                 <div key={line.label} className="group grid min-w-0 gap-0.5">
@@ -271,6 +261,7 @@ export function ExecutionDetailPane({
                 </div>
               </div>
             ) : null}
+            </div>
           </Section>
 
           {/* ── Bölüm 2: İlerleme ──────────────────────────────────── */}
@@ -289,18 +280,20 @@ export function ExecutionDetailPane({
                 ) : undefined
               }
             >
-              {progressLoading ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {t("loading_progress")}
-                </p>
-              ) : (
-                <RunProgressSteps
-                  events={progressEvents}
-                  phase={progressPhase}
-                  running={running}
-                  loading={progressLoading}
-                />
-              )}
+              <div className="px-3 py-2">
+                {progressLoading ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("loading_progress")}
+                  </p>
+                ) : (
+                  <RunProgressSteps
+                    events={progressEvents}
+                    phase={progressPhase}
+                    running={running}
+                    loading={progressLoading}
+                  />
+                )}
+              </div>
             </Section>
           ) : null}
 
@@ -320,27 +313,29 @@ export function ExecutionDetailPane({
                 </Badge>
               }
             >
-              <div className="flex flex-col gap-0.5 rounded border border-border/40 bg-muted/20 p-2 font-mono text-[11px]">
-                {opfsDetail!.files.map((file) => (
-                  <div
-                    key={file.name}
-                    className="flex items-center justify-between gap-2 border-b border-border/20 py-0.5 last:border-0 last:pb-0"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="truncate font-medium text-foreground">
-                        {file.name}
-                      </span>
-                      {file.lastModified ? (
-                        <span className="text-[10px] text-muted-foreground/80">
-                          [{new Date(file.lastModified).toLocaleString()}]
+              <div className="px-3 py-2">
+                <div className="flex flex-col gap-0.5 rounded border border-border/40 bg-muted/20 p-2 font-mono text-[11px]">
+                  {opfsDetail!.files.map((file) => (
+                    <div
+                      key={file.name}
+                      className="flex items-center justify-between gap-2 border-b border-border/20 py-0.5 last:border-0 last:pb-0"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="truncate font-medium text-foreground">
+                          {file.name}
                         </span>
-                      ) : null}
+                        {file.lastModified ? (
+                          <span className="text-[10px] text-muted-foreground/80">
+                            [{new Date(file.lastModified).toLocaleString()}]
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">
+                        {formatBytes(file.sizeBytes)}
+                      </span>
                     </div>
-                    <span className="shrink-0 text-muted-foreground tabular-nums">
-                      {formatBytes(file.sizeBytes)}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </Section>
           ) : null}
@@ -351,11 +346,13 @@ export function ExecutionDetailPane({
             defaultOpen={false}
             empty={!inputJson || inputJson.trim() === "" || inputJson === "{\n  \n}"}
           >
-            <CodeBlock
-              value={inputJson}
-              language="json"
-              className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
-            />
+            <div className="px-3 py-2">
+              <CodeBlock
+                value={inputJson}
+                language="json"
+                className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
+              />
+            </div>
           </Section>
         </div>
       </div>
