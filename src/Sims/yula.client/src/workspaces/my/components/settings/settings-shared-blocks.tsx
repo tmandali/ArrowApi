@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 import { Copy, Paperclip, Plus, Send, Share2, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -118,11 +119,23 @@ export function ProfileSidePanel({
   const locale = useLocale();
   const fmtDate = (iso: string | null | undefined) => formatSettingsDate(iso, locale);
 
+  // Provider chip'i (i18n-dışı literal etiket — rozet etiketi geleneği).
+  const { data: session } = useSession();
+  const provider = (session?.user as { provider?: string } | undefined)?.provider;
+  const providerLabel = provider === "keycloak" ? "Keycloak" : "Google";
+
   return (
     <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
       {/* Profil resmi: avatar + hover "Yeniden getir" + tek satır durum —
-          ad/soyad satırının üstünde, ortalanarak. */}
-      <ProfileImageCard />
+          ad/soyad satırının üstünde, ortalanarak. Provider chip'i
+          avatar'ın sağına, dikey ortada. */}
+      <ProfileImageCard
+        trailing={
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {providerLabel}
+          </span>
+        }
+      />
 
       <div className="flex items-start justify-between">
         <div>

@@ -24,7 +24,7 @@ type SyncState =
   | { kind: "no-token" }
   | { kind: "error" };
 
-export function ProfileImageCard() {
+export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
   const t = useTranslations("MySettings");
   const { data: session } = useSession();
   const user = session?.user;
@@ -69,6 +69,7 @@ export function ProfileImageCard() {
 
   return (
     <div className="flex flex-col items-center gap-1.5">
+      <div className="flex items-center gap-3">
       <div className="group/avatar relative shrink-0">
         {shownImage && !imgBroken ? (
           <img
@@ -117,6 +118,10 @@ export function ProfileImageCard() {
             <RefreshCw className="size-3.5" />
           )}
         </button>
+      </div>
+      {/* Avatar'ın sağına, dikey ortada duran istemci tedarik ettiği
+          içerik (örn. provider chip'i). */}
+      {trailing}
       </div>
     </div>
   );
