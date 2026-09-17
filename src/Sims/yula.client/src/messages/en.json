@@ -126,11 +126,7 @@
     "tpa_title": "Third Party Authentication",
     "social_logins": "Social Logins",
     "connections_body": "Connected Social Logins & Roles",
-    "image_refresh": "Refresh (userinfo)",
-    "image_loading": "Fetching…",
-    "image_no_picture": "Provider returned no image — account has no profile photo",
-    "image_no_token": "Access token expired — sign in again",
-    "image_fetch_error": "Could not fetch — try again"
+    "image_refresh": "Refresh (userinfo)"
   },
   "WorkspaceLanding": {
     "pending_actions_title": "Pending Actions",

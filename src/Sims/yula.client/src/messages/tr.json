@@ -126,11 +126,7 @@
     "tpa_title": "Üçüncü Parti Kimlik Doğrulama",
     "social_logins": "Sosyal Girişler",
     "connections_body": "Bağlı Sosyal Girişler & Roller",
-    "image_refresh": "Yeniden getir (userinfo)",
-    "image_loading": "Alınıyor…",
-    "image_no_picture": "Sağlayıcı resim vermedi — hesapta profil fotoğrafı yok",
-    "image_no_token": "Giriş token'ı süresi dolmuş — yeniden giriş gerekli",
-    "image_fetch_error": "Alınamadı — tekrar deneyin"
+    "image_refresh": "Yeniden getir (userinfo)"
   },
   "WorkspaceLanding": {
     "pending_actions_title": "İşlem Bekleyenler",

@@ -67,34 +67,6 @@ export function ProfileImageCard() {
     }
   }, []);
 
-  // Statü satırı + rengi: yalnız dikkat çeken durumlarda görünür
-  // (token yok / hata / hesapta resim yok). Başarı halleri sessizdir —
-  // "Taze alındı" satırı gürültüydü.
-  let statusText = "";
-  let statusClass = "text-muted-foreground";
-  switch (sync.kind) {
-    case "loading":
-      statusText = t("image_loading");
-      statusClass = "text-muted-foreground";
-      break;
-    case "fresh":
-      if (!sync.hasPicture) {
-        statusText = t("image_no_picture");
-        statusClass = "text-amber-600 dark:text-amber-400";
-      }
-      break;
-    case "no-token":
-      statusText = t("image_no_token");
-      statusClass = "text-amber-600 dark:text-amber-400";
-      break;
-    case "error":
-      statusText = t("image_fetch_error");
-      statusClass = "text-red-600 dark:text-red-400";
-      break;
-    case "idle":
-      break;
-  }
-
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="group/avatar relative shrink-0">
@@ -112,9 +84,9 @@ export function ProfileImageCard() {
             {profileInitialsOf(user?.name ?? "")}
           </div>
         )}
-        {/* Hover'da beliren "Yeniden getir" butonu — aynı anda statü
-            göstergesi: spinning (yükleniyor), onay (başarılı), uyarı
-            (token/hata). Renk statüyle eşleşir. */}
+        {/* "Yeniden getir" butonu — durum tamamen ikonla okunur:
+            spin (yükleniyor), onay (başarılı), uyarı (token/resim yok
+            ya da hata). Sorunlu hallerde buton kendiliğinden görünür. */}
         <button
           type="button"
           onClick={handleRefresh}
@@ -127,25 +99,25 @@ export function ProfileImageCard() {
             "hover:text-foreground transition-all cursor-pointer",
             "opacity-0 group-hover/avatar:opacity-100 focus-visible:opacity-100",
             sync.kind === "loading" && "opacity-100 cursor-wait",
-            sync.kind === "no-token" && "opacity-100 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400",
-            sync.kind === "error" && "opacity-100 text-red-600 dark:text-red-400 hover:text-red-600 dark:hover:text-red-400",
+            sync.kind === "no-token" &&
+              "opacity-100 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400",
+            sync.kind === "error" &&
+              "opacity-100 text-red-600 dark:text-red-400 hover:text-red-600 dark:hover:text-red-400",
+            sync.kind === "fresh" && !sync.hasPicture &&
+              "opacity-100 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400",
           )}
         >
           {sync.kind === "loading" ? (
             <Loader2 className="size-3.5 animate-spin" />
-          ) : sync.kind === "fresh" ? (
+          ) : sync.kind === "fresh" && sync.hasPicture ? (
             <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-          ) : sync.kind === "no-token" || sync.kind === "error" ? (
+          ) : sync.kind === "fresh" || sync.kind === "no-token" || sync.kind === "error" ? (
             <TriangleAlert className="size-3.5" />
           ) : (
             <RefreshCw className="size-3.5" />
           )}
         </button>
       </div>
-      {/* Tek satır durum: yalnız hata/dikkat anlarında görünür
-          (token yok, getirme hatası, hesapta resim yok). Başarıda
-          sessiz — boştaysa satır hiç render edilmez. */}
-      {statusText ? <p className={cn("max-w-full truncate text-[10px]", statusClass)}>{statusText}</p> : null}
     </div>
   );
 }
