@@ -46,22 +46,18 @@ export async function GET() {
   }
 
   let url: string;
-  // "google-onesig": eski session cookie'si — NextAuth'un credentials
-  // provider damgası. provider alanı varsa Google'a sorulabilir.
-  const provider = user.provider === "google-onesig" ? "google" : user.provider;
-
-  // Google One Tap session'ı: refresh token YOKTUR (OAuth grant yapılmaz,
-  // GIS yalnız ID token üretir). Bu session'larda accessToken ASLINDA ID
-  // token'ın kendisidir — Google'ın userinfo endpoint'i onu Bearer olarak
-  // REDDEDER (401 invalid_request — canlıda doğrulandı). ID token zaten
+  // "google-onesig": One Tap (GIS) session'ının provider damgası (bkz.
+  // auth.ts jwt callback 1b). Bu session'larda accessToken ASLINDA ID
+  // token'ıdır; Google'ın userinfo endpoint'i onu Bearer olarak REDDER
+  // (401 invalid_request — canlıda doğrulandı). ID token zaten
   // name/email/picture claim'lerini taşıdığından, session'daki değerler
-  // (= giriş anındaki durum) "son senkronizasyon" olarak döner. Sonraki
-  // girişe kadar Google'daki profil değişikliği yansımaz.
-  // (Klasik redirect'li Google OAuth session'larında refresh token vardır;
-  // onlar için gerçek userinfo çağrısına devam edilir.)
-  if (provider === "google" && !user.refreshToken) {
+  // (= giriş anındaki durum) "son senkronizasyon" olarak döner; sonraki
+  // girişe kadar Google'daki profil değişikliği yansımaz. Klâsik Google
+  // OAuth session'ları provider "google" damgasıyla aşağıdaki switch'e
+  // düşer — gerçek access token'la userinfo çağrılır.
+  if (user.provider === "google-onesig") {
     return NextResponse.json({
-      provider: "google",
+      provider: "google-onesig",
       name: user.name ?? null,
       email: user.email ?? null,
       picture: user.image ?? null,
@@ -69,11 +65,11 @@ export async function GET() {
       source: "session-claims",
     });
   }
-  switch (provider) {
+  switch (user.provider) {
     case "google":
-      // Klasik redirect'li Google OAuth (refresh token'lu) — gerçek
-      // access token'la çalışır. (One Tap session'ları yukarıda
-      // session-claims olarak dönüştü.)
+      // Klâsik redirect'li Google OAuth — gerçek access token'la
+      // çalışır (refresh token varsayılmaz; ömrü dolmuş token 409'a
+      // döner, One Tap'teki gibi değil — gerçek token süresi ~1 saat).
       url = "https://openidconnect.googleapis.com/v1/userinfo";
       break;
     case "keycloak": {

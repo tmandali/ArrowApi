@@ -175,8 +175,8 @@ const googleOneTapProvider = {
     const expiresAt = payload.exp * 1000;
 
     // accessToken/expiresAt jwt callback'te tüketilir; provider
-    // "google" olarak haritalanır ki refreshEndpoint() aynı Google
-    // endpoint'ini çözümsünlensin.
+    // "google-onesig" damgasıyla oturuma yazılır (userinfo route'u bu
+    // damgaya bakıp session claim fallback'i yapar).
     return {
       id: payload.sub,
       name: payload.name,
@@ -184,7 +184,7 @@ const googleOneTapProvider = {
       image: payload.picture,
       accessToken,
       expiresAt,
-      provider: "google",
+      provider: "google-onesig",
     };
   },
 };
@@ -251,7 +251,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (oneTapUser.accessToken) token.accessToken = oneTapUser.accessToken;
         if (oneTapUser.refreshToken) token.refreshToken = oneTapUser.refreshToken;
         token.expiresAt = oneTapUser.expiresAt;
-        token.provider = "google";
+        // "google-onesig" damgası: /api/auth/userinfo bu provider'a bakıp
+        // One Tap session'larında session claim'lerini döner (ID token'ı
+        // Bearer kabul etmediğinden). Klasik Google OAuth provider
+        // "google" damgasıyla farklı kalır.
+        token.provider = "google-onesig";
       }
 
       // 2) Token hâlâ geçerli → iş yapma.
