@@ -184,7 +184,7 @@ export function ChatComposer({
           if (showCommands) return;
           handleSend();
         }}
-        className="rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20 dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10"
+        className="rounded-xl border border-primary/15 bg-muted/40 p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20 dark:bg-muted/30"
       >
         <div className="flex flex-wrap items-center gap-1.5 px-1 py-0.5 min-h-[36px]">
           {selectedCommand ? (
