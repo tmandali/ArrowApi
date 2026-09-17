@@ -67,8 +67,10 @@ export function ProfileImageCard() {
     }
   }, []);
 
-  // Statü satırı + rengi.
-  let statusText = t("image_session");
+  // Statü satırı + rengi: yalnız dikkat çeken durumlarda görünür
+  // (token yok / hata / hesapta resim yok). Başarı halleri sessizdir —
+  // "Taze alındı" satırı gürültüydü.
+  let statusText = "";
   let statusClass = "text-muted-foreground";
   switch (sync.kind) {
     case "loading":
@@ -76,10 +78,10 @@ export function ProfileImageCard() {
       statusClass = "text-muted-foreground";
       break;
     case "fresh":
-      statusText = sync.hasPicture
-        ? t("image_fresh")
-        : t("image_no_picture");
-      statusClass = sync.hasPicture ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400";
+      if (!sync.hasPicture) {
+        statusText = t("image_no_picture");
+        statusClass = "text-amber-600 dark:text-amber-400";
+      }
       break;
     case "no-token":
       statusText = t("image_no_token");
@@ -132,9 +134,10 @@ export function ProfileImageCard() {
           )}
         </button>
       </div>
-      {/* Tek satır durum: kenar panelinde ad/soyad zaten altta göründüğü
-          için başlık satırı kaldırıldı, yalnız senkronizasyon durumu. */}
-      <p className={cn("max-w-full truncate text-[10px]", statusClass)}>{statusText}</p>
+      {/* Tek satır durum: yalnız hata/dikkat anlarında görünür
+          (token yok, getirme hatası, hesapta resim yok). Başarıda
+          sessiz — boştaysa satır hiç render edilmez. */}
+      {statusText ? <p className={cn("max-w-full truncate text-[10px]", statusClass)}>{statusText}</p> : null}
     </div>
   );
 }
