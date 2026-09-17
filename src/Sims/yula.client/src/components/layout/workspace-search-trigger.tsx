@@ -50,7 +50,7 @@ export function WorkspaceSearchTrigger({
   return (
     <div
       className={cn(
-        "relative flex h-7 w-full max-w-64 items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/60 px-2 transition-colors sm:max-w-72 focus-within:border-sidebar-ring focus-within:ring-2 focus-within:ring-sidebar-ring/30 dark:bg-sidebar-accent/40",
+        "relative flex h-7 w-full max-w-64 items-center gap-2 rounded-md border border-sidebar-border bg-white px-2 transition-colors sm:max-w-72 focus-within:border-sidebar-ring focus-within:ring-2 focus-within:ring-sidebar-ring/30 dark:bg-[#1e2026]",
         className
       )}
     >
@@ -74,7 +74,7 @@ export function WorkspaceSearchTrigger({
           }
         }}
         placeholder={resolvedPlaceholder}
-        className="min-w-0 flex-1 bg-transparent text-xs/relaxed outline-none text-sidebar-foreground placeholder:text-sidebar-foreground/50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-w-0 flex-1 bg-transparent text-xs/relaxed outline-none text-gray-900 placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:placeholder:text-gray-500"
         aria-label="Search workspace"
       />
       {query || open ? (
