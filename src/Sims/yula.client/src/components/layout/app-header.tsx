@@ -65,7 +65,7 @@ export function AppHeader({ className }: { className?: string }) {
 
       {/* Orta: Global Arama Çubuğu */}
       <div className="flex min-w-0 max-w-xl flex-1 items-center justify-center px-2">
-        <WorkspaceSearchTrigger className="max-w-md border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground placeholder:text-muted-foreground focus-within:border-ring focus-within:ring-ring/20 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/50" />
+        <WorkspaceSearchTrigger className="max-w-md text-sidebar-foreground" />
       </div>
 
       {/* Sağ: Bildirimler + Kullanıcı Menüsü */}
