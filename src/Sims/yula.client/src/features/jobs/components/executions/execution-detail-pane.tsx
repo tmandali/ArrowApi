@@ -82,11 +82,7 @@ function Section({
         <span className="truncate">{title}</span>
         {badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
       </button>
-      {open ? (
-        <CollapsibleContent>
-          <div className="px-3 py-2">{children}</div>
-        </CollapsibleContent>
-      ) : null}
+      {open ? <CollapsibleContent>{children}</CollapsibleContent> : null}
     </Collapsible>
   );
 }
@@ -227,6 +223,7 @@ export function ExecutionDetailPane({
             defaultOpen={true}
             empty={summaryLines.length === 0 && !errorLine}
           >
+            <div className="px-4 py-2">
             <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
               {summaryLines.map((line) => (
                 <div key={line.label} className="group grid min-w-0 gap-0.5">
@@ -263,6 +260,7 @@ export function ExecutionDetailPane({
                 </div>
               </div>
             ) : null}
+            </div>
           </Section>
 
           {/* ── Bölüm 2: İlerleme ──────────────────────────────────── */}
@@ -281,18 +279,20 @@ export function ExecutionDetailPane({
                 ) : undefined
               }
             >
-              {progressLoading ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {t("loading_progress")}
-                </p>
-              ) : (
-                <RunProgressSteps
-                  events={progressEvents}
-                  phase={progressPhase}
-                  running={running}
-                  loading={progressLoading}
-                />
-              )}
+              <div className="px-4 py-2">
+                {progressLoading ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("loading_progress")}
+                  </p>
+                ) : (
+                  <RunProgressSteps
+                    events={progressEvents}
+                    phase={progressPhase}
+                    running={running}
+                    loading={progressLoading}
+                  />
+                )}
+              </div>
             </Section>
           ) : null}
 
@@ -312,7 +312,8 @@ export function ExecutionDetailPane({
                 </Badge>
               }
             >
-              <div className="flex flex-col gap-0.5 rounded border border-border/40 bg-muted/20 p-2 font-mono text-[11px]">
+              <div className="px-1 py-1">
+                <div className="flex flex-col gap-0.5 rounded border border-border/40 bg-muted/20 p-2 font-mono text-[11px]">
                   {opfsDetail!.files.map((file) => (
                     <div
                       key={file.name}
@@ -334,6 +335,7 @@ export function ExecutionDetailPane({
                     </div>
                   ))}
                 </div>
+              </div>
             </Section>
           ) : null}
 
@@ -343,11 +345,11 @@ export function ExecutionDetailPane({
             defaultOpen={false}
             empty={!inputJson || inputJson.trim() === "" || inputJson === "{\n  \n}"}
           >
-            <CodeBlock
-              value={inputJson}
-              language="json"
-              className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
-            />
+              <CodeBlock
+                value={inputJson}
+                language="json"
+                className="max-h-[min(24rem,50vh)] min-h-32 rounded-none border-0"
+              />
           </Section>
         </div>
       </div>
