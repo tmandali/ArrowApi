@@ -17,11 +17,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useJobSession } from "@/features/auth/hooks/use-job-session";
 import {
   setLocalProfileImage,
@@ -49,16 +44,6 @@ const themes = [
   { value: "dark", icon: Moon, label: "Dark" },
   { value: "system", icon: Monitor, label: "System" },
 ] as const;
-
-/**
- * Provider → literal Türkçe rozet etiketi (i18n/çeviri katmanından bağımsız;
- * tooltip'de kullanılır — bkz. rozet tooltip'i).
- */
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google Hesabı",
-  "google-onesig": "Google Hesabı",
-  keycloak: "Keycloak Hesabı",
-};
 
 /**
  * Header trigger ve dropdown menüdeki rozeti aynı resim + aynı stilde gösteren
@@ -178,7 +163,6 @@ export function NavUser() {
   }, [user, badgeImage, user?.accessToken]);
 
   const activeTheme = mounted ? (theme ?? "system") : "system";
-  const providerLabel = PROVIDER_LABELS[user?.provider ?? ""] ?? "Hesap";
 
   const handleSignOut = () => {
     clearJobSession();
@@ -209,48 +193,26 @@ export function NavUser() {
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="User menu"
-              className="group relative flex size-8 items-center justify-center rounded-full transition-all duration-150 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=open]:ring-2 data-[state=open]:ring-primary/50 cursor-pointer"
-            >
-            <NavUserAvatar
-              image={badgeImage}
-              name={user.name}
-              initials={initials}
-              sizeClass="size-8 transition-all group-hover:ring-sidebar-foreground/30"
-              ringClass="ring-sidebar-border"
-            />
-            {/* Online/Aktif durumu belirteci */}
-            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
-            </button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={8} className="px-3 py-2.5 text-left leading-snug">
-          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/60">
-            {providerLabel}
-            {/* Resim durumu göstergesi: resim varsa yeşil, yoksa amber */}
-            <span
-              role="img"
-              aria-label={badgeImage ? "Resim yüklü" : "Resim yok"}
-              title={badgeImage ? "Resim yüklü" : "Resim yok — baş harfler gösteriliyor"}
-              className={cn(
-                "size-1.5 shrink-0 rounded-full",
-                badgeImage ? "bg-emerald-400" : "bg-amber-400/90"
-              )}
-            />
-          </span>
-          <span className="block max-w-56 truncate text-xs font-medium">
-            {user.name ?? "-"}
-          </span>
-          <span className="block max-w-56 truncate text-xs text-primary-foreground/80">
-            {user.email ?? "-"}
-          </span>
-        </TooltipContent>
-      </Tooltip>
+      {/* Rozet tooltip'i kaldırıldı: ad/e-posta + provider etiketi artık
+          yalnız ayarlar sayfasının sağ panelinde (provider kaynağından).
+          Rozet artık: avatar + yeşil online noktası. */}
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="User menu"
+          className="group relative flex size-8 items-center justify-center rounded-full transition-all duration-150 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=open]:ring-2 data-[state=open]:ring-primary/50 cursor-pointer"
+        >
+          <NavUserAvatar
+            image={badgeImage}
+            name={user.name}
+            initials={initials}
+            sizeClass="size-8 transition-all group-hover:ring-sidebar-foreground/30"
+            ringClass="ring-sidebar-border"
+          />
+          {/* Online/Aktif durumu belirteci */}
+          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
+        </button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent
         className="w-68 rounded-xl p-1.5 shadow-xl border-border/80"
         side="bottom"
