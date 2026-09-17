@@ -45,6 +45,39 @@ const themes = [
   { value: "system", icon: Monitor, label: "System" },
 ] as const;
 
+/**
+ * Header trigger ve dropdown menüdeki rozeti aynı resim + aynı stilde gösteren
+ * ortak Avatar bileşeni. "Farklı resim" algısı yaratan ring/boyut sürprizlerini önler.
+ */
+function NavUserAvatar({
+  image,
+  name,
+  initials,
+  sizeClass,
+  ringClass,
+}: {
+  image?: string | null;
+  name?: string | null;
+  initials: string;
+  sizeClass?: string;
+  ringClass?: string;
+}) {
+  return (
+    <Avatar
+      className={cn(
+        "rounded-full ring-1 after:border-0 shadow-xs",
+        sizeClass,
+        ringClass
+      )}
+    >
+      {image ? <AvatarImage src={image} alt={name ?? ""} /> : null}
+      <AvatarFallback className="rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-xs font-semibold tracking-wider text-foreground">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
 export function NavUser() {
   const t = useTranslations("NavUser");
   const { data: session, status } = useSession();
@@ -106,15 +139,13 @@ export function NavUser() {
           aria-label="User menu"
           className="group relative flex size-8 items-center justify-center rounded-full transition-all duration-150 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=open]:ring-2 data-[state=open]:ring-primary/50 cursor-pointer"
         >
-          <Avatar className="size-8 rounded-full ring-1 ring-sidebar-border group-hover:ring-sidebar-foreground/30 transition-all after:border-0 shadow-xs">
-            <AvatarImage
-              src={user.image ?? ""}
-              alt={user.name ?? ""}
-            />
-            <AvatarFallback className="rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-sidebar-foreground text-xs font-semibold tracking-wider">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <NavUserAvatar
+            image={user.image}
+            name={user.name}
+            initials={initials}
+            sizeClass="size-8 transition-all group-hover:ring-sidebar-foreground/30"
+            ringClass="ring-sidebar-border"
+          />
           {/* Online/Aktif durumu belirteci */}
           <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
         </button>
@@ -127,15 +158,13 @@ export function NavUser() {
       >
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-2.5 py-3 bg-muted/40 rounded-lg">
-            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border shadow-xs">
-              <AvatarImage
-                src={user.image ?? ""}
-                alt={user.name ?? ""}
-              />
-              <AvatarFallback className="rounded-full bg-linear-to-br from-primary/30 to-primary/10 text-foreground text-xs font-semibold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <NavUserAvatar
+              image={user.image}
+              name={user.name}
+              initials={initials}
+              sizeClass="h-10 w-10"
+              ringClass="ring-sidebar-border"
+            />
             <div className="grid flex-1 text-left leading-tight min-w-0">
               <span className="truncate text-sm font-medium text-foreground">
                 {user.name}
