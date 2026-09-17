@@ -109,6 +109,7 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
       }
       try {
         let image: CanvasImageSource & { width: number; height: number };
+        let bitmapToClose: ImageBitmap | null = null;
         let revoke = () => {};
         if (isSvg) {
           // SVG yolu: <img> olarak çözümlenir (createImageBitmap SVG'
@@ -131,7 +132,8 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
           revoke = () => URL.revokeObjectURL(blobUrl);
           image = el;
         } else {
-          image = await createImageBitmap(file);
+          bitmapToClose = await createImageBitmap(file);
+          image = bitmapToClose;
         }
         // Kare yok / 0 boyutlu (görüşlü SVG) → makul varsayımla çiz.
         const srcW = (image as { naturalWidth?: number }).naturalWidth || image.width || 256;
@@ -154,7 +156,7 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         const w = srcW * scale;
         const h = srcH * scale;
         ctx.drawImage(image, (size - w) / 2, (size - h) / 2, w, h);
-        if ("close" in image && image !== file) (image as { close?: () => void }).close?.();
+        if (bitmapToClose) bitmapToClose.close();
         revoke();
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         setBrokenSrc(null);
