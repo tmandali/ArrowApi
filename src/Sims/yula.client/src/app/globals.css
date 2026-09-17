@@ -181,6 +181,10 @@
 @theme {
   --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
 
+  /* Şirket geçişi: key ile remount edilen sayfa içeriğinin sert
+     veri→iskelet değişimini yumuşatan kısa açılış. */
+  --animate-page-swap: page-swap 180ms ease-out;
+
   @keyframes indeterminate {
     0% {
       left: -40%;
@@ -189,6 +193,15 @@
     100% {
       left: 100%;
       width: 40%;
+    }
+  }
+
+  @keyframes page-swap {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
     }
   }
 }

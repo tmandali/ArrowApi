@@ -13,18 +13,28 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <TooltipProvider>
       <Toaster richColors closeButton position="bottom-right" />
       {/*
-        Şirket geçişi anlık + optimistiktir: key değişimiyle workspace alt
-        ağacı yeniden mount edilir; her panel kendi verisini (X-Company-Id)
-        yeniden çeker ve kendi loading state'ini gösterir. Tam ekran bir
-        "geçiş" gate'i yoktur.
+        Provider'lar (iş takibi SSE'leri, bildirim kutusu) KÜRESELDİR —
+        company'den bağımsız, bu yüzden key'in DIŞINDA kalır: şirket
+        geçişinde çalışan job'ların akışları kesilmez, bildirim kutusu
+        sıfırlanmaz. (Eski hâllerinde key ile birlikte remount ediliyor,
+        tüm SSE akışları abort edilip yeniden açılıyordu — "flaş").
+
+        Şirket geçişi anlık + optimistiktir: key yalnızca SAHİFELERİ
+        yeniden mount eder; her panel kendi verisini (X-Company-Id)
+        yeniden çeker ve kendi loading state'ini gösterir. Kısa
+        fade-in (animate-page-swap) sert veri→iskelet geçişini yumuşatır.
+        Tam ekran bir "geçiş" gate'i yoktur.
       */}
-      <div key={activeCompanyId ?? "no-company"} className="contents">
-        <WorkspaceNotificationsProvider>
-          <JobSyncProvider>
+      <WorkspaceNotificationsProvider>
+        <JobSyncProvider>
+          <div
+            key={activeCompanyId ?? "no-company"}
+            className="contents animate-page-swap"
+          >
             {children}
-          </JobSyncProvider>
-        </WorkspaceNotificationsProvider>
-      </div>
+          </div>
+        </JobSyncProvider>
+      </WorkspaceNotificationsProvider>
     </TooltipProvider>
   )
 }
