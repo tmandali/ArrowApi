@@ -28,7 +28,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useJobSession } from "@/features/auth/hooks/use-job-session";
-import { useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
+import {
+  setLocalProfileImage,
+  useLocalProfileImage,
+} from "@/features/auth/lib/local-profile-image";
 import type { Session } from "@/lib/auth";
 import { useActiveCompany } from "@/features/company/hooks/use-active-company";
 import { emptySubscribe } from "@/hooks/use-mounted";
@@ -123,6 +126,32 @@ export function NavUser() {
   // "Yeniden getir" başarısında saklanan yerel kayıt (localStorage)
   // tamamlar — resim header ile kart arasında eşleşir.
   const badgeImage = useLocalProfileImage(user?.image);
+
+  // Otomatik tamamlama: ilk girişte session'da resim YOK ama access
+  // token varsa, arka planda tek seferlik /api/auth/userinfo çağrısı
+  // yapılır; taze resim yerel kayda yazılır → badge kendi kendine dolar,
+  // sonraki yüklemelerde kayıt sayesinde çağrı bile gerekmez. Hata
+  // (örn. token ömrü dolmuş 409) sessizce yutulur — badge initials'e
+  // kalır, kullanıcı ayarlardan manuel "Yeniden getir"le dener.
+  const autoFetched = React.useRef(false);
+  React.useEffect(() => {
+    if (!user || !user.accessToken || badgeImage || autoFetched.current) {
+      return;
+    }
+    autoFetched.current = true;
+    let cancelled = false;
+    fetch("/api/auth/userinfo", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.picture) setLocalProfileImage(data.picture);
+      })
+      .catch(() => {
+        // Ağ hatası: sessizce yut — rozet baş harflerle kalır.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, badgeImage, user?.accessToken]);
 
   const activeTheme = mounted ? (theme ?? "system") : "system";
   const providerLabel = PROVIDER_LABELS[user?.provider ?? ""] ?? "Hesap";
