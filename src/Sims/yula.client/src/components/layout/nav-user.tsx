@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useJobSession } from "@/features/auth/hooks/use-job-session";
+import { useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
 import type { Session } from "@/lib/auth";
 import { useActiveCompany } from "@/features/company/hooks/use-active-company";
 import { emptySubscribe } from "@/hooks/use-mounted";
@@ -118,6 +119,11 @@ export function NavUser() {
         .slice(0, 2)
     : "NB";
 
+  // Rozet resmi: session'daki resmi yoksa ayarlar sayfasındaki
+  // "Yeniden getir" başarısında saklanan yerel kayıt (localStorage)
+  // tamamlar — resim header ile kart arasında eşleşir.
+  const badgeImage = useLocalProfileImage(user?.image);
+
   const activeTheme = mounted ? (theme ?? "system") : "system";
   const providerLabel = PROVIDER_LABELS[user?.provider ?? ""] ?? "Hesap";
 
@@ -159,7 +165,7 @@ export function NavUser() {
               className="group relative flex size-8 items-center justify-center rounded-full transition-all duration-150 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 data-[state=open]:ring-2 data-[state=open]:ring-primary/50 cursor-pointer"
             >
             <NavUserAvatar
-              image={user.image}
+              image={badgeImage}
               name={user.name}
               initials={initials}
               sizeClass="size-8 transition-all group-hover:ring-sidebar-foreground/30"
@@ -173,14 +179,14 @@ export function NavUser() {
         <TooltipContent side="bottom" sideOffset={8} className="px-3 py-2.5 text-left leading-snug">
           <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/60">
             {providerLabel}
-            {/* Resim durumu göstergesi: session'da resim varsa yeşil, yoksa amber */}
+            {/* Resim durumu göstergesi: resim varsa yeşil, yoksa amber */}
             <span
               role="img"
-              aria-label={user.image ? "Resim yüklü" : "Resim yok"}
-              title={user.image ? "Resim yüklü" : "Resim yok — baş harfler gösteriliyor"}
+              aria-label={badgeImage ? "Resim yüklü" : "Resim yok"}
+              title={badgeImage ? "Resim yüklü" : "Resim yok — baş harfler gösteriliyor"}
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
-                user.image ? "bg-emerald-400" : "bg-amber-400/90"
+                badgeImage ? "bg-emerald-400" : "bg-amber-400/90"
               )}
             />
           </span>
@@ -201,7 +207,7 @@ export function NavUser() {
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-2.5 py-3 bg-muted/40 rounded-lg">
             <NavUserAvatar
-              image={user.image}
+              image={badgeImage}
               name={user.name}
               initials={initials}
               sizeClass="h-10 w-10"

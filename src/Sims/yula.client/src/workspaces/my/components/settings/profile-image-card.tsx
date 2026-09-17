@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { setLocalProfileImage, useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
 
 /**
@@ -35,8 +36,11 @@ export function ProfileImageCard() {
   // yeni URL gelince resim tekrar denenir).
   const [brokenSrc, setBrokenSrc] = React.useState<string | null>(null);
 
-  // Görüntülenecek resim: taze getirilen > session'daki > yok (initials).
-  const shownImage = fetchedImage ?? user?.image ?? null;
+  // Görüntülenecek resim: taze getirilen > session/yerel kayıt > yok
+  // (initials). Yerel kayıt: önceki "Yeniden getir" başarısında saklanan
+  // URL — reload sonrası da rozetle eşleşmeyi sağlar.
+  const baseImage = useLocalProfileImage(user?.image);
+  const shownImage = fetchedImage ?? baseImage;
   const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
   const handleRefresh = React.useCallback(async () => {
@@ -52,8 +56,12 @@ export function ProfileImageCard() {
         return;
       }
       const data = (await res.json()) as { picture?: string | null };
-      setFetchedImage(data.picture ?? null);
-      setSync({ kind: "fresh", at: new Date().toISOString(), hasPicture: !!data.picture });
+      const picture = data.picture ?? null;
+      setFetchedImage(picture);
+      // Başarılı getirme → yerel kayıt: header rozeti dahil tüm
+      // uygulama aynı resimle eşleşir (bkz. local-profile-image.ts).
+      setLocalProfileImage(picture);
+      setSync({ kind: "fresh", at: new Date().toISOString(), hasPicture: !!picture });
     } catch {
       setSync({ kind: "error" });
     }
