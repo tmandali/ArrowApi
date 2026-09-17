@@ -64,14 +64,13 @@ function Section({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      {/* Header: yalnız üst bölümle ayırır (ilk dışa açıkken üst border zaten yok).
-          Collapsed durumda alt border'ı yalnız header'ın kendisi taşır —
-          CollapsibleContent yok, padding yok, kalın çizgi yok. */}
+      {/* Bölüm arası çizgiyi container'ın divide-y'si çizer —
+          header'ın kendisinde border yok (üst üste binme / kaybolma yok). */}
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "flex w-full items-center gap-1.5 border-b border-border/60 bg-muted/10 px-3 py-2 text-left text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40",
+          "flex w-full items-center gap-1.5 bg-muted/10 px-3 py-2 text-left text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40",
         )}
       >
         {open ? (
@@ -217,7 +216,7 @@ export function ExecutionDetailPane({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="divide-y divide-border/60 min-h-0 flex-1 overflow-y-auto">
           {/* ── Bölüm 1: Özet ─────────────────────────────────────── */}
           <Section
             title={t("summary")}
