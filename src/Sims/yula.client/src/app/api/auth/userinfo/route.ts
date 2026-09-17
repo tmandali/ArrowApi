@@ -32,6 +32,13 @@ export async function GET() {
 
   const accessToken = user.accessToken;
   if (!accessToken) {
+    // Diagnostik: hangi senaryoda token boş kaldığı dev terminal'den okunsun:
+    //  - eski formattaki session (exchange'ten önce giriş yapılmış),
+    //  - token exchange hatası (bkz. authorize log'ı),
+    //  - exchange'ten refresh_token gelmemesi + access token ömrünün dolması.
+    console.warn(
+      `[auth/userinfo] access token yok (provider=${user.provider ?? "?"}, userId=${user.id.slice(0, 8)}…) — yeniden giriş veya exchange hatası kontrol et`,
+    );
     return NextResponse.json(
       { error: "no_access_token", provider: user.provider ?? null },
       { status: 409 },
