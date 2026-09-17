@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Check, TriangleAlert } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { setLocalProfileImage, useLocalProfileImage } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
@@ -112,7 +112,9 @@ export function ProfileImageCard() {
             {profileInitialsOf(user?.name ?? "")}
           </div>
         )}
-        {/* Hover'da beliren "Yeniden getir" butonu */}
+        {/* Hover'da beliren "Yeniden getir" butonu — aynı anda statü
+            göstergesi: spinning (yükleniyor), onay (başarılı), uyarı
+            (token/hata). Renk statüyle eşleşir. */}
         <button
           type="button"
           onClick={handleRefresh}
@@ -125,10 +127,16 @@ export function ProfileImageCard() {
             "hover:text-foreground transition-all cursor-pointer",
             "opacity-0 group-hover/avatar:opacity-100 focus-visible:opacity-100",
             sync.kind === "loading" && "opacity-100 cursor-wait",
+            sync.kind === "no-token" && "opacity-100 text-amber-600 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-400",
+            sync.kind === "error" && "opacity-100 text-red-600 dark:text-red-400 hover:text-red-600 dark:hover:text-red-400",
           )}
         >
           {sync.kind === "loading" ? (
             <Loader2 className="size-3.5 animate-spin" />
+          ) : sync.kind === "fresh" ? (
+            <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          ) : sync.kind === "no-token" || sync.kind === "error" ? (
+            <TriangleAlert className="size-3.5" />
           ) : (
             <RefreshCw className="size-3.5" />
           )}
