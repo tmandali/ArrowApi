@@ -1394,7 +1394,8 @@
     "morning": "Good morning",
     "afternoon": "Good afternoon",
     "evening": "Good evening",
-    "fallback": "Welcome"
+    "fallback": "Welcome",
+    "named": "{greeting}, {name}"
   },
   "RecordMode": {
     "new": "New",

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import * as React from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
 import { YulaChatTurn } from "@/components/layout/yula-chat-turn";
@@ -59,7 +60,19 @@ function AIChatPanelSession({
   const now = React.useMemo(() => new Date(), []);
   const tGreet = useTranslations("Greeting");
   const locale = useLocale();
-  const greeting = mounted ? greetingFor(now, tGreet) : t("greeting");
+  // Karşılamaya ad eklenir — oturumdaki kullanıcı adı (Keycloak/Google, ikisi de
+  // `session.user.name` sağlar; ad yoksa yalnız selamlama gösterilir).
+  const { data: session } = useSession();
+  const firstName = React.useMemo(() => {
+    const name = (session?.user?.name ?? "").trim();
+    return name ? (name.split(/\s+/)[0] ?? "") : "";
+  }, [session?.user?.name]);
+  const plainGreeting = greetingFor(now, tGreet);
+  const greeting = mounted
+    ? firstName
+      ? tGreet("named", { greeting: plainGreeting, name: firstName })
+      : plainGreeting
+    : t("greeting");
   const dateLabel = mounted ? formatDate(now, locale) : null;
 
   const workspaceLabel = workspaceLabelFromPath(pathname);

@@ -1394,7 +1394,8 @@
     "morning": "Günaydın",
     "afternoon": "İyi günler",
     "evening": "İyi akşamlar",
-    "fallback": "Hoş geldiniz"
+    "fallback": "Hoş geldiniz",
+    "named": "{greeting}, {name}"
   },
   "RecordMode": {
     "new": "Yeni",
