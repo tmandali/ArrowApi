@@ -824,7 +824,7 @@ export function VirtualSpreadsheet<T>({
 
   return (
     <div
-      className={cn(panelCardClass, "flex-1", isMaximized && "rounded-none border-none", className)}
+      className={cn(panelCardClass, "flex-1", className)}
       onCopy={handleCopy}
       data-cell-locator={cellLocator ? "true" : undefined}
     >

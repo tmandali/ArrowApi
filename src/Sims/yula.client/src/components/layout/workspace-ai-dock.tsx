@@ -55,6 +55,12 @@ type WorkspaceAiDockProps = {
   centeredIntro?: boolean
   /** Open Yula automatically when the dock mounts. */
   defaultOpen?: boolean
+  /**
+   * Side-dock panel kabuğunun gutter sınıflarını geçersiz kiler
+   * (varsayılan: panelShellClass — pt-0). Örn. rapor ekranında grid
+   * maximize edilince üst kenar boşluğunu korumak için pt-2.
+   */
+  panelShellClassName?: string
 }
 
 function YulaNewChatButton() {
@@ -297,6 +303,7 @@ export function WorkspaceAiDock({
   transparent = false,
   centeredIntro = false,
   defaultOpen = false,
+  panelShellClassName,
 }: WorkspaceAiDockProps) {
   const { open, setOpen, expanded, setExpanded } =
     useWorkspaceAiChat()
@@ -401,6 +408,7 @@ export function WorkspaceAiDock({
       mainMinSizePercent={40}
       layoutId="yula-dock"
       mainClassName="overflow-y-auto overscroll-contain"
+      panelShellClassName={panelShellClassName}
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
       {content}

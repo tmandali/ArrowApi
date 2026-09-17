@@ -11,6 +11,7 @@ import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
+import { panelShellClass } from "@/components/layout/panel-chrome"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import type { ArrowJobStatus } from "@/features/jobs"
 import {
@@ -380,8 +381,9 @@ export function ReportCriteriaShell({
         className={cn(
           isGridMaximized ? "p-0" : "overflow-hidden max-md:overflow-y-auto"
         )}
+        panelShellClassName={isGridMaximized ? cn(panelShellClass, "pt-2") : undefined}
       >
-        <ModuleNavPane className={isGridMaximized ? "p-0" : undefined}>
+        <ModuleNavPane className={isGridMaximized ? "px-2 pt-2 pb-2" : undefined}>
           {renderFilter(setCriteriaHandle, {
             onListError: handleListError,
           })}
