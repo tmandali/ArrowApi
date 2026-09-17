@@ -61,6 +61,11 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         email?: string | null;
       };
       const picture = data.picture ?? null;
+      // Başarılı getirme → taze URL'e dön ve eski "bozuk" durumunu
+      // sıfırla: önceki (hataya düşen) URL'i artık gösterilmez, yeni
+      // getiriğin resmi denetlenir; resim yine yüklenemezse yeni URL
+      // üzerinden yeniden fallback'e düşülür.
+      setBrokenSrc(null);
       setFetchedImage(picture);
       // Başarılı getirme → yerel kayıt (resim + ad/soyad + e-posta):
       // header rozeti ve sağ panelin ad/email satırı dahil tüm uygulama
