@@ -20,6 +20,8 @@ import {
 } from "@/features/jobs/run-events";
 import type { JsonSchemaObject } from "@/features/report-criteria";
 import type { ArrowJobStatus } from "../../types";
+import { useJobOwner } from "@/features/jobs/hooks/use-job-owners";
+import { useSession } from "next-auth/react";
 import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { cn } from "@/utils/cn";
@@ -592,6 +594,15 @@ export function ArrowJobExecutionsPanel({
     [deleteTargetId, selectedId, deleting, removeTrackedJob, onJobDeleted, loadList, t, setHistoryEvents, setInputJson]
   );
 
+  const { data: session } = useSession();
+  const myOwnerId = (session?.user as { id?: string } | undefined)?.id;
+  const myOwnerName = (session?.user as { name?: string | null } | undefined)?.name;
+  const { label: ownerLabel, kind: ownerKind } = useJobOwner(
+    selectedJob?.ownerId,
+    myOwnerId,
+    myOwnerName,
+  );
+
   const detailLines: DetailLine[] = React.useMemo(() => {
     if (!selectedJob && !isActiveSelected) {
       return [{ label: t("status"), value: "—" }];
@@ -604,44 +615,28 @@ export function ArrowJobExecutionsPanel({
     });
     const lines = [
       { label: t("status"), value: selectedDisplayStatus },
+      { label: t("owner"), value: ownerLabel },
       { label: t("created"), value: formatWhen(selectedJob?.createdAt) },
       { label: t("completed"), value: formatWhen(selectedJob?.completedAt) },
       { label: t("duration"), value: duration ?? "—" },
       {
-        label: t("rows"),
-        value:
-          isTerminal && selectedJob?.totalRows != null
-            ? formatCount(selectedJob.totalRows)
-            : liveCounts?.totalRows != null
-              ? formatCount(liveCounts.totalRows)
-              : selectedJob?.totalRows != null
-                ? formatCount(selectedJob.totalRows)
-                : "—",
-      },
-      {
-        label: t("batches"),
-        value:
-          isTerminal && selectedJob?.batchCount != null
-            ? formatCount(selectedJob.batchCount)
-            : liveCounts?.batchCount != null
-              ? formatCount(liveCounts.batchCount)
-              : selectedJob?.batchCount != null
-                ? formatCount(selectedJob.batchCount)
-                : "—",
-      },
-      {
-        label: t("opfs_cache"),
-        value: opfsDetail?.hasParts
-          ? t("opfs_parts", { count: opfsDetail.partCount, size: formatBytes(opfsDetail.totalSizeBytes) })
-          : opfsLoading
-            ? t("opfs_scanning")
-            : t("opfs_none"),
-      },
-      {
-        label: t("opfs_date"),
-        value: opfsDetail?.files?.[0]?.lastModified
-          ? formatWhen(new Date(opfsDetail.files[0].lastModified).toISOString())
-          : "—",
+        label: t("results"),
+        value: (() => {
+          const batches =
+            isTerminal && selectedJob?.batchCount != null
+              ? selectedJob.batchCount
+              : liveCounts?.batchCount != null
+                ? liveCounts.batchCount
+                : selectedJob?.batchCount ?? null;
+          const rows =
+            isTerminal && selectedJob?.totalRows != null
+              ? selectedJob.totalRows
+              : liveCounts?.totalRows != null
+                ? liveCounts.totalRows
+                : selectedJob?.totalRows ?? null;
+          if (batches == null && rows == null) return "—";
+          return `${batches != null ? formatCount(batches) : "?"}/${rows != null ? formatCount(rows) : "?"}`;
+        })(),
       },
     ];
     if (selectedJob?.error) {
@@ -650,13 +645,12 @@ export function ArrowJobExecutionsPanel({
     return lines;
   }, [
     selectedJob,
+    ownerLabel,
     selectedDisplayStatus,
     isTerminal,
     isActiveSelected,
     liveCounts,
     progressEvents,
-    opfsDetail,
-    opfsLoading,
     t,
   ]);
 

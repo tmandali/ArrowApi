@@ -53,6 +53,7 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         TRequest request,
         string? name = null,
         Guid? rootJobId = null,
+        string? ownerId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -64,7 +65,8 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             Name = name,
             RootJobId = rootJobId ?? jobId,
             Request = request,
-            RequestHash = ArrowJobRequestHasher.ComputeHash(request)
+            RequestHash = ArrowJobRequestHasher.ComputeHash(request),
+            OwnerId = ownerId
         };
         ArrowJobTracePropagation.CaptureCurrent(job);
 
@@ -326,7 +328,9 @@ public sealed class RedisArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             job.TotalRows,
             null,
             job.Name,
-            job.RootJobId);
+            job.RootJobId,
+            job.ParentJobId,
+            job.OwnerId);
     }
 
     public Task<bool> TryCancelJobAsync(Guid id, CancellationToken cancellationToken = default) =>

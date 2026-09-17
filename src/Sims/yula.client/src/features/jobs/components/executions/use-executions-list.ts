@@ -113,6 +113,11 @@ export function useExecutionsList(args: {
   }, [listRefreshToken, loadList]);
 
   // Poll while any in-flight job exists (focused or queued siblings).
+  // Diğer oturumların (başka kullanıcıların) başlattığı aktif job'ları
+  // yakalamak için: kendi session'ında pending job'lar bile olmasa
+  // periyodik olarak sunucuyu sorgula.
+  //  - Aktif (running/queued) job varken: 2.5 sn'de bir (hızlı canlı izleme).
+  //  - Pasif modda (idle + pending boş): 10 sn'de bir arka plan poll.
   React.useEffect(() => {
     const hasPending = pendingJobs.some(
       (job) =>
@@ -120,10 +125,11 @@ export function useExecutionsList(args: {
         job.status === "Running" ||
         !job.status
     );
-    if (activeRunPhase !== "running" && !hasPending) return;
+    const isActive = activeRunPhase === "running" || hasPending;
+    const intervalMs = isActive ? 2500 : 10_000;
     const id = window.setInterval(() => {
       void loadList(undefined, { silent: true });
-    }, 2500);
+    }, intervalMs);
     return () => window.clearInterval(id);
   }, [activeRunPhase, pendingJobs, loadList]);
 

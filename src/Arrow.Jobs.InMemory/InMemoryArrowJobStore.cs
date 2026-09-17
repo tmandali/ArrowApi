@@ -11,6 +11,7 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
         TRequest request,
         string? name = null,
         Guid? rootJobId = null,
+        string? ownerId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -22,7 +23,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             Name = name,
             RootJobId = rootJobId ?? jobId,
             Request = request,
-            RequestHash = ArrowJobRequestHasher.ComputeHash(request)
+            RequestHash = ArrowJobRequestHasher.ComputeHash(request),
+            OwnerId = ownerId
         };
         ArrowJobTracePropagation.CaptureCurrent(job);
 
@@ -205,7 +207,8 @@ public sealed class InMemoryArrowJobStore<TRequest> : IArrowJobStore<TRequest>
             null,
             job.Name,
             job.RootJobId,
-            job.ParentJobId);
+            job.ParentJobId,
+            job.OwnerId);
 
         return Task.FromResult<ArrowJobStatus?>(status);
     }

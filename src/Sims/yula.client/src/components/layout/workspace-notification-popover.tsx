@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react"
 import { useTranslations } from "next-intl"
+import { useSession } from "next-auth/react"
 import {
   Popover,
   PopoverContent,
@@ -26,7 +27,13 @@ import {
 } from "@/lib/workspace"
 import { WORKSPACE_NOTIFICATION_TITLE_KEYS } from "@/lib/workspace-search-catalog"
 import { cn } from "@/utils/cn"
-import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, X } from "lucide-react"
+import { listArrowJobs } from "@/features/jobs/arrow-job-client"
+import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, UserRound, X } from "lucide-react"
+
+/** Workspace → jobs endpoint eşlemesi (cross-user polling). */
+const WORKSPACE_JOBS_ENDPOINT: Record<string, string> = {
+  "/stock": "/api/arrow/jobs/retail-sales-report",
+}
 
 type DisplayNotification = {
   id: string
@@ -36,8 +43,10 @@ type DisplayNotification = {
   unread: boolean
   type: WorkspaceNotificationType
   href?: string
-  source: "pending" | "live"
+  source: "pending" | "live" | "other-user" | "system"
   pending?: boolean
+  /** İşlemi başlatan kullanıcının kısa adı (sadece other-user / system). */
+  ownerLabel?: string
 }
 
 function formatUnreadCount(count: number) {
@@ -80,6 +89,73 @@ export function WorkspaceNotificationPopover() {
     [jobs, key]
   )
 
+  // ── Cross-user aktif job polling ───────────────────────────────
+  // Başka kullanıcıların (veya sistemin) başlattığı aktif job'ları
+  // sunucudan periyodik olarak çeker; kendi Zustand store'u bu job'ları
+  // bilmediği için (farklı tarayıcı/oturum) buradan besler.
+  const { data: session } = useSession()
+  const mySessionId = (session?.user as { id?: string } | undefined)?.id
+  const jobsEndpoint = WORKSPACE_JOBS_ENDPOINT[key]
+  const [remoteJobs, setRemoteJobs] = React.useState<
+    import("@/features/jobs/types").ArrowJobStatus[]
+  >([])
+  const [remotePolling, setRemotePolling] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!jobsEndpoint) return
+    let cancelled = false
+
+    const poll = async () => {
+      if (cancelled) return
+      setRemotePolling(true)
+      try {
+        const page = await listArrowJobs(jobsEndpoint, { take: 20 })
+        if (!cancelled) {
+          setRemoteJobs(
+            (page.items ?? []).filter(
+              (j) => j.status === "Queued" || j.status === "Running"
+            ),
+          )
+        }
+      } catch {
+        if (!cancelled) setRemoteJobs([])
+      } finally {
+        if (!cancelled) setRemotePolling(false)
+      }
+    }
+
+    void poll()
+    const id = window.setInterval(() => void poll(), 10_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [jobsEndpoint])
+
+  // Kendi pending listemde zaten olan job'ları uzak listeden düş (mükerrer gösterilmesin).
+  const myPendingIds = React.useMemo(
+    () => new Set(pendingJobs.map((j) => j.id)),
+    [pendingJobs],
+  )
+  const remoteActiveJobs = React.useMemo(
+    () => remoteJobs.filter((j) => !myPendingIds.has(j.id)),
+    [remoteJobs, myPendingIds],
+  )
+  const otherUserJobs = React.useMemo(
+    () =>
+      remoteActiveJobs.filter(
+        (j) =>
+          j.ownerId != null &&
+          j.ownerId !== "" &&
+          j.ownerId !== mySessionId,
+      ),
+    [remoteActiveJobs, mySessionId],
+  )
+  const systemJobs = React.useMemo(
+    () => remoteActiveJobs.filter((j) => j.ownerId == null || j.ownerId === ""),
+    [remoteActiveJobs],
+  )
+
   const t = useTranslations("Notifications")
 
   const displayNotifications = React.useMemo<DisplayNotification[]>(() => {
@@ -113,12 +189,47 @@ export function WorkspaceNotificationPopover() {
         source: "live" as const,
       }))
 
-    return [...pending, ...live]
-  }, [notifications, pendingJobs, key, t])
+    const otherUser = otherUserJobs.map((j) => ({
+      id: `remote-${j.id}`,
+      title: j.name ?? j.id,
+      description: `${j.status} — ${t("other_user_running")}`,
+      time: formatNotificationTime(createdAtMs(j.createdAt ?? ""), t),
+      unread: true,
+      type: "report" as WorkspaceNotificationType,
+      href: `/stock/retail-sales-report?jobId=${j.id}`,
+      source: "other-user" as const,
+      pending: true,
+      ownerLabel: "other-user",
+    }))
 
-  const unreadCount = displayNotifications.filter((n) => n.unread).length
+    const system = systemJobs.map((j) => ({
+      id: `sys-${j.id}`,
+      title: j.name ?? j.id,
+      description: `${j.status} — ${t("system_running")}`,
+      time: formatNotificationTime(createdAtMs(j.createdAt ?? ""), t),
+      unread: true,
+      type: "report" as WorkspaceNotificationType,
+      href: `/stock/retail-sales-report?jobId=${j.id}`,
+      source: "system" as const,
+      pending: true,
+      ownerLabel: "system",
+    }))
+
+    return [...pending, ...live, ...otherUser, ...system]
+  }, [
+    notifications,
+    pendingJobs,
+    otherUserJobs,
+    systemJobs,
+    key,
+    t,
+  ])
+
+  const unreadCount = displayNotifications.filter(
+    (n) => n.unread && n.source === "pending",
+  ).length
   const readCount = displayNotifications.filter(
-    (n) => !n.unread && n.source !== "pending"
+    (n) => !n.unread && n.source !== "pending",
   ).length
 
   const handleMarkAllAsRead = () => {
@@ -248,6 +359,9 @@ export function WorkspaceNotificationPopover() {
                         <LoaderCircle className="size-3.5 shrink-0 animate-spin text-primary" />
                       ) : item.unread ? (
                         <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                      ) : null}
+                      {item.source === "other-user" ? (
+                        <UserRound className="size-3.5 shrink-0 text-amber-500" />
                       ) : null}
                       <span className="truncate">{item.title}</span>
                     </span>

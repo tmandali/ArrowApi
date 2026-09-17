@@ -790,7 +790,9 @@
     "just_now": "Az önce",
     "minutes_ago": "{count} dakika önce",
     "hours_ago": "{count} saat önce",
-    "days_ago": "{count} gün önce"
+    "days_ago": "{count} gün önce",
+    "other_user_running": "Başka bir kullanıcı başlattı",
+    "system_running": "Sistem job çalışıyor"
   },
   "HeaderSearch": {
     "search_ph": "Sohbet geçmişinde ara...",
@@ -926,7 +928,7 @@
     "run_report": "Raporu çalıştır",
     "run": "Çalıştır",
     "rerun_report": "Raporu tekrar çalıştır",
-    "rerun": "Tekrar çalıştır",
+    "rerun": "Tekrar Çalış",
     "criteria_not_ready": "Kriterler hazır değil",
     "clear_criteria": "Temizle"
   },
@@ -940,10 +942,6 @@
     "created": "Oluşturulma",
     "completed": "Tamamlanma",
     "duration": "Süre",
-    "rows": "Satır",
-    "batches": "Paket",
-    "opfs_cache": "Yerel Önbellek",
-    "opfs_date": "Önbellek Tarihi",
     "error": "Hata",
     "loading_request": "İstek yükleniyor…",
     "status_meta_request": "Durum, meta ve istek yükü",
@@ -963,8 +961,6 @@
     "run_plural": "çalışma",
     "rows_plural": "satır",
     "opfs_parts": "{count} parça ({size})",
-    "opfs_scanning": "Taranıyor…",
-    "opfs_none": "Yok",
     "request_input": "İstek Girdisi",
     "opfs_files": "Yerel önbellek parçaları ({count})",
     "progress": "İlerleme",
@@ -994,7 +990,10 @@
     "cancel_running_job_title": "Çalışan işi iptal et",
     "grid": "Tablo",
     "show_grid": "Tabloyu göster",
-    "show_detail": "Detayı göster"
+    "show_detail": "Detayı göster",
+    "owner": "Başlatan",
+    "results": "Sonuç",
+    "summary": "Özet"
   },
   "ToolExec": {
     "tool_execution": "Araç Çalıştırma"

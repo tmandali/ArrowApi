@@ -10,6 +10,8 @@ export type ArrowJobStatus = {
   totalRows?: number
   name?: string
   rootJobId?: string
+  /** Job başlatan kullanıcının OIDC sub kimliği; sistem job'larında null. */
+  ownerId?: string | null
 }
 
 export type ArrowJobStatusList = {

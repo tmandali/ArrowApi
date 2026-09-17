@@ -44,6 +44,11 @@ public sealed class ArrowJob<TRequest>
     public byte? TraceFlags { get; set; }
     /// <summary>Tekilleştirme için istek özeti hash'i.</summary>
     public string? RequestHash { get; set; }
+    /// <summary>
+    /// Job'ı başlatan kullanıcının kimliği (OIDC <c>sub</c> claim).
+    /// Sistem job'larında (user olmadan) null kalır.
+    /// </summary>
+    public string? OwnerId { get; set; }
     /// <summary>Kök (zincirin ilk) job kimliği.</summary>
     public Guid RootJobId { get; set; }
     /// <summary>Üst (doğrudan tetikleyen) job kimliği.</summary>
@@ -66,6 +71,7 @@ public sealed record ArrowQueryRequest(
     int? BatchSize = null) : Arrow.Http.AspNetCore.Dispatcher.IRequest<System.Collections.Generic.IAsyncEnumerable<Apache.Arrow.RecordBatch>>;
 
 /// <summary>Job durum yanıt modeli (DTO).</summary>
+/// <param name="OwnerId">Job'a ait OIDC sub owner kimliği; sistem job'larında null.</param>
 public sealed record ArrowJobStatus(
     Guid Id,
     string Status,
@@ -79,7 +85,8 @@ public sealed record ArrowJobStatus(
     Guid? RetriedFrom = null,
     string? Name = null,
     Guid? RootJobId = null,
-    Guid? ParentJobId = null);
+    Guid? ParentJobId = null,
+    string? OwnerId = null);
 
 /// <summary>Job listeleme sorgu parametreleri.</summary>
 public sealed record ArrowJobListQuery(

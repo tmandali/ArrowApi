@@ -241,7 +241,13 @@ public static class ArrowJobEndpoints
             }
         }
 
-        ArrowJob<TRequest> job = await store.CreateAsync(request, jobName, cancellationToken: cancellationToken);
+        // Job'ı başlatan kullanıcının kimliğini OIDC <c>sub</c> claim'inden çek.
+        // User yoksa (sistem / tek kullanıcı dev modu) OwnerId null kalır.
+        string? ownerId = httpContext.User?.FindFirst("sub")?.Value
+            ?? httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        ArrowJob<TRequest> job = await store.CreateAsync(
+            request, jobName, ownerId: ownerId, cancellationToken: cancellationToken);
         await queue.EnqueueAsync(job.Id, cancellationToken);
 
         string jobsPathResolved = ResolveJobsBasePath(httpRequest);
@@ -558,7 +564,8 @@ public static class ArrowJobEndpoints
             retriedFrom,
             job.Name,
             job.RootJobId,
-            job.ParentJobId);
+            job.ParentJobId,
+            job.OwnerId);
 
     private static ArrowJobStatus ToStatusResponse(
         ArrowJobStatus status,
@@ -577,7 +584,8 @@ public static class ArrowJobEndpoints
             retriedFrom,
             status.Name,
             status.RootJobId,
-            status.ParentJobId);
+            status.ParentJobId,
+            status.OwnerId);
 
     private static string JobUrl(string jobsPath, Guid id) => $"{jobsPath}/{id:D}";
 

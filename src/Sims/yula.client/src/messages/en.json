@@ -790,7 +790,9 @@
     "just_now": "Just now",
     "minutes_ago": "{count, plural, one {# minute ago} other {# minutes ago}}",
     "hours_ago": "{count, plural, one {# hour ago} other {# hours ago}}",
-    "days_ago": "{count, plural, one {# day ago} other {# days ago}}"
+    "days_ago": "{count, plural, one {# day ago} other {# days ago}}",
+    "other_user_running": "Started by another user",
+    "system_running": "System job in progress"
   },
   "HeaderSearch": {
     "search_ph": "Search chat history...",
@@ -940,10 +942,6 @@
     "created": "Created",
     "completed": "Completed",
     "duration": "Duration",
-    "rows": "Rows",
-    "batches": "Batches",
-    "opfs_cache": "Local Cache",
-    "opfs_date": "Cache Date",
     "error": "Error",
     "loading_request": "Loading request…",
     "status_meta_request": "Status, meta and request payload",
@@ -963,8 +961,6 @@
     "run_plural": "run",
     "rows_plural": "row",
     "opfs_parts": "{count} parts ({size})",
-    "opfs_scanning": "Scanning…",
-    "opfs_none": "None",
     "request_input": "Request Input",
     "opfs_files": "Local cache parts ({count})",
     "progress": "Progress",
@@ -994,7 +990,10 @@
     "cancel_running_job_title": "Cancel running job",
     "grid": "Grid",
     "show_grid": "Show Grid",
-    "show_detail": "Show Detail"
+    "show_detail": "Show Detail",
+    "owner": "Owner",
+    "results": "Results",
+    "summary": "Summary"
   },
   "ToolExec": {
     "tool_execution": "Tool Execution"
