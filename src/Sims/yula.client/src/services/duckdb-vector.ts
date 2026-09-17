@@ -14,6 +14,7 @@ import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { STOCK_WORKSPACE_MENU_ITEMS } from "@/lib/workspace-search-catalog";
 
 import { opfsVectorCache } from "@/services/opfs/opfs-vector-cache";
+import { devInfo } from "@/lib/dev-log";
 
 export type { RagSearchFilter, RagVectorTier };
 
@@ -113,7 +114,7 @@ export async function initVectorStore(dimension = VECTOR_DIMENSION): Promise<voi
       // PRAGMA/detay başarısızsa tablo yine kullanılabilir (kolonlar yok sayılır)
     }
     activeStoreDimension = dimension;
-    console.info(`🤖 [WASM Vector Store] ${VECTOR_TABLE_NAME} ready (FLOAT[${dimension}]).`);
+    devInfo(`🤖 [WASM Vector Store] ${VECTOR_TABLE_NAME} ready (FLOAT[${dimension}]).`);
   } catch (err) {
     console.warn("[Vector Store] init error, recreating:", err);
     await duckDbClient.executeCustomSql(`DROP TABLE IF EXISTS ${VECTOR_TABLE_NAME};`).catch(() => {});
@@ -164,7 +165,7 @@ export async function ensureRagCorpusVersion(): Promise<boolean> {
     const w = await fh.createWritable();
     await w.write(String(RAG_CORPUS_VERSION));
     await w.close();
-    console.info(
+    devInfo(
       `🤖 [WASM Vector Indexer] Corpus v${current} → v${RAG_CORPUS_VERSION}: cache cleared, full reindex.`,
     );
     return true;
@@ -300,11 +301,11 @@ async function doIndexReportSchemas(): Promise<number> {
       entriesToSave.push({ id: missingFromCache[i].id, embedding: vec });
     }
     await opfsVectorCache.setMany(entriesToSave);
-    console.info(
+    devInfo(
       `🤖 [DuckDB WASM Vector Indexer] ${missingFromCache.length} new report schemas generated and saved to OPFS.`
     );
   } else {
-    console.info(
+    devInfo(
       `🤖 [DuckDB WASM Vector Indexer] All ${pending.length} report schemas loaded from persistent OPFS cache (0 token cost).`
     );
   }
@@ -322,7 +323,7 @@ async function doIndexReportSchemas(): Promise<number> {
   const routerCount = await indexWorkspaceRouter();
   const total = pending.length + menuCount + routerCount;
 
-  console.info(`🤖 [DuckDB WASM Vector Indexer] ${total} total vector items ready in DuckDB WASM.`);
+  devInfo(`🤖 [DuckDB WASM Vector Indexer] ${total} total vector items ready in DuckDB WASM.`);
   return total;
 }
 
@@ -455,11 +456,11 @@ async function doIndexWorkspaceMenus(): Promise<number> {
       entriesToSave.push({ id: missingFromCache[i].id, embedding: vec });
     }
     await opfsVectorCache.setMany(entriesToSave);
-    console.info(
+    devInfo(
       `🤖 [WASM Vector Indexer] ${missingFromCache.length} new workspace menu items generated and saved to OPFS.`
     );
   } else {
-    console.info(
+    devInfo(
       `🤖 [WASM Vector Indexer] All ${pending.length} workspace menu items loaded from persistent OPFS cache (0 token cost).`
     );
   }
@@ -536,11 +537,11 @@ export function indexConversationHistory(items: ConversationIndexItem[]): Promis
           entriesToSave.push({ id: `conv_${it.id}`, embedding: vec });
         }
         await opfsVectorCache.setMany(entriesToSave);
-        console.info(
+        devInfo(
           `🤖 [WASM Vector Indexer] ${missingFromCache.length} new conversations generated and saved to OPFS.`
         );
       } else {
-        console.info(
+        devInfo(
           `🤖 [WASM Vector Indexer] All ${pending.length} conversations loaded from persistent OPFS cache (0 token cost).`
         );
       }

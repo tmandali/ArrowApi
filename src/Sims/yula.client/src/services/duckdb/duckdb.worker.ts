@@ -1,5 +1,6 @@
 import * as duckdb from "@duckdb/duckdb-wasm"
 import { tableToIPC } from "apache-arrow"
+import { devLog } from "../../lib/dev-log"
 import {
   formatTimeOfDayValue,
   isArrowBigNum,
@@ -60,7 +61,7 @@ async function getDuckDb(): Promise<{
 
       db = newDb
       conn = newConn
-      console.log(
+      devLog(
         "[DuckDB Worker] init v4 — in-memory db, memory_limit=3GB (WAL/checkpoint yok)"
       )
     })()
@@ -243,7 +244,7 @@ async function resetDuckDb(): Promise<{
     await conn.query("SET preserve_insertion_order=false;").catch(() => {})
     await conn.query("SET memory_limit='3GB';").catch(() => {})
 
-    console.log(
+    devLog(
       "[DuckDB Worker] fast reset completed (RAM freed, report tables cleared, vector store preserved)"
     )
     return { db, conn }

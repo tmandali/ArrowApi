@@ -10,6 +10,8 @@
  * tarayıcılarda varsayılan navigator.storage deponuza kesintisiz düşer (fallback).
  */
 
+import { devInfo } from "./dev-log";
+
 export interface StorageBucketQuota {
   name: string;
   usage: number;
@@ -109,7 +111,7 @@ async function initializeYulaStorageBuckets(): Promise<YulaStorageStatus> {
     const buckets = [reports, rag, cache];
     const totalUsage = buckets.reduce((total, bucket) => total + bucket.usage, 0);
 
-    console.info(
+    devInfo(
       `🤖 [Storage Buckets] 3 Isolated Storage Buckets Ready (Total Usage: ${(totalUsage / 1024 / 1024).toFixed(2)} MB).`,
       buckets,
     );
