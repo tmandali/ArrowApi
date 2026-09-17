@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Loader2, RefreshCw, Check, TriangleAlert, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/utils/cn";
-import { setLocalProfileImage, useLocalProfileImage, setLocalUserPhoto } from "@/features/auth/lib/local-profile-image";
+import { setLocalProfileImage, toAvatarSrc, useLocalProfileImage, setLocalUserPhoto } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
 
 /**
@@ -43,9 +43,12 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
   // (initials).
   const profile = useLocalProfileImage(user);
   const hasCustomPhoto = (profile.picture ?? "").startsWith("data:image/");
+  // Uzak (provider) URL'ler /api/avatar proxy'sinden stream edilir —
+  // localStorage'daki ham URL'ler WebView'de kırılgan yükleniyordu;
+  // KENDİ yüklenen data: URL'leri proxy'den geçmez.
   const shownImage = hasCustomPhoto
     ? profile.picture
-    : (fetchedImage ?? profile.picture);
+    : toAvatarSrc(fetchedImage ?? profile.picture);
   const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
   const handleRefresh = React.useCallback(async () => {

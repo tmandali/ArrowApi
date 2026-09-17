@@ -116,6 +116,27 @@ export function getLocalProfileRecord(): LocalProfileRecord | null {
 }
 
 /**
+ * Avatar kaynak URL'i haritası — <img src> hedefi.
+ *
+ * Uzak (http/https) provider resimleri localStorage'daki HAM URL olarak
+ * tarayıcıya/WebView'e yükletilmez: süre/dönen URL'ler ve 3. parti
+ * engelleri baş harfler fallback'ine düşürüyordu. Bunun yerine
+ * `/api/avatar` proxy'si session üzerinden resmi sunucu tarafında TAZE
+ * çözüp same-origin stream eder (bkz. src/app/api/avatar/route.ts).
+ * `data:` URL'leri (kullanıcının kendi yüklediği resim) ve null aynen
+ * döner — proxy yalnızca UZAK URL'ler içindir.
+ */
+export function toAvatarSrc(
+  url: string | null | undefined,
+): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return "/api/avatar";
+  }
+  return url;
+}
+
+/**
  * "Yeniden getir" başarısında çağrılır. V2: {picture, name, email};
  * geriye uyum için çıplak URL (yalnız resim) veya null (kayıt sil) kabul
  * edilir. Kayıt silinir/yazılırsa yayımlanır (canlı dinleyiciler tetiklenir).
