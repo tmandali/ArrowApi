@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { fetchJobEventLog, fetchJobRequest } from "@/features/jobs/arrow-job-client";
+import { useTabVisible } from "@/hooks/use-tab-visible";
 import {
   buildRunEventsFromLog,
   type RunEventItem,
@@ -96,6 +97,7 @@ export function useExecutionDetail(args: {
   const [detailRefreshToken, setDetailRefreshToken] = React.useState(0);
   const [opfsDetail, setOpfsDetail] = React.useState<OpfsJobParquetDetail | null>(null);
   const [opfsLoadedId, setOpfsLoadedId] = React.useState<string | null>(null);
+  const tabVisible = useTabVisible();
   const opfsLoading = Boolean(selectedId && opfsLoadedId !== selectedId);
 
   const bumpDetail = React.useCallback(() => {
@@ -215,6 +217,9 @@ export function useExecutionDetail(args: {
 
   React.useEffect(() => {
     if (!selectedId) return;
+    // Sekme hidden iken arka plan poll'ü yapma; visible'a geçişte
+    // effect yeniden çalışıp catch-up loadHistory yapar.
+    if (!tabVisible) return;
     // Canlı aktif SSE akışı varsa HTTP ile polling yapma
     if (isLiveActive) return;
     // Terminal bir işse ve sunucunun persisted event-log'u zaten çekildiyse tekrarlama
@@ -258,6 +263,7 @@ export function useExecutionDetail(args: {
     };
   }, [
     selectedId,
+    tabVisible,
     isLiveActive,
     isTerminal,
     hasHubEvents,

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { listArrowJobs } from "@/features/jobs/arrow-job-client";
+import { useTabVisible } from "@/hooks/use-tab-visible";
 import type { ArrowJobStatus } from "../../types";
 
 export type PendingJobInfo = {
@@ -34,6 +35,10 @@ export function useExecutionsList(args: {
     onListError,
   } = args;
   const t = useTranslations("JobExecutions");
+  const tabVisible = useTabVisible();
+
+  // ETag: sunucu 304 dönerse önceki liste state'i korunur (gereksiz re-render yok).
+  const etagRef = React.useRef<string | undefined>(undefined);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -59,7 +64,13 @@ export function useExecutionsList(args: {
         const page = await listArrowJobs(jobsEndpoint, {
           take: 50,
           signal,
+          ifNoneMatch: etagRef.current,
         });
+        etagRef.current = page.etag;
+        if (page.notModified) {
+          // 304: liste değişmedi — state'e dokunmadan çık, re-render tetikleme.
+          return;
+        }
         setItems(page.items ?? []);
         setTotal(page.total ?? 0);
         setError(null);
@@ -118,7 +129,20 @@ export function useExecutionsList(args: {
   // periyodik olarak sunucuyu sorgula.
   //  - Aktif (running/queued) job varken: 2.5 sn'de bir (hızlı canlı izleme).
   //  - Pasif modda (idle + pending boş): 10 sn'de bir arka plan poll.
+  //  - Sekme hidden iken: poll tamamen durur (fetch atılmaz); visible'a
+  //    geçişte geçen süre içinde kaçan event'ler için anında catch-up refresh.
+  const wasHiddenRef = React.useRef(false);
   React.useEffect(() => {
+    if (!tabVisible) {
+      wasHiddenRef.current = true;
+      return;
+    }
+
+    if (wasHiddenRef.current) {
+      wasHiddenRef.current = false;
+      void loadList(undefined, { silent: true });
+    }
+
     const hasPending = pendingJobs.some(
       (job) =>
         job.status === "Queued" ||
@@ -131,7 +155,7 @@ export function useExecutionsList(args: {
       void loadList(undefined, { silent: true });
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [activeRunPhase, pendingJobs, loadList]);
+  }, [activeRunPhase, pendingJobs, loadList, tabVisible]);
 
   const lastRefreshPhaseRef = React.useRef(activeRunPhase);
 

@@ -2,6 +2,8 @@ using Arrow.Data;
 using Arrow.Http.AspNetCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Arrow.Jobs.AspNetCore;
 
@@ -148,8 +150,8 @@ public static class ArrowJobEndpoints
         // Job tipine özel history: GET /api/arrow/jobs/{jobName}
         group.MapGet(
                 string.Empty,
-                (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
-                    ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, jobName, cancellationToken))
+                (HttpRequest httpRequest, HttpResponse httpResponse, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
+                    ListJobsAsync(httpRequest, httpResponse, store, state, from, to, skip, take, rootJobId, jobName, cancellationToken))
             .Produces<ArrowJobStatusList>();
 
         bool shouldMapGuidRoutes = !endpoints.DataSources
@@ -165,8 +167,8 @@ public static class ArrowJobEndpoints
             {
                 targetBuilder.MapGet(
                         string.Empty,
-                        (HttpRequest httpRequest, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
-                            ListJobsAsync(httpRequest, store, state, from, to, skip, take, rootJobId, null, cancellationToken))
+                        (HttpRequest httpRequest, HttpResponse httpResponse, IArrowJobStore<TRequest> store, [FromQuery] string? state, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int? skip, [FromQuery] int? take, [FromQuery] Guid? rootJobId, CancellationToken cancellationToken) =>
+                            ListJobsAsync(httpRequest, httpResponse, store, state, from, to, skip, take, rootJobId, null, cancellationToken))
                     .Produces<ArrowJobStatusList>();
             }
 
@@ -259,6 +261,7 @@ public static class ArrowJobEndpoints
 
     private static async Task<IResult> ListJobsAsync<TRequest>(
         HttpRequest httpRequest,
+        HttpResponse httpResponse,
         IArrowJobStore<TRequest> store,
         string? state,
         DateTimeOffset? from,
@@ -294,7 +297,51 @@ public static class ArrowJobEndpoints
             page.Items.Select(j => ToStatusResponse(j, jobsPath)).ToList(),
             page.Total);
 
+        // ETag (RFC 7232): sorgu anahtarı + veri alanları üzerinden hesaplanır.
+        // Veri + filtre değişmediğinde poller tam payload yerine 304 alır.
+        string etag = ComputeListEtag(response, state, from, to, skip ?? 0, take ?? 50, rootJobId, jobName);
+        httpResponse.Headers.ETag = etag;
+        if (httpRequest.Headers.IfNoneMatch.ToString().Contains(etag, StringComparison.Ordinal))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
         return Results.Ok(response);
+    }
+
+    /// <summary>
+    /// Liste endpoint'i ETag'i: sorgu anahtarı (state/from/to/skip/take/rootJobId/jobName) +
+    /// öğe veri alanları (id, status, zaman damgaları, satır/batch sayıları, hata, owner)
+    /// üzerinden SHA-256 olarak hesaplanır. <c>_t</c> gibi istemci-side cache-buster
+    /// parametreleri girdiye girmez: aynı veri + aynı filtre ⇒ aynı tag.
+    /// </summary>
+    private static string ComputeListEtag(
+        ArrowJobStatusList response,
+        string? state,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        int skip,
+        int take,
+        Guid? rootJobId,
+        string? jobName)
+    {
+        var parts = new List<string>(2 + response.Items.Count) { 
+            $"{state}|{from:O}|{to:O}|{skip}|{take}|{rootJobId:N}|{jobName}",
+            response.Total.ToString()
+        };
+        foreach (ArrowJobStatus item in response.Items)
+        {
+            parts.Add($"{item.Id:N}|{item.Status}|{item.CreatedAt:O}|{item.CompletedAt:O}"
+                + $"|{item.TotalRows}|{item.BatchCount}|{item.Error}|{item.OwnerId}|{item.RetriedFrom:N}");
+        }
+
+        string canon = string.Join("\u0001", parts);
+        byte[] digest;
+        using (var sha = SHA256.Create())
+        {
+            digest = sha.ComputeHash(Encoding.UTF8.GetBytes(canon));
+        }
+        return "\"" + Convert.ToHexString(digest).ToLowerInvariant() + "\"";
     }
 
     private static async Task<IResult> GetJobRequestAsync(

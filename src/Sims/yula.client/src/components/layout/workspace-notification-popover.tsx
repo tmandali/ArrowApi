@@ -28,6 +28,7 @@ import {
 import { WORKSPACE_NOTIFICATION_TITLE_KEYS } from "@/lib/workspace-search-catalog"
 import { cn } from "@/utils/cn"
 import { listArrowJobs } from "@/features/jobs/arrow-job-client"
+import { useTabVisible } from "@/hooks/use-tab-visible"
 import { Bell, CheckCheck, Clock, LoaderCircle, Trash2, UserRound, X } from "lucide-react"
 
 /** Workspace → jobs endpoint eşlemesi (cross-user polling). */
@@ -99,7 +100,9 @@ export function WorkspaceNotificationPopover() {
   const [remoteJobs, setRemoteJobs] = React.useState<
     import("@/features/jobs/types").ArrowJobStatus[]
   >([])
-  const [remotePolling, setRemotePolling] = React.useState(false)
+  const tabVisible = useTabVisible()
+  // ETag: sunucu 304 dönerse remoteJobs state'i korunur (değişim yok).
+  const etagRef = React.useRef<string | undefined>(undefined)
 
   React.useEffect(() => {
     if (!jobsEndpoint) return
@@ -107,30 +110,35 @@ export function WorkspaceNotificationPopover() {
 
     const poll = async () => {
       if (cancelled) return
-      setRemotePolling(true)
       try {
-        const page = await listArrowJobs(jobsEndpoint, { take: 20 })
-        if (!cancelled) {
-          setRemoteJobs(
-            (page.items ?? []).filter(
-              (j) => j.status === "Queued" || j.status === "Running"
-            ),
-          )
-        }
+        const page = await listArrowJobs(jobsEndpoint, {
+          take: 20,
+          ifNoneMatch: etagRef.current,
+        })
+        if (cancelled) return
+        etagRef.current = page.etag
+        if (page.notModified) return
+        setRemoteJobs(
+          (page.items ?? []).filter(
+            (j) => j.status === "Queued" || j.status === "Running"
+          ),
+        )
       } catch {
         if (!cancelled) setRemoteJobs([])
-      } finally {
-        if (!cancelled) setRemotePolling(false)
       }
     }
 
     void poll()
-    const id = window.setInterval(() => void poll(), 10_000)
+    // Sekme hidden iken interval kurulmaz (arka planda fetch atılmaz);
+    // visible'a geçişte effect yeniden çalışıp catch-up poll yapar.
+    const id = tabVisible
+      ? window.setInterval(() => void poll(), 10_000)
+      : undefined
     return () => {
       cancelled = true
-      window.clearInterval(id)
+      if (id !== undefined) window.clearInterval(id)
     }
-  }, [jobsEndpoint])
+  }, [jobsEndpoint, tabVisible])
 
   // Kendi pending listemde zaten olan job'ları uzak listeden düş (mükerrer gösterilmesin).
   const myPendingIds = React.useMemo(

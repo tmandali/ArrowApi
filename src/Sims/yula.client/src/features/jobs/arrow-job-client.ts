@@ -150,8 +150,15 @@ export async function listArrowJobs(
     skip?: number
     state?: string
     signal?: AbortSignal
+    /** Son listeleme yanıtındaki ETag; sunucu 304 dönerse `notModified` sonucu döner. */
+    ifNoneMatch?: string
   } = {}
-): Promise<{ items: ArrowJobStatus[]; total: number }> {
+): Promise<{
+  items: ArrowJobStatus[]
+  total: number
+  etag?: string
+  notModified: boolean
+}> {
   const params = new URLSearchParams()
   if (options.take != null) params.set("take", String(options.take))
   if (options.skip != null) params.set("skip", String(options.skip))
@@ -168,6 +175,7 @@ export async function listArrowJobs(
         Accept: "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
+        ...(options.ifNoneMatch ? { "If-None-Match": options.ifNoneMatch } : {}),
         ...getCompanyHeaders(),
       },
       signal: options.signal,
@@ -182,6 +190,15 @@ export async function listArrowJobs(
     )
   }
 
+  if (response.status === 304) {
+    return {
+      items: [],
+      total: 0,
+      etag: response.headers.get("ETag") ?? options.ifNoneMatch,
+      notModified: true,
+    }
+  }
+
   if (!response.ok) {
     const body = await safeParseResponseBody(response)
     throw new ApiError(
@@ -191,7 +208,12 @@ export async function listArrowJobs(
     )
   }
 
-  return (await response.json()) as { items: ArrowJobStatus[]; total: number }
+  const parsed = (await response.json()) as { items: ArrowJobStatus[]; total: number }
+  return {
+    ...parsed,
+    etag: response.headers.get("ETag") ?? undefined,
+    notModified: false,
+  }
 }
 
 export async function fetchJobStatus(
