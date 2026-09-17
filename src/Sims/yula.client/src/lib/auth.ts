@@ -263,6 +263,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (oneTapUser.refreshToken) token.refreshToken = oneTapUser.refreshToken;
         token.expiresAt = oneTapUser.expiresAt;
         token.provider = "google";
+        // Diagnostik: yeni One Tap session'ında exchange'in ne ürettiği
+        // terminalden okunsun (409/debug için). Sadece sign-in'de fırlar.
+        console.info(
+          `[auth] one-tap jwt: accessToken=${oneTapUser.accessToken ? "evet" : "YOK (exchange başarısız?)"}, refreshToken=${oneTapUser.refreshToken ? "evet" : "yok"}, expiresAt=${new Date(oneTapUser.expiresAt).toISOString()}`,
+        );
       }
 
       // 2) Token hâlâ geçerli → iş yapma.
