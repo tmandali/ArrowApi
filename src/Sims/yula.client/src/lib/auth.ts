@@ -247,15 +247,48 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }),
           cache: "no-store",
         });
-        const data = (await res.json()) as {
+        let data: {
           access_token?: string;
           refresh_token?: string;
           expires_in?: number;
           error?: string;
           error_description?: string;
         };
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          // JSON olmayan gövde (5xx sayfası vb.) → geçici hata olarak say.
+          data = {};
+        }
+
+        const errorType = data.error as string | undefined;
         if (!res.ok || !data.access_token) {
-          throw new Error(data.error_description ?? data.error ?? "Token refresh başarısız");
+          const label =
+            data.error_description ?? errorType ?? "Token refresh başarısız";
+          // Kalıcı hata: refresh token geçersiz/rotasyon kırılmış, client
+          // config yanlışı veya erişim reddi → token'ları temizle, kullanıcı
+          // doğal olarak yeniden giriş yapar.
+          const fatal =
+            res.status === 400 &&
+            (errorType === "invalid_grant" ||
+              errorType === "invalid_client" ||
+              errorType === "unauthorized_client");
+          if (fatal) {
+            console.error(
+              `[auth] kalıcı refresh hatası (${provider}): ${label} — token'lar temizlendi`,
+            );
+            delete token.accessToken;
+            delete token.refreshToken;
+            delete token.expiresAt;
+            return token;
+          }
+          // Geçici hata (429/5xx, ağ hatası, JSON olmayan yanıt): token'a
+          // dokunma; bir sonraki istekte tekrar denenebilir. Spam koruması:
+          // yalnız logla, throw ETME.
+          console.error(
+            `[auth] geçici refresh hatası (${provider}): HTTP ${res.status} — ${label}`,
+          );
+          return token;
         }
 
         token.accessToken = data.access_token;
@@ -266,12 +299,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // tekrar giriş gerektirmez — en geç 5 dakikada yansır).
         if (provider === "keycloak") token.roles = realmRolesFromAccessToken(data.access_token);
       } catch (error) {
-        // Refresh başarısız → token'ları temizle; kullanıcı bir sonraki
-        // istekte yeniden giriş yapar (sessiz hata yok).
-        console.error(`[auth] refresh token hatası (${provider}):`, error);
-        delete token.accessToken;
-        delete token.refreshToken;
-        delete token.expiresAt;
+        // Ağ hatası / beklenmeyen istisna → token'a dokunma, sonraki
+        // istekte tekrar dene; tek satır log, spam üretme.
+        console.error(`[auth] refresh isteği istisna (${provider}):`, error);
       }
       return token;
     },

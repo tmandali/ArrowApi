@@ -108,7 +108,9 @@
       "frontchannelLogout": true,
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:56402/*##http://localhost:3000/*",
-        "use.refresh.tokens": "true"
+        "use.refresh.tokens": "true",
+        "org.keycloak.refresh_token_max_lifespan": "604800",
+        "org.keycloak.token.refresh.token.reuse.period": "300"
       },
       "redirectUris": ["http://localhost:56402/*", "http://localhost:3000/*"],
       "webOrigins": ["http://localhost:56402", "http://localhost:3000"],
