@@ -165,6 +165,12 @@ const googleOneTapProvider = {
     // "yeniden giriş" döner. (Klâsik redirect'li Google OAuth bu
     // kısıtın dışında — access + refresh token'la çalışmaya devam
     // eder, orada gerçek userinfo çağrısı yapılır.)
+    // Not: Google'ın yeni One Tap consent yapısı ID token'a `picture`
+    // claim'i GÖMMEZ (canlıda doğrulandı: iss,azp,aud,sub,email,
+    // email_verified,nbf,name,given_name,family_name,iat,exp,jti —
+    // picture yok). Resimli profil gerekiyorsa klasik OAuth
+    // (GOOGLE_ONE_TAP kapatılmalı) kullanın — orada userinfo resim
+    // çeker.
     const accessToken = idToken;
     const expiresAt = payload.exp * 1000;
 
