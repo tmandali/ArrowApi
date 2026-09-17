@@ -253,13 +253,6 @@ async function doIndexReportSchemas(): Promise<number> {
       tier: "global",
     },
     {
-      id: "system_settings",
-      scope: "system",
-      content: "Sistem Ayarları (/settings): Platform seviyesi yönetim ekranı (yalnız yönetici). Sistem kullanıcıları, ajan ayarları ve skill ayarları bölümleri burada toplanır. Kullanıcı profil/AI ayarları bu ekranda DEĞİLDİR — onlar /my/settings'te.",
-      metadata: { type: "system_route", path: "/settings" },
-      tier: "global",
-    },
-    {
       id: "system_admin_users",
       scope: "system",
       content: "Sistem Kullanıcı Dizin Kataloğu (/system/users): Şirket genelindeki tüm kayıtlı kullanıcılar, rolleri, erişim yetkileri ve aktif oturum durumları bu ekranda yönetilir.",

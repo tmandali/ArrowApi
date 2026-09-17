@@ -8,7 +8,6 @@ import {
   Users,
   Bot,
   Sparkles,
-  Settings,
   UserCog,
   X,
 } from "lucide-react";
@@ -66,11 +65,6 @@ export function GlobalNavDrawer() {
       url: "/system/skills",
       label: tNav("system_skills"),
       icon: Sparkles,
-    },
-    {
-      url: "/settings",
-      label: tNav("system_settings"),
-      icon: Settings,
     },
     {
       url: "/my/settings",

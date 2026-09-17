@@ -40,7 +40,6 @@ export function workspaceLabelFromPath(pathname: string): string {
   if (pathname.startsWith("/my") || pathname.startsWith("/user-settings")) return "My"
   if (
     pathname === "/" ||
-    pathname === "/settings" ||
     pathname.startsWith("/system") ||
     pathname.startsWith("/agents") ||
     pathname.startsWith("/agent/")
@@ -85,7 +84,6 @@ export function workspaceIdFromPath(pathname: string): string {
   if (pathname.startsWith("/my") || pathname.startsWith("/user-settings")) return "my"
   if (
     pathname === "/" ||
-    pathname === "/settings" ||
     pathname.startsWith("/system") ||
     pathname.startsWith("/agents") ||
     pathname.startsWith("/agent/")

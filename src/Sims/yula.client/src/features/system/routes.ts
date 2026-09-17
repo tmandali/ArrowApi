@@ -1,5 +1,4 @@
 import {
-  Settings2Icon,
   UserCheckIcon,
   BotIcon,
   SparklesIcon,
@@ -9,12 +8,6 @@ import type { WorkspaceNavItem } from "@/types";
 export const systemDashboardPath = "/";
 
 export const systemNav: WorkspaceNavItem[] = [
-  {
-    title: "Sistem Ayarları",
-    url: "/settings",
-    icon: Settings2Icon,
-    adminOnly: true,
-  },
   {
     title: "Tüm Kullanıcılar",
     url: "/system/users",
