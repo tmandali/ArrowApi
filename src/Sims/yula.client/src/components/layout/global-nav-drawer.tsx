@@ -97,7 +97,8 @@ export function GlobalNavDrawer() {
               <YulaMarkIcon />
             </span>
             <SheetTitle className="text-sm font-semibold tracking-tight text-sidebar-foreground cursor-pointer">
-              {YULA.name}
+              <span className="text-orange-500 dark:text-orange-400">Omni</span>
+              <span className="text-sidebar-foreground">Core</span>
             </SheetTitle>
           </Link>
           <button
@@ -219,7 +220,10 @@ export function GlobalNavDrawer() {
 
         {/* Alt Bilgi — tema token'lariyla (light/dark ikisinde de okunur) */}
         <div className="shrink-0 border-t border-sidebar-border p-3 text-xs text-sidebar-foreground/70 flex items-center justify-between gap-3">
-          <span className="shrink-0 font-semibold tracking-tight text-sidebar-foreground">{YULA.nameBrand}</span>
+          <span className="shrink-0 font-semibold tracking-tight">
+            <span className="text-orange-500 dark:text-orange-400">Omni</span>
+            <span className="text-sidebar-foreground">Core</span>
+          </span>
           <span className="truncate">{YULA.slogan}</span>
         </div>
       </SheetContent>
