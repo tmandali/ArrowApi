@@ -171,8 +171,18 @@ export function NavUser() {
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={8} className="px-3 py-2.5 text-left leading-snug">
-          <span className="block text-[10px] font-semibold tracking-wider text-primary-foreground/60">
+          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/60">
             {providerLabel}
+            {/* Resim durumu göstergesi: session'da resim varsa yeşil, yoksa amber */}
+            <span
+              role="img"
+              aria-label={user.image ? "Resim yüklü" : "Resim yok"}
+              title={user.image ? "Resim yüklü" : "Resim yok — baş harfler gösteriliyor"}
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                user.image ? "bg-emerald-400" : "bg-amber-400/90"
+              )}
+            />
           </span>
           <span className="block max-w-56 truncate text-xs font-medium">
             {user.name ?? "-"}
