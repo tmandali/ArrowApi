@@ -4,7 +4,6 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/utils/cn";
 import { profileInitialsOf } from "./settings-utils";
 
@@ -31,9 +30,14 @@ export function ProfileImageCard() {
 
   const [fetchedImage, setFetchedImage] = React.useState<string | null>(null);
   const [sync, setSync] = React.useState<SyncState>({ kind: "idle" });
+  // Radix Avatar'ın state makinesi yerine düz <img> + onError:
+  // resim yüklenemezse yalnız o URL için initials'e düş (yeniden getirde
+  // yeni URL gelince resim tekrar denenir).
+  const [brokenSrc, setBrokenSrc] = React.useState<string | null>(null);
 
   // Görüntülenecek resim: taze getirilen > session'daki > yok (initials).
   const shownImage = fetchedImage ?? user?.image ?? null;
+  const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
   const handleRefresh = React.useCallback(async () => {
     setSync({ kind: "loading" });
@@ -84,12 +88,20 @@ export function ProfileImageCard() {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-background/60 p-4">
       <div className="group/avatar relative shrink-0">
-        <Avatar className="size-14 rounded-full ring-1 ring-border after:border-0 shadow-xs">
-          {shownImage ? <AvatarImage src={shownImage} alt={user?.name ?? ""} /> : null}
-          <AvatarFallback className="rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-sm font-semibold tracking-wider text-foreground">
+        {shownImage && !imgBroken ? (
+          <img
+            src={shownImage}
+            alt={user?.name ?? ""}
+            onError={() => setBrokenSrc(shownImage)}
+            className="size-14 rounded-full object-cover shadow-xs ring-1 ring-border"
+          />
+        ) : (
+          <div
+            className="flex size-14 items-center justify-center rounded-full bg-linear-to-br from-primary/25 to-primary/10 text-sm font-semibold tracking-wider text-foreground shadow-xs ring-1 ring-border"
+          >
             {profileInitialsOf(user?.name ?? "")}
-          </AvatarFallback>
-        </Avatar>
+          </div>
+        )}
         {/* Hover'da beliren "Yeniden getir" butonu */}
         <button
           type="button"
