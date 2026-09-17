@@ -164,6 +164,14 @@ async function consolidateGuestDupes(
             providerId: dupe.providerId!,
           });
         }
+        // FK (identity_aliases.owner_id → user_identities.id, NO ACTION):
+        // hedefe owner olarak bakan alias satırlarını silmeden ÖNCE ana
+        // kimliğe taşı. unique(provider, provider_id) indeksi ÇİFT üzerinedir
+        // (owner değil) → taşıma unique constraint'i asla çiğnemez.
+        await tx
+          .update(identityAliasesSchema)
+          .set({ ownerId: owner.id })
+          .where(eq(identityAliasesSchema.ownerId, dupe.id));
         await tx
           .delete(userIdentitiesSchema)
           .where(eq(userIdentitiesSchema.id, dupe.id));

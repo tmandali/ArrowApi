@@ -135,6 +135,14 @@ export async function POST(req: Request) {
       //    FK no-action → ayar satırları ÖNCE düşürülür: hedefin ayarları 1)'de
       //    taşındı; re-insert'e seed edilmiş mükerrer ayar satırı da (owner'ın
       //   kini gölgelediği için) kaldırılır.
+      //    FK no-action → hedefe owner olarak bakan alias satırları da ÖNCE
+      //    ana kimliğe taşınır (unique(provider, provider_id) çift üzerinedir
+      //    → taşıma constraint'i çiğnemez; zincirli merge'larda B→C'de
+      //    A-pair→B alias'ı B silinirken B'yi referans ederdi).
+      await tx
+        .update(identityAliasesSchema)
+        .set({ ownerId })
+        .where(eq(identityAliasesSchema.ownerId, targetIdentityId));
       const pairRows = await tx
         .select({ id: userIdentitiesSchema.id })
         .from(userIdentitiesSchema)
