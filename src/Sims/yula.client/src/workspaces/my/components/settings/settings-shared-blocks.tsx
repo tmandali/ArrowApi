@@ -128,7 +128,7 @@ export function ProfileSidePanel({
     <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
       {/* Profil resmi: avatar + hover "Yeniden getir" + tek satır durum —
           ad/soyad satırının üstünde, ortalanarak. Provider chip'i
-          avatar'ın sağına, dikey ortada. */}
+          avatar'ın ÜSTÜNE, ortalanmış. */}
       <ProfileImageCard
         trailing={
           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

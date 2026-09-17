@@ -69,7 +69,9 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
 
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="flex items-center gap-3">
+      {/* Avatar'ın ÜSTÜNE, ortalanmış istemci tedarik ettiği içerik
+          (örn. provider chip'i). */}
+      {trailing}
       <div className="group/avatar relative shrink-0">
         {shownImage && !imgBroken ? (
           <img
@@ -118,10 +120,6 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
             <RefreshCw className="size-3.5" />
           )}
         </button>
-      </div>
-      {/* Avatar'ın sağına, dikey ortada duran istemci tedarik ettiği
-          içerik (örn. provider chip'i). */}
-      {trailing}
       </div>
     </div>
   );
