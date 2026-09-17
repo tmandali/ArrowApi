@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Loader2, RefreshCw, Check, TriangleAlert, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/utils/cn";
-import { setLocalProfileImage, toAvatarSrc, useLocalProfileImage, setLocalUserPhoto } from "@/features/auth/lib/local-profile-image";
+import { setLocalProfileImage, useAvatarSrc, useLocalProfileImage, setLocalUserPhoto, invalidateAvatarProxy } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
 
 /**
@@ -40,15 +40,15 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
 
   // Görüntülenecek resim: KENDİ yüklenen (data URL, provider zincirinin
   // üstüne bindirilir) > taze getirilen > session/yerel kayıt > yok
-  // (initials).
+  // (initials). Uzak (provider) URL'ler /api/avatar proxy'sine TEK
+  // SEFERLIK dedup'lu fetch üzerinden çözülür (nav-user rozetiyle aynı
+  // blob URL'i paylaşılan); resim YÜKLENMEZSE ham URL hiç istenmez —
+  // 404 fırtınası olmaz. KENDİ yüklenen data: URL'leri proxy'den geçmez.
   const profile = useLocalProfileImage(user);
   const hasCustomPhoto = (profile.picture ?? "").startsWith("data:image/");
-  // Uzak (provider) URL'ler /api/avatar proxy'sinden stream edilir —
-  // localStorage'daki ham URL'ler WebView'de kırılgan yükleniyordu;
-  // KENDİ yüklenen data: URL'leri proxy'den geçmez.
-  const shownImage = hasCustomPhoto
-    ? profile.picture
-    : toAvatarSrc(fetchedImage ?? profile.picture);
+  const shownImage = useAvatarSrc(
+    hasCustomPhoto ? profile.picture : fetchedImage ?? profile.picture,
+  );
   const imgBroken = shownImage !== null && brokenSrc === shownImage;
 
   const handleRefresh = React.useCallback(async () => {
@@ -83,6 +83,10 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
         name: data.name ?? null,
         email: data.email ?? null,
       });
+      // "Yeniden getir" taze resim getirdiyse paylaşılan /api/avatar
+      // önbelleğını iptal et: rozet + bu kart bir sonraki çözümlemeye
+      // taze proxy istegi atar (önceki 404 önbelleği takılı kalmasın).
+      if (picture) invalidateAvatarProxy();
       setSync({ kind: "fresh", at: new Date().toISOString(), hasPicture: !!picture });
     } catch {
       setSync({ kind: "error" });

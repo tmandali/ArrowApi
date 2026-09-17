@@ -20,7 +20,7 @@ import {
 import { useJobSession } from "@/features/auth/hooks/use-job-session";
 import {
   setLocalProfileImage,
-  toAvatarSrc,
+  useAvatarSrc,
   useLocalProfileImage,
 } from "@/features/auth/lib/local-profile-image";
 import type { Session } from "@/lib/auth";
@@ -144,9 +144,11 @@ export function NavUser() {
 
   // Rozet resmi: session'daki resmi yoksa ayarlar sayfasındaki
   // "Yeniden getir" başarısında saklanan yerel kayıt (localStorage)
-  // tamamlar. Uzak (provider) URL'ler `toAvatarSrc` ile /api/avatar
-  // proxy'sine haritalanır — ham URL'ler WebView'de kırılgan yükleniyordu.
-  const badgeImage = toAvatarSrc(useLocalProfileImage(user).picture);
+  // tamamlar. Uzak (provider) URL'ler `useAvatarSrc` ile /api/avatar
+  // proxy'sine TEK SEFERLIK dedup'lu fetch üzerinden blob URL'e çözümlenir
+  // — her mount'ta /api/avatar'a yeniden istek (404 fırtınası) atılmaz.
+  const profilePicture = useLocalProfileImage(user).picture;
+  const badgeImage = useAvatarSrc(profilePicture);
 
   // Otomatik tamamlama: ilk girişte session'da resim YOK ama access
   // token varsa, arka planda TEK SEFERLIK /api/auth/userinfo çağrısı

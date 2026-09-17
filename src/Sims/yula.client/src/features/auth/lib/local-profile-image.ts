@@ -136,6 +136,101 @@ export function toAvatarSrc(
   return url;
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// /api/avatar TEK SEFERLIK fetch (istemci-side dedup)
+//
+// YOKSAY edilmeyen kök neden: `Cache-Control: no-store` + 404'ün
+// cache'lenememesi → her <img> mount'u (sayfa geçişi yeniden mount,
+// StrictMode 2×, HMR, her F5, dropdown açılışı) /api/avatar'a YENİ
+// istek atar; resim yokken hepsi log'a 404 satırı düşer ("404 fırtınası").
+//
+// Çözüm: sayfa ömründe proxy YALNIZCA BİR KEZ fetch edilir; baytları
+// paylaşılan bir blob URL olarak bütün tüketicilere verilir
+// (nav-user rozeti, ayarlar kartı). 404 / ağ hatası → null → baş
+// harfler fallback'i ve sonrasında istek YOK. "Yeniden getir" başarısında
+// `invalidateAvatarProxy()` çağrılır; taze resim bir sonraki mount'ta
+// yeniden çözülebilir. Blob URL bilinçli olarak release edilmez —
+// tarayıcı sayfa kapanışında serbest bırakır (resim baytları ≤ 5 MB;
+// tek kopya, kabul edilebilir).
+// ────────────────────────────────────────────────────────────────────────
+let sharedAvatarBlobUrl: string | null = null;
+let sharedAvatarPromise: Promise<string | null> | null = null;
+let avatarEpoch = 0;
+const avatarEpochListeners = new Set<() => void>();
+
+/** /api/avatar proxy'si için TEK istek (modül seviyesi dedup — tüm
+ *  tüketiciler aynı blob URL'i / null'u paylaşır).
+ *  Avatar baytlarının blob URL'ini döner; 404 (resim yok) veya hata →
+ *  null (ve sonraki çağrılar ağa ÇIKMAZ). */
+export function fetchAvatarProxyOnce(): Promise<string | null> {
+  if (sharedAvatarPromise) return sharedAvatarPromise;
+  sharedAvatarPromise = fetch("/api/avatar", { cache: "no-store" })
+    .then((res) => (res.ok ? res.blob() : null))
+    .then((blob) => {
+      sharedAvatarBlobUrl = blob ? URL.createObjectURL(blob) : null;
+      return sharedAvatarBlobUrl;
+    })
+    .catch(() => {
+      // Ağ hatası: sayfa ömrü boyunca null (baş harfler kalır; "Yeniden
+      // getir" başarısı invalidasyonla yeniden dener).
+      return null;
+    });
+  return sharedAvatarPromise;
+}
+
+/** "Yeniden getir" başarısında çağrılır: paylaşılan sonuç iptal edilir,
+ *  epoch bump'u hook'ları yeniden çözümlemeye zorlar. */
+export function invalidateAvatarProxy(): void {
+  if (sharedAvatarBlobUrl) {
+    URL.revokeObjectURL(sharedAvatarBlobUrl);
+  }
+  sharedAvatarBlobUrl = null;
+  sharedAvatarPromise = null;
+  avatarEpoch += 1;
+  avatarEpochListeners.forEach((listener) => listener());
+}
+
+/**
+ * `toAvatarSrc`'in reaktif, dedup'lu versiyonu — <img src> hedefi.
+ *
+ * - `data:` / yerel URL'ler aynen döner (proxy'den geçmez).
+ * - Uzak (http/https) URL'ler TEK SEFERLIK /api/avatar fetch'i ile
+ *   paylaşılan blob URL'e çözülür; çözülmeden önce (ve çözüm
+ *   başarısızsa) null → baş harfler rozeti; src'siz <img> mount
+ *   edilmediği için 404 fırtınası olmaz.
+ *
+ * Hydration güvenli: ilk (SSR) render'da daima null — tarayıcıda ilk
+ * render da null, <img> çözülünceye kadar DOM'da yoktur (mismatch yok).
+ */
+export function useAvatarSrc(
+  url: string | null | undefined,
+): string | null {
+  const isRemote = !!url && url.startsWith("http");
+  const plain = isRemote ? null : (url ?? null);
+  const epoch = React.useSyncExternalStore(
+    (callback) => {
+      avatarEpochListeners.add(callback);
+      return () => {
+        avatarEpochListeners.delete(callback);
+      };
+    },
+    () => avatarEpoch,
+    () => 0,
+  );
+  const [remote, setRemote] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!isRemote) return;
+    let cancelled = false;
+    void fetchAvatarProxyOnce().then((blobUrl) => {
+      if (!cancelled) setRemote(blobUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isRemote, epoch]);
+  return plain ?? remote;
+}
+
 /**
  * "Yeniden getir" başarısında çağrılır. V2: {picture, name, email};
  * geriye uyum için çıplak URL (yalnız resim) veya null (kayıt sil) kabul

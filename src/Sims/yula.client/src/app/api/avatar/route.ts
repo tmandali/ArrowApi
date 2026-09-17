@@ -59,13 +59,24 @@ async function fetchProviderPicture(user: ProviderUser): Promise<string | null> 
  * ve byte'ları same-origin stream eder.
  *
  * 404: oturum yok / resim yok — UI'daki baş harfler kartı zaten bu hâli
- * temsil eder; hata değildir.
+ * temsil eder; hata değildir. 404 yanıtları kısa `max-age` ile
+ * cache'lenebilir: istemci mount'ları (sayfa geçişi, StrictMode, F5)
+ * tarayıcı önbelleğine çarpıp log'da 404 fırtınası yaratmaz.
+ * (İstemcinin tek-fetch dedup'u `cache: "no-store"` ile bu cache'i
+ * bypass eder; "Yeniden getir" sonrası invalidasyonla taze dener.)
  */
+const NO_PICTURE_CACHE = "public, max-age=60";
+
 export async function GET() {
   const session = (await auth()) as Session | null;
   const user = session?.user;
   if (!user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 404 });
+    // Oturum YOKKEN cache'lenmez: kullanıcı giriş yapınca resim
+    // anında çözülmeli (no-store ile her deneme taze).
+    return NextResponse.json(
+      { error: "unauthorized" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   let picture: string | null = null;
@@ -76,7 +87,13 @@ export async function GET() {
   }
   if (!picture) picture = user.image ?? null;
   if (!picture) {
-    return NextResponse.json({ error: "no_picture" }, { status: 404 });
+    // Oturum var ama resim YOK: 60 sn cache'le → mount fırtınasında
+    // tek istek, log'da tek 404 satırı; taze denemeler (istemci
+    // dedup'u / invalidasyon) bu cache'i bypass ederek üzerine yazar.
+    return NextResponse.json(
+      { error: "no_picture" },
+      { status: 404, headers: { "Cache-Control": NO_PICTURE_CACHE } },
+    );
   }
 
   let upstream: Response;
