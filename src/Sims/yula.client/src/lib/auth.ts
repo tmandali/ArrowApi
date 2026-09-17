@@ -106,13 +106,15 @@ function refreshEndpoint(provider: string): {
  *
  * Notlar:
  *  - One Tap'te ID token'ın kendisi "accessToken" olarak session'a
- *    taşınır: Google'ın `oauth2/v4/token` endpoint'i RFC 8693
- *    token-exchange'i desteklemez (canlıda 400 unsupported_grant_type
- *    ile doğrulandı); ancak OpenID Connect userinfo endpoint'i ID
- *    token'ı Bearer olarak kabul eder → /api/auth/userinfo proxy'si
- *    bunu doğrudan kullanır. Ömür ~1 saattir; refresh_token olmadığından
- *    arka plan refresh yok — süresi dolunca yeniden giriş (tek tık)
- *    tazeler.
+ *    taşınır. Dikkat: Google'ın ne token-exchange'i (400
+ *    unsupported_grant_type) ne de userinfo endpoint'inin ID token'ı
+ *    Bearer olarak kabul etmesi (401 invalid_request) mümkün — ikisi
+ *    da canlıda doğrulandı. Bu yüzden /api/auth/userinfo proxy'si One
+ *    Tap session'larında (provider=google + refresh_token yok) Google'a
+ *    gitmez, session'daki name/email/picture claim'lerini "son
+ *    senkronizasyon" olarak döndürür. Ömür ~1 saattir; refresh_token
+ *    olmadığından arka plan refresh yok — süresi dolunca yeniden giriş
+ *    (tek tık) tazeler.
  *  - İd bilinçli olarak "google-onesig" — `getProviders()` bu provider'ı
  *    sign-in ekranına sızdırabilir; `ProviderButtons` bileşeninde gizli
  *    listede tutulur (One Tap YALNIZ sign-in kartındaki GIS butonundadır).
@@ -152,17 +154,17 @@ const googleOneTapProvider = {
     }
     if (!payload.sub || !payload.exp) return null;
 
-    // Google'un `oauth2/v4/token` endpoint'i RFC 8693 token-exchange'i
-    // DESTEKLEMEZ (HTTP 400 unsupported_grant_type — canlıda doğrulandı).
-    // Çözüm: ID token'ı OLABİLDİĞİ KADAR "accessToken" olarak session'a
-    // taşıyoruz — Google'ın OpenID Connect userinfo endpoint'i
-    // (openidconnect.googleapis.com/v1/userinfo) ID token'ı doğrudan
-    // Bearer olarak kabul eder; /api/auth/userinfo proxy'si de bu URL'i
-    // kullanır. Ömür = ID token'ın exp'i (~1 saat); refresh_token
-    // olmadığından arka plan refresh yok — süresi dolunca session sürer,
-    // userinfo proxy'si `no_access_token` (409) döner ve "Yeniden getir"
-    // için yeniden giriş gerekir. (Klâsik redirect'li Google OAuth bu
-    // kısıtın dışında — access + refresh token'la çalışmaya devam eder.)
+    // Google One Tap: GIS yalnız ID token verir. Token exchange
+    // (`oauth2/v4/token`, RFC 8693) Google'da desteklenmez (400) ve
+    // userinfo endpoint'i de ID token'ı Bearer kabul etmez (401) —
+    // ikisi de canlıda doğrulandı. Çözüm: ID token'ı OLABİLDİĞİ KADAR
+    // "accessToken" olarak session'a taşırız; /api/auth/userinfo
+    // proxy'si One Tap session'larında (refresh_token yok) Google'a
+    // gitmez, session claim'lerini döner. Ömür = ID token'ın exp'i
+    // (~1 saat); süresi dolunca jwt callback token'ı siler, route 409
+    // "yeniden giriş" döner. (Klâsik redirect'li Google OAuth bu
+    // kısıtın dışında — access + refresh token'la çalışmaya devam
+    // eder, orada gerçek userinfo çağrısı yapılır.)
     const accessToken = idToken;
     const expiresAt = payload.exp * 1000;
 

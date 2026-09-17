@@ -32,12 +32,12 @@ export async function GET() {
 
   const accessToken = user.accessToken;
   if (!accessToken) {
-    // Diagnostik: hangi senaryoda token boş kaldığı dev terminal'den okunsun:
-    //  - eski formattaki session (exchange'ten önce giriş yapılmış),
-    //  - token exchange hatası (bkz. authorize log'ı),
-    //  - exchange'ten refresh_token gelmemesi + access token ömrünün dolması.
+    // Diagnostik: hangi senaryoda token boş kalır:
+    //  - eski session (token taşımaya geçilmeden önce giriş yapılmış),
+    //  - One Tap: ID token ömrü (~1 saat) doldu → jwt callback token'ı
+    //    sildi → yeniden giriş gerekli.
     console.warn(
-      `[auth/userinfo] access token yok (provider=${user.provider ?? "?"}, userId=${user.id.slice(0, 8)}…) — yeniden giriş veya exchange hatası kontrol et`,
+      `[auth/userinfo] access token yok (provider=${user.provider ?? "?"}, userId=${user.id.slice(0, 8)}…) — yeniden giriş gerekli`,
     );
     return NextResponse.json(
       { error: "no_access_token", provider: user.provider ?? null },
@@ -46,11 +46,34 @@ export async function GET() {
   }
 
   let url: string;
-  // "google-onesig": eski (exchange öncesi) session cookie'si — NextAuth'un
-  // credentials provider damgası. provider alanı varsa Google'a sorulabilir.
+  // "google-onesig": eski session cookie'si — NextAuth'un credentials
+  // provider damgası. provider alanı varsa Google'a sorulabilir.
   const provider = user.provider === "google-onesig" ? "google" : user.provider;
+
+  // Google One Tap session'ı: refresh token YOKTUR (OAuth grant yapılmaz,
+  // GIS yalnız ID token üretir). Bu session'larda accessToken ASLINDA ID
+  // token'ın kendisidir — Google'ın userinfo endpoint'i onu Bearer olarak
+  // REDDEDER (401 invalid_request — canlıda doğrulandı). ID token zaten
+  // name/email/picture claim'lerini taşıdığından, session'daki değerler
+  // (= giriş anındaki durum) "son senkronizasyon" olarak döner. Sonraki
+  // girişe kadar Google'daki profil değişikliği yansımaz.
+  // (Klasik redirect'li Google OAuth session'larında refresh token vardır;
+  // onlar için gerçek userinfo çağrısına devam edilir.)
+  if (provider === "google" && !user.refreshToken) {
+    return NextResponse.json({
+      provider: "google",
+      name: user.name ?? null,
+      email: user.email ?? null,
+      picture: user.image ?? null,
+      fetchedAt: new Date().toISOString(),
+      source: "session-claims",
+    });
+  }
   switch (provider) {
     case "google":
+      // Klasik redirect'li Google OAuth (refresh token'lu) — gerçek
+      // access token'la çalışır. (One Tap session'ları yukarıda
+      // session-claims olarak dönüştü.)
       url = "https://openidconnect.googleapis.com/v1/userinfo";
       break;
     case "keycloak": {
@@ -79,6 +102,10 @@ export async function GET() {
   if (!upstream.ok) {
     // 401/400: token geçersiz/düşmüş → istemci bunu "yeniden giriş"
     // mesajıyla yorumlar.
+    console.error(
+      "[userinfo] upstream reddetti: HTTP", upstream.status,
+      (await upstream.text()).slice(0, 300),
+    );
     return NextResponse.json(
       { error: "userinfo_failed", status: upstream.status },
       { status: 502 },
