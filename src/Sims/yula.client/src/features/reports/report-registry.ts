@@ -1,9 +1,11 @@
 import type { JsonSchemaObject } from "@/features/report-criteria";
-import {
-  stockBalanceCriteriaSchema,
-  stockAnalyticsCriteriaSchema,
-  retailSalesCriteriaSchema,
-} from "@/workspaces/stock";
+// Şema JSON dosyaları doğrudan (derin) içe aktarılır; workspace index'inden
+// import tsx/Node test ortamında döngüsel bir re-export zinciri üretir
+// (index → form bileşenleri → report-criteria → bu modül). Bundler'da
+// davranış aynıdır: tek kaynak yine schemas/*.json dosyalarıdır.
+import stockBalanceCriteriaSchema from "@/workspaces/stock/stock-balance/schemas/stock-balance-criteria.schema.json";
+import stockAnalyticsCriteriaSchema from "@/workspaces/stock/stock-analytics/schemas/stock-analytics-criteria.schema.json";
+import retailSalesCriteriaSchema from "@/workspaces/stock/retail-sales-report/schemas/retail-sales-criteria.schema.json";
 
 export interface YulaReportMeta {
   scope: string;

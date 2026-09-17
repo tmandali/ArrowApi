@@ -18,7 +18,7 @@
     "copy:duckdb": "node scripts/copy-duckdb-assets.mjs",
     "copy:parquet": "node scripts/copy-parquet-assets.mjs",
     "test:grid": "node src/features/jobs/components/virtual-spreadsheet/tests/run-all.mjs",
-    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test": "tsx --require ./scripts/register-md.cjs --test \"src/**/*.test.ts\"",
     "test:ui": "vitest run",
     "test:all": "npm run test && npm run test:grid",
     "test:e2e": "playwright test",
