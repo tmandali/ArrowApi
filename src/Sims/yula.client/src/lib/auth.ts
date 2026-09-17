@@ -105,11 +105,14 @@ function refreshEndpoint(provider: string): {
  * ve profili token'ın içinden okur — ek access token/userinfo turu gerekmez.
  *
  * Notlar:
- *  - One Tap'te ID token, authorize içinde Google token exchange'e
- *    (oauth2/v4/token, token-exchange) çevrilir → access + refresh token
- *    elde edilir. Access token süresi dolarsa arka plan refresh devrededir;
- *    exchange ağ hatasıyla başarısız olursa oturum eskisi gibi tek tıkla
- *    yeniden girişle tazelenir.
+ *  - One Tap'te ID token'ın kendisi "accessToken" olarak session'a
+ *    taşınır: Google'ın `oauth2/v4/token` endpoint'i RFC 8693
+ *    token-exchange'i desteklemez (canlıda 400 unsupported_grant_type
+ *    ile doğrulandı); ancak OpenID Connect userinfo endpoint'i ID
+ *    token'ı Bearer olarak kabul eder → /api/auth/userinfo proxy'si
+ *    bunu doğrudan kullanır. Ömür ~1 saattir; refresh_token olmadığından
+ *    arka plan refresh yok — süresi dolunca yeniden giriş (tek tık)
+ *    tazeler.
  *  - İd bilinçli olarak "google-onesig" — `getProviders()` bu provider'ı
  *    sign-in ekranına sızdırabilir; `ProviderButtons` bileşeninde gizli
  *    listede tutulur (One Tap YALNIZ sign-in kartındaki GIS butonundadır).
@@ -149,43 +152,21 @@ const googleOneTapProvider = {
     }
     if (!payload.sub || !payload.exp) return null;
 
-    // ID token'ı Google OAuth token'ına çevir (token exchange) — profile scope.
-    // Bunu olmadan One Tap hiç access token üretmez; auth()'ın arka plan
-    // refresh'i ve /api/auth/userinfo (taze picture) çalışamazdı.
-    let accessToken: string | undefined;
-    let expiresAt = payload.exp * 1000;
-    let refreshToken: string | undefined;
-    try {
-      const exRes = await fetch("https://www.googleapis.com/oauth2/v4/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-          token_type_hint: "id_token",
-          scope: "openid email profile",
-          audience: clientId,
-          access_token: idToken,
-          offline_access: "1",
-        }),
-        cache: "no-store",
-      });
-      const ex = (await exRes.json()) as {
-        access_token?: string;
-        expires_in?: number;
-        refresh_token?: string;
-      };
-      if (ex.access_token) {
-        accessToken = ex.access_token;
-        expiresAt = Date.now() + (ex.expires_in ?? 3600) * 1000;
-        refreshToken = ex.refresh_token;
-      }
-    } catch (error) {
-      // Exchange best-effort: ağ hatasında eski davranışa (access token'siz
-      // session) dön — giriş asla kırılmasın.
-      console.error("[auth] One Tap token exchange hatası:", error);
-    }
+    // Google'un `oauth2/v4/token` endpoint'i RFC 8693 token-exchange'i
+    // DESTEKLEMEZ (HTTP 400 unsupported_grant_type — canlıda doğrulandı).
+    // Çözüm: ID token'ı OLABİLDİĞİ KADAR "accessToken" olarak session'a
+    // taşıyoruz — Google'ın OpenID Connect userinfo endpoint'i
+    // (openidconnect.googleapis.com/v1/userinfo) ID token'ı doğrudan
+    // Bearer olarak kabul eder; /api/auth/userinfo proxy'si de bu URL'i
+    // kullanır. Ömür = ID token'ın exp'i (~1 saat); refresh_token
+    // olmadığından arka plan refresh yok — süresi dolunca session sürer,
+    // userinfo proxy'si `no_access_token` (409) döner ve "Yeniden getir"
+    // için yeniden giriş gerekir. (Klâsik redirect'li Google OAuth bu
+    // kısıtın dışında — access + refresh token'la çalışmaya devam eder.)
+    const accessToken = idToken;
+    const expiresAt = payload.exp * 1000;
 
-    // accessToken/expiresAt/refreshToken jwt callback'te tüketilir; provider
+    // accessToken/expiresAt jwt callback'te tüketilir; provider
     // "google" olarak haritalanır ki refreshEndpoint() aynı Google
     // endpoint'ini çözümsünlensin.
     return {
@@ -194,7 +175,6 @@ const googleOneTapProvider = {
       email: payload.email,
       image: payload.picture,
       accessToken,
-      refreshToken,
       expiresAt,
       provider: "google",
     };
@@ -246,27 +226,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             : [];
       }
 
-      // 1b) Google One Tap (credentials): ömür `user` üzerinden gelir
-      //     (redirect'li OAuth'tan farklı olarak `account` yoktur). Token
-      //     exchange (authorize) ile access + refresh token taşınır; refresh
-      //     yoksa eskiden olduğu gibi yalnızca ID token ömrüyle yaşam.
+      // 1b) Google One Tap (credentials): ID token, `user.accessToken`
+      //     olarak taşınır (userinfo Bearer'ı — dosya başı notu).
+      //     Not: v5 credentials sign-in'de `account` DA tanımlı gelebilir;
+      //     One Tap user'ı custom `expiresAt` alanıyla AYIRT edilir
+      //     (redirect akışında user bu alanı taşımaz); bu branch 1)
+      //     branch'inin üstüne yazabilir — One Tap'te user'ın değeri
+      //     otoriterdir.
       const oneTapUser = user as (NextAuthUser & {
         accessToken?: string;
         refreshToken?: string;
         expiresAt?: number;
       }) | undefined;
-      if (!account && typeof oneTapUser?.expiresAt === "number") {
+      if (typeof oneTapUser?.expiresAt === "number") {
         if (oneTapUser.accessToken) token.accessToken = oneTapUser.accessToken;
-        // Google her token exchange'te refresh_token döndürmeyebilir
-        // (offline access daha önce verilmişse); mevcut refresh token'ı
-        // silmeyelim.
         if (oneTapUser.refreshToken) token.refreshToken = oneTapUser.refreshToken;
         token.expiresAt = oneTapUser.expiresAt;
         token.provider = "google";
-        // Diagnostik: yeni One Tap session'ında exchange'in ne ürettiği
-        // terminalden okunsun (409/debug için). Sadece sign-in'de fırlar.
+        // Sadece sign-in'de fırlar; terminalden One Tap session'ının
+        // token durumu izlenir (409/debug için).
         console.info(
-          `[auth] one-tap jwt: accessToken=${oneTapUser.accessToken ? "evet" : "YOK (exchange başarısız?)"}, refreshToken=${oneTapUser.refreshToken ? "evet" : "yok"}, expiresAt=${new Date(oneTapUser.expiresAt).toISOString()}`,
+          `[auth] one-tap jwt: accessToken(id-token)=${oneTapUser.accessToken ? "evet" : "YOK"}, expiresAt=${new Date(oneTapUser.expiresAt).toISOString()}`,
         );
       }
 
@@ -274,8 +254,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.expiresAt && Date.now() < (token.expiresAt as number)) return token;
 
       // 3) Token ömrü dolmuş → refresh token ile yenile.
-      //    (refresh_token yoksa — exchange'siz eski One Tap sessionları vb. —
-      //     mevcut token'a dokunma.)
+      //    (refresh_token yoksa — One Tap sessionları vb. — süresi dolan
+      //     accessToken'i sil: userinfo proxy'si temiz 409 "yeniden giriş"
+      //     dönebilsin, 502 "hata" değil.)
       if (!token.refreshToken) {
         if (token.accessToken && token.expiresAt && Date.now() >= (token.expiresAt as number)) {
           delete token.accessToken;
