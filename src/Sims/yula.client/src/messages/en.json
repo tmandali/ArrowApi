@@ -128,7 +128,11 @@
     "connections_body": "Connected Social Logins & Roles",
     "image_refresh": "Refresh (userinfo)",
     "image_upload": "Upload your photo",
-    "image_custom_remove": "Remove custom photo — back to provider photo"
+    "image_custom_remove": "Remove custom photo — back to provider photo",
+    "image_upload_failed": "Profile photo could not be loaded",
+    "image_upload_not_image": "Please choose an image file (PNG, JPG...).",
+    "image_upload_too_big": "File is too large — choose an image under 8 MB.",
+    "image_upload_generic": "Image could not be processed — try another file (e.g. PNG/JPEG).",
   },
   "WorkspaceLanding": {
     "pending_actions_title": "Pending Actions",

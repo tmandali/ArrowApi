@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { Loader2, RefreshCw, Check, TriangleAlert, Upload, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/utils/cn";
 import { setLocalProfileImage, useLocalProfileImage, setLocalUserPhoto } from "@/features/auth/lib/local-profile-image";
 import { profileInitialsOf } from "./settings-utils";
@@ -90,29 +91,44 @@ export function ProfileImageCard({ trailing }: { trailing?: React.ReactNode }) {
    * data URL (localStorage kotasına sığar; provider resminin ÜSTÜNE
    * bindirilir; Trash2 ile kaldırılınca provider zinciri devre).
    */
-  const handleUpload = React.useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    if (file.size > 8 * 1024 * 1024) return; // pratik üst sınır
-    try {
-      const bitmap = await createImageBitmap(file);
-      const size = 256;
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const scale = Math.max(size / bitmap.width, size / bitmap.height);
-      const w = bitmap.width * scale;
-      const h = bitmap.height * scale;
-      ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
-      bitmap.close();
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      setBrokenSrc(null);
-      setLocalUserPhoto(dataUrl);
-    } catch {
-      // Yükleme hatası: sessizce yut (mevcut resim korunur).
-    }
-  }, []);
+  const handleUpload = React.useCallback(
+    async (file: File) => {
+      const fail = (reason: string) =>
+        toast.error(t("image_upload_failed"), { description: reason });
+      if (!file.type.startsWith("image/")) {
+        fail(t("image_upload_not_image"));
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        fail(t("image_upload_too_big"));
+        return;
+      }
+      try {
+        const bitmap = await createImageBitmap(file);
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          fail(t("image_upload_generic"));
+          return;
+        }
+        const scale = Math.max(size / bitmap.width, size / bitmap.height);
+        const w = bitmap.width * scale;
+        const h = bitmap.height * scale;
+        ctx.drawImage(bitmap, (size - w) / 2, (size - h) / 2, w, h);
+        bitmap.close();
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        setBrokenSrc(null);
+        setLocalUserPhoto(dataUrl);
+      } catch {
+        // Dosya okunamadı / biçim desteklenmiyor (örn. HEIC).
+        fail(t("image_upload_generic"));
+      }
+    },
+    [t],
+  );
 
   const handleRemoveCustom = React.useCallback(() => {
     setLocalUserPhoto(null);
