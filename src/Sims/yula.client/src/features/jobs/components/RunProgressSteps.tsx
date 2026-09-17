@@ -84,14 +84,7 @@ export function RunProgressSteps({
   }
 
   return (
-    <div className={cn("space-y-3", !runningOnly && "mt-3", className)}>
-      {!runningOnly ? (
-        <Marker variant="separator">
-          <MarkerContent className="text-[11px] text-muted-foreground">
-            {t("progress")}
-          </MarkerContent>
-        </Marker>
-      ) : null}
+    <div className={cn("space-y-3", className)}>
       {loading && events.length === 0 ? (
         <Marker role="status">
           <MarkerIcon>
