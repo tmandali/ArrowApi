@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/timeline";
 import { formatSettingsDate } from "./settings-utils";
 import type { SettingsMeta } from "./settings-types";
+import { ProfileImageCard } from "./profile-image-card";
 
 /**
  * user-details + settings sekmelerinde birebir tekrar eden bloklar:
@@ -119,6 +120,10 @@ export function ProfileSidePanel({
 
   return (
     <div className="w-full lg:w-72 border-l p-4 space-y-6 text-xs bg-muted/10">
+      {/* Profil resmi: avatar + hover "Yeniden getir" + tek satır durum —
+          ad/soyad satırının üstünde, ortalanarak. */}
+      <ProfileImageCard />
+
       <div className="flex items-start justify-between">
         <div>
           <h4 className="font-semibold text-sm text-foreground">{fullName || "—"}</h4>

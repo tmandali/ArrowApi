@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { profileInitialsOf, splitFullName } from "./settings-utils";
-import { ProfileImageCard } from "./profile-image-card";
 import type { ProfileLanguage, ProfileTimeZone } from "./settings-types";
 import type { SettingsFormState } from "./use-settings-form-state";
 import { ActivityBlock, CommentsBlock, ProfileSidePanel } from "./settings-shared-blocks";
@@ -57,8 +56,6 @@ export function ProfileTab({ form }: { form: SettingsFormState }) {
         </div>
 
         <div className="space-y-4 pt-2">
-          <ProfileImageCard />
-
           <h3 className="text-xs font-semibold text-foreground">{t("basic_info")}</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

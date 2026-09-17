@@ -9,13 +9,13 @@ import { setLocalProfileImage, useLocalProfileImage } from "@/features/auth/lib/
 import { profileInitialsOf } from "./settings-utils";
 
 /**
- * user-details sekmesindeki profil resmi kartı:
+ * user-details sekmesinin SAĞ KENAR PANELİNDEKİ profil resmi:
  * - Resim: önce session (`user.image` — giriş anındaki değer), taze getirme
  *   başarılıysa o (`fetchedImage`) öne geçer.
  * - Hover'da görünen "Yeniden getir" butonu: `GET /api/auth/userinfo` proxy'si
  *   üzerinden provider'ın (Google/Keycloak) taze userinfo'sunu çeker.
- * - Sağlayıcı resim vermiyorsa (hesapta profil fotoğrafı yok) kart bunu
- *   statü satırında dürüstçe gösterir — fallback initials korunur.
+ * - Sağlayıcı resim vermiyorsa (hesapta profil fotoğrafı yok) alttaki
+ *   statü satırı bunu dürüstçe gösterir — fallback initials korunur.
  */
 type SyncState =
   | { kind: "idle" }
@@ -94,7 +94,7 @@ export function ProfileImageCard() {
   }
 
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-background/60 p-4">
+    <div className="flex flex-col items-center gap-1.5">
       <div className="group/avatar relative shrink-0">
         {shownImage && !imgBroken ? (
           <img
@@ -132,11 +132,9 @@ export function ProfileImageCard() {
           )}
         </button>
       </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-foreground">{t("image_title")}</p>
-        <p className={cn("truncate text-[11px]", statusClass)}>{statusText}</p>
-      </div>
+      {/* Tek satır durum: kenar panelinde ad/soyad zaten altta göründüğü
+          için başlık satırı kaldırıldı, yalnız senkronizasyon durumu. */}
+      <p className={cn("max-w-full truncate text-[10px]", statusClass)}>{statusText}</p>
     </div>
   );
 }
