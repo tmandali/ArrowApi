@@ -8,6 +8,7 @@ import { ModuleSidebar } from "@/components/layout/module-sidebar";
 import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator";
 import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat";
 import { WorkspaceSearchProvider } from "@/context/workspace-search";
+import { useCompanyStore } from "@/store/slices/company-store";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { isDomainWorkspacePath } from "@/lib/workspace-registry";
 import { cn } from "@/utils/cn";
@@ -22,6 +23,7 @@ import { cn } from "@/utils/cn";
 export function AppLayout({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname();
   const hasSubNav = isDomainWorkspacePath(pathname);
+  const activeCompanyId = useCompanyStore((state) => state.activeCompanyId);
 
   return (
     <div
@@ -49,7 +51,19 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                   hasSubNav ? "mr-2" : "mx-2"
                 )}
               >
-                <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                {/*
+                  Şirket geçiş ANAHTARI yalnızca SAYFA İÇERİĞİNDE yaşar:
+                  header (search kutusu, bildirimler, NavUser), WorkspaceSearch/AiChat
+                  provider'ları ve küresel job/bildirim altyapısı HAYATTA KALIR —
+                  kutu remount edilmez, open/query durumu sıfırlanmaz (zıplama yok).
+                  Anahtar değişince yalnız paneller yeniden mount olup kendi
+                  verisini (X-Company-Id) yeniler; 180ms fade-in sert
+                  veri→iskelet değişimini yumuşatır.
+                */}
+                <div
+                  key={activeCompanyId ?? "no-company"}
+                  className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-page-swap"
+                >
                   {children}
                 </div>
                 {/* Rotalı geçişte ince üst şerit — boş alan flaşı yerine geçiş sinyali */}
