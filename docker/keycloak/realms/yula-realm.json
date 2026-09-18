@@ -40,7 +40,7 @@
   "authenticationFlows": [
     {
       "alias": "Yula Browser",
-      "description": "Username + password + mandatory TOTP (MFA for all users)",
+      "description": "Username + password (MFA disabled)",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -70,7 +70,7 @@
     },
     {
       "alias": "Yula Forms",
-      "description": "Password form followed by mandatory OTP form",
+      "description": "Password form (OTP/MFA step disabled)",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -80,13 +80,6 @@
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 10,
-          "userSetupAllowed": false
-        },
-        {
-          "authenticator": "auth-otp-form",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 20,
           "userSetupAllowed": false
         }
       ]
