@@ -15,6 +15,7 @@ import { getProviders, signIn } from "next-auth/react";
 import { providerSignInParams } from "@/features/auth/lib/provider-signin-params";
 import { isGoogleOneTapEnabled } from "@/features/auth/lib/google-one-tap-flag";
 import { GoogleOneTapButton, type GsiButtonTheme } from "@/features/auth/components/google-one-tap-button";
+import { SmsOtpSignIn } from "@/features/auth/components/sms-otp-sign-in";
 import { Button } from "@/components/ui/button";
 import {
   Fingerprint,
@@ -36,7 +37,7 @@ type Providers = NonNullable<Awaited<ReturnType<typeof getProviders>>>;
  *  - google: One Tap modu açıkken (GOOGLE_ONE_TAP=1) OAuth redirect butonu
  *    gizlenir — yerine listedeki GIS butonu geçer, çift buton çıkmaz.
  */
-const HIDDEN_PROVIDER_IDS = new Set(["google-onesig"]);
+const HIDDEN_PROVIDER_IDS = new Set(["google-onesig", "sms-otp"]);
 
 /**
  * Self-hosted provider'lar — redirect'ten ÖNCE sağlığı preflight'lanır
@@ -118,10 +119,12 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
   const available = Object.values(providers).filter(
     (p) => !HIDDEN_PROVIDER_IDS.has(p.id) && !(p.id === "google" && isGoogleOneTapEnabled()),
   );
+  // SMS OTP formu provider register edilmişse (env açık) kendisini çizer.
+  const hasSmsOtp = Object.values(providers).some((p) => p.id === "sms-otp");
   // One Tap modu: OAuth redirect butonu yerine GIS butonu listenin en üstünde.
   // (clientId yoksa GoogleOneTapButton null döner, yer kaplamaz.)
   const showOneTapButton = isGoogleOneTapEnabled();
-  if (available.length === 0 && !showOneTapButton) {
+  if (available.length === 0 && !showOneTapButton && !hasSmsOtp) {
     return (
       <p className="text-center text-sm text-muted-foreground">{t("no_providers")}</p>
     );
@@ -167,6 +170,7 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
           </Button>
         );
       })}
+      {hasSmsOtp ? <SmsOtpSignIn t={t} next={next} /> : null}
       {unreachableProvider ? (
         <div
           role="alert"

@@ -28,6 +28,8 @@ import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import Google from "next-auth/providers/google";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { normalizePhone } from "@/features/auth/lib/sms-otp";
+import { verifySmsOtp } from "@/features/auth/lib/sms-otp-store";
 import type { Session as NextAuthSession, User as NextAuthUser } from "next-auth";
 import type { Company } from "@/types/company";
 import { getAuthorizedCompanies } from "@/lib/company-catalog";
@@ -61,6 +63,12 @@ export interface Session extends NextAuthSession {
      * imzalar; aktif şirket istemci localStorage'unda YAŞAMAZ.
      */
     activeCompanyId?: string | null;
+    /**
+     * SMS OTP girişlerinde telefon numarası (E.164). `id` de aynı değer
+     * taşır (provider="sms" ile `sessionIdentity` → (sms, phone) çözümü;
+     * identity satırı giriş sonrası ensure-user ile otomatik açılır).
+     */
+    phone?: string | null;
   };
 }
 
@@ -222,6 +230,55 @@ const googleOneTapProvider = {
   },
 };
 
+/**
+ * SMS OTP credentials provider'ı — telefon numarası + SMS koduyla giriş.
+ *
+ * Akış (2 adım):
+ *  1. `POST /api/sms/request` — kod üret + SMS (veya console) dispatch.
+ *  2. `signIn("sms-otp", { phone, code, ... })` — NextAuth credentials
+ *     akışı; `authorize` kodu `verifySmsOtp` ile doğrulayıp (TTL +
+ *     deneme limiti + hash eşleşmesi) user'ı döndürür.
+ *
+ * Kimlik modeli uyumu (bkz. server/db/schema.ts):
+ *  - `user.id` = E.164 telefon → session JWT'sinin `sub`'u = telefon;
+ *    `token.provider` jwt callback'te "sms" damgasıyla yazılır ve
+ *    `sessionIdentity` → (sms, phone) çözer. Identity satırı (guest)
+ *    giriş SONRASI ensure-user akışıyla otomatik açılır — authorize
+ *    kullanıcı tablosuna YAZMAZ.
+ *  - OAuth refresh token mantığı credentials'ta yoktur; jwt callback
+ *    (1c) branch'i `token.provider = "sms"` ile erken döner ve refresh
+ *    mantığını atlar.
+ *
+ * Koşullu kayıt: `AUTH_SMS_OTP_ENABLED=true` iken register edilir
+ * (Keycloak/Google deseni — env yoksa UI'de görünmez). Kodu kimin
+ * gönderdiği `SMS_PROVIDER` (console | twilio) belirler.
+ */
+const smsOtpProvider = {
+  id: "sms-otp",
+  name: "SMS OTP",
+  type: "credentials" as const,
+  credentials: {
+    phone: { label: "Telefon", type: "text", placeholder: "5XXXXXXXXX" },
+    code: { label: "Kod", type: "text" },
+  },
+  async authorize(credentials: Record<string, unknown>) {
+    const phone = normalizePhone(credentials?.phone);
+    const code = typeof credentials?.code === "string" ? credentials.code : "";
+    if (!phone || !code) return null;
+
+    const verdict = await verifySmsOtp(phone, code);
+    if (!verdict.ok) {
+      console.log(`[auth] sms-otp doğrulama başarısız (${verdict.reason})`);
+      return null; // form hata mesajı gösterilir (invalid_credentials)
+    }
+
+    // Katmanlı model: identity satırı burada değil, giriş sonrası
+    // ensure-user ile açılır. `id` = telefon (E.164) → `sub` = telefon,
+    // `sessionIdentity` (sms, phone) döner.
+    return { id: phone, phone };
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     // Koşullu: yalnızca tüm Keycloak env'leri varken register edilir.
@@ -247,6 +304,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           googleOneTapProvider,
         ]
       : []),
+    // SMS OTP: yalnızca `AUTH_SMS_OTP_ENABLED=true` iken register edilir
+    // (Kod dispatch'i `SMS_PROVIDER` ile seçilir — console dev/test varsayılan).
+    ...(process.env.AUTH_SMS_OTP_ENABLED === "true" ? [smsOtpProvider] : []),
   ],
   trustHost: true,
   session: { strategy: "jwt" },
@@ -308,6 +368,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Bearer kabul etmediğinden). Klasik Google OAuth provider
         // "google" damgasıyla farklı kalır.
         token.provider = "google-onesig";
+      }
+
+      // 1c) SMS OTP (credentials): authorize user'ı `phone` alanıyla
+      //     damgalanır → provider "sms" (identity modeli: (sms, phone)),
+      //     credentials'ta access/refresh token YOK → token temizlenir
+      //     ve refresh mantığı ATLANIR (erken return).
+      const smsUser = user as NextAuthUser & { phone?: string } | undefined;
+      if (smsUser && typeof smsUser.phone === "string") {
+        token.phone = smsUser.phone;
+        token.provider = "sms";
+        delete token.accessToken;
+        delete token.refreshToken;
+        delete token.expiresAt;
+        return token;
       }
 
       // 2) Token hâlâ geçerli → iş yapma.
@@ -407,6 +481,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           roles?: string[];
           companies?: Company[];
           activeCompanyId?: string | null;
+          phone?: string | null;
         };
         user.accessToken = token.accessToken as string | undefined;
         user.provider = token.provider as string | undefined;
@@ -421,6 +496,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           : [];
         user.activeCompanyId =
           typeof token.activeCompanyId === "string" ? (token.activeCompanyId as string) : null;
+        // SMS OTP: telefon numarası (E.164) session'a taşınır (bkz. 1c).
+        // Token tipinin index signature'ı session callback'te tüm
+        // custom alanları kapsamadığından cast ile okunur.
+        user.phone =
+          typeof (token as Record<string, unknown>).phone === "string"
+            ? ((token as Record<string, unknown>).phone as string)
+            : null;
       }
       return session;
     },

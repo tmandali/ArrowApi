@@ -1622,7 +1622,21 @@
     "error_account_not_linked": "This account is already linked to a different identity provider. Please sign in with the provider you used when creating your account.",
     "error_oauth_generic": "Sign-in could not be completed. Please try again.",
     "forgot_password": "Forgot password?",
-    "invalid_credentials": "Invalid email or password."
+    "invalid_credentials": "Invalid email or password.",
+    "sms_title": "Sign in with SMS",
+    "sms_phone_label": "Phone",
+    "sms_phone_placeholder": "5XXXXXXXXX",
+    "sms_send_code": "Send Code",
+    "sms_change_phone": "Change number",
+    "sms_code_label": "Code",
+    "sms_code_placeholder": "6-digit code",
+    "sms_verify": "Sign In",
+    "sms_invalid_code": "Invalid or expired code. Please try again.",
+    "sms_phone_invalid": "Invalid phone number.",
+    "sms_code_wait": "Please wait a few seconds.",
+    "sms_code_hourly": "Hourly code limit reached for this number. Try again later.",
+    "sms_send_failed": "Code could not be sent. Please try again.",
+    "sms_dev_code": "Console mode — code: {code}"
   },
   "ForgotPassword": {
     "title": "Reset Password",

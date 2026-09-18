@@ -1620,7 +1620,21 @@
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "provider_unreachable": "{provider} sunucusuna ulaşılamıyor. Lütfen servisin çalıştığından ve ortam değişkenlerinin doğru yapılandırıldığından emin olun, ardından tekrar deneyin.",
     "forgot_password": "Şifremi Unuttum",
-    "invalid_credentials": "E-posta veya şifre hatalı."
+    "invalid_credentials": "E-posta veya şifre hatalı.",
+    "sms_title": "SMS ile Giriş",
+    "sms_phone_label": "Telefon",
+    "sms_phone_placeholder": "5XXXXXXXXX",
+    "sms_send_code": "Kodu Gönder",
+    "sms_change_phone": "Numarayı Değiştir",
+    "sms_code_label": "Kod",
+    "sms_code_placeholder": "6 haneli kod",
+    "sms_verify": "Giriş Yap",
+    "sms_invalid_code": "Geçersiz veya süresi dolmuş kod. Yeniden deneyin.",
+    "sms_phone_invalid": "Geçersiz telefon numarası.",
+    "sms_code_wait": "Lütfen birkaç saniye bekleyin.",
+    "sms_code_hourly": "Bu numara için saatlik kod limiti doldu. Daha sonra tekrar deneyin.",
+    "sms_send_failed": "Kod gönderilemedi. Lütfen tekrar deneyin.",
+    "sms_dev_code": "Konsol modu — kod: {code}"
   },
   "ForgotPassword": {
     "title": "Şifre Sıfırlama",

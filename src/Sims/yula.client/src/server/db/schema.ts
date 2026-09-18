@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /**
  * My Settings + System Users için tablo yapıları.
@@ -135,3 +135,36 @@ export const identityAliasesSchema = pgTable(
 
 export type IdentityAliasRow = typeof identityAliasesSchema.$inferSelect;
 export type AppUserRow = typeof appUsersSchema.$inferSelect;
+
+/**
+ * `sms_codes` — SMS OTP doğrulama kodları (sms-otp credentials provider'ı).
+ *
+ * - `phone` E.164 normalize edilir (örn. +905XXXXXXXXX) ve PRIMARY key'dir:
+ *   bir telefon numarası için aynı anda EN FAZLA bir bekleyen kod vardır
+ *   (yeni istekte satır yenilenir — eski kod artık geçersizdir).
+ * - `codeHash`: kodun SHA-256'ı (`phone:code`) — ham kod DISK'E ASLA
+ *   yazılmaz; yalnızca hash saklanır.
+ * - `attempts`: kod başına deneme sınırı (5); yeni kod yollandığında
+ *   sıfırlanır. `expires_at` dolan kod doğrulama tarafında red'den önce
+ *   temizlenir (GC, bkz. features/auth/lib/sms-otp.ts).
+ * - `lastSendAt`: ardışık gönderimler arası ~30 sn bekleme için DB
+ *   tarafında uygulanır (çok instance'ta da tutarlı kalır).
+ *
+ * Yeni alan ekleyince: `npm run db:generate` + `npm run db:migrate`.
+ */
+export const smsCodesSchema = pgTable("sms_codes", {
+  /** E.164 telefon numarası (ör. +905XXXXXXXXX) — bekleyen kodun anahtarı. */
+  phone: text("phone").primaryKey(),
+  /** SHA-256(`<phone>:<code>`) hex'ı — ham kod saklanmaz. */
+  codeHash: text("code_hash").notNull(),
+  /** Kod geçerlilik sınırı (istek anında now + 5 dk). */
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  /** Bu koda ait doğrulama denemeleri (limit: 5). */
+  attempts: integer("attempts").notNull().default(0),
+  /** İlk kod üretimi — denetim/log amaçlı. */
+  sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
+  /** Son kod gönderimi — rate-limit (~30 sn aralık) bu kolon üzerinden. */
+  lastSendAt: timestamp("last_send_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export type SmsCodeRow = typeof smsCodesSchema.$inferSelect;
