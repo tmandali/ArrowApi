@@ -43,6 +43,11 @@ import { Check, History, Maximize2, Minimize2, SquarePen } from "lucide-react"
 type WorkspaceAiDockProps = {
   children: React.ReactNode
   className?: string
+  /**
+   * Sayfa başlığı — split'in üstünde, overlay konum kabının içinde render
+   * edilir; tam ekran overlay açıkken başlığı da kapsar.
+   */
+  header?: React.ReactNode
   /** Copilot-style centered intro on the empty chat. */
   centeredIntro?: boolean
   /** Open Yula automatically when the dock mounts. */
@@ -277,6 +282,7 @@ export function YulaHistoryToggle() {
 export function WorkspaceAiDock({
   children,
   className,
+  header,
   centeredIntro = false,
   defaultOpen = false,
   panelShellClassName,
@@ -321,6 +327,7 @@ export function WorkspaceAiDock({
           className
         )}
       >
+        {header}
         {content}
       </div>
     )
@@ -332,6 +339,7 @@ export function WorkspaceAiDock({
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {header}
       <WorkspaceSidePanelLayout
         open={open}
         onOpenChange={setOpen}

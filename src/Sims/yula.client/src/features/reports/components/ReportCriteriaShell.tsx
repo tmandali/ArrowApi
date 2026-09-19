@@ -298,66 +298,6 @@ export function ReportCriteriaShell({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {isGridMaximized ? null : (
-        <WorkspacePageHeader
-          showSearch={false}
-          startExtra={
-            recordMode != null ? (
-              <RecordModeChip mode={recordMode} labels={recordModeLabels} />
-            ) : null
-          }
-          actions={
-            <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
-              {headerActions}
-              <Button
-                type="button"
-                variant={isNewMode ? "ghost" : "outline"}
-                size="sm"
-                className={
-                  isNewMode
-                    ? "h-7 shrink-0 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                    : "h-7 shrink-0 gap-1.5 px-2.5 text-xs"
-                }
-                onClick={() =>
-                  isNewMode ? onCancelNewReport?.() : onStartNewReport?.()
-                }
-                title={isNewMode ? t("cancel") : t("new_report")}
-                aria-label={isNewMode ? t("cancel") : t("new_report")}
-              >
-                {isNewMode ? (
-                  <X className="size-3.5" />
-                ) : (
-                  <FilePlus2 className="size-3.5" />
-                )}
-                {isNewMode ? t("cancel") : t("new")}
-              </Button>
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                className="h-7 shrink-0 gap-1.5 px-2.5 text-xs"
-                disabled={submittingCriteria || criteriaLocked}
-                onClick={() => void handleCriteriaSubmit()}
-                title={t(rerun ? "rerun_report" : "run_report")}
-                aria-label={t(rerun ? "rerun_report" : "run_report")}
-              >
-                {submittingCriteria ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : rerun ? (
-                  <RefreshCw className="size-3.5" />
-                ) : (
-                  <Play className="size-3.5" />
-                )}
-                {t(rerun ? "rerun" : "run")}
-              </Button>
-              <AIChatAssistant />
-            </div>
-          }
-        >
-          <PageHeaderTitle>{title}</PageHeaderTitle>
-        </WorkspacePageHeader>
-      )}
-
       {!searchOpen && !isGridMaximized && listErrorBanner ? (
         <WorkspaceBanner
           tone="error"
@@ -382,6 +322,67 @@ export function ReportCriteriaShell({
           isGridMaximized ? "p-0" : "overflow-hidden max-md:overflow-y-auto"
         )}
         panelShellClassName={isGridMaximized ? cn(panelShellClass, "pt-2") : undefined}
+        header={
+          isGridMaximized ? null : (
+            <WorkspacePageHeader
+              showSearch={false}
+              startExtra={
+                recordMode != null ? (
+                  <RecordModeChip mode={recordMode} labels={recordModeLabels} />
+                ) : null
+              }
+              actions={
+                <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
+                  {headerActions}
+                  <Button
+                    type="button"
+                    variant={isNewMode ? "ghost" : "outline"}
+                    size="sm"
+                    className={
+                      isNewMode
+                        ? "h-7 shrink-0 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                        : "h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+                    }
+                    onClick={() =>
+                      isNewMode ? onCancelNewReport?.() : onStartNewReport?.()
+                    }
+                    title={isNewMode ? t("cancel") : t("new_report")}
+                    aria-label={isNewMode ? t("cancel") : t("new_report")}
+                  >
+                    {isNewMode ? (
+                      <X className="size-3.5" />
+                    ) : (
+                      <FilePlus2 className="size-3.5" />
+                    )}
+                    {isNewMode ? t("cancel") : t("new")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+                    disabled={submittingCriteria || criteriaLocked}
+                    onClick={() => void handleCriteriaSubmit()}
+                    title={t(rerun ? "rerun_report" : "run_report")}
+                    aria-label={t(rerun ? "rerun_report" : "run_report")}
+                  >
+                    {submittingCriteria ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : rerun ? (
+                      <RefreshCw className="size-3.5" />
+                    ) : (
+                      <Play className="size-3.5" />
+                    )}
+                    {t(rerun ? "rerun" : "run")}
+                  </Button>
+                  <AIChatAssistant />
+                </div>
+              }
+            >
+              <PageHeaderTitle>{title}</PageHeaderTitle>
+            </WorkspacePageHeader>
+          )
+        }
       >
         <ModuleNavPane className={isGridMaximized ? "px-2 pt-2 pb-2" : undefined}>
           {renderFilter(setCriteriaHandle, {

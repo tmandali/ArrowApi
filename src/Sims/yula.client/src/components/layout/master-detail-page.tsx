@@ -131,20 +131,22 @@ export function MasterDetailPage({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <WorkspacePageHeader
-        showSearch={showSearch}
-        actions={
-          <div className="flex items-center gap-1.5">
-            {actions}
-            <AIChatAssistant />
-          </div>
+      <WorkspaceAiDock
+        header={
+          <WorkspacePageHeader
+            showSearch={showSearch}
+            actions={
+              <div className="flex items-center gap-1.5">
+                {actions}
+                <AIChatAssistant />
+              </div>
+            }
+            startExtra={titleExtra}
+          >
+            <PageHeaderTitle>{title}</PageHeaderTitle>
+          </WorkspacePageHeader>
         }
-        startExtra={titleExtra}
       >
-        <PageHeaderTitle>{title}</PageHeaderTitle>
-      </WorkspacePageHeader>
-
-      <WorkspaceAiDock>
         <ModuleNavPane>
           {panelGroup}
         </ModuleNavPane>

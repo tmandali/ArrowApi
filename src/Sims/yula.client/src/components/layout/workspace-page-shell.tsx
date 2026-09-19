@@ -67,19 +67,23 @@ export function WorkspacePageShell({
         className
       )}
     >
-      {hideHeader ? null : (
-        <WorkspacePageHeader
-          showSearch={showSearch}
-          searchPlaceholder={searchPlaceholder}
-          headerSearch={headerSearch}
-          startExtra={startExtra}
-          actions={actions}
-          frameless={frameless}
-        >
-          {title}
-        </WorkspacePageHeader>
-      )}
-      <WorkspaceAiDock className={contentClassName}>
+      <WorkspaceAiDock
+        className={contentClassName}
+        header={
+          hideHeader ? null : (
+            <WorkspacePageHeader
+              showSearch={showSearch}
+              searchPlaceholder={searchPlaceholder}
+              headerSearch={headerSearch}
+              startExtra={startExtra}
+              actions={actions}
+              frameless={frameless}
+            >
+              {title}
+            </WorkspacePageHeader>
+          )
+        }
+      >
         <ModuleNavPane paneContent={paneContent} paneTitle={paneTitle}>
           {children}
         </ModuleNavPane>
