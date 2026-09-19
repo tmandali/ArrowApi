@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useTranslations } from "next-intl"
+import { useFormatter, useTranslations } from "next-intl"
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat"
 import { useChatsStore } from "@/lib/stores/chats"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,7 @@ export type YulaContextUsageBadgeProps = {
 
 export function YulaContextUsageBadge({ className }: YulaContextUsageBadgeProps) {
   const t = useTranslations("AiDock")
+  const format = useFormatter()
   const chat = useOptionalYulaChat()
   const activeId = useChatsStore((s) => s.activeId)
   const shortNo = activeId
@@ -60,6 +61,7 @@ export function YulaContextUsageBadge({ className }: YulaContextUsageBadgeProps)
       <PopoverTrigger asChild>
         <button
           type="button"
+          suppressHydrationWarning
           className={cn(
             "flex h-6 items-center gap-1.5 rounded-md border px-2 font-mono text-[10.5px] font-medium transition-colors select-none shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             statusBadgeClass,
@@ -68,12 +70,12 @@ export function YulaContextUsageBadge({ className }: YulaContextUsageBadgeProps)
           title={
             activeId
               ? `#${shortNo} (${activeId}) — ${t("context_tooltip", {
-                  used: tokens.toLocaleString(),
-                  total: contextWindow.toLocaleString(),
+                  used: format.number(tokens),
+                  total: format.number(contextWindow),
                 })}`
               : t("context_tooltip", {
-                  used: tokens.toLocaleString(),
-                  total: contextWindow.toLocaleString(),
+                  used: format.number(tokens),
+                  total: format.number(contextWindow),
                 })
           }
           aria-label={t("context_title")}
@@ -155,8 +157,8 @@ export function YulaContextUsageBadge({ className }: YulaContextUsageBadgeProps)
             className={cn("h-1.5 bg-muted", progressIndicatorClass)}
           />
           <div className="flex items-center justify-between text-[10.5px] text-muted-foreground font-mono">
-            <span>{tokens.toLocaleString()} tok</span>
-            <span>{contextWindow.toLocaleString()} tok</span>
+            <span>{format.number(tokens)} tok</span>
+            <span>{format.number(contextWindow)} tok</span>
           </div>
         </div>
 
