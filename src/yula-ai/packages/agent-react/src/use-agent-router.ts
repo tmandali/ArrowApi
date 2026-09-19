@@ -1,6 +1,5 @@
-import { piEventStream, uiEventBus } from '@my-agent/core';
+import { piEventStream, uiEventBus, z } from '@my-agent/core';
 import { useAgentComponent } from './use-agent-component';
-import { z } from 'zod';
 
 export interface UseAgentRouterOptions {
   currentRoute: string;

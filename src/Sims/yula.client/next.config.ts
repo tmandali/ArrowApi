@@ -68,7 +68,7 @@ const nextConfig: NextConfig = {
   // Monorepo içinde ikinci package-lock nedeniyle kök çıkarımı kararsız olabiliyor;
   // grafiği bu proje dizinine sabitliyoruz.
   turbopack: {
-    root: path.resolve(__dirname, "../../.."),
+    root: path.resolve(__dirname),
     rules: {
       "*.yaml": {
         loaders: [require.resolve("raw-loader")],

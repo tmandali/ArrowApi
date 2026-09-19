@@ -6568,6 +6568,7 @@ snapshots:
       '@my-agent/core': file:../../yula-ai/packages/agent-core
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
+      zod: 4.6.5
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
