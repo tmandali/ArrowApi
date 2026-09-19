@@ -2,14 +2,17 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { normalizePath, extractAgentIdFromPath } from "@/lib/workspace-paths";
+import { extractAgentIdFromPath } from "@/lib/workspace-paths";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 
 /**
  * Ekran bazlı aktif sohbet yönetimi — orijinal YulaChatProvider effect'inin
- * birebir taşınmış hali (davranış değişikliği yok):
- * Sayfa değişiminde aktif sohbetin O EKRANA ait olup olmadığını denetler.
+ * taşınmış hali:
+ * Sayfa değişiminde aktif sohbet KORUNUR (ana ekran ↔ dock tek session);
+ * yalnız ajan kimliği URL ile senkronlanır ve sohbetin kendi navigasyonu
+ * (followNav) hedef sayfaya bağlanır. Taze sohbet yalnız kullanıcının
+ * "yeni sohbet" aksiyonu veya ajan değişimiyle açılır.
  */
 export function useConversationRouteSync() {
   const pathname = usePathname();
@@ -52,24 +55,9 @@ export function useConversationRouteSync() {
           useUserAgentsStore.getState().activeAgentId ??
           null;
         store.followArrivedConversation(follow.id, undefined, followAgentId);
-        return;
       }
     }
-
-    // Her sayfa değişimi = taze sohbet: aktif sohbet yalnız bu sayfaya BİREBİR
-    // bağlıysa VE aynı ajan kimliğini taşıyorsa korunur (history tıklaması da
-    // bu eşleşmeyle korunur); aksi halde yeni sohbet açılır.
-    const activeConv = store.conversations.find((c) => c.id === currentActiveId);
-    const activeMsgs = currentActiveId ? store.messagesById[currentActiveId] ?? [] : [];
-    const currentAgentId =
-      routeAgentId ?? useUserAgentsStore.getState().activeAgentId ?? null;
-    const isSamePage = activeConv
-      ? normalizePath(activeConv.pathname ?? "/") === normalizePath(pathname) &&
-        (activeConv.agentId ?? null) === (currentAgentId ?? null)
-      : activeMsgs.length === 0;
-
-    if (!isSamePage) {
-      store.newConversation();
-    }
+    // Sayfa değişiminde aktif sohbet korunur — yeni sohbet açılmaz.
+    // (Tek session: ana ekran ve dock aynı conversationId'yi paylaşır.)
   }, [pathname]);
 }

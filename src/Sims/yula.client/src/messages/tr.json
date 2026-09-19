@@ -818,6 +818,8 @@
   "AiDock": {
     "new_chat": "Yeni Sohbet Başlat",
     "continue_main": "Ana ekranda devam et",
+    "expand_overlay": "Tam ekrana genişlet",
+    "collapse_overlay": "Dock'a geri dön",
     "toggle_history_show": "Sohbet Geçmişini Göster",
     "toggle_history_hide": "Sohbet Geçmişini Gizle",
     "close_panel": "Paneli kapat",

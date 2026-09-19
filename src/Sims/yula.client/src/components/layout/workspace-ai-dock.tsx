@@ -11,8 +11,6 @@ import { AIChatPanelTitle } from "@/components/layout/ai-chat/ai-chat-panel-titl
 import { YULA } from "@/components/layout/yula-brand-data"
 import { Button } from "@/components/ui/button"
 import {
-  pageContentGutterClass,
-  panelCardClass,
   panelHeaderClass,
 } from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
@@ -25,7 +23,6 @@ import { agentScopeWorkspaceId, filterAgentsByScope } from "@/lib/yula-user-agen
 import { AgentAvatar } from "@/features/system/components/agents/agent-avatar"
 import { agentInitials } from "@/features/system/components/agents/agent-initials"
 import { YulaMarkIcon } from "@/components/layout/yula-brand"
-import { applyYulaAgentQuery, readYulaAgentQuery } from "@/components/layout/yula-agent-query"
 import {
   Command,
   CommandEmpty,
@@ -41,17 +38,11 @@ import {
 } from "@/components/ui/popover"
 import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge"
 import { cn } from "@/utils/cn"
-import { Check, History, Maximize2, SquarePen } from "lucide-react"
+import { Check, History, Maximize2, Minimize2, SquarePen } from "lucide-react"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
   className?: string
-  /** Open Yula as full content instead of the side dock. */
-  startExpanded?: boolean
-  /** Hide the Yula panel header bar (title / expand / collapse). */
-  hideHeader?: boolean
-  /** Transparent, borderless panel card (for empty pages). */
-  transparent?: boolean
   /** Copilot-style centered intro on the empty chat. */
   centeredIntro?: boolean
   /** Open Yula automatically when the dock mounts. */
@@ -94,26 +85,13 @@ function YulaNewChatButton() {
 }
 
 /**
- * Dock başlığındaki "ana ekranda devam et" butonu: navigasyon YAPMAZ —
- * Yula'yı sayfa İÇİNDE tam genişliğe açar (main mode); sayfa session'ı
- * (criteria formu, grid düzeni, scroll) canlı kalır, collapse'de aynı
- * sayfaya dönülür. Ajanlı oturumda ?yula=<agentId> yazılır (F5/paylaşım
- * yeniden kurması için); buton main modda iken tıklanırsa dock'a döner.
+ * Dock başlığındaki genişlet/daralt butonu: Yula'yı aynı session ile tam
+ * ekran overlay'e açar (sayfa içeriği arkada canlı kalır, unmount olmaz);
+ * overlay'deyken tıklanırsa side dock'a döner. Escape de daraltır.
  */
-function YulaOpenInMainButton() {
+function YulaExpandToggleButton() {
   const t = useTranslations("AiDock")
   const { expanded, setExpanded } = useWorkspaceAiChat()
-  const dockAgent = useDockAgent()
-
-  const handleOpen = () => {
-    if (expanded) {
-      setExpanded(false)
-      applyYulaAgentQuery(null)
-      return
-    }
-    setExpanded(true)
-    applyYulaAgentQuery(dockAgent?.id ?? null)
-  }
 
   return (
     <Button
@@ -121,11 +99,11 @@ function YulaOpenInMainButton() {
       size="icon"
       variant="ghost"
       className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      onClick={handleOpen}
-      title={t("continue_main")}
-      aria-label={t("continue_main")}
+      onClick={() => setExpanded(!expanded)}
+      title={t(expanded ? "collapse_overlay" : "expand_overlay")}
+      aria-label={t(expanded ? "collapse_overlay" : "expand_overlay")}
     >
-      <Maximize2 className="size-3.5" />
+      {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
     </Button>
   )
 }
@@ -299,9 +277,6 @@ export function YulaHistoryToggle() {
 export function WorkspaceAiDock({
   children,
   className,
-  startExpanded = false,
-  hideHeader = false,
-  transparent = false,
   centeredIntro = false,
   defaultOpen = false,
   panelShellClassName,
@@ -323,19 +298,18 @@ export function WorkspaceAiDock({
       if (defaultOpen) {
         setOpen(true)
       }
-      if (startExpanded) {
-        setExpanded(true)
-      }
-      // ?yula=<agentId>: F5/doğrudan bağlantıda expand + ajan durumunu
-      // yeniden kur (sayfa session'ında kal — navigasyon yok).
-      const yulaParam = readYulaAgentQuery()
-      if (yulaParam) {
-        setOpen(true)
-        setExpanded(true)
-        useUserAgentsStore.getState().setActiveAgentId(yulaParam)
-      }
     }
-  }, [defaultOpen, startExpanded, setOpen, setExpanded])
+  }, [defaultOpen, setOpen])
+
+  // Tam ekran overlay açıkken Escape daraltır (side dock'a dönülür).
+  React.useEffect(() => {
+    if (!open || !expanded) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [open, expanded, setExpanded])
 
   // Search açıkken Yula paneli de gizlenir — arama görünümü tüm alanı kaplar
   // (ana ekran davranışı); panel search kapanınca yeniden belirir.
@@ -352,70 +326,55 @@ export function WorkspaceAiDock({
     )
   }
 
-  const isMainMode = open && (expanded || startExpanded)
-
-  if (isMainMode) {
-    return (
-      <aside
-        className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent",
-          pageContentGutterClass,
-          className
-        )}
-        aria-label={YULA.name}
-      >
-        <div
-          className={cn(
-            transparent
-              ? "flex min-h-0 flex-col overflow-hidden"
-              : panelCardClass,
-            "flex-1"
-          )}
-        >
-          {!hideHeader ? (
-            <div className={cn(panelHeaderClass, "gap-1")}>
-              <DockHeaderTitle />
-              <YulaContextUsageBadge />
-              <YulaNewChatButton />
-              <YulaOpenInMainButton />
-            </div>
-          ) : null}
-          <div className="relative flex min-h-0 flex-1 overflow-hidden">
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-              <AIChatPanel mode="main" centeredIntro={centeredIntro} />
-            </div>
-          </div>
-        </div>
-      </aside>
-    )
-  }
+  // Tam ekran overlay: ana ekran görünümüyle aynı session — sayfa içeriği
+  // arkada mounted kalır (criteria formu, grid düzeni, scroll korunur).
+  const isOverlayOpen = open && expanded
 
   return (
-    <WorkspaceSidePanelLayout
-      open={open}
-      onOpenChange={setOpen}
-      title={<DockHeaderTitle />}
-      titleCollapseDisabled
-      collapseLabel={YULA.collapseLabel}
-      headerActions={
-        <div className="flex min-w-0 items-center gap-0.5">
-          <YulaContextUsageBadge />
-          <YulaNewChatButton />
-          <YulaOpenInMainButton />
+    <>
+      <WorkspaceSidePanelLayout
+        open={open}
+        onOpenChange={setOpen}
+        title={<DockHeaderTitle />}
+        titleCollapseDisabled
+        collapseLabel={YULA.collapseLabel}
+        headerActions={
+          <div className="flex min-w-0 items-center gap-0.5">
+            <YulaContextUsageBadge />
+            <YulaNewChatButton />
+            <YulaExpandToggleButton />
+          </div>
+        }
+        panel={<AIChatPanel centeredIntro={centeredIntro} />}
+        defaultSizePercent={32}
+        minSizePercent={20}
+        maxSizePercent={60}
+        mainMinSizePercent={40}
+        layoutId="yula-dock"
+        mainClassName="overflow-y-auto overscroll-contain"
+        panelShellClassName={panelShellClassName}
+        className={cn("min-h-0 flex-1 overflow-hidden", className)}
+      >
+        {content}
+      </WorkspaceSidePanelLayout>
+      {isOverlayOpen ? (
+        <div
+          role="dialog"
+          aria-label={YULA.name}
+          className="fixed inset-0 z-50 flex min-h-0 flex-col bg-background"
+        >
+          <div className={cn(panelHeaderClass, "gap-1")}>
+            <DockHeaderTitle />
+            <YulaContextUsageBadge />
+            <YulaNewChatButton />
+            <YulaExpandToggleButton />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AIChatPanel mode="main" centeredIntro={centeredIntro} />
+          </div>
         </div>
-      }
-      panel={<AIChatPanel centeredIntro={centeredIntro} />}
-      defaultSizePercent={32}
-      minSizePercent={20}
-      maxSizePercent={60}
-      mainMinSizePercent={40}
-      layoutId="yula-dock"
-      mainClassName="overflow-y-auto overscroll-contain"
-      panelShellClassName={panelShellClassName}
-      className={cn("min-h-0 flex-1 overflow-hidden", className)}
-    >
-      {content}
-    </WorkspaceSidePanelLayout>
+      ) : null}
+    </>
   )
 }
 

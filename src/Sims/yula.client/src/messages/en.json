@@ -818,6 +818,8 @@
   "AiDock": {
     "new_chat": "New Chat",
     "continue_main": "Continue in main screen",
+    "expand_overlay": "Expand to fullscreen",
+    "collapse_overlay": "Back to dock",
     "toggle_history_show": "Show Chat History",
     "toggle_history_hide": "Hide Chat History",
     "close_panel": "Close panel",
