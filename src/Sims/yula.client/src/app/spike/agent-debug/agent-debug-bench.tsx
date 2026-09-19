@@ -37,8 +37,6 @@ const WORKSPACE_PHASE_TOOLS = [
   "cancel_job",
   "ask_user_question",
   "run_user_skill",
-  "run_skill_script",
-  "read_skill_file",
 ];
 
 /** Beklenen akış için kritik araçlar (sor → şema → doldur → yönlendir → koş). */

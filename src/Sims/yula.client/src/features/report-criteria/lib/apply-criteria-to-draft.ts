@@ -93,10 +93,17 @@ export function applyCriteriaToDraft(
     let stringVal = "";
     if (isDateLikeField && typeof rawValue === "string") {
       stringVal = resolveRelativeDateString(rawValue);
+    } else if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+      const obj = rawValue as Record<string, unknown>;
+      const from = String(obj.from ?? obj.start ?? obj.min ?? "").trim();
+      const to = String(obj.to ?? obj.end ?? obj.max ?? "").trim();
+      if (from || to) {
+        stringVal = from && to ? `${from}..${to}` : from ? `${from}..` : `..${to}`;
+      } else {
+        stringVal = JSON.stringify(rawValue);
+      }
     } else if (Array.isArray(rawValue)) {
       stringVal = rawValue.map(String).join(",");
-    } else if (typeof rawValue === "object") {
-      stringVal = JSON.stringify(rawValue);
     } else {
       stringVal = rawStr;
     }

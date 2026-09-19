@@ -22,7 +22,7 @@ export default defineConfig({
   },
 
   webServer: {
-    command: process.env.CI ? "npm run start" : "npm run dev:next",
+    command: process.env.CI ? "pnpm run start" : "pnpm run dev:next",
     url: baseURL,
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,

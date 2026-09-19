@@ -17,7 +17,7 @@ Quick summary:
 - **Workspaces will later split via module federation** (each a separate React remote);
   preserve workspace boundaries on every change, cross-workspace imports are forbidden, outsiders consume only the workspace's `index.ts` (Public API) entry point.
 - **Large Data Reports**: Shared `<ArrowReportGrid />` component with W3C OPFS local disk cache and the DuckDB WASM engine. After F5, reports open from disk with zero internet cost.
-- **Tauri 2.0 Desktop & Hybrid Web**: The project runs both in the browser (`npm run dev`) and on desktop (`npm run tauri:dev`). Tauri dependencies are dynamically isolated via `isTauriEnv`.
+- **Tauri 2.0 Desktop & Hybrid Web**: The project runs both in the browser (`pnpm dev`) and on desktop (`pnpm tauri:dev`). Tauri dependencies are dynamically isolated via `isTauriEnv`.
 - **Embedded Python AI Sidecar**: Bidirectional Tool Calling over a `sys.stdin`/`sys.stdout` JSON stream with a `toolRegistry` bridge.
 - **Context-Aware & Scoped AI Agent**: 3-level hierarchical scope (Global > Workspace > Page Scope), dynamic tool registration/cleanup via `useScreenAgentContext`, bidirectional live React state sharing, State-Driven Tool Swapping (Criteria vs Results mode), Few-Shot Data Grounding (column mapping via sample rows), and smart cross-workspace routing.
 - **3-Layer Yula AI Agent Core Tool Architecture**:

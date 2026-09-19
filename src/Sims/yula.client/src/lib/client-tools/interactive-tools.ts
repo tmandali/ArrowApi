@@ -80,8 +80,7 @@ export async function readUserFileTool(
     ...useUserSkillsStore.getState().skills,
     ...BUILT_IN_USER_SKILLS,
   ].find((s) => s.slash.toLowerCase() === slash);
-  // Yerleşik paket dosyaları sunucu tarafındadır (read_skill_file);
-  // burada yalnızca kullanıcı ekli dosyalar okunur.
+  // Kullanıcı ekli dosyalar burada okunur (skill.files).
   const file = skill?.files?.find((f) => f.name.toLowerCase() === name);
   if (!skill || !file) {
     return {

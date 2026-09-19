@@ -826,7 +826,15 @@
     "no_results": "No results.",
     "agent_default": "Yula default",
     "change_agent_tooltip": "{name} — change agent",
-    "change_agent_aria": "Change agent"
+    "change_agent_aria": "Change agent",
+    "context_title": "Context Window",
+    "context_auto_compact": "Auto-compact",
+    "context_compact_now": "Compact Now",
+    "context_compacting": "Compacting...",
+    "context_auto_on": "Auto",
+    "context_auto_off": "Off",
+    "context_tooltip": "Context: {used} / {total} tokens",
+    "context_dump_session": "Export Session (JSON Dump)"
   },
   "PinnedItems": {
     "unpin": "Unpin"
@@ -1009,7 +1017,24 @@
   "WorkedAccordion": {
     "worked_for": "Worked for {timeLabel}s",
     "step": "step",
-    "steps": "steps"
+    "steps": "steps",
+    "telemetry_tokens": "Tokens",
+    "telemetry_input": "Input",
+    "telemetry_output": "Output",
+    "telemetry_cost": "Cost",
+    "telemetry_terminal": "Terminal",
+    "telemetry_terminal_title": "Execution Trace",
+    "copy_terminal": "Copy execution trace",
+    "telemetry_context": "Context",
+    "telemetry_context_short": "context",
+    "telemetry_turn_count": "{count} {count, plural, one {turn} other {turns}}",
+    "log_turn": "Turn",
+    "log_request": "Request",
+    "log_thought": "Thought",
+    "log_exec": "Execute",
+    "log_output": "Output",
+    "log_error": "Error",
+    "log_done": "Completed"
   },
   "ChartCard": {
     "unpin_from_home": "Remove from workspace homepage",
@@ -1075,8 +1100,6 @@
     "description_placeholder": "When should this skill be used?",
     "attachments": "Attachments",
     "prompt_placeholder": "Generate a summary of the last 7 days of sales: {{input}}",
-    "runs_in_server_sandbox": "Runs in server sandbox",
-    "runs_in_server_sandbox_detail": "Runs in server sandbox (run_skill_script).",
     "slash_label": "Slash name",
     "slash_example": "example-skill",
     "scope_label": "Scope",
@@ -1085,8 +1108,6 @@
     "skill_md_aria": "SKILL.md raw markdown",
     "skill_md_not_found": "SKILL.md not found.",
     "file_content_aria": "{name} raw content",
-    "loading": "Loading…",
-    "script_badge": "script",
     "remove": "Remove"
   },
   "SkillManagement": {
@@ -1413,6 +1434,11 @@
       "description": "Add a document or file to the chat",
       "prompt": "/dosya"
     },
+    "dump": {
+      "label": "Download Session Dump",
+      "description": "Download full step-by-step transcript and event log as JSON",
+      "prompt": "/dump"
+    },
     "grid-analiz": {
       "label": "Table Analysis & Data Quality",
       "description": "Analyzes data quality and anomalies, listing problems with clickable action links",
@@ -1473,8 +1499,6 @@
     "tool_suggest_next_steps": "Suggest next steps",
     "tool_request_user_confirmation": "Request confirmation",
     "tool_run_user_skill": "Run skill",
-    "tool_run_skill_script": "Run skill script",
-    "tool_read_skill_file": "Read skill file",
     "tool_grid-tools": "Grid tools (table/SQL/chart)",
     "provider_azure": "Azure Foundry",
     "provider_ollama": "Ollama (local)",

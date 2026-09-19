@@ -76,6 +76,17 @@ export async function runJobTool(
         criteriaObj[dateFieldKey] = resolveDate(
           criteriaObj[dateFieldKey] as string,
         );
+      } else if (
+        criteriaObj[dateFieldKey] &&
+        typeof criteriaObj[dateFieldKey] === "object"
+      ) {
+        const obj = criteriaObj[dateFieldKey] as Record<string, unknown>;
+        const from = String(obj.from ?? obj.start ?? obj.min ?? "").trim();
+        const to = String(obj.to ?? obj.end ?? obj.max ?? "").trim();
+        if (from || to) {
+          criteriaObj[dateFieldKey] =
+            from && to ? `${from}..${to}` : from ? `${from}..` : `..${to}`;
+        }
       }
     }
 

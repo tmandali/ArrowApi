@@ -1,0 +1,5 @@
+{
+  "agnes-ai": { "type": "api_key", "key": "sk-..." },
+  "openrouter": { "type": "api_key", "key": "sk-or-..." },
+  "opencode": { "type": "api_key", "key": "sk-..." }
+}

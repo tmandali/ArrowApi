@@ -16,9 +16,16 @@
  *   - SkillEditor.prompt_placeholder                         ({{var}} double-brace ICU)
  */
 const { execSync } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 
-const bin = path.join(__dirname, "../../../../node_modules/.bin/i18n-check");
+const localBin = path.join(__dirname, "../node_modules/.bin/i18n-check");
+const rootBin = path.join(__dirname, "../../../../node_modules/.bin/i18n-check");
+const bin = fs.existsSync(localBin)
+  ? localBin
+  : fs.existsSync(rootBin)
+    ? rootBin
+    : "pnpm exec i18n-check";
 const base = ["-l", "src/messages", "-s", "en", "-f", "next-intl"];
 
 const unusedIgnore = [

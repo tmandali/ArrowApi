@@ -14,8 +14,10 @@ import { yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
 import { ChatInstance } from "./yula-chat/yula-chat-instance";
 import {
   firstUserMessageText,
+  getActiveConversationId,
   type LiveHelpers,
 } from "./yula-chat/chat-shared";
+import { installPiTraceBridge } from "@/lib/my-agent-pi-bridge";
 import { useConversationRouteSync } from "./yula-chat/use-conversation-route-sync";
 
 /**
@@ -42,6 +44,12 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // son navigasyon hedefine bağla (açılışta bir kez).
   React.useEffect(() => {
     healConversationRecords();
+  }, []);
+
+  // my-agent Pi köprüsü: tool_execution_start/end olayları turn-trace'e
+  // adım satırı olarak düşer (YulaWorkedAccordion görünümü değişmez).
+  React.useEffect(() => {
+    installPiTraceBridge(getActiveConversationId);
   }, []);
 
   // Ekran bazlı aktif sohbet yönetimi (sayfa değişiminde taze/kayıtlı sohbet seçimi).
@@ -139,7 +147,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
     );
     // Sohbet kimliği imzada: iki sohbet aynı görünümlü durumda olsa bile
     // geçişte panel mutlaka tazelensin (geçmişten açılan sohbetin görünmemesi)
-    const sig = `${useChatsStore.getState().activeId}:${h.status}:${h.messages.length}:${partsCount}:${textLen}:${Boolean(h.error)}:${h.busy}`;
+    const sig = `${useChatsStore.getState().activeId}:${h.status}:${h.messages.length}:${partsCount}:${textLen}:${Boolean(h.error)}:${h.busy}:${h.contextUsage?.percent}:${h.isCompacting}:${h.autoCompactEnabled}`;
     // İmza değişmeden state GÜNCELLENMEZ: ChatInstance her render'da yeni bir
     // helpers objesi üretir; koşulsuz setState sonsuz döngü kurar.
     if (sig === lastSigRef.current) return;
@@ -180,6 +188,12 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
         undoToUserMessage: () => undefined,
         retryResponse: async () => {},
         runPendingTool: () => {},
+        dumpSession: () => {},
+        contextUsage: undefined,
+        autoCompactEnabled: true,
+        setAutoCompactEnabled: () => {},
+        isCompacting: false,
+        compact: async () => false,
       };
     }
     return {

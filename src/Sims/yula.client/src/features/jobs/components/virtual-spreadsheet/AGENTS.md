@@ -30,7 +30,7 @@ src/features/jobs/components/
     │   ├── use-cell-selection.ts         # Excel benzeri coklu hucre secimi + klavye navigasyonu + data-vsp-cell attribute enjeksiyonu
     │   ├── use-client-side-sort.ts       # Kontroldusuz modda bellek ici coklu sirlama motoru
     │   └── use-grid-scroll-sync.ts       # useVirtualWindow sarmalayici: header/body yatay sync, scrollbar genisligi, infinite scroll tetikleme
-    └── tests/                            # Otomasyon testleri: npm run test:grid
+    └── tests/                            # Otomasyon testleri: pnpm run test:grid
         ├── filter-parser.test.mjs        # DuckDB WHERE SQL üretimi, istemci arama ve şema formatlama testleri
         ├── export-formats.test.mjs       # Excel 1M/2M limitleri, GZIP CSV ve özel görünüm dışa aktarım testleri
         ├── test-parquet-merge.mjs        # OPFS parça birleştirme ve DuckDB Arrow IPC lazy parquet akış testleri
@@ -177,10 +177,10 @@ Tablonun kolon konfigürasyonu istemci tarafında kalıcı olarak saklanır:
 
 Bu bileşen üzerinde herhangi bir kod değişikliği veya optimizasyon yapıldığında aşağıdaki adımlarla doğrulayın:
 
-### 1. Otomasyon Testleri (`npm run test:grid`):
+### 1. Otomasyon Testleri (`pnpm run test:grid`):
 Tek komutla tüm tablo ve DuckDB kurallarını test eder:
 ```bash
-npm run test:grid
+pnpm run test:grid
 ```
 Test suite (`src/features/jobs/components/virtual-spreadsheet/tests/`) şunları garanti eder:
 - **`filter-parser.test.mjs`:**
@@ -204,8 +204,8 @@ Test suite (`src/features/jobs/components/virtual-spreadsheet/tests/`) şunları
   - DuckDB Arrow IPC stream chunk'larından (50.000 satırlık dilimler) `parquet-wasm` ile sıfır-OOM Parquet üretimi doğrulaması
 
 ### 2. Statik Analiz & Derleme:
-- `npm run lint` (oxlint): **0 warnings, 0 errors** olmalı.
-- `npm run typecheck` (tsc): **0 errors** olmalı.
+- `pnpm run lint` (oxlint): **0 warnings, 0 errors** olmalı.
+- `pnpm run typecheck` (tsc): **0 errors** olmalı.
 
 ### 3. Manuel Fonksiyonel Kontrol Listesi:
 - Kolon ayırıcıya basıldığında sürüklemenin (D&D) tetiklenmediğini doğrulayın.

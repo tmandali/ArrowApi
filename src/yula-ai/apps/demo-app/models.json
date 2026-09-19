@@ -1,0 +1,63 @@
+{
+  "defaultProvider": "agnes-ai",
+  "defaultModel": "agnes-3.0-flash",
+  "providers": {
+    "agnes-ai": {
+      "name": "Agnes AI",
+      "baseUrl": "https://apihub.agnes-ai.com/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "agnes-3.0-flash",
+          "name": "Agnes 3.0 Flash",
+          "reasoning": true,
+          "contextWindow": 128000,
+          "cost": { "input": 0.15, "output": 0.60 }
+        },
+        {
+          "id": "agnes-2.5-flash",
+          "name": "Agnes 2.5 Flash",
+          "reasoning": true,
+          "contextWindow": 128000,
+          "cost": { "input": 0.15, "output": 0.60 }
+        },
+        {
+          "id": "agnes-2.5-pro",
+          "name": "Agnes 2.5 Pro",
+          "reasoning": true,
+          "contextWindow": 128000,
+          "cost": { "input": 1.25, "output": 5.00 }
+        }
+      ]
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "anthropic/claude-sonnet-4",
+          "name": "Claude Sonnet 4",
+          "contextWindow": 200000,
+          "cost": { "input": 3.00, "output": 15.00 }
+        },
+        {
+          "id": "openai/gpt-4o",
+          "name": "GPT-4o",
+          "contextWindow": 128000,
+          "cost": { "input": 2.50, "output": 10.00 }
+        }
+      ]
+    },
+    "opencode": {
+      "name": "OpenCode",
+      "models": [
+        {
+          "id": "opencode-default",
+          "name": "OpenCode Default",
+          "cost": { "input": 0.20, "output": 0.80 }
+        }
+      ]
+    }
+  }
+}

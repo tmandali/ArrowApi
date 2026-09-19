@@ -1,10 +1,7 @@
 import { load } from "js-yaml";
 import {
   SquarePen,
-  Paperclip,
-  BarChart2,
   RotateCcw,
-  Package,
   ShieldAlert,
   HelpCircle,
   Download,
@@ -13,7 +10,6 @@ import {
 } from "lucide-react";
 import { systemAgentYaml } from "@/features/system";
 import { gridAgentYaml } from "@/features/reports";
-import { stockReportAgentYaml } from "@/workspaces/stock";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
@@ -52,10 +48,7 @@ export type YulaCommandYamlManifest = {
 /** İkon metin isimlerini Lucide React bileşenlerine dönüştüren dinamik harita */
 const ICON_MAP: Record<string, LucideIcon> = {
   SquarePen,
-  Paperclip,
-  BarChart2,
   RotateCcw,
-  Package,
   ShieldAlert,
   Download,
 };
@@ -89,29 +82,21 @@ export const SYSTEM_COMMANDS: YulaCommand[] = parseYamlCommands(systemAgentYaml)
 /** Sonuç Evresi Komutları (features/reports manifest'i — Public API) */
 export const GRID_COMMANDS: YulaCommand[] = parseYamlCommands(gridAgentYaml);
 
-/** Kriter Evresi Komutları (workspaces/stock manifest'i — Public API) */
-export const REPORT_COMMANDS: YulaCommand[] = parseYamlCommands(stockReportAgentYaml);
-
 /**
- * Slash paleti yalnızca eylem komutlarıdır (rapor adı değil).
- * - Sonuç (GUID / grid) → /analiz, /top5, /sorgu, /kolonlar, /temizle
- * - Kriter / workspace → /run-job ve sistem komutları
- * Kullanıcı skill'leri (`extra`) her iki evrede de listelenir (global kapsam).
+ * Slash paleti komut listesi:
+ * - Sonuç (GUID / grid) → /analiz, /temizle, /indir ve sistem komutları
+ * - Kriter / workspace → Sistem komutları (/yeni, /dump)
+ * Kullanıcı skill'leri (`extra`) her iki evrede de listelenir (kapsamına göre).
  */
 export function getAllYulaCommands(
   isViewingResults = false,
-  pathname = "/",
+  _pathname = "/",
   extra: YulaCommand[] = [],
 ): YulaCommand[] {
   if (isViewingResults) {
     return [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...extra];
   }
-  const path = pathname.split("?")[0] || "/";
-  const reportCommands = REPORT_COMMANDS.filter((cmd) => {
-    if (!cmd.pagePath) return true;
-    return path !== cmd.pagePath && !path.startsWith(`${cmd.pagePath}/`);
-  });
-  return [...SYSTEM_COMMANDS, ...reportCommands, ...extra];
+  return [...SYSTEM_COMMANDS, ...extra];
 }
 
 /**
@@ -154,13 +139,13 @@ export function getUserSkillCommandsSnapshot(): YulaCommand[] {
   }
 }
 
-/** Manifestteki tüm slash komutları (evre karışık; tam eşleşme için). */
+/** Manifestteki tüm slash komutları (tam eşleşme için). */
 export function getRegisteredYulaCommands(
   extra: YulaCommand[] = getUserSkillCommandsSnapshot(),
 ): YulaCommand[] {
   const seen = new Set<string>();
   const out: YulaCommand[] = [];
-  for (const cmd of [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...REPORT_COMMANDS, ...extra]) {
+  for (const cmd of [...SYSTEM_COMMANDS, ...GRID_COMMANDS, ...extra]) {
     const key = cmd.slash.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

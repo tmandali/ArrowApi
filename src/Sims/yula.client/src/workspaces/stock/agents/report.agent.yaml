@@ -1,8 +1,0 @@
-commands:
-  - id: "report-run-job"
-    slash: "run-job"
-    label: "Öner & Çalıştır"
-    description: "Açık raporun şemasını yorumlayarak öneriler sunar, seçime göre kriterleri forma doldurur"
-    prompt: "Rapor şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
-    icon: "Package"
-    phase: "report"

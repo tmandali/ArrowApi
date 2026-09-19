@@ -235,18 +235,44 @@ export function validateCriteria(
     instance = rowsToCriteriaInstance(rowsOrInstance, resolvedFields)
   } else {
     // Nesne olarak gönderilen kriterleri (run_job criteria objesi)
-    // rowsToCriteriaInstance ile rangeSplit (from_/to_) ve array tiplerine dönüştür
     const syntheticRows: CriteriaFilterRow[] = Object.entries(rowsOrInstance).map(
-      ([name, value], idx) => ({
-        id: `synthetic-${idx}`,
-        selected: false,
-        name,
-        value: Array.isArray(value) ? value.map(String).join(",") : String(value ?? ""),
-      })
+      ([name, value], idx) => {
+        let strVal = "";
+        if (Array.isArray(value)) {
+          strVal = value.map(String).join(",");
+        } else if (value && typeof value === "object") {
+          const obj = value as Record<string, unknown>;
+          const from = String(obj.from ?? obj.start ?? obj.min ?? "").trim();
+          const to = String(obj.to ?? obj.end ?? obj.max ?? "").trim();
+          if (from || to) {
+            strVal = from && to ? `${from}..${to}` : from ? `${from}..` : `..${to}`;
+          } else {
+            strVal = JSON.stringify(value);
+          }
+        } else {
+          strVal = String(value ?? "");
+        }
+        return {
+          id: `synthetic-${idx}`,
+          selected: false,
+          name,
+          value: strVal,
+        };
+      }
     )
+    const convertedInstance = rowsToCriteriaInstance(syntheticRows, resolvedFields);
+    const cleanedRaw = { ...rowsOrInstance };
+    for (const [k, v] of Object.entries(cleanedRaw)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        const field = resolvedFields.find((f) => f.key === k);
+        if (field?.rangeSplit) {
+          delete cleanedRaw[k];
+        }
+      }
+    }
     instance = {
-      ...rowsOrInstance,
-      ...rowsToCriteriaInstance(syntheticRows, resolvedFields),
+      ...cleanedRaw,
+      ...convertedInstance,
     }
   }
 

@@ -34,18 +34,19 @@ export const useAgentCriteriaStore = create<AgentCriteriaState>((set) => ({
     }));
     const previous = expiryTimers.get(scope);
     if (previous) clearTimeout(previous);
-    expiryTimers.set(
-      scope,
-      setTimeout(() => {
-        expiryTimers.delete(scope);
-        set((s) => {
-          if (!(scope in s.aiFilledCriteria)) return s;
-          const next = { ...s.aiFilledCriteria };
-          delete next[scope];
-          return { aiFilledCriteria: next };
-        });
-      }, EXPIRY_MS),
-    );
+    const timer = setTimeout(() => {
+      expiryTimers.delete(scope);
+      set((s) => {
+        if (!(scope in s.aiFilledCriteria)) return s;
+        const next = { ...s.aiFilledCriteria };
+        delete next[scope];
+        return { aiFilledCriteria: next };
+      });
+    }, EXPIRY_MS);
+    if (typeof (timer as any)?.unref === "function") {
+      (timer as any).unref();
+    }
+    expiryTimers.set(scope, timer);
   },
   clearAiFilledCriteria: () => {
     for (const timer of expiryTimers.values()) clearTimeout(timer);

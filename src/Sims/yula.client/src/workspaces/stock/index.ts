@@ -20,8 +20,8 @@ export { StockLedgerForm } from "./stock-ledger";
 export { ItemFormShell } from "./item";
 
 /**
- * Yula plug-and-play report registration: kart + slash komut manifest'i
+ * Yula plug-and-play report registration: kartlar
  * Public API üzerinden shell'e verilir (shell workspace içine bakmaz).
  */
 export { stockReportCards, stockReportCardKinds } from "./report-cards";
-export { default as stockReportAgentYaml } from "./agents/report.agent.yaml";
+

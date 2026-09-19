@@ -1,0 +1,16 @@
+{
+  "name": "headless-react-ui-agent-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter demo-app dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "simulate": "pnpm --filter @my-agent/core exec vitest run src/agent-simulation.test.ts",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -147,20 +147,22 @@ export function useChatComposer(args: {
     if (!trimmed && !promptPrefix && !pastedChip && attachments.length === 0) return;
 
     if (
-      selectedCommand?.id === "attach" ||
-      selectedCommand?.slash === "dosya" ||
-      trimmed.toLowerCase() === "/dosya"
+      selectedCommand?.id === "new" ||
+      trimmed.toLowerCase() === "/new" ||
+      trimmed.toLowerCase() === "/yeni" ||
+      trimmed.toLowerCase() === "/clear"
     ) {
-      fileInputRef.current?.click();
+      newConversation();
       setInput("");
       setSelectedCommand(null);
       setPastedChip(null);
+      setAttachments([]);
       setHistoryClosed(true);
       return;
     }
 
-    if (selectedCommand?.id === "new" || trimmed.toLowerCase() === "/new") {
-      newConversation();
+    if (selectedCommand?.id === "dump" || trimmed.toLowerCase() === "/dump") {
+      yula.dumpSession?.();
       setInput("");
       setSelectedCommand(null);
       setPastedChip(null);
@@ -204,8 +206,8 @@ export function useChatComposer(args: {
       setHistoryClosed(true);
       return;
     }
-    if (command.id === "attach" || command.slash === "dosya") {
-      fileInputRef.current?.click();
+    if (command.id === "dump") {
+      yula.dumpSession?.();
       setInput("");
       setSelectedCommand(null);
       setPastedChip(null);

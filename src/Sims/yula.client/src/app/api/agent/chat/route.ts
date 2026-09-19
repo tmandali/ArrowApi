@@ -13,12 +13,11 @@ import {
   streamText,
   wrapLanguageModel,
 } from "ai";
-import { type YulaStaticTools, type ReportToolContext } from "@/lib/yula-server-tools";
+import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
 import { filterActiveToolsByAgent } from "@/lib/yula-user-agent";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
-import { buildServerTools } from "@/lib/yula-server-tools";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import {
   getYulaLanguageModel,
@@ -39,11 +38,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Paylaşılan mesaj tipi — cookbook deseni:
- * statik araçlar tipli (`tool-<ad>` parçaları), grid dinamikleri
- * `dynamic-tool` olarak akar ve istemci ikisini de destekler.
+ * Paylaşılan mesaj tipi — standart @my-agent/core araç setiyle
+ * uçtan uca tip güvenliği.
  */
-export type YulaTools = InferUITools<YulaStaticTools>;
+export type YulaTools = InferUITools<StandardAgentTools>;
 /** Per-message metadata: token usage attached at step finish (SDK recipe). */
 export type YulaMessageMetadata = { usage?: LanguageModelUsage };
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
@@ -54,8 +52,6 @@ export const DEFAULT_MODEL = getDefaultModel();
 const SKILL_TOOL_NAMES = new Set([
   "run_user_skill",
   "read_user_file",
-  "run_skill_script",
-  "read_skill_file",
 ]);
 
 /**
@@ -193,13 +189,14 @@ export async function POST(req: Request) {
       return Response.json({ error: "invalid json" }, { status: 400 });
     }
 
-    const { messages, model, thinkingEnabled, effort: requestedEffort, context, provider: requestedProvider, endpoint } =
+    const { messages, model, thinkingEnabled, effort: requestedEffort, context, uiContext, provider: requestedProvider, endpoint } =
       (body ?? {}) as {
         messages?: YulaMessage[];
         model?: string;
         thinkingEnabled?: boolean;
         effort?: YulaEffort | string;
         context?: YulaScreenContext;
+        uiContext?: import("@my-agent/core").UIContextSnapshot;
         provider?: string;
         endpoint?: string;
       };
@@ -213,69 +210,11 @@ export async function POST(req: Request) {
       return Response.json({ error: "messages required" }, { status: 400 });
     }
 
-    // PHASE WALL (SDK-native): full set built once, prepareStep locks
-    // per-step tools —
-    //   results          → grid tools only (columns present)
-    //   results-loading  → no tools (table not ready; run_job forbidden)
-    //   workspace        → criteria/run tools only
     const phase = context?.phase ?? "workspace";
-    const grid = context?.grid ?? null;
-    const criteriaTools = buildServerTools(null);
-    const gridTools =
-      grid && grid.columns.length > 0 ? buildServerTools(grid) : null;
-    const tools = { ...criteriaTools, ...(gridTools ?? {}) };
-    const criteriaToolNames = Object.keys(criteriaTools);
-    const gridToolNames = gridTools ? Object.keys(gridTools) : [];
 
-    // Dynamic tool descriptions (SDK toolsContext): inject the active
-    // report scope, title, and required criteria fields so the model
-    // grounds tool choice without hardcoded report lists.
-    const pathname = context?.pathname ?? "";
-    const activeReport =
-      REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ??
-      (context?.screen?.reportScope
-        ? findReport(context.screen.reportScope)
-        : undefined);
-    // Ajan oturumu gibi rapor-dışı ekranda aktif rapor yoktur; o zaman
-    // toolContext stock-balance varsayılanına düşer ve modeli yanlış rapora
-    // yönlendirir. RAG router-hit varsa hedef rapor oradan çözülür.
-    const routerHitMeta =
-      activeReport || phase !== "workspace"
-        ? undefined
-        : (context?.ragContext ?? []).find(
-            (item) =>
-              typeof item.metadata === "object" &&
-              item.metadata !== null &&
-              (item.metadata as Record<string, unknown>).type ===
-                "report_router" &&
-              typeof (item.metadata as Record<string, unknown>).scope ===
-                "string",
-          )?.metadata;
-    const routerReport =
-      !activeReport && routerHitMeta
-        ? findReport(
-            (routerHitMeta as Record<string, unknown>).scope as string,
-          )
-        : undefined;
-    const resolvedReport = activeReport ?? routerReport;
-    const schemaRequired = (resolvedReport?.fullSchema as { required?: unknown })
-      ?.required;
-    const toolContext: ReportToolContext = {
-      reportScope: resolvedReport?.scope ?? null,
-      reportTitle: resolvedReport?.title ?? null,
-      requiredFields: Array.isArray(schemaRequired)
-        ? (schemaRequired as unknown[]).filter(
-            (f): f is string => typeof f === "string",
-          )
-        : [],
-      availableReports: REGISTERED_REPORTS.map((r) => r.scope).join(", "),
-    };
-    const toolsContext = {
-      run_job: toolContext,
-      apply_criteria: toolContext,
-      open_last_report: toolContext,
-      find_matching_report: toolContext,
-    };
+    // Standart Headless React UI-Agent (@my-agent/core) araç seti
+    const tools = { ...STANDARD_AGENT_TOOLS };
+    const toolNames = Object.keys(tools);
 
     const isThinking = resolveThinkingEnabled(thinkingEnabled);
     // Efor önceliği: ajan pini > istek > eski boolean bayrak. Cookbook deseni:
@@ -293,7 +232,7 @@ export async function POST(req: Request) {
     });
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
     // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
-    const systemPrompt = buildSystemPrompt(context);
+    const systemPrompt = buildSystemPrompt({ ...context, uiContext });
 
     // Çıkarım önceliği: ajan sabiti > sohbet modeli > sağlayıcı varsayılanı.
     // resolveModel listede bulamazsa sağlayıcı varsayılanına düşer.
@@ -346,13 +285,7 @@ export async function POST(req: Request) {
       (m) => Array.isArray(m.content) && m.content.some((p) => p.type === "image"),
     );
 
-    // SDK-native phase lock: only the current phase's tools are callable.
-    const phaseToolNames =
-      hasImageInMessages || phase === "results-loading"
-        ? []
-        : phase === "results" && gridToolNames.length > 0
-          ? gridToolNames
-          : criteriaToolNames;
+    const activeToolNames = hasImageInMessages ? [] : toolNames;
 
     const result = streamText({
       model: wrapLanguageModel({
@@ -369,27 +302,8 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: modelMessages,
       tools,
-      toolsContext,
       prepareStep: async ({ messages, stepNumber }) => {
-        // Ajan kapısı (Step 5/6 karşılığı): seçili ajan allowlist verdiyse
-        // faz araçları onunla kesiştirilir; boş = tüm faz araçları.
-        const agentTools = context?.agent?.tools;
-        let gatedTools =
-          agentTools && agentTools.length > 0
-            ? filterActiveToolsByAgent(phaseToolNames, gridToolNames, agentTools)
-            : phaseToolNames;
-        // Skill kapısı: ajanın skill listesi boşsa skill araçları kapatılır
-        // (boş = skill yok; envanter + palet de aynı kuralı uygular).
-        const agentSkillList = context?.agent?.skills;
-        if (
-          context?.agent &&
-          (!agentSkillList || agentSkillList.length === 0)
-        ) {
-          gatedTools = gatedTools.filter(
-            (t) => !SKILL_TOOL_NAMES.has(t),
-          );
-        }
-        const activeTools = gatedTools as Extract<
+        const activeTools = activeToolNames as Extract<
           keyof typeof tools,
           string
         >[];
@@ -430,26 +344,12 @@ export async function POST(req: Request) {
       stopWhen: [
         isStepCount(6),
         hasToolCall(
-          "set_grid_query",
-          "filter_current_grid",
-          "set_grid_sort",
-          "configure_grid_columns",
-          "pin_grid_columns",
-          "apply_grid_filters",
-          "reset_grid_layout",
-          "export_grid_data",
-          "visualize_grid_data",
-          "run_job",
-          "apply_criteria",
-          "navigate_to_page",
-          "open_last_report",
-          "profile_grid_table",
-          "analyze_grid_data",
-          "run_expert_sql",
-          "get_report_schema",
-          "request_user_confirmation",
-          "ask_user_question",
-          "suggest_next_steps",
+          "dispatch_component_action",
+          "ask_user_choice",
+          "time_travel",
+          "remember_fact",
+          "recall_fact",
+          "inspect_ui_state",
         ),
       ],
     });

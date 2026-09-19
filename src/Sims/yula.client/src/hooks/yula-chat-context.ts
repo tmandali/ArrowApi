@@ -1,13 +1,15 @@
 import * as React from "react";
-import type { UseChatHelpers } from "@ai-sdk/react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import type { YulaConversation } from "@/lib/stores/chats";
 
-export interface YulaChatContextValue
-  extends Pick<
-    UseChatHelpers<YulaMessage>,
-    "messages" | "status" | "stop" | "error" | "addToolOutput"
-  > {
+export type YulaChatStatus = "ready" | "submitted" | "streaming" | "error";
+
+export interface YulaChatContextValue {
+  messages: YulaMessage[];
+  status: YulaChatStatus;
+  stop: () => void;
+  error?: Error | undefined;
+  addToolOutput?: (params: { toolCallId: string; output: unknown }) => void;
   busy: boolean;
   sendMessageText: (
     text: string,
@@ -46,6 +48,14 @@ export interface YulaChatContextValue
   streamErrorTexts: Record<string, string>;
   /** Asistan mesaj id -> LLM tur/çağrı sayısı */
   llmStepCounts: Record<string, number>;
+  /** Oturumun tüm detaylarıyla (mesajlar, telemetri, araçlar, olaylar) dump dosyasını indirir */
+  dumpSession: () => void;
+  /** Context Window doluluğu ve token hesabı (Pi Reference) */
+  contextUsage?: import("@my-agent/core").ContextUsage;
+  autoCompactEnabled?: boolean;
+  setAutoCompactEnabled?: (enabled: boolean) => void;
+  isCompacting?: boolean;
+  compact?: (customInstructions?: string) => Promise<boolean>;
 }
 
 export const YulaChatContext = React.createContext<YulaChatContextValue>({} as YulaChatContextValue);

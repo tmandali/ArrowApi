@@ -1,55 +1,38 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useChat } from "@ai-sdk/react";
-import type { YulaMessage, YulaTools } from "@/app/api/agent/chat/route";
-import {
-  yulaToolPartInfo,
-  SERVER_EXECUTED_TOOLS,
-  DEDUPE_SKIP_MARKER,
-  findDuplicateQuestionCallIds,
-} from "@/lib/yula-tool-info";
-import {
-  isReportResultPath,
-  extractJobIdFromHref,
-  reportExecutionPath,
-} from "@/lib/workspace-paths";
+import { useRouter } from "next/navigation";
+import { useAgentChat } from "@my-agent/react";
+import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { useChatsStore } from "@/lib/stores/chats";
-import { queueYulaPrompt, takeQueuedYulaPrompt } from "@/lib/yula-pending-prompt";
-import { clearTurnTrace, getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
-import { GRID_COMMANDS, isYulaGridSlashPrompt, localizeYulaCommands } from "@/components/layout/yula-commands";
-import { useYulaGridStore } from "@/lib/stores/grid";
-import { useYulaDockStore } from "@/lib/stores/dock";
+import { clearTurnTrace } from "@/lib/yula-turn-trace";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-steps";
-import { useLocale, useTranslations } from "next-intl";
-import {
-  MAX_AUTO_STEPS,
-  toolStepCountSinceLastUser,
-  shouldContinueAfterToolOutputs,
-} from "./chat-loop-policy";
 import {
   getRequestStartMs,
   clearRequestStart,
   markRequestStart,
   setActiveConversationId,
-  getActiveConversationId,
   resolveCurrentAgentId,
   type LiveHelpers,
 } from "./chat-shared";
-import { buildYulaTransport } from "./chat-transport";
-import { useYulaToolRunner } from "./use-yula-tool-runner";
+import {
+  uiRegistry,
+  uiEventBus,
+  type ComponentSchema,
+  executeComponentAction,
+  piEventStream,
+} from "@my-agent/core";
+import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
+import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
+import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 
 /**
- * Yula v2 — referans repo deseninin standart Next karşılığı.
- * Tek kaynak: ai-sdk `useChat` + zustand persist (konuşma geçmişi/model).
+ * Yula Chat Instance — Saf @my-agent/react motoru ve Headless UI-Agent bileşen kaydı.
  *
- * Konuşma değişimi: dış sağlayıcı yalnız seçim durumunu okur,
- * içte anahtarlanmış (<ChatInstance key>) taze bir chat örneği kurulur;
- * böylece persist edilmiş mesajlar asla çalışan örneğe çift eklenmez.
+ * Demo projedeki gibi yapay Vercel SDK manuel döngüleri, prompt kuyruklama
+ * veya süre kapıları (sendGate) içermez; araçlar ve olaylar doğrudan EventBus
+ * ve @my-agent/core üzerinden yürütülür.
  */
-
-/** Konuşma başına tek taze chat örneği — key değiştikçe sıfırdan kurulur. */
 export function ChatInstance({
   conversationId,
   onContextReady,
@@ -58,21 +41,8 @@ export function ChatInstance({
   onContextReady: (helpers: LiveHelpers) => void;
 }) {
   const router = useRouter();
-  const tc = useTranslations("Commands");
-  const locale = useLocale();
-  // Yerel dilde grid komut listesi: metin alanları `Commands` next-intl
-  // ad alanından çözülür; locale stabil string → yalnız locale değişince
-  // yeniden hesaplanır (`tc` render başına yenidir, bağımlılık yerine locale izlenir).
-  const localizedGridCommands = React.useMemo(
-    () => localizeYulaCommands(GRID_COMMANDS, tc),
-    /* eslint-disable react-hooks/exhaustive-deps -- `tc` render başına yenidir; locale değişimi gerçek sürücüdür, locale izlenir */
-    [locale],
-    /* eslint-enable react-hooks/exhaustive-deps */
-  );
   const saveMessages = useChatsStore((s) => s.saveMessages);
-  const renameFromFirstMessage = useChatsStore(
-    (s) => s.renameFromFirstMessage,
-  );
+  const renameFromFirstMessage = useChatsStore((s) => s.renameFromFirstMessage);
 
   const initialMessages = React.useMemo(
     () => useChatsStore.getState().messagesById[conversationId] ?? [],
@@ -84,48 +54,205 @@ export function ChatInstance({
     setActiveConversationId(conversationId);
   });
 
-  const transport = React.useMemo(
-    () => buildYulaTransport(localizedGridCommands),
-    // Mount-snapshot transport: locale değişince (stabil string) yeniden kurulur
-    [localizedGridCommands],
-  );
+  // Headless UI-Agent Sistem Bileşenleri: app_router & job_history
+  React.useEffect(() => {
+    const routerSchema: ComponentSchema = {
+      id: "app_router",
+      meta: { description: "Sayfa ve Rota Yönlendirici" },
+      actions: {
+        NAVIGATE: {
+          description: "Kullanıcıyı hedef sayfaya/rapora yönlendirir ({ path }).",
+          whenToCall: "Kullanıcı başka bir rapor veya sayfaya gitmek istediğinde.",
+          whenNotToCall: "Kullanıcı zaten o ekrandayken.",
+        },
+      },
+    };
+    uiRegistry.register(routerSchema);
+    const unsubRouter = uiEventBus.subscribe("app_router", (action, payload) => {
+      if (action === "NAVIGATE" && payload?.path) {
+        let rawPath = String(payload.path).trim();
+        const [basePath, search] = rawPath.split("?");
+        const clean = basePath.replace(/^\//, "").toLowerCase();
+        const matched = REGISTERED_REPORTS.find(
+          (r) =>
+            r.pagePath.toLowerCase() === basePath.toLowerCase() ||
+            r.scope.toLowerCase() === clean ||
+            clean.endsWith(r.scope.toLowerCase()) ||
+            r.aliases.some((a) => a.toLowerCase() === clean),
+        );
+        let targetPath = matched ? matched.pagePath : basePath;
+        if (search) {
+          targetPath = `${targetPath}?${search}`;
+        }
+        router.push(targetPath);
+        return { success: true, navigatedTo: targetPath };
+      }
+      return { success: false, error: "Bilinmeyen router aksiyonu" };
+    });
 
-  // Kullanıcı "durdur" bayrağı — bir sonraki kullanıcı mesajına kadar otomatik
-  // devam döngüsünü (sendAutomaticallyWhen + araç yürütme) kilitler.
+    const jobHistorySchema: ComponentSchema = {
+      id: "job_history",
+      meta: { description: "Rapor Çalışma Geçmişi ve İş Takibi" },
+      actions: {
+        OPEN_LAST: {
+          description: "En son tamamlanan rapor sonucunu ekranda açar.",
+          whenToCall: "Kullanıcı 'son raporu aç', 'en son sonucu göster' dediğinde.",
+          whenNotToCall: "Yeni bir rapor çalıştırılmak istendiğinde.",
+        },
+        LIST: {
+          description: "Geçmiş işleri listeler.",
+          whenToCall: "Kullanıcı 'hangi raporlar çalıştı', 'geçmiş' dediğinde.",
+          whenNotToCall: "Mevcut rapor incelenirken.",
+        },
+        CANCEL: {
+          description: "Çalışmakta olan işi iptal eder ({ jobId }).",
+          whenToCall: "Kullanıcı 'durdur', 'iptal et' dediğinde.",
+          whenNotToCall: "İş zaten tamamlanmışken.",
+        },
+      },
+    };
+    uiRegistry.register(jobHistorySchema);
+    const unsubJob = uiEventBus.subscribe("job_history", (action, payload) => {
+      return executeDispatchComponentAction({ component_id: "job_history", action, payload }) as any;
+    });
+
+    // Headless Platform Rapor Kriter Formları (REGISTERED_REPORTS):
+    // Kullanıcı ana sayfada veya başka bir ekrandayken de raporları çalıştırabilmesi
+    // ve form doldurabilmesi için (demo-app mimarisindeki gibi) headless olarak kaydedilir.
+    const unsubReports: Array<() => void> = [];
+    REGISTERED_REPORTS.forEach((report) => {
+      const formCompId = `criteria_form:${report.scope}`;
+      const formSchema: ComponentSchema = {
+        id: formCompId,
+        meta: {
+          reportScope: report.scope,
+          screenTitle: report.title,
+          pagePath: report.pagePath,
+          workspaceId: report.workspace,
+          isHeadless: true,
+        },
+        actions: {
+          APPLY: {
+            description: `${report.title} kriter formuna değerleri yazar ve sayfaya yönlendirir.`,
+            whenToCall: `Kullanıcı ${report.title} rapor kriterlerini girmek veya güncellemek istediğinde.`,
+            whenNotToCall: "Raporu doğrudan çalıştırmak istediğinde veya form alanlarıyla ilgisiz işlemlerde.",
+          },
+          RUN: {
+            description: `${report.title} raporunu çalıştırır ve sonuç ekranına yönlendirir.`,
+            whenToCall: `Kullanıcı ${report.title} raporunu çalıştırmak veya sonuçlarını görmek istediğinde.`,
+            whenNotToCall: "Sadece kriterleri taslak olarak doldurmak istediğinde.",
+          },
+          SCHEMA: {
+            description: `${report.title} kriter şemasını inceler.`,
+            whenToCall: `Raporun alanlarını ve veri formatlarını öğrenmek gerektiğinde.`,
+            whenNotToCall: "Kriter yapısı zaten biliniyorken.",
+          },
+          READ: {
+            description: `${report.title} mevcut taslak kriterlerini okur.`,
+            whenToCall: `Formdaki mevcut doldurulmuş değerleri kontrol etmek için.`,
+            whenNotToCall: "Yeni değerler atanırken.",
+          },
+          VALIDATE: {
+            description: `${report.title} kriterlerini doğrular.`,
+            whenToCall: `Kriter girdilerinin şema kurallarına uygunluğunu denetlemek için.`,
+            whenNotToCall: "Kriter girilmediğinde.",
+          },
+        },
+      };
+      uiRegistry.register(formSchema);
+      const unsub = uiEventBus.subscribe(formCompId, async (action, payload) => {
+        const res = (await executeDispatchComponentAction({
+          component_id: formCompId,
+          action,
+          payload: { ...payload, report: report.scope },
+        })) as Record<string, unknown> | null;
+
+        if (res && typeof res === "object") {
+          const navTarget =
+            (res.navigateTo as string) ||
+            (action === "APPLY" || action === "RUN" ? report.pagePath : undefined);
+          if (navTarget) {
+            const navToolCallId = `nav_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            piEventStream.emit({
+              type: "tool_execution_start",
+              toolCallId: navToolCallId,
+              toolName: "dispatch_component_action",
+              args: {
+                component_id: "app_router",
+                action: "NAVIGATE",
+                payload: { path: navTarget },
+              },
+            });
+            let navOutcome: any;
+            try {
+              if (Boolean(uiRegistry.get("app_router"))) {
+                navOutcome = uiEventBus.dispatch({
+                  component_id: "app_router",
+                  action: "NAVIGATE",
+                  payload: { path: navTarget },
+                });
+              } else {
+                router.push(navTarget);
+                navOutcome = { success: true, result: { navigatedTo: navTarget } };
+              }
+            } catch (err) {
+              router.push(navTarget);
+              navOutcome = { success: false, error: String(err) };
+            }
+            const cleanNavOutput =
+              navOutcome?.result ?? { success: navOutcome?.success, navigatedTo: navTarget };
+            piEventStream.emit({
+              type: "tool_execution_end",
+              toolCallId: navToolCallId,
+              toolName: "dispatch_component_action",
+              result: cleanNavOutput,
+              isError: !navOutcome?.success,
+            });
+          }
+        }
+        return res;
+      });
+      unsubReports.push(unsub);
+    });
+
+    return () => {
+      unsubRouter();
+      unsubJob();
+      unsubReports.forEach((unsub) => unsub());
+      uiRegistry.unregister("app_router");
+      uiRegistry.unregister("job_history");
+      REGISTERED_REPORTS.forEach((report) => {
+        uiRegistry.unregister(`criteria_form:${report.scope}`);
+      });
+    };
+  }, [router]);
+
   const userStoppedRef = React.useRef(false);
-  // UI-reaktif kopya (durdurulan kısmi metin akışlarında retry butonu için)
   const [stopped, setStopped] = React.useState(false);
-  // Akış hatası (sağlayıcı 401/kota/ağ vb.) — asistan mesaj id'sine kaydedilir;
-  // SilentTurnFallback genel "sessiz tur" yerine anlamlı hata gösterir.
-  const [streamErrorTexts, setStreamErrorTexts] = React.useState<
-    Record<string, string>
-  >({});
-  // Tur içinde çalıştırılan araç çağrıları (araç:girdi imzası). Aynı imza
-  // tekrar gelirse yeniden KOŞULMAZ; modele "zaten çalıştı" hatası döner.
-  // Küçük modellerin (gemma) [metin + aynı araç çağrısı] turlarını sonsuza
-  // kadar tekrarlamasını buradaki sinyal keser.
-  const executedCallsRef = React.useRef<Map<string, string>>(new Map());
+  const [streamErrorTexts, setStreamErrorTexts] = React.useState<Record<string, string>>({});
 
-  const chat = useChat<YulaMessage>({
-    id: conversationId,
-    messages: initialMessages,
-    transport,
-    // Streaming render seyreltme — memoized markdown bloklarıyla akıcı güncelleme
-    throttle: 60,
+  const currentPath =
+    typeof window !== "undefined"
+      ? `${window.location.pathname}${window.location.search}`
+      : "/";
+
+  // Saf @my-agent/react sohbet motoru
+  const chat = useAgentChat(currentPath, {
+    initialMessages: initialMessages as any,
+    compactEndpoint: "/api/compact",
+    compactionSettings: {
+      enabled: true,
+      reserveTokens: 16384,
+      keepRecentTokens: 20000,
+    },
+    onCompaction(_result) {
+      saveMessages(conversationId, chat.messages as YulaMessage[]);
+    },
     onError(err) {
       console.error("🤖 [Yula Chat Client Error Details]:", err);
       userStoppedRef.current = true;
       setStopped(true);
       const raw = err instanceof Error ? err.message : String(err);
-      upsertTurnTrace(getActiveConversationId(), {
-        id: "client-error",
-        toolName: "worker",
-        label: "İstemci hatası",
-        isError: true,
-        detailText: raw,
-      });
-      // Akış hatasını son asistan mesajına işle — SilentTurnFallback genel
-      // "sessiz tur" yerine anlamlı hata mesajı göstersin.
       const lastAssistant = [...chat.messages]
         .reverse()
         .find((m) => m.role === "assistant");
@@ -135,15 +262,11 @@ export function ChatInstance({
         );
       }
     },
-    // Cookbook/Client-Tools deseni: araç çıktısı eklendiğinde akış kendiliğinden
-    // devam etsin (manuel sendMessage yerine SDK köprüsü).
-    sendAutomaticallyWhen: ({ messages }) =>
-      !userStoppedRef.current && shouldContinueAfterToolOutputs(messages),
   });
 
   const status = chat.status;
 
-  // Storage Buckets & WASM Vector RAG şema indeksleyicisi
+  // Background indexing
   React.useEffect(() => {
     void import("@/lib/yula-storage-buckets").then(({ initYulaStorageBuckets }) => {
       void initYulaStorageBuckets().catch(() => {});
@@ -155,7 +278,7 @@ export function ChatInstance({
     });
   }, []);
 
-  // Konuşma kalıcılığı (localStorage / zustand persist) — ajan kimliğiyle birlikte.
+  // Mesaj kalıcılığı
   React.useEffect(() => {
     if (!conversationId || status !== "ready") return;
     const currentPath =
@@ -165,239 +288,44 @@ export function ChatInstance({
     const currentAgentId = currentPath ? resolveCurrentAgentId(currentPath) : null;
     saveMessages(conversationId, chat.messages, currentPath, currentAgentId);
     const firstUser = chat.messages.find((m) => m.role === "user");
-    const textPart = firstUser?.parts.find(
-      (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
+    const textPart = firstUser?.parts?.find(
+      (p): p is Extract<(typeof p), { type: "text" }> => (p as { type: string }).type === "text",
     );
-    const text =
-      textPart && textPart.type === "text" ? textPart.text : "";
+    const text = textPart && "text" in textPart ? textPart.text : "";
     if (text) renameFromFirstMessage(conversationId, text, currentAgentId);
   }, [status, chat.messages, conversationId, saveMessages, renameFromFirstMessage]);
 
-  const runPendingTool = useYulaToolRunner(chat, executedCallsRef);
-
-  // İstemci-tarafı araç döngüsü (cookbook "client tools"):
-  // asistan turu bittiğinde bekleyen YÜRÜTÜLEBİLİR araç varsa otomatik koştur.
-  // Kriter kartı katmanı kaldırıldı; rapor çalıştırma yalnız run_job ile.
-  const handledToolsRef = React.useRef<Set<string>>(new Set());
-  const [isExecutingTools, setIsExecutingTools] = React.useState(false);
-
-  React.useEffect(() => {
-    // TÜM asistan mesajlarındaki bekleyen araçları topla — yalnız son mesajı değil.
-    // Kesintiye uğrayan eski turlar (hata/reload) sonradan gelen mesajlarla
-    // kendini onaramazdı; burada geriye dönük self-heal yapılır.
-    const pending = chat.messages.flatMap((m) =>
-      m.role === "assistant"
-        ? m.parts
-            .map((p) => yulaToolPartInfo(p))
-            .filter(
-              (info): info is NonNullable<typeof info> =>
-                info !== null &&
-                info.state === "input-available" &&
-                !SERVER_EXECUTED_TOOLS.has(info.toolName) &&
-                !handledToolsRef.current.has(info.toolCallId),
-            )
-        : [],
-    );
-    if (pending.length === 0) return;
-    pending.forEach((info) => handledToolsRef.current.add(info.toolCallId));
-    // Aynı adımda yinelenen soru çağrıları: model bazen tek adımda paralel
-    // iki `ask_user_question` üretir — ikisi de çalışırsa çift soru kartı
-    // çıkar. Adım başına yalnız ilk soru yaşar, sonrakiler koşturulmadan
-    // dedupe çıktısıyla kapatılır (kart render edilmez, tur terminal kalır).
-    const duplicateAskIds = findDuplicateQuestionCallIds(chat.messages);
-
-    void (async () => {
-      setIsExecutingTools(true);
-      try {
-        for (const info of pending) {
-          // Kullanıcı bu sırada durdurduysa kalan araçları koşturma
-          if (userStoppedRef.current) break;
-          // Manual agent loop telemetrisi (cookbook: "custom logging")
-          console.info(
-            `[Yula Agent Loop] adım ${toolStepCountSinceLastUser(chat.messages) + 1}/${MAX_AUTO_STEPS} → ${info.toolName}`,
-          );
-          await runPendingTool(
-            {
-              toolCallId: info.toolCallId,
-              toolName: info.toolName,
-              input: info.input,
-              state: info.state,
-            },
-            info.toolName === "ask_user_question" &&
-              duplicateAskIds.has(info.toolCallId)
-              ? {
-                  skipAsDuplicate:
-                    DEDUPE_SKIP_MARKER +
-                    " (a previous ask_user_question call in the same step was kept). " +
-                    "Do not call ask_user_question again; end your turn with a short visible summary instead.",
-                }
-              : undefined,
-          );
-        }
-      } finally {
-        setIsExecutingTools(false);
-      }
-    })();
-  }, [status, chat.messages, runPendingTool]);
-
-  /**
-   * "Yanıtı durdur" — akışı keser, bekleyen araç çağrılarını "durduruldu"
-   * çıktısıyla kapatır (satırlar "Çalışıyor…"da asılı kalmasın) ve otomatik
-   * devam döngüsünü bir sonraki kullanıcı mesajına kadar duraklatır.
-   */
   const stopResponse = React.useCallback(async () => {
     userStoppedRef.current = true;
     setStopped(true);
     await chat.stop();
-    const last = chat.messages[chat.messages.length - 1];
-    if (last?.role === "assistant") {
-      for (const p of last.parts) {
-        const info = yulaToolPartInfo(p);
-        if (info?.state === "input-available") {
-          // SDK ToolUIPart sözleşmesi: hata → state:"output-error" + errorText
-          chat.addToolOutput({
-            tool: info.toolName as keyof YulaTools,
-            toolCallId: info.toolCallId,
-            state: "output-error",
-            errorText: "Kullanıcı tarafından durduruldu.",
-          });
-        }
-      }
-    }
   }, [chat]);
 
-  /**
-   * "Yeniden dene" — SDK `regenerate`/`sendMessage` ikilisinin akıllı seçimi:
-   *  • Son asistan mesajında tamamlanmış metin var → `chat.regenerate()`
-   *    (SDK o mesajı geçmişten atar ve cevabı yeniden üretir).
-   *  • Yoksa (durdurulmuş akış: yalnız araç parçaları) → argsız `sendMessage()`
-   *    geçmişi olduğu gibi resubmit eder; araç çıktıları korunur, model devam eder.
-   */
   const retryResponse = React.useCallback(async () => {
     userStoppedRef.current = false;
     setStopped(false);
-    // Yeniden deneme yeni bir tur açar: tekrar-çağrı hafızası sıfırlanır.
-    executedCallsRef.current.clear();
-    const last = chat.messages[chat.messages.length - 1];
-    const hasText =
-      last?.role === "assistant" &&
-      last.parts.some(
-        (p) =>
-          p.type === "text" &&
-          typeof (p as { text?: unknown }).text === "string" &&
-          ((p as { text?: string }).text ?? "").trim().length > 0,
-      );
-    if (hasText) {
-      await chat.regenerate();
-    } else {
-      await chat.sendMessage();
-    }
+    await chat.regenerate();
   }, [chat]);
 
-  // TÜM YANIT SÜRECİ AKTİF Mİ? (LLM akışı + Araç yürütmeleri + Otomatik devam turları)
-  const hasPendingTools = React.useMemo(() => {
-    return chat.messages.some(
-      (m) =>
-        m.role === "assistant" &&
-        m.parts.some(
-          (p) => yulaToolPartInfo(p)?.state === "input-available",
-        ),
-    );
-  }, [chat.messages]);
+  const isTurnActive = (status === "submitted" || status === "streaming") && !stopped;
+  const busy = isTurnActive;
 
-  const willAutoContinue = React.useMemo(() => {
-    return shouldContinueAfterToolOutputs(chat.messages);
-  }, [chat.messages]);
-
-  const isTurnActive =
-    (status === "submitted" ||
-      status === "streaming" ||
-      isExecutingTools ||
-      hasPendingTools ||
-      willAutoContinue) &&
-    !stopped;
-
-  // Gönder → SDK `submitted` arası boşlukta busy false kalmasın (peş peşe mesaj).
-  const [sendGate, setSendGate] = React.useState(false);
-  const busy = isTurnActive || sendGate;
-  const busyRef = React.useRef(busy);
-  React.useEffect(() => {
-    busyRef.current = busy;
-  });
-
-  const pagePathname = usePathname();
-  const liveGridSpec = useYulaGridStore((s) => s.spec);
-
-  React.useEffect(() => {
-    if (!isReportResultPath(pagePathname)) return;
-    if (!liveGridSpec?.columns.length) return;
-    if (status !== "ready") return;
-    if (busyRef.current) return;
-    const queued = takeQueuedYulaPrompt();
-    if (!queued) return;
-    const connectQueued = () => {
-      userStoppedRef.current = false;
-      setStopped(false);
-      setSendGate(true);
-    }
-    connectQueued();
-    upsertTurnTrace(conversationId, {
-      id: "open-results",
-      toolName: "worker",
-      label: "Sonuç tablosu açıldı",
-      isLive: false,
-      input: { pathname: pagePathname },
-      output: {
-        table: liveGridSpec.tableName,
-        cols: liveGridSpec.columns.length,
-      },
-    });
-    upsertTurnTrace(conversationId, {
-      id: "flush-prompt",
-      toolName: "worker",
-      label: "Kuyruktaki komut gönderiliyor",
-      isLive: true,
-      input: { queued },
-    });
-    void chat.sendMessage({ text: queued });
-  }, [pagePathname, liveGridSpec, status, chat, conversationId]);
-
-  React.useEffect(() => {
-    if (!sendGate) return;
-    const releaseGate = () => {
-      if (isTurnActive) {
-        setSendGate(false);
-        return true;
-      }
-      return false;
-    }
-    if (releaseGate()) return;
-    const t = window.setTimeout(() => setSendGate(false), 8_000);
-    return () => window.clearTimeout(t);
-  }, [sendGate, isTurnActive]);
-
-  // Kullanıcı mesajı gönderdiği an veya tur aktifleştiği an bekleme süresi başlar (KesintisizSayaç)
+  // Sayaç ve yanıt süresi takibi
   React.useEffect(() => {
     if (isTurnActive && getRequestStartMs() === null) {
       markRequestStart();
     }
-  }, [isTurnActive]);
-
-  // TÜM Yanıt Süreci tamamen bittiğinde (!isTurnActive) GERÇEK KÜMÜLATİF bekleme süresini kaydet
-  React.useEffect(() => {
     if (!isTurnActive && getRequestStartMs() !== null) {
-      const durationSec = Number(
-        ((performance.now() - (getRequestStartMs() ?? performance.now())) / 1000).toFixed(1),
+      const durationSec = Math.max(
+        1,
+        Math.round((Date.now() - (getRequestStartMs() ?? Date.now())) / 1000),
       );
-      const assistantMsgs = chat.messages.filter((m) => m.role === "assistant");
-      const finalDuration = durationSec > 0 ? durationSec : 0.1;
       const applyDuration = () => {
         setResponseDurations((prev) => {
           const next = { ...prev };
-          for (const m of assistantMsgs) {
-            if (!next[m.id]) {
-              next[m.id] = finalDuration;
-            }
+          const lastMsg = chat.messages[chat.messages.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            next[lastMsg.id] = durationSec;
           }
           return next;
         });
@@ -407,22 +335,8 @@ export function ChatInstance({
     }
   }, [isTurnActive, chat.messages]);
 
-  React.useEffect(() => {
-    if (isTurnActive) return;
-    const liveHttp = getTurnTrace(conversationId).find(
-      (s) => s.id === "flush-prompt" && s.isLive,
-    );
-    if (!liveHttp) return;
-    upsertTurnTrace(conversationId, {
-      ...liveHttp,
-      isLive: false,
-      label: "HTTP /api/agent/chat bitti",
-    });
-  }, [isTurnActive, conversationId]);
-
   const [llmStepCounts, setLlmStepCounts] = React.useState<Record<string, number>>({});
 
-  // Asistan mesajlarındaki ekranda görünen Worked adımlarının sayısını hesapla
   React.useEffect(() => {
     const assistantMsgs = chat.messages.filter((m) => m.role === "assistant");
     const counts: Record<string, number> = {};
@@ -431,27 +345,20 @@ export function ChatInstance({
       if (steps.length > 0) {
         counts[msg.id] = steps.length;
       } else {
-        const stepStarts = msg.parts.filter((p) => p.type === "step-start").length;
+        const stepStarts = (msg.parts || []).filter((p) => (p as { type: string }).type === "step-start").length;
         counts[msg.id] = stepStarts > 0 ? stepStarts : 1;
       }
     }
-    const applyCounts = () => {
-      setLlmStepCounts(counts);
-    }
-    applyCounts();
+    setLlmStepCounts(counts);
   }, [chat.messages]);
 
-  /**
-   * "Mesajı Geri Al" (Undo) — seçilen kullanıcı mesajını ve altındaki tüm sonraki
-   * turları geçmişten ve LLM bağlamından (messages) siler, soru metnini döndürür.
-   */
   const undoToUserMessage = React.useCallback(
     (messageId: string): string | undefined => {
       const idx = chat.messages.findIndex((m) => m.id === messageId);
       if (idx === -1) return undefined;
 
       const targetMsg = chat.messages[idx];
-      const textPart = targetMsg.parts.find((p) => p.type === "text") as
+      const textPart = targetMsg.parts?.find((p) => (p as { type: string }).type === "text") as
         | { text?: string }
         | undefined;
       const userText = textPart?.text ?? "";
@@ -472,128 +379,25 @@ export function ChatInstance({
 
       userStoppedRef.current = false;
       setStopped(false);
-      executedCallsRef.current.clear();
 
       return userText;
     },
     [chat, conversationId, saveMessages],
   );
 
-  const value = React.useMemo(() => ({
-    messages: chat.messages,
-    status: chat.status,
-    stop: stopResponse,
-    error: chat.error,
-    busy,
-    stopped,
-    retryResponse,
-    undoToUserMessage,
-    addToolOutput: chat.addToolOutput,
-    isTurnActive: busy,
-    responseDurations,
-    llmStepCounts,
-    streamErrorTexts,
-    sendMessageText: (
+  const dumpSession = React.useCallback(() => {
+    const currentRoute = typeof window !== "undefined" ? window.location.pathname : "/";
+    exportDetailedYulaSessionDump(chat.messages, conversationId, currentRoute);
+  }, [chat.messages, conversationId]);
+
+  const sendMessageText = React.useCallback(
+    (
       text: string,
       attachmentsList?: Array<{ name: string; type: string; dataUrl?: string }>,
     ) => {
-      void (async () => {
-      clearTurnTrace(conversationId);
-      if (busyRef.current) {
-        userStoppedRef.current = true;
-        upsertTurnTrace(conversationId, {
-          id: "busy-interrupt",
-          toolName: "worker",
-          label: "Önceki tur kesildi",
-          detailText: "Yeni mesaj için bekleyen akış durduruldu.",
-        });
-        try {
-          await chat.stop();
-        } catch {
-          /* ignore */
-        }
-      }
-
-      const href =
-        typeof window !== "undefined"
-          ? `${window.location.pathname}${window.location.search}`
-          : "";
-      const pathOnly = href.split("?")[0] || "/";
-      const selectedJobId = extractJobIdFromHref(href);
-      const expectedTable = selectedJobId
-        ? `report_${selectedJobId.replace(/[^a-zA-Z0-9_]/g, "_")}`
-        : "";
-      const spec = useYulaGridStore.getState().spec;
-      const tableReadyOnScreen =
-        Boolean(expectedTable) &&
-        spec?.tableName === expectedTable &&
-        (        spec.columns?.length ?? 0) > 0;
-
-      upsertTurnTrace(conversationId, {
-        id: "user-send",
-        toolName: "worker",
-        label: "İstek alındı",
-        subLabel: text.slice(0, 80),
-        input: {
-          text,
-          href,
-          selectedJobId,
-          expectedTable,
-          specTable: spec?.tableName ?? null,
-          specCols: spec?.columns?.length ?? 0,
-          tableReadyOnScreen,
-          resultPath: isReportResultPath(pathOnly),
-        },
-      });
-
-      if (
-        isYulaGridSlashPrompt(text, localizedGridCommands) &&
-        !isReportResultPath(pathOnly) &&
-        selectedJobId &&
-        !tableReadyOnScreen
-      ) {
-        queueYulaPrompt(text);
-        const exec = reportExecutionPath(pathOnly);
-        const to = exec ? `${exec}/${selectedJobId}` : null;
-        upsertTurnTrace(conversationId, {
-          id: "open-results",
-          toolName: "worker",
-          label: "Sonuç tablosu açılıyor",
-          subLabel: selectedJobId.slice(0, 8),
-          isLive: true,
-          input: { from: href, to },
-          output: { reason: "grid slash; tablo henüz oluşmamış" },
-        });
-        if (to) {
-          useChatsStore.getState().beginConversationFollow(conversationId);
-          useYulaDockStore.getState().setOpen(true);
-          router.push(to);
-        }
-        return;
-      }
-
-      setSendGate(true);
-      // Yeni kullanıcı mesajı → durdurma kilidini kaldır, tur sıfırdan başlar
       userStoppedRef.current = false;
       setStopped(false);
-      executedCallsRef.current.clear();
-
-      // Koruma: Bekleyen (yanıtlanmamış) tüm araç çağrılarını kapat ki SDK missing tool result hatası atmasın
-      for (const m of chat.messages) {
-        if (m.role === "assistant") {
-          for (const p of m.parts) {
-            const info = yulaToolPartInfo(p);
-            if (info?.state === "input-available") {
-              chat.addToolOutput({
-                tool: info.toolName as keyof YulaTools,
-                toolCallId: info.toolCallId,
-                state: "output-error",
-                errorText: "Kullanıcı yeni mesaj gönderdiği için atlandı.",
-              });
-            }
-          }
-        }
-      }
+      clearTurnTrace(conversationId);
 
       const imageFiles = (attachmentsList ?? []).filter(
         (f) => f.dataUrl && f.type.startsWith("image/"),
@@ -620,12 +424,79 @@ export function ChatInstance({
       } else {
         void chat.sendMessage({ text: finalText });
       }
-      })();
     },
-    runPendingTool,
-  }), [chat, runPendingTool, stopResponse, retryResponse, undoToUserMessage, stopped, responseDurations, llmStepCounts, streamErrorTexts, busy, router, conversationId, localizedGridCommands]);
+    [chat, conversationId],
+  );
 
-  // Üst sağlayıcıya canlı yardımcıları duyur (imza-eşikli)
+  const runPendingTool = React.useCallback(
+    async (part: { toolCallId: string; toolName: string; input?: unknown; state?: string }) => {
+      const args = (part.input ?? {}) as Record<string, unknown>;
+      if (part.toolName === "dispatch_component_action") {
+        await executeComponentAction({
+          component_id: String(args.component_id ?? ""),
+          action: String(args.action ?? ""),
+          payload: (args.payload as Record<string, unknown>) ?? {},
+          toolCallId: part.toolCallId,
+        });
+      } else {
+        await executeDispatchComponentAction({
+          component_id: part.toolName,
+          action: "RUN",
+          payload: args,
+        });
+      }
+    },
+    [],
+  );
+
+  const value = React.useMemo(
+    () => ({
+      messages: chat.messages as YulaMessage[],
+      status: chat.status,
+      stop: stopResponse,
+      error: chat.error ?? undefined,
+      busy,
+      stopped,
+      retryResponse,
+      undoToUserMessage,
+      addToolOutput: chat.addToolOutput,
+      isTurnActive: busy,
+      responseDurations,
+      llmStepCounts,
+      streamErrorTexts,
+      dumpSession,
+      sendMessageText,
+      runPendingTool,
+      contextUsage: chat.contextUsage,
+      autoCompactEnabled: chat.autoCompactEnabled,
+      setAutoCompactEnabled: chat.setAutoCompactEnabled,
+      isCompacting: chat.isCompacting,
+      compact: chat.compact,
+    }),
+    [
+      chat.messages,
+      chat.status,
+      chat.error,
+      chat.addToolOutput,
+      chat.contextUsage,
+      chat.autoCompactEnabled,
+      chat.setAutoCompactEnabled,
+      chat.isCompacting,
+      chat.compact,
+      stopResponse,
+      busy,
+      stopped,
+      retryResponse,
+      undoToUserMessage,
+      responseDurations,
+      llmStepCounts,
+      streamErrorTexts,
+      dumpSession,
+      sendMessageText,
+      runPendingTool,
+    ],
+  );
+
   React.useEffect(() => {
     onContextReady(value as LiveHelpers);
   }, [onContextReady, value]);

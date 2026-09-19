@@ -32,25 +32,37 @@ import {
   runUserSkillTool,
   readUserFileTool,
 } from "./client-tools/interactive-tools";
+import { executeDispatchComponentAction } from "./client-tools/dispatch-bridge";
+import { executeComponentAction } from "@my-agent/core";
 
 export { resetGridCustomView } from "./client-tools/dataset";
+export { executeDispatchComponentAction } from "./client-tools/dispatch-bridge";
 
 /**
  * İstemci tarafı araç yürütücüleri — kullanıcının etkileşimiyle ya da
  * modelin dynamic-tool çağrısıyla çalışır, çıktı akışa geri verilir.
- *
- * İnce dispatcher: her araç gövdesi kendi katman modülünde yaşar —
- * Layer 1 (`grid-ui-tools`), Layer 2 (`grid-sql-tools`), Layer 3
- * (`job-lifecycle-tools`), etkileşimli (`interactive-tools`).
- * Dış API (`executeClientTool`, `resetGridCustomView`) değişmedi.
  */
-
 export async function executeClientTool(
   toolName: string,
   input: unknown,
 ): Promise<unknown> {
   const args = (input ?? {}) as Record<string, unknown>;
   switch (toolName) {
+    case "dispatch_component_action": {
+      const res = await executeComponentAction({
+        component_id: String(args.component_id ?? ""),
+        action: String(args.action ?? ""),
+        payload: (args.payload as Record<string, unknown>) ?? {},
+      });
+      if (!res.success) {
+        return executeDispatchComponentAction({
+          component_id: String(args.component_id ?? ""),
+          action: String(args.action ?? ""),
+          payload: (args.payload as Record<string, unknown>) ?? {},
+        });
+      }
+      return (res as any).result ?? res.message ?? res;
+    }
     case "run_job":
       return runJobTool(args);
     case "apply_criteria":

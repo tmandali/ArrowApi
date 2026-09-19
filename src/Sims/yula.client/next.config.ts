@@ -8,6 +8,9 @@ const computerName = process.env.COMPUTERNAME || "timurmandali2";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@electric-sql/pglite"],
+  // Local yula-ai workspace paketi (@my-agent/core + @my-agent/react) ham
+  // TypeScript olarak export ediyor (src/index.ts); Next bunları derlemeli.
+  transpilePackages: ["@my-agent/core", "@my-agent/react"],
   // Client'e açık env — Google One Tap (GIS) butonu AUTH_GOOGLE_ID'yi
   // `NEXT_PUBLIC_GOOGLE_CLIENT_ID` olarak kullanır (build'de, .env'den okunur).
   // Yalnızca public client id açılır; AUTH_GOOGLE_SECRET client'a ASLA verilmez.
@@ -65,7 +68,7 @@ const nextConfig: NextConfig = {
   // Monorepo içinde ikinci package-lock nedeniyle kök çıkarımı kararsız olabiliyor;
   // grafiği bu proje dizinine sabitliyoruz.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(__dirname, "../../.."),
     rules: {
       "*.yaml": {
         loaders: [require.resolve("raw-loader")],

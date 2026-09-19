@@ -9,7 +9,6 @@ import { cn } from "@/utils/cn";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { ChatMarkdown } from "./chat-markdown/chat-markdown";
 import { FileOpenChip } from "./chat-markdown/markdown-chips";
-import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { criteriaStaticTitles } from "@/lib/yula-actions";
 import { yulaToolPartInfo } from "@/lib/yula-tool-info";
 import { extractSourceTable } from "@/lib/yula-source-table";
@@ -198,9 +197,7 @@ function TextPart({
   onRunReport?: () => boolean
 }) {
   if (!text) return null
-  const displayText =
-    role === "user" ? text : sanitizeAssistantText(text)
-  if (role !== "user" && !displayText) return null
+  const displayText = text
 
   // Skill çıktısı dosya token'ı: [[file:<mutlak yol>|<etiket>]] → tıkla & varsayılan uygulamada aç
   const FILE_TOKEN = /\[\[file:(.+?)\|(.+?)\]\]/g

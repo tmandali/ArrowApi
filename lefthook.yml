@@ -2,7 +2,7 @@
 commit-msg:
   jobs:
     - name: commitlint
-      run: npx --prefix src/Sims/yula.client commitlint --config src/Sims/yula.client/commitlint.config.ts --edit {1}
+      run: pnpm --dir src/Sims/yula.client exec commitlint --config commitlint.config.ts --edit {1}
 
 # Validate content before committing
 pre-commit:
@@ -12,8 +12,8 @@ pre-commit:
       # (örn. lefthook.yml, .env.example, .md) staged ise "No files found"
       # ile exit 1 vermek yerine temiz geçer; gerçek .ts/.tsx sorunlarında
       # hata hâlâ döner.
-      run: npx oxlint --fix --no-error-on-unmatched-pattern {staged_files}
+      run: pnpm --dir src/Sims/yula.client exec oxlint --fix --no-error-on-unmatched-pattern {staged_files}
       skip_when_empty: true
     - name: knip
-      run: cd src/Sims/yula.client && npm run check:deps
+      run: pnpm --dir src/Sims/yula.client run check:deps
       skip_when_empty: true

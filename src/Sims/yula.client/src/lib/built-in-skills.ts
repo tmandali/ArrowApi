@@ -11,7 +11,6 @@ import type { UserSkill } from "@/lib/yula-user-skill";
 import ayKapanisMd from "../../skills/ay-kapanis/SKILL.md";
 import sayimFarkMd from "../../skills/sayim-fark/SKILL.md";
 import raporKaliteMd from "../../skills/rapor-kalite/SKILL.md";
-import kapanisKontrolMd from "../../skills/ay-kapanis/references/kapanis-kontrol-listesi.md";
 
 const SOURCES: Array<{ md: string; fallback: string }> = [
   { md: ayKapanisMd, fallback: "ay-kapanis" },
@@ -35,31 +34,7 @@ export const BUILT_IN_USER_SKILLS: UserSkill[] = SOURCES.map(
   },
 );
 
-export interface BuiltInSkillFile {
-  path: string;
-  kind: "script" | "reference";
-  /** Referans dokümanlarda ham içerik (önizleme için); betiklerde yok. */
-  content?: string;
-}
-
 /** Yerleşik SKILL.md ham kaynakları (slash → dosya içeriği). */
 export const BUILT_IN_SKILL_SOURCES: Record<string, string> = Object.fromEntries(
   BUILT_IN_USER_SKILLS.map((s, i) => [s.slash, SOURCES[i].md]),
 );
-
-/** Skill paketi dosya envanteri (SKILL.md dışı): betikler + referanslar. */
-export const BUILT_IN_SKILL_FILES: Record<string, BuiltInSkillFile[]> = {
-  "ay-kapanis": [
-    {
-      path: "ay-kapanis/scripts/month-range.mjs",
-      kind: "script",
-    },
-    {
-      path: "ay-kapanis/references/kapanis-kontrol-listesi.md",
-      kind: "reference",
-      content: kapanisKontrolMd,
-    },
-  ],
-  "sayim-fark": [],
-  "rapor-kalite": [],
-};

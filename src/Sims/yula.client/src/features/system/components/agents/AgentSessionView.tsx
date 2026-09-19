@@ -9,6 +9,7 @@ import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { Button } from "@/components/ui/button";
+import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
@@ -30,18 +31,14 @@ function AgentSessionHeaderTitle({
     ? conversations.find((c) => c.id === activeId)
     : undefined;
   const chatName = activeConv?.title?.trim() || t("new_chat");
-  const shortNo = activeId
-    ? (activeId.split("-").pop() || activeId).slice(-6).toUpperCase()
-    : null;
-  const chatSuffix = shortNo ? `${chatName} · #${shortNo}` : chatName;
-  const text = `${agentName} – ${chatSuffix}`;
+  const text = `${agentName} – ${chatName}`;
   return (
     <PageHeaderTitle
       title={activeId ? `${text} (${activeId})` : text}
       className="font-medium text-muted-foreground"
     >
       <span className="font-semibold text-primary">{agentName}</span>
-      <span>{` – ${chatSuffix}`}</span>
+      <span>{` – ${chatName}`}</span>
     </PageHeaderTitle>
   );
 }
@@ -194,6 +191,7 @@ export function AgentSessionView() {
   return (
     <WorkspacePageShell
       title={<AgentSessionHeaderTitle agentName={agent.name} />}
+      startExtra={<YulaContextUsageBadge />}
       showSearch={false}
       actions={<AgentSessionHeaderActions agentId={agent.id} />}
     >

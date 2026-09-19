@@ -13,10 +13,6 @@ defaults:
     # ${{ github.workspace }} ile repo kökü'nden tam yol göster.
     working-directory: src/Sims/yula.client
 
-env:
-  # peer dep ERESOLVE hatalarını (--legacy-peer-deps davranışı) CI'da bypass eder
-  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
-
 jobs:
   build:
     name: Build Next.js
@@ -26,18 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache: npm
-          cache-dependency-path: src/Sims/yula.client/package-lock.json
+          cache: pnpm
+          cache-dependency-path: src/Sims/yula.client/pnpm-lock.yaml
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Clean build output
         run: rm -rf .next
 
-      - run: npm run build
+      - run: pnpm run build
 
       - uses: actions/upload-artifact@v4
         with:
@@ -55,13 +55,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache: npm
-          cache-dependency-path: src/Sims/yula.client/package-lock.json
+          cache: pnpm
+          cache-dependency-path: src/Sims/yula.client/pnpm-lock.yaml
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - if: github.event_name == 'pull_request'
         name: Validate PR commits
@@ -69,15 +73,15 @@ jobs:
         run: |
           BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo "")
           if [ -n "$BASE" ]; then
-            npx commitlint --from "$BASE" --to HEAD --verbose
+            pnpm exec commitlint --from "$BASE" --to HEAD --verbose
           else
             echo "::warning::Could not resolve merge-base; skipping commitlint"
           fi
 
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run check:deps
-      - run: npm run check:i18n
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm run check:deps
+      - run: pnpm run check:i18n
 
   unit:
     name: Unit tests
@@ -87,20 +91,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache: npm
-          cache-dependency-path: src/Sims/yula.client/package-lock.json
+          cache: pnpm
+          cache-dependency-path: src/Sims/yula.client/pnpm-lock.yaml
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # test:all → tsx --test (Node runner) + grid testleri; playwright gerekmez
-      - run: npm run test:all
+      - run: pnpm run test:all
 
       # test:ui → vitest browser mode (chromium)
-      - run: npx playwright install chromium
-      - run: npm run test:ui
+      - run: pnpm exec playwright install chromium
+      - run: pnpm run test:ui
 
   e2e:
     name: E2E tests
@@ -111,13 +119,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
       - uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache: npm
-          cache-dependency-path: src/Sims/yula.client/package-lock.json
+          cache: pnpm
+          cache-dependency-path: src/Sims/yula.client/pnpm-lock.yaml
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # build artefaktını indir → sıfırdan build'e gerek kalmaz
       - uses: actions/download-artifact@v4
@@ -125,8 +137,8 @@ jobs:
           name: next-build
           path: ${{ github.workspace }}/src/Sims/yula.client/.next
 
-      - run: npx playwright install chromium
-      - run: npm run test:e2e -- --project=chromium
+      - run: pnpm exec playwright install chromium
+      - run: pnpm run test:e2e -- --project=chromium
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { uiRegistry, uiEventBus, type ComponentSchema } from "@my-agent/core";
+import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { useYulaGridStore } from "@/lib/stores/grid";
 
 /**
@@ -95,7 +97,128 @@ export function useScreenAgentContext(input: {
       ...(stateExtra ? { stateExtra } : {}),
     });
 
+    const registeredCompIds: string[] = [];
+    const unsubscribes: Array<() => void> = [];
+
+    // Headless UI-Agent (@my-agent/core) Bileşen Kaydı
+    if (isViewingResults) {
+      const gridCompId = "result_grid:active";
+      const gridSchema: ComponentSchema = {
+        id: gridCompId,
+        meta: {
+          tableName: currentSummary?.tableName,
+          columns: currentSummary?.columns,
+          rowCount: currentSummary?.totalFiltered,
+        },
+        actions: {
+          RUN_SQL: {
+            description: "DuckDB SQL sorgusu çalıştırır ({ query }).",
+            whenToCall: "Kullanıcı SQL veya özel hesaplama istediğinde.",
+            whenNotToCall: "Tablo henüz ekranda değilken veya basit filtre yeterliyken.",
+          },
+          FILTER: {
+            description: "Gridi filtreler ({ field, value, op }).",
+            whenToCall: "Tablo verisini süzmek için.",
+            whenNotToCall: "Kullanıcı filtreleme istemediğinde.",
+          },
+          SORT: {
+            description: "Kolona göre sıralar ({ column, direction }).",
+            whenToCall: "Sıralama istendiğinde.",
+            whenNotToCall: "Sıralama istenmediğinde.",
+          },
+          COLUMNS: {
+            description: "Sütunları gösterir/gizler/sıralar ({ visibleColumns, hiddenColumns }).",
+            whenToCall: "Sütun görünürlüğü için.",
+            whenNotToCall: "Sütun düzeni değiştirilmek istenmediğinde.",
+          },
+          PIN: {
+            description: "Sütunları sabitler ({ columns }).",
+            whenToCall: "Sütun dondurma istendiğinde.",
+            whenNotToCall: "Sabitleme istenmediğinde.",
+          },
+          RESET_LAYOUT: {
+            description: "Varsayılan ızgara yerleşimine döner.",
+            whenToCall: "Yerleşimi sıfırlamak istendiğinde.",
+            whenNotToCall: "Mevcut düzen korunmak istendiğinde.",
+          },
+          EXPORT: {
+            description: "Veriyi dışa aktarır ({ format }).",
+            whenToCall: "Excel/CSV/Parquet indirme istendiğinde.",
+            whenNotToCall: "Dışa aktarma istenmediğinde.",
+          },
+          VISUALIZE: {
+            description: "Grafik oluşturur ({ type, dimension, metric }).",
+            whenToCall: "Görsel grafik istendiğinde.",
+            whenNotToCall: "Grafik istenmediğinde.",
+          },
+          ANALYZE: {
+            description: "Veri analiz özeti çıkarır.",
+            whenToCall: "İstatistiki özet istendiğinde.",
+            whenNotToCall: "Özet analiz istenmediğinde.",
+          },
+          PROFILE: {
+            description: "Sütun veri kalitesi profili çıkarır.",
+            whenToCall: "Veri kalitesi incelenirken.",
+            whenNotToCall: "Profilleme istenmediğinde.",
+          },
+        },
+      };
+      uiRegistry.register(gridSchema);
+      registeredCompIds.push(gridCompId);
+      unsubscribes.push(
+        uiEventBus.subscribe(gridCompId, (action, payload) =>
+          executeDispatchComponentAction({ component_id: gridCompId, action, payload }) as any
+        )
+      );
+    } else if (reportScope) {
+      const formCompId = `criteria_form:${reportScope}`;
+      const formSchema: ComponentSchema = {
+        id: formCompId,
+        meta: {
+          reportScope,
+          screenTitle,
+          workspaceId,
+        },
+        actions: {
+          APPLY: {
+            description: "Kriter formu alanlarını doldurur/günceller ({ criteria }).",
+            whenToCall: "Kullanıcı kriter belirlediğinde veya hazırlık istendiğinde.",
+            whenNotToCall: "Kullanıcı çalıştırma emri verdiğinde.",
+          },
+          RUN: {
+            description: "Raporu çalıştırır ({ criteria }).",
+            whenToCall: "Kullanıcı açıkça 'çalıştır', 'getir', 'koştur' dediğinde.",
+            whenNotToCall: "Sadece alan doldurma istendiğinde.",
+          },
+          SCHEMA: {
+            description: "Rapor kriter şemasını inceler.",
+            whenToCall: "Raporun hangi alanları aldığını öğrenmek için.",
+            whenNotToCall: "Şema zaten biliniyorken.",
+          },
+          READ: {
+            description: "Formdaki mevcut değerleri okur.",
+            whenToCall: "Kullanıcının yazdığı mevcut kriterleri öğrenmek için.",
+            whenNotToCall: "Yeni değerler atanırken.",
+          },
+          VALIDATE: {
+            description: "Kriterlerin geçerliliğini doğrular.",
+            whenToCall: "Çalıştırmadan önce zorunlu alanları doğrulamak için.",
+            whenNotToCall: "Doğrulama istenmediğinde.",
+          },
+        },
+      };
+      uiRegistry.register(formSchema);
+      registeredCompIds.push(formCompId);
+      unsubscribes.push(
+        uiEventBus.subscribe(formCompId, (action, payload) =>
+          executeDispatchComponentAction({ component_id: formCompId, action, payload }) as any
+        )
+      );
+    }
+
     return () => {
+      unsubscribes.forEach((unsub) => unsub());
+      registeredCompIds.forEach((id) => uiRegistry.unregister(id));
       useYulaGridStore.getState().unregisterScreen();
       useYulaGridStore.getState().unregister();
     };

@@ -1,11 +1,9 @@
 /**
- * Agent Skills keşfi (cookbook: agent-skills Steps 2-4) — dosya sistemi
- * soyutlaması üzerinden çalışır; saf ayrıştırıcılar + sandbox güdümlü keşif.
- * `Sandbox` tipi server modülünden yalnızca tip olarak alınır (istemci
- * demetine node kodu girmez).
+ * Agent Skills keşfi (cookbook: agent-skills Steps 2-4) — saf ayrıştırıcılar.
+ * Yalnızca SKILL.md frontmatter + gövde ayrıştırma; dosya yürütme ve paket
+ * keşfi kaldırılmıştır (skill'ler SKILL.md'den ibarettir).
  */
 import { load } from "js-yaml";
-import type { Sandbox } from "@/lib/skill-sandbox";
 
 export interface SkillMetadata {
   /** Standart skill adı */
@@ -65,45 +63,4 @@ export function parseSkillFile(
     scope: (fm.scope || "global").trim().toLowerCase() || "global",
     prompt,
   };
-}
-
-/**
- * Dizinleri tarar, SKILL.md metaverisini toplar. Aynı isimde ilk
- * bulunan kazanır (proje geçersiz kılmaya izin verir).
- */
-export async function discoverSkills(
-  sandbox: Pick<Sandbox, "readdir" | "readFile">,
-  directories: string[],
-): Promise<SkillMetadata[]> {
-  const skills: SkillMetadata[] = [];
-  const seenNames = new Set<string>();
-  for (const dir of directories) {
-    let entries;
-    try {
-      entries = await sandbox.readdir(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const skillDir = `${dir}/${entry.name}`;
-      try {
-        const content = await sandbox.readFile(`${skillDir}/SKILL.md`, "utf-8");
-        const parsed = parseSkillFile(content, entry.name);
-        if (seenNames.has(parsed.name)) continue;
-        seenNames.add(parsed.name);
-        skills.push({
-          name: parsed.name,
-          slash: parsed.slash,
-          label: parsed.label,
-          description: parsed.description,
-          scope: parsed.scope,
-          path: skillDir,
-        });
-      } catch {
-        continue;
-      }
-    }
-  }
-  return skills;
 }

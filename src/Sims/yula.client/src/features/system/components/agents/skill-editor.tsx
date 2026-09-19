@@ -14,7 +14,6 @@ import {
 } from "@/lib/yula-user-skill";
 import { resolveValidationIssue } from "@/lib/yula-user-agent";
 import {
-  BUILT_IN_SKILL_FILES,
   BUILT_IN_SKILL_SOURCES,
 } from "@/lib/built-in-skills";
 import { getRailWorkspaces } from "@/lib/workspace-registry";
@@ -208,68 +207,10 @@ export function SkillEditor({
     );
   };
 
-  const builtinFiles = isRO && skill ? (BUILT_IN_SKILL_FILES[skill.slash] ?? []) : [];
   const builtinMd = isRO && skill ? BUILT_IN_SKILL_SOURCES[skill.slash] : undefined;
 
-  // Betik metinleri demete gömülü değildir (.mjs ham-importu tüm projeyi
-  // bozar); salt-okunur önizleme için sunucu rotasından tembel yüklenir.
-  const [scriptContents, setScriptContents] = React.useState<Record<string, string>>({});
-  const [scriptsLoading, setScriptsLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!(isRO && skill)) return;
-    const missing = (BUILT_IN_SKILL_FILES[skill.slash] ?? []).filter(
-      (f) =>
-        f.kind === "script" && !f.content && scriptContents[f.path] === undefined,
-    );
-    if (missing.length === 0) return;
-    let cancelled = false;
-    setScriptsLoading(true);
-    void (async () => {
-      const settled = await Promise.all(
-        missing.map(async (f) => {
-          try {
-            const res = await fetch(
-              `/api/skills/file?path=${encodeURIComponent(f.path)}`,
-            );
-            if (!res.ok) return null;
-            const data = (await res.json()) as { content?: unknown };
-            return typeof data.content === "string"
-              ? ([f.path, data.content] as const)
-              : null;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (cancelled) return;
-      setScriptContents((prev) => {
-        const next = { ...prev };
-        for (const entry of settled) {
-          if (entry) next[entry[0]] = entry[1];
-        }
-        return next;
-      });
-      setScriptsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isRO, skill, scriptContents]);
-
   const fileTabs = React.useMemo<SkillDetailFileTab[]>(() => {
-    if (isRO && skill) {
-      const fs = BUILT_IN_SKILL_FILES[skill.slash] ?? [];
-      return fs.map((f) => {
-        const label = f.path.split("/").pop() ?? f.path;
-        return {
-          key: `file:${f.path}`,
-          label,
-          title: f.path,
-          kind: f.kind === "script" ? ("script" as const) : fileKindForName(label),
-        };
-      });
-    }
+    if (isRO) return [];
     if (!isRO) {
       return files.map((f) => ({
         key: `file:${f.name.toLowerCase()}`,
@@ -323,23 +264,15 @@ export function SkillEditor({
         prompt: skillMd,
       });
 
-  // Dosya sekmeleri için birleşik satırlar: aynı sıra (tip rozeti + ham
-  // editör + alt bilgi), yalnızca disabled/kaynak farklı.
+  // Dosya sekmeleri için birleşik satırlar: kullanıcı ekli dosyalar.
+  // Yerleşik skill'lerde paket dosyası yoktur (SKILL.md sekmesi yeterlidir).
   const fileRows: Array<{
     key: string;
     name: string;
     content: string | undefined;
     kind: FileKind;
   }> = isRO
-    ? builtinFiles.map((f) => {
-        const name = f.path.split("/").pop() ?? f.path;
-        return {
-          key: `file:${f.path}`,
-          name,
-          content: f.content ?? scriptContents[f.path],
-          kind: f.kind === "script" ? ("script" as const) : fileKindForName(name),
-        };
-      })
+    ? []
     : files.map((f) => ({
         key: `file:${f.name.toLowerCase()}`,
         name: f.name,
@@ -455,19 +388,8 @@ export function SkillEditor({
                 ) : undefined
               }
               files={
-                isRO && skill
-                  ? builtinFiles.map((f) => {
-                      const name = f.path.split("/").pop() ?? f.path;
-                      return {
-                        key: `file:${f.path}`,
-                        name,
-                        dotClassName: fileDotClass(
-                          f.kind === "script"
-                            ? ("script" as const)
-                            : fileKindForName(name),
-                        ),
-                      };
-                    })
+                isRO
+                  ? []
                   : files.map((f) => ({
                       key: `file:${f.name.toLowerCase()}`,
                       name: f.name,
@@ -524,11 +446,6 @@ export function SkillEditor({
             >
               {FILE_KIND_LABEL[f.kind]}
             </span>
-            {f.kind === "script" && isRO ? (
-              <span className="text-[10.5px] text-muted-foreground">
-                {t("runs_in_server_sandbox")}
-              </span>
-            ) : null}
           </div>
           {f.content ? (
             <Textarea
@@ -550,18 +467,7 @@ export function SkillEditor({
                       aria-label={t("file_content_aria", { name: f.name })}
                       className="min-h-48 w-full flex-1 rounded-none border-0 bg-transparent px-0 font-mono text-xs shadow-none resize-none focus-visible:border-0 focus-visible:ring-0 data-disabled:opacity-80"
                     />
-          ) : scriptsLoading ? (
-            <p className="text-[11.5px] text-muted-foreground">
-              {t("loading")}
-            </p>
-          ) : (
-            <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-              <span className="mr-1.5 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                {t("script_badge")}
-              </span>
-              {t("runs_in_server_sandbox_detail")}
-            </p>
-          )}
+          ) : null}
           <div className="mt-1.5 flex items-center justify-between">
             <span className="font-mono text-[10px] text-muted-foreground/70">
               {f.content ? `${(f.content.length / 1024).toFixed(1)}K` : "—"}

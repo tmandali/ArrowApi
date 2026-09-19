@@ -243,8 +243,6 @@ export const AGENT_TOOL_CATALOG: Array<{ name: string; label: string }> = [
   { name: "suggest_next_steps", label: "Öneri sunma" },
   { name: "request_user_confirmation", label: "Onay isteme" },
   { name: "run_user_skill", label: "Skill çalıştırma" },
-  { name: "run_skill_script", label: "Skill betiği" },
-  { name: "read_skill_file", label: "Skill dosyası okuma" },
   { name: GRID_TOOLS_TOKEN, label: "Grid araçları (tablo/SQL/grafik)" },
 ];
 

@@ -39,6 +39,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge"
 import { cn } from "@/utils/cn"
 import { Check, History, Maximize2, SquarePen } from "lucide-react"
 
@@ -374,6 +375,7 @@ export function WorkspaceAiDock({
           {!hideHeader ? (
             <div className={cn(panelHeaderClass, "gap-1")}>
               <DockHeaderTitle />
+              <YulaContextUsageBadge />
               <YulaNewChatButton />
               <YulaOpenInMainButton />
             </div>
@@ -397,6 +399,7 @@ export function WorkspaceAiDock({
       collapseLabel={YULA.collapseLabel}
       headerActions={
         <div className="flex min-w-0 items-center gap-0.5">
+          <YulaContextUsageBadge />
           <YulaNewChatButton />
           <YulaOpenInMainButton />
         </div>

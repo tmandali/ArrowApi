@@ -8,10 +8,10 @@ import {
 } from "@/lib/yula-tool-info";
 import type { useTranslations } from "next-intl";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
-import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { resolveYulaSlashCommand } from "@/components/layout/yula-commands";
 import { getTurnTrace } from "@/lib/yula-turn-trace";
 import type { TurnTraceStep } from "@/lib/yula-turn-trace";
+import { describeDispatchAction, PI_TRACE_ID_PREFIX } from "@/lib/my-agent-pi-bridge";
 
 /** Modül-seviyesi adım üreticileri hook kullanamadığından, bileşen tarafı
  * `useTranslations("WorkedSteps")`'ı buraya taşır. */
@@ -116,6 +116,17 @@ export function extractWorkedSteps(
     }
   }
 
+  // Pi köprüsü (`my-agent-pi-bridge`) aynı çağrıyı trace'e yazdıysa parça
+  // sürümü atlanır — canlı güncellenen trace satırı tek kaynak olur.
+  const piCoveredIds = new Set<string>();
+  if (conversationId) {
+    for (const trace of getTurnTrace(conversationId)) {
+      if (trace.id.startsWith(PI_TRACE_ID_PREFIX)) {
+        piCoveredIds.add(trace.id.slice(PI_TRACE_ID_PREFIX.length));
+      }
+    }
+  }
+
   const userText = userMessage?.parts
     ?.filter((p) => p.type === "text")
     ?.map((p) => (p as { text: string }).text)
@@ -164,13 +175,10 @@ export function extractWorkedSteps(
   message.parts.forEach((part, index) => {
     if (part.type === "reasoning") {
       const raw = part.text ?? "";
-      // Boş reasoning part'ı gürültü adımı üretmez (bazı sağlayıcılar
-      // düşünce metni olmadan reasoning çerçevesi akıtır).
       if (!raw.trim()) return;
-      const text = sanitizeAssistantText(raw);
       const meta = (part as { meta?: string }).meta;
       const isThinking = !meta || meta === "thinking";
-      const approxDuration = Math.max(1, Math.round((text || raw).length / 60));
+      const approxDuration = Math.max(1, Math.round(raw.length / 60));
 
       pushStep({
         id: `${message.id}-reasoning-${index}`,
@@ -178,43 +186,19 @@ export function extractWorkedSteps(
         label: isThinking
           ? isLiveStreaming
             ? "Thinking & reasoning..."
-            : text.trim()
-              ? `Thought for ${approxDuration}s`
-              : "Thought (empty / hidden)"
+            : `Thought for ${approxDuration}s`
           : `Reasoning (${meta})`,
         subLabel: `${approxDuration}s`,
         durationSec: approxDuration,
-        detailText: text || raw || L("thought_no_text"),
+        detailText: raw,
         isLive: isLiveStreaming,
-        isError: !text.trim() && Boolean(raw.trim()),
+        isError: false,
       });
       return;
     }
 
     if (part.type === "text") {
-      const raw = (part as { text?: string }).text ?? "";
-      // Salt-boşluk metin (araç çağrıları arası model formatlaması) satır
-      // üretmez — normal akış gürültüsüdür. Yalnız sanitizer'ın GERÇEK
-      // içeriği yediği durum raporlanır (sızıntı/çöp sinyali).
-      if (!raw.trim()) return;
-      const text = sanitizeAssistantText(raw);
-      if (text.trim()) return;
-      pushStep({
-        id: `${message.id}-text-hidden-${index}`,
-        kind: "thought",
-        label: raw.trim() ? L("model_text_hidden") : L("model_text_empty"),
-        subLabel: isLiveStreaming ? "Streaming..." : "no visible bubble",
-        detailText: raw.slice(0, 2000) || L("part_text_empty"),
-        isLive: isLiveStreaming,
-        isError: Boolean(raw.trim()),
-        info: {
-          toolCallId: `${message.id}-text-hidden-${index}`,
-          toolName: "model_text",
-          state: "output-available",
-          input: { chars: raw.length },
-          output: { sanitizedEmpty: true, preview: raw.slice(0, 400) },
-        },
-      });
+      // Metin parçaları doğrudan sohbet mesajı balonunda render edilir.
       return;
     }
 
@@ -243,6 +227,9 @@ export function extractWorkedSteps(
       });
       return;
     }
+
+    // Pi trace satırı varsa parça sürümünü üretme (çift satır engeli).
+    if (piCoveredIds.has(info.toolCallId)) return;
 
     const isError = isFailedToolInfo(info);
     const isPending = info.state !== "output-available" && info.state !== "output-error";
@@ -684,38 +671,6 @@ export function extractWorkedSteps(
         });
         break;
       }
-      case "run_skill_script": {
-        const script =
-          typeof inputObj.script === "string" && inputObj.script
-            ? inputObj.script.split("/").pop()
-            : "script";
-        pushStep({
-          id: info.toolCallId,
-          kind: "ran",
-          label: `Ran script: ${script}`,
-          subLabel: isPending ? "Executing skill script..." : "Script output",
-          isLive: isPending,
-          isError,
-          info,
-        });
-        break;
-      }
-      case "read_skill_file": {
-        const file =
-          typeof inputObj.path === "string" && inputObj.path
-            ? inputObj.path.split("/").pop()
-            : "file";
-        pushStep({
-          id: info.toolCallId,
-          kind: "explored",
-          label: `Read skill file: ${file}`,
-          subLabel: isPending ? "Reading bundled reference..." : "Reference loaded",
-          isLive: isPending,
-          isError,
-          info,
-        });
-        break;
-      }
       case "read_user_file": {
         const file =
           typeof inputObj.file === "string" && inputObj.file
@@ -726,6 +681,22 @@ export function extractWorkedSteps(
           kind: "explored",
           label: `Read user file: ${file}`,
           subLabel: isPending ? "Reading attached reference..." : "Reference loaded",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "dispatch_component_action": {
+        // Yeni yapı (standart tool): component_id + action mevcut adım diline çözülür.
+        const desc = describeDispatchAction(inputObj);
+        const doneSub =
+          desc.subLabel && !/[.…]{1,3}$/.test(desc.subLabel) ? desc.subLabel : undefined;
+        pushStep({
+          id: info.toolCallId,
+          kind: desc.kind,
+          label: desc.label,
+          subLabel: isPending ? (desc.subLabel ?? "Executing operation...") : doneSub,
           isLive: isPending,
           isError,
           info,

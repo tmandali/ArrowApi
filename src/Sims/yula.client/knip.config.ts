@@ -10,6 +10,7 @@ const config: KnipConfig = {
   // Runtime dependencies that are not directly imported in TS (CLI tools)
   ignoreDependencies: [
     '@commitlint/cli',
+    '@lingual/i18n-check',
     '@types/js-yaml',
     // Vitest browser-mode çekirdeği: provider (@vitest/browser-playwright)
     // üzerinden çalışır, doğrudan import edilmez.

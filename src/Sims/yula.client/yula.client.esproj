@@ -1,9 +1,16 @@
 <Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.5581896">
   <PropertyGroup>
     <!-- Next.js App Router projesi — standart next altyapısı -->
-    <StartupCommand>npm run dev</StartupCommand>
+    <StartupCommand>pnpm run dev</StartupCommand>
     <ShouldRunBuildScript>false</ShouldRunBuildScript>
+    <ShouldRunNpmInstall>false</ShouldRunNpmInstall>
     <!-- next build çıktısı (SSR server) — publish sürecinde ayrı Node servisi olarak koşar -->
     <BuildOutputFolder>$(MSBuildProjectDirectory)\.next\standalone</BuildOutputFolder>
   </PropertyGroup>
+
+  <!-- pnpm install target: Visual Studio veya dotnet build sırasında npm yerine pnpm kullanır -->
+  <Target Name="RunPnpmInstall" BeforeTargets="Build" Condition="!Exists('$(MSBuildProjectDirectory)\node_modules')">
+    <Message Importance="high" Text="Restoring dependencies using 'pnpm'..." />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="pnpm install" />
+  </Target>
 </Project>

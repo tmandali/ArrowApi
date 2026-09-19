@@ -8,6 +8,7 @@ import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { Button } from "@/components/ui/button";
+import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
@@ -26,18 +27,14 @@ function YulaSessionHeaderTitle({ displayName }: { displayName: string }) {
     ? conversations.find((c) => c.id === activeId)
     : undefined;
   const chatName = activeConv?.title?.trim() || t("empty_chat_title");
-  const shortNo = activeId
-    ? (activeId.split("-").pop() || activeId).slice(-6).toUpperCase()
-    : null;
-  const chatSuffix = shortNo ? `${chatName} · #${shortNo}` : chatName;
-  const text = `${displayName} – ${chatSuffix}`;
+  const text = `${displayName} – ${chatName}`;
   return (
     <PageHeaderTitle
       title={activeId ? `${text} (${activeId})` : text}
       className="font-medium text-muted-foreground"
     >
       <span className="font-semibold text-primary">{displayName}</span>
-      <span>{` – ${chatSuffix}`}</span>
+      <span>{` – ${chatName}`}</span>
     </PageHeaderTitle>
   );
 }
@@ -116,6 +113,7 @@ export function SystemHomeView() {
   return (
     <WorkspacePageShell
       title={<YulaSessionHeaderTitle displayName={displayName} />}
+      startExtra={<YulaContextUsageBadge />}
       actions={<YulaSessionHeaderActions agentId={displayAgentId} />}
       showSearch={false}
     >

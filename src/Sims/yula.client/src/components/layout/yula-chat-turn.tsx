@@ -23,7 +23,6 @@ import { cn } from "@/utils/cn";
 import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 
 import { copyToClipboard } from "@/lib/clipboard";
-import { sanitizeAssistantText } from "@/lib/sanitize-assistant-text";
 import { describeYulaStreamError } from "@/lib/yula-stream-error";
 import { runConfirmationClickPrompt } from "@/lib/yula-actions";
 import { triggerReportRun } from "@/lib/report-run-bus";
@@ -33,126 +32,14 @@ import {
   type YulaUiLang,
 } from "@/lib/yula-lang";
 
-const SCREEN_TOOLS = new Set([
-  "filter_current_grid",
-  "apply_grid_filters",
-  "set_grid_sort",
-  "configure_grid_columns",
-  "pin_grid_columns",
-  "reset_grid_layout",
-  "export_grid_data",
-  "set_grid_query",
-  "run_job",
-  "apply_criteria",
-  "navigate_to_page",
-  "open_last_report",
-  "find_matching_report",
-  "visualize_grid_data",
-]);
-
-function formatTokenCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return `${n}`;
-}
-
-function liveStatusLabel(toolParts: YulaToolPartInfo[], lang: YulaUiLang): string {
-  const pending = toolParts.find(
-    (i) => i.state === "input-available" || i.state === "input-streaming",
-  );
-  const L = (tr: string, en: string) => pickLang(lang, tr, en);
-  switch (pending?.toolName) {
-    case "profile_grid_table":
-      return L("Tablo analiz ediliyor — lütfen bekleyin…", "Analyzing table — please wait…");
-    case "analyze_grid_data":
-      return L("Tablo özeti hesaplanıyor…", "Computing table summary…");
-    case "run_expert_sql":
-      return L("SQL sorgusu çalışıyor…", "Running SQL query…");
-    case "visualize_grid_data":
-      return L("Grafik hazırlanıyor…", "Preparing chart…");
-    case "ask_user_question":
-      return L("Sorular hazırlanıyor…", "Preparing questions…");
-    case "suggest_next_steps":
-      return L("Öneriler hazırlanıyor…", "Preparing suggestions…");
-    case "filter_current_grid":
-    case "apply_grid_filters":
-      return L("Filtre uygulanıyor…", "Applying filter…");
-    case "set_grid_sort":
-      return L("Tablo sıralanıyor…", "Sorting table…");
-    case "configure_grid_columns":
-    case "pin_grid_columns":
-      return L("Kolonlar düzenleniyor…", "Arranging columns…");
-    case "reset_grid_layout":
-      return L("Görünüm sıfırlanıyor…", "Resetting view…");
-    case "export_grid_data":
-      return L("Dosya dışa aktarılıyor…", "Exporting file…");
-    case "set_grid_query":
-      return L("Tablo görünümü güncelleniyor…", "Updating table view…");
-    default:
-      return pending
-        ? L("İstek işleniyor — lütfen bekleyin…", "Processing request — please wait…")
-        : L("Yula yanıt hazırlıyor — lütfen bekleyin…", "Yula is preparing a reply — please wait…");
-  }
-}
-
-function SilentTurnFallback({
-  toolParts,
-  streamErrorText,
-  onRetry,
-  lang,
-}: {
-  toolParts: YulaToolPartInfo[];
-  streamErrorText?: string;
-  onRetry: () => void;
-  lang: YulaUiLang;
-}) {
-  // Kasıtlı dedupe bastırmaları gerçek hata değildir — sessiz-tur
-  // uyarısında raporlanmaz (aksi halde yinelenen soru elenince yersiz
-  // kırmızı kutu çıkardı).
-  const failed = toolParts.filter(
-    (i) => isFailedToolInfo(i) && !isDedupeSkipOutput(i),
-  );
-  const hasScreenOk = toolParts.some(
-    (i) => SCREEN_TOOLS.has(i.toolName) && !isFailedToolInfo(i) && i.state === "output-available",
-  );
-  if (hasScreenOk && !streamErrorText) return null;
-
-  const friendlyStreamError = describeYulaStreamError(streamErrorText);
-  const hint = pickLang(
-    lang,
-    friendlyStreamError
-      ? `AI sağlayıcısı hata döndürdü: ${friendlyStreamError}`
-      : failed.length > 0
-        ? `Analiz tamamlanamadı: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "araç hatası")}.`
-        : "Bu turda görünür bir yanıt yazılamadı (analiz takılmış veya model sessiz bitmiş olabilir).",
-    friendlyStreamError
-      ? `AI provider returned an error: ${friendlyStreamError}`
-      : failed.length > 0
-        ? `Analysis could not finish: ${failed[0].errorText || (typeof failed[0].output === "object" && failed[0].output && "error" in failed[0].output ? String((failed[0].output as { error?: unknown }).error) : "tool error")}.`
-        : "No visible reply was produced in this turn (analysis may be stuck or the model ended silently).",
-  );
-
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-2.5 text-[12px] leading-relaxed text-amber-950 dark:text-amber-100">
-      <p>
-        {hint}{" "}
-        {pickLang(
-          lang,
-          "Yeni bir mesaj yazmadan önce yeniden deneyin.",
-          "Please retry before writing a new message.",
-        )}
-      </p>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 w-fit text-[11px]"
-        onClick={onRetry}
-      >
-        {pickLang(lang, "Yanıtı yeniden dene", "Retry reply")}
-      </Button>
-    </div>
-  );
-}
+import {
+  SCREEN_TOOLS,
+  dispatchLiveStatus,
+  formatTokenCount,
+  liveStatusLabel,
+  SilentTurnFallback,
+} from "./yula-chat-turn-helpers";
+import { modelCatalog } from "@my-agent/core";
 
 export interface YulaChatTurnProps {
   userMessage?: YulaMessage;
@@ -203,13 +90,18 @@ export function YulaChatTurn({
   // Asistan mesajının metni
   const assistantText = React.useMemo(() => {
     if (!assistantMessage) return "";
-    return sanitizeAssistantText(
-      assistantMessage.parts
-        .filter((p) => p.type === "text")
-        .map((p) => (p as { text: string }).text)
-        .join("\n"),
-    );
+    return assistantMessage.parts
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text: string }).text)
+      .join("\n");
   }, [assistantMessage]);
+
+  const turnCostFormatted = React.useMemo(() => {
+    if (!tokenUsage?.totalTokens) return null;
+    const inTok = tokenUsage.inputTokens ?? 0;
+    const outTok = tokenUsage.outputTokens ?? 0;
+    return modelCatalog.calculateCost("gpt-4o-mini", inTok, outTok).formatted;
+  }, [tokenUsage]);
 
   const handleCopyUserText = async () => {
     if (!userText) return;
@@ -240,12 +132,17 @@ export function YulaChatTurn({
 
   const hasSqlCard = React.useMemo(() => {
     if (!assistantMessage) return false;
-    return toolParts.some(
-      (i) =>
-        i.toolName === "run_expert_sql" &&
-        !isFailedToolInfo(i) &&
-        i.state === "output-available"
-    )
+    const hasSqlTool = toolParts.some((i) => {
+      if (isFailedToolInfo(i) || i.state !== "output-available") return false;
+      if (i.toolName === "run_expert_sql") return true;
+      // Yeni yapı: grid SQL dispatch üzerinden gelir (RUN_SQL/QUERY/ANALYZE)
+      if (i.toolName === "dispatch_component_action" && i.input && typeof i.input === "object") {
+        const action = (i.input as { action?: unknown }).action;
+        return action === "RUN_SQL" || action === "QUERY" || action === "ANALYZE";
+      }
+      return false;
+    });
+    return hasSqlTool
       ? assistantMessage.parts.some(
           (p) => p.type === "text" && p.text.includes("|")
         )
@@ -259,10 +156,10 @@ export function YulaChatTurn({
         const raw = hasSqlCard
           ? stripMarkdownTables((p as { text: string }).text)
           : (p as { text: string }).text;
-        return { ...p, text: sanitizeAssistantText(raw) };
+        return { ...p, text: raw };
       }
       if (p.type === "reasoning" && "text" in p) {
-        return { ...p, text: sanitizeAssistantText(String((p as { text?: string }).text ?? "")) };
+        return { ...p, text: String((p as { text?: string }).text ?? "") };
       }
       return p;
     });
@@ -480,11 +377,20 @@ export function YulaChatTurn({
         ) : null}
 
         {/* Cevap Altı Telemetri Çubuğu */}
-        {!isLive && durationSec ? (
-          <div className="mt-0.5 flex justify-end text-[10.5px] font-mono text-muted-foreground/40 select-none">
-            {llmStepCount && llmStepCount > 1 ? `${llmStepCount} tur · ` : ""}
-            {tokenUsage?.totalTokens ? `${formatTokenCount(tokenUsage.totalTokens)} tok · ` : ""}
-            {durationSec}s
+        {!isLive && (durationSec || tokenUsage?.totalTokens) ? (
+          <div className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] font-mono text-muted-foreground/45 select-none">
+            {llmStepCount && llmStepCount > 1 ? <span>{llmStepCount} tur · </span> : null}
+            {tokenUsage?.totalTokens ? (
+              <span>
+                {formatTokenCount(tokenUsage.totalTokens)} tok
+                {tokenUsage.inputTokens !== undefined && tokenUsage.outputTokens !== undefined ? (
+                  <span className="text-muted-foreground/30"> ({formatTokenCount(tokenUsage.inputTokens)}/{formatTokenCount(tokenUsage.outputTokens)})</span>
+                ) : null}
+                {" · "}
+              </span>
+            ) : null}
+            {turnCostFormatted ? <span>{turnCostFormatted} · </span> : null}
+            {durationSec ? <span>{durationSec}s</span> : null}
           </div>
         ) : null}
       </div>

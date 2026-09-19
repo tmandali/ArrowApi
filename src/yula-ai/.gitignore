@@ -1,0 +1,13 @@
+node_modules
+dist
+.env.local
+.env
+.DS_Store
+.idea/
+reference-pi/
+
+# Auth & Secrets
+auth.json
+**/auth.json
+!auth.example.json
+!**/auth.example.json

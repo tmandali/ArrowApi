@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <SpaRoot>..\yula.client</SpaRoot>
-    <SpaProxyLaunchCommand>npm run dev:next</SpaProxyLaunchCommand>
+    <SpaProxyLaunchCommand>pnpm run dev:next</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>http://localhost:56402</SpaProxyServerUrl>
   </PropertyGroup>
 

@@ -826,7 +826,15 @@
     "no_results": "Sonuç yok.",
     "agent_default": "Yula varsayılan",
     "change_agent_tooltip": "{name} — ajanı değiştir",
-    "change_agent_aria": "Ajanı değiştir"
+    "change_agent_aria": "Ajanı değiştir",
+    "context_title": "Bağlam Penceresi",
+    "context_auto_compact": "Otomatik Özetleme",
+    "context_compact_now": "Şimdi Özetle",
+    "context_compacting": "Özetleniyor...",
+    "context_auto_on": "Otomatik",
+    "context_auto_off": "Kapalı",
+    "context_tooltip": "Bağlam: {used} / {total} token",
+    "context_dump_session": "Oturumu İndir (JSON Dump)"
   },
   "PinnedItems": {
     "unpin": "İğneyi Kaldır"
@@ -1009,7 +1017,24 @@
   "WorkedAccordion": {
     "worked_for": "{timeLabel} saniye çalıştı",
     "step": "adım",
-    "steps": "adım"
+    "steps": "adım",
+    "telemetry_tokens": "Token",
+    "telemetry_input": "Girdi",
+    "telemetry_output": "Çıktı",
+    "telemetry_cost": "Maliyet",
+    "telemetry_terminal": "Terminal",
+    "telemetry_terminal_title": "İşlem Akış İzi",
+    "copy_terminal": "Akış günlüğünü kopyala",
+    "telemetry_context": "Bağlam",
+    "telemetry_context_short": "bağlam",
+    "telemetry_turn_count": "{count} tur",
+    "log_turn": "Tur",
+    "log_request": "İstek",
+    "log_thought": "Düşünce",
+    "log_exec": "Çalıştır",
+    "log_output": "Çıktı",
+    "log_error": "Hata",
+    "log_done": "Tamamlandı"
   },
   "ChartCard": {
     "unpin_from_home": "Çalışma alanı ana sayfasından kaldır",
@@ -1075,8 +1100,6 @@
     "description_placeholder": "Ne zaman kullanılır?",
     "attachments": "Ek dosyalar",
     "prompt_placeholder": "Son 7 günün satış özetini çıkar: {{input}}",
-    "runs_in_server_sandbox": "Sunucu sandbox''ında çalışır",
-    "runs_in_server_sandbox_detail": "Sunucu sandbox''ında çalışır (run_skill_script).",
     "slash_label": "Slash adı",
     "slash_example": "ornek-skill",
     "scope_label": "Kapsam",
@@ -1085,8 +1108,6 @@
     "skill_md_aria": "SKILL.md ham markdown",
     "skill_md_not_found": "SKILL.md bulunamadı.",
     "file_content_aria": "{name} ham metin",
-    "loading": "Yükleniyor…",
-    "script_badge": "betik",
     "remove": "Kaldır"
   },
   "SkillManagement": {
@@ -1413,6 +1434,11 @@
       "description": "Sohbete belge veya dosya ekle",
       "prompt": "/dosya"
     },
+    "dump": {
+      "label": "Oturumu İndir",
+      "description": "Tüm adım adım oturum ve olay kaydını JSON olarak indir",
+      "prompt": "/dump"
+    },
     "grid-analiz": {
       "label": "Tablo Analizi & Veri Kalitesi",
       "description": "Veri kalitesi ve anomali analizi yaparak problemleri tıklanabilir aksiyon linkleriyle listeler",
@@ -1473,8 +1499,6 @@
     "tool_suggest_next_steps": "Öneri sunma",
     "tool_request_user_confirmation": "Onay isteme",
     "tool_run_user_skill": "Skill çalıştırma",
-    "tool_run_skill_script": "Skill betiği",
-    "tool_read_skill_file": "Skill dosyası okuma",
     "tool_grid-tools": "Grid araçları (tablo/SQL/grafik)",
     "provider_azure": "Azure Foundry",
     "provider_ollama": "Ollama (yerel)",

@@ -7,14 +7,6 @@ commands:
     icon: "ShieldAlert"
     phase: "grid"
 
-  - id: "grid-top5"
-    slash: "top5"
-    label: "En Yüksek 5 Grafik"
-    description: "En yüksek ilk 5 kaydı grafikle özetle"
-    prompt: "En yüksek ilk 5 kaydı grafikle özetle"
-    icon: "BarChart2"
-    phase: "grid"
-
   - id: "grid-temizle"
     slash: "temizle"
     label: "Görünümü & Filtreleri Sıfırla"
@@ -30,4 +22,3 @@ commands:
     prompt: "Bu tablodaki verileri Excel olarak indir"
     icon: "Download"
     phase: "grid"
-

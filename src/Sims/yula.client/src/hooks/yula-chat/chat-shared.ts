@@ -1,4 +1,3 @@
-import type { ScreenSnapshot } from "@/lib/screen-snapshot";
 import { extractAgentIdFromPath } from "@/lib/workspace-paths";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
@@ -39,9 +38,6 @@ export function getActiveConversationId() {
 export function setActiveConversationId(id: string) {
   activeConversationId = id;
 }
-
-/** Son gönderilen ekran snapshot'ı (sohbet başına) — turlar arası diff için. */
-export const lastScreenSnapshots = new Map<string, ScreenSnapshot>();
 
 /**
  * Güncel ajan kimliği: /agents/<id> sayfasındayken URL kazanır (ayrı session),

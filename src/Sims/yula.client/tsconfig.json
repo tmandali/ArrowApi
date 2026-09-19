@@ -18,8 +18,11 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@my-agent/core": ["../../yula-ai/packages/agent-core/src/index.ts"],
+      "@my-agent/react": ["../../yula-ai/packages/agent-react/src/index.ts"]
     }
   },
   "include": [

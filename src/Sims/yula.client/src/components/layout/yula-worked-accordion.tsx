@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
+import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { subscribeTurnTrace } from "@/lib/yula-turn-trace";
 import {
@@ -29,6 +30,10 @@ import {
   groupStepsByPhase,
   type WorkedStepItem,
 } from "./yula-worked-steps";
+import { modelCatalog } from "@my-agent/core";
+import { formatTokenCount } from "./yula-chat-turn-helpers";
+import { buildFullCopyText } from "./yula-worked-copy";
+import { YulaExecutionTerminal } from "./yula-execution-terminal";
 
 interface YulaWorkedAccordionProps {
   userMessage?: YulaMessage;
@@ -45,11 +50,13 @@ export function YulaWorkedAccordion({
   message,
   isLive = false,
   durationSec,
+  llmStepCount,
   conversationId,
   className,
 }: YulaWorkedAccordionProps) {
   const t = useTranslations("WorkedAccordion")
   const ws = useTranslations("WorkedSteps")
+  const { contextUsage } = useOptionalYulaChat() ?? {}
   const [open, setOpen] = React.useState(isLive);
   const [userToggled, setUserToggled] = React.useState(false);
   const [liveTimer, setLiveTimer] = React.useState(0);
@@ -58,58 +65,46 @@ export function YulaWorkedAccordion({
   /** Kullanıcının kapattığı fazlar — tüm fazlar varsayılan açık (şeffaf iz) */
   const [collapsedPhases, setCollapsedPhases] = React.useState<Set<number>>(new Set());
 
-  /** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
-  const stepPayload = (step: WorkedStepItem): string | null => {
-    if (!step.info) return null;
-    const out = (() => {
-      if (!step.info?.output || typeof step.info.output !== "object") return step.info?.output ?? null;
-      const cleaned = { ...(step.info.output as Record<string, unknown>) };
-      if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-        delete cleaned.sql;
-        delete cleaned.display;
+  /** Token kullanımı ve maliyet hesaplaması */
+  const usage = message?.metadata?.usage as
+    | {
+        inputTokens?: number;
+        outputTokens?: number;
+        totalTokens?: number;
+        promptTokens?: number;
+        completionTokens?: number;
       }
-      return cleaned;
-    })();
-    const body: Record<string, unknown> = { tool: step.info.toolName, input: step.info.input };
-    // Sınır işaretlerinde output hiç üretilmez: null alanı basmak yerine atla
-    if (out !== null && out !== undefined) body.output = out;
-    return JSON.stringify(body, null, 2);
-  };
+    | undefined;
 
-  /** "Worked for" başlığı + tüm adım detayları + nihai cevap metni */
-  const buildFullCopyText = (): string => {
-    const sections: string[] = [];
-    sections.push(`${t("worked_for", { timeLabel })}`);
+  const inTokens = usage ? (usage.inputTokens ?? usage.promptTokens ?? 0) : 0;
+  const outTokens = usage ? (usage.outputTokens ?? usage.completionTokens ?? 0) : 0;
+  const totalTokens = usage ? (usage.totalTokens ?? inTokens + outTokens) : 0;
 
-    steps.forEach((step, index) => {
-      const lines = [`${index + 1}. ${step.label}${step.subLabel ? ` (${step.subLabel})` : ""}`];
-      if (step.detailText) lines.push(`   ${step.detailText}`);
-      const payload = stepPayload(step);
-      if (payload) lines.push(payload);
-      sections.push(lines.join("\n"));
-    });
-
-    if (message) {
-      const fullText = message.parts
-        .map((p) => {
-          if (p.type === "text") return (p as { text: string }).text;
-          if (p.type === "reasoning" && (p as { text?: string }).text) {
-            return `[Thinking / Reasoning]\n${(p as { text: string }).text}`;
-          }
-          return "";
-        })
-        .filter(Boolean)
-        .join("\n\n");
-      if (fullText.trim()) sections.push(`———\n${fullText}`);
-    }
-
-    return sections.join("\n\n");
-  };
+  const costFormatted = React.useMemo(() => {
+    if (totalTokens <= 0) return null;
+    const cost = modelCatalog.calculateCost("gpt-4o-mini", inTokens, outTokens);
+    return cost.formatted;
+  }, [totalTokens, inTokens, outTokens]);
 
   const handleCopyAnswer = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!message && steps.length === 0) return;
-    const fullText = buildFullCopyText();
+    const fullText = buildFullCopyText({
+      timeLabel,
+      totalTokens,
+      inTokens,
+      outTokens,
+      costFormatted,
+      contextUsage,
+      steps,
+      message,
+      workedForText: t("worked_for", { timeLabel }),
+      telemetryTokensLabel: t("telemetry_tokens"),
+      telemetryInputLabel: t("telemetry_input"),
+      telemetryOutputLabel: t("telemetry_output"),
+      telemetryCostLabel: t("telemetry_cost"),
+      telemetryContextLabel: t("telemetry_context"),
+    });
     if (!fullText.trim()) return;
     const success = await copyToClipboard(fullText);
     if (success) {
@@ -218,6 +213,7 @@ export function YulaWorkedAccordion({
 
   const timeLabel = typeof totalTime === "number" ? Math.max(1, Math.round(totalTime)) : totalTime;
 
+
   // Worker her zaman: asistan, canlı akış, süre veya görünür adım varsa
   if (!message && !isLive && !durationSec && steps.length === 0) return null;
 
@@ -241,8 +237,13 @@ export function YulaWorkedAccordion({
             hasExpandableContent ? "hover:text-foreground cursor-pointer" : "cursor-default"
           )}
         >
-          <span className="font-sans text-foreground/90 font-medium flex items-center gap-1">
+          <span className="font-sans text-foreground/90 font-medium flex items-center gap-1.5">
             <span>{t("worked_for", { timeLabel })}</span>
+            {totalTokens > 0 ? (
+              <span className="font-mono text-[11px] text-muted-foreground/60 font-normal">
+                · {formatTokenCount(totalTokens)} tok
+              </span>
+            ) : null}
           </span>
 
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-data-[state=open]/worked:rotate-90" />
@@ -445,6 +446,22 @@ export function YulaWorkedAccordion({
               );
             })}
           </div>
+
+          {/* Canlı Telemetri & Token Kullanımı Özeti — Katlanabilir Terminal Görünümü */}
+          {!isLive && totalTokens > 0 ? (
+            <YulaExecutionTerminal
+              userMessage={userMessage}
+              steps={steps}
+              totalTokens={totalTokens}
+              inTokens={inTokens}
+              outTokens={outTokens}
+              costFormatted={costFormatted}
+              contextUsage={contextUsage}
+              timeLabel={timeLabel}
+              durationSec={durationSec}
+              llmStepCount={llmStepCount}
+            />
+          ) : null}
         </CollapsibleContent>
       ) : null}
     </Collapsible>
