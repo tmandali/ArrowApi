@@ -116,10 +116,25 @@ export function useScreenAgentContext(input: {
             whenToCall: "Kullanıcı SQL veya özel hesaplama istediğinde.",
             whenNotToCall: "Tablo henüz ekranda değilken veya basit filtre yeterliyken.",
           },
+          SQL: {
+            description: "DuckDB SQL sorgusu çalıştırır ({ query }).",
+            whenToCall: "Kullanıcı SQL veya özel hesaplama istediğinde.",
+            whenNotToCall: "Tablo henüz ekranda değilken veya basit filtre yeterliyken.",
+          },
+          QUERY: {
+            description: "Grid görünümünü SQL ile günceller / türetilmiş görünüm açar ({ query }).",
+            whenToCall: "Kullanıcı türetilmiş kolonlar veya gruplanmış tablo görünümü istediğinde.",
+            whenNotToCall: "Sadece filtre veya sıralama değiştirilirken.",
+          },
           FILTER: {
             description: "Gridi filtreler ({ field, value, op }).",
             whenToCall: "Tablo verisini süzmek için.",
             whenNotToCall: "Kullanıcı filtreleme istemediğinde.",
+          },
+          APPLY_FILTERS: {
+            description: "Çoklu filtreleri tabloya uygular ({ filters, clearOthers }).",
+            whenToCall: "Birden fazla kolonda eş zamanlı filtreleme gerektiğinde.",
+            whenNotToCall: "Tek bir kolon filtrelenirken.",
           },
           SORT: {
             description: "Kolona göre sıralar ({ column, direction }).",
@@ -151,6 +166,11 @@ export function useScreenAgentContext(input: {
             whenToCall: "Görsel grafik istendiğinde.",
             whenNotToCall: "Grafik istenmediğinde.",
           },
+          CHART: {
+            description: "Grafik oluşturur ({ type, dimension, metric }).",
+            whenToCall: "Görsel grafik veya çizelge istendiğinde.",
+            whenNotToCall: "Grafik istenmediğinde.",
+          },
           ANALYZE: {
             description: "Veri analiz özeti çıkarır.",
             whenToCall: "İstatistiki özet istendiğinde.",
@@ -180,10 +200,20 @@ export function useScreenAgentContext(input: {
           workspaceId,
         },
         actions: {
+          SET_FIELDS: {
+            description: "Kriter formu alanlarını doldurur/günceller ({ criteria }).",
+            whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak istediğinde.",
+            whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+          },
           APPLY: {
             description: "Kriter formu alanlarını doldurur/günceller ({ criteria }).",
             whenToCall: "Kullanıcı kriter belirlediğinde veya hazırlık istendiğinde.",
             whenNotToCall: "Kullanıcı çalıştırma emri verdiğinde.",
+          },
+          SUBMIT: {
+            description: "Raporu çalıştırır ({ criteria }).",
+            whenToCall: "Kullanıcı açıkça 'çalıştır', 'getir', 'koştur', 'al' dediğinde.",
+            whenNotToCall: "Sadece alan doldurma istendiğinde.",
           },
           RUN: {
             description: "Raporu çalıştırır ({ criteria }).",

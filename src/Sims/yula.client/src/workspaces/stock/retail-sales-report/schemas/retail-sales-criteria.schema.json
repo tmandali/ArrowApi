@@ -174,12 +174,20 @@
     "sirketKod": {
       "type": "string",
       "title": "Şirket Kodu",
-      "description": "Perakende satışı raporlanacak şirketin kodu (örn: TJ01, TJ02).",
+      "description": "Perakende satışı raporlanacak şirketin kodu.",
+      "enum": [
+        "TJ01",
+        "TJ02"
+      ],
+      "x-enumTitles": {
+        "TJ01": "TJ01 (Ana Mağazacılık)",
+        "TJ02": "TJ02 (İkinci Mağazacılık)"
+      },
       "x-ai": {
         "intent": "company_code",
         "priority": 90,
         "columnHints": ["AXSirketKodu", "ŞirketKodu", "sirketKod"],
-        "directive": "Zorunlu alandır. Kullanıcı şirket kodu belirtmemişse mevcut şirket kodlarını sor veya kullanıcının önceki sohbet bağlamından çıkar. Kodu küçük harfe dönüştürmeden olduğu gibi ilet."
+        "directive": "Zorunlu alandır. Şirket seçenekleri: TJ01 (Ana Mağazacılık) ve TJ02 (İkinci Mağazacılık). Kullanıcı şirket kodu belirtmemişse bu seçenekleri sor (asla 1000, 2000 gibi uydurma kodlar önerme). Kodu küçük harfe dönüştürmeden olduğu gibi ilet."
       }
     }
   },

@@ -115,9 +115,23 @@ const BASE_PROMPT = [
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
   "",
+  "GROUNDING, MISSING ASSETS & OUT-OF-SCOPE PROTOCOL:",
+  "• MISSING ASSETS (Anti-Confabulation): If the user asks about or references an image, screenshot, attachment, file, or document (e.g. 'bu ne resmi', 'resimdeki sorun ne', 'bu PDF'i özetle') but NO image or file is present in their turn/context:",
+  "  - Immediately state in the user's language that no image or file was received/attached.",
+  "  - NEVER guess, invent, or substitute a description of the current screen/reports when an image or file was asked about.",
+  "• SCREEN INTRODUCTION BOUNDARY: Only describe the current screen, its purpose, or list available reports if the user explicitly asks about the screen itself (e.g. 'bu ekran ne işe yarar', 'bu sayfa nedir', 'burada ne yapabilirim', 'what is this page').",
+  "• OUT-OF-SCOPE & AMBIGUITY: If a user request is ambiguous, unclear, or outside enterprise data analysis/reporting capabilities, do NOT make assumptions or force ERP reporting summaries; instead, transparently state your limitation or ask a concise clarifying question (optionally using 'ask_user_choice').",
+  "",
   "INTERACTIVE QUESTIONS & CONFIRMATION PROTOCOL (ask_user_choice):",
   `• RELATIVE DATE EXPANSION: When the user specifies natural relative date terms (${formatLocalizedRelativeDateTerms()}), immediately calculate and expand them into exact ISO date ranges (e.g. '2026-09-07..2026-09-13') based on the Current Date. Do NOT ask clarifying questions or choices for standard calendar terms like 'geçen hafta' or 'bu ay'.`,
-  "• ONLY call 'ask_user_choice' when mandatory criteria (such as required company or store code) are genuinely missing or when the user explicitly requests alternatives/confirmation.",
+  "• ONLY call 'ask_user_choice' when mandatory criteria (such as required company or store code) are genuinely missing, when input is ambiguous, or when the user explicitly requests alternatives/confirmation.",
+  "• DATA-GROUNDED CHOICES ONLY: NEVER invent, fabricate, or hallucinate dummy/placeholder codes (such as 1000, 2000, 3000 or generic numbers). Options MUST always be grounded in real schema enums, actual company/store catalog entries, or concrete context data. If actual codes are not defined in the schema or catalog, do NOT propose fake numbers — ask the user to type their code or choose an option.",
+  "• STEP-BY-STEP (DEPENDENT) CRITERIA GATHERING: When multiple criteria are required or when subsequent choices depend on earlier answers (e.g. Date -> Company -> Store/Branch -> Final Confirmation):",
+  "  - Gather them step-by-step, asking ONE question per turn.",
+  "  - As soon as the user selects or types an answer, immediately apply it to the screen form via 'dispatch_component_action' (action='SET_FIELDS') with the received field so the user sees live progress.",
+  "  - Formulate the next question based on the newly updated state, narrowing dependent choices dynamically.",
+  "  - Once all required criteria are gathered, present a concise summary and ask for final confirmation before running (or run directly if the user gave an explicit run command).",
+  "• DYNAMIC INPUT WATERMARK & CONCRETE OPTIONS: When calling 'ask_user_choice', 'options' must ONLY contain concrete, directly selectable values (e.g. date presets or specific company/store codes). If custom user input is allowed (allow_custom !== false), pass a concise, informative watermark hint or example in 'custom_placeholder' in the user's language (e.g. expected format or example value). NEVER add options that merely signify the action of typing or custom entry (such as 'custom value', 'other', or typing intents); the inline text box handles free-form input automatically.",
   "• When calling 'ask_user_choice', provide at most 4 concise actionable options in the user's language.",
   "• Call 'ask_user_choice' at most ONCE per turn — never emit parallel or repeated question calls in the same step; if you already asked, end the turn.",
   "• When calling 'ask_user_choice', write 1 short visible sentence in the user's language (what is ready + what is needed) — never leave the turn text empty or whitespace-only; the interactive choice card renders automatically below.",
@@ -164,6 +178,11 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
         whenToCall: "Kullanıcı 'hangi raporlar çalıştı', 'geçmiş' dediğinde.",
         whenNotToCall: "Mevcut rapor incelenirken.",
       },
+      FIND: {
+        description: "Geçmişte çalıştırılmış raporları veya eşleşen işleri arar ({ query }).",
+        whenToCall: "Kullanıcı belirli bir rapor veya işi bulmak istediğinde.",
+        whenNotToCall: "Tüm liste istendiğinde veya yeni rapor çalıştırılırken.",
+      },
       CANCEL: {
         description: "Çalışmakta olan işi iptal eder ({ jobId }).",
         whenToCall: "Kullanıcı 'durdur', 'iptal et' dediğinde.",
@@ -198,10 +217,30 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           whenToCall: "Kullanıcı tek bir kolonda değer süzmek istediğinde.",
           whenNotToCall: "Çoklu filtre uygulanırken (APPLY_FILTERS kullanılmalı).",
         },
+        APPLY_FILTERS: {
+          description: "Çoklu filtreleri tabloya uygular ({ filters, clearOthers }).",
+          whenToCall: "Birden fazla kolonda eş zamanlı filtreleme gerektiğinde.",
+          whenNotToCall: "Tek bir kolon filtrelenirken.",
+        },
         SORT: {
           description: "Kolonu artan veya azalan sırada sıralar ({ column, direction }).",
           whenToCall: "Kullanıcı sıralama istediğinde.",
           whenNotToCall: "Tablo henüz hazır değilken.",
+        },
+        COLUMNS: {
+          description: "Sütunları gösterir/gizler/sıralar ({ visibleColumns, hiddenColumns, order }).",
+          whenToCall: "Sütun görünürlüğü veya sırası değiştirilmek istendiğinde.",
+          whenNotToCall: "Tablo verisi filtrelenirken.",
+        },
+        PIN: {
+          description: "Sütunları sabitler ({ columns }).",
+          whenToCall: "Sütun dondurma istendiğinde.",
+          whenNotToCall: "Sabitleme istenmediğinde.",
+        },
+        RESET_LAYOUT: {
+          description: "Varsayılan ızgara yerleşimine döner.",
+          whenToCall: "Yerleşimi sıfırlamak istendiğinde.",
+          whenNotToCall: "Mevcut düzen korunmak istendiğinde.",
         },
         EXPORT: {
           description: "Tabloyu dışa aktarır ({ format: 'xlsx'|'parquet'|'csv'|'gz' }).",
@@ -212,6 +251,11 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           description: "Tablo kolonlarının null sayıları, kardinalite ve anomalilerini analiz eder.",
           whenToCall: "Kullanıcı '/analiz' dediğinde veya veri anomalilerini incelemek istediğinde.",
           whenNotToCall: "Kullanıcı sadece belirli bir satırı ararken.",
+        },
+        ANALYZE: {
+          description: "Veri analiz özeti çıkarır.",
+          whenToCall: "İstatistiki özet istendiğinde.",
+          whenNotToCall: "Özet analiz istenmediğinde.",
         },
         VISUALIZE: {
           description: "Tablo verisini grafik olarak görselleştirir ({ type, dimension, metric }).",
@@ -259,6 +303,11 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'raporu al', 'raporunu al', 'getir' dediğinde.",
           whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
         },
+        SCHEMA: {
+          description: "Rapor kriter şemasını ve kabul edilen alanları inceler.",
+          whenToCall: "Raporun hangi alanları ve veri formatlarını kabul ettiğini öğrenmek için.",
+          whenNotToCall: "Şema zaten biliniyorken.",
+        },
         VALIDATE: {
           description: "Girilen kriterlerin şemaya uygunluğunu doğrular ({ criteria }).",
           whenToCall: "Kullanıcı kriterlerin geçerli olup olmadığını sorduğunda.",
@@ -268,11 +317,6 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           description: "Formdaki mevcut kriter taslağını okur.",
           whenToCall: "Mevcut form durumunu öğrenmek veya değer birleştirmek (merge) gerektiğinde.",
           whenNotToCall: "Kullanıcı doğrudan rapor çalıştırma ('al', 'çalıştır', 'başlat') istediğinde veya yeni değer atarken.",
-        },
-        SCHEMA: {
-          description: "Raporun alan tanımlarını ve şemasını okur.",
-          whenToCall: "Form alanlarının tiplerini ve seçeneklerini öğrenmek gerektiğinde.",
-          whenNotToCall: "Alanlar zaten biliniyorken.",
         },
       },
     });

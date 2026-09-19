@@ -105,13 +105,29 @@ function isModelVisionCapable(
   return (
     lower.includes("gpt-4") ||
     lower.includes("gpt-5") ||
+    lower.includes("gemini") ||
     lower.includes("vision") ||
+    lower.includes("vl") ||
+    lower.includes("pixtral") ||
+    lower.includes("paligemma") ||
     lower.includes("llava") ||
     lower.includes("bakllava") ||
     lower.includes("moondream") ||
     lower.includes("minicpm-v") ||
     lower.includes("cloud")
   );
+}
+
+function extractRawUrlOrData(p: { data?: unknown; url?: unknown; image?: unknown }): string | null {
+  if (typeof p.data === "string") return p.data;
+  if (p.data && typeof p.data === "object" && "url" in p.data) {
+    const u = (p.data as { url: unknown }).url;
+    return typeof u === "string" ? u : u != null ? String(u) : null;
+  }
+  if (typeof p.url === "string") return p.url;
+  if (p.url && typeof p.url === "object") return String(p.url);
+  if (typeof p.image === "string") return p.image;
+  return null;
 }
 
 async function prepareModelMessages(
@@ -131,44 +147,63 @@ async function prepareModelMessages(
 
     (msg.content as unknown[]).forEach((part) => {
       let imageBuffer: Buffer | null = null;
+      let imageUrl: URL | null = null;
       let mimeType = "image/jpeg";
 
-      const p = part as { type?: string; data?: unknown; url?: unknown; image?: unknown; mimeType?: string; mediaType?: string };
+      const p = part as {
+        type?: string;
+        data?: unknown;
+        url?: unknown;
+        image?: unknown;
+        mimeType?: string;
+        mediaType?: string;
+      };
 
       if (p.type === "file") {
-        const dataVal = p.data ?? p.url;
+        const raw = extractRawUrlOrData(p);
         const mime = p.mimeType || p.mediaType || "image/jpeg";
-        if (typeof dataVal === "string" && (mime.startsWith("image/") || dataVal.startsWith("data:image/"))) {
-          const base64Data = dataVal.includes(",") ? dataVal.split(",")[1] : dataVal;
-          if (base64Data) {
-            imageBuffer = Buffer.from(base64Data, "base64");
+        if (raw && (mime.startsWith("image/") || raw.startsWith("data:image/"))) {
+          if (raw.startsWith("data:")) {
+            const base64Data = raw.includes(",") ? raw.split(",")[1] : raw;
+            if (base64Data) {
+              imageBuffer = Buffer.from(base64Data, "base64");
+              mimeType = raw.split(";")[0]?.replace("data:", "") || mime;
+            }
+          } else if (raw.startsWith("http://") || raw.startsWith("https://")) {
+            imageUrl = new URL(raw);
             mimeType = mime;
           }
         }
       } else if (p.type === "image") {
         if (typeof p.image === "string") {
-          const dataStr = p.image;
-          const base64Data = dataStr.includes(",") ? dataStr.split(",")[1] : dataStr;
-          if (base64Data) {
-            imageBuffer = Buffer.from(base64Data, "base64");
+          const raw = p.image;
+          if (raw.startsWith("http://") || raw.startsWith("https://")) {
+            imageUrl = new URL(raw);
             mimeType = p.mimeType || "image/jpeg";
+          } else {
+            const base64Data = raw.includes(",") ? raw.split(",")[1] : raw;
+            if (base64Data) {
+              imageBuffer = Buffer.from(base64Data, "base64");
+              mimeType = p.mimeType || "image/jpeg";
+            }
           }
         } else if (Buffer.isBuffer(p.image)) {
           imageBuffer = p.image as Buffer;
+          mimeType = p.mimeType || "image/jpeg";
         }
       }
 
-      if (imageBuffer) {
+      if (imageBuffer || imageUrl) {
         if (supportsVision) {
           content.push({
             type: "image",
-            image: imageBuffer,
+            image: imageBuffer ?? imageUrl!,
             mimeType,
           });
         } else {
           content.push({
             type: "text",
-            text: `\n[Image attached: The local "${activeModel}" model has no vision capability. Please select a vision-capable model to read images.]`,
+            text: `\n[Image attached: The active "${activeModel}" model has no vision capability. Please select a vision-capable model to inspect images.]`,
           });
         }
       } else {
@@ -343,14 +378,7 @@ export async function POST(req: Request) {
       },
       stopWhen: [
         isStepCount(6),
-        hasToolCall(
-          "dispatch_component_action",
-          "ask_user_choice",
-          "time_travel",
-          "remember_fact",
-          "recall_fact",
-          "inspect_ui_state",
-        ),
+        hasToolCall("ask_user_choice"),
       ],
     });
 

@@ -85,6 +85,16 @@ export function YulaChatTurn({
       .join("\n");
   }, [userMessage]);
 
+  // Kullanıcı mesajındaki ekli dosyalar / görseller
+  const userFiles = React.useMemo(() => {
+    if (!userMessage?.parts) return [];
+    return userMessage.parts.filter(
+      (p) =>
+        ((p as { type: string }).type === "file" || (p as { type: string }).type === "image") &&
+        Boolean((p as { url?: unknown; data?: unknown }).url || (p as { url?: unknown; data?: unknown }).data),
+    ) as Array<{ type: string; url?: string; data?: string; filename?: string; mediaType?: string }>;
+  }, [userMessage]);
+
   // Tur dili: sabit arayüz metinleri (durum etiketi, fallback) için
   const turnLang = React.useMemo(() => detectUserLanguage(userText), [userText]);
 
@@ -247,7 +257,7 @@ export function YulaChatTurn({
   return (
     <div className="group/turn relative flex flex-col gap-2.5 py-2">
       {/* 1. Yapışkan Soru Kartı (Kullanıcı Mesajı + Kopyala & Geri Al Simge Butonları) */}
-      {userMessage && userText ? (
+      {userMessage && (userText || userFiles.length > 0) ? (
         <div className={cn("py-1 font-sans", isLive && "sticky top-0 z-10")}>
           <div className="group/prompt relative flex min-h-8 min-w-0 items-center justify-between gap-2 rounded-xl border border-primary/15 dark:border-primary/20 bg-gradient-to-br from-primary/[0.04] via-muted/20 to-orange-500/[0.06] dark:from-primary/10 dark:via-muted/15 dark:to-orange-500/10 backdrop-blur-md px-3 py-1.5 shadow-xs">
             <button
@@ -256,16 +266,51 @@ export function YulaChatTurn({
               title={userPromptOpen ? "Kısalt" : userText}
               className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left"
             >
-              <p
-                className={cn(
-                  "text-[13px] font-sans text-foreground/95 leading-snug break-words",
-                  userPromptOpen
-                    ? "whitespace-pre-wrap"
-                    : "overflow-hidden text-ellipsis whitespace-nowrap",
-                )}
-              >
-                {userPromptOpen ? userText : userText.replace(/\s+/g, " ").trim()}
-              </p>
+              <div className="flex flex-col gap-1.5">
+                {userFiles.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    {userFiles.map((file, idx) => {
+                      const fileUrl = file.url || file.data;
+                      const isImg =
+                        file.mediaType?.startsWith("image/") ||
+                        file.type === "image" ||
+                        (typeof fileUrl === "string" && fileUrl.startsWith("data:image/"));
+                      return isImg && fileUrl ? (
+                        <div
+                          key={idx}
+                          className="relative size-10 overflow-hidden rounded-md border border-border/80 bg-muted/40 shadow-xs shrink-0"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={fileUrl}
+                            alt={file.filename || "Attached image"}
+                            className="size-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/30 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                        >
+                          {file.filename || "Dosya"}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                {userText ? (
+                  <p
+                    className={cn(
+                      "text-[13px] font-sans text-foreground/95 leading-snug break-words",
+                      userPromptOpen
+                        ? "whitespace-pre-wrap"
+                        : "overflow-hidden text-ellipsis whitespace-nowrap",
+                    )}
+                  >
+                    {userPromptOpen ? userText : userText.replace(/\s+/g, " ").trim()}
+                  </p>
+                ) : null}
+              </div>
             </button>
 
             {!isLive ? (

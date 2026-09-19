@@ -307,7 +307,16 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     msgOrContent?: { role?: 'user'; content?: string; text?: string; files?: any[]; parts?: any[] } | string,
   ) => {
     const promptText = promptTextOf(msgOrContent, input);
-    if (!promptText.trim()) return;
+    const incomingFiles: any[] =
+      typeof msgOrContent === 'object' && msgOrContent && Array.isArray(msgOrContent.files)
+        ? msgOrContent.files
+        : [];
+    const incomingParts: any[] =
+      typeof msgOrContent === 'object' && msgOrContent && Array.isArray(msgOrContent.parts)
+        ? msgOrContent.parts
+        : [];
+
+    if (!promptText.trim() && incomingFiles.length === 0 && incomingParts.length === 0) return;
 
     // Pi Reference: Built-in Sistem Komutu Kontrolü
     if (promptTemplateManager.isSystemCommand(promptText)) {
@@ -317,11 +326,33 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       if (handled) return;
     }
 
+    const userParts: any[] = [];
+    if (incomingParts.length > 0) {
+      userParts.push(...incomingParts);
+    } else {
+      if (promptText.trim()) {
+        userParts.push({ type: 'text' as const, text: promptText });
+      }
+      for (const f of incomingFiles) {
+        if (!f) continue;
+        if (typeof f === 'object' && (f.type === 'file' || f.type === 'image')) {
+          userParts.push(f);
+        } else if (typeof f === 'object') {
+          userParts.push({
+            type: 'file' as const,
+            filename: f.filename || f.name || 'attachment',
+            mediaType: f.mediaType || f.type || 'image/jpeg',
+            url: f.url || f.dataUrl || f.data,
+          });
+        }
+      }
+    }
+
     const userMsg: AgentMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       role: 'user',
-      content: promptText,
-      parts: textPart(promptText),
+      content: promptText || (incomingFiles.length > 0 ? '[Görsel / Dosya Eki]' : ''),
+      parts: userParts,
       createdAt: new Date(),
     };
 
@@ -753,13 +784,13 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     reload: async () => {
       if (messages.length > 0) {
         const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-        if (lastUser) await sendMessage(lastUser.content);
+        if (lastUser) await sendMessage({ content: lastUser.content, parts: lastUser.parts });
       }
     },
     regenerate: async () => {
       if (messages.length > 0) {
         const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-        if (lastUser) await sendMessage(lastUser.content);
+        if (lastUser) await sendMessage({ content: lastUser.content, parts: lastUser.parts });
       }
     },
     message: lastAssistantMessage,

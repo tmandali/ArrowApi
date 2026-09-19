@@ -31,7 +31,7 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   ask_user_choice: tool({
-    description: "Prompt the user with interactive choice buttons or a clarification question with predefined options.",
+    description: "Prompt the user with interactive choice buttons or a clarification question with predefined options and an optional custom input.",
     inputSchema: z.object({
       question: z.string().describe("Question or decision prompt to present to the user"),
       options: z
@@ -46,8 +46,12 @@ export const STANDARD_AGENT_TOOLS = {
           ]),
         )
         .min(1)
-        .describe("List of selectable options"),
-      allow_custom: z.boolean().optional().default(true).describe("Allow custom text input"),
+        .describe("List of selectable options. ONLY concrete choices (e.g. 'Son 7 gün', 'Son 30 gün', 'TJ01'). Do not add placeholder options for typing; if custom input is allowed, provide a format hint in custom_placeholder instead."),
+      allow_custom: z.boolean().optional().default(true).describe("Allow custom text input below options"),
+      custom_placeholder: z
+        .string()
+        .optional()
+        .describe("Watermark/placeholder hint for the custom input box in the user's language (e.g. 'Örn: 2026-09-01..2026-09-15' or 'Örn: TJ01')"),
     }),
   }),
 

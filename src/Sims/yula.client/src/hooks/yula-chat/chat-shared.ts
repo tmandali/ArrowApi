@@ -17,7 +17,7 @@ export const RESPONSE_TIMEOUT_MS = 45000;
 let requestStartMs: number | null = null;
 
 export function markRequestStart() {
-  if (requestStartMs === null) requestStartMs = performance.now();
+  if (requestStartMs === null) requestStartMs = Date.now();
 }
 
 export function getRequestStartMs() {

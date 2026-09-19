@@ -128,4 +128,32 @@ describe("buildSystemPrompt agent katmanı", () => {
       "doluyken listelenmeli",
     );
   });
+
+  it("eksik varlık (anti-confabulation) ve ekran tanıtım sınırı kurallarını içerir", () => {
+    const prompt = buildSystemPrompt({ pathname: "/" });
+    assert.ok(
+      prompt.includes("GROUNDING, MISSING ASSETS & OUT-OF-SCOPE PROTOCOL"),
+      "grounding başlığı olmalı",
+    );
+    assert.ok(
+      prompt.includes("MISSING ASSETS (Anti-Confabulation)") &&
+        prompt.includes("SCREEN INTRODUCTION BOUNDARY"),
+      "eksik varlık ve ekran sınırı kuralları yer almalı",
+    );
+  });
+
+  it("adım adım bağımlı kriter toplama (step-by-step dependent criteria) kuralını içerir", () => {
+    const prompt = buildSystemPrompt({ pathname: "/" });
+    assert.ok(
+      prompt.includes("STEP-BY-STEP (DEPENDENT) CRITERIA GATHERING"),
+      "adım adım kriter toplama kuralı olmalı",
+    );
+    assert.ok(
+      prompt.includes("ONE question per turn") &&
+        prompt.includes("narrowing dependent choices dynamically"),
+      "tur başına tek soru ve dinamik daraltma talimatı yer almalı",
+    );
+  });
 });
+
+

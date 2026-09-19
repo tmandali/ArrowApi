@@ -116,10 +116,20 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
         isHeadless: true,
       },
       actions: {
+        SET_FIELDS: {
+          description: "Kriterleri doldurur ve sayfaya yönlendirir.",
+          whenToCall: "Kriterleri güncellemek için.",
+          whenNotToCall: "Formu çalıştırmadan önce.",
+        },
         APPLY: {
           description: "Kriterleri doldurur ve sayfaya yönlendirir.",
           whenToCall: "Kriterleri güncellemek için.",
           whenNotToCall: "Formu çalıştırmadan önce.",
+        },
+        SUBMIT: {
+          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
+          whenToCall: "Raporu çalıştırmak için.",
+          whenNotToCall: "Taslak düzenlerken.",
         },
         RUN: {
           description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
@@ -235,6 +245,11 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
         isHeadless: true,
       },
       actions: {
+        SUBMIT: {
+          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
+          whenToCall: "Rapor çalıştırma isteğinde.",
+          whenNotToCall: "Taslak form doldurulurken.",
+        },
         RUN: {
           description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
           whenToCall: "Rapor çalıştırma isteğinde.",
@@ -403,10 +418,20 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
       id: formCompId,
       meta: { description: `${report.title} Kriter Formu`, scope: report.scope },
       actions: {
+        SET_FIELDS: {
+          description: "Kriterleri uygular",
+          whenToCall: "Kriterler doldurulurken",
+          whenNotToCall: "Zaten doluyken",
+        },
         APPLY: {
           description: "Kriterleri uygular",
           whenToCall: "Kriterler doldurulurken",
           whenNotToCall: "Zaten doluyken",
+        },
+        SUBMIT: {
+          description: "Raporu çalıştırır",
+          whenToCall: "Çalıştır komutunda",
+          whenNotToCall: "Eksik kriter varken",
         },
         RUN: {
           description: "Raporu çalıştırır",

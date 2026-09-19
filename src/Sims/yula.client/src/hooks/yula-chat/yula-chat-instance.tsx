@@ -109,6 +109,11 @@ export function ChatInstance({
           whenToCall: "Kullanıcı 'hangi raporlar çalıştı', 'geçmiş' dediğinde.",
           whenNotToCall: "Mevcut rapor incelenirken.",
         },
+        FIND: {
+          description: "Geçmişte çalıştırılmış raporları veya eşleşen işleri arar ({ query }).",
+          whenToCall: "Kullanıcı belirli bir rapor veya işi bulmak istediğinde.",
+          whenNotToCall: "Tüm liste istendiğinde veya yeni rapor çalıştırılırken.",
+        },
         CANCEL: {
           description: "Çalışmakta olan işi iptal eder ({ jobId }).",
           whenToCall: "Kullanıcı 'durdur', 'iptal et' dediğinde.",
@@ -137,10 +142,20 @@ export function ChatInstance({
           isHeadless: true,
         },
         actions: {
+          SET_FIELDS: {
+            description: `${report.title} kriter formuna değerleri yazar ve taslağa uygular ({ criteria }).`,
+            whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak istediğinde.",
+            whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+          },
           APPLY: {
             description: `${report.title} kriter formuna değerleri yazar ve sayfaya yönlendirir.`,
             whenToCall: `Kullanıcı ${report.title} rapor kriterlerini girmek veya güncellemek istediğinde.`,
             whenNotToCall: "Raporu doğrudan çalıştırmak istediğinde veya form alanlarıyla ilgisiz işlemlerde.",
+          },
+          SUBMIT: {
+            description: `${report.title} raporunu çalıştırır ve işi kuyruğa alır ({ criteria, report }).`,
+            whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'getir' dediğinde.",
+            whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
           },
           RUN: {
             description: `${report.title} raporunu çalıştırır ve sonuç ekranına yönlendirir.`,

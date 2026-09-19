@@ -18,9 +18,10 @@ export interface UserChoiceData {
   question: string;
   options: UserChoiceOption[];
   allowCustom: boolean;
+  customPlaceholder?: string;
 }
 
-function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | null {
+export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | null {
   const source = (
     input && typeof input === "object"
       ? input
@@ -32,6 +33,12 @@ function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | nu
   if (!source) return null;
 
   const question = typeof source.question === "string" ? source.question.trim() : "";
+  const allowCustom = source.allow_custom !== false;
+  const customPlaceholder =
+    typeof source.custom_placeholder === "string" && source.custom_placeholder.trim().length > 0
+      ? source.custom_placeholder.trim()
+      : undefined;
+
   const rawOptions = Array.isArray(source.options) ? source.options : [];
   const options: UserChoiceOption[] = rawOptions
     .map((opt) => {
@@ -49,12 +56,13 @@ function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | nu
     })
     .filter((o) => o.label.length > 0);
 
-  if (!question && options.length === 0) return null;
+  if (!question && options.length === 0 && !allowCustom) return null;
 
   return {
     question: question || "Lütfen bir seçenek belirleyin:",
     options,
-    allowCustom: source.allow_custom !== false,
+    allowCustom,
+    customPlaceholder,
   };
 }
 
@@ -75,7 +83,6 @@ export function YulaChoiceCard({
 
   const [selectedLabel, setSelectedLabel] = React.useState<string | null>(null);
   const [customInput, setCustomInput] = React.useState("");
-  const [showCustomInput, setShowCustomInput] = React.useState(false);
 
   // Kart dili tespiti
   const cardLang = React.useMemo(() => {
@@ -89,6 +96,9 @@ export function YulaChoiceCard({
     return detectUserLanguage(text);
   }, [yula.messages, messageId]);
   const L = (tr: string, en: string) => pickLang(cardLang, tr, en);
+
+  // Watermark / placeholder metni: Yalnızca model tarafından dinamik sağlanan hint
+  const customPlaceholder = choiceData?.customPlaceholder;
 
   // Bu mesajdan sonra gelen kullanıcı mesajı varsa yanıtlanmış sayılır
   const answeredByFollowUp = React.useMemo(() => {
@@ -205,41 +215,27 @@ export function YulaChoiceCard({
         ))}
       </div>
 
-      {/* Serbest Giriş (allow_custom) */}
+      {/* Doğrudan Görünür Serbest Giriş (Watermarklı Text Box) */}
       {choiceData.allowCustom ? (
-        <div className="pt-1">
-          {!showCustomInput ? (
-            <button
-              type="button"
-              disabled={yula.busy}
-              onClick={() => setShowCustomInput(true)}
-              className="text-[11.5px] text-muted-foreground hover:text-primary transition-colors underline-offset-2 hover:underline cursor-pointer"
-            >
-              {L("Farklı bir tarih veya değer girmek istiyorum…", "I want to enter a custom date or value…")}
-            </button>
-          ) : (
-            <form onSubmit={handleCustomSubmit} className="flex items-center gap-1.5">
-              <Input
-                type="text"
-                autoFocus
-                placeholder={L("Örn: 2026-09-01..2026-09-15 veya serbest metin…", "E.g.: 2026-09-01..2026-09-15 or text…")}
-                value={customInput}
-                onChange={(e) => setCustomInput(e.target.value)}
-                disabled={yula.busy}
-                className="h-8 text-[12px] bg-background"
-              />
-              <Button
-                type="submit"
-                size="sm"
-                disabled={!customInput.trim() || yula.busy}
-                className="h-8 px-2.5 text-[12px] shrink-0"
-              >
-                <CornerDownLeft className="size-3.5 mr-1" />
-                {L("Gönder", "Send")}
-              </Button>
-            </form>
-          )}
-        </div>
+        <form onSubmit={handleCustomSubmit} className="pt-1 flex items-center gap-1.5">
+          <Input
+            type="text"
+            placeholder={customPlaceholder}
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            disabled={yula.busy}
+            className="h-8 text-[12px] bg-background/90 placeholder:text-muted-foreground/60 border-border/80 focus-visible:ring-primary/40"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!customInput.trim() || yula.busy}
+            className="h-8 px-2.5 text-[12px] shrink-0"
+          >
+            <CornerDownLeft className="size-3.5 mr-1" />
+            {L("Gönder", "Send")}
+          </Button>
+        </form>
       ) : null}
     </div>
   );
