@@ -331,7 +331,7 @@ export function WorkspaceAiDock({
   const isOverlayOpen = open && expanded
 
   return (
-    <>
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <WorkspaceSidePanelLayout
         open={open}
         onOpenChange={setOpen}
@@ -361,7 +361,7 @@ export function WorkspaceAiDock({
         <div
           role="dialog"
           aria-label={YULA.name}
-          className="fixed inset-0 z-50 flex min-h-0 flex-col bg-background"
+          className="absolute inset-0 z-40 flex min-h-0 flex-col bg-background"
         >
           <div className={cn(panelHeaderClass, "gap-1")}>
             <DockHeaderTitle />
@@ -374,7 +374,7 @@ export function WorkspaceAiDock({
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   )
 }
 
