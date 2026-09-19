@@ -1,4 +1,4 @@
-import { and, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { userIdentitiesSchema } from "@/server/db/schema";
 

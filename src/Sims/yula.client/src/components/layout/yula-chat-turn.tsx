@@ -15,8 +15,6 @@ import { useYulaChat } from "@/hooks/use-yula-chat";
 import {
   yulaToolPartInfo,
   isFailedToolInfo,
-  isDedupeSkipOutput,
-  type YulaToolPartInfo,
 } from "@/lib/yula-tool-info";
 import { stripMarkdownTables } from "@/lib/markdown-table-strip";
 import { Button } from "@/components/ui/button";
@@ -24,18 +22,13 @@ import { cn } from "@/utils/cn";
 import { Copy, Check, Undo2, Loader2 } from "lucide-react";
 
 import { copyToClipboard } from "@/lib/clipboard";
-import { describeYulaStreamError } from "@/lib/yula-stream-error";
 import { runConfirmationClickPrompt } from "@/lib/yula-actions";
 import { triggerReportRun } from "@/lib/report-run-bus";
 import {
   detectUserLanguage,
-  pickLang,
-  type YulaUiLang,
 } from "@/lib/yula-lang";
 
 import {
-  SCREEN_TOOLS,
-  dispatchLiveStatus,
   formatTokenCount,
   liveStatusLabel,
   SilentTurnFallback,

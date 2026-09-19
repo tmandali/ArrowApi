@@ -152,6 +152,7 @@ export type ModuleNavMenuProps = {
  * listesi gibi bağımsız pane içerikleri ile ana menü arasında tutarlılık
  * için aynı kuralı dışarı açar.
  */
+// eslint-disable-next-line react/only-export-components -- hook + bileşen aynı dosyada; menü yerelleştirme hook'u
 export function useNavTitleLocalizer(pathname: string) {
   const tNav = useTranslations("SystemNav")
   const tMenu = useTranslations("NavMenu")
@@ -189,6 +190,7 @@ export function ModuleNavMenu({
    */
   const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({})
   React.useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- pathname değişiminde grup otomatik açılır; kullanıcı kapatması korunur (harici navigasyon senkronu, loop yok)
     setOpenGroups((prev) => {
       let changed = false
       const next = { ...prev }

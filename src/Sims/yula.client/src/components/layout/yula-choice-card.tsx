@@ -21,6 +21,7 @@ export interface UserChoiceData {
   customPlaceholder?: string;
 }
 
+// eslint-disable-next-line react/only-export-components -- parser + bileşen aynı dosyada; saf veri çözümleyici
 export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | null {
   const source = (
     input && typeof input === "object"

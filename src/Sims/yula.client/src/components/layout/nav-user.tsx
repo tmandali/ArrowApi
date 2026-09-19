@@ -122,6 +122,7 @@ export function NavUser() {
   const [syncing, setSyncing] = React.useState(false);
   React.useEffect(() => {
     if (!lastSwitchedAt) return;
+    // eslint-disable-next-line react/set-state-in-effect -- şirket geçişi sonrası 900ms senkron spinner'ı; harici store tetikler, loop yok
     setSyncing(true);
     const timer = window.setTimeout(() => setSyncing(false), 900);
     return () => window.clearTimeout(timer);

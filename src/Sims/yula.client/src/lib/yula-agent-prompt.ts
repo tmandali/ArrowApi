@@ -15,9 +15,6 @@ import {
 } from "@/features/reports/report-registry";
 import { USER_AGENT_ATTACHMENTS_PROMPT_MAX_CHARS } from "@/lib/yula-user-agent";
 import {
-  isWorkspaceHomePath,
-  workspaceIdFromPath,
-  workspaceLabelFromPath,
   extractJobIdFromHref,
 } from "@/lib/workspace-paths";
 import { formatLocalizedRelativeDateTerms } from "./yula-prompt-directives";
@@ -362,10 +359,6 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
 
   const href = context?.pathname ?? "/";
   const pathname = href.split("?")[0] || "/";
-  const isMainHome = isWorkspaceHomePath(pathname);
-  const mode = context?.mode ?? (isMainHome ? "main" : "dock");
-  const wsId = context?.workspaceId ?? workspaceIdFromPath(pathname);
-  const wsLabel = context?.workspaceLabel ?? workspaceLabelFromPath(pathname);
   const phase = context?.phase ?? "workspace";
   const jobId = context?.jobId ?? extractJobIdFromHref(href);
   const todayStr = new Date().toISOString().split("T")[0];

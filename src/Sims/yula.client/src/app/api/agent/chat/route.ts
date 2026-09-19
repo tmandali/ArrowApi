@@ -14,9 +14,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
-import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
-import { filterActiveToolsByAgent } from "@/lib/yula-user-agent";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { slimMessagesForTransport } from "@/lib/context-slim";
 import {
@@ -47,12 +45,6 @@ export type YulaMessageMetadata = { usage?: LanguageModelUsage };
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
 
 export const DEFAULT_MODEL = getDefaultModel();
-
-/** Skill çalıştırma/okuma araçları (ajan skill listesi boşsa kapatılır). */
-const SKILL_TOOL_NAMES = new Set([
-  "run_user_skill",
-  "read_user_file",
-]);
 
 /**
  * Context compaction (SDK recipe: track-agent-token-usage).

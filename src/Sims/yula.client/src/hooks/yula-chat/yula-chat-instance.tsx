@@ -24,7 +24,6 @@ import {
   steeringManager,
   type QueueItem,
   multiLaneScheduler,
-  adaptivePublisher,
   retryWithBackoff,
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
@@ -205,7 +204,7 @@ export function ChatInstance({
             });
             let navOutcome: any;
             try {
-              if (Boolean(uiRegistry.get("app_router"))) {
+              if (uiRegistry.get("app_router")) {
                 navOutcome = uiEventBus.dispatch({
                   component_id: "app_router",
                   action: "NAVIGATE",
@@ -295,6 +294,7 @@ export function ChatInstance({
   }, []);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- harici piEventStream kuyruk senkronu; mount'ta tek-atış, sonrası event-driven
     syncQueues();
     const unsub = piEventStream.subscribe((event) => {
       if (
@@ -427,6 +427,7 @@ export function ChatInstance({
         counts[msg.id] = stepStarts > 0 ? stepStarts : 1;
       }
     }
+    // eslint-disable-next-line react/set-state-in-effect -- mesaj dizisinden türetilen adım sayacı; harici chat.messages senkronu
     setLlmStepCounts(counts);
   }, [chat.messages]);
 

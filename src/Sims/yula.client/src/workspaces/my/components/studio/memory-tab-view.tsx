@@ -8,16 +8,12 @@ import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Brain, Trash2, RefreshCw, HardDrive, Clock, Check } from "lucide-react";
 
 export function MemoryTabView() {
-  const [entries, setEntries] = React.useState<MemoryEntry[]>([]);
+  const [entries, setEntries] = React.useState<MemoryEntry[]>(() => agentMemory.getAll());
   const [justCleared, setJustCleared] = React.useState(false);
 
   const reload = React.useCallback(() => {
     setEntries(agentMemory.getAll());
   }, []);
-
-  React.useEffect(() => {
-    reload();
-  }, [reload]);
 
   const handleForget = (key: string) => {
     agentMemory.forget(key);

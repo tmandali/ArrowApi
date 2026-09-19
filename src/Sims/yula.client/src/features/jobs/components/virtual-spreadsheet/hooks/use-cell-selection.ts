@@ -71,6 +71,7 @@ export function useCellSelection({
   // artık yanlış veriye işaret eder; state'i sıfırla. DOM attribute'ları
   // markSelectionCells/applyRowSelectionAttributes selection=null'da temizler.
   React.useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- veri kaynağı değişiminde eski seçimi sıfırla; harici dataIdentity senkronu
     setSelection(null)
     setActiveCell(null)
   }, [dataIdentity])

@@ -74,6 +74,7 @@ export function useJobOwner(
   React.useEffect(() => {
     // Kendi job'ında veya sistem job'ında dışa fetch gerekmez.
     if (!ownerId || isMine || isSystem) {
+      // eslint-disable-next-line react/set-state-in-effect -- owner değişiminde cache/fetch senkronu; cancellation guard'lı, loop yok
       setInfo(null);
       return;
     }

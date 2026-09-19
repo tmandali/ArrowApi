@@ -16,16 +16,13 @@ import {
   multiLaneScheduler,
   deferredManager,
   reconciliationEngine,
-  defaultRpcTransport,
   piEventStream,
 } from "@my-agent/core";
 import {
   stockPredictiveAnalyticsPlugin,
   registerDefaultYulaPlugins,
-  pluginRegistry,
 } from "@/lib/plugins/yula-plugins";
 import { pingRpc, sendRpcAction } from "@/lib/rpc/yula-rpc-client";
-import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 
 describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () => {
   beforeEach(() => {

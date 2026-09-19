@@ -30,6 +30,7 @@ export const SCREEN_TOOLS = new Set([
 ]);
 
 /** dispatch_component_action girdisinden canlı durum etiketi. */
+// eslint-disable-next-line react/only-export-components -- yardımcı + bileşen aynı dosyada; Fast Refresh dışı saf fonksiyon
 export function dispatchLiveStatus(input: unknown, lang: YulaUiLang): string | null {
   const L = (tr: string, en: string) => pickLang(lang, tr, en);
   const action =
@@ -67,11 +68,13 @@ export function dispatchLiveStatus(input: unknown, lang: YulaUiLang): string | n
   }
 }
 
+// eslint-disable-next-line react/only-export-components -- yardımcı + bileşen aynı dosyada; saf format fonksiyonu
 export function formatTokenCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return `${n}`;
 }
 
+// eslint-disable-next-line react/only-export-components -- yardımcı + bileşen aynı dosyada; saf etiket fonksiyonu
 export function liveStatusLabel(toolParts: YulaToolPartInfo[], lang: YulaUiLang): string {
   const pending = toolParts.find(
     (i) => i.state === "input-available" || i.state === "input-streaming",

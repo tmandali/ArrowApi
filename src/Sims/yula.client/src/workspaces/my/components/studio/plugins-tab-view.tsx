@@ -7,11 +7,7 @@ import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Blocks, CheckCircle2, Cpu, Wrench } from "lucide-react";
 
 export function PluginsTabView() {
-  const [plugins, setPlugins] = React.useState<AgentPlugin[]>([]);
-
-  React.useEffect(() => {
-    setPlugins(pluginRegistry.getAll());
-  }, []);
+  const [plugins] = React.useState<AgentPlugin[]>(() => pluginRegistry.getAll());
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">

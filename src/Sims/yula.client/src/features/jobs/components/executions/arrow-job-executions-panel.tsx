@@ -25,7 +25,7 @@ import { useSession } from "next-auth/react";
 import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { cn } from "@/utils/cn";
-import { formatCount, formatBytes } from "@/utils/format";
+import { formatCount } from "@/utils/format";
 import { ApiError } from "@/services";
 import { WorkspaceBanner } from "@/components/layout/workspace-banner";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -236,7 +236,6 @@ export function ArrowJobExecutionsPanel({
     setHistoryEvents,
     historyLoading,
     opfsDetail,
-    opfsLoading,
     bumpDetail,
   } = detail;
 
@@ -597,7 +596,7 @@ export function ArrowJobExecutionsPanel({
   const { data: session } = useSession();
   const myOwnerId = (session?.user as { id?: string } | undefined)?.id;
   const myOwnerName = (session?.user as { name?: string | null } | undefined)?.name;
-  const { label: ownerLabel, kind: ownerKind } = useJobOwner(
+  const { label: ownerLabel } = useJobOwner(
     selectedJob?.ownerId,
     myOwnerId,
     myOwnerName,
