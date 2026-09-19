@@ -17,12 +17,9 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
+import { useTranslations } from "next-intl";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import { cn } from "@/utils/cn";
-import {
-  detectUserLanguage,
-  pickLang,
-} from "@/lib/yula-lang";
 import { MessageCircleQuestionMark, Check } from "lucide-react";
 
 export interface YulaQuestionChoice {
@@ -96,22 +93,7 @@ export function YulaQuestionnaireCard({
   const [freeform, setFreeform] = React.useState<Record<string, string>>({});
   const [picked, setPicked] = React.useState<Record<string, string[]>>({});
 
-  // Kart dili: asistandan önceki son kullanıcı mesajına göre
-  const cardLang = React.useMemo(() => {
-    const idx = messageId
-      ? yula.messages.findIndex((m) => m.id === messageId)
-      : -1;
-    const pool = idx >= 0 ? yula.messages.slice(0, idx) : yula.messages;
-    const lastUser = [...pool]
-      .reverse()
-      .find((m) => m.role === "user");
-    const text = lastUser?.parts
-      .filter((p) => p.type === "text")
-      .map((p) => (p as { text?: string }).text ?? "")
-      .join("\n");
-    return detectUserLanguage(text);
-  }, [yula.messages, messageId]);
-  const L = (tr: string, en: string) => pickLang(cardLang, tr, en);
+  const t = useTranslations("QuestionnaireCard");
 
   // Bu turdan sonra gelen bir kullanıcı mesajı varsa soru cevaplanmış sayılır
   const answeredByFollowUp = React.useMemo(() => {
@@ -217,7 +199,7 @@ export function YulaQuestionnaireCard({
       <div className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
           <Check className="size-3.5 text-emerald-500" />
-          {L("Cevaplanan sorular", "Answered questions")}
+          {t("answered_questions")}
         </div>
         {questions.map((q) => {
           const vals = submitted?.answers[q.id] ?? [];
@@ -240,12 +222,9 @@ export function YulaQuestionnaireCard({
               ? labels.join(", ")
               : wasSkipped
                 ? q.defaultValue
-                  ? L(
-                      `(atlandı → varsayılan: ${q.defaultValue})`,
-                      `(skipped → default: ${q.defaultValue})`,
-                    )
-                  : L("(atlandı)", "(skipped)")
-                : (followUpAnswer ?? L("(cevaplandı)", "(answered)"));
+                  ? t("skipped_default", { defaultValue: q.defaultValue })
+                  : t("skipped")
+                : (followUpAnswer ?? t("answered"));
           return (
             <div key={q.id} className="text-[12px] leading-relaxed">
               <span className="font-medium text-foreground">{q.prompt}</span>
@@ -269,7 +248,7 @@ export function YulaQuestionnaireCard({
     >
       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-900 dark:text-amber-200">
         <MessageCircleQuestionMark className="size-3.5 shrink-0" />
-        {L("Devam etmek için cevabınız gerekiyor", "Your answer is needed to continue")}
+        {t("need_answer")}
       </div>
       <Questionnaire
         items={questions.map((q) => ({ name: q.id, required: q.required ?? false }))}
@@ -302,23 +281,23 @@ export function YulaQuestionnaireCard({
                 </QuestionnaireChoice>
               ))}
               <QuestionnaireInput
-                aria-label={L("Kendi cevabınız", "Your own answer")}
-                placeholder={L("Kendi cevabınızı yazın…", "Type your own answer…")}
+                aria-label={t("own_answer_label")}
+                placeholder={t("own_answer_placeholder")}
                 value={freeform[q.id] ?? ""}
                 onChange={(e) =>
                   setFreeform((prev) => ({ ...prev, [q.id]: e.target.value }))
                 }
               />
             </QuestionnaireChoices>
-            <QuestionnaireError>{L("Bu soruyu cevaplayın veya atlayın.", "Answer this question or skip.")}</QuestionnaireError>
+            <QuestionnaireError>{t("validation_error")}</QuestionnaireError>
           </QuestionnaireItem>
         ))}
         <QuestionnaireActions>
-          <QuestionnairePrevious>{L("Geri", "Back")}</QuestionnairePrevious>
-          <QuestionnaireSkip>{L("Atla", "Skip")}</QuestionnaireSkip>
-          <QuestionnaireNext>{L("İleri", "Next")}</QuestionnaireNext>
+          <QuestionnairePrevious>{t("back")}</QuestionnairePrevious>
+          <QuestionnaireSkip>{t("skip")}</QuestionnaireSkip>
+          <QuestionnaireNext>{t("next")}</QuestionnaireNext>
           <span className="flex-1" />
-          <QuestionnaireSubmit>{L("Gönder", "Send")}</QuestionnaireSubmit>
+          <QuestionnaireSubmit>{t("send")}</QuestionnaireSubmit>
         </QuestionnaireActions>
       </Questionnaire>
     </div>

@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { HelpCircle, CheckCircle2, CornerDownLeft } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { detectUserLanguage, pickLang } from "@/lib/yula-lang";
 
 export interface UserChoiceOption {
   label: string;
@@ -85,18 +85,7 @@ export function YulaChoiceCard({
   const [selectedLabel, setSelectedLabel] = React.useState<string | null>(null);
   const [customInput, setCustomInput] = React.useState("");
 
-  // Kart dili tespiti
-  const cardLang = React.useMemo(() => {
-    const idx = messageId ? yula.messages.findIndex((m) => m.id === messageId) : -1;
-    const pool = idx >= 0 ? yula.messages.slice(0, idx) : yula.messages;
-    const lastUser = [...pool].reverse().find((m) => m.role === "user");
-    const text = lastUser?.parts
-      ?.filter((p) => p.type === "text")
-      ?.map((p) => (p as { text?: string }).text ?? "")
-      ?.join("\n");
-    return detectUserLanguage(text);
-  }, [yula.messages, messageId]);
-  const L = (tr: string, en: string) => pickLang(cardLang, tr, en);
+  const t = useTranslations("ChoiceCard");
 
   // Watermark / placeholder metni: Yalnızca model tarafından dinamik sağlanan hint
   const customPlaceholder = choiceData?.customPlaceholder;
@@ -160,7 +149,7 @@ export function YulaChoiceCard({
 
   // Yanıtlanmış kart görünümü
   if (isAnswered) {
-    const displayText = selectedLabel || followUpText || L("Seçim yapıldı", "Option selected");
+    const displayText = selectedLabel || followUpText || t("option_selected");
     return (
       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08] px-3.5 py-2.5 text-[12.5px] transition-all">
         <div className="flex items-center gap-2 text-muted-foreground font-medium">
@@ -234,7 +223,7 @@ export function YulaChoiceCard({
             className="h-8 px-2.5 text-[12px] shrink-0"
           >
             <CornerDownLeft className="size-3.5 mr-1" />
-            {L("Gönder", "Send")}
+            {t("send")}
           </Button>
         </form>
       ) : null}

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Compass, FileSpreadsheet, LineChart, Sparkles } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useYulaChat } from "@/hooks/use-yula-chat";
@@ -39,6 +40,7 @@ export function YulaSuggestionChips({
   input?: unknown;
   output?: unknown;
 }) {
+  const t = useTranslations("SuggestionChips");
   const yula = useYulaChat();
   const router = useRouter();
   const [used, setUsed] = React.useState<ReadonlySet<number>>(new Set());
@@ -88,8 +90,8 @@ export function YulaSuggestionChips({
             disabled={s.kind !== "report" && s.kind !== "navigation" && !canSend}
             title={
               s.kind === "report" || s.kind === "navigation"
-                ? `"${s.title}" ekranını açmak için tıklayın`
-                : `"${s.prompt ?? s.title}" olarak sormak için tıklayın`
+                ? t("open_screen_title", { title: s.title })
+                : t("ask_prompt_title", { prompt: s.prompt ?? s.title })
             }
             className={cn(
               "inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-all select-none",

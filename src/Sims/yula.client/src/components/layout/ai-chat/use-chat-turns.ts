@@ -122,7 +122,15 @@ export function useRecoveredToolCallIds(messages: YulaMessage[]): Set<string> {
         }
         const info = yulaToolPartInfo(p);
         if (info) {
-          if (info.state === "output-available" && !isFailedToolInfo(info)) {
+          const isInteractiveCard =
+            info.toolName === "ask_user_choice" ||
+            info.toolName === "ask_user_question" ||
+            info.toolName === "suggest_next_steps";
+          if (
+            (info.state === "output-available" ||
+              (isInteractiveCard && info.state === "input-available")) &&
+            !isFailedToolInfo(info)
+          ) {
             progresses.push({ msgIdx: mi, partIdx: pi });
           }
         } else if (

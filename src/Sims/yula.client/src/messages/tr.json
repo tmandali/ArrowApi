@@ -871,7 +871,52 @@
     "copy_question": "Soruyu Kopyala",
     "copy": "Kopyala",
     "undo_edit": "Mesajı Geri Al ve Düzenle",
-    "undo_edit_short": "Geri Al ve Düzenle"
+    "undo_edit_short": "Geri Al ve Düzenle",
+    "no_visible_reply": "Bu turda görünür bir yanıt üretilemedi.",
+    "operation_failed": "İşlem tamamlanamadı: {detail}",
+    "tool_error_default": "araç hatası",
+    "ai_provider_error": "AI sağlayıcısı hata döndürdü: {error}",
+    "retry_hint": "Yeni bir mesaj yazmadan önce yeniden deneyebilirsiniz.",
+    "retry_reply": "Yanıtı yeniden dene",
+    "status_query": "Tablo görünümü güncelleniyor…",
+    "status_sort": "Tablo sıralanıyor…",
+    "status_filter": "Filtre uygulanıyor…",
+    "status_columns": "Kolonlar düzenleniyor…",
+    "status_reset_layout": "Görünüm sıfırlanıyor…",
+    "status_export": "Dosya dışa aktarılıyor…",
+    "status_run_sql": "SQL sorgusu çalışıyor…",
+    "status_analyze": "Tablo özeti hesaplanıyor…",
+    "status_profile": "Tablo analiz ediliyor — lütfen bekleyin…",
+    "status_visualize": "Grafik hazırlanıyor…",
+    "status_set_fields": "Kriterler uygulanıyor…",
+    "status_submit": "Rapor çalıştırılıyor…",
+    "status_options": "Seçenekler hazırlanıyor…",
+    "status_questions": "Sorular hazırlanıyor…",
+    "status_suggestions": "Öneriler hazırlanıyor…",
+    "status_processing": "İstek işleniyor — lütfen bekleyin…",
+    "status_preparing_reply": "Yula yanıt hazırlıyor — lütfen bekleyin…"
+  },
+  "ChoiceCard": {
+    "option_selected": "Seçim yapıldı",
+    "send": "Gönder"
+  },
+  "QuestionnaireCard": {
+    "answered_questions": "Cevaplanan sorular",
+    "skipped_default": "(atlandı → varsayılan: {defaultValue})",
+    "skipped": "(atlandı)",
+    "answered": "(cevaplandı)",
+    "need_answer": "Devam etmek için cevabınız gerekiyor",
+    "own_answer_label": "Kendi cevabınız",
+    "own_answer_placeholder": "Kendi cevabınızı yazın…",
+    "validation_error": "Bu soruyu cevaplayın veya atlayın.",
+    "back": "Geri",
+    "skip": "Atla",
+    "next": "İleri",
+    "send": "Gönder"
+  },
+  "SuggestionChips": {
+    "open_screen_title": "\"{title}\" ekranını açmak için tıklayın",
+    "ask_prompt_title": "\"{prompt}\" olarak sormak için tıklayın"
   },
   "ModelSelector": {
     "select_model": "Yula AI Modeli Seç",

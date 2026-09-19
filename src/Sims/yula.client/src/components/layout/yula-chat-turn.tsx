@@ -32,6 +32,7 @@ import {
   formatTokenCount,
   liveStatusLabel,
   SilentTurnFallback,
+  hasVisibleTurnContent,
 } from "./yula-chat-turn-helpers";
 import { modelCatalog } from "@my-agent/core";
 
@@ -221,6 +222,15 @@ export function YulaChatTurn({
           parts: [{ type: "text", text: fallbackToolText }],
         } as unknown as YulaMessage)
       : undefined;
+
+  const hasVisibleContent = hasVisibleTurnContent({
+    toolParts,
+    assistantText,
+    fallbackMessage,
+  });
+
+  const shouldShowSilentFallback =
+    !isLive && (!hasVisibleContent || Boolean(streamErrorText));
 
   // Run-onay delegesi: turda "çalıştır" önerisi varsa (kriter ekranı, iş
   // henüz koşmadı) metin-içi "Raporu çalıştır" tıklaması ÖNCE ekranın kendi
@@ -439,12 +449,13 @@ export function YulaChatTurn({
         {isLive ? (
           <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground">
             <Loader2 className="size-3.5 shrink-0 text-primary animate-spin" />
-            <span>{liveStatusLabel(toolParts, turnLang)}</span>
+            <span>{liveStatusLabel(toolParts, t, turnLang)}</span>
           </div>
-        ) : !assistantText.trim() && !fallbackMessage ? (
+        ) : shouldShowSilentFallback ? (
           <SilentTurnFallback
             toolParts={toolParts}
             streamErrorText={streamErrorText}
+            recoveredToolCallIds={recoveredToolCallIds}
             onRetry={() => void yula.retryResponse()}
             lang={turnLang}
           />

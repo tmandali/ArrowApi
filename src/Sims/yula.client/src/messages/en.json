@@ -871,7 +871,52 @@
     "copy_question": "Copy question",
     "copy": "Copy",
     "undo_edit": "Undo and edit message",
-    "undo_edit_short": "Undo and edit"
+    "undo_edit_short": "Undo and edit",
+    "no_visible_reply": "No visible reply was produced in this turn.",
+    "operation_failed": "Operation could not be completed: {detail}",
+    "tool_error_default": "tool error",
+    "ai_provider_error": "AI provider returned an error: {error}",
+    "retry_hint": "You can retry before sending a new message.",
+    "retry_reply": "Retry reply",
+    "status_query": "Updating table view…",
+    "status_sort": "Sorting table…",
+    "status_filter": "Applying filter…",
+    "status_columns": "Arranging columns…",
+    "status_reset_layout": "Resetting view…",
+    "status_export": "Exporting file…",
+    "status_run_sql": "Running SQL query…",
+    "status_analyze": "Computing table summary…",
+    "status_profile": "Analyzing table — please wait…",
+    "status_visualize": "Preparing chart…",
+    "status_set_fields": "Applying criteria…",
+    "status_submit": "Running report…",
+    "status_options": "Preparing options…",
+    "status_questions": "Preparing questions…",
+    "status_suggestions": "Preparing suggestions…",
+    "status_processing": "Processing request — please wait…",
+    "status_preparing_reply": "Yula is preparing a reply — please wait…"
+  },
+  "ChoiceCard": {
+    "option_selected": "Option selected",
+    "send": "Send"
+  },
+  "QuestionnaireCard": {
+    "answered_questions": "Answered questions",
+    "skipped_default": "(skipped → default: {defaultValue})",
+    "skipped": "(skipped)",
+    "answered": "(answered)",
+    "need_answer": "Your answer is needed to continue",
+    "own_answer_label": "Your own answer",
+    "own_answer_placeholder": "Type your own answer…",
+    "validation_error": "Answer this question or skip.",
+    "back": "Back",
+    "skip": "Skip",
+    "next": "Next",
+    "send": "Send"
+  },
+  "SuggestionChips": {
+    "open_screen_title": "Click to open \"{title}\"",
+    "ask_prompt_title": "Click to ask as \"{prompt}\""
   },
   "ModelSelector": {
     "select_model": "Select Yula AI Model",
