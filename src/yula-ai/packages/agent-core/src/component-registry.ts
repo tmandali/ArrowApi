@@ -1,7 +1,7 @@
-import { ComponentSchema, PreflightValidationResult } from './types';
-import { i18nManager } from './i18n';
+import { ComponentSchema, PreflightValidationResult, IComponentRegistry } from './types';
+import { i18nManager, enDictionary } from './i18n';
 
-class UIComponentRegistry {
+export class UIComponentRegistry implements IComponentRegistry {
   private registry: Map<string, ComponentSchema[]> = new Map();
 
   register(schema: ComponentSchema): void {
@@ -83,8 +83,9 @@ class UIComponentRegistry {
     if (schema && typeof schema.safeParse === 'function') {
       const parseResult = schema.safeParse(payload || {});
       if (!parseResult.success) {
-        const formattedError = parseResult.error?.errors
-          ? parseResult.error.errors.map((e: any) => `${e.path.join('.') || 'root'}: ${e.message}`).join('; ')
+        const issues = (parseResult.error as any)?.issues || (parseResult.error as any)?.errors;
+        const formattedError = Array.isArray(issues) && issues.length > 0
+          ? issues.map((e: any) => `${e.path?.join?.('.') || 'root'}: ${e.message}`).join('; ')
           : parseResult.error?.message || 'Geçersiz parametreler.';
         return {
           valid: false,
@@ -108,7 +109,8 @@ class UIComponentRegistry {
     const list = components || this.getActiveComponents();
     if (list.length === 0) return '';
 
-    const pDict = i18nManager.getDictionary().prompts;
+    // LLM system prompts strictly use standard English headers to avoid context poisoning
+    const pDict = enDictionary.prompts;
     const lines: string[] = [
       '<active_ui_components>',
       pDict.activeComponentsIntro,
@@ -127,6 +129,12 @@ class UIComponentRegistry {
           lines.push(`  ${pDict.actionLabel(actionName)}`);
           if (contract.description) {
             lines.push(`    - ${pDict.descriptionLabel}: ${contract.description}`);
+          }
+          if (contract.schema && typeof contract.schema === 'object' && 'shape' in contract.schema) {
+            const shapeKeys = Object.keys((contract.schema as any).shape || {});
+            if (shapeKeys.length > 0) {
+              lines.push(`    - ${pDict.parametersLabel || 'Parameters'}: { ${shapeKeys.join(', ')} }`);
+            }
           }
           if (contract.whenToCall) {
             lines.push(`    - ${pDict.whenToCallLabel}: ${contract.whenToCall}`);

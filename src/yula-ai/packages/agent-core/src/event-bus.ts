@@ -1,4 +1,4 @@
-import { UIEvent, UIAction } from './types';
+import { UIEvent, UIAction, IEventBus } from './types';
 
 export interface DispatchResult {
   success: boolean;
@@ -13,7 +13,7 @@ export type ActionHandler = (
 
 type TelemetryListener = (event: UIEvent) => void;
 
-class UIEventBus {
+export class UIEventBus implements IEventBus {
   private subscribers: Map<string, ActionHandler[]> = new Map();
   private telemetryListeners: Set<TelemetryListener> = new Set();
   private ringBuffer: UIEvent[] = [];

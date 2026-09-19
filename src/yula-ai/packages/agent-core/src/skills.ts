@@ -100,7 +100,7 @@ export class SkillRegistry {
 
     return [
       '\n<available_ui_skills>',
-      'Aşağıdaki beceri paketleri bu sayfadaki bileşenleri doğru yönetebilmen için kılavuzdur:',
+      'The following skill guides provide instructions for interacting with components on this screen:',
       ...active.map(
         (s) => `
 <skill name="${s.name}">

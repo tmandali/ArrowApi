@@ -16,18 +16,18 @@ export function buildDynamicToolsFromRegistry(): Record<string, any> {
 
   const validComponentIds = activeComponents.map((c) => c.id);
 
-  // Ekranda aktif olan bileşenlere göre dinamik Zod şeması
+  // Dynamic Zod schema based on active components
   return {
     dispatch_component_action: tool({
-      description: `Ekranda şu an aktif olan UI bileşenlerine (${validComponentIds.join(', ')}) tip güvenli komut gönderir.`,
+      description: `Dispatches a type-safe action to active UI components (${validComponentIds.join(', ')}).`,
       inputSchema: z.object({
-        component_id: z.string().describe(`Hedef bileşen (Aktifler: ${validComponentIds.join(', ')})`),
-        action: z.string().describe('Tetiklenecek aksiyon adı'),
-        payload: z.record(z.string(), z.any()).optional().describe('Aksiyona ait parametreler'),
+        component_id: z.string().describe(`Target component ID (Active: ${validComponentIds.join(', ')})`),
+        action: z.string().describe('Action name to invoke (e.g. SET_FIELDS, SUBMIT, SORT)'),
+        payload: z.record(z.string(), z.any()).optional().describe('Parameters for the action'),
       }),
-execute: async ({ component_id, action, payload }): Promise<ExecuteActionResult> => {
-      return executeComponentAction({ component_id, action, payload });
-    },
+      execute: async ({ component_id, action, payload }): Promise<ExecuteActionResult> => {
+        return executeComponentAction({ component_id, action, payload });
+      },
     }),
   };
 }

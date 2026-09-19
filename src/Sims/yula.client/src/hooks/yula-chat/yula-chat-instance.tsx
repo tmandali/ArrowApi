@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useAgentChat } from "@my-agent/react";
+import { useAgentChat, useAgentSteering } from "@my-agent/react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { useChatsStore } from "@/lib/stores/chats";
 import { clearTurnTrace } from "@/lib/yula-turn-trace";
@@ -16,19 +16,13 @@ import {
   type LiveHelpers,
 } from "./chat-shared";
 import {
-  uiRegistry,
-  uiEventBus,
-  type ComponentSchema,
   executeComponentAction,
-  piEventStream,
-  steeringManager,
-  type QueueItem,
   multiLaneScheduler,
   retryWithBackoff,
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
-import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
+import { useHeadlessSystemComponents } from "./use-headless-system-components";
 
 /**
  * Yula Chat Instance — Saf @my-agent/react motoru ve Headless UI-Agent bileşen kaydı.
@@ -58,193 +52,8 @@ export function ChatInstance({
     setActiveConversationId(conversationId);
   });
 
-  // Headless UI-Agent Sistem Bileşenleri: app_router & job_history
-  React.useEffect(() => {
-    const routerSchema: ComponentSchema = {
-      id: "app_router",
-      meta: { description: "Sayfa ve Rota Yönlendirici" },
-      actions: {
-        NAVIGATE: {
-          description: "Kullanıcıyı hedef sayfaya/rapora yönlendirir ({ path }).",
-          whenToCall: "Kullanıcı başka bir rapor veya sayfaya gitmek istediğinde.",
-          whenNotToCall: "Kullanıcı zaten o ekrandayken.",
-        },
-      },
-    };
-    uiRegistry.register(routerSchema);
-    const unsubRouter = uiEventBus.subscribe("app_router", (action, payload) => {
-      if (action === "NAVIGATE" && payload?.path) {
-        let rawPath = String(payload.path).trim();
-        const [basePath, search] = rawPath.split("?");
-        const clean = basePath.replace(/^\//, "").toLowerCase();
-        const matched = REGISTERED_REPORTS.find(
-          (r) =>
-            r.pagePath.toLowerCase() === basePath.toLowerCase() ||
-            r.scope.toLowerCase() === clean ||
-            clean.endsWith(r.scope.toLowerCase()) ||
-            r.aliases.some((a) => a.toLowerCase() === clean),
-        );
-        let targetPath = matched ? matched.pagePath : basePath;
-        if (search) {
-          targetPath = `${targetPath}?${search}`;
-        }
-        router.push(targetPath);
-        return { success: true, navigatedTo: targetPath };
-      }
-      return { success: false, error: "Bilinmeyen router aksiyonu" };
-    });
-
-    const jobHistorySchema: ComponentSchema = {
-      id: "job_history",
-      meta: { description: "Rapor Çalışma Geçmişi ve İş Takibi" },
-      actions: {
-        OPEN_LAST: {
-          description: "En son tamamlanan rapor sonucunu ekranda açar.",
-          whenToCall: "Kullanıcı 'son raporu aç', 'en son sonucu göster' dediğinde.",
-          whenNotToCall: "Yeni bir rapor çalıştırılmak istendiğinde.",
-        },
-        LIST: {
-          description: "Geçmiş işleri listeler.",
-          whenToCall: "Kullanıcı 'hangi raporlar çalıştı', 'geçmiş' dediğinde.",
-          whenNotToCall: "Mevcut rapor incelenirken.",
-        },
-        FIND: {
-          description: "Geçmişte çalıştırılmış raporları veya eşleşen işleri arar ({ query }).",
-          whenToCall: "Kullanıcı belirli bir rapor veya işi bulmak istediğinde.",
-          whenNotToCall: "Tüm liste istendiğinde veya yeni rapor çalıştırılırken.",
-        },
-        CANCEL: {
-          description: "Çalışmakta olan işi iptal eder ({ jobId }).",
-          whenToCall: "Kullanıcı 'durdur', 'iptal et' dediğinde.",
-          whenNotToCall: "İş zaten tamamlanmışken.",
-        },
-      },
-    };
-    uiRegistry.register(jobHistorySchema);
-    const unsubJob = uiEventBus.subscribe("job_history", (action, payload) => {
-      return executeDispatchComponentAction({ component_id: "job_history", action, payload }) as any;
-    });
-
-    // Headless Platform Rapor Kriter Formları (REGISTERED_REPORTS):
-    // Kullanıcı ana sayfada veya başka bir ekrandayken de raporları çalıştırabilmesi
-    // ve form doldurabilmesi için (demo-app mimarisindeki gibi) headless olarak kaydedilir.
-    const unsubReports: Array<() => void> = [];
-    REGISTERED_REPORTS.forEach((report) => {
-      const formCompId = `criteria_form:${report.scope}`;
-      const formSchema: ComponentSchema = {
-        id: formCompId,
-        meta: {
-          reportScope: report.scope,
-          screenTitle: report.title,
-          pagePath: report.pagePath,
-          workspaceId: report.workspace,
-          isHeadless: true,
-        },
-        actions: {
-          SET_FIELDS: {
-            description: `${report.title} kriter formuna değerleri yazar ve taslağa uygular ({ criteria }).`,
-            whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak istediğinde.",
-            whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
-          },
-          APPLY: {
-            description: `${report.title} kriter formuna değerleri yazar ve sayfaya yönlendirir.`,
-            whenToCall: `Kullanıcı ${report.title} rapor kriterlerini girmek veya güncellemek istediğinde.`,
-            whenNotToCall: "Raporu doğrudan çalıştırmak istediğinde veya form alanlarıyla ilgisiz işlemlerde.",
-          },
-          SUBMIT: {
-            description: `${report.title} raporunu çalıştırır ve işi kuyruğa alır ({ criteria, report }).`,
-            whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'getir' dediğinde.",
-            whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
-          },
-          RUN: {
-            description: `${report.title} raporunu çalıştırır ve sonuç ekranına yönlendirir.`,
-            whenToCall: `Kullanıcı ${report.title} raporunu çalıştırmak veya sonuçlarını görmek istediğinde.`,
-            whenNotToCall: "Sadece kriterleri taslak olarak doldurmak istediğinde.",
-          },
-          SCHEMA: {
-            description: `${report.title} kriter şemasını inceler.`,
-            whenToCall: `Raporun alanlarını ve veri formatlarını öğrenmek gerektiğinde.`,
-            whenNotToCall: "Kriter yapısı zaten biliniyorken.",
-          },
-          READ: {
-            description: `${report.title} mevcut taslak kriterlerini okur.`,
-            whenToCall: `Formdaki mevcut doldurulmuş değerleri kontrol etmek için.`,
-            whenNotToCall: "Yeni değerler atanırken.",
-          },
-          VALIDATE: {
-            description: `${report.title} kriterlerini doğrular.`,
-            whenToCall: `Kriter girdilerinin şema kurallarına uygunluğunu denetlemek için.`,
-            whenNotToCall: "Kriter girilmediğinde.",
-          },
-        },
-      };
-      uiRegistry.register(formSchema);
-      const unsub = uiEventBus.subscribe(formCompId, async (action, payload) => {
-        const res = (await executeDispatchComponentAction({
-          component_id: formCompId,
-          action,
-          payload: { ...payload, report: report.scope },
-        })) as Record<string, unknown> | null;
-
-        if (res && typeof res === "object") {
-          const navTarget =
-            (res.navigateTo as string) ||
-            (action === "APPLY" || action === "RUN" ? report.pagePath : undefined);
-          if (navTarget) {
-            const navToolCallId = `nav_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-            piEventStream.emit({
-              type: "tool_execution_start",
-              toolCallId: navToolCallId,
-              toolName: "dispatch_component_action",
-              args: {
-                component_id: "app_router",
-                action: "NAVIGATE",
-                payload: { path: navTarget },
-              },
-            });
-            let navOutcome: any;
-            try {
-              if (uiRegistry.get("app_router")) {
-                navOutcome = uiEventBus.dispatch({
-                  component_id: "app_router",
-                  action: "NAVIGATE",
-                  payload: { path: navTarget },
-                });
-              } else {
-                router.push(navTarget);
-                navOutcome = { success: true, result: { navigatedTo: navTarget } };
-              }
-            } catch (err) {
-              router.push(navTarget);
-              navOutcome = { success: false, error: String(err) };
-            }
-            const cleanNavOutput =
-              navOutcome?.result ?? { success: navOutcome?.success, navigatedTo: navTarget };
-            piEventStream.emit({
-              type: "tool_execution_end",
-              toolCallId: navToolCallId,
-              toolName: "dispatch_component_action",
-              result: cleanNavOutput,
-              isError: !navOutcome?.success,
-            });
-          }
-        }
-        return res;
-      });
-      unsubReports.push(unsub);
-    });
-
-    return () => {
-      unsubRouter();
-      unsubJob();
-      unsubReports.forEach((unsub) => unsub());
-      uiRegistry.unregister("app_router");
-      uiRegistry.unregister("job_history");
-      REGISTERED_REPORTS.forEach((report) => {
-        uiRegistry.unregister(`criteria_form:${report.scope}`);
-      });
-    };
-  }, [router]);
+  // Headless UI-Agent Sistem Bileşenleri: app_router, job_history & criteria_form:*
+  useHeadlessSystemComponents(router);
 
   const userStoppedRef = React.useRef(false);
   const [stopped, setStopped] = React.useState(false);
@@ -285,57 +94,26 @@ export function ChatInstance({
 
   const status = chat.status;
 
-  const [steeringQueue, setSteeringQueue] = React.useState<QueueItem[]>([]);
-  const [followUpQueue, setFollowUpQueue] = React.useState<QueueItem[]>([]);
-
-  const syncQueues = React.useCallback(() => {
-    setSteeringQueue(steeringManager.getSteeringQueue());
-    setFollowUpQueue(steeringManager.getFollowUpQueue());
-  }, []);
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react/set-state-in-effect -- harici piEventStream kuyruk senkronu; mount'ta tek-atış, sonrası event-driven
-    syncQueues();
-    const unsub = piEventStream.subscribe((event) => {
-      if (
-        event.type === "steer_injected" ||
-        event.type === "follow_up_queued" ||
-        event.type === "turn_start" ||
-        event.type === "turn_end" ||
-        event.type === "agent_start" ||
-        event.type === "agent_end"
-      ) {
-        syncQueues();
-      }
-    });
-    return unsub;
-  }, [syncQueues]);
+  const {
+    steeringQueue,
+    followUpQueue,
+    clearSteering,
+    clearFollowUp,
+  } = useAgentSteering();
 
   const steer = React.useCallback(
     (text: string) => {
       chat.steer(text);
-      syncQueues();
     },
-    [chat, syncQueues],
+    [chat],
   );
 
   const followUp = React.useCallback(
     (text: string) => {
       chat.followUp(text);
-      syncQueues();
     },
-    [chat, syncQueues],
+    [chat],
   );
-
-  const clearSteering = React.useCallback(() => {
-    steeringManager.clearSteering();
-    syncQueues();
-  }, [syncQueues]);
-
-  const clearFollowUp = React.useCallback(() => {
-    steeringManager.clearFollowUp();
-    syncQueues();
-  }, [syncQueues]);
 
   // Background indexing with Multi-Lane Scheduler (lane: background)
   React.useEffect(() => {

@@ -40,7 +40,7 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
       id: "criteria_form:retail-sales-report",
       actions: {
         SET_FIELDS: {
-          description: "Kriterleri doldurur",
+          description: "Populates criteria",
         },
       },
     };
@@ -72,7 +72,7 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     const schema: ComponentSchema = {
       id: "criteria_form:retail-sales-report",
       actions: {
-        SUBMIT: { description: "Raporu çalıştırır" },
+        SUBMIT: { description: "Executes report" },
       },
     };
     uiRegistry.register(schema);
@@ -307,7 +307,7 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     const routerSchema: ComponentSchema = {
       id: "app_router",
       actions: {
-        NAVIGATE: { description: "Sayfa değiştir" },
+        NAVIGATE: { description: "Navigates between pages" },
       },
     };
     uiRegistry.register(routerSchema);
@@ -341,8 +341,8 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     const formSchema: ComponentSchema = {
       id: "criteria_form:retail-sales-report",
       actions: {
-        SET_FIELDS: { description: "Kriterleri doldurur" },
-        SUBMIT: { description: "Raporu çalıştırır" },
+        SET_FIELDS: { description: "Populates criteria" },
+        SUBMIT: { description: "Executes report" },
       },
     };
     uiRegistry.register(formSchema);

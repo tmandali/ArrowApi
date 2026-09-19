@@ -1,3 +1,5 @@
+import { StorageAdapter } from './types';
+
 export type MemoryScope = 'session' | 'persistent';
 
 export interface MemoryEntry {
@@ -8,34 +10,123 @@ export interface MemoryEntry {
   updatedAt: number;
 }
 
+export interface AgentMemoryOptions {
+  storage?: StorageAdapter;
+  persistentStorageKey?: string;
+  defaultMemories?: Array<{ key: string; value: any; scope?: MemoryScope; description?: string }>;
+}
+
+class LocalStorageAdapter implements StorageAdapter {
+  getItem(key: string): string | null {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  setItem(key: string, value: string): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (e) {
+        console.warn('[LocalStorageAdapter] setItem error:', e);
+      }
+    }
+  }
+
+  removeItem(key: string): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch (e) {
+        console.warn('[LocalStorageAdapter] removeItem error:', e);
+      }
+    }
+  }
+
+  clear(): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.clear();
+      } catch {}
+    }
+  }
+}
+
+class MemoryStorageAdapter implements StorageAdapter {
+  private store = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.store.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+}
+
 /**
  * Pi-Style Agent Memory System
  * Reference: earendil-works/pi/packages/agent/src/harness/memory/
  * 
  * Katmanlar:
  * 1. Session Memory: Oturum boyunca geçerli geçici bellek (scratchpad)
- * 2. Persistent Memory: LocalStorage ile tarayıcıda kalıcı kullanıcı gerçekleri & tercihleri
+ * 2. Persistent Memory: StorageAdapter ile tarayıcıda/istemcide kalıcı kullanıcı tercihleri
  * 3. Tool Execution Memoization: Aynı parametrelerle çalışan pahalı araç sonuçlarını önbelleğe alma
  */
 export class AgentMemory {
   private sessionStore: Map<string, MemoryEntry> = new Map();
-  private persistentStorageKey = '__my_agent_persistent_memory__';
+  private persistentStorageKey: string;
+  private storage: StorageAdapter;
   private toolCache: Map<string, { result: any; expiresAt: number }> = new Map();
+  private listeners: Set<() => void> = new Set();
+  private cachedAll?: MemoryEntry[];
 
-  constructor() {
-    this.initDefaultMemories();
+  constructor(options?: AgentMemoryOptions) {
+    this.persistentStorageKey = options?.persistentStorageKey || '__my_agent_persistent_memory__';
+    this.storage =
+      options?.storage ||
+      (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+        ? new LocalStorageAdapter()
+        : new MemoryStorageAdapter());
+
+    this.initDefaultMemories(options?.defaultMemories);
   }
 
-  private isBrowser(): boolean {
-    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.cachedAll = undefined;
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[AgentMemory] Listener error:', err);
+      }
+    });
   }
 
   private getPersistentEntries(): Map<string, MemoryEntry> {
     const map = new Map<string, MemoryEntry>();
-    if (!this.isBrowser()) return map;
-
     try {
-      const raw = window.localStorage.getItem(this.persistentStorageKey);
+      const raw = this.storage.getItem(this.persistentStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         for (const item of parsed) {
@@ -49,9 +140,8 @@ export class AgentMemory {
   }
 
   private savePersistentEntries(entries: MemoryEntry[]): void {
-    if (!this.isBrowser()) return;
     try {
-      window.localStorage.setItem(this.persistentStorageKey, JSON.stringify(entries));
+      this.storage.setItem(this.persistentStorageKey, JSON.stringify(entries));
     } catch (e) {
       console.warn('[AgentMemory] Persistent memory kaydetme hatası:', e);
     }
@@ -76,6 +166,8 @@ export class AgentMemory {
       persistent.set(key, entry);
       this.savePersistentEntries(Array.from(persistent.values()));
     }
+
+    this.notify();
   }
 
   /**
@@ -107,6 +199,9 @@ export class AgentMemory {
       this.savePersistentEntries(Array.from(persistent.values()));
       deleted = true;
     }
+    if (deleted) {
+      this.notify();
+    }
     return deleted;
   }
 
@@ -120,10 +215,13 @@ export class AgentMemory {
     if (scope === 'session') return sessionList;
     if (scope === 'persistent') return persistentList;
 
-    const combined = new Map<string, MemoryEntry>();
-    for (const item of persistentList) combined.set(item.key, item);
-    for (const item of sessionList) combined.set(item.key, item);
-    return Array.from(combined.values());
+    if (!this.cachedAll) {
+      const combined = new Map<string, MemoryEntry>();
+      for (const item of persistentList) combined.set(item.key, item);
+      for (const item of sessionList) combined.set(item.key, item);
+      this.cachedAll = Array.from(combined.values());
+    }
+    return this.cachedAll;
   }
 
   /**
@@ -134,12 +232,11 @@ export class AgentMemory {
       this.sessionStore.clear();
     }
     if (scope === 'persistent' || scope === 'all') {
-      if (this.isBrowser()) {
-        try {
-          window.localStorage.removeItem(this.persistentStorageKey);
-        } catch {}
-      }
+      try {
+        this.storage.removeItem(this.persistentStorageKey);
+      } catch {}
     }
+    this.notify();
   }
 
   /**
@@ -151,7 +248,7 @@ export class AgentMemory {
 
     return [
       '\n<agent_memory>',
-      'Aşağıdaki bilgiler kullanıcının kalıcı tercihleri ve hafızanda saklanan gerçeklerdir:',
+      'The following information represents the user\'s preferences and persistent memories:',
       ...entries.map(
         (e) => `- ${e.key}: ${JSON.stringify(e.value)}${e.description ? ` (${e.description})` : ''} [${e.scope}]`
       ),
@@ -186,8 +283,21 @@ export class AgentMemory {
     this.toolCache.clear();
   }
 
-  private initDefaultMemories(): void {
+  private initDefaultMemories(
+    customDefaults?: Array<{ key: string; value: any; scope?: MemoryScope; description?: string }>
+  ): void {
     const existing = this.getPersistentEntries();
+
+    if (customDefaults && customDefaults.length > 0) {
+      for (const item of customDefaults) {
+        if (!existing.has(item.key)) {
+          this.remember(item.key, item.value, item.scope || 'persistent', item.description);
+        }
+      }
+      return;
+    }
+
+    // Geriye dönük uyumluluk varsayılanları
     if (!existing.has('preferred_store')) {
       this.remember('preferred_store', 'Kadıköy', 'persistent', 'Kullanıcının varsayılan şube tercihi');
     }

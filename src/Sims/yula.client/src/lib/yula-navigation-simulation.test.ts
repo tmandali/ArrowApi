@@ -22,12 +22,12 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
     // 2. Yula ChatInstance'daki app_router sözleşmesini mount et
     const routerSchema: ComponentSchema = {
       id: "app_router",
-      meta: { description: "Sayfa ve Rota Yönlendirici" },
+      meta: { description: "Page and Route Navigator" },
       actions: {
         NAVIGATE: {
-          description: "Kullanıcıyı hedef sayfaya/rapora yönlendirir ({ path }).",
-          whenToCall: "Kullanıcı başka bir rapor veya sayfaya gitmek istediğinde.",
-          whenNotToCall: "Kullanıcı zaten o ekrandayken.",
+          description: "Navigates the user to a target page or report ({ path }).",
+          whenToCall: "When the user wants to navigate to another report, workspace, or page.",
+          whenNotToCall: "When the user is already on the target screen.",
         },
       },
     };
@@ -117,24 +117,24 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
       },
       actions: {
         SET_FIELDS: {
-          description: "Kriterleri doldurur ve sayfaya yönlendirir.",
-          whenToCall: "Kriterleri güncellemek için.",
-          whenNotToCall: "Formu çalıştırmadan önce.",
+          description: "Populates criteria fields and navigates to the page.",
+          whenToCall: "When updating criteria.",
+          whenNotToCall: "Before running the form.",
         },
         APPLY: {
-          description: "Kriterleri doldurur ve sayfaya yönlendirir.",
-          whenToCall: "Kriterleri güncellemek için.",
-          whenNotToCall: "Formu çalıştırmadan önce.",
+          description: "Populates criteria fields and navigates to the page.",
+          whenToCall: "When updating criteria.",
+          whenNotToCall: "Before running the form.",
         },
         SUBMIT: {
-          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
-          whenToCall: "Raporu çalıştırmak için.",
-          whenNotToCall: "Taslak düzenlerken.",
+          description: "Executes the report and navigates to the result screen.",
+          whenToCall: "When requesting to run the report.",
+          whenNotToCall: "When drafting criteria.",
         },
         RUN: {
-          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
-          whenToCall: "Raporu çalıştırmak için.",
-          whenNotToCall: "Taslak düzenlerken.",
+          description: "Executes the report and navigates to the result screen.",
+          whenToCall: "When requesting to run the report.",
+          whenNotToCall: "When drafting criteria.",
         },
       },
     };
@@ -200,12 +200,12 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
     // 1. app_router kaydı
     const routerSchema: ComponentSchema = {
       id: "app_router",
-      meta: { description: "Sayfa ve Rota Yönlendirici" },
+      meta: { description: "Page and Route Navigator" },
       actions: {
         NAVIGATE: {
-          description: "Kullanıcıyı hedef sayfaya/rapora yönlendirir ({ path }).",
-          whenToCall: "Kullanıcı sayfalar arası geçiş istediğinde.",
-          whenNotToCall: "Kullanıcı zaten mevcut sayfadayken.",
+          description: "Navigates the user to a target page or report ({ path }).",
+          whenToCall: "When the user wants to navigate between pages.",
+          whenNotToCall: "When the user is already on the current page.",
         },
       },
     };
@@ -229,7 +229,7 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
         fakeRouter.push(targetPath);
         return { success: true, navigatedTo: targetPath };
       }
-      return { success: false, error: "Bilinmeyen router aksiyonu" };
+      return { success: false, error: "Unknown router action" };
     });
 
     // 2. Headless form kaydı
@@ -246,14 +246,14 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
       },
       actions: {
         SUBMIT: {
-          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
-          whenToCall: "Rapor çalıştırma isteğinde.",
-          whenNotToCall: "Taslak form doldurulurken.",
+          description: "Executes the report and navigates to the result screen.",
+          whenToCall: "When requesting to run the report.",
+          whenNotToCall: "When drafting the form.",
         },
         RUN: {
-          description: "Raporu çalıştırır ve sonuç ekranına yönlendirir.",
-          whenToCall: "Rapor çalıştırma isteğinde.",
-          whenNotToCall: "Taslak form doldurulurken.",
+          description: "Executes the report and navigates to the result screen.",
+          whenToCall: "When requesting to run the report.",
+          whenNotToCall: "When drafting the form.",
         },
       },
     };
@@ -416,27 +416,27 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
     // 3. Form bileşenini mount et
     const formSchema: ComponentSchema = {
       id: formCompId,
-      meta: { description: `${report.title} Kriter Formu`, scope: report.scope },
+      meta: { description: `${report.title} Criteria Form`, scope: report.scope },
       actions: {
         SET_FIELDS: {
-          description: "Kriterleri uygular",
-          whenToCall: "Kriterler doldurulurken",
-          whenNotToCall: "Zaten doluyken",
+          description: "Applies criteria values",
+          whenToCall: "When populating criteria",
+          whenNotToCall: "When already populated",
         },
         APPLY: {
-          description: "Kriterleri uygular",
-          whenToCall: "Kriterler doldurulurken",
-          whenNotToCall: "Zaten doluyken",
+          description: "Applies criteria values",
+          whenToCall: "When populating criteria",
+          whenNotToCall: "When already populated",
         },
         SUBMIT: {
-          description: "Raporu çalıştırır",
-          whenToCall: "Çalıştır komutunda",
-          whenNotToCall: "Eksik kriter varken",
+          description: "Executes the report",
+          whenToCall: "On execute command",
+          whenNotToCall: "When missing required criteria",
         },
         RUN: {
-          description: "Raporu çalıştırır",
-          whenToCall: "Çalıştır komutunda",
-          whenNotToCall: "Eksik kriter varken",
+          description: "Executes the report",
+          whenToCall: "On execute command",
+          whenNotToCall: "When missing required criteria",
         },
       },
     };

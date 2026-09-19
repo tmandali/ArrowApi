@@ -150,12 +150,12 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
   comps.push({
     id: "app_router",
     capabilities: ["NAVIGATE"],
-    meta: { description: "Sayfa ve Rota Yönlendirici" },
+    meta: { description: "Page and Route Navigator" },
     actions: {
       NAVIGATE: {
-        description: "Kullanıcıyı hedef sayfaya/rapora yönlendirir ({ path }).",
-        whenToCall: "Kullanıcı başka bir rapor veya sayfaya gitmek istediğinde.",
-        whenNotToCall: "Kullanıcı zaten o ekrandayken.",
+        description: "Navigates the user to a target page or report ({ path }).",
+        whenToCall: "When the user wants to navigate to another report, workspace, or page.",
+        whenNotToCall: "When the user is already on the target screen.",
       },
     },
   });
@@ -163,27 +163,27 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
   comps.push({
     id: "job_history",
     capabilities: ["OPEN_LAST", "LIST", "FIND", "CANCEL"],
-    meta: { description: "Rapor Çalışma Geçmişi ve İş Takibi" },
+    meta: { description: "Report Execution History and Job Tracker" },
     actions: {
       OPEN_LAST: {
-        description: "En son tamamlanan rapor sonucunu ekranda açar.",
-        whenToCall: "Kullanıcı 'son raporu aç', 'en son sonucu göster' dediğinde.",
-        whenNotToCall: "Yeni bir rapor çalıştırılmak istendiğinde.",
+        description: "Opens the most recently completed report result on the screen.",
+        whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
+        whenNotToCall: "When the user intends to execute a new report.",
       },
       LIST: {
-        description: "Geçmiş işleri listeler.",
-        whenToCall: "Kullanıcı 'hangi raporlar çalıştı', 'geçmiş' dediğinde.",
-        whenNotToCall: "Mevcut rapor incelenirken.",
+        description: "Lists past execution jobs.",
+        whenToCall: "When the user asks 'which reports ran', 'show history', 'list past jobs', etc.",
+        whenNotToCall: "When actively inspecting or filtering the current report.",
       },
       FIND: {
-        description: "Geçmişte çalıştırılmış raporları veya eşleşen işleri arar ({ query }).",
-        whenToCall: "Kullanıcı belirli bir rapor veya işi bulmak istediğinde.",
-        whenNotToCall: "Tüm liste istendiğinde veya yeni rapor çalıştırılırken.",
+        description: "Searches past report executions or matching jobs ({ query }).",
+        whenToCall: "When the user wants to find a specific job, execution, or report run.",
+        whenNotToCall: "When requesting the entire list or running a new report.",
       },
       CANCEL: {
-        description: "Çalışmakta olan işi iptal eder ({ jobId }).",
-        whenToCall: "Kullanıcı 'durdur', 'iptal et' dediğinde.",
-        whenNotToCall: "İş zaten tamamlanmışken.",
+        description: "Cancels an active or running job ({ jobId }).",
+        whenToCall: "When the user explicitly asks to 'stop', 'abort', or 'cancel' an execution.",
+        whenNotToCall: "When the job is already finished or terminated.",
       },
     },
   });
@@ -193,71 +193,71 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
     comps.push({
       id: "result_grid:active",
       meta: {
-        description: `Canlı Sonuç Tablosu (${context.grid.tableName || "active_view"}) - ${context.grid.rowCount ?? "?"} satır, Kolonlar: ${(context.grid.columns || []).join(", ")}`,
+        description: `Active Result Grid (${context.grid.tableName || "active_view"}) - ${context.grid.rowCount ?? "?"} rows, Columns: ${(context.grid.columns || []).join(", ")}`,
         tableName: context.grid.tableName,
         columns: context.grid.columns,
         filters: context.grid.filters,
       },
       actions: {
         RUN_SQL: {
-          description: "DuckDB 'active_view' üzerinde salt-okunur SQL sorgusu çalıştırır ({ query }).",
-          whenToCall: "Kullanıcı tablodaki verilerle ilgili hesaplama, top N, ortalama veya özel analiz istediğinde.",
-          whenNotToCall: "Basit filtreleme veya sıralama için (FILTER veya SORT tercih edilmeli).",
+          description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
+          whenToCall: "When the user requests calculations, top N, aggregations, or custom SQL analysis on active table data.",
+          whenNotToCall: "For simple column filtering or sorting (use FILTER or SORT instead).",
         },
         QUERY: {
-          description: "Grid görünümünü SQL ile günceller / türetilmiş görünüm açar ({ query }).",
-          whenToCall: "Kullanıcı türetilmiş kolonlar veya gruplanmış tablo görünümü istediğinde.",
-          whenNotToCall: "Sadece filtre veya sıralama değiştirilirken.",
+          description: "Updates the grid view via SQL or opens a derived view ({ query }).",
+          whenToCall: "When the user wants derived columns or grouped table views.",
+          whenNotToCall: "When only changing simple filters or sorting.",
         },
         FILTER: {
-          description: "Kolona filtre uygular ({ field, value, op }).",
-          whenToCall: "Kullanıcı tek bir kolonda değer süzmek istediğinde.",
-          whenNotToCall: "Çoklu filtre uygulanırken (APPLY_FILTERS kullanılmalı).",
+          description: "Applies a filter to a single column ({ field, value, op }).",
+          whenToCall: "When the user wants to filter records by a single column value.",
+          whenNotToCall: "When applying multiple filters simultaneously (use APPLY_FILTERS instead).",
         },
         APPLY_FILTERS: {
-          description: "Çoklu filtreleri tabloya uygular ({ filters, clearOthers }).",
-          whenToCall: "Birden fazla kolonda eş zamanlı filtreleme gerektiğinde.",
-          whenNotToCall: "Tek bir kolon filtrelenirken.",
+          description: "Applies multiple filters to the table simultaneously ({ filters, clearOthers }).",
+          whenToCall: "When multiple columns need to be filtered concurrently.",
+          whenNotToCall: "When filtering only a single column.",
         },
         SORT: {
-          description: "Kolonu artan veya azalan sırada sıralar ({ column, direction }).",
-          whenToCall: "Kullanıcı sıralama istediğinde.",
-          whenNotToCall: "Tablo henüz hazır değilken.",
+          description: "Sorts the column in ascending or descending order ({ column, direction }).",
+          whenToCall: "When sorting is requested.",
+          whenNotToCall: "When sorting is not requested.",
         },
         COLUMNS: {
-          description: "Sütunları gösterir/gizler/sıralar ({ visibleColumns, hiddenColumns, order }).",
-          whenToCall: "Sütun görünürlüğü veya sırası değiştirilmek istendiğinde.",
-          whenNotToCall: "Tablo verisi filtrelenirken.",
+          description: "Shows, hides, or reorders columns ({ visibleColumns, hiddenColumns, order }).",
+          whenToCall: "When adjusting column visibility or display order.",
+          whenNotToCall: "When filtering table data.",
         },
         PIN: {
-          description: "Sütunları sabitler ({ columns }).",
-          whenToCall: "Sütun dondurma istendiğinde.",
-          whenNotToCall: "Sabitleme istenmediğinde.",
+          description: "Pins columns to the left or right ({ columns }).",
+          whenToCall: "When column freezing or pinning is requested.",
+          whenNotToCall: "When pinning is not requested.",
         },
         RESET_LAYOUT: {
-          description: "Varsayılan ızgara yerleşimine döner.",
-          whenToCall: "Yerleşimi sıfırlamak istendiğinde.",
-          whenNotToCall: "Mevcut düzen korunmak istendiğinde.",
+          description: "Resets the grid to default layout and visibility.",
+          whenToCall: "When the user wants to reset custom column arrangements.",
+          whenNotToCall: "When keeping the current layout.",
         },
         EXPORT: {
-          description: "Tabloyu dışa aktarır ({ format: 'xlsx'|'parquet'|'csv'|'gz' }).",
-          whenToCall: "Kullanıcı 'indir', 'excel yap', 'csv al' dediğinde.",
-          whenNotToCall: "Sadece veriyi ekranda görmek istediğinde.",
+          description: "Exports the table to file ({ format: 'xlsx'|'parquet'|'csv'|'gz' }).",
+          whenToCall: "When the user requests exporting or downloading data to Excel, CSV, or Parquet.",
+          whenNotToCall: "When only viewing data on screen.",
         },
         PROFILE: {
-          description: "Tablo kolonlarının null sayıları, kardinalite ve anomalilerini analiz eder.",
-          whenToCall: "Kullanıcı '/analiz' dediğinde veya veri anomalilerini incelemek istediğinde.",
-          whenNotToCall: "Kullanıcı sadece belirli bir satırı ararken.",
+          description: "Analyzes column null counts, cardinality, and data quality anomalies.",
+          whenToCall: "When the user requests data profiling or inspecting data quality anomalies.",
+          whenNotToCall: "When the user is searching for specific rows.",
         },
         ANALYZE: {
-          description: "Veri analiz özeti çıkarır.",
-          whenToCall: "İstatistiki özet istendiğinde.",
-          whenNotToCall: "Özet analiz istenmediğinde.",
+          description: "Generates a statistical analysis summary of active data.",
+          whenToCall: "When statistical summary or distribution analysis is requested.",
+          whenNotToCall: "When statistical summary is not requested.",
         },
         VISUALIZE: {
-          description: "Tablo verisini grafik olarak görselleştirir ({ type, dimension, metric }).",
-          whenToCall: "Kullanıcı grafik veya çizelge istediğinde.",
-          whenNotToCall: "Tabloda sayısal metrik yokken.",
+          description: "Generates a visual chart or plot from table data ({ type, dimension, metric }).",
+          whenToCall: "When the user requests a chart, plot, or graph visualization.",
+          whenNotToCall: "When there are no numeric metrics in the table.",
         },
       },
     });
@@ -270,50 +270,50 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
       (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
 
     const scope = activeReport?.scope ?? (context?.screen?.reportScope || "report");
-    const reportTitle = activeReport?.title ?? "Rapor";
+    const reportTitle = activeReport?.title ?? "Report";
 
     comps.push({
       id: `criteria_form:${scope}`,
       meta: {
-        description: `${reportTitle} Kriter Formu`,
+        description: `${reportTitle} Criteria Form`,
         scope,
         criteriaDraft: (context as any)?.screenState?.criteria ?? (context?.uiContext as any)?.criteria,
       },
       actions: {
         SET_FIELDS: {
-          description: "Kriter formuna değerleri yazar ve günceller ({ criteria }).",
-          whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak istediğinde.",
-          whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+          description: "Populates criteria form fields without executing the report ({ criteria }).",
+          whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
+          whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT or RUN).",
         },
         APPLY: {
-          description: "Kriter formuna değerleri yazar ve günceller ({ criteria }).",
-          whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak/seçmek istediğinde.",
-          whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+          description: "Populates criteria form fields and updates the form ({ criteria }).",
+          whenToCall: "When the user prepares or updates criteria parameters.",
+          whenNotToCall: "When the user commands to run the report directly.",
         },
         SUBMIT: {
-          description: "Raporu kriterlerle çalıştırıp işi kuyruğa alır ({ criteria, report }).",
-          whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'raporu al', 'raporunu al', 'getir' dediğinde.",
-          whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
+          description: "Submits criteria, executes the report, and queues the job ({ criteria, report }).",
+          whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
+          whenNotToCall: "When required fields are missing or user is only drafting parameters.",
         },
         RUN: {
-          description: "Raporu kriterlerle çalıştırıp işi kuyruğa alır ({ criteria, report }).",
-          whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'raporu al', 'raporunu al', 'getir' dediğinde.",
-          whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
+          description: "Submits criteria, executes the report, and queues the job ({ criteria, report }).",
+          whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
+          whenNotToCall: "When required fields are missing or user is only drafting parameters.",
         },
         SCHEMA: {
-          description: "Rapor kriter şemasını ve kabul edilen alanları inceler.",
-          whenToCall: "Raporun hangi alanları ve veri formatlarını kabul ettiğini öğrenmek için.",
-          whenNotToCall: "Şema zaten biliniyorken.",
+          description: "Inspects report criteria schema and accepted parameter definitions.",
+          whenToCall: "To discover parameter names, data types, and accepted formats.",
+          whenNotToCall: "When the criteria schema is already known.",
         },
         VALIDATE: {
-          description: "Girilen kriterlerin şemaya uygunluğunu doğrular ({ criteria }).",
-          whenToCall: "Kullanıcı kriterlerin geçerli olup olmadığını sorduğunda.",
-          whenNotToCall: "Kullanıcı doğrudan çalıştırmak istediğinde.",
+          description: "Validates criteria parameters against schema rules ({ criteria }).",
+          whenToCall: "When checking whether parameters satisfy schema constraints.",
+          whenNotToCall: "When the user directly commands execution.",
         },
         READ: {
-          description: "Formdaki mevcut kriter taslağını okur.",
-          whenToCall: "Mevcut form durumunu öğrenmek veya değer birleştirmek (merge) gerektiğinde.",
-          whenNotToCall: "Kullanıcı doğrudan rapor çalıştırma ('al', 'çalıştır', 'başlat') istediğinde veya yeni değer atarken.",
+          description: "Reads current draft criteria values from the active form.",
+          whenToCall: "To inspect current form state or merge values.",
+          whenNotToCall: "When assigning or overwriting new values.",
         },
       },
     });

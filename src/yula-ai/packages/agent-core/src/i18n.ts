@@ -25,6 +25,7 @@ export interface AgentDictionary {
     descriptionLabel: string;
     supportedActionsLabel: string;
     actionLabel: (action: string) => string;
+    parametersLabel: string;
     whenToCallLabel: string;
     whenNotToCallLabel: string;
   };
@@ -61,13 +62,14 @@ export const trDictionary: AgentDictionary = {
   },
   prompts: {
     activeComponentsIntro:
-      'Şu anda ekranda mount edilmiş ve doğrudan etkileşime geçebileceğin UI bileşenleri ve kullanım kuralları:',
-    componentLabel: (id) => `[Bileşen: ${id}]`,
-    descriptionLabel: 'Tanım',
-    supportedActionsLabel: 'Desteklenen Aksiyonlar',
-    actionLabel: (action) => `• Aksiyon: ${action}`,
-    whenToCallLabel: '✅ WHEN TO CALL (Ne Zaman Çağrılmalı)',
-    whenNotToCallLabel: '⛔ WHEN NOT TO CALL (Ne Zaman Çağrılmamalı)',
+      'Currently mounted UI components on screen that you can directly interact with, along with execution rules:',
+    componentLabel: (id) => `[Component: ${id}]`,
+    descriptionLabel: 'Description',
+    supportedActionsLabel: 'Supported Actions',
+    actionLabel: (action) => `• Action: ${action}`,
+    parametersLabel: 'Parameters',
+    whenToCallLabel: '✅ WHEN TO CALL',
+    whenNotToCallLabel: '⛔ WHEN NOT TO CALL',
   },
   status: {
     waitingUserSelection: (question, count) =>
@@ -108,6 +110,7 @@ export const enDictionary: AgentDictionary = {
     descriptionLabel: 'Description',
     supportedActionsLabel: 'Supported Actions',
     actionLabel: (action) => `• Action: ${action}`,
+    parametersLabel: 'Parameters',
     whenToCallLabel: '✅ WHEN TO CALL',
     whenNotToCallLabel: '⛔ WHEN NOT TO CALL',
   },

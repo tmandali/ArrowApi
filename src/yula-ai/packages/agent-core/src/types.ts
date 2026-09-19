@@ -1,7 +1,16 @@
+import type { ZodTypeAny } from 'zod';
+
+export interface StorageAdapter {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+  clear?: () => void;
+}
+
 export interface Tool<TInput = any, TOutput = any> {
   description: string;
   parameters?: any;
-  inputSchema?: any;
+  inputSchema?: ZodTypeAny | any;
   execute: (input: TInput) => Promise<TOutput>;
 }
 
@@ -9,9 +18,9 @@ export function tool<TInput = any, TOutput = any>(def: Tool<TInput, TOutput>): T
   return def;
 }
 
-export interface ActionContract {
+export interface ActionContract<TSchema extends ZodTypeAny = ZodTypeAny> {
   description?: string;
-  schema?: any; // z.ZodSchema
+  schema?: TSchema;
   whenToCall: string;     // Modelin bu aksiyonu tetiklemesi GEREKEN durumlar
   whenNotToCall: string;  // Modelin bu aksiyonu ASLA tetiklememesi gereken durumlar
 }
@@ -22,6 +31,24 @@ export interface ComponentSchema {
   meta?: Record<string, any>;
   executionMode?: 'parallel' | 'sequential';
   actions?: Record<string, ActionContract>;
+}
+
+export interface IEventBus {
+  subscribe(componentId: string, handler: (action: string, payload: any) => any): () => void;
+  dispatch(actionPayload: UIAction): { success: boolean; result?: any; error?: string };
+  recordTelemetry(event: Omit<UIEvent, 'timestamp'>): void;
+  getRecentEvents(): UIEvent[];
+  clear(): void;
+}
+
+export interface IComponentRegistry {
+  register(schema: ComponentSchema): void;
+  unregister(componentId: string, schema?: ComponentSchema): void;
+  get(componentId: string): ComponentSchema | undefined;
+  getActiveComponents(): ComponentSchema[];
+  preflightValidate(componentId: string, action: string, payload?: any): PreflightValidationResult;
+  formatActiveComponentsPrompt(components?: ComponentSchema[]): string;
+  clear(): void;
 }
 
 export interface UIEvent {

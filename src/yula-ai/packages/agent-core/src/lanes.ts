@@ -37,6 +37,26 @@ export class MultiLaneScheduler {
   };
 
   private isProcessing = false;
+  private listeners: Set<() => void> = new Set();
+  private cachedStatus?: Record<AgentLane, LaneStatus>;
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.cachedStatus = undefined;
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[MultiLaneScheduler] Listener error:', err);
+      }
+    });
+  }
 
   async enqueue<T>(lane: AgentLane, description: string, execute: () => Promise<T>): Promise<T> {
     const id = `task_${lane}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -60,6 +80,7 @@ export class MultiLaneScheduler {
       };
 
       this.queues[lane].push(wrappedTask);
+      this.notify();
       this.processNext();
     });
   }
@@ -78,6 +99,7 @@ export class MultiLaneScheduler {
         const task = this.queues[lane].shift();
         if (task) {
           this.states[lane] = 'running';
+          this.notify();
           piEventStream.emit({
             type: 'lane_switched',
             lane,
@@ -92,6 +114,7 @@ export class MultiLaneScheduler {
           } finally {
             this.states[lane] = 'idle';
             this.completedCounts[lane]++;
+            this.notify();
           }
 
           // Steering veya interactive çalıştıktan sonra tekrar en baştan öncelikleri kontrol et
@@ -110,11 +133,13 @@ export class MultiLaneScheduler {
 
   pauseLane(lane: AgentLane): void {
     this.states[lane] = 'paused';
+    this.notify();
   }
 
   resumeLane(lane: AgentLane): void {
     if (this.states[lane] === 'paused') {
       this.states[lane] = 'idle';
+      this.notify();
       this.processNext();
     }
   }
@@ -129,17 +154,21 @@ export class MultiLaneScheduler {
   }
 
   getAllStatus(): Record<AgentLane, LaneStatus> {
-    return {
-      steering: this.getLaneStatus('steering'),
-      interactive: this.getLaneStatus('interactive'),
-      background: this.getLaneStatus('background'),
-    };
+    if (!this.cachedStatus) {
+      this.cachedStatus = {
+        steering: this.getLaneStatus('steering'),
+        interactive: this.getLaneStatus('interactive'),
+        background: this.getLaneStatus('background'),
+      };
+    }
+    return this.cachedStatus;
   }
 
   clear(): void {
     this.queues.steering = [];
     this.queues.interactive = [];
     this.queues.background = [];
+    this.notify();
   }
 }
 

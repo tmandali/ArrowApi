@@ -130,6 +130,19 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
   useEffect(() => {
     setCanUndo(sessionManager.canUndo());
     setCanRedo(sessionManager.canRedo());
+    const unsub = sessionManager.subscribe(() => {
+      setCanUndo(sessionManager.canUndo());
+      setCanRedo(sessionManager.canRedo());
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   const getContextSnapshot = useCallback((): UIContextSnapshot => {
@@ -382,6 +395,9 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
 
     setMessages((prev) => [...prev, assistantMsg]);
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 

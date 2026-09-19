@@ -65,7 +65,7 @@ export async function executeComponentAction({
 
     return {
       success: false,
-      error: `Eylem engellendi: ${beforeDecision.block.reason}`,
+      error: `Action blocked: ${beforeDecision.block.reason}`,
       terminate: beforeDecision.block.terminate,
     };
   }
@@ -110,7 +110,7 @@ export async function executeComponentAction({
               outcome.result = resolved;
               if (resolved === false) {
                 outcome.success = false;
-                outcome.error = `Bileşen "${effectiveComponentId}" eylemi reddetti.`;
+                outcome.error = `Component "${effectiveComponentId}" rejected the action.`;
               } else if (resolved && typeof resolved === 'object' && resolved.success === false) {
                 outcome.success = false;
                 outcome.error = resolved.error || outcome.error;
@@ -195,11 +195,11 @@ export async function executeComponentAction({
 
 export const agentUiTools: Record<string, Tool> = {
   dispatch_component_action: tool({
-    description: 'Ekranda aktif olan bir UI bileşenine (form, tablo vb.) aksiyon gönderir.',
+    description: 'Dispatch an action to an active UI component on the screen (criteria form, result grid, app router, job history).',
     inputSchema: z.object({
-      component_id: z.string().describe('Hedef bileşenin benzersiz kimliği'),
-      action: z.string().describe('Tetiklenecek aksiyon (örn: SET_FIELDS, SUBMIT, SORT)'),
-      payload: z.record(z.string(), z.any()).optional().describe('Aksiyona ait parametreler'),
+      component_id: z.string().describe('Target component identifier (e.g. criteria_form:scope, result_grid:active, app_router, job_history)'),
+      action: z.string().describe('Action to trigger (e.g. SET_FIELDS, SUBMIT, SORT, NAVIGATE)'),
+      payload: z.record(z.string(), z.any()).optional().describe('Action parameters and criteria'),
     }),
     execute: async ({ component_id, action, payload }) => {
       return executeComponentAction({ component_id, action, payload });
@@ -207,15 +207,15 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   inspect_ui_state: tool({
-    description: 'Ekranda aktif olan bir bileşenin yeteneklerini veya tüm aktif UI bileşenlerinin anlık durumunu inceler.',
+    description: 'Inspect active screen components, capabilities, or current UI state snapshot.',
     inputSchema: z.object({
-      component_id: z.string().optional().describe('İncelenmek istenen bileşenin IDsi (boş bırakılırsa tüm aktif bileşenler döner)'),
+      component_id: z.string().optional().describe('Target component ID to inspect (if omitted, all active components return)'),
     }),
     execute: async ({ component_id }) => {
       if (component_id) {
         const comp = uiRegistry.get(component_id);
         if (!comp) {
-          return { success: false, error: `Bileşen "${component_id}" şu an ekranda mount edilmemiş.` };
+          return { success: false, error: `Component "${component_id}" is not currently mounted on screen.` };
         }
         return { success: true, component: comp };
       }
@@ -228,18 +228,18 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   remember_fact: tool({
-    description: 'Kullanıcının kalıcı tercihlerini veya konuşma boyunca hatırlanması gereken bir gerçeği hafızaya kaydeder.',
+    description: 'Save a user preference, fact, or custom rule into agent memory.',
     inputSchema: z.object({
-      key: z.string().describe('Hafıza anahtarı (örn: preferred_store, user_role, export_format)'),
-      value: z.any().describe('Kaydedilecek değer'),
-      scope: z.enum(['session', 'persistent']).default('session').describe('Hafıza kapsamı: session (sadece bu oturum) veya persistent (kalıcı)'),
-      description: z.string().optional().describe('Bu bilginin ne olduğuna dair kısa açıklama'),
+      key: z.string().describe('Memory key (e.g. preferred_store, user_role, export_format)'),
+      value: z.any().describe('Value to store'),
+      scope: z.enum(['session', 'persistent']).default('session').describe('Memory scope: session (current session only) or persistent (persists across sessions)'),
+      description: z.string().optional().describe('Brief description of what this fact represents'),
     }),
     execute: async ({ key, value, scope, description }) => {
       agentMemory.remember(key, value, scope, description);
       return {
         success: true,
-        message: `"${key}" bilgisi [${scope}] hafızasına başarıyla kaydedildi.`,
+        message: `Fact "${key}" successfully saved to [${scope}] memory.`,
         key,
         value,
         scope,
@@ -248,15 +248,15 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   recall_fact: tool({
-    description: 'Hafızada saklanan bir bilgiyi veya tüm hafıza kayıtlarını sorgular.',
+    description: 'Recall a stored memory fact or query all records from memory.',
     inputSchema: z.object({
-      key: z.string().optional().describe('Sorgulanacak hafıza anahtarı (boş bırakılırsa tüm hafıza döner)'),
+      key: z.string().optional().describe('Memory key to query (if omitted, returns all memories)'),
     }),
     execute: async ({ key }) => {
       if (key) {
         const val = agentMemory.recall(key);
         if (val === undefined) {
-          return { success: false, error: `Hafızada "${key}" anahtarına ait bir kayıt bulunamadı.` };
+          return { success: false, error: `No memory record found for key "${key}".` };
         }
         return { success: true, key, value: val };
       }
@@ -268,16 +268,16 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   forget_fact: tool({
-    description: 'Hafızada kayıtlı bir bilgiyi anahtarına göre siler.',
+    description: 'Delete a stored memory record by its key.',
     inputSchema: z.object({
-      key: z.string().describe('Silinecek bilginin anahtarı'),
+      key: z.string().describe('Memory key to delete'),
     }),
     execute: async ({ key }) => {
       const removed = agentMemory.forget(key);
       if (!removed) {
         return {
           success: false,
-          error: `"${key}" bilgisi hafızada bulunamadı.`,
+          error: `Fact "${key}" not found in memory.`,
           key,
         };
       }
@@ -290,9 +290,9 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   time_travel: tool({
-    description: 'Sayfa durumunu zamanda geri alır (undo) veya ileri sarar (redo).',
+    description: 'Undo or redo the page and criteria state in time.',
     inputSchema: z.object({
-      action: z.enum(['undo', 'redo']).describe('Zaman yolculuğu yönü: undo (geri al) veya redo (ileri al)'),
+      action: z.enum(['undo', 'redo']).describe('Time travel direction: undo or redo'),
     }),
     execute: async ({ action }) => {
       const dict = i18nManager.getDictionary();
@@ -309,27 +309,27 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   ask_user_choice: tool({
-    description: 'Kullanıcıya netleştirmek, karar vermesini sağlamak veya seçenekler arasından tercih yaptırmak için etkileşimli butonlar sunar.',
+    description: 'Prompt the user with interactive choice buttons or a clarification question with predefined options and optional freeform input.',
     inputSchema: z.object({
-      question: z.string().describe('Kullanıcıya yöneltilecek soru veya karar başlığı'),
+      question: z.string().describe('Question or decision prompt to present to the user'),
       options: z
         .array(
           z.union([
             z.string(),
             z.object({
-              label: z.string().describe('Seçenek butonunda görünecek başlık'),
-              value: z.string().optional().describe('Seçildiğinde dönecek değer (boşsa label kullanılır)'),
-              description: z.string().optional().describe('Seçenek hakkında ek açıklama veya detay'),
+              label: z.string().describe('Option button label'),
+              value: z.string().optional().describe('Returned value when selected (defaults to label)'),
+              description: z.string().optional().describe('Additional detail or note for this option'),
             }),
           ]),
         )
         .min(1)
-        .describe('Kullanıcıya sunulacak tıklanabilir seçenekler listesi (en az 1 adet)'),
+        .describe('List of selectable options (at least 1 option)'),
       allow_custom: z
         .boolean()
         .optional()
         .default(true)
-        .describe('Kullanıcının seçenekler dışında serbest metin girmesine izin verilsin mi?'),
+        .describe('Whether the user is allowed to type freeform text outside the options'),
     }),
     execute: async ({
       question,
@@ -397,53 +397,54 @@ export function createAgentToolsForServer(
       description: agentUiTools.dispatch_component_action.description,
       inputSchema: agentUiTools.dispatch_component_action.inputSchema,
       execute: async ({ component_id, action, payload }) => {
-        // 1. Sunucu tarafı Preflight denetimi
+        // 1. Server-side Preflight check
         const comp = activeComps.find((c) => c.id === component_id);
         if (!comp) {
           return {
             success: false,
-            error: `Preflight Hatası: Bileşen "${component_id}" şu an ekranda mount edilmemiş.`,
+            error: `Preflight Error: Component "${component_id}" is not currently mounted on screen.`,
           };
         }
         const caps = comp.capabilities || Object.keys(comp.actions || {});
         if (!caps.includes(action)) {
           return {
             success: false,
-            error: `Preflight Hatası: Bileşen "${component_id}", "${action}" aksiyonunu desteklemiyor. Desteklenenler: ${caps.join(', ')}`,
+            error: `Preflight Error: Component "${component_id}" does not support action "${action}". Supported: ${caps.join(', ')}`,
           };
         }
 
-        // 2. Sunucu Tarafı Zod Şema Doğrulaması (actions tanımlıysa)
+        // 2. Server-side Zod schema validation (if actions defined)
         const schema =
           options?.actions?.[component_id]?.[action]?.schema ||
           comp.actions?.[action]?.schema;
         if (schema && typeof schema.safeParse === 'function') {
           const parseResult = schema.safeParse(payload || {});
           if (!parseResult.success) {
-            const formattedError = parseResult.error?.errors
-              ? parseResult.error.errors.map((e: any) => `${e.path.join('.') || 'root'}: ${e.message}`).join('; ')
-              : parseResult.error?.message || 'Geçersiz parametreler.';
+            const issues = (parseResult.error as any)?.issues || (parseResult.error as any)?.errors;
+            const formattedError = Array.isArray(issues) && issues.length > 0
+              ? issues.map((e: any) => `${e.path?.join?.('.') || 'root'}: ${e.message}`).join('; ')
+              : parseResult.error?.message || 'Invalid parameters.';
             return {
               success: false,
-              error: `Zod Validasyon Hatası (${component_id}.${action}): ${formattedError}`,
+              error: `Zod Validation Error (${component_id}.${action}): ${formattedError}`,
             };
           }
         }
 
-        // 3. Opsiyonel özel validasyon kancası
+        // 3. Optional custom validation hook
         if (options?.onValidateAction) {
           const valRes = options.onValidateAction({ component_id, action, payload });
           if (valRes && !valRes.valid) {
             return {
               success: false,
-              error: valRes.error || 'Validasyon hatası.',
+              error: valRes.error || 'Validation error.',
             };
           }
         }
 
         return {
           success: true,
-          message: `Aksiyon '${action}' bileşen '${component_id}' için başarıyla iletildi.`,
+          message: `Action '${action}' successfully dispatched to component '${component_id}'.`,
           component_id,
           action,
           payload,
@@ -456,7 +457,7 @@ export function createAgentToolsForServer(
       execute: async ({ component_id }) => {
         if (component_id) {
           const comp = activeComps.find((c) => c.id === component_id);
-          if (!comp) return { success: false, error: `Bileşen "${component_id}" ekranda yok.` };
+          if (!comp) return { success: false, error: `Component "${component_id}" is not mounted on screen.` };
           return { success: true, component: comp };
         }
         return {

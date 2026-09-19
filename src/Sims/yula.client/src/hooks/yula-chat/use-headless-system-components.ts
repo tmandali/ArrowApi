@@ -1,0 +1,203 @@
+"use client";
+
+import * as React from "react";
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import {
+  uiRegistry,
+  uiEventBus,
+  type ComponentSchema,
+  piEventStream,
+} from "@my-agent/core";
+import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
+import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
+
+/**
+ * Headless UI-Agent Sistem Bileşenleri Kayıt Kancası
+ * app_router, job_history ve REGISTERED_REPORTS formlarını headless olarak kaydeder.
+ */
+export function useHeadlessSystemComponents(router: AppRouterInstance) {
+  React.useEffect(() => {
+    const routerSchema: ComponentSchema = {
+      id: "app_router",
+      meta: { description: "Page and Route Navigator" },
+      actions: {
+        NAVIGATE: {
+          description: "Navigates the user to a target page or report ({ path }).",
+          whenToCall: "When the user wants to navigate to another report, workspace, or page.",
+          whenNotToCall: "When the user is already on the target screen.",
+        },
+      },
+    };
+    uiRegistry.register(routerSchema);
+    const unsubRouter = uiEventBus.subscribe("app_router", (action, payload) => {
+      if (action === "NAVIGATE" && payload?.path) {
+        let rawPath = String(payload.path).trim();
+        const [basePath, search] = rawPath.split("?");
+        const clean = basePath.replace(/^\//, "").toLowerCase();
+        const matched = REGISTERED_REPORTS.find(
+          (r) =>
+            r.pagePath.toLowerCase() === basePath.toLowerCase() ||
+            r.scope.toLowerCase() === clean ||
+            clean.endsWith(r.scope.toLowerCase()) ||
+            r.aliases.some((a) => a.toLowerCase() === clean),
+        );
+        let targetPath = matched ? matched.pagePath : basePath;
+        if (search) {
+          targetPath = `${targetPath}?${search}`;
+        }
+        router.push(targetPath);
+        return { success: true, navigatedTo: targetPath };
+      }
+      return { success: false, error: "Unknown router action" };
+    });
+
+    const jobHistorySchema: ComponentSchema = {
+      id: "job_history",
+      meta: { description: "Report Execution History and Job Tracker" },
+      actions: {
+        OPEN_LAST: {
+          description: "Opens the most recently completed report result on the screen.",
+          whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
+          whenNotToCall: "When the user intends to execute a new report.",
+        },
+        LIST: {
+          description: "Lists past execution jobs.",
+          whenToCall: "When the user asks 'which reports ran', 'show history', 'list past jobs', etc.",
+          whenNotToCall: "When actively inspecting or filtering the current report.",
+        },
+        FIND: {
+          description: "Searches past report executions or matching jobs ({ query }).",
+          whenToCall: "When the user wants to find a specific job, execution, or report run.",
+          whenNotToCall: "When requesting the entire list or running a new report.",
+        },
+        CANCEL: {
+          description: "Cancels an active or running job ({ jobId }).",
+          whenToCall: "When the user explicitly asks to 'stop', 'abort', or 'cancel' an execution.",
+          whenNotToCall: "When the job is already finished or terminated.",
+        },
+      },
+    };
+    uiRegistry.register(jobHistorySchema);
+    const unsubJob = uiEventBus.subscribe("job_history", (action, payload) => {
+      return executeDispatchComponentAction({ component_id: "job_history", action, payload }) as any;
+    });
+
+    // Headless Platform Rapor Kriter Formları (REGISTERED_REPORTS):
+    const unsubReports: Array<() => void> = [];
+    REGISTERED_REPORTS.forEach((report) => {
+      const formCompId = `criteria_form:${report.scope}`;
+      const formSchema: ComponentSchema = {
+        id: formCompId,
+        meta: {
+          reportScope: report.scope,
+          screenTitle: report.title,
+          pagePath: report.pagePath,
+          workspaceId: report.workspace,
+          isHeadless: true,
+        },
+        actions: {
+          SET_FIELDS: {
+            description: `Populates criteria form fields for ${report.title} without triggering execution ({ criteria }).`,
+            whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
+            whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT or RUN).",
+          },
+          APPLY: {
+            description: `Applies criteria field values for ${report.title} and navigates to the report screen.`,
+            whenToCall: `When the user wants to fill or update criteria for ${report.title} and inspect the form.`,
+            whenNotToCall: "When the user wants to directly run the report or perform non-form operations.",
+          },
+          SUBMIT: {
+            description: `Executes the ${report.title} report and queues the job ({ criteria, report }).`,
+            whenToCall: "When the user explicitly asks to 'run', 'start', 'fetch', or 'execute' the report.",
+            whenNotToCall: "When required parameters are missing or when user is only drafting criteria.",
+          },
+          RUN: {
+            description: `Executes the ${report.title} report and navigates to the result screen.`,
+            whenToCall: `When the user wants to execute ${report.title} and inspect the result grid.`,
+            whenNotToCall: "When only drafting or setting criteria without execution.",
+          },
+          SCHEMA: {
+            description: `Inspects the criteria schema and parameters for ${report.title}.`,
+            whenToCall: `When the agent needs to discover available parameters, types, or constraints.`,
+            whenNotToCall: "When the criteria schema is already known.",
+          },
+          READ: {
+            description: `Reads current draft criteria values for ${report.title}.`,
+            whenToCall: `To inspect the current values filled in the criteria form.`,
+            whenNotToCall: "When assigning or overwriting new values.",
+          },
+          VALIDATE: {
+            description: `Validates criteria input parameters against schema rules for ${report.title}.`,
+            whenToCall: `To check parameter constraints and validation rules before submission.`,
+            whenNotToCall: "When no criteria have been supplied.",
+          },
+        },
+      };
+      uiRegistry.register(formSchema);
+      const unsub = uiEventBus.subscribe(formCompId, async (action, payload) => {
+        const res = (await executeDispatchComponentAction({
+          component_id: formCompId,
+          action,
+          payload: { ...payload, report: report.scope },
+        })) as Record<string, unknown> | null;
+
+        if (res && typeof res === "object") {
+          const navTarget =
+            (res.navigateTo as string) ||
+            (action === "APPLY" || action === "RUN" ? report.pagePath : undefined);
+          if (navTarget) {
+            const navToolCallId = `nav_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            piEventStream.emit({
+              type: "tool_execution_start",
+              toolCallId: navToolCallId,
+              toolName: "dispatch_component_action",
+              args: {
+                component_id: "app_router",
+                action: "NAVIGATE",
+                payload: { path: navTarget },
+              },
+            });
+            let navOutcome: any;
+            try {
+              if (uiRegistry.get("app_router")) {
+                navOutcome = uiEventBus.dispatch({
+                  component_id: "app_router",
+                  action: "NAVIGATE",
+                  payload: { path: navTarget },
+                });
+              } else {
+                router.push(navTarget);
+                navOutcome = { success: true, result: { navigatedTo: navTarget } };
+              }
+            } catch (err) {
+              router.push(navTarget);
+              navOutcome = { success: false, error: String(err) };
+            }
+            const cleanNavOutput =
+              navOutcome?.result ?? { success: navOutcome?.success, navigatedTo: navTarget };
+            piEventStream.emit({
+              type: "tool_execution_end",
+              toolCallId: navToolCallId,
+              toolName: "dispatch_component_action",
+              result: cleanNavOutput,
+              isError: !navOutcome?.success,
+            });
+          }
+        }
+        return res;
+      });
+      unsubReports.push(unsub);
+    });
+
+    return () => {
+      unsubRouter();
+      unsubJob();
+      unsubReports.forEach((unsub) => unsub());
+      uiRegistry.unregister("app_router");
+      uiRegistry.unregister("job_history");
+      REGISTERED_REPORTS.forEach((report) => {
+        uiRegistry.unregister(`criteria_form:${report.scope}`);
+      });
+    };
+  }, [router]);
+}

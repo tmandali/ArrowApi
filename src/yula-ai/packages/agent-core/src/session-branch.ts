@@ -12,9 +12,27 @@ export class SessionBranchManager {
   private branches: Map<string, SessionBranch> = new Map();
   private activeBranchName = 'main';
   private restoreHandlers: Set<StateRestoreHandler> = new Set();
+  private listeners: Set<() => void> = new Set();
 
   constructor() {
     this.createBranch('main');
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[SessionBranchManager] Listener error:', err);
+      }
+    });
   }
 
   onRestore(handler: StateRestoreHandler): () => void {
@@ -69,6 +87,7 @@ export class SessionBranchManager {
       label,
     });
 
+    this.notify();
     return cp;
   }
 
@@ -78,6 +97,7 @@ export class SessionBranchManager {
       branch.currentIndex -= 1;
       const target = branch.checkpoints[branch.currentIndex];
       this.notifyRestore(target.snapshot.state);
+      this.notify();
       return target;
     }
     return null;
@@ -89,6 +109,7 @@ export class SessionBranchManager {
       branch.currentIndex += 1;
       const target = branch.checkpoints[branch.currentIndex];
       this.notifyRestore(target.snapshot.state);
+      this.notify();
       return target;
     }
     return null;
@@ -113,6 +134,7 @@ export class SessionBranchManager {
     newBranch.currentIndex = newBranch.checkpoints.length - 1;
     this.activeBranchName = newBranchName;
 
+    this.notify();
     return newBranch;
   }
 
@@ -123,6 +145,7 @@ export class SessionBranchManager {
       if (branch.currentIndex >= 0 && branch.checkpoints[branch.currentIndex]) {
         this.notifyRestore(branch.checkpoints[branch.currentIndex].snapshot.state);
       }
+      this.notify();
       return true;
     }
     return false;
@@ -136,6 +159,7 @@ export class SessionBranchManager {
     this.branches.clear();
     this.createBranch('main');
     this.activeBranchName = 'main';
+    this.notify();
   }
 
   restoreState(state: Record<string, any>): void {

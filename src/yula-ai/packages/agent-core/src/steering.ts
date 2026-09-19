@@ -8,6 +8,28 @@ import { piEventStream } from './pi-event-stream';
 export class SteeringQueueManager {
   private steeringQueue: QueueItem[] = [];
   private followUpQueue: QueueItem[] = [];
+  private listeners: Set<() => void> = new Set();
+  private cachedSteering?: QueueItem[];
+  private cachedFollowUp?: QueueItem[];
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.cachedSteering = undefined;
+    this.cachedFollowUp = undefined;
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[SteeringQueueManager] Listener error:', err);
+      }
+    });
+  }
 
   /**
    * Yüksek öncelikli araya girme mesajı ekler (Agent araçları çalıştırırken yönünü değiştirir).
@@ -20,6 +42,7 @@ export class SteeringQueueManager {
       timestamp: Date.now(),
     };
     this.steeringQueue.push(item);
+    this.notify();
     piEventStream.emit({
       type: 'steer_injected',
       message: content,
@@ -38,6 +61,7 @@ export class SteeringQueueManager {
       timestamp: Date.now(),
     };
     this.followUpQueue.push(item);
+    this.notify();
     piEventStream.emit({
       type: 'follow_up_queued',
       message: content,
@@ -54,11 +78,15 @@ export class SteeringQueueManager {
   }
 
   popSteer(): QueueItem | undefined {
-    return this.steeringQueue.shift();
+    const item = this.steeringQueue.shift();
+    if (item) this.notify();
+    return item;
   }
 
   popFollowUp(): QueueItem | undefined {
-    return this.followUpQueue.shift();
+    const item = this.followUpQueue.shift();
+    if (item) this.notify();
+    return item;
   }
 
   peekSteer(): QueueItem | undefined {
@@ -70,24 +98,38 @@ export class SteeringQueueManager {
   }
 
   getSteeringQueue(): QueueItem[] {
-    return [...this.steeringQueue];
+    if (!this.cachedSteering) {
+      this.cachedSteering = [...this.steeringQueue];
+    }
+    return this.cachedSteering;
   }
 
   getFollowUpQueue(): QueueItem[] {
-    return [...this.followUpQueue];
+    if (!this.cachedFollowUp) {
+      this.cachedFollowUp = [...this.followUpQueue];
+    }
+    return this.cachedFollowUp;
   }
 
   clearSteering(): void {
-    this.steeringQueue = [];
+    if (this.steeringQueue.length > 0) {
+      this.steeringQueue = [];
+      this.notify();
+    }
   }
 
   clearFollowUp(): void {
-    this.followUpQueue = [];
+    if (this.followUpQueue.length > 0) {
+      this.followUpQueue = [];
+      this.notify();
+    }
   }
 
   clearAll(): void {
-    this.clearSteering();
-    this.clearFollowUp();
+    const hadItems = this.steeringQueue.length > 0 || this.followUpQueue.length > 0;
+    this.steeringQueue = [];
+    this.followUpQueue = [];
+    if (hadItems) this.notify();
   }
 
   clear(): void {
