@@ -1157,7 +1157,12 @@
     "agent_create": "Ajan oluştur",
     "agent_manage_open": "Yönetim sayfasını aç",
     "history_suggestions": "Geçmişten öneriler",
-    "still_answering": "Yula hâlâ yanıtlıyor. Bitene kadar yeni mesaj gönderilemez; gerekirse Durdur.",
+    "still_answering": "Yula çalışıyor. Anında yön değiştirmek için Araya Girin veya sonraki adımı Kuyruğa Ekleyin.",
+    "pi_steer_label": "Araya Gir",
+    "pi_steer_title": "Agent işlem yürütürken araya girip yönünü değiştirin",
+    "pi_follow_up_label": "Kuyruğa Ekle",
+    "pi_follow_up_title": "Agent mevcut işini bitirdikten sonra sıradaki işi otomatik devralsın",
+    "input_placeholder_running": "Ajan çalışıyor… Araya girmek veya sıraya eklemek için yazın…",
     "remove_attachment": "{name} ekini kaldır",
     "paste_lines": "Paste ({count} satır)",
     "paste_chars": "Paste ({count} karakter)",
@@ -1485,6 +1490,13 @@
     }
   },
   "AgentCatalog": {
+    "tool_dispatch_component_action": "Bileşen ve sayfa aksiyonları (Form/Rapor/Grid/Navigasyon)",
+    "tool_inspect_ui_state": "Arayüz ve şema durumunu okuma",
+    "tool_ask_user_choice": "İnteraktif seçenek ve onay sunma",
+    "tool_time_travel": "Zaman yolculuğu (Geri/İleri alma)",
+    "tool_remember_fact": "Oturum hafızasına kaydetme",
+    "tool_recall_fact": "Oturum hafızasından hatırlama",
+    "tool_grid-tools": "Grid araçları (tablo/SQL/grafik)",
     "tool_run_job": "Rapor çalıştırma",
     "tool_apply_criteria": "Kriter uygulama",
     "tool_find_matching_report": "Mevcut rapor arama",
@@ -1499,7 +1511,6 @@
     "tool_suggest_next_steps": "Öneri sunma",
     "tool_request_user_confirmation": "Onay isteme",
     "tool_run_user_skill": "Skill çalıştırma",
-    "tool_grid-tools": "Grid araçları (tablo/SQL/grafik)",
     "provider_azure": "Azure Foundry",
     "provider_ollama": "Ollama (yerel)",
     "provider_openai": "OpenAI",
@@ -1528,6 +1539,11 @@
   "SystemNav": {
     "home": "Ana Ekran & Yula AI",
     "my_settings": "Hesabım & Ayarlarım",
+    "my_skills": "Beceriler & Komutlar",
+    "my_agents": "Personalar & Ajanlar",
+    "my_plugins": "Kurumsal Eklentiler",
+    "my_memory": "Kalıcı Bellek & Tercihler",
+    "my_studio": "Yula Stüdyo",
     "system_users": "Kullanıcı Yönetimi",
     "system_agents": "Ajan Ayarları",
     "system_skills": "Skill Ayarları",
@@ -1536,6 +1552,11 @@
   },
   "ScreenLabels": {
     "agents": "Ajan",
+    "my_skills": "Beceriler & Komutlar",
+    "my_agents": "Personalar & Ajanlar",
+    "my_plugins": "Kurumsal Eklentiler",
+    "my_memory": "Kalıcı Bellek",
+    "my_studio": "Yula Stüdyo",
     "stock_balance": "Stok Bakiye",
     "stock_analytics": "Stok Analiz",
     "retail_sales": "Perakende Satış",
@@ -1840,5 +1861,9 @@
   },
   "Company": {
     "sync_failed": "Şirket geçişi sunucuya yazılamadı — önceki şirkete dönüldü."
+  },
+  "PromptDirectives": {
+    "run_verbs": "çalıştır, oluştur, başlat, getir, al, raporu al, raporunu al, üret, hazırla, dök, çek",
+    "relative_date_terms": "bugün, dün, geçen hafta, bu hafta, bu ay, geçen ay, son 7 gün, son 30 gün"
   }
 }

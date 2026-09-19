@@ -24,9 +24,12 @@ import { cn } from "@/utils/cn";
 const SYSTEM_NAV_KEYS: Record<string, string> = {
   "/": "home",
   "/my/settings": "my_settings",
+  "/my/skills": "my_skills",
+  "/my/agents": "my_agents",
+  "/my/plugins": "my_plugins",
+  "/my/memory": "my_memory",
+  "/my/studio": "my_skills",
   "/system/users": "system_users",
-  "/system/agents": "system_agents",
-  "/system/skills": "system_skills",
 }
 
 /**

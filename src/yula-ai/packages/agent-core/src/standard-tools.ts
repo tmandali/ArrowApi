@@ -141,7 +141,7 @@ export async function executeComponentAction({
   if (!isSuccess) {
     return {
       success: false,
-      error: errorMsg || `"${effectiveComponentId}" bileşeni "${effectiveAction}" eylemini yürütemedi.`,
+      error: errorMsg || `"${effectiveComponentId}" failed to execute action "${effectiveAction}".`,
       details: dispatchOutcome.result,
     };
   }
@@ -158,9 +158,17 @@ export async function executeComponentAction({
     }
   }
 
+  const explicitMessage =
+    dispatchOutcome.result &&
+    typeof dispatchOutcome.result === 'object' &&
+    'message' in dispatchOutcome.result &&
+    typeof (dispatchOutcome.result as any).message === 'string'
+      ? (dispatchOutcome.result as any).message
+      : `Action "${effectiveAction}" dispatched to "${effectiveComponentId}".`;
+
   let initialResult: ExecuteActionResult = {
     success: true,
-    message: `"${effectiveComponentId}" bileşenine "${effectiveAction}" komutu iletildi.`,
+    message: explicitMessage,
     details: truncatedResult,
   };
 

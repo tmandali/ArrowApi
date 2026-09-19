@@ -17,9 +17,11 @@ import {
   FileCode,
   FileText,
   History,
+  ListOrdered,
   Plus,
   Square,
   X,
+  Zap,
 } from "lucide-react";
 import { formatHistoryAgo } from "./use-history-suggestions";
 import type { ChatComposerState } from "./use-chat-composer";
@@ -60,6 +62,8 @@ export function ChatComposer({
     showHistory,
     openHistoryConversation,
     handleSend,
+    handleSteer,
+    handleFollowUp,
     applyCommand,
     onFilesSelected,
     canSubmit,
@@ -109,7 +113,7 @@ export function ChatComposer({
                 {showNewAgentItem ? (
                   <CommandItem
                     value="__new-agent__"
-                    onSelect={() => router.push("/system/agents")}
+                    onSelect={() => router.push("/my/agents")}
                     data-selected={isNewAgentSelected ? "true" : undefined}
                     className={cn(
                       "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
@@ -182,7 +186,11 @@ export function ChatComposer({
         onSubmit={(event) => {
           event.preventDefault();
           if (showCommands) return;
-          handleSend();
+          if (isLoading) {
+            handleSteer();
+          } else {
+            handleSend();
+          }
         }}
         className="rounded-xl border border-primary/15 bg-card p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20"
       >
@@ -243,7 +251,7 @@ export function ChatComposer({
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   if (isNewAgentSelected) {
-                    router.push("/system/agents");
+                    router.push("/my/agents");
                     return;
                   }
                   const targetCmd = commandMatches?.[selectedIndex] ?? commandMatches?.[0];
@@ -290,7 +298,11 @@ export function ChatComposer({
 
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                handleSend();
+                if (isLoading) {
+                  handleSteer();
+                } else {
+                  handleSend();
+                }
               }
               if (event.key === "Backspace" && !input) {
                 if (pastedChip) {
@@ -338,9 +350,11 @@ export function ChatComposer({
               }
             }}
             placeholder={
-              selectedCommand || pastedChip
-                ? t("input_placeholder_secondary")
-                : t("yula_placeholder")
+              isLoading
+                ? t("input_placeholder_running")
+                : selectedCommand || pastedChip
+                  ? t("input_placeholder_secondary")
+                  : t("yula_placeholder")
             }
             className="flex-1 min-w-[120px] min-h-[28px] max-h-32 resize-none border-0 bg-transparent px-1 py-1 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
           />
@@ -377,23 +391,51 @@ export function ChatComposer({
             </Button>
           </div>
 
-          {isLoading && !canSubmit ? (
-            <Button
-              type="button"
-              size="icon"
-              onClick={onStop}
-              className="size-7 rounded-full border border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-all"
-              aria-label={t("stop")}
-              title={t("stop")}
-            >
-              <Square className="size-3 fill-current" />
-            </Button>
+          {isLoading ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+              <Button
+                type="button"
+                size="icon"
+                onClick={onStop}
+                className="size-7 rounded-full border border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-all cursor-pointer"
+                aria-label={t("stop")}
+                title={t("stop")}
+              >
+                <Square className="size-3 fill-current" />
+              </Button>
+
+              {canSubmit ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleFollowUp()}
+                    className="h-7 px-2.5 rounded-full text-[11px] font-medium border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-500/30 transition-all gap-1 cursor-pointer"
+                    title={t("pi_follow_up_title")}
+                  >
+                    <ListOrdered className="size-3 text-violet-500 shrink-0" />
+                    <span>{t("pi_follow_up_label")}</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleSteer()}
+                    className="h-7 px-2.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs transition-all gap-1 cursor-pointer"
+                    title={t("pi_steer_title")}
+                  >
+                    <Zap className="size-3 fill-current shrink-0" />
+                    <span>{t("pi_steer_label")}</span>
+                  </Button>
+                </>
+              ) : null}
+            </div>
           ) : (
             <Button
               type="submit"
               size="icon"
               disabled={!canSubmit}
-              className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90 transition-all"
+              className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90 transition-all cursor-pointer"
               aria-label={t("send_aria")}
             >
               <ArrowUp className="size-3.5" />

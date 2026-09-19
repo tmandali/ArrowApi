@@ -1,14 +1,9 @@
-import { AppLayout } from "@/components/layout/app-layout";
-import { RequireAdmin, SkillManagementView } from "@/features/system";
+import { redirect } from "next/navigation";
 
+/**
+ * `/system/skills` rotası `/my/skills` altına taşınmıştır.
+ * Geriye dönük uyumluluk için yönlendirilir.
+ */
 export default function SystemSkillsPage() {
-  return (
-    <AppLayout>
-      <div className="flex h-full min-h-0 flex-1 flex-col">
-        <RequireAdmin>
-          <SkillManagementView />
-        </RequireAdmin>
-      </div>
-    </AppLayout>
-  );
+  redirect("/my/skills");
 }

@@ -5,6 +5,7 @@ import {
   normalizeCriteria,
   normalizeCriteriaValue,
 } from "@/lib/criteria-match";
+import { deferredManager } from "@my-agent/core";
 
 /**
  * Layer 3: Criteria Input Engine & Job Lifecycle araçları —
@@ -136,6 +137,24 @@ export async function runJobTool(
     });
 
     const preset = typeof args.presetTitle === "string" ? args.presetTitle : undefined;
+
+    // ⏱️ Pi Deferred: Uzun süren rapor işini deferred yöneticisine kaydet
+    try {
+      const { promise } = deferredManager.createDeferred(
+        job.id,
+        { scope, jobId: job.id, preset },
+        180000,
+        job.id,
+      );
+      // Zaman aşımı veya iptal durumunda unhandled rejection oluşmasını önle
+      promise.catch((err) => {
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[DeferredManager] Job ${job.id} deferred wait ended:`, err?.message || err);
+        }
+      });
+    } catch {
+      // Best-effort deferred registration
+    }
     return {
       status: "executed",
       jobId: job.id,

@@ -89,6 +89,8 @@ export function liveStatusLabel(toolParts: YulaToolPartInfo[], lang: YulaUiLang)
       return L("SQL sorgusu çalışıyor…", "Running SQL query…");
     case "visualize_grid_data":
       return L("Grafik hazırlanıyor…", "Preparing chart…");
+    case "ask_user_choice":
+      return L("Seçenekler hazırlanıyor…", "Preparing options…");
     case "ask_user_question":
       return L("Sorular hazırlanıyor…", "Preparing questions…");
     case "suggest_next_steps":

@@ -1157,7 +1157,12 @@
     "agent_create": "Create agent",
     "agent_manage_open": "Open the management page",
     "history_suggestions": "Suggestions from history",
-    "still_answering": "Yula is still answering. No new message can be sent until it finishes; use Stop if needed.",
+    "still_answering": "Yula is working. Steer to change direction immediately or queue a follow-up task.",
+    "pi_steer_label": "Steer",
+    "pi_steer_title": "Intervene and steer the agent while it is executing",
+    "pi_follow_up_label": "Queue Follow-up",
+    "pi_follow_up_title": "Queue a follow-up task to run automatically after current turn completes",
+    "input_placeholder_running": "Agent is working… Type to steer or queue a follow-up…",
     "remove_attachment": "Remove the {name} attachment",
     "paste_lines": "Pasted {count} lines",
     "paste_chars": "Pasted {count} characters",
@@ -1485,6 +1490,13 @@
     }
   },
   "AgentCatalog": {
+    "tool_dispatch_component_action": "Component and page actions (Form/Report/Grid/Navigation)",
+    "tool_inspect_ui_state": "Inspect UI and schema state",
+    "tool_ask_user_choice": "Interactive choices and confirmation",
+    "tool_time_travel": "Time travel (Undo/Redo)",
+    "tool_remember_fact": "Remember facts in session memory",
+    "tool_recall_fact": "Recall facts from session memory",
+    "tool_grid-tools": "Grid tools (table/SQL/chart)",
     "tool_run_job": "Run report",
     "tool_apply_criteria": "Apply criteria",
     "tool_find_matching_report": "Find existing report",
@@ -1499,7 +1511,6 @@
     "tool_suggest_next_steps": "Suggest next steps",
     "tool_request_user_confirmation": "Request confirmation",
     "tool_run_user_skill": "Run skill",
-    "tool_grid-tools": "Grid tools (table/SQL/chart)",
     "provider_azure": "Azure Foundry",
     "provider_ollama": "Ollama (local)",
     "provider_openai": "OpenAI",
@@ -1528,6 +1539,11 @@
   "SystemNav": {
     "home": "Home & Yula AI",
     "my_settings": "My Account & Settings",
+    "my_skills": "Skills & Commands",
+    "my_agents": "Personas & Agents",
+    "my_plugins": "Enterprise Plugins",
+    "my_memory": "Agent Memory & Preferences",
+    "my_studio": "Yula Studio",
     "system_users": "All Users (Admin)",
     "system_agents": "Agent Settings",
     "system_skills": "Skill Settings",
@@ -1536,6 +1552,11 @@
   },
   "ScreenLabels": {
     "agents": "Agent",
+    "my_skills": "Skills & Commands",
+    "my_agents": "Personas & Agents",
+    "my_plugins": "Enterprise Plugins",
+    "my_memory": "Agent Memory",
+    "my_studio": "Yula Studio",
     "stock_balance": "Stock Balance",
     "stock_analytics": "Stock Analytics",
     "retail_sales": "Retail Sales",
@@ -1842,5 +1863,9 @@
   },
   "Company": {
     "sync_failed": "Company switch could not be saved — reverted to the previous company."
+  },
+  "PromptDirectives": {
+    "run_verbs": "run, execute, generate, start, fetch, create, build, get, retrieve",
+    "relative_date_terms": "today, yesterday, last week, this week, this month, last month, last 7 days, last 30 days"
   }
 }

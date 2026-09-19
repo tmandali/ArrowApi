@@ -19,6 +19,8 @@ import {
 } from "./yula-chat/chat-shared";
 import { installPiTraceBridge } from "@/lib/my-agent-pi-bridge";
 import { useConversationRouteSync } from "./yula-chat/use-conversation-route-sync";
+import { reconciliationEngine } from "@my-agent/core";
+import { registerDefaultYulaPlugins } from "@/lib/plugins/yula-plugins";
 
 /**
  * Yula v2 — referans repo deseninin standart Next karşılığı.
@@ -50,6 +52,25 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // adım satırı olarak düşer (YulaWorkedAccordion görünümü değişmez).
   React.useEffect(() => {
     installPiTraceBridge(getActiveConversationId);
+  }, []);
+
+  // Pi Reconcile: Tarayıcı açılışında askıda kalan kilitlenme veya yarım kalmış oturum işlemlerini toparla
+  React.useEffect(() => {
+    try {
+      const report = reconciliationEngine.reconcile();
+      if (report.hasInconsistencies) {
+        console.info(`🔄 [Yula Reconcile]: ${report.message}`);
+      }
+    } catch (e) {
+      console.warn("[Yula Reconcile Error]:", e);
+    }
+  }, []);
+
+  // Pi Plugins: Varsayılan analitik ve tahminleme eklentilerini çalışma zamanına kaydet
+  React.useEffect(() => {
+    void registerDefaultYulaPlugins().catch((e) => {
+      console.warn("[Yula Plugins Register Error]:", e);
+    });
   }, []);
 
   // Ekran bazlı aktif sohbet yönetimi (sayfa değişiminde taze/kayıtlı sohbet seçimi).
@@ -194,6 +215,12 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
         setAutoCompactEnabled: () => {},
         isCompacting: false,
         compact: async () => false,
+        steer: () => {},
+        followUp: () => {},
+        steeringQueue: [],
+        followUpQueue: [],
+        clearSteering: () => {},
+        clearFollowUp: () => {},
       };
     }
     return {

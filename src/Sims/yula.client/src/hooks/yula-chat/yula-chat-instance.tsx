@@ -21,6 +21,11 @@ import {
   type ComponentSchema,
   executeComponentAction,
   piEventStream,
+  steeringManager,
+  type QueueItem,
+  multiLaneScheduler,
+  adaptivePublisher,
+  retryWithBackoff,
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
@@ -266,13 +271,66 @@ export function ChatInstance({
 
   const status = chat.status;
 
-  // Background indexing
+  const [steeringQueue, setSteeringQueue] = React.useState<QueueItem[]>([]);
+  const [followUpQueue, setFollowUpQueue] = React.useState<QueueItem[]>([]);
+
+  const syncQueues = React.useCallback(() => {
+    setSteeringQueue(steeringManager.getSteeringQueue());
+    setFollowUpQueue(steeringManager.getFollowUpQueue());
+  }, []);
+
   React.useEffect(() => {
-    void import("@/lib/yula-storage-buckets").then(({ initYulaStorageBuckets }) => {
-      void initYulaStorageBuckets().catch(() => {});
+    syncQueues();
+    const unsub = piEventStream.subscribe((event) => {
+      if (
+        event.type === "steer_injected" ||
+        event.type === "follow_up_queued" ||
+        event.type === "turn_start" ||
+        event.type === "turn_end" ||
+        event.type === "agent_start" ||
+        event.type === "agent_end"
+      ) {
+        syncQueues();
+      }
     });
-    void import("@/services/duckdb-vector").then(({ indexReportSchemas }) => {
-      void indexReportSchemas().catch((err) =>
+    return unsub;
+  }, [syncQueues]);
+
+  const steer = React.useCallback(
+    (text: string) => {
+      chat.steer(text);
+      syncQueues();
+    },
+    [chat, syncQueues],
+  );
+
+  const followUp = React.useCallback(
+    (text: string) => {
+      chat.followUp(text);
+      syncQueues();
+    },
+    [chat, syncQueues],
+  );
+
+  const clearSteering = React.useCallback(() => {
+    steeringManager.clearSteering();
+    syncQueues();
+  }, [syncQueues]);
+
+  const clearFollowUp = React.useCallback(() => {
+    steeringManager.clearFollowUp();
+    syncQueues();
+  }, [syncQueues]);
+
+  // Background indexing with Multi-Lane Scheduler (lane: background)
+  React.useEffect(() => {
+    multiLaneScheduler.enqueue("background", "Init Yula Storage Buckets", async () => {
+      const { initYulaStorageBuckets } = await import("@/lib/yula-storage-buckets");
+      await initYulaStorageBuckets().catch(() => {});
+    });
+    multiLaneScheduler.enqueue("background", "DuckDB RAG Schema Indexing", async () => {
+      const { indexReportSchemas } = await import("@/services/duckdb-vector");
+      await indexReportSchemas().catch((err) =>
         console.warn("[Yula RAG] Background indexing error:", err),
       );
     });
@@ -304,7 +362,12 @@ export function ChatInstance({
   const retryResponse = React.useCallback(async () => {
     userStoppedRef.current = false;
     setStopped(false);
-    await chat.regenerate();
+    await retryWithBackoff(
+      async () => {
+        await chat.regenerate();
+      },
+      { maxRetries: 2, initialDelayMs: 250, backoffMultiplier: 2 }
+    );
   }, [chat]);
 
   const isTurnActive = (status === "submitted" || status === "streaming") && !stopped;
@@ -472,6 +535,12 @@ export function ChatInstance({
       setAutoCompactEnabled: chat.setAutoCompactEnabled,
       isCompacting: chat.isCompacting,
       compact: chat.compact,
+      steer,
+      followUp,
+      steeringQueue,
+      followUpQueue,
+      clearSteering,
+      clearFollowUp,
     }),
     [
       chat.messages,
@@ -494,6 +563,12 @@ export function ChatInstance({
       dumpSession,
       sendMessageText,
       runPendingTool,
+      steer,
+      followUp,
+      steeringQueue,
+      followUpQueue,
+      clearSteering,
+      clearFollowUp,
     ],
   );
 
@@ -503,3 +578,4 @@ export function ChatInstance({
 
   return null;
 }
+

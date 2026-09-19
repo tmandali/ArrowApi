@@ -86,6 +86,10 @@ export function describeDispatchAction(input: unknown): {
   if (family === "job_history") {
     return { kind: "explored", label: `Job history: ${action || "query"}`, subLabel: undefined };
   }
+  if (family === "plugin") {
+    const pluginName = comp.slice("plugin:".length) || action || "plugin";
+    return { kind: "ran", label: `Ran Plugin: ${pluginName}`, subLabel: action };
+  }
   return { kind: "ran", label: `Ran tool: ${action || comp || "dispatch"}`, subLabel: comp || undefined };
 }
 

@@ -229,20 +229,12 @@ export const GRID_TOOLS_TOKEN = "grid-tools";
 
 /** Ajan formundaki araç çoklu-seçimi için katalog (statik araçlar + grup jetonu) */
 export const AGENT_TOOL_CATALOG: Array<{ name: string; label: string }> = [
-  { name: "run_job", label: "Rapor çalıştırma" },
-  { name: "apply_criteria", label: "Kriter uygulama" },
-  { name: "find_matching_report", label: "Mevcut rapor arama" },
-  { name: "open_last_report", label: "Son raporu açma" },
-  { name: "list_report_executions", label: "Çalışma geçmişi" },
-  { name: "cancel_job", label: "İşi iptal etme" },
-  { name: "navigate_to_page", label: "Sayfa gezinmesi" },
-  { name: "get_report_schema", label: "Şema okuma" },
-  { name: "validate_criteria_input", label: "Kriter doğrulama" },
-  { name: "get_current_criteria", label: "Form okuma" },
-  { name: "ask_user_question", label: "Kullanıcıya soru sorma" },
-  { name: "suggest_next_steps", label: "Öneri sunma" },
-  { name: "request_user_confirmation", label: "Onay isteme" },
-  { name: "run_user_skill", label: "Skill çalıştırma" },
+  { name: "dispatch_component_action", label: "Bileşen ve sayfa aksiyonları (Form/Rapor/Grid/Navigasyon)" },
+  { name: "inspect_ui_state", label: "Arayüz ve şema durumunu okuma" },
+  { name: "ask_user_choice", label: "İnteraktif seçenek ve onay sunma" },
+  { name: "time_travel", label: "Zaman yolculuğu (Geri/İleri alma)" },
+  { name: "remember_fact", label: "Oturum hafızasına kaydetme" },
+  { name: "recall_fact", label: "Oturum hafızasından hatırlama" },
   { name: GRID_TOOLS_TOKEN, label: "Grid araçları (tablo/SQL/grafik)" },
 ];
 

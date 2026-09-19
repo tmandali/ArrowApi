@@ -13,14 +13,14 @@ describe("buildFindingDrillPrompt", () => {
     );
     assert.ok(out.startsWith("[Analiz bulgusuna tıklandı]"));
     assert.ok(out.includes("MusteriNo"));
-    assert.ok(out.includes("run_expert_sql"));
+    assert.ok(out.includes("SQL sorgusunu üret"));
   });
   it("wraps English findings with EN click context", () => {
     const out = buildFindingDrillPrompt(
       "Empty customer numbers: 10 rows with NULL CustomerNo.",
     );
     assert.ok(out.startsWith("[Analysis finding clicked]"));
-    assert.ok(out.includes("run_expert_sql"));
+    assert.ok(out.includes("Produce the SQL query"));
   });
   it("truncates very long findings", () => {
     const out = buildFindingDrillPrompt(`Bulgu: ${"x".repeat(900)}`);

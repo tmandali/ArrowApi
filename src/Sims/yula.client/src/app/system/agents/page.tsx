@@ -1,14 +1,9 @@
-import { AppLayout } from "@/components/layout/app-layout";
-import { AgentManagementView, RequireAdmin } from "@/features/system";
+import { redirect } from "next/navigation";
 
+/**
+ * `/system/agents` rotası `/my/agents` altına taşınmıştır.
+ * Geriye dönük uyumluluk için yönlendirilir.
+ */
 export default function SystemAgentsPage() {
-  return (
-    <AppLayout>
-      <div className="flex h-full min-h-0 flex-1 flex-col">
-        <RequireAdmin>
-          <AgentManagementView />
-        </RequireAdmin>
-      </div>
-    </AppLayout>
-  );
+  redirect("/my/agents");
 }

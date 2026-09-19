@@ -8,6 +8,7 @@ import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { YulaQuestionnaireCard } from "@/components/layout/yula-questionnaire-card";
+import { YulaChoiceCard } from "@/components/layout/yula-choice-card";
 import { YulaSuggestionChips } from "@/components/layout/yula-suggestion-chips";
 import { YulaJobStartedCard } from "@/components/layout/yula-job-started-card";
 import { useYulaChat } from "@/hooks/use-yula-chat";
@@ -168,23 +169,42 @@ export function YulaChatTurn({
 
   // Metin yazılmayan turlarda son başarılı araç çıktısının "message" alanı
   // görünür yanıt olarak kullanılır (LLM, terminal ekran araçlarından sonra yazmaz).
-  // Soru araçları hariç: soru kartı zaten render edilir; sistem-İngilizcesi
-  // "message" alanları kullanıcı balonuna sızmamalıdır.
+  // Soru araçları ve salt-okuma/taslak/iç taşıma mesajları hariç tutulur.
   const streamErrorText = assistantMessage ? yula.streamErrorTexts[assistantMessage.id] : undefined;
   let fallbackToolText = "";
   if (!assistantText.trim() && !streamErrorText) {
     for (let i = toolParts.length - 1; i >= 0; i--) {
       const info = toolParts[i];
       if (
+        info.toolName === "ask_user_choice" ||
         info.toolName === "ask_user_question" ||
         info.toolName === "request_user_confirmation" ||
         info.toolName === "suggest_next_steps"
       )
         continue;
       if (info.state !== "output-available" || isFailedToolInfo(info)) continue;
+
+      // Standart component dispatch eylemlerinde salt-okuma veya iç taşıma eylemleri
+      // (READ, SCHEMA, VALIDATE) kullanıcı sohbet balonuna sızmamalıdır.
+      if (info.toolName === "dispatch_component_action") {
+        const action = (info.input as { action?: string } | undefined)?.action;
+        if (action === "READ" || action === "SCHEMA" || action === "VALIDATE") {
+          continue;
+        }
+      }
+
       const out = info.output as { message?: unknown } | undefined;
       if (typeof out?.message === "string" && out.message.trim()) {
-        fallbackToolText = out.message.trim();
+        const msg = out.message.trim();
+        // Ham bileşen dispatch iletileri (örn: "criteria_form:..." bileşenine "..." komutu iletildi
+        // veya Action "..." dispatched to "...") son kullanıcı sohbet metni değildir.
+        if (
+          /bileşenine\s+"?[^"]+"?\s+komutu iletildi/i.test(msg) ||
+          /^Action\s+"?[^"]+"?\s+dispatched\s+to\s+"?[^"]+"?/i.test(msg)
+        ) {
+          continue;
+        }
+        fallbackToolText = msg;
         break;
       }
     }
@@ -308,6 +328,16 @@ export function YulaChatTurn({
               info.state === "output-available" ? (
                 <YulaChartCard output={info.output} />
               ) : null}
+              {info.toolName === "ask_user_choice" &&
+              !isError &&
+              (info.state === "output-available" ||
+                info.state === "input-available") ? (
+                <YulaChoiceCard
+                  messageId={assistantMessage?.id}
+                  input={info.input}
+                  output={info.state === "output-available" ? info.output : undefined}
+                />
+              ) : null}
               {info.toolName === "ask_user_question" &&
               !isError &&
               (info.state === "output-available" ||
@@ -327,7 +357,13 @@ export function YulaChatTurn({
                   output={info.state === "output-available" ? info.output : undefined}
                 />
               ) : null}
-              {info.toolName === "run_job" &&
+              {(info.toolName === "run_job" ||
+                (info.toolName === "dispatch_component_action" &&
+                  (info.input as { action?: string } | undefined)?.action === "RUN") ||
+                (info.toolName === "dispatch_component_action" &&
+                  typeof info.output === "object" &&
+                  info.output !== null &&
+                  (info.output as { status?: unknown }).status === "executed")) &&
               !isError &&
               info.state === "output-available" &&
               typeof info.output === "object" &&

@@ -261,7 +261,7 @@ export function AgentDebugBench() {
         </div>
       ) : agents.length === 0 ? (
         <div className="rounded-md border p-3 text-muted-foreground">
-          Kayıtlı ajan yok — önce /system/agents ekranından bir ajan oluştur.
+          Kayıtlı ajan yok — önce /my/agents ekranından bir ajan oluştur.
         </div>
       ) : (
         <>

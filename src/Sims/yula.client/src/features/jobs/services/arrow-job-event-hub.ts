@@ -2,6 +2,7 @@ import type { ArrowJobEvent } from "../types"
 import { type RunEventItem, appendOrUpdateRunEvent } from "../run-events"
 import { fetchJobStatus, readJobSseEvents } from "../arrow-job-client"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
+import { deferredManager } from "@my-agent/core"
 
 export type JobPhase = "idle" | "running" | "done" | "cancelled"
 
@@ -208,6 +209,15 @@ export class ArrowJobEventHub extends EventTarget {
         error: payload.error ?? prev.error,
         completedAt: payload.completedAt ?? prev.completedAt,
         isStreaming: phase === "running",
+      }
+
+      // ⏱️ Pi Deferred: Terminal durumda (Completed, Failed, Cancelled) askıya alınmış ajanı uyandır
+      if (phase === "done" || phase === "cancelled" || payload.status === "Failed" || eventName === "failed") {
+        try {
+          deferredManager.resume(normId(session.snapshot.jobId || key), session.snapshot);
+        } catch {
+          // Deferred resume best-effort
+        }
       }
 
       // Progress olayları yüksek frekansta (saniyede onlarca kez) gelebilir.

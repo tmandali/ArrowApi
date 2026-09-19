@@ -23,6 +23,7 @@ import type { AIChatPanelProps } from "./ai-chat-panel";
 import { useChatComposer } from "./use-chat-composer";
 import { ChatComposer } from "./chat-composer";
 import { ChatIntro } from "./chat-intro";
+import { YulaQueueBadge } from "./yula-queue-badge";
 import {
   useDedupedMessages,
   useChatTurns,
@@ -221,7 +222,12 @@ function AIChatPanelSession({
             introDescription={introDescription}
             dateLabel={dateLabel}
             agentInference={agentInference}
-            aboveInput={aboveInput}
+            aboveInput={
+              <>
+                <YulaQueueBadge />
+                {aboveInput}
+              </>
+            }
             composer={composerView}
             belowInput={belowInput}
             agentWorkspaceId={agentWorkspaceId}
@@ -302,6 +308,7 @@ function AIChatPanelSession({
       </div>
       {!showCenteredIntro ? (
         <>
+          <YulaQueueBadge />
           {aboveInput}
           {composerView}
         </>

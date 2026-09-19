@@ -301,8 +301,8 @@ export function WorkspaceLandingTemplate({
               onManage={(id) =>
                 router.push(
                   id
-                    ? `/system/agents?edit=${encodeURIComponent(id)}`
-                    : "/system/agents",
+                    ? `/my/agents?edit=${encodeURIComponent(id)}`
+                    : "/my/agents",
                 )
               }
               className="max-w-full space-y-2 px-0 pt-0"

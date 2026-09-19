@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Users,
-  Bot,
   Sparkles,
   UserCircle,
+  Bot,
+  Blocks,
+  Brain,
   X,
 } from "lucide-react";
 import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
@@ -59,16 +61,6 @@ export function GlobalNavDrawer() {
       label: tNav("system_users"),
       icon: Users,
     },
-    {
-      url: "/system/agents",
-      label: tNav("system_agents"),
-      icon: Bot,
-    },
-    {
-      url: "/system/skills",
-      label: tNav("system_skills"),
-      icon: Sparkles,
-    },
   ];
 
   // Oturum (kişisel) bölümü — tüm oturum açan kullanıcılara gösterilir.
@@ -77,6 +69,26 @@ export function GlobalNavDrawer() {
       url: "/my/settings",
       label: tNav("my_settings"),
       icon: UserCircle,
+    },
+    {
+      url: "/my/skills",
+      label: tNav("my_skills"),
+      icon: Sparkles,
+    },
+    {
+      url: "/my/agents",
+      label: tNav("my_agents"),
+      icon: Bot,
+    },
+    {
+      url: "/my/plugins",
+      label: tNav("my_plugins"),
+      icon: Blocks,
+    },
+    {
+      url: "/my/memory",
+      label: tNav("my_memory"),
+      icon: Brain,
     },
   ];
 

@@ -56,7 +56,7 @@ function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
   };
 
   const handleSettings = () => {
-    if (agentId) router.push(`/system/agents?edit=${encodeURIComponent(agentId)}`);
+    if (agentId) router.push(`/my/agents?edit=${encodeURIComponent(agentId)}`);
   };
 
   return (

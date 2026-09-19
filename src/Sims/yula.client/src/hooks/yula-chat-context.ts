@@ -56,6 +56,15 @@ export interface YulaChatContextValue {
   setAutoCompactEnabled?: (enabled: boolean) => void;
   isCompacting?: boolean;
   compact?: (customInstructions?: string) => Promise<boolean>;
+  /** ⚡ Pi Steering: Ajan çalışırken anlık araya girme */
+  steer: (message: string) => void;
+  /** 📥 Pi Follow-up: Ajan mevcut işini bitirince sıradaki işi otomatik devralma */
+  followUp: (message: string) => void;
+  /** Bekleyen steering ve follow-up kuyrukları */
+  steeringQueue: import("@my-agent/core").QueueItem[];
+  followUpQueue: import("@my-agent/core").QueueItem[];
+  clearSteering: () => void;
+  clearFollowUp: () => void;
 }
 
 export const YulaChatContext = React.createContext<YulaChatContextValue>({} as YulaChatContextValue);

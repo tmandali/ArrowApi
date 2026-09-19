@@ -9,6 +9,9 @@ export { myNav, myDashboardPath } from "./routes";
  * sayfası ince zarf olarak tüketir.
  */
 export { MySettingsForm } from "./components/settings/my-settings-form";
+export { YulaStudioView } from "./components/studio/yula-studio-view";
+export { PluginsPageView } from "./components/plugins/plugins-page-view";
+export { MemoryPageView } from "./components/memory/memory-page-view";
 
 /**
  * `my` workspace oturum kapısı — `my/*` sayfaları bu bileşenle sarılır.

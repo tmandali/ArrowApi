@@ -178,15 +178,25 @@ function reportScreenLabelKey(pathname: string): string | null {
   if (pathname.includes("/stock/retail-sales-report")) return "retail_sales"
   if (pathname.includes("/stock/stock-ledger")) return "stock_ledger"
   if (pathname.includes("/stock/item")) return "stock_item"
+  if (pathname.includes("/my/skills")) return "my_skills"
+  if (pathname.includes("/my/agents")) return "my_agents"
+  if (pathname.includes("/my/plugins")) return "my_plugins"
+  if (pathname.includes("/my/memory")) return "my_memory"
+  if (pathname.includes("/my/studio")) return "my_skills"
   if (pathname.includes("/system/users")) return "system_users"
-  if (pathname.includes("/system/agents")) return "system_agents"
-  if (pathname.includes("/system/skills")) return "system_skills"
+  if (pathname.includes("/system/agents")) return "my_agents"
+  if (pathname.includes("/system/skills")) return "my_skills"
   return null
 }
 
 /** Locale-bağımsız fallback (resolver verilmeyen çağrıranlar için; TR kaynak). */
 const SCREEN_LABEL_DEFAULTS: Record<string, string> = {
   agents: "Ajan",
+  my_skills: "Beceriler",
+  my_agents: "Ajanlar",
+  my_plugins: "Eklentiler",
+  my_memory: "Kalıcı Bellek",
+  my_studio: "Yula Stüdyo",
   stock_balance: "Stok Bakiye",
   stock_analytics: "Stok Analiz",
   retail_sales: "Perakende Satış",

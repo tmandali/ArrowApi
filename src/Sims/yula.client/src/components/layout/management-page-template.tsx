@@ -43,6 +43,10 @@ type ManagementPageTemplateProps = {
   detailPanelId?: string;
   /** Detay kutusunda maksimize düğmesi (rapor ızgarasındaki desen) */
   maximizable?: boolean;
+  /** Header arama kutusunu göster (varsayılan: false) */
+  showSearch?: boolean;
+  /** İç içe (sekme/başka sayfa kabuğu içinde) çalıştığında bağımsız header ve Yula dock oluşturmayı önler */
+  embedded?: boolean;
 };
 
 /**
@@ -54,6 +58,7 @@ export function ManagementPageTemplate({
   title,
   mode,
   actions,
+  showSearch = false,
   listHeader,
   list,
   tabs,
@@ -67,6 +72,7 @@ export function ManagementPageTemplate({
   listPanelId,
   detailPanelId,
   maximizable = true,
+  embedded = false,
 }: ManagementPageTemplateProps) {
   // Detay maksimize: örnekteki (rapor sonucu) desen — liste paneli gizlenir,
   // detay %100'e açılır; her şey WorkspaceAiDock içinde kalır, Yula kapanmaz.
@@ -96,11 +102,13 @@ export function ManagementPageTemplate({
       title={title}
       titleExtra={mode != null ? <RecordModeChip mode={mode} /> : null}
       actions={actions}
+      showSearch={showSearch}
       listHeader={listHeader}
       list={list}
       listPanelId={listPanelId}
       detailPanelId={detailPanelId}
       detailMaximized={detailMaximized}
+      embedded={embedded}
     >
       <TabbedDetail
         resetKey={tabResetKey}

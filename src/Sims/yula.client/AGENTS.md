@@ -16,7 +16,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **User Skills (runtime, on-device):** Users define their own slash commands (`lib/stores/user-skills.ts`, localStorage-persisted; pure logic in `lib/yula-user-skill.ts`). Scope is `global` or a workspace id; user skills may attach reference files (.md/.txt/.json, 32K each, validated, never scripts) shown with previews in the editor and loadable via the client-executed `read_user_file` tool. They merge into the same `YulaCommand` pipe (`source: "user"`), appear in the slash palette with a `skill` badge, and send via `buildUserSkillPrompt` (`{{input}}` substitution, else append). Built-in slashes win on conflict. Creating a skill never creates an agent — skills are instruction data run by the existing Yula agent.
 - **Model Skill Awareness (progressive disclosure):** Each turn sends only the in-scope inventory (slash/label/description, never full prompts) in the request body (`context.userSkills`); the prompt lists it under USER SKILLS. The `run_user_skill` tool loads the full instructions as tool output and the model follows them. Worked-steps render `Loaded skill: /<slash>`.
 - **Built-in Skills:** `/ay-kapanis` (global month-end close checklist), `/sayim-fark` (stock count variance), `/rapor-kalite` (global data-quality tour) — single source is `skills/<name>/SKILL.md` (standard Agent Skills layout: `name`/`description` + `slash`/`label`/`scope` extensions), raw-imported via bundler rules and parsed into `BUILT_IN_USER_SKILLS` (`lib/built-in-skills.ts`).
-- **User Agents (persona, on-device):** Users define agent identities (`lib/stores/user-agents.ts`, localStorage; pure logic in `lib/yula-user-agent.ts`): name + instructions + tool allowlist + skill allowlist + scope + provider/model pin. Selection is card-based (`YulaAgentCards`) with a slim active-agent chip above the input.
+- **Yula AI Customization Hub (`/my/*`):** All user-facing AI customization is organized into 4 dedicated screens in the `my` workspace: Skills (`/my/skills`), Personas/Agents (`/my/agents`), Plugin Registry (`/my/plugins`), and Agent Memory (`/my/memory`). Legacy `/my/studio`, `/system/agents`, and `/system/skills` routes redirect to their corresponding `/my/*` pages; the `system` workspace strictly manages platform infrastructure and users (`/system/users`).
 - **Skill Discovery (pure):** `lib/skill-discovery.ts` (SKILL.md frontmatter parse only: `parseSkillFile`, `stripSkillFrontmatter`).
 
 ---
@@ -164,6 +164,28 @@ Every agent-ready component MUST register via `@my-agent/react` (`useAgentCompon
 - **Neutral English System Feedback:** Tool returns (`message`, `hint`, `error`, `directive`) must stay neutral, standard English.
 - **Natural Language Mirroring:** Never hardcode instructions forcing a single language (e.g. *"respond only in Turkish"*). The model mirrors the user's conversational language dynamically.
 - **Exploration Limit (Max 10 Records Rule):** SQL explorations, schema previews, or job lists must never return more than 10 records to prevent token bloat and hallucination.
+
+### 7. Pi Güvenilirlik Katmanı & 14 Çekirdek Yetenek (@my-agent/core & @my-agent/react)
+Yula AI, endüstriyel güvenilirlik için 14 temel motor yeteneği ile donatılmıştır:
+1. **✍️ SET_FIELDS / APPLY:** `criteria_form` eylemleri kriterleri reaktif form taslağına hatasız yansıtır.
+2. **🚀 SUBMIT (Inline HITL):** Kritik aksiyonlar (`SUBMIT`, `RUN`, `EXPORT`) `hookPipeline.beforeToolCall` ile kullanıcı onayına tabi tutulur.
+3. **⚡ Steer (Araya Gir):** Ajan çalışırken kullanıcı anında yönlendirme veya vazgeçme talimatı verebilir (`SteeringQueue.enqueueSteer`).
+4. **📥 Follow-up (Takip İşi):** Ajanın mevcut işi bittiğinde ardışık yürütülecek işler kuyruğa alınır (`SteeringQueue.enqueueFollowUp`).
+5. **✂️ Dual-Bound Truncation:** UI aksiyon çıktıları hem satır (`maxLines`) hem bayt (`maxBytes`) sınırıyla kırpılarak token ve hafıza şişmesi engellenir.
+6. **⛓️ Mutation Line (Atomik Sıralama):** `globalMutationLine` tüm UI mutasyonlarını FIFO sırasında işleterek yarış durumlarını (race conditions) ortadan kaldırır.
+7. **🌊 Adaptive Publisher (60 FPS):** Yüksek frekanslı olaylar 16ms'lik animasyon penceresinde batch edilerek UI render yükü minimize edilir.
+8. **🔁 Retry Backoff:** Geçici ağ kopmalarında katlanarak artan gecikmeyle (exponential backoff) otomatik kurtarma sağlanır (`retryWithBackoff`).
+9. **🧠 Memory (Kalıcı Tercih):** `remember_fact` ve `recall_fact` ile kullanıcı tercihleri `session` veya kalıcı `localStorage` ortamında saklanır.
+10. **🔌 Plugin Registry (`yula-plugins.ts`):** Tahminleme, harici servisler ve analitik modülleri dinamik olarak sisteme kaydedilir (`pluginRegistry`).
+11. **🛤️ Multi-Lane Scheduler:** DuckDB RAG indeksleme ve ağır arka plan işleri `multiLaneScheduler.enqueue('background', ...)` ile interaktif sohbet şeridinden tamamen izole edilir.
+12. **⏱️ Deferred Manager (Askıya Al & Uyandır):** Rapor işi başladığında ajan askıya alınır (`deferredManager.createDeferred`), Arrow Job SSE terminal olayı (`Completed`/`Failed`) geldiğinde ajanı otomatik uyandırır (`deferredManager.resume`).
+13. **🔄 Reconciliation Engine (Kurtarma):** Uygulama açılışında `reconciliationEngine.reconcile()` çalışarak tarayıcı yenilemesi sonrası askıda kalan kilitleri ve yetim durumları mühürler.
+14. **🌐 Remote RPC (JSON-RPC 2.0):** Worker ve AI sidecar iletişimi için tip güvenli JSON-RPC 2.0 köprüsü (`yula-rpc-client.ts`).
+
+### 8. Akış İçi (Inline) Onay & HITL Standardı (No Modals)
+- **Modal Yasağı:** Yula paneli her ekran boyutunda Side Dock / Drawer form faktörünü korur. Ekranın ortasına veya sohbetin üstüne popup modal (`HitlModal`) açmak kesinlikle yasaktır; modal yaklaşımı dar ekranlarda taşma yapar, akışı koparır ve denetim izini (audit trail) gizler.
+- **Akış İçi Onay Kartları (`YulaChoiceCard`):** Kullanıcı teyidi ve seçenek sorma işlemleri yalnızca akış içi `ask_user_choice` veya `request_user_confirmation` mekanizmaları ile mesaj dizisi içine eklenen etkileşimli çip/buton kartları üzerinden yürütülür.
+- **Audit Trail & Yeniden Oynatma:** Kullanıcının verdiği her onay veya ret kararı sohbet geçmişinde birer mesaj/araç çıktısı olarak kalıcılaşır ve `/dump` raporuna eksiksiz yansır.
 
 ---
 

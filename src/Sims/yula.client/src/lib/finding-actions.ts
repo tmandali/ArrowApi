@@ -129,13 +129,16 @@ export function parseColonTitleLine(line: string): { title: string; desc: string
     .replace(/^([-*•●]|\d+\.)\s+/, "")
     .replace(/\*\*/g, "")
     .trim();
-  const colon = cleaned.indexOf(":");
-  if (colon < 3 || colon > 80) return null;
-  const title = cleaned.slice(0, colon).trim();
-  const desc = cleaned.slice(colon + 1).trim();
-  if (title.length < 3 || desc.length < 2) return null;
+  // Başlık-açıklama çiftlerinde iki nokta sonrasında mutlaka boşluk olmalıdır ("Başlık: açıklama").
+  // "criteria_form:xyz" gibi bileşen tanımlayıcıları veya saat ifadeleri başlık değildir.
+  const colonMatch = cleaned.match(/^([^:\n]+?):\s+(\S[\s\S]*)$/);
+  if (!colonMatch) return null;
+  const title = colonMatch[1].trim();
+  const desc = colonMatch[2].trim();
+  if (title.length < 3 || title.length > 80 || desc.length < 2) return null;
   if (/^https?:\/\//i.test(title) || /^\d{1,2}$/.test(title)) return null;
-  if (title.includes("\n") || desc.length > 800) return null;
+  if (title.startsWith('"') || title.startsWith("'")) return null;
+  if (desc.length > 800) return null;
   return { title, desc };
 }
 

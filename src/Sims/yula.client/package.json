@@ -23,6 +23,7 @@
     "test:ui": "vitest run",
     "test:all": "pnpm test && pnpm test:grid",
     "test:e2e": "playwright test",
+    "simulate": "tsx --require ./scripts/register-md.cjs --test \"src/**/*simulation*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/i18n-check-wrapper.js"
   },

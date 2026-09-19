@@ -72,7 +72,7 @@ export function ChatIntro({
             showAll={pathname === "/"}
             onManage={(id) =>
               router.push(
-                id ? `/system/agents?edit=${encodeURIComponent(id)}` : "/system/agents",
+                id ? `/my/agents?edit=${encodeURIComponent(id)}` : "/my/agents",
               )
             }
             className="mt-6"
@@ -155,7 +155,7 @@ export function ChatIntro({
           showAll={pathname === "/"}
           onManage={(id) =>
             router.push(
-              id ? `/system/agents?edit=${encodeURIComponent(id)}` : "/system/agents",
+              id ? `/my/agents?edit=${encodeURIComponent(id)}` : "/my/agents",
             )
           }
         />

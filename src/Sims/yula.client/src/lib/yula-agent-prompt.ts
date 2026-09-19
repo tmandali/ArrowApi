@@ -20,6 +20,7 @@ import {
   workspaceLabelFromPath,
   extractJobIdFromHref,
 } from "@/lib/workspace-paths";
+import { formatLocalizedRelativeDateTerms } from "./yula-prompt-directives";
 
 export interface YulaGridContext {
   tableName: string;
@@ -109,16 +110,19 @@ const BASE_PROMPT = [
   "  3. 'ask_user_choice': To present interactive choice chips or ask clarifying questions when input is ambiguous or confirmation is needed.",
   "  4. 'time_travel': To undo or redo state transitions when requested by user.",
   "  5. 'remember_fact' & 'recall_fact': To persist and retrieve session preferences and facts.",
+  "• PERSISTENT PREFERENCES (remember_fact): When the user states a recurring habit or preference (e.g. 'ben her zaman Kadıköy mağazasına bakarım', 'always download as Excel'), call 'remember_fact' with type='preference' and scope='persistent'. Leverage recalled preferences with 'recall_fact' when applicable.",
   "• Do NOT announce tool execution in conversational text. Call the tool; after results, answer in the user's language.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
   "",
   "INTERACTIVE QUESTIONS & CONFIRMATION PROTOCOL (ask_user_choice):",
-  "• When information is missing, ambiguous (incomplete criteria, unclear date range, fork in the road), or user choice/confirmation is required, call 'ask_user_choice' with at most 4 concise options instead of asking a plain-text question.",
+  `• RELATIVE DATE EXPANSION: When the user specifies natural relative date terms (${formatLocalizedRelativeDateTerms()}), immediately calculate and expand them into exact ISO date ranges (e.g. '2026-09-07..2026-09-13') based on the Current Date. Do NOT ask clarifying questions or choices for standard calendar terms like 'geçen hafta' or 'bu ay'.`,
+  "• ONLY call 'ask_user_choice' when mandatory criteria (such as required company or store code) are genuinely missing or when the user explicitly requests alternatives/confirmation.",
+  "• When calling 'ask_user_choice', provide at most 4 concise actionable options in the user's language.",
   "• Call 'ask_user_choice' at most ONCE per turn — never emit parallel or repeated question calls in the same step; if you already asked, end the turn.",
-  "• When you ask questions, also write 1–2 short visible sentences in the user's language (what you found + why you are asking) — never leave the turn text empty or whitespace-only.",
+  "• When calling 'ask_user_choice', write 1 short visible sentence in the user's language (what is ready + what is needed) — never leave the turn text empty or whitespace-only; the interactive choice card renders automatically below.",
   "• Options must be in the user's language and formatted as direct actionable answers.",
-  "• After starting a report job (action='RUN'), write one short started/queued line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically.",
+  "• After starting a report job (action='SUBMIT' or 'RUN'), write one short started/queued line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically.",
 ].join("\n");
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
 export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
@@ -235,14 +239,24 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
         criteriaDraft: (context as any)?.screenState?.criteria ?? (context?.uiContext as any)?.criteria,
       },
       actions: {
+        SET_FIELDS: {
+          description: "Kriter formuna değerleri yazar ve günceller ({ criteria }).",
+          whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak istediğinde.",
+          whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+        },
         APPLY: {
           description: "Kriter formuna değerleri yazar ve günceller ({ criteria }).",
           whenToCall: "Kullanıcı mağaza, tarih veya filtre kriteri belirtip doldurmak/seçmek istediğinde.",
-          whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (RUN çağrılmalı).",
+          whenNotToCall: "Kullanıcı doğrudan raporu çalıştırmak istediğinde (SUBMIT/RUN çağrılmalı).",
+        },
+        SUBMIT: {
+          description: "Raporu kriterlerle çalıştırıp işi kuyruğa alır ({ criteria, report }).",
+          whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'raporu al', 'raporunu al', 'getir' dediğinde.",
+          whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
         },
         RUN: {
-          description: "Raporu kriterlerle çalıştırıp işi kuyruğa alır ({ criteria }).",
-          whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'raporu al' dediğinde.",
+          description: "Raporu kriterlerle çalıştırıp işi kuyruğa alır ({ criteria, report }).",
+          whenToCall: "Kullanıcı açıkça 'çalıştır', 'başlat', 'al', 'raporu al', 'raporunu al', 'getir' dediğinde.",
           whenNotToCall: "Zorunlu alanlar eksikken veya kullanıcı sadece kriter taslağını düzenlerken.",
         },
         VALIDATE: {
@@ -253,7 +267,7 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
         READ: {
           description: "Formdaki mevcut kriter taslağını okur.",
           whenToCall: "Mevcut form durumunu öğrenmek veya değer birleştirmek (merge) gerektiğinde.",
-          whenNotToCall: "Kullanıcı yeni değer verip doldurmasını istediğinde.",
+          whenNotToCall: "Kullanıcı doğrudan rapor çalıştırma ('al', 'çalıştır', 'başlat') istediğinde veya yeni değer atarken.",
         },
         SCHEMA: {
           description: "Raporun alan tanımlarını ve şemasını okur.",
@@ -277,7 +291,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       "",
       `=== LEVEL 0: ACTIVE AGENT PERSONA (${context.agent.name}) ===`,
       context.agent.instructions,
-      "Precedence is limited to tone and task priorities: keep the persona's tone and priorities in EVERY reply — including greetings and small talk (greet as the persona, briefly state who you are and how you can help in your domain). Never fall back to a generic assistant voice. The safety rules below are NOT overridden by this persona: phase walls (RESULTS vs WORKSPACE separation, no unapproved run_job) and tool allowlists still bind every reply.",
+      "Precedence is limited to tone and task priorities: keep the persona's tone and priorities in EVERY reply — including greetings and small talk (greet as the persona, briefly state who you are and how you can help in your domain). Never fall back to a generic assistant voice. The safety rules below are NOT overridden by this persona: phase walls (RESULTS vs WORKSPACE separation, no unapproved execution [action='RUN']) and tool allowlists still bind every reply.",
     );
     const docs = (context.agent.attachments ?? []).filter(
       (d) => d.name.trim() && d.content.trim(),

@@ -4,6 +4,10 @@
  */
 import { skillsManager } from "@my-agent/core";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
+import {
+  formatLocalizedRelativeDateTerms,
+  formatLocalizedRunVerbs,
+} from "../yula-prompt-directives";
 
 const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
   const fields = Object.entries(r.criteriaSchema.properties)
@@ -19,11 +23,11 @@ export const AGENT_PREPARE_CHAIN_RULES = [
   "AGENT SESSION PREPARE CHAIN (active persona + WORKSPACE phase + target report on another screen):",
   "• Prepare-type requests are FULL prepare chains, never navigate-only:",
   "  1. Identify the target report (catalog / RAG router) and learn its fields via dispatch_component_action (component_id='criteria_form:<scope>', action='SCHEMA').",
-  "  2. Extract criteria from the request and expand relative dates to exact ISO ranges. Read draft with action='READ', merge, then call dispatch_component_action with component_id='criteria_form:<scope>', action='APPLY' (apply_criteria) with the COMPLETE set for the target scope BEFORE navigating.",
+  `  2. Extract criteria from the request and automatically expand relative dates (${formatLocalizedRelativeDateTerms()}) to exact ISO ranges without asking choice questions. Read draft with action='READ', merge, then call dispatch_component_action with component_id='criteria_form:<scope>', action='SET_FIELDS' (apply_criteria) with the COMPLETE set for the target scope BEFORE navigating.`,
   "  3. Open the target route via dispatch_component_action with component_id='app_router', action='NAVIGATE' (navigate_to_page) (payload: { path: '/...' }) in the SAME turn. Include the report link in your reply.",
   "  4. Reply with what was filled (field names + values, user's language) plus the run confirmation as a separate clickable bold bullet (e.g. '• **Run the report**').",
-  "• Preparing ≠ running: NEVER call action='RUN' (run_job) without an explicit run request ('run', 'execute', 'start the job'). If required fields are missing, ask via 'ask_user_choice'.",
-  "• Explicit run verbs skip the confirmation: chain action='APPLY' (apply_criteria) → action='RUN' (run_job) → point to execution.",
+  `• Preparing ≠ running: NEVER call action='SUBMIT' (run_job) without an explicit run verb (${formatLocalizedRunVerbs()}). If mandatory fields are missing, ask via 'ask_user_choice'.`,
+  `• Explicit run verbs skip the confirmation: When user explicitly asks to run/create/start/fetch (${formatLocalizedRunVerbs()}) (e.g. 'satış raporunu al', 'raporu çalıştır', 'run sales report'): directly execute action='SUBMIT' (run_job) with component_id='criteria_form:<scope>' (chaining action='SET_FIELDS' only if specific criteria were provided in the request). Do NOT call action='READ' or 'SCHEMA' first on explicit run requests.`,
 ].join("\n");
 
 export function registerYulaSkills(): void {
@@ -34,8 +38,8 @@ export function registerYulaSkills(): void {
       applicableComponents: ["app_router", "job_history"],
       instructions: [
         "REPORT CATALOG & NAVIGATION (via dispatch_component_action):",
-        "• To prepare or fill criteria: dispatch_component_action with component_id='criteria_form:<scope>', action='APPLY' (apply_criteria), payload: { criteria, report: '<scope>' }.",
-        "• Only execute on explicit run request: dispatch_component_action with component_id='criteria_form:<scope>', action='RUN' (run_job), payload: { criteria, report: '<scope>' }.",
+        "• To prepare or fill criteria: dispatch_component_action with component_id='criteria_form:<scope>', action='SET_FIELDS' (apply_criteria), payload: { criteria, report: '<scope>' }.",
+        "• Only execute on explicit run request: dispatch_component_action with component_id='criteria_form:<scope>', action='SUBMIT' (run_job), payload: { criteria, report: '<scope>' }.",
         "• To navigate to another page/report: dispatch_component_action with component_id='app_router', action='NAVIGATE' (navigate_to_page), payload: { path: '/...' }.",
         "• To view past reports: dispatch_component_action with component_id='job_history', action='OPEN_LAST' (open_last_report) or action='LIST'.",
         "• To ask interactive choices/clarifications: call 'ask_user_choice' with question and options.",

@@ -10,14 +10,15 @@ export const STANDARD_AGENT_TOOLS = {
     description: [
       "Dispatch an action to an active UI component on the screen (criteria form, result grid, app router, job history).",
       "Usage:",
-      "- Criteria Form: component_id='criteria_form:<scope>', action='APPLY' | 'RUN' | 'VALIDATE' | 'READ', payload={ criteria, report }.",
+      "- Criteria Form: component_id='criteria_form:<scope>', action='SET_FIELDS' | 'APPLY' | 'SUBMIT' | 'RUN' | 'VALIDATE' | 'READ', payload={ criteria, report }.",
       "- Result Grid: component_id='result_grid:active', action='RUN_SQL' | 'QUERY' | 'FILTER' | 'SORT' | 'EXPORT' | 'COLUMNS' | 'PIN' | 'RESET_LAYOUT' | 'VISUALIZE' | 'ANALYZE' | 'PROFILE', payload={ ... }.",
       "- App Router: component_id='app_router', action='NAVIGATE', payload={ path }.",
       "- Job History: component_id='job_history', action='OPEN_LAST' | 'LIST' | 'FIND' | 'CANCEL', payload={ ... }.",
+      "- Plugins: component_id='plugin:<name>', action='<toolName>', payload={ ... }.",
     ].join(" "),
     inputSchema: z.object({
-      component_id: z.string().describe("Target component identifier (e.g. 'criteria_form:retail-sales', 'result_grid:active', 'app_router', 'job_history')"),
-      action: z.string().describe("Action to perform (e.g. 'APPLY', 'RUN', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
+      component_id: z.string().describe("Target component identifier (e.g. 'criteria_form:retail-sales', 'result_grid:active', 'app_router', 'job_history', 'plugin:stock-predictive-analytics')"),
+      action: z.string().describe("Action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'APPLY', 'RUN', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
       payload: z.record(z.string(), z.any()).optional().default({}).describe("Action parameters and criteria"),
     }),
   }),

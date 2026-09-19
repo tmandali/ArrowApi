@@ -6,6 +6,7 @@ import {
   executeComponentAction,
   type ComponentSchema,
   piEventStream,
+  steeringManager,
 } from "@my-agent/core";
 import { executeAgentToolCall } from "@my-agent/react";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
@@ -344,5 +345,182 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
     unsubForm();
     uiRegistry.unregister("app_router");
     uiRegistry.unregister(formCompId);
+  });
+
+  it("kullanıcı 'geçen hafta' dediğinde ask_user_choice ile seçenek sunulması ve seçilen tarihle raporun çalıştırılması akışını simüle etmelidir", async () => {
+    uiRegistry.clear();
+    uiEventBus.clear();
+
+    const report = REGISTERED_REPORTS.find((r) => r.scope === "retail-sales-report")!;
+    const formCompId = `criteria_form:${report.scope}`;
+
+    let capturedPiChoiceEvent: any = null;
+    const choiceInput = {
+      question: "“Geçen hafta” için hangi tarih aralığını kullanayım?",
+      options: [
+        {
+          label: "Önceki takvim haftası",
+          value: "2026-09-07..2026-09-13",
+          description: "Pazartesi–Pazar: 7–13 Eylül 2026",
+        },
+        {
+          label: "Son 7 gün",
+          value: "2026-09-12..2026-09-18",
+          description: "12–18 Eylül 2026",
+        },
+      ],
+      allow_custom: true,
+    };
+
+    // Core server araç setindeki execute'ı çalıştır
+    const { agentUiTools, piEventStream: streamInstance } = await import("@my-agent/core");
+    const unsubStream = streamInstance.subscribe((event) => {
+      if (event.type === "user_choice_prompt") {
+        capturedPiChoiceEvent = event;
+      }
+    });
+
+    const coreChoiceTool = (agentUiTools as any)?.ask_user_choice;
+    assert.ok(coreChoiceTool, "ask_user_choice aracı agentUiTools içinde tanımlı olmalı");
+
+    const choiceOutput = await coreChoiceTool.execute(choiceInput);
+
+    assert.equal(choiceOutput.success, true, "Seçenek sunumu başarılı olmalı");
+    assert.equal(choiceOutput.status, "waiting_user_selection", "Kullanıcı seçimi bekleme durumunda olmalı");
+    assert.equal(choiceOutput.options.length, 2, "2 seçenek sunulmalı");
+
+    // Pi EventStream'e user_choice_prompt düştüğünü doğrula
+    assert.ok(capturedPiChoiceEvent, "piEventStream'e user_choice_prompt olayı düşmeli");
+    assert.equal(capturedPiChoiceEvent?.question, choiceInput.question);
+    assert.equal(capturedPiChoiceEvent?.options.length, 2);
+
+    // 2. Kullanıcı seçimini simüle et: Kullanıcı 1. seçeneği (Önceki takvim haftası) seçer
+    const selectedOption = choiceInput.options[0];
+    assert.equal(selectedOption.value, "2026-09-07..2026-09-13");
+
+    // 3. Form bileşenini mount et
+    const formSchema: ComponentSchema = {
+      id: formCompId,
+      meta: { description: `${report.title} Kriter Formu`, scope: report.scope },
+      actions: {
+        APPLY: {
+          description: "Kriterleri uygular",
+          whenToCall: "Kriterler doldurulurken",
+          whenNotToCall: "Zaten doluyken",
+        },
+        RUN: {
+          description: "Raporu çalıştırır",
+          whenToCall: "Çalıştır komutunda",
+          whenNotToCall: "Eksik kriter varken",
+        },
+      },
+    };
+    uiRegistry.register(formSchema);
+
+    let appliedCriteria: Record<string, unknown> | null = null;
+    let runExecuted = false;
+
+    const unsubForm = uiEventBus.subscribe(formCompId, (action, payload) => {
+      if (action === "APPLY") {
+        appliedCriteria = payload?.criteria as Record<string, unknown>;
+        return { success: true, appliedCriteria };
+      }
+      if (action === "RUN") {
+        runExecuted = true;
+        return {
+          success: true,
+          status: "executed",
+          jobId: "retail-job-choice-test",
+          navigateTo: `${report.pagePath}?jobId=retail-job-choice-test`,
+        };
+      }
+      return { success: false, error: "Bilinmeyen form aksiyonu" };
+    });
+
+    // 4. Model seçilen tarihle form APPLY aksiyonunu çağırır
+    const applyRes = await executeComponentAction({
+      component_id: formCompId,
+      action: "APPLY",
+      payload: {
+        criteria: {
+          sirketKod: "TRCL",
+          hareketTarihi: selectedOption.value,
+        },
+        report: report.scope,
+      },
+    });
+
+    assert.equal(applyRes.success, true, "APPLY aksiyonu başarılı olmalı");
+    assert.deepEqual(
+      appliedCriteria,
+      {
+        sirketKod: "TRCL",
+        hareketTarihi: "2026-09-07..2026-09-13",
+      },
+      "Seçilen takvim haftası tarihi ve şirket kodu forma doğru aktarılmalı",
+    );
+
+    // 5. Ardından RUN aksiyonunu çağırır
+    const runRes = await executeComponentAction({
+      component_id: formCompId,
+      action: "RUN",
+      payload: {
+        criteria: appliedCriteria,
+        report: report.scope,
+      },
+    });
+
+    assert.equal(runRes.success, true, "RUN aksiyonu başarılı olmalı");
+    assert.equal(runExecuted, true, "Rapor işi başarıyla çalıştırılmış olmalı");
+    assert.equal((runRes.details as any)?.jobId, "retail-job-choice-test");
+
+    unsubStream();
+    unsubForm();
+    uiRegistry.unregister(formCompId);
+  });
+
+  it("⚡ Pi Steering ve 📥 Follow-up kuyruğu doğru yönetilmeli ve sırayla tüketilmelidir", async () => {
+    // 1. Temiz başlangıç
+    steeringManager.clearSteering();
+    steeringManager.clearFollowUp();
+
+    assert.equal(steeringManager.hasSteering(), false);
+    assert.equal(steeringManager.hasFollowUp(), false);
+
+    // 2. Anlık araya girme (Steering) ekle
+    steeringManager.steer("Dur, Kadıköy yerine Beşiktaş'ı seç!");
+    assert.equal(steeringManager.hasSteering(), true);
+    assert.equal(steeringManager.getSteeringQueue().length, 1);
+    assert.equal(
+      steeringManager.getSteeringQueue()[0].content,
+      "Dur, Kadıköy yerine Beşiktaş'ı seç!",
+    );
+
+    // 3. Takip görevi (Follow-up) ekle
+    steeringManager.followUp("Rapor bitince sonuçları CSV olarak indir.");
+    assert.equal(steeringManager.hasFollowUp(), true);
+    assert.equal(steeringManager.getFollowUpQueue().length, 1);
+    assert.equal(
+      steeringManager.getFollowUpQueue()[0].content,
+      "Rapor bitince sonuçları CSV olarak indir.",
+    );
+
+    // 4. Kuyruktan ilk steer mesajı tüketilsin
+    const nextSteer = steeringManager.popSteer();
+    assert.ok(nextSteer);
+    assert.equal(nextSteer.role, "user");
+    assert.equal(nextSteer.content, "Dur, Kadıköy yerine Beşiktaş'ı seç!");
+    assert.equal(steeringManager.hasSteering(), false);
+
+    // 5. Steering bitince follow-up tüketilsin
+    const nextFollowUp = steeringManager.popFollowUp();
+    assert.ok(nextFollowUp);
+    assert.equal(nextFollowUp.role, "user");
+    assert.equal(nextFollowUp.content, "Rapor bitince sonuçları CSV olarak indir.");
+    assert.equal(steeringManager.hasFollowUp(), false);
+
+    // 6. Kuyruklar tamamen boşalmış olmalı
+    assert.equal(steeringManager.popSteer(), undefined);
+    assert.equal(steeringManager.popFollowUp(), undefined);
   });
 });

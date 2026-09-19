@@ -26,6 +26,7 @@ import {
   listReportExecutionsTool,
   cancelJobTool,
 } from "./job-lifecycle-tools";
+import { pluginRegistry } from "@/lib/plugins/yula-plugins";
 
 export interface DispatchActionParams {
   component_id: string;
@@ -145,6 +146,16 @@ export async function executeDispatchComponentAction({
       default:
         return { status: "unknown-action", component_id, action };
     }
+  }
+
+  // 5. Eklenti (Plugin) Araçları
+  if (family === "plugin") {
+    const customTools = pluginRegistry.getCustomTools();
+    const tool = customTools[action] || (subId ? customTools[subId] : undefined);
+    if (tool && typeof tool.execute === "function") {
+      return tool.execute(args);
+    }
+    return { status: "unknown-plugin-tool", component_id, action };
   }
 
   return { status: "unknown-component", component_id, action };

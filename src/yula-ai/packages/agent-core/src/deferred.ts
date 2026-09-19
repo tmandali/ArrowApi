@@ -17,12 +17,34 @@ export interface DeferredHandle<T = any> {
 export class DeferredManager {
   private handles: Map<string, DeferredHandle> = new Map();
 
+  private findHandle(idOrKey: string): DeferredHandle | undefined {
+    let handle = this.handles.get(idOrKey);
+    if (handle) return handle;
+
+    for (const h of this.handles.values()) {
+      if (
+        h.handleId === idOrKey ||
+        h.name === idOrKey ||
+        h.metadata?.jobId === idOrKey ||
+        h.metadata?.taskId === idOrKey
+      ) {
+        return h;
+      }
+    }
+    return undefined;
+  }
+
   createDeferred<T = any>(
     name: string,
     metadata?: any,
-    timeoutMs: number = 30000
+    timeoutMs: number = 30000,
+    customHandleId?: string
   ): { handle: DeferredHandle<T>; promise: Promise<T> } {
-    const handleId = `def_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const handleId =
+      customHandleId ||
+      metadata?.handleId ||
+      metadata?.jobId ||
+      `def_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     let resolver!: (value: T) => void;
     let rejecter!: (reason?: any) => void;
@@ -46,8 +68,18 @@ export class DeferredManager {
       handle.timeoutId = setTimeout(() => {
         if (handle.status === 'suspended') {
           handle.status = 'timed_out';
-          handle.reject?.(new Error(`[DeferredManager] "${name}" zaman aşımına uğradı (${timeoutMs}ms)`));
-          this.handles.delete(handleId);
+          const timeoutError = new Error(`[DeferredManager] "${name}" zaman aşımına uğradı (${timeoutMs}ms)`);
+
+          piEventStream.emit({
+            type: 'task_timed_out',
+            taskId: handle.handleId,
+            handleId: handle.handleId,
+            metadata: { name, ...metadata },
+            timestamp: Date.now(),
+          });
+
+          handle.reject?.(timeoutError);
+          this.handles.delete(handle.handleId);
         }
       }, timeoutMs);
     }
@@ -65,10 +97,10 @@ export class DeferredManager {
     return { handle, promise };
   }
 
-  resume<T = any>(handleId: string, result: T): boolean {
-    const handle = this.handles.get(handleId);
+  resume<T = any>(idOrKey: string, result: T): boolean {
+    const handle = this.findHandle(idOrKey);
     if (!handle || handle.status !== 'suspended') {
-      console.warn(`[DeferredManager] Askıda olmayan görev sürdürülemez: ${handleId}`);
+      console.warn(`[DeferredManager] Askıda olmayan görev sürdürülemez: ${idOrKey}`);
       return false;
     }
 
@@ -79,25 +111,33 @@ export class DeferredManager {
 
     piEventStream.emit({
       type: 'task_resumed',
-      taskId: handleId,
-      handleId,
+      taskId: handle.handleId,
+      handleId: handle.handleId,
       result,
       timestamp: Date.now(),
     });
 
-    this.handles.delete(handleId);
+    this.handles.delete(handle.handleId);
     return true;
   }
 
-  cancel(handleId: string, reason: string = 'Kullanıcı tarafından iptal edildi'): boolean {
-    const handle = this.handles.get(handleId);
+  cancel(idOrKey: string, reason: string = 'Kullanıcı tarafından iptal edildi'): boolean {
+    const handle = this.findHandle(idOrKey);
     if (!handle || handle.status !== 'suspended') return false;
 
     if (handle.timeoutId) clearTimeout(handle.timeoutId);
     handle.status = 'cancelled';
     handle.reject?.(new Error(reason));
 
-    this.handles.delete(handleId);
+    piEventStream.emit({
+      type: 'task_cancelled',
+      taskId: handle.handleId,
+      handleId: handle.handleId,
+      reason,
+      timestamp: Date.now(),
+    });
+
+    this.handles.delete(handle.handleId);
     return true;
   }
 

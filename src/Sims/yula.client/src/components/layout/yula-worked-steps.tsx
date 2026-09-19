@@ -583,6 +583,38 @@ export function extractWorkedSteps(
         });
         break;
       }
+      case "ask_user_choice": {
+        const question =
+          typeof inputObj.question === "string" ? inputObj.question : undefined;
+        const rawOpts = (inputObj as { options?: unknown }).options;
+        const count = Array.isArray(rawOpts) ? rawOpts.length : 0;
+        if (isDedupeSkipOutput(info)) {
+          pushStep({
+            id: info.toolCallId,
+            kind: "confirmation",
+            label: "Duplicate choice prompt suppressed",
+            subLabel: "same-step repeat — first choice kept",
+            isLive: false,
+            isError: false,
+            info,
+          });
+          break;
+        }
+        pushStep({
+          id: info.toolCallId,
+          kind: "confirmation",
+          label: question ? `Asked: ${question}` : "Asked user choice",
+          subLabel: isPending
+            ? "Waiting for user selection..."
+            : count > 0
+              ? `${count} options presented`
+              : "User choice",
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
       case "ask_user_question": {
         const raw = (inputObj as { questions?: unknown }).questions;
         const first =

@@ -20,6 +20,15 @@ function askPart(toolCallId: string, state = "input-available") {
   };
 }
 
+function choicePart(toolCallId: string, state = "input-available") {
+  return {
+    type: "tool-ask_user_choice",
+    toolCallId,
+    state,
+    input: { question: "Soru?", options: ["A", "B"] },
+  };
+}
+
 function otherPart(toolCallId: string, name = "run_job") {
   return { type: `tool-${name}`, toolCallId, state: "input-available", input: {} };
 }
@@ -48,6 +57,13 @@ describe("findDuplicateQuestionCallIds", () => {
       { role: "assistant", parts: [askPart("a1")] },
     ]);
     assert.equal(out.size, 0);
+  });
+
+  it("aynı adımdaki ikinci ask_user_choice çağrısını yinelenen sayar", () => {
+    const out = findDuplicateQuestionCallIds([
+      { role: "assistant", parts: [choicePart("c1"), choicePart("c2")] },
+    ]);
+    assert.deepEqual([...out], ["c2"]);
   });
 
   it("farklı adımdaki sorular elenmez (step-start sınırı)", () => {

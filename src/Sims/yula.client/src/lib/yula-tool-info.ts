@@ -95,7 +95,9 @@ export function findDuplicateQuestionCallIds(
       if (info) blocks[blocks.length - 1].push(info);
     }
     for (const block of blocks) {
-      const asks = block.filter((i) => i.toolName === "ask_user_question");
+      const asks = block.filter(
+        (i) => i.toolName === "ask_user_question" || i.toolName === "ask_user_choice",
+      );
       // İlk çağrı (durumu ne olursa olsun) yaşar; sonrakiler yinelenendir.
       for (const extra of asks.slice(1)) duplicates.add(extra.toolCallId);
     }

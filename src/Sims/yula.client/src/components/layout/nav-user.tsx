@@ -37,6 +37,8 @@ import {
   Moon,
   Monitor,
   LogOut,
+  Sparkles,
+  Bot,
 } from "lucide-react";
 
 const themes = [
@@ -301,6 +303,23 @@ export function NavUser() {
               </DropdownMenuItem>
             );
           })}
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
+          <DropdownMenuItem asChild className="cursor-pointer gap-2">
+            <Link href="/my/skills" onClick={() => setOpen(false)}>
+              <Sparkles className="size-4 text-amber-500" />
+              <span>Beceriler & Komutlar</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer gap-2">
+            <Link href="/my/agents" onClick={() => setOpen(false)}>
+              <Bot className="size-4 text-primary" />
+              <span>Personalar & Ajanlar</span>
+            </Link>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />

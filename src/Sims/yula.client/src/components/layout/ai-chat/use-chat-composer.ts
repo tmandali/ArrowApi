@@ -197,6 +197,26 @@ export function useChatComposer(args: {
     doSend(input);
   };
 
+  const handleSteer = (text?: string) => {
+    const content = (text ?? input).trim();
+    if (!content) return;
+    yula.steer?.(content);
+    setInput("");
+    setSelectedCommand(null);
+    setPastedChip(null);
+    setAttachments([]);
+  };
+
+  const handleFollowUp = (text?: string) => {
+    const content = (text ?? input).trim();
+    if (!content) return;
+    yula.followUp?.(content);
+    setInput("");
+    setSelectedCommand(null);
+    setPastedChip(null);
+    setAttachments([]);
+  };
+
   const applyCommand = (command: YulaCommand) => {
     if (command.id === "new") {
       newConversation();
@@ -281,6 +301,8 @@ export function useChatComposer(args: {
     showHistory,
     openHistoryConversation,
     handleSend,
+    handleSteer,
+    handleFollowUp,
     applyCommand,
     onFilesSelected,
     canSubmit,

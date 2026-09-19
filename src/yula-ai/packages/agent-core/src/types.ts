@@ -93,8 +93,10 @@ export type AgentEvent =
   // Pi Advanced Part 2: Progress, Lanes, Deferred, Replay, Reconcile
   | { type: 'tool_progress'; toolCallId: string; toolName: string; percentage: number; message: string; data?: any; timestamp?: number }
   | { type: 'lane_switched'; lane: string; reason?: string; timestamp?: number }
-  | { type: 'task_suspended'; taskId: string; handleId: string; metadata?: any; timestamp?: number }
+    | { type: 'task_suspended'; taskId: string; handleId: string; metadata?: any; timestamp?: number }
   | { type: 'task_resumed'; taskId: string; handleId: string; result?: any; timestamp?: number }
+  | { type: 'task_timed_out'; taskId: string; handleId: string; metadata?: any; timestamp?: number }
+  | { type: 'task_cancelled'; taskId: string; handleId: string; reason?: string; timestamp?: number }
   | { type: 'session_replayed'; fromSeq: number; toSeq: number; timestamp?: number }
   | { type: 'reconcile_completed'; recoveredCount: number; message: string; timestamp?: number }
   | { type: 'user_choice_prompt'; question: string; options: any[]; allow_custom?: boolean; timestamp?: number }
