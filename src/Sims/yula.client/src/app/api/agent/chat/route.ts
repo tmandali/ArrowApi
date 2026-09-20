@@ -436,7 +436,6 @@ export async function POST(req: Request) {
       ],
     });
 
-    const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
     const wikiInfo: YulaMessageMetadata["wiki"] = {
       level: "workspace",
       workspaceId: wsId,
