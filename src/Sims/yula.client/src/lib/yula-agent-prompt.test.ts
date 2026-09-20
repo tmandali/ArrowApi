@@ -289,6 +289,27 @@ describe("buildSystemPrompt agent katmanı", () => {
       "Tarif başlık ve özeti yer almalı",
     );
   });
+
+  it("grounded ERP workflow ve modül kataloğu direktifleri promptta yer alır", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/",
+      phase: "workspace",
+    });
+
+    assert.ok(
+      prompt.includes("PLAYBOOK PROCEDURAL KNOWLEDGE & GROUNDED WORKFLOW PROTOCOL"),
+      "Grounded workflow protokolü yer almalı",
+    );
+    assert.ok(
+      prompt.includes("NO VERIFIED RECIPE (Anti-Confabulation / Grounded Fallback)"),
+      "Anti-confabulation fallback kuralı olmalı",
+    );
+    assert.ok(
+      prompt.includes("Available Enterprise Modules"),
+      "Sistem modül envanteri yer almalı",
+    );
+  });
 });
+
 
 

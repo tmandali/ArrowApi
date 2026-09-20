@@ -2,6 +2,26 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-20] Grounded ERP Workflow Protocol & Procedural Memory (Eliminating Theoretical LLM Fallback)
+- **Rationale:**
+  1. *Theoretical Parametric Fallback:* When a user asked about multi-step enterprise workflows (such as purchasing order creation, approvals, goods receipt, and invoicing), the LLM lacked verified procedural recipes in the workspace wiki. Governed by a generic rule ("Answer general conceptual questions directly"), the model fell into parametric training memory and generated generic textbook theories ("Talep açılır -> Tedarikçi seçilir -> Fatura ödenir") completely detached from actual Sims ERP screens, routes, and business rules.
+  2. *Missing Level 0 Recipe Discovery:* `chat/route.ts` pre-injected `playbookRules` (screen guidelines), but omitted `playbookRecipes` from Level 0 system prompt context, forcing extra search turns.
+  3. *Lack of Proactive Playbook Learning:* When no company-specific recipe was found, the model failed to offer interactive Human-In-The-Loop learning chips (`ask_user_choice`) to record the company's real DAG workflow via `propose_playbook_update`.
+- **Decision:**
+  - **Prompt Grounding & Directives (`yula-agent-prompt.ts`):** Replaced the generic conceptual exception with the **Grounded Workflow Protocol**:
+    - For ERP workflow and operational procedure queries, ungrounded textbook essays and theoretical diagrams detached from Sims ERP are strictly forbidden.
+    - If a verified recipe exists, present its concrete DAG steps and screen routes.
+    - If no verified recipe exists (Anti-Confabulation / Grounded Fallback): transparently state that no verified company recipe exists, ground the response in actual Sims ERP modules and screen routes (`stock`, `selling`, `accounting`, `manufacturing`, `subcontracting`), and proactively offer interactive `ask_user_choice` chips (`['Playbook Reçetesi Oluştur', 'İlgili Ekrana Git', 'Vazgeç']`).
+    - Added the Sims Available Enterprise Modules catalog to Level 0 context.
+  - **Zero-Latency Recipe Discovery (`chat/route.ts`):** Added pre-injection of `playbookRecipes` using `serverPlaybookStorage.readEntries(wsId)` so existing workflow recipes are visible to the agent in Level 0 with 0 ms latency.
+  - **Frontmatter Parsing Hardening (`playbook-server.ts`):** Stripped surrounding quotation marks from `category` and `targetPath` frontmatter attributes to ensure strict enum matching (`workflow_recipe`).
+  - **Core Tool Binding (`ui-tool-adapter.ts`):** Fixed missing `playbookManager` import in `@my-agent/core` ui tool adapter.
+  - **Baseline Recipe & Catalog:** Added `recipe-purchasing-flow.md` and initialized `index.md` in `storage/wiki/workspaces/stock/`.
+  - **Simulation & Verification:** Added `yula-workflow-grounding.simulation.test.ts` (4/4 pass) and expanded `yula-agent-prompt.test.ts` (18/18 pass). All simulation suites pass (31/31).
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-20] Multi-Step ReAct Isolation & Tool Loadout Synchronization (Pi DAG Message Model & Server-Client Tool Bridge)
 - **Rationale:**
   1. *Duplicate Visual Artifacts & Preamble Pollution:* In multi-step turns (where the model executed tools before formulating its terminal response), intermediate assistant preambles and draft Mermaid diagrams were concatenated with the terminal response because `computeChatTurns` merged all assistant message parts using `flatMap`.

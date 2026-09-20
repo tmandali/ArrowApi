@@ -182,8 +182,8 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
         const [k, ...rest] = lines[i].split(":");
         const v = rest.join(":").trim();
         if (k.trim() === "title") title = v.replace(/^["']|["']$/g, "");
-        if (k.trim() === "category") category = v as any;
-        if (k.trim() === "targetPath") targetPath = v;
+        if (k.trim() === "category") category = v.replace(/^["']|["']$/g, "") as any;
+        if (k.trim() === "targetPath") targetPath = v.replace(/^["']|["']$/g, "");
       }
       if (fmEnd !== -1) contentStart = fmEnd + 1;
     }

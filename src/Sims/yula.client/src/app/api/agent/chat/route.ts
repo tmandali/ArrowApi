@@ -15,7 +15,7 @@ import {
 } from "ai";
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
-import { serverPlaybookService } from "@/lib/playbook-server";
+import { serverPlaybookService, serverPlaybookStorage } from "@/lib/playbook-server";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { prepareStepRouting } from "@/lib/yula-step-router";
 import { createFailoverLanguageModel } from "@/lib/yula-provider-failover";
@@ -277,12 +277,24 @@ export async function POST(req: Request) {
       requestEffort: bodyEffort,
       defaultEffort: isThinking ? "low" : "off",
     });
-    // Aktif rota ve çalışma alanına ait doğrulanmış Playbook kurallarını getir (0 ms discovery)
+    // Aktif rota ve çalışma alanına ait doğrulanmış Playbook kurallarını ve reçetelerini getir (0 ms discovery)
     let playbookRules = context?.playbookRules;
-    if (!playbookRules) {
+    let playbookRecipes = context?.playbookRecipes;
+    const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
+    if (!playbookRules || !playbookRecipes) {
       try {
-        const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
-        playbookRules = await serverPlaybookService.getScreenRules(effectivePathname, wsId);
+        if (!playbookRules) {
+          playbookRules = await serverPlaybookService.getScreenRules(effectivePathname, wsId);
+        }
+        if (!playbookRecipes) {
+          const entries = await serverPlaybookStorage.readEntries(wsId);
+          playbookRecipes = entries
+            .filter((e) => e.category === "workflow_recipe")
+            .map((e) => ({
+              title: e.title,
+              summary: e.contentMarkdown.split("\n")[0]?.slice(0, 100) || e.title,
+            }));
+        }
       } catch {
         // Playbook okuma başarısız olursa kesintisiz devam et
       }
@@ -296,6 +308,7 @@ export async function POST(req: Request) {
       phase: effectivePhase,
       uiContext,
       playbookRules: playbookRules && playbookRules.length > 0 ? playbookRules : context?.playbookRules,
+      playbookRecipes: playbookRecipes && playbookRecipes.length > 0 ? playbookRecipes : context?.playbookRecipes,
     });
 
     // Çıkarım önceliği: ajan sabiti > sohbet modeli > sağlayıcı varsayılanı.

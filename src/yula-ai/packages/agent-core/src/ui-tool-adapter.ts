@@ -10,6 +10,7 @@ import { executeComponentAction } from './standard-tools';
 import { agentMemory } from './memory';
 import { sessionManager } from './session-branch';
 import { truncateContent } from './truncate';
+import { playbookManager } from './playbook';
 
 import { delegatedToolRegistry } from './ui-delegation';
 
