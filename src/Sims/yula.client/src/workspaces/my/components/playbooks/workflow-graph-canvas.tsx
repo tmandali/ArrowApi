@@ -22,6 +22,7 @@ import {
   type WorkflowGraphData,
   type WorkflowNode,
   type WorkflowStepType,
+  type PlaybookEntry,
 } from "@my-agent/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,30 +190,35 @@ function applyDagreLayout(
 }
 
 export interface WorkflowGraphCanvasProps {
-  title: string;
+  title?: string;
+  recipe?: PlaybookEntry;
   graph?: WorkflowGraphData;
   contentMarkdown?: string;
   className?: string;
 }
 
 export function WorkflowGraphCanvas({
-  title,
+  title: passedTitle,
+  recipe,
   graph: initialGraph,
   contentMarkdown,
   className = "",
 }: WorkflowGraphCanvasProps) {
+  const title = passedTitle || recipe?.title || "Workflow Graph";
+  const effectiveGraph = initialGraph || recipe?.graph;
+  const effectiveMarkdown = contentMarkdown || recipe?.contentMarkdown;
   const [showExecutionOrder, setShowExecutionOrder] = React.useState(false);
 
   // Compute graph either from passed prop or from markdown steps
   const activeDAG = React.useMemo(() => {
-    if (initialGraph && initialGraph.nodes.length > 0) {
-      return new PlaybookDAG(initialGraph);
+    if (effectiveGraph && effectiveGraph.nodes.length > 0) {
+      return new PlaybookDAG(effectiveGraph);
     }
-    if (contentMarkdown) {
-      return PlaybookDAG.fromMarkdownSteps(contentMarkdown);
+    if (effectiveMarkdown) {
+      return PlaybookDAG.fromMarkdownSteps(effectiveMarkdown);
     }
     return new PlaybookDAG();
-  }, [initialGraph, contentMarkdown]);
+  }, [effectiveGraph, effectiveMarkdown]);
 
   // Compute topological order map
   const topologicalOrderMap = React.useMemo(() => {

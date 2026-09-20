@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useAgentPlaybook } from "@my-agent/react";
+import type { PlaybookEntry } from "@my-agent/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,17 +22,27 @@ import {
   Clock,
   LayoutList,
   Network,
+  ShieldCheck,
 } from "lucide-react";
 import { WorkflowGraphCanvas } from "./workflow-graph-canvas";
 import { usePlaybookAgentBinding } from "./use-playbook-agent-binding";
+import { PlaybookProposalsTab } from "./playbook-proposals-tab";
+import { PlaybookLogTab } from "./playbook-log-tab";
 
-export function PlaybooksManagementView() {
+interface PlaybooksManagementViewProps {
+  defaultTab?: "screens" | "workflows" | "log" | "proposals";
+}
+
+export function PlaybooksManagementView({
+  defaultTab = "screens",
+}: PlaybooksManagementViewProps = {}) {
   const t = useTranslations("Playbooks");
   const [workspace, _setWorkspace] = React.useState("stock");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [workflowViewMode, setWorkflowViewMode] = React.useState<"graph" | "cards">("graph");
   const [selectedWorkflowId, setSelectedWorkflowId] = React.useState<string | null>(null);
+  const [proposals, setProposals] = React.useState<PlaybookEntry[]>([]);
 
   // Kütüphane seviyesindeki @my-agent/react useAgentPlaybook kancası ile veri yönetimi
   const {
@@ -42,6 +53,26 @@ export function PlaybooksManagementView() {
     refresh: loadData,
     removeRule,
   } = useAgentPlaybook({ workspaceId: workspace });
+
+  const loadProposals = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agent/playbook/proposals?workspace=${workspace}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProposals(data.proposals || []);
+      }
+    } catch {
+      // Taslak getirme hatasında devam et
+    }
+  }, [workspace]);
+
+  React.useEffect(() => {
+    loadProposals();
+  }, [loadProposals]);
+
+  const handleRefresh = React.useCallback(async () => {
+    await Promise.all([loadData(), loadProposals()]);
+  }, [loadData, loadProposals]);
 
   const screenRules = entries.filter((e) => e.category === "screen_rule");
   const workflowRecipes = entries.filter((e) => e.category === "workflow_recipe");
@@ -57,7 +88,7 @@ export function PlaybooksManagementView() {
     workflowViewMode,
     setWorkflowViewMode,
     removeRule,
-    refresh: loadData,
+    refresh: handleRefresh,
     screenTitle: t("title"),
   });
 
@@ -97,6 +128,11 @@ export function PlaybooksManagementView() {
           <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
             {t("rules_count", { count: screenRules.length })}
           </Badge>
+          {proposals.length > 0 && (
+            <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal text-amber-600 dark:text-amber-400 border-amber-500/40">
+              {proposals.length} {t("proposals_pending_badge")}
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -113,7 +149,7 @@ export function PlaybooksManagementView() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
+            onClick={handleRefresh}
             disabled={loading}
             className="text-xs h-7 px-2.5 gap-1.5 cursor-pointer"
           >
@@ -124,7 +160,7 @@ export function PlaybooksManagementView() {
       </div>
 
       {/* Sekmeler ve İçerik Alanı */}
-      <Tabs defaultValue="screens" className="flex-1 min-h-0 flex flex-col">
+      <Tabs defaultValue={defaultTab} className="flex-1 min-h-0 flex flex-col">
         <div className="px-4 pt-3 border-b border-border/60 bg-muted/20">
           <TabsList className="h-8 p-0.5 bg-muted/60">
             <TabsTrigger value="screens" className="text-xs gap-1.5 h-7">
@@ -135,6 +171,10 @@ export function PlaybooksManagementView() {
               <Workflow className="size-3.5" />
               {t("tab_workflows")} ({workflowRecipes.length})
             </TabsTrigger>
+            <TabsTrigger value="proposals" className="text-xs gap-1.5 h-7">
+              <ShieldCheck className="size-3.5 text-amber-500" />
+              {t("tab_proposals")} ({proposals.length})
+            </TabsTrigger>
             <TabsTrigger value="log" className="text-xs gap-1.5 h-7">
               <History className="size-3.5" />
               {t("tab_log")} ({logs.length})
@@ -144,9 +184,7 @@ export function PlaybooksManagementView() {
 
         {/* 1. Ekran Kuralları Sekmesi */}
         <TabsContent value="screens" className="flex-1 min-h-0 overflow-y-auto p-4 m-0 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            {t("subtitle")}
-          </p>
+          <p className="text-xs text-muted-foreground">{t("subtitle")}</p>
 
           {filteredRules.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-center rounded-lg border border-dashed border-border/80 bg-muted/10">
@@ -242,31 +280,32 @@ export function PlaybooksManagementView() {
 
         {/* 2. İş Akışı Tarifleri Sekmesi (Graf DAG & Kartlar) */}
         <TabsContent value="workflows" className="flex-1 min-h-0 overflow-y-auto p-4 m-0 space-y-3">
-          {/* Görünüm Geçiş Çubuğu */}
           <div className="flex items-center justify-between pb-2 border-b border-border/60">
             <p className="text-xs text-muted-foreground">
               İş akışı tarifleri ve yönlü döngüsüz graf (DAG) adımları
             </p>
 
-            <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-md border border-border/40">
-              <Button
-                variant={workflowViewMode === "graph" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
-                onClick={() => setWorkflowViewMode("graph")}
-              >
-                <Network className="size-3" />
-                Akış Şeması (DAG)
-              </Button>
-              <Button
-                variant={workflowViewMode === "cards" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
-                onClick={() => setWorkflowViewMode("cards")}
-              >
-                <LayoutList className="size-3" />
-                Kartlar
-              </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border border-border rounded-md p-0.5 bg-muted/30">
+                <Button
+                  variant={workflowViewMode === "graph" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setWorkflowViewMode("graph")}
+                  className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
+                >
+                  <Network className="size-3" />
+                  Graf (DAG)
+                </Button>
+                <Button
+                  variant={workflowViewMode === "cards" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setWorkflowViewMode("cards")}
+                  className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
+                >
+                  <LayoutList className="size-3" />
+                  Kartlar
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -278,121 +317,66 @@ export function PlaybooksManagementView() {
                 {t("empty_workflows_desc")}
               </p>
             </div>
-          ) : workflowViewMode === "graph" && activeWorkflow ? (
+          ) : workflowViewMode === "graph" ? (
             <div className="space-y-3">
-              {/* Çoklu iş akışı varsa seçim hapları */}
               {filteredWorkflows.length > 1 && (
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                  {filteredWorkflows.map((w) => (
+                  {filteredWorkflows.map((wf) => (
                     <Button
-                      key={w.id}
-                      variant={w.id === activeWorkflow.id ? "secondary" : "outline"}
+                      key={wf.id}
+                      variant={activeWorkflow?.id === wf.id ? "default" : "outline"}
                       size="sm"
-                      className="h-7 text-xs px-2.5 shrink-0 gap-1.5 cursor-pointer font-medium"
-                      onClick={() => setSelectedWorkflowId(w.id)}
+                      onClick={() => setSelectedWorkflowId(wf.id)}
+                      className="text-xs h-7 px-2.5 shrink-0 cursor-pointer"
                     >
-                      <Workflow className="size-3" />
-                      <span className="truncate max-w-[160px]">{w.title}</span>
+                      {wf.title}
                     </Button>
                   ))}
                 </div>
               )}
 
-              {/* İnteraktif React Flow Canvas */}
-              <WorkflowGraphCanvas
-                title={activeWorkflow.title}
-                graph={activeWorkflow.graph}
-                contentMarkdown={activeWorkflow.contentMarkdown}
-              />
-
-              {/* Seçili İş Akışı Özet Bilgisi ve İşlemler */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-card/60">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold">{activeWorkflow.title}</span>
-                    {activeWorkflow.targetPath && (
-                      <span className="text-[10.5px] font-mono text-muted-foreground">
-                        {activeWorkflow.targetPath}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground line-clamp-1">
-                    {activeWorkflow.contentMarkdown?.split("\n")[0]}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {deleteConfirmId === activeWorkflow.id ? (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-6 px-2 text-[10px]"
-                        onClick={() => handleDelete(activeWorkflow.id)}
-                      >
-                        Onayla
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-1.5 text-[10px]"
-                        onClick={() => setDeleteConfirmId(null)}
-                      >
-                        İptal
-                      </Button>
+              {activeWorkflow && (
+                <div className="rounded-lg border border-border bg-card p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-semibold text-foreground">
+                        {activeWorkflow.title}
+                      </h3>
+                      {activeWorkflow.targetPath && (
+                        <span className="text-[10.5px] font-mono text-muted-foreground">
+                          {activeWorkflow.targetPath}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive cursor-pointer"
-                      onClick={() => setDeleteConfirmId(activeWorkflow.id)}
-                    >
-                      <Trash2 className="size-3.5 mr-1" />
-                      Tarifi Sil
-                    </Button>
-                  )}
+                    <Badge variant="outline" className="text-[10px]">
+                      {activeWorkflow.scope}
+                    </Badge>
+                  </div>
+
+                  <WorkflowGraphCanvas recipe={activeWorkflow} />
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="grid gap-3">
               {filteredWorkflows.map((recipe) => (
                 <div
                   key={recipe.id}
-                  className="rounded-lg border border-border bg-card p-4 space-y-2.5 shadow-sm"
+                  className="rounded-lg border border-border bg-card p-4 space-y-2.5 shadow-sm hover:border-border/80 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-xs text-foreground">
-                          {recipe.title}
-                        </span>
-                        <Badge variant="secondary" className="h-4 px-1.5 text-[9.5px]">
-                          {t("badge_workflow")}
-                        </Badge>
-                      </div>
+                      <span className="font-semibold text-xs text-foreground">
+                        {recipe.title}
+                      </span>
                       {recipe.targetPath && (
-                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
-                          <span>{recipe.targetPath}</span>
+                        <div className="text-[11px] text-muted-foreground font-mono">
+                          {recipe.targetPath}
                         </div>
                       )}
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-[10px] gap-1 cursor-pointer"
-                        onClick={() => {
-                          setSelectedWorkflowId(recipe.id);
-                          setWorkflowViewMode("graph");
-                        }}
-                      >
-                        <Network className="size-3 text-primary" />
-                        Akış Şemasında Gör
-                      </Button>
-
                       {deleteConfirmId === recipe.id ? (
                         <div className="flex items-center gap-1">
                           <Button
@@ -434,50 +418,19 @@ export function PlaybooksManagementView() {
           )}
         </TabsContent>
 
-        {/* 3. Hafıza Değişiklik Günlüğü Sekmesi (Audit Log) */}
+        {/* 3. Taslak Yönetişim & Onay Sekmesi (Option B Governance) */}
+        <TabsContent value="proposals" className="flex-1 min-h-0 overflow-hidden p-0 m-0">
+          <PlaybookProposalsTab
+            workspace={workspace}
+            proposals={proposals}
+            loading={loading}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+
+        {/* 4. Hafıza Değişiklik Günlüğü Sekmesi (Audit Log) */}
         <TabsContent value="log" className="flex-1 min-h-0 overflow-y-auto p-4 m-0 space-y-3">
-          {logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-center rounded-lg border border-dashed border-border/80 bg-muted/10">
-              <History className="size-8 text-muted-foreground/40 mb-2.5" />
-              <p className="text-xs font-medium text-foreground">{t("empty_log_title")}</p>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border overflow-hidden bg-card">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-muted/40 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="px-3.5 py-2.5 font-semibold">{t("col_date")}</th>
-                    <th className="px-3.5 py-2.5 font-semibold">{t("col_action")}</th>
-                    <th className="px-3.5 py-2.5 font-semibold">{t("col_title")}</th>
-                    <th className="px-3.5 py-2.5 font-semibold">{t("col_author")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 font-mono text-[11px]">
-                  {logs.map((log, idx) => (
-                    <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">
-                        {log.timestamp}
-                      </td>
-                      <td className="px-3.5 py-2.5">
-                        <Badge
-                          variant="outline"
-                          className="h-4 px-1.5 text-[9.5px] uppercase font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                        >
-                          {log.action}
-                        </Badge>
-                      </td>
-                      <td className="px-3.5 py-2.5 text-foreground font-sans font-medium">
-                        {log.title}
-                      </td>
-                      <td className="px-3.5 py-2.5 text-muted-foreground font-sans">
-                        {log.author}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <PlaybookLogTab logs={logs} />
         </TabsContent>
       </Tabs>
     </div>

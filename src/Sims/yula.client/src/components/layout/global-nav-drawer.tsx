@@ -11,6 +11,7 @@ import {
   Bot,
   Blocks,
   Brain,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
@@ -60,6 +61,11 @@ export function GlobalNavDrawer() {
       url: "/system/users",
       label: tNav("system_users"),
       icon: Users,
+    },
+    {
+      url: "/system/playbooks",
+      label: tNav("system_playbooks"),
+      icon: ShieldCheck,
     },
   ];
 

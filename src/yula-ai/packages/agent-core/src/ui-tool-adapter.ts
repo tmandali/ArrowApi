@@ -209,7 +209,7 @@ export function createStandardAgentTools(): AgentTool[] {
       execute: async (_toolCallId, args: any): Promise<AgentToolResult> => {
         const { category = 'screen_rule', title, content, target_path, workspace = 'stock' } = args || {};
         try {
-          const entry = await playbookManager.recordEntry({
+          const entry = await playbookManager.proposeEntry({
             category,
             title: title || 'Learned Rule',
             contentMarkdown: content || '',
@@ -217,15 +217,16 @@ export function createStandardAgentTools(): AgentTool[] {
             workspaceId: workspace,
             scope: 'workspace',
             author: 'Yula AI (Learned)',
+            proposedBy: 'Yula AI (Agent)',
           });
           return {
             content: [
               {
                 type: 'text',
-                text: `Proposed ${category} "${title}" successfully recorded to Workspace Wiki (${workspace}).`,
+                text: `Önerilen ${category === 'workflow_recipe' ? 'iş akışı reçetesi' : 'ekran kuralı'} "${title}" taslak (draft) olarak yönetici onayına sunuldu. Yönetici onaylayana kadar üretim akışlarına dahil edilmeyecektir.`,
               },
             ],
-            details: { status: 'saved', entry },
+            details: { status: 'draft', entry },
           };
         } catch (err: any) {
           return {

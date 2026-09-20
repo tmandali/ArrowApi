@@ -18,7 +18,8 @@ import {
  *   ├── index.md (Katalog)
  *   ├── log.md (Zaman çizelgesi)
  *   ├── screens/*.md (Ekran kuralları)
- *   └── workflows/*.md (İş akışı reçeteleri)
+ *   ├── workflows/*.md (İş akışı reçeteleri)
+ *   └── proposals/*.md (Taslak öneriler - Option B Governance)
  */
 export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
   private baseDir: string;
@@ -155,6 +156,96 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
     }
   }
 
+  // --- Option B Yönetişim: Taslak Öneriler (Draft Proposals) ---
+
+  async readProposals(workspaceId: string): Promise<PlaybookEntry[]> {
+    const wsDir = this.getWorkspaceDir(workspaceId);
+    const proposalsDir = path.join(wsDir, "proposals");
+    const proposals: PlaybookEntry[] = [];
+    try {
+      const files = await fs.readdir(proposalsDir);
+      for (const file of files) {
+        if (!file.endsWith(".md")) continue;
+        const fullPath = path.join(proposalsDir, file);
+        const raw = await fs.readFile(fullPath, "utf-8");
+        const parsed = this.parseMarkdownFile(raw, file, workspaceId, "workspace");
+        if (parsed) proposals.push(parsed);
+      }
+    } catch {
+      // Dizin yoksa boş liste döner
+    }
+    return proposals;
+  }
+
+  async writeProposal(entry: PlaybookEntry): Promise<void> {
+    const wsDir = this.getWorkspaceDir(entry.workspaceId, entry.scope);
+    const proposalsDir = path.join(wsDir, "proposals");
+    await this.ensureDir(proposalsDir);
+
+    const draftEntry: PlaybookEntry = { ...entry, status: "draft" };
+    const filename = `${entry.id}.md`;
+    const filePath = path.join(proposalsDir, filename);
+    const content = this.serializeMarkdownFile(draftEntry);
+    await fs.writeFile(filePath, content, "utf-8");
+  }
+
+  async approveProposal(id: string, workspaceId: string, reviewer: string = "Admin"): Promise<PlaybookEntry | null> {
+    const wsDir = this.getWorkspaceDir(workspaceId);
+    const proposalPath = path.join(wsDir, "proposals", `${id}.md`);
+    try {
+      const raw = await fs.readFile(proposalPath, "utf-8");
+      const parsed = this.parseMarkdownFile(raw, `${id}.md`, workspaceId, "workspace");
+      if (!parsed) return null;
+
+      parsed.status = "approved";
+      parsed.reviewedBy = reviewer;
+      parsed.updatedAt = new Date().toISOString();
+
+      await this.writeEntry(parsed);
+      await fs.unlink(proposalPath);
+
+      await this.appendLog(workspaceId, {
+        timestamp: new Date().toISOString(),
+        action: "proposal_approved",
+        title: parsed.title,
+        targetPath: parsed.targetPath,
+        author: reviewer,
+      });
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async rejectProposal(id: string, workspaceId: string, reason?: string): Promise<boolean> {
+    const wsDir = this.getWorkspaceDir(workspaceId);
+    const proposalPath = path.join(wsDir, "proposals", `${id}.md`);
+    try {
+      let title = id;
+      try {
+        const raw = await fs.readFile(proposalPath, "utf-8");
+        const parsed = this.parseMarkdownFile(raw, `${id}.md`, workspaceId, "workspace");
+        if (parsed) title = parsed.title;
+      } catch {
+        // Devam et
+      }
+
+      await fs.unlink(proposalPath);
+
+      await this.appendLog(workspaceId, {
+        timestamp: new Date().toISOString(),
+        action: "proposal_rejected",
+        title: `${title}${reason ? ` (Neden: ${reason})` : ""}`,
+        author: "Admin",
+      });
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // --- Yardımcı Markdown Ayrıştırma ve Formatlama ---
 
   private parseMarkdownFile(
@@ -169,9 +260,13 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
     let title = id;
     let category: PlaybookEntry["category"] = "screen_rule";
     let targetPath: string | undefined;
+    let author: string | undefined;
+    let status: PlaybookEntry["status"] = "approved";
+    let proposedBy: string | undefined;
+    let reviewedBy: string | undefined;
+    let changeSummary: string | undefined;
     let contentStart = 0;
 
-    // Basit frontmatter ayrıştırma (varsa)
     if (lines[0]?.trim() === "---") {
       let fmEnd = -1;
       for (let i = 1; i < lines.length; i++) {
@@ -180,10 +275,16 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
           break;
         }
         const [k, ...rest] = lines[i].split(":");
-        const v = rest.join(":").trim();
-        if (k.trim() === "title") title = v.replace(/^["']|["']$/g, "");
-        if (k.trim() === "category") category = v.replace(/^["']|["']$/g, "") as any;
-        if (k.trim() === "targetPath") targetPath = v.replace(/^["']|["']$/g, "");
+        const key = k.trim();
+        const v = rest.join(":").trim().replace(/^["']|["']$/g, "");
+        if (key === "title") title = v;
+        if (key === "category") category = v as any;
+        if (key === "targetPath") targetPath = v;
+        if (key === "author") author = v;
+        if (key === "status") status = v as any;
+        if (key === "proposedBy") proposedBy = v;
+        if (key === "reviewedBy") reviewedBy = v;
+        if (key === "changeSummary") changeSummary = v;
       }
       if (fmEnd !== -1) contentStart = fmEnd + 1;
     }
@@ -206,6 +307,11 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
       targetPath,
       contentMarkdown,
       graph,
+      author,
+      status,
+      proposedBy,
+      reviewedBy,
+      changeSummary,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -218,10 +324,13 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
       `title: "${entry.title}"`,
       `category: "${entry.category}"`,
       `scope: "${entry.scope}"`,
+      entry.status ? `status: "${entry.status}"` : null,
       entry.targetPath ? `targetPath: "${entry.targetPath}"` : null,
       entry.author ? `author: "${entry.author}"` : null,
+      entry.proposedBy ? `proposedBy: "${entry.proposedBy}"` : null,
+      entry.reviewedBy ? `reviewedBy: "${entry.reviewedBy}"` : null,
+      entry.changeSummary ? `changeSummary: "${entry.changeSummary}"` : null,
       "---",
-      "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -230,7 +339,7 @@ export class ServerFsPlaybookStorage implements IPlaybookStorageAdapter {
       entry.contentMarkdown ||
       (entry.graph ? new PlaybookDAG(entry.graph).toMarkdownSteps() : "");
 
-    return `${frontmatter}${content}\n`;
+    return `${frontmatter}\n${content}\n`;
   }
 
   private parseIndexMarkdown(raw: string): PlaybookIndexItem[] {

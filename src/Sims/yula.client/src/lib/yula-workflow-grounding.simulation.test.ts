@@ -118,4 +118,71 @@ describe("Grounded ERP Workflow Protocol & Playbook Simulation", () => {
     assert.equal(unverifiedWorkflowDecisionCard.choiceToolCall.input.options.length, 3);
     assert.ok(unverifiedWorkflowDecisionCard.choiceToolCall.input.options.includes("Playbook Reçetesi Oluştur"));
   });
+
+  it("5. Option B Taslak Yönetişim Yaşam Döngüsü (Draft Isolation & Admin Approval)", async () => {
+    const testId = `sim_prop_${Date.now()}`;
+    // 1. Taslak öneri oluşturma
+    await serverPlaybookStorage.writeProposal({
+      id: testId,
+      workspaceId: "stock",
+      scope: "workspace",
+      category: "workflow_recipe",
+      title: "Simülasyon Özel Fason Üretim Onayı",
+      contentMarkdown: "1. Talep oluştur\n2. Yönetici onayı al\n3. Sevk irsaliyesi kes",
+      author: "Test Kullanıcı",
+      proposedBy: "Test Kullanıcı",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // 2. Taslak listesinde bulunmalıdır
+    const proposals = await serverPlaybookStorage.readProposals("stock");
+    const foundProp = proposals.find((p) => p.id === testId);
+    assert.ok(foundProp, "Oluşturulan taslak readProposals içinde yer almalıdır");
+    assert.equal(foundProp?.status, "draft");
+
+    // 3. Sıfır Sızıntı İzolasyon Testi: findRecipe veya readEntries içinde ASLA yer almamalıdır
+    const activeEntries = await serverPlaybookStorage.readEntries("stock");
+    assert.ok(
+      !activeEntries.some((e) => e.id === testId),
+      "Taslak öneri onaylanana kadar readEntries içinde ASLA yer almamalıdır (Sıfır Sızıntı)",
+    );
+    const queriedRecipe = await serverPlaybookService.findRecipe(
+      "Simülasyon Özel Fason Üretim Onayı",
+      "stock",
+    );
+    assert.equal(
+      queriedRecipe,
+      null,
+      "Taslak öneri findRecipe aramasında çıkmamalıdır",
+    );
+
+    // 4. Admin Onay Promosyonu Testi
+    const approved = await serverPlaybookStorage.approveProposal(testId, "stock", "Sistem Yöneticisi");
+    assert.ok(approved, "Yönetici onayı başarılı dönmelidir");
+    assert.equal(approved?.status, "approved");
+    assert.equal(approved?.reviewedBy, "Sistem Yöneticisi");
+
+    // 5. Onay sonrası: Artık aktif depoda ve findRecipe'da görünmelidir
+    const updatedEntries = await serverPlaybookStorage.readEntries("stock");
+    assert.ok(
+      updatedEntries.some((e) => e.id === testId),
+      "Onaylanan reçete readEntries içinde yer almalıdır",
+    );
+    const foundApproved = await serverPlaybookService.findRecipe(
+      "Simülasyon Özel Fason Üretim Onayı",
+      "stock",
+    );
+    assert.ok(foundApproved, "Onaylanan reçete findRecipe ile bulunabilmelidir");
+
+    // 6. Taslak listesinden silinmiş olmalıdır
+    const remainingProposals = await serverPlaybookStorage.readProposals("stock");
+    assert.ok(
+      !remainingProposals.some((p) => p.id === testId),
+      "Onaylanan taslak proposals klasöründen kaldırılmış olmalıdır",
+    );
+
+    // Temizlik
+    await serverPlaybookStorage.deleteEntry(testId, "stock");
+  });
 });

@@ -185,6 +185,7 @@ function reportScreenLabelKey(pathname: string): string | null {
   if (pathname.includes("/my/playbooks")) return "my_playbooks"
   if (pathname.includes("/my/studio")) return "my_skills"
   if (pathname.includes("/system/users")) return "system_users"
+  if (pathname.includes("/system/playbooks")) return "system_playbooks"
   if (pathname.includes("/system/agents")) return "my_agents"
   if (pathname.includes("/system/skills")) return "my_skills"
   return null
@@ -205,6 +206,7 @@ const SCREEN_LABEL_DEFAULTS: Record<string, string> = {
   stock_ledger: "Stok Ekstre",
   stock_item: "Stok Kartı",
   system_users: "Kullanıcılar",
+  system_playbooks: "Kural & Akış Onayları",
   system_agents: "Ajan Ayarları",
   system_skills: "Skill Ayarları",
 }

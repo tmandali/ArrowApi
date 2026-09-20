@@ -30,6 +30,7 @@ const SYSTEM_NAV_KEYS: Record<string, string> = {
   "/my/memory": "my_memory",
   "/my/studio": "my_skills",
   "/system/users": "system_users",
+  "/system/playbooks": "system_playbooks",
 }
 
 /**

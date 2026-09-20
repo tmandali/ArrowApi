@@ -28,17 +28,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, index });
     }
 
+    if (type === "proposals") {
+      const proposals = await serverPlaybookService.getProposals(workspace);
+      return NextResponse.json({ success: true, proposals });
+    }
+
     if (type === "log") {
       const log = await serverPlaybookService.getLog(workspace);
       return NextResponse.json({ success: true, log });
     }
 
-    // Default: tüm kayıtları ve index'i döner
+    // Default: tüm kayıtları, index'i ve taslakları döner
     const entries = await serverPlaybookStorage.readEntries(workspace);
     const index = await serverPlaybookService.getIndex(workspace);
     const log = await serverPlaybookService.getLog(workspace);
+    const proposals = await serverPlaybookService.getProposals(workspace);
 
-    return NextResponse.json({ success: true, entries, index, log });
+    return NextResponse.json({ success: true, entries, index, log, proposals });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error?.message || "Playbook sorgulama hatası" },

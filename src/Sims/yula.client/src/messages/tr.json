@@ -694,6 +694,10 @@
           "title": "Kullanıcı & Rol Yönetimi",
           "description": "Erişim hakları ve roller"
         },
+        "sys-playbooks": {
+          "title": "Kural & Akış Onayları",
+          "description": "Onay bekleyen taslak iş akışları ve ekran kuralları"
+        },
         "sys-my-settings": {
           "title": "Kullanıcı Tercihleri",
           "description": "Profil, bildirim ve tema"
@@ -1638,6 +1642,7 @@
     "my_memory": "Kalıcı Bellek & Tercihler",
     "my_studio": "Yula Stüdyo",
     "system_users": "Kullanıcı Yönetimi",
+    "system_playbooks": "Kural & Akış Onayları",
     "system_agents": "Ajan Ayarları",
     "system_skills": "Skill Ayarları",
     "system_section": "Sistem",
@@ -1657,6 +1662,7 @@
     "stock_ledger": "Stok Ekstre",
     "stock_item": "Stok Kartı",
     "system_users": "Kullanıcılar",
+    "system_playbooks": "Kural & Akış Onayları",
     "system_agents": "Ajan Ayarları",
     "system_skills": "Skill Ayarları",
     "fallback": "Ekran"
@@ -1965,13 +1971,26 @@
     "subtitle": "Yula AI'ın ekran kuralları, iş akışı tarifleri ve organizasyon hafızası.",
     "tab_screens": "Ekran Kuralları",
     "tab_workflows": "İş Akışı Tarifleri",
+    "tab_proposals": "Onay Bekleyenler",
     "tab_log": "Hafıza Değişiklik Günlüğü (Audit Log)",
     "rules_count": "{count} kural",
     "workflows_count": "{count} tarif",
+    "proposals_count": "{count} taslak",
+    "proposals_list_title": "Taslak Öneriler",
+    "proposals_pending_badge": "Onay Bekliyor",
+    "status_waiting_approval": "Yönetici Onayı Bekliyor",
+    "btn_approve": "Onayla & Yayınla",
+    "btn_reject": "Reddet",
     "empty_rules_title": "Henüz ekran kuralı yok",
     "empty_rules_desc": "Yula AI sohbet ederken kullanıcı talimatlarıyla veya kural önerileriyle yeni ekran kuralları öğrenebilir.",
     "empty_workflows_title": "Henüz iş akışı tarifi yok",
     "empty_workflows_desc": "Çok adımlı ERP iş süreçleri ve analiz adımları buraya kaydedilir.",
+    "empty_proposals_title": "Onay bekleyen taslak öneri yok",
+    "empty_proposals_desc": "Kullanıcılar veya Yula AI yeni bir akış veya kural önerdiğinde onaylanmak üzere buraya düşer.",
+    "workflow_visual_dag_preview": "Görsel İş Akışı Şeması (DAG Graf)",
+    "screen_rule_content_preview": "Önerilen Ekran Kuralı Metni",
+    "proposal_approved_success": "Öneri başarıyla onaylandı ve Playbook Wiki'ye yayınlandı.",
+    "proposal_rejected_success": "Öneri reddedildi ve taslaklardan kaldırıldı.",
     "empty_log_title": "Henüz kayıtlı işlem yok",
     "col_title": "Başlık",
     "col_target": "Hedef Rota",

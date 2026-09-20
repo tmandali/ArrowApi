@@ -694,6 +694,10 @@
           "title": "User & Role Management",
           "description": "Access rights and roles"
         },
+        "sys-playbooks": {
+          "title": "Rule & Workflow Approvals",
+          "description": "Pending workflow and screen rule proposals"
+        },
         "sys-my-settings": {
           "title": "User Preferences",
           "description": "Profile, notifications and theme"
@@ -1638,6 +1642,7 @@
     "my_memory": "Agent Memory & Preferences",
     "my_studio": "Yula Studio",
     "system_users": "All Users (Admin)",
+    "system_playbooks": "Rule & Workflow Approvals",
     "system_agents": "Agent Settings",
     "system_skills": "Skill Settings",
     "system_section": "System",
@@ -1657,6 +1662,7 @@
     "stock_ledger": "Stock Ledger",
     "stock_item": "Item Card",
     "system_users": "Users",
+    "system_playbooks": "Rule & Workflow Approvals",
     "system_agents": "Agent Settings",
     "system_skills": "Skill Settings",
     "fallback": "Screen"
@@ -1967,13 +1973,26 @@
     "subtitle": "Yula AI's screen rules, workflow recipes, and company procedural memory.",
     "tab_screens": "Screen Rules",
     "tab_workflows": "Workflow Recipes",
+    "tab_proposals": "Pending Approvals",
     "tab_log": "Memory Audit Log",
     "rules_count": "{count} rules",
     "workflows_count": "{count} recipes",
+    "proposals_count": "{count} proposals",
+    "proposals_list_title": "Draft Proposals",
+    "proposals_pending_badge": "Pending Review",
+    "status_waiting_approval": "Awaiting Admin Approval",
+    "btn_approve": "Approve & Publish",
+    "btn_reject": "Reject",
     "empty_rules_title": "No screen rules yet",
     "empty_rules_desc": "Yula AI learns new screen rules via user instructions during chat or manual entry.",
     "empty_workflows_title": "No workflow recipes yet",
     "empty_workflows_desc": "Multi-step ERP business workflows and analytical sequences are stored here.",
+    "empty_proposals_title": "No pending proposals",
+    "empty_proposals_desc": "When users or Yula AI propose a new workflow or rule, it appears here for administrative approval.",
+    "workflow_visual_dag_preview": "Visual Workflow Diagram (DAG Graph)",
+    "screen_rule_content_preview": "Proposed Screen Rule Markdown",
+    "proposal_approved_success": "Proposal successfully approved and published to Playbook Wiki.",
+    "proposal_rejected_success": "Proposal rejected and removed from drafts.",
     "empty_log_title": "No log entries yet",
     "col_title": "Title",
     "col_target": "Target Route",

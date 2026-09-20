@@ -295,6 +295,7 @@ export const WORKSPACE_LANDING_STRUCTURE: Record<WorkspaceId, StructuralLanding>
     ],
     quickShortcuts: [
       { id: "sys-users", url: "/system/users", icon: Users },
+      { id: "sys-playbooks", url: "/system/playbooks", icon: ShieldCheck },
       { id: "sys-my-settings", url: "/my/settings", icon: Wrench },
     ],
   },

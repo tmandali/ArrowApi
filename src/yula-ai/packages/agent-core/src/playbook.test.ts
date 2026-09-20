@@ -142,5 +142,67 @@ describe('PlaybookService & LLM Wiki Çekirdek Motoru', () => {
     delete (globalThis as any).window;
     delete (globalThis as any).localStorage;
   });
+
+  describe('Yönetişim & Taslak Öneri Yaşam Döngüsü (Option B Governance)', () => {
+    it('kullanıcı önerisi taslak (draft) olarak kaydedilir ve onaylanana kadar aramalarda çıkmaz (İzolasyon)', async () => {
+      const storage = new MemoryPlaybookStorage();
+      const service = new PlaybookService(storage);
+
+      // Kullanıcı kural ve reçete önerir
+      await service.proposeEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'workflow_recipe',
+        title: 'Özel Depo Transfer Onayı',
+        contentMarkdown: '1. Transfer talebi aç\n2. Müdür onayı al\n3. Sevk et',
+        proposedBy: 'Ahmet',
+      });
+
+      await service.proposeEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'screen_rule',
+        title: 'Taslak İskonto Kısıtı',
+        targetPath: '/stock/stock-balance',
+        contentMarkdown: '- Onaysız taslak kural',
+        proposedBy: 'Mehmet',
+      });
+
+      // İzolasyon testi: Aktif aramalarda çıkmamalı
+      const recipe = await service.findRecipe('Depo Transfer', 'stock');
+      expect(recipe).toBeNull();
+
+      const screenRules = await service.getScreenRules('/stock/stock-balance', 'stock');
+      expect(screenRules).toHaveLength(0);
+
+      // Taslak listesinde görünmeli
+      const proposals = await service.getProposals('stock');
+      expect(proposals).toHaveLength(2);
+      expect(proposals[0].status).toBe('draft');
+      expect(proposals[0].proposedBy).toBe('Ahmet');
+
+      // Admin onayı testi
+      const approvedRecipe = await service.approveProposal(proposals[0].id, 'stock', 'Admin Ali');
+      expect(approvedRecipe).not.toBeNull();
+      expect(approvedRecipe?.status).toBe('approved');
+      expect(approvedRecipe?.reviewedBy).toBe('Admin Ali');
+
+      // Artık aramalarda çıkmalı
+      const foundRecipe = await service.findRecipe('Depo Transfer', 'stock');
+      expect(foundRecipe).not.toBeNull();
+      expect(foundRecipe?.title).toBe('Özel Depo Transfer Onayı');
+
+      // Kalan taslak sayısı 1 olmalı
+      const remainingProposals = await service.getProposals('stock');
+      expect(remainingProposals).toHaveLength(1);
+
+      // Reddetme testi
+      const rejected = await service.rejectProposal(proposals[1].id, 'stock', 'Gereksiz kural');
+      expect(rejected).toBe(true);
+
+      const emptyProposals = await service.getProposals('stock');
+      expect(emptyProposals).toHaveLength(0);
+    });
+  });
 });
 
