@@ -144,6 +144,7 @@ async function prepareModelMessages(
   const normalized = normalizeUIMessagesForTransport(rawMessages);
   const modelMessages = await convertToModelMessages(
     slimMessagesForTransport(normalized),
+    { ignoreIncompleteToolCalls: true },
   );
 
   return modelMessages.map((msg) => {

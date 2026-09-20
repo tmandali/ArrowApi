@@ -204,6 +204,117 @@ export function normalizeUIMessagesForTransport<
     }
   }
 
+  // 4) Tamamlanmamış / yanıtsız araç çağrılarını (ask_user_choice, ask_user_question vb.)
+  // takip eden kullanıcı mesajı veya varsayılan sonuçla çözüme kavuştur (MissingToolResultsError koruması).
+  for (let i = 0; i < folded.length; i++) {
+    const msg = folded[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+
+    const nextUser = folded.slice(i + 1).find((m) => m.role === "user");
+    let userText = "";
+    if (nextUser) {
+      if (typeof nextUser.content === "string") {
+        userText = nextUser.content;
+      } else if (Array.isArray(nextUser.parts)) {
+        userText = (nextUser.parts as Record<string, unknown>[])
+          .filter((p) => p && p.type === "text" && typeof p.text === "string")
+          .map((p) => String(p.text))
+          .join("\n")
+          .trim();
+      }
+    }
+
+    msg.parts = msg.parts.map((p) => {
+      if (!p || typeof p !== "object") return p;
+      const part = p as Record<string, unknown>;
+      const rawType = String(part.type || "");
+      const isTool = rawType === "dynamic-tool" || rawType.startsWith("tool-") || Boolean(part.toolName);
+      if (!isTool) return p;
+
+      const state = String(part.state || "");
+      const hasOutput = part.output !== undefined;
+
+      // Zaten tamamlanmış ve geçerli çıktısı olan parçaları koru
+      if (hasOutput || state === "output-available" || state === "output-error" || state === "output-denied") {
+        return {
+          ...part,
+          state: state === "output-error" || state === "output-denied" ? state : "output-available",
+        };
+      }
+
+      const toolName = String(
+        part.toolName || (rawType.startsWith("tool-") ? rawType.slice(5) : "action"),
+      );
+
+      if (toolName === "ask_user_choice") {
+        const input = (part.input ?? {}) as { options?: unknown };
+        const options = Array.isArray(input.options) ? input.options : [];
+        let matchedLabel: string | undefined;
+        let matchedValue: string | undefined;
+
+        if (userText) {
+          for (const opt of options) {
+            if (typeof opt === "string" && userText.includes(opt)) {
+              matchedLabel = opt;
+              matchedValue = opt;
+              break;
+            } else if (opt && typeof opt === "object") {
+              const o = opt as { label?: string; value?: string };
+              if (o.value && userText.includes(o.value)) {
+                matchedLabel = o.label ?? o.value;
+                matchedValue = o.value;
+                break;
+              }
+              if (o.label && userText.includes(o.label)) {
+                matchedLabel = o.label;
+                matchedValue = o.value ?? o.label;
+                break;
+              }
+            }
+          }
+        }
+
+        return {
+          ...part,
+          state: "output-available",
+          output: {
+            selected: matchedLabel ?? (userText || "Seçim yapıldı"),
+            value: matchedValue ?? matchedLabel ?? (userText || "selected"),
+          },
+        };
+      }
+
+      if (toolName === "ask_user_question") {
+        return {
+          ...part,
+          state: "output-available",
+          output: {
+            status: "answered",
+            answers: userText || "Cevaplandı",
+          },
+        };
+      }
+
+      // Takip eden kullanıcı mesajı varsa genel araç sonucunu tamamla
+      if (nextUser) {
+        return {
+          ...part,
+          state: "output-available",
+          output: {
+            status: "completed",
+            message: "İşlem kullanıcı tarafından onaylandı ve devam ettirildi.",
+          },
+        };
+      }
+
+      return {
+        ...part,
+        state: "output-error",
+        errorText: "İşlem yanıtlanmadı veya kesintiye uğradı.",
+      };
+    });
+  }
+
   return folded as unknown as T[];
 }
 
@@ -233,10 +344,14 @@ export function slimMessagesForTransport<
     const isLatest = i === lastAssistant;
     const parts = message.parts.map((part) => {
       if (!isToolPart(part)) return part;
-      // SDK koruması: Herhangi bir araç çağrısı "input-available" durumunda kaldıysa
-      // (ör. yanıtlanmamış onay kartı veya yarıda kesilmiş araç), transport kopyasında
+      // SDK koruması: Herhangi bir araç çağrısı tamamlanmamışsa
+      // (ör. "call", "input-available" veya yarıda kesilmiş araç), transport kopyasında
       // state'i output-error'a çek ki AI SDK "Tool result is missing for tool call" hatası vermesin.
-      if (part.state === "input-available" || !part.state) {
+      if (
+        part.state !== "output-available" &&
+        part.state !== "output-error" &&
+        part.state !== "output-denied"
+      ) {
         changed = true;
         return {
           ...part,

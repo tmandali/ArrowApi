@@ -93,4 +93,82 @@ describe("context-slim & message normalization testleri", () => {
     assert.ok(Array.isArray(modelMessages));
     assert.equal(modelMessages.length, 3); // user + assistant(tool-call) + tool(tool-result)
   });
+
+  it("ask_user_choice çağrısını takip eden kullanıcı seçimiyle eşleştirip MissingToolResultsError hatasını engellemelidir", async () => {
+    const chatHistory = [
+      {
+        role: "user",
+        parts: [{ type: "text", text: "Haftalık stok sayım mutabakatını kontrol et." }],
+      },
+      {
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Plan hazır:" },
+          {
+            type: "tool-ask_user_choice",
+            toolCallId: "tc_choice_99",
+            toolName: "ask_user_choice",
+            input: {
+              question: "Mutabakat kontrolü için iş akışını nasıl başlatayım?",
+              options: [
+                { label: "Planı Başlat ve İcra Et", value: "start_current_week" },
+                { label: "Geçen Tamamlanan Haftayı Kontrol Et", value: "start_previous_week" },
+              ],
+            },
+            state: "call",
+          },
+        ],
+      },
+      {
+        role: "user",
+        parts: [{ type: "text", text: "Geçen Tamamlanan Haftayı Kontrol Et (start_previous_week)" }],
+      },
+    ];
+
+    const normalized = normalizeUIMessagesForTransport(chatHistory as any);
+    const asstMsg = normalized[1];
+    const choicePart = (asstMsg.parts as any[])?.find((p) => p.toolCallId === "tc_choice_99");
+
+    assert.ok(choicePart, "ask_user_choice parçası bulunmalıdır");
+    assert.equal(choicePart.state, "output-available");
+    assert.equal(choicePart.output?.selected, "Geçen Tamamlanan Haftayı Kontrol Et");
+    assert.equal(choicePart.output?.value, "start_previous_week");
+
+    // convertToModelMessages hatasız çalışmalı ve tool mesajı üretmelidir
+    const modelMessages = await convertToModelMessages(
+      slimMessagesForTransport(normalized) as any,
+      { ignoreIncompleteToolCalls: true },
+    );
+    assert.equal(modelMessages.length, 4); // user + assistant + tool + user
+    assert.equal(modelMessages[2].role, "tool");
+  });
+
+  it("herhangi bir açıkta kalan state: call aracı slimMessagesForTransport güvenle sonuçlandırmalıdır", async () => {
+    const raw = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-dispatch_component_action",
+            toolCallId: "tc_raw_call",
+            toolName: "dispatch_component_action",
+            input: { action: "SET_FIELDS" },
+            state: "call",
+          },
+        ],
+      },
+    ];
+
+    const slimmed = slimMessagesForTransport(normalizeUIMessagesForTransport(raw as any));
+    const toolPart = (slimmed[0].parts as any[])[0];
+    assert.ok(
+      toolPart.state === "output-available" || toolPart.state === "output-error",
+      "Durum güvenli bir çıktı durumuna geçmelidir",
+    );
+
+    const modelMessages = await convertToModelMessages(slimmed as any, {
+      ignoreIncompleteToolCalls: true,
+    });
+    assert.ok(Array.isArray(modelMessages));
+  });
 });

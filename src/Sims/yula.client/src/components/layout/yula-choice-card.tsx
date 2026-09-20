@@ -127,10 +127,12 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
 
 export function YulaChoiceCard({
   messageId,
+  toolCallId,
   input,
   output,
 }: {
   messageId?: string;
+  toolCallId?: string;
   input?: unknown;
   output?: unknown;
 }) {
@@ -184,6 +186,13 @@ export function YulaChoiceCard({
       if (yula.busy || isAnswered) return;
       setSelectedLabel(opt.label);
 
+      if (toolCallId && yula.addToolOutput) {
+        yula.addToolOutput({
+          toolCallId,
+          output: { selected: opt.label, value: opt.value || opt.label },
+        });
+      }
+
       // Gönderilecek metin: Değer etiketten farklı ve anlamlıysa parantezde belirt
       const textToSend =
         opt.value && opt.value !== opt.label
@@ -192,7 +201,7 @@ export function YulaChoiceCard({
 
       yula.sendMessageText(textToSend);
     },
-    [yula, isAnswered],
+    [yula, isAnswered, toolCallId],
   );
 
   const handleCustomSubmit = React.useCallback(
@@ -201,9 +210,17 @@ export function YulaChoiceCard({
       const trimmed = customInput.trim();
       if (!trimmed || yula.busy || isAnswered) return;
       setSelectedLabel(trimmed);
+
+      if (toolCallId && yula.addToolOutput) {
+        yula.addToolOutput({
+          toolCallId,
+          output: { selected: trimmed, value: trimmed },
+        });
+      }
+
       yula.sendMessageText(trimmed);
     },
-    [customInput, yula, isAnswered],
+    [customInput, yula, isAnswered, toolCallId],
   );
 
   if (!choiceData) return null;

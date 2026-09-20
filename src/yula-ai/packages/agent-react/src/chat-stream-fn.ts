@@ -79,7 +79,7 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                   toolCallId: call.id,
                   toolName: call.name,
                   input: call.arguments,
-                  state: 'call',
+                  state: 'input-available',
                 });
                 stopReason = 'tool_use';
               }
@@ -91,7 +91,7 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
               if (resData?.toolCallId) {
                 const existingPart = assistantParts.find((p) => p.toolCallId === resData.toolCallId);
                 if (existingPart) {
-                  existingPart.state = 'result';
+                  existingPart.state = 'output-available';
                   existingPart.output = resData.result ?? resData.output;
                 }
                 const idx = toolCalls.findIndex((c) => c.id === resData.toolCallId);
@@ -127,7 +127,7 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                   toolCallId: call.id,
                   toolName: call.name,
                   input: call.arguments,
-                  state: 'call',
+                  state: 'input-available',
                 });
                 stopReason = 'tool_use';
               } else if (parsed?.type === 'tool-output-available' || parsed?.type === 'tool-result') {
@@ -136,7 +136,7 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                 const output = parsed.output ?? parsed.result;
                 const existingPart = assistantParts.find((p) => p.toolCallId === toolCallId);
                 if (existingPart) {
-                  existingPart.state = 'result';
+                  existingPart.state = 'output-available';
                   existingPart.output = output;
                 }
                 const idx = toolCalls.findIndex((c) => c.id === toolCallId);

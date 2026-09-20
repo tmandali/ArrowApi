@@ -412,6 +412,7 @@ export function YulaChatTurn({
               return (
                 <YulaChoiceCard
                   key={info.toolCallId}
+                  toolCallId={info.toolCallId}
                   messageId={assistantMessage?.id}
                   input={info.input}
                   output={info.state === "output-available" ? info.output : undefined}

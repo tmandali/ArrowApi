@@ -442,7 +442,25 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     forget: (k: string) => agentMemory.forget(k),
     getMemories: () => agentMemory.getAll(),
     chooseOption: (choice: string) => sendMessage(choice),
-    addToolOutput: () => {},
+    addToolOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.role !== 'assistant' || !Array.isArray(msg.parts)) return msg;
+          const hasTarget = msg.parts.some(
+            (p: any) => p && typeof p === 'object' && p.toolCallId === toolCallId,
+          );
+          if (!hasTarget) return msg;
+          return {
+            ...msg,
+            parts: msg.parts.map((p: any) =>
+              p && typeof p === 'object' && p.toolCallId === toolCallId
+                ? { ...p, state: 'output-available', output }
+                : p,
+            ),
+          };
+        }),
+      );
+    },
   };
 
 }
