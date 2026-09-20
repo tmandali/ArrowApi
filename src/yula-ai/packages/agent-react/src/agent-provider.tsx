@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   AgentLocale,
   AgentDictionary,
   i18nManager,
+  PlaybookService,
+  IPlaybookStorageAdapter,
+  playbookManager,
 } from '@my-agent/core';
 
 export interface AgentContextType {
@@ -12,6 +15,7 @@ export interface AgentContextType {
   locale: AgentLocale;
   dictionary: AgentDictionary;
   setLocale: (locale: AgentLocale) => void;
+  playbookService: PlaybookService;
 }
 
 const AgentContext = createContext<AgentContextType | null>(null);
@@ -23,6 +27,8 @@ export function AgentProvider({
   systemName = 'DefaultSystem',
   locale = 'tr',
   messages,
+  playbookService,
+  playbookStorage,
 }: {
   children: React.ReactNode;
   apiEndpoint?: string;
@@ -30,6 +36,10 @@ export function AgentProvider({
   systemName?: string;
   locale?: AgentLocale;
   messages?: Partial<AgentDictionary>;
+  /** Kütüphane kullanıcılarının prosedürel hafıza servisini ezmesini (override) sağlar */
+  playbookService?: PlaybookService;
+  /** Kütüphane kullanıcılarının depolama adaptörünü ezmesini (override) sağlar */
+  playbookStorage?: IPlaybookStorageAdapter;
 }) {
   const [currentLocale, setCurrentLocale] = useState<AgentLocale>(() => {
     if (locale) i18nManager.setLocale(locale);
@@ -37,6 +47,12 @@ export function AgentProvider({
     return i18nManager.getLocale();
   });
   const [dictionary, setDictionary] = useState<AgentDictionary>(() => i18nManager.getDictionary());
+
+  const effectivePlaybookService = useMemo(() => {
+    if (playbookService) return playbookService;
+    if (playbookStorage) return new PlaybookService(playbookStorage);
+    return playbookManager;
+  }, [playbookService, playbookStorage]);
 
   useEffect(() => {
     if (locale) i18nManager.setLocale(locale);
@@ -67,6 +83,7 @@ export function AgentProvider({
         locale: currentLocale,
         dictionary,
         setLocale: handleSetLocale,
+        playbookService: effectivePlaybookService,
       }}
     >
       {children}
@@ -84,5 +101,7 @@ export function useAgentContext(): AgentContextType {
     locale: i18nManager.getLocale(),
     dictionary: i18nManager.getDictionary(),
     setLocale: (loc) => i18nManager.setLocale(loc),
+    playbookService: playbookManager,
   };
 }
+

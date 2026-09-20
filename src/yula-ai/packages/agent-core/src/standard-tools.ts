@@ -8,6 +8,7 @@ import { telemetryTracker } from './telemetry-metrics';
 import { truncateContent } from './truncate';
 import { globalMutationLine } from './mutation-line';
 import { agentMemory } from './memory';
+import { playbookManager } from './playbook';
 import { sessionManager } from './session-branch';
 import { piEventStream } from './pi-event-stream';
 import { ComponentSchema, ActionContract, Tool, tool } from './types';
@@ -285,6 +286,71 @@ export const agentUiTools: Record<string, Tool> = {
         success: true,
         message: i18nManager.getDictionary().status.factDeleted(key),
         key,
+      };
+    },
+  }),
+
+  query_playbook: tool({
+    description: 'Query verified organizational playbooks, operational screen rules, or multi-step workflow recipes from the LLM Wiki.',
+    inputSchema: z.object({
+      task: z.string().describe('The task, topic, or screen path to search playbooks for (e.g. "stok mutabakatı", "fire analizi", "/stock/stock-balance")'),
+      workspace: z.string().optional().default('stock').describe('Workspace ID (defaults to "stock")'),
+    }),
+    execute: async ({ task, workspace = 'stock' }) => {
+      const rules = await playbookManager.getScreenRules(task, workspace);
+      const recipe = await playbookManager.findRecipe(task, workspace);
+      if (rules.length === 0 && !recipe) {
+        return {
+          success: true,
+          found: false,
+          message: `No specific verified playbook found for "${task}". Explore dynamically using standard component actions.`,
+        };
+      }
+      return {
+        success: true,
+        found: true,
+        screen_rules: rules,
+        recipe: recipe ? { title: recipe.title, content: recipe.contentMarkdown } : undefined,
+      };
+    },
+  }),
+
+  propose_playbook_update: tool({
+    description: 'Propose a learned operational rule or multi-step workflow recipe to be saved into the organizational Playbook wiki with user confirmation.',
+    inputSchema: z.object({
+      category: z.enum(['screen_rule', 'workflow_recipe']).describe('Type of playbook entry: screen_rule (e.g. filter restriction) or workflow_recipe (multi-step recipe)'),
+      title: z.string().describe('Short descriptive title for this rule or recipe'),
+      content: z.string().describe('The markdown content of the rule or recipe'),
+      target_path: z.string().optional().describe('Target screen route (e.g. /stock/stock-balance) if this is a screen rule'),
+      workspace: z.string().optional().default('stock').describe('Target workspace (defaults to "stock")'),
+    }),
+    execute: async ({ category, title, content, target_path, workspace = 'stock' }) => {
+      const question = category === 'screen_rule'
+        ? `📋 Yeni Ekran Kuralı: "${title}"\nBu kuralı Playbook'a kalıcı olarak kaydetmek istiyor musunuz?`
+        : `🚀 Yeni İş Akışı Reçetesi: "${title}"\nBu reçeteyi Playbook'a kalıcı olarak kaydetmek istiyor musunuz?`;
+
+      // Trigger inline HITL prompt
+      piEventStream.emit({
+        type: 'user_choice_prompt',
+        question,
+        options: [
+          { label: "Evet, Playbook'a Kaydet", value: 'confirm_save' },
+          { label: 'Hayır, Sadece Bu Seferlik', value: 'skip_save' },
+        ],
+        allow_custom: false,
+      } as any);
+
+      uiEventBus.recordTelemetry({
+        source: 'propose_playbook_update',
+        type: 'PLAYBOOK_PROPOSAL',
+        payload: { category, title, content, target_path, workspace },
+      });
+
+      return {
+        success: true,
+        status: 'waiting_user_selection',
+        message: `Proposed ${category} "${title}". Waiting for user confirmation.`,
+        proposal: { category, title, content, target_path, workspace },
       };
     },
   }),

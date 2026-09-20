@@ -8,8 +8,8 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import { systemAgentYaml } from "@/features/system";
-import { gridAgentYaml } from "@/features/reports";
+import systemAgentYaml from "@/features/system/agents/system.agent.yaml";
+import gridAgentYaml from "@/features/reports/agents/grid.agent.yaml";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import type { UserSkill } from "@/lib/stores/user-skills";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";

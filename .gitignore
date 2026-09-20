@@ -493,3 +493,7 @@ $RECYCLE.BIN/
 # Arrow job result files (SampleHost / FileArrowResultStorage)
 *.arrows
 arrow-jobs/
+
+# Vitest cache / attachments
+.vitest/
+

@@ -154,6 +154,13 @@ export class PromptTemplateManager {
     });
 
     this.register({
+      command: '/plan',
+      description: 'Eylemleri doğrudan koşturmak yerine onay için yol haritası (Plan) modu açar',
+      argumentHint: '[hedef / analiz (opsiyonel)]',
+      category: 'system',
+    });
+
+    this.register({
       command: '/help',
       description: 'Kullanılabilir tüm hazır sistem ve şablon komutlarını listeler',
       category: 'system',

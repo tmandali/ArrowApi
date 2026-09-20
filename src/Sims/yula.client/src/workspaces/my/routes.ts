@@ -1,4 +1,4 @@
-import { Settings2, Sparkles, Bot, Blocks, Brain } from "lucide-react";
+import { Settings2, Sparkles, Bot, Blocks, Brain, BookOpen } from "lucide-react";
 import type { WorkspaceNavItem } from "@/types";
 
 export const myDashboardPath = "/my/settings";
@@ -35,5 +35,10 @@ export const myNav: WorkspaceNavItem[] = [
     title: "Kalıcı Bellek & Tercihler",
     url: "/my/memory",
     icon: Brain,
+  },
+  {
+    title: "Playbook & Prosedürel Hafıza",
+    url: "/my/playbooks",
+    icon: BookOpen,
   },
 ];

@@ -64,6 +64,13 @@ export async function handleBuiltInCommand(
     return true;
   }
 
+  if (cmd === '/plan') {
+    const hint = args.length > 0 ? `\nHedef / Analiz: **${args.join(' ')}**` : '';
+    const content = `📋 **Planlama Modu Aktif:** Ajan eylemleri doğrudan çalıştırmayacak; önce adımları ve parametreleri içeren bir yol haritası (Plan) sunup onay isteyecektir.${hint}`;
+    ctx.appendSystemMessage(content);
+    return true;
+  }
+
   if (cmd === '/help' || cmd === '/yardim') {
     const allCmds = promptTemplateManager.getAll();
     const sysList = allCmds

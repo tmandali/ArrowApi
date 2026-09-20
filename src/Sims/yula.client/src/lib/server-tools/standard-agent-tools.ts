@@ -73,6 +73,15 @@ export const STANDARD_AGENT_TOOLS = {
       scope: z.enum(["session", "persistent"]).default("session").describe("Memory scope"),
       description: z.string().optional().describe("Description of this memory item"),
     }),
+    execute: async ({ key, value, scope, description }) => {
+      try {
+        const { agentMemory } = await import("@my-agent/core");
+        agentMemory.remember(key, value, scope);
+        return { status: "saved", key, scope, message: `Preference "${key}" saved.` };
+      } catch (err: any) {
+        return { status: "error", message: err?.message || "Failed to save memory" };
+      }
+    },
   }),
 
   recall_fact: tool({
@@ -80,6 +89,91 @@ export const STANDARD_AGENT_TOOLS = {
     inputSchema: z.object({
       key: z.string().optional().describe("Memory key to query (empty to list all)"),
     }),
+    execute: async ({ key }) => {
+      try {
+        const { agentMemory } = await import("@my-agent/core");
+        if (key) {
+          const val = agentMemory.recall(key);
+          return { status: "found", key, value: val };
+        }
+        return { status: "all", memories: agentMemory.getAll() };
+      } catch (err: any) {
+        return { status: "error", message: err?.message || "Failed to recall memory" };
+      }
+    },
+  }),
+
+  query_playbook: tool({
+    description: "Query verified organizational playbooks, operational screen rules, or multi-step workflow recipes from the LLM Wiki.",
+    inputSchema: z.object({
+      task: z.string().describe("The task, topic, or screen path to search playbooks for (e.g. 'stok mutabakatı', 'fire analizi', '/stock/stock-balance')"),
+      workspace: z.string().optional().default("stock").describe("Workspace ID (defaults to 'stock')"),
+    }),
+    execute: async ({ task, workspace }) => {
+      try {
+        const { serverPlaybookService } = await import("@/lib/playbook-server");
+        const wsId = workspace || "stock";
+        const screenRules = await serverPlaybookService.getScreenRules(task, wsId);
+        const recipe = await serverPlaybookService.findRecipe(task, wsId);
+        const index = await serverPlaybookService.getIndex(wsId);
+        const relevantIndex = index.filter(
+          (i) =>
+            i.title.toLowerCase().includes(task.toLowerCase()) ||
+            (i.targetPath && i.targetPath.includes(task)) ||
+            (i.summary && i.summary.toLowerCase().includes(task.toLowerCase())),
+        );
+        return {
+          status: "ok",
+          level: "workspace",
+          workspaceId: wsId,
+          task,
+          screenRules,
+          recipe,
+          relevantIndex,
+          rulesCount: screenRules.length,
+        };
+      } catch (err: any) {
+        return { status: "error", message: err?.message || "Failed to query playbook" };
+      }
+    },
+  }),
+
+  propose_playbook_update: tool({
+    description: "Propose a learned operational rule or multi-step workflow recipe to be saved into the organizational Playbook wiki with user confirmation.",
+    inputSchema: z.object({
+      category: z.enum(["screen_rule", "workflow_recipe"]).describe("Type of playbook entry: screen_rule or workflow_recipe"),
+      title: z.string().describe("Short descriptive title for this rule or recipe"),
+      content: z.string().describe("The markdown content of the rule or recipe"),
+      target_path: z.string().optional().describe("Target screen route (e.g. /stock/stock-balance) if this is a screen rule"),
+      workspace: z.string().optional().default("stock").describe("Target workspace"),
+    }),
+    execute: async ({ category, title, content, target_path, workspace }) => {
+      try {
+        const { serverPlaybookService } = await import("@/lib/playbook-server");
+        const wsId = workspace || "stock";
+        const entry = await serverPlaybookService.recordEntry({
+          category,
+          title,
+          contentMarkdown: content,
+          targetPath: target_path,
+          workspaceId: wsId,
+          scope: "workspace",
+          author: "Yula AI (Learned)",
+        });
+        return {
+          status: "saved",
+          level: "workspace",
+          workspaceId: wsId,
+          category,
+          title,
+          targetPath: target_path,
+          entry,
+          message: `Rule "${title}" successfully recorded to Workspace Wiki (${wsId}).`,
+        };
+      } catch (err: any) {
+        return { status: "error", message: err?.message || "Failed to update playbook" };
+      }
+    },
   }),
 };
 

@@ -172,6 +172,47 @@ export function extractWorkedSteps(
   const pushStep = (s: WorkedStepItem) =>
     steps.push({ ...s, stepIndex: currentStep < 0 ? 0 : currentStep });
 
+  // 0. Proaktif Wiki / Playbook Seviyesi Okuma Adımı
+  const wikiMeta = (message as any)?.metadata?.wiki;
+  if (wikiMeta) {
+    const levelLabel =
+      wikiMeta.level === "workspace"
+        ? `Workspace Wiki (${wikiMeta.workspaceId})`
+        : wikiMeta.level === "user"
+          ? "User Wiki (Personal)"
+          : "System Baseline Wiki";
+    const hasRules = wikiMeta.rulesCount > 0;
+    pushStep({
+      id: `${message.id}-wiki-level`,
+      kind: "explored",
+      label: hasRules
+        ? `Read ${wikiMeta.rulesCount} rules from ${levelLabel}`
+        : `Checked ${levelLabel}`,
+      subLabel: hasRules
+        ? (wikiMeta.targetPath ? `Scope: ${wikiMeta.targetPath}` : "Verified guidelines active")
+        : "No custom screen rules — system baseline active",
+      detailText: hasRules
+        ? wikiMeta.rules.map((r: string) => `• ${r}`).join("\n")
+        : `Checked procedural memory at ${levelLabel} for ${wikiMeta.targetPath || "/"}. No custom overrides found; standard baseline policies applied.`,
+      isLive: false,
+      isError: false,
+      info: {
+        toolCallId: `${message.id}-wiki-level`,
+        toolName: "wiki_context",
+        state: "output-available",
+        input: {
+          level: wikiMeta.level,
+          workspace: wikiMeta.workspaceId,
+          targetPath: wikiMeta.targetPath,
+        },
+        output: {
+          rulesCount: wikiMeta.rulesCount,
+          rules: wikiMeta.rules,
+        },
+      },
+    });
+  }
+
   message.parts.forEach((part, index) => {
     if (part.type === "reasoning") {
       const raw = part.text ?? "";
@@ -729,6 +770,89 @@ export function extractWorkedSteps(
           kind: desc.kind,
           label: desc.label,
           subLabel: isPending ? (desc.subLabel ?? "Executing operation...") : doneSub,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "query_playbook": {
+        const task = typeof inputObj.task === "string" ? inputObj.task : "Rules & workflows";
+        const ws = typeof inputObj.workspace === "string" ? inputObj.workspace : "stock";
+        const out = (info.output as any) || {};
+        const rulesFound = Array.isArray(out.screenRules) ? out.screenRules.length : 0;
+        const hasRecipe = Boolean(out.recipe);
+        const sub = isPending
+          ? `Searching Workspace Wiki (${ws})...`
+          : rulesFound > 0
+            ? `${rulesFound} rules found in Workspace Wiki (${ws})`
+            : hasRecipe
+              ? `Workflow recipe found: ${out.recipe.title}`
+              : `Searched Workspace Wiki (${ws})`;
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Queried Workspace Wiki (${ws}): "${task}"`,
+          subLabel: sub,
+          detailText: out.recipe
+            ? `${out.recipe.title}\n\n${out.recipe.contentMarkdown}`
+            : rulesFound > 0
+              ? out.screenRules.map((r: string) => `• ${r}`).join("\n")
+              : undefined,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "propose_playbook_update": {
+        const category = typeof inputObj.category === "string" ? inputObj.category : "screen_rule";
+        const title = typeof inputObj.title === "string" ? inputObj.title : "Learned Rule";
+        const content = typeof inputObj.content === "string" ? inputObj.content : "";
+        const ws = typeof inputObj.workspace === "string" ? inputObj.workspace : "stock";
+        const targetPath = typeof inputObj.target_path === "string" ? inputObj.target_path : "";
+        const out = (info.output as any) || {};
+        const isSaved = out.status === "saved";
+        const catLabel = category === "screen_rule" ? "Screen Rule" : "Workflow Recipe";
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: `Updated Workspace Wiki (${ws}): ${title}`,
+          subLabel: isPending
+            ? `Recording ${catLabel} to Workspace Wiki...`
+            : isSaved
+              ? `Saved to Workspace Wiki (${ws}) · ${catLabel}`
+              : `Proposed ${catLabel}`,
+          detailText: targetPath ? `Target: ${targetPath}\n\n${content}` : content,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "remember_fact": {
+        const key = typeof inputObj.key === "string" ? inputObj.key : "preference";
+        const scope = typeof inputObj.scope === "string" ? inputObj.scope : "session";
+        const val = typeof inputObj.value === "object" ? JSON.stringify(inputObj.value) : String(inputObj.value ?? "");
+        pushStep({
+          id: info.toolCallId,
+          kind: "edited",
+          label: `Saved memory preference: ${key}`,
+          subLabel: isPending ? "Storing preference..." : `Scope: ${scope} · ${val}`,
+          detailText: val,
+          isLive: isPending,
+          isError,
+          info,
+        });
+        break;
+      }
+      case "recall_fact": {
+        const key = typeof inputObj.key === "string" && inputObj.key ? inputObj.key : "all memories";
+        pushStep({
+          id: info.toolCallId,
+          kind: "explored",
+          label: `Recalled memory: ${key}`,
+          subLabel: isPending ? "Reading preferences..." : "Memory loaded",
           isLive: isPending,
           isError,
           info,

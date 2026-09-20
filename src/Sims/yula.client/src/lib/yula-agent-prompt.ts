@@ -88,12 +88,22 @@ export interface YulaScreenContext {
     effort?: string;
     attachments?: Array<{ name: string; content: string }>;
   } | null;
+  /** Doğrulanmış Playbook kuralları (aktif ekran ve çalışma alanı bağlamında 0 ms enjeksiyon) */
+  playbookRules?: string[];
+  /** Mevcut Playbook tarif / iş akışları katalog özeti */
+  playbookRecipes?: Array<{ title: string; summary: string }>;
 }
 
 const BASE_PROMPT = [
   "ROLE & PERSONA:",
   'You are "Yula", an intelligent enterprise data analysis, querying, and reporting copilot.',
   "Provide concise, accurate, and actionable responses. Use Markdown formatting when helpful.",
+  "",
+  "VISUAL DIAGRAMS & WORKFLOW SCHEMAS (Mermaid):",
+  "• When explaining multi-step business workflows, approval lifecycles, decision trees, state transitions, or entity relationships, illustrate them visually using Mermaid diagrams inside fenced code blocks (` ```mermaid ... ``` `).",
+  "• Supported Mermaid diagram types: 'graph TD' / 'graph LR', 'flowchart TD', 'sequenceDiagram', 'stateDiagram-v2', 'erDiagram'.",
+  "• The UI automatically renders these as interactive vector diagrams with zoom controls and a raw code switcher.",
+  "• Keep diagrams concise, readable, and directly relevant to the user's business context.",
   "",
   "LANGUAGE DIRECTIVE:",
   "• Always write user-facing conversational answers, findings, and explanations in the user's active language (mirror the language of their latest message). Never force a single response language.",
@@ -107,7 +117,13 @@ const BASE_PROMPT = [
   "  3. 'ask_user_choice': To present interactive choice chips or ask clarifying questions when input is ambiguous or confirmation is needed.",
   "  4. 'time_travel': To undo or redo state transitions when requested by user.",
   "  5. 'remember_fact' & 'recall_fact': To persist and retrieve session preferences and facts.",
+  "  6. 'query_playbook': To search verified company/screen procedural recipes, business rules, and how-tos.",
+  "  7. 'propose_playbook_update': When the user instructs a new procedural rule, correction, or best practice for a screen/workspace, propose it to procedural memory (always confirmed via inline HITL).",
   "• PERSISTENT PREFERENCES (remember_fact): When the user states a recurring habit or preference (e.g. 'ben her zaman Kadıköy mağazasına bakarım', 'always download as Excel'), call 'remember_fact' with type='preference' and scope='persistent'. Leverage recalled preferences with 'recall_fact' when applicable.",
+  "• PLAYBOOK PROCEDURAL KNOWLEDGE (propose_playbook_update & query_playbook): When the user explicitly corrects a workflow, teaches a rule (e.g. 'bu ekranda filtreleri her zaman şöyle seç', 'bu raporda mağaza kodu boş bırakılamaz'), or asks how a workflow is done:",
+  "  - For new rules or workflows: Call 'propose_playbook_update' with action='add_rule' or 'add_workflow'.",
+  "  - For corrections or modifications: Call 'propose_playbook_update' with action='modify_rule'.",
+  "  - Always present proposed procedural rules to the user clearly or confirm via 'ask_user_choice'.",
   "• Do NOT announce tool execution in conversational text. Call the tool; after results, answer in the user's language.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
@@ -146,234 +162,11 @@ const BASE_PROMPT = [
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
 export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
 
-/**
- * Ekranda mount edilmiş bileşenleri ve Zod aksiyon sözleşmelerini çözer.
- */
-export function resolveActiveComponents(context?: YulaScreenContext): ComponentSchema[] {
-  const comps: ComponentSchema[] = [];
-  const href = context?.pathname || context?.uiContext?.route || "/";
-  const pathname = href.split("?")[0] || "/";
-  const phase = context?.phase ?? "workspace";
-
-  // 1. Evrensel Yönlendirici ve İş Geçmişi Bileşenleri
-  comps.push({
-    id: "app_router",
-    capabilities: ["NAVIGATE"],
-    meta: { description: "Page and Route Navigator" },
-    actions: {
-      NAVIGATE: {
-        description: "Navigates the user to a target page or report ({ path }).",
-        whenToCall: "When the user wants to navigate to another report, workspace, or page.",
-        whenNotToCall: "When the user is already on the target screen.",
-      },
-    },
-  });
-
-  comps.push({
-    id: "job_history",
-    capabilities: ["OPEN_LAST", "LIST", "FIND", "CANCEL"],
-    meta: { description: "Report Execution History and Job Tracker" },
-    actions: {
-      OPEN_LAST: {
-        description: "Opens the most recently completed report result on the screen ({ report?: string }). Defaults to active report if omitted.",
-        whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
-        whenNotToCall: "When the user intends to execute a new report.",
-      },
-      LIST: {
-        description: "Lists past execution jobs ({ report?: string, limit?: number }). If report is omitted, defaults to the active screen's report, or lists recent runs across all reports if not on a report screen.",
-        whenToCall: "When the user asks 'how many reports ran' ('kaç rapor çalışmış'), 'which reports ran', 'show history', 'list past jobs', etc.",
-        whenNotToCall: "When the user wants to execute a new report run (use SUBMIT or RUN).",
-      },
-      FIND: {
-        description: "Searches past report executions or matching jobs ({ query, report?: string }). Defaults to active report if omitted.",
-        whenToCall: "When the user wants to find a specific job, execution, or report run.",
-        whenNotToCall: "When requesting the entire list or running a new report.",
-      },
-      CANCEL: {
-        description: "Cancels an active or running job ({ jobId }).",
-        whenToCall: "When the user explicitly asks to 'stop', 'abort', or 'cancel' an execution.",
-        whenNotToCall: "When the job is already finished or terminated.",
-      },
-    },
-  });
-
-  // 2. RESULTS Evresi: Sonuç Tablosu Ekranda Mount Durumda
-  if (phase === "results" && context?.grid) {
-    comps.push({
-      id: "result_grid:active",
-      meta: {
-        description: `Active Result Grid (${context.grid.tableName || "active_view"}) - ${context.grid.rowCount ?? "?"} rows, Columns: ${(context.grid.columns || []).join(", ")}`,
-        tableName: context.grid.tableName,
-        columns: context.grid.columns,
-        filters: context.grid.filters,
-      },
-      actions: {
-        RUN_SQL: {
-          description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
-          whenToCall: "When the user requests calculations, top N, aggregations, or custom SQL analysis on active table data.",
-          whenNotToCall: "For simple column filtering or sorting (use FILTER or SORT instead).",
-        },
-        QUERY: {
-          description: "Updates the grid view via SQL or opens a derived view ({ query }).",
-          whenToCall: "When the user wants derived columns or grouped table views.",
-          whenNotToCall: "When only changing simple filters or sorting.",
-        },
-        FILTER: {
-          description: "Applies a filter to a single column ({ field, value, op }).",
-          whenToCall: "When the user wants to filter records by a single column value.",
-          whenNotToCall: "When applying multiple filters simultaneously (use APPLY_FILTERS instead).",
-        },
-        APPLY_FILTERS: {
-          description: "Applies multiple filters to the table simultaneously ({ filters, clearOthers }).",
-          whenToCall: "When multiple columns need to be filtered concurrently.",
-          whenNotToCall: "When filtering only a single column.",
-        },
-        SORT: {
-          description: "Sorts the column in ascending or descending order ({ column, direction }).",
-          whenToCall: "When sorting is requested.",
-          whenNotToCall: "When sorting is not requested.",
-        },
-        COLUMNS: {
-          description: "Shows, hides, or reorders columns ({ visibleColumns, hiddenColumns, order }).",
-          whenToCall: "When adjusting column visibility or display order.",
-          whenNotToCall: "When filtering table data.",
-        },
-        PIN: {
-          description: "Pins columns to the left or right ({ columns }).",
-          whenToCall: "When column freezing or pinning is requested.",
-          whenNotToCall: "When pinning is not requested.",
-        },
-        RESET_LAYOUT: {
-          description: "Resets the grid to default layout and visibility.",
-          whenToCall: "When the user wants to reset custom column arrangements.",
-          whenNotToCall: "When keeping the current layout.",
-        },
-        EXPORT: {
-          description: "Exports the table to file ({ format: 'xlsx'|'parquet'|'csv'|'gz' }).",
-          whenToCall: "When the user requests exporting or downloading data to Excel, CSV, or Parquet.",
-          whenNotToCall: "When only viewing data on screen.",
-        },
-        PROFILE: {
-          description: "Analyzes column null counts, cardinality, and data quality anomalies.",
-          whenToCall: "When the user requests data profiling or inspecting data quality anomalies.",
-          whenNotToCall: "When the user is searching for specific rows.",
-        },
-        ANALYZE: {
-          description: "Generates a statistical analysis summary of active data.",
-          whenToCall: "When statistical summary or distribution analysis is requested.",
-          whenNotToCall: "When statistical summary is not requested.",
-        },
-        VISUALIZE: {
-          description: "Generates a visual chart or plot from table data ({ type, dimension, metric }).",
-          whenToCall: "When the user requests a chart, plot, or graph visualization.",
-          whenNotToCall: "When there are no numeric metrics in the table.",
-        },
-      },
-    });
-  }
-
-  // 3. WORKSPACE Evresi: Kriter Formu Ekranda Mount Durumda
-  if (phase === "workspace") {
-    const activeReport =
-      REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
-      (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
-
-    const scope = activeReport?.scope ?? (context?.screen?.reportScope || "report");
-    const reportTitle = activeReport?.title ?? "Report";
-
-    comps.push({
-      id: `criteria_form:${scope}`,
-      meta: {
-        description: `${reportTitle} Criteria Form`,
-        scope,
-        criteriaDraft: (context as any)?.screenState?.criteria ?? (context?.uiContext as any)?.criteria,
-      },
-      actions: {
-        SET_FIELDS: {
-          description: "Primary action to mutate criteria form fields without executing the report ({ criteria }).",
-          whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
-          whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT).",
-        },
-        SUBMIT: {
-          description: "Primary action to submit criteria and execute the report job ({ criteria, report }).",
-          whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
-          whenNotToCall: "When required fields are missing or user is only drafting parameters.",
-        },
-        APPLY: {
-          description: "Alias for SET_FIELDS: Populates criteria form fields ({ criteria }).",
-          whenToCall: "When the user prepares or updates criteria parameters.",
-          whenNotToCall: "When the user commands to run the report directly.",
-        },
-        RUN: {
-          description: "Alias for SUBMIT: Submits criteria and executes the report ({ criteria, report }).",
-          whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
-          whenNotToCall: "When required fields are missing or user is only drafting parameters.",
-        },
-        SCHEMA: {
-          description: "Inspects report criteria schema and accepted parameter definitions.",
-          whenToCall: "To discover parameter names, data types, and accepted formats.",
-          whenNotToCall: "When the criteria schema is already known.",
-        },
-        VALIDATE: {
-          description: "Validates criteria parameters against schema rules ({ criteria }).",
-          whenToCall: "When checking whether parameters satisfy schema constraints.",
-          whenNotToCall: "When the user directly commands execution.",
-        },
-        READ: {
-          description: "Reads current draft criteria values from the active form.",
-          whenToCall: "To inspect current form state or merge values.",
-          whenNotToCall: "When assigning or overwriting new values.",
-        },
-      },
-    });
-  }
-
-  return comps;
-}
-
-/**
- * Aktif ekranın kapsamına ve fazına göre bileşenleri filtreler.
- * Özellikle bir rapor sayfasındayken diğer inaktif raporların criteria_form
- * bileşenlerini çıkararak LLM context bloat ve token israfını engeller.
- */
-export function filterRelevantComponents(
-  comps: ComponentSchema[],
-  context?: YulaScreenContext,
-): ComponentSchema[] {
-  const href = context?.pathname || context?.uiContext?.route || "/";
-  const pathname = href.split("?")[0] || "/";
-  const phase = context?.phase ?? "workspace";
-
-  const activeReport =
-    REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
-    (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
-
-  const activeScope = activeReport?.scope || context?.screen?.reportScope;
-
-  return comps.filter((comp) => {
-    // 1. Evrensel bileşenler her zaman kalır
-    if (comp.id === "app_router" || comp.id === "job_history") {
-      return true;
-    }
-
-    // 2. Sonuç Izgarası
-    if (comp.id.startsWith("result_grid:")) {
-      return phase === "results" || Boolean(context?.grid);
-    }
-
-    // 3. Kriter Formları: Aktif ekranda bir rapor varsa sadece onun formu kalır
-    if (comp.id.startsWith("criteria_form:")) {
-      const scope = comp.id.replace("criteria_form:", "");
-      if (activeScope) {
-        return scope === activeScope;
-      }
-      return true;
-    }
-
-    // 4. Diğer bileşenler (entity_form, plugin vb.)
-    return true;
-  });
-}
+import {
+  resolveActiveComponents,
+  filterRelevantComponents,
+} from "./yula-active-components";
+export { resolveActiveComponents, filterRelevantComponents };
 
 export function buildSystemPrompt(context?: YulaScreenContext): string {
   registerYulaSkills();
@@ -433,12 +226,45 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   if (activeReport) {
     lines.push(
       "",
-      `ACTIVE REPORT CONTEXT RULE (${activeReport.title} — ${activeReport.scope}):`,
+      `ACTIVE REPORT CONTEXT RULE & DIRECT EXECUTION (${activeReport.title} — ${activeReport.scope}):`,
       `• The user is currently on the "${activeReport.title}" report screen (scope: "${activeReport.scope}").`,
       `• When the user asks about report executions, past runs, job counts, criteria, or results (e.g. 'kaç rapor çalışmış', 'çalışma geçmişini göster', 'önceki sonuçlar', 'raporu çalıştır', 'filtrele') without specifying a different report:`,
       `  - NEVER ask which report they mean. They are ALREADY viewing this report screen.`,
       `  - Directly assume the request refers to "${activeReport.title}" (scope: "${activeReport.scope}").`,
       `  - To answer past runs / count questions, call dispatch_component_action with component_id="job_history" and action="LIST" (payload: { report: "${activeReport.scope}" }) and summarize the executions clearly in the user's language.`,
+      `• DIRECT EXECUTION MODE: The criteria form is active. Apply criteria via 'SET_FIELDS' and execute via 'SUBMIT' directly as requested by the user without introducing an unnecessary plan approval card first.`,
+    );
+  } else {
+    lines.push(
+      "",
+      `GLOBAL ORCHESTRATION & PLAN-FIRST MODE:`,
+      `• The user is at the global / workspace landing level (route: "${pathname}"). NO report criteria form or result grid is currently mounted on the DOM.`,
+      `• NAVIGATION FAST-PATH: If the user simply asks to open or navigate to a page or report (e.g. 'beni stok bakiye raporuna götür', 'go to sales report', 'stok ekranını aç'):`,
+      `  - Call dispatch_component_action with component_id="app_router" and action="NAVIGATE" directly in ONE step.`,
+      `  - Do NOT ask for plan approval or propose multi-step confirmation for simple direct navigation.`,
+      `• PLAN-FIRST FOR MULTI-STEP & ACTION REQUESTS: If the user requests running a report, performing analysis, or executing operations from outside the screen:`,
+      `  1. Do NOT call 'SUBMIT' or 'SET_FIELDS' directly on criteria_form, as no form is mounted on this page.`,
+      `  2. Formulate a structured, concise numbered plan under a 'Plan:' header with concrete steps (Target screen, filter parameters, and execution).`,
+      `  3. Invoke 'ask_user_choice' to offer interactive choice chips to the user (e.g. 'Planı Başlat ve İcra Et', 'Planı Düzenle', 'Vazgeç').`,
+      `  4. Never invent fictitious reports or codes; ground targets in registered catalog routes.`,
+    );
+  }
+
+  // 0. DOĞRULANMIŞ PLAYBOOK KURALLARI & PROSEDÜREL BİLGİLER (LLM Wiki / Playbook)
+  if (context?.playbookRules && context.playbookRules.length > 0) {
+    lines.push(
+      "",
+      "=== VERIFIED PLAYBOOK RULES (Company / Screen Guidelines) ===",
+      "Follow these established organizational rules strictly for this screen and workspace:",
+      ...context.playbookRules.map((rule) => `• ${rule}`),
+    );
+  }
+
+  if (context?.playbookRecipes && context.playbookRecipes.length > 0) {
+    lines.push(
+      "",
+      "=== PLAYBOOK RECIPES (Available Procedural Workflows) ===",
+      ...context.playbookRecipes.map((r) => `• ${r.title}: ${r.summary}`),
     );
   }
 

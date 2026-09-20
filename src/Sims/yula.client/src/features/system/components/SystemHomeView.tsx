@@ -13,6 +13,7 @@ import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { YULA } from "@/components/layout/yula-brand-data";
+import { YulaExpandToggleButton } from "@/components/layout/fullscreen-overlay/yula-dock-controls";
 
 /**
  * Yula ana ekran başlığı — ajan oturumundaki desenin aynısı:
@@ -86,6 +87,7 @@ function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
           <Settings className="size-3.5" />
         </Button>
       ) : null}
+      <YulaExpandToggleButton />
     </div>
   );
 }

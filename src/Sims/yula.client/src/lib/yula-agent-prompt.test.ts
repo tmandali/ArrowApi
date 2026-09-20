@@ -225,6 +225,70 @@ describe("buildSystemPrompt agent katmanı", () => {
     assert.ok(!prompt.includes("criteria_form:store-sales"), "İnaktif store-sales formu filtrelenmeli");
     assert.ok(!prompt.includes("criteria_form:cash-flow"), "İnaktif cash-flow formu filtrelenmeli");
   });
+
+  it("ekran dışındayken (global scope) criteria_form elenir ve GLOBAL ORCHESTRATION & PLAN-FIRST MODE devreye girer", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/",
+      uiContext: {
+        route: "/",
+        active_components: [
+          { id: "app_router", capabilities: ["NAVIGATE"] },
+          { id: "job_history", capabilities: ["LIST"] },
+          { id: "criteria_form:stock-balance", capabilities: ["SET_FIELDS", "SUBMIT"] },
+        ],
+        recent_events: [],
+      },
+    });
+
+    assert.ok(prompt.includes("GLOBAL ORCHESTRATION & PLAN-FIRST MODE"), "Plan modu direktifi olmalı");
+    assert.ok(prompt.includes("NAVIGATION FAST-PATH"), "Saf navigasyon hızlı yolu tarif edilmeli");
+    assert.ok(prompt.includes("PLAN-FIRST FOR MULTI-STEP"), "Çok adımlı işler için plan gereksinimi olmalı");
+    assert.ok(!prompt.includes("criteria_form:stock-balance"), "Ekran dışındayken form promptta yer almamalı");
+  });
+
+  it("ekran içindeyken DIRECT EXECUTION MODE kuralı promptta yer alır", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/stock/stock-balance",
+      phase: "workspace",
+    });
+
+    assert.ok(prompt.includes("DIRECT EXECUTION MODE"), "Doğrudan icra direktifi olmalı");
+    assert.ok(prompt.includes("criteria_form:stock-balance"), "Aktif ekranın formu mount edilmeli");
+  });
+
+  it("doğrulanmış Playbook kuralları ve tarifleri prompta enjekte edilir", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/stock/stock-balance",
+      playbookRules: [
+        "Kadıköy mağazası için her zaman KDV hariç tutarlar baz alınmalıdır.",
+        "Rapor çekilirken tarih aralığı 30 günü geçemez.",
+      ],
+      playbookRecipes: [
+        { title: "Haftalık Stok Kapanışı", summary: "Pazartesi sabahı stok bakiye ve satış raporu karşılaştırması." },
+      ],
+    });
+
+    assert.ok(
+      prompt.includes("=== VERIFIED PLAYBOOK RULES (Company / Screen Guidelines) ==="),
+      "Playbook kuralları başlığı bulunmalı",
+    );
+    assert.ok(
+      prompt.includes("Kadıköy mağazası için her zaman KDV hariç tutarlar"),
+      "Birinci kural promptta yer almalı",
+    );
+    assert.ok(
+      prompt.includes("Rapor çekilirken tarih aralığı 30 günü geçemez"),
+      "İkinci kural promptta yer almalı",
+    );
+    assert.ok(
+      prompt.includes("=== PLAYBOOK RECIPES (Available Procedural Workflows) ==="),
+      "Playbook tarifleri başlığı bulunmalı",
+    );
+    assert.ok(
+      prompt.includes("Haftalık Stok Kapanışı: Pazartesi sabahı"),
+      "Tarif başlık ve özeti yer almalı",
+    );
+  });
 });
 
 

@@ -15,6 +15,7 @@ import {
 } from "ai";
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
+import { serverPlaybookService } from "@/lib/playbook-server";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { slimMessagesForTransport, normalizeUIMessagesForTransport } from "@/lib/context-slim";
 import {
@@ -40,8 +41,18 @@ export const dynamic = "force-dynamic";
  * uçtan uca tip güvenliği.
  */
 export type YulaTools = InferUITools<StandardAgentTools>;
-/** Per-message metadata: token usage attached at step finish (SDK recipe). */
-export type YulaMessageMetadata = { usage?: LanguageModelUsage };
+/** Per-message metadata: token usage attached at step finish and wiki procedural memory scope. */
+export type YulaMessageMetadata = {
+  usage?: LanguageModelUsage;
+  wiki?: {
+    level: "system" | "workspace" | "user";
+    workspaceId: string;
+    targetPath?: string;
+    rulesCount: number;
+    rules: string[];
+    recipesCount?: number;
+  };
+};
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
 
 export const DEFAULT_MODEL = getDefaultModel();
@@ -264,6 +275,17 @@ export async function POST(req: Request) {
       requestEffort: bodyEffort,
       defaultEffort: isThinking ? "low" : "off",
     });
+    // Aktif rota ve çalışma alanına ait doğrulanmış Playbook kurallarını getir (0 ms discovery)
+    let playbookRules = context?.playbookRules;
+    if (!playbookRules) {
+      try {
+        const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
+        playbookRules = await serverPlaybookService.getScreenRules(effectivePathname, wsId);
+      } catch {
+        // Playbook okuma başarısız olursa kesintisiz devam et
+      }
+    }
+
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
     // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
     const systemPrompt = buildSystemPrompt({
@@ -271,6 +293,7 @@ export async function POST(req: Request) {
       pathname: effectivePathname,
       phase: effectivePhase,
       uiContext,
+      playbookRules: playbookRules && playbookRules.length > 0 ? playbookRules : context?.playbookRules,
     });
 
     // Çıkarım önceliği: ajan sabiti > sohbet modeli > sağlayıcı varsayılanı.
@@ -386,6 +409,15 @@ export async function POST(req: Request) {
       ],
     });
 
+    const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
+    const wikiInfo: YulaMessageMetadata["wiki"] = {
+      level: "workspace",
+      workspaceId: wsId,
+      targetPath: effectivePathname,
+      rulesCount: playbookRules?.length ?? 0,
+      rules: playbookRules ?? [],
+    };
+
     const uiStream = toUIMessageStream<typeof tools, YulaMessage>({
       stream: result.stream,
       onError(error) {
@@ -394,7 +426,10 @@ export async function POST(req: Request) {
       },
       messageMetadata: ({ part }) => {
         if (part.type === "finish-step") {
-          return { usage: part.usage };
+          return {
+            usage: part.usage,
+            wiki: wikiInfo,
+          };
         }
       },
     });

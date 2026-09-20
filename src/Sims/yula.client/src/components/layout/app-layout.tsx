@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { GlobalNavDrawer } from "@/components/layout/global-nav-drawer";
 import { ModuleSidebar } from "@/components/layout/module-sidebar";
 import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator";
+import { YulaFullscreenHost } from "@/components/layout/fullscreen-overlay/yula-fullscreen-host";
 import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat";
 import { WorkspaceSearchProvider } from "@/context/workspace-search";
 import { useCompanyStore } from "@/store/slices/company-store";
@@ -68,6 +69,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                 </div>
                 {/* Rotalı geçişte ince üst şerit — boş alan flaşı yerine geçiş sinyali */}
                 <RouteTransitionIndicator />
+                {/* Tam ekran overlay: Sol nav ile AppHeader arasında kalıp tüm içeriğe yayılır */}
+                <YulaFullscreenHost />
               </main>
             </div>
           </WorkspaceAiChatProvider>

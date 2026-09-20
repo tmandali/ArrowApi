@@ -8,6 +8,7 @@ export interface AgentDictionary {
     compact: string;
     new: string;
     history: string;
+    plan?: string;
   };
   errors: {
     componentNotMounted: (id: string) => string;
@@ -46,6 +47,7 @@ export const trDictionary: AgentDictionary = {
     compact: 'Konuşma geçmişini ve token bağlamını özetleyerek sıkıştırır.',
     new: 'Yeni ve temiz bir konuşma oturumu başlatır.',
     history: 'Oturum geçmişi ve dallanma kontrol noktalarını listeler.',
+    plan: 'Eylemleri doğrudan koşturmak yerine onay için yol haritası (Plan) modu açar.',
   },
   errors: {
     componentNotMounted: (id) => `Bileşen "${id}" şu an ekranda mount edilmemiş veya görünür değil.`,
@@ -89,6 +91,7 @@ export const enDictionary: AgentDictionary = {
     compact: 'Compacts conversation history and summarizes token context.',
     new: 'Starts a brand new, clean conversation session.',
     history: 'Lists session history and checkpoint branches.',
+    plan: 'Toggles plan-first mode to formulate a roadmap before executing actions.',
   },
   errors: {
     componentNotMounted: (id) => `Component "${id}" is currently not mounted or visible on screen.`,

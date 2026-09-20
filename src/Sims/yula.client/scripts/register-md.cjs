@@ -10,3 +10,11 @@ const fs = require("node:fs");
 require.extensions[".md"] = (module, filename) => {
   module.exports = fs.readFileSync(filename, "utf-8");
 };
+
+require.extensions[".yaml"] = (module, filename) => {
+  module.exports = fs.readFileSync(filename, "utf-8");
+};
+
+require.extensions[".yml"] = (module, filename) => {
+  module.exports = fs.readFileSync(filename, "utf-8");
+};

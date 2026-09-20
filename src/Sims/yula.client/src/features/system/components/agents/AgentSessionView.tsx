@@ -10,6 +10,7 @@ import { PageHeaderTitle } from "@/components/layout/page-header-title";
 import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
 import { Button } from "@/components/ui/button";
 import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
+import { YulaAgentModeChip } from "@/components/layout/yula-agent-mode-chip";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
@@ -39,6 +40,7 @@ function AgentSessionHeaderTitle({
     >
       <span className="font-semibold text-primary">{agentName}</span>
       <span>{` – ${chatName}`}</span>
+      <YulaAgentModeChip className="ml-1.5" />
     </PageHeaderTitle>
   );
 }

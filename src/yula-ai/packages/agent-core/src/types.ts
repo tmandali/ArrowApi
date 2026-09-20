@@ -33,10 +33,19 @@ export interface ComponentSchema {
   actions?: Record<string, ActionContract>;
 }
 
+export interface RecordTelemetryOptions {
+  /** Milisaniye cinsinden tekilleştirme penceresi (varsayılan: 250ms) */
+  dedupWindowMs?: number;
+  /** Aynı source ve type ile gelen ardışık olayların son kaydını yerinde güncelleme (varsayılan: true) */
+  coalesce?: boolean;
+  /** Tekilleştirme ve birleştirmeyi atlayıp olayı doğrudan yeni kayıt olarak ekleme */
+  force?: boolean;
+}
+
 export interface IEventBus {
   subscribe(componentId: string, handler: (action: string, payload: any) => any): () => void;
   dispatch(actionPayload: UIAction): { success: boolean; result?: any; error?: string };
-  recordTelemetry(event: Omit<UIEvent, 'timestamp'>): void;
+  recordTelemetry(event: Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
   getRecentEvents(): UIEvent[];
   clear(): void;
 }

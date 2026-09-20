@@ -182,6 +182,7 @@ function reportScreenLabelKey(pathname: string): string | null {
   if (pathname.includes("/my/agents")) return "my_agents"
   if (pathname.includes("/my/plugins")) return "my_plugins"
   if (pathname.includes("/my/memory")) return "my_memory"
+  if (pathname.includes("/my/playbooks")) return "my_playbooks"
   if (pathname.includes("/my/studio")) return "my_skills"
   if (pathname.includes("/system/users")) return "system_users"
   if (pathname.includes("/system/agents")) return "my_agents"
@@ -196,6 +197,7 @@ const SCREEN_LABEL_DEFAULTS: Record<string, string> = {
   my_agents: "Ajanlar",
   my_plugins: "Eklentiler",
   my_memory: "Kalıcı Bellek",
+  my_playbooks: "Playbook & Hafıza",
   my_studio: "Yula Stüdyo",
   stock_balance: "Stok Bakiye",
   stock_analytics: "Stok Analiz",

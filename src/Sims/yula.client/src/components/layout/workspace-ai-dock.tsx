@@ -10,9 +10,6 @@ import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { AIChatPanelTitle } from "@/components/layout/ai-chat/ai-chat-panel-title";
 import { YULA } from "@/components/layout/yula-brand-data"
 import { Button } from "@/components/ui/button"
-import {
-  panelHeaderClass,
-} from "@/components/layout/panel-chrome"
 import { WorkspaceSidePanelLayout } from "@/components/layout/workspace-side-panel"
 import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view"
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context"
@@ -36,9 +33,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge"
 import { cn } from "@/utils/cn"
-import { Check, History, Maximize2, Minimize2, SquarePen } from "lucide-react"
+import { Check, History } from "lucide-react"
+import { MermaidCanvasSheet } from "@/components/layout/chat-markdown/mermaid-canvas-sheet"
+import {
+  YulaNewChatButton,
+  YulaExpandToggleButton,
+  YulaCloseButton,
+} from "./fullscreen-overlay/yula-dock-controls"
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -58,59 +60,6 @@ type WorkspaceAiDockProps = {
    * maximize edilince üst kenar boşluğunu korumak için pt-2.
    */
   panelShellClassName?: string
-}
-
-function YulaNewChatButton() {
-  const t = useTranslations("AiDock")
-  // Dock başlığı oturum hazır olmadan da mount olabilir (defaultOpen) —
-  // tıklama anında oturum hazırdır; yine de null-güvenli tutulur.
-  const { newConversation } = useOptionalYulaChat() ?? {}
-  const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen)
-  const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory)
-
-  const handleNew = () => {
-    setSearchingHistory(false)
-    setHistoryOpen(false)
-    newConversation?.()
-  }
-
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      onClick={handleNew}
-      title={t("new_chat")}
-      aria-label={t("new_chat")}
-    >
-      <SquarePen className="size-3.5" />
-    </Button>
-  )
-}
-
-/**
- * Dock başlığındaki genişlet/daralt butonu: Yula'yı aynı session ile tam
- * ekran overlay'e açar (sayfa içeriği arkada canlı kalır, unmount olmaz);
- * overlay'deyken tıklanırsa side dock'a döner. Escape de daraltır.
- */
-function YulaExpandToggleButton() {
-  const t = useTranslations("AiDock")
-  const { expanded, setExpanded } = useWorkspaceAiChat()
-
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      onClick={() => setExpanded(!expanded)}
-      title={t(expanded ? "collapse_overlay" : "expand_overlay")}
-      aria-label={t(expanded ? "collapse_overlay" : "expand_overlay")}
-    >
-      {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-    </Button>
-  )
 }
 
 /**
@@ -241,7 +190,7 @@ function DockAgentSwitch() {
   )
 }
 
-/** Başlık metni + ajan değiştirici kompozisyonu (boş sohbette ajan adı yazılır). */
+/** Başlık metni + ajan değiştirici kompozisyonu (sade dock başlığı). */
 function DockHeaderTitle() {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
@@ -287,8 +236,7 @@ export function WorkspaceAiDock({
   defaultOpen = false,
   panelShellClassName,
 }: WorkspaceAiDockProps) {
-  const { open, setOpen, expanded, setExpanded } =
-    useWorkspaceAiChat()
+  const { open, setOpen, expanded } = useWorkspaceAiChat()
   const { open: searchOpen } = useWorkspaceSearch()
   const pathname = usePathname()
   const isHomePage = isWorkspaceHomePath(pathname) || isAgentSessionPath(pathname)
@@ -307,16 +255,6 @@ export function WorkspaceAiDock({
     }
   }, [defaultOpen, setOpen])
 
-  // Tam ekran overlay açıkken Escape daraltır (side dock'a dönülür).
-  React.useEffect(() => {
-    if (!open || !expanded) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false)
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [open, expanded, setExpanded])
-
   // Search açıkken Yula paneli de gizlenir — arama görünümü tüm alanı kaplar
   // (ana ekran davranışı); panel search kapanınca yeniden belirir.
   if (isHomePage || searchOpen) {
@@ -333,24 +271,23 @@ export function WorkspaceAiDock({
     )
   }
 
-  // Tam ekran overlay: ana ekran görünümüyle aynı session — sayfa içeriği
-  // arkada mounted kalır (criteria formu, grid düzeni, scroll korunur).
-  const isOverlayOpen = open && expanded
-
+  // Tam ekran overlay AppLayout (main tuval) seviyesinde YulaFullscreenHost tarafından
+  // render edilir (sayfa içinde değil, Sol Nav ile AppHeader arasında tüm içeriğe yayılır).
+  // Yan dock yalnızca expanded false iken açıktır (çift chat mount'u önlenir).
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {header}
       <WorkspaceSidePanelLayout
-        open={open}
+        open={open && !expanded}
         onOpenChange={setOpen}
         title={<DockHeaderTitle />}
         titleCollapseDisabled
         collapseLabel={YULA.collapseLabel}
         headerActions={
           <div className="flex min-w-0 items-center gap-0.5">
-            <YulaContextUsageBadge />
             <YulaNewChatButton />
             <YulaExpandToggleButton />
+            <YulaCloseButton />
           </div>
         }
         panel={<AIChatPanel centeredIntro={centeredIntro} />}
@@ -365,23 +302,7 @@ export function WorkspaceAiDock({
       >
         {content}
       </WorkspaceSidePanelLayout>
-      {isOverlayOpen ? (
-        <div
-          role="dialog"
-          aria-label={YULA.name}
-          className="absolute inset-0 z-40 flex min-h-0 flex-col bg-background"
-        >
-          <div className={cn(panelHeaderClass, "gap-1")}>
-            <DockHeaderTitle />
-            <YulaContextUsageBadge />
-            <YulaNewChatButton />
-            <YulaExpandToggleButton />
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <AIChatPanel mode="main" centeredIntro={centeredIntro} />
-          </div>
-        </div>
-      ) : null}
+      {!expanded ? <MermaidCanvasSheet /> : null}
     </div>
   )
 }

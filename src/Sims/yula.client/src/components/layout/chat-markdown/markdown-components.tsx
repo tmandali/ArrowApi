@@ -14,6 +14,7 @@ import { defaultReportScope, reportPageForAction } from "./markdown-entities";
 import { useChatMarkdownCallbacks } from "./markdown-context";
 import { CriteriaApplyChip, FileOpenChip } from "./markdown-chips";
 import { extractCodeDetails } from "./markdown-component-map";
+import { MermaidChip } from "./mermaid-chip";
 
 export function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
   const t = useTranslations("ChatMarkdown");
@@ -47,6 +48,10 @@ export function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
     [text]
   );
 
+  if (language === "mermaid") {
+    return <MermaidChip chart={text} />;
+  }
+
   const langTitle = (language ?? "code").toUpperCase();
 
   return (
@@ -74,7 +79,7 @@ export function MarkdownPreBlock({ children }: { children?: React.ReactNode }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {isSql ? (
             <button
               type="button"

@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/utils/cn";
 import { stripSkillFrontmatter } from "@/lib/skill-discovery";
 import { CodeBlock } from "@/components/ui/code-block";
+import { MermaidBlock } from "@/components/layout/chat-markdown/mermaid-block";
 
 /** `pre` altındaki `<code class="language-x">` gövdesinden ham metin + dil çıkarır. */
 function extractDocCodeDetails(children: React.ReactNode): {
@@ -75,6 +76,9 @@ const mdComponents: Components = {
   pre: ({ children }) => {
     const { text, language } = extractDocCodeDetails(children);
     if (!text) return null;
+    if (language === "mermaid") {
+      return <MermaidBlock chart={text} className="my-2" />;
+    }
     return (
       <CodeBlock
         value={text}

@@ -1,85 +1,45 @@
-# ArrowApi
+# ArrowApi Developer Agent Guidelines
 
-## Yula Client (Next.js frontend)
+This file is the **lightweight Master Router** for AI coding agents and human engineers. Detailed architectural decisions (ADRs), coding standards, and step-by-step checklists are maintained modularly in the [Developer Agent Wiki](file:///Users/tmr/Source/ArrowApi/.agents/index.md).
 
-For architecture decisions and directory structure rules, see: **`src/Sims/yula.client/AGENTS.md`**
-(read it in every session).
+---
 
-Quick summary:
-- **Shell (host)** = root skeleton: routing, layout, sidebar, Yula, global pages.
-- **Workspace** = independent work area; its content lives under `src/workspaces/<workspace>/`, `src/app/` holds thin wrappers only.
-- **Domain Workspace vs. Platform Core**: Platform infrastructure modules (`auth`, `jobs`, `reports`, `report-criteria`, `system`, `settings`) live under `src/features/<feature>/`. Independent work areas (`stock`, `selling`, `subcontracting`, `accounting`, `manufacturing`) live under `src/workspaces/<workspace>/`.
-- **Workspace Route Standard**: The workspace root (`/<workspace>`) is the general landing screen; summary dashboards and KPI screens live on the standard sub-route (`/<workspace>/dashboard`).
-- Each workspace **registers itself** via `workspace.config.ts` + `routes.ts` + `index.ts`; `src/lib/workspace-registry.ts` collects all modules dynamically.
-- **Declarative YAML Agent Manifest & Command Registry**: No hardcoded commands or prompts in code. All system, grid, and workspace-level agent/command capabilities are declared in the relevant `src/workspaces/<workspace>/agents/*.agent.yaml` (or `src/features/system/agents/`) manifest files and loaded dynamically through `yula-commands.ts`.
-- Do not touch shadcn `components/ui/*`; protected by `.oxlintrc.json` overrides.
-- Hooks and Providers in separate files (Fast Refresh).
-- **Workspaces will later split via module federation** (each a separate React remote);
-  preserve workspace boundaries on every change, cross-workspace imports are forbidden, outsiders consume only the workspace's `index.ts` (Public API) entry point.
-- **Large Data Reports**: Shared `<ArrowReportGrid />` component with W3C OPFS local disk cache and the DuckDB WASM engine. After F5, reports open from disk with zero internet cost.
-- **Tauri 2.0 Desktop & Hybrid Web**: The project runs both in the browser (`pnpm dev`) and on desktop (`pnpm tauri:dev`). Tauri dependencies are dynamically isolated via `isTauriEnv`.
-- **Embedded Python AI Sidecar**: Bidirectional Tool Calling over a `sys.stdin`/`sys.stdout` JSON stream with a `toolRegistry` bridge.
-- **Context-Aware & Scoped AI Agent**: 3-level hierarchical scope (Global > Workspace > Page Scope), dynamic tool registration/cleanup via `useScreenAgentContext`, bidirectional live React state sharing, State-Driven Tool Swapping (Criteria vs Results mode), Few-Shot Data Grounding (column mapping via sample rows), and smart cross-workspace routing.
-- **Headless React UI-Agent Architecture & Pi Reliability Layer (@my-agent)**:
-  - **Action Dispatch & Preflight**: Replaces legacy manual tool loops with `@my-agent/react` (`dispatch_component_action`, `inspect_ui_state`, `ask_user_choice`, `remember_fact`, `time_travel`). Max 6 standard tools (`STANDARD_AGENT_TOOLS`) are exposed to the LLM.
-  - **Native Component Wrapping (`useAgentComponent`)**: Interaktif bileşenler asla dışarıdan dağınık tool veya store yamalarıyla yönetilmez. Bileşen doğrudan `@my-agent/react`'in `useAgentComponent` kancasıyla kendi yaşam döngüsünde kaydolur.
-    - `<ArrowJobExecutionsPanel />`: `id: "job_history"` olarak kaydolur; `recentExecutions`, `itemsCount`, `total` verilerini **0 ms**'de modele sunar (`LIST`, `SELECT`, `REFRESH`, `CANCEL`).
-    - `<ArrowReportGrid />`: `id: "result_grid:active"` olarak kaydolur (`RUN_SQL`, `FILTER`, `APPLY_FILTERS`, `SORT`, `COLUMNS`, `PIN`, `RESET_LAYOUT`, `EXPORT`, `VISUALIZE`, `ANALYZE`, `PROFILE`).
-  - **Prompt Pruning & Single Active Form Rule**: Sistem promptuna inaktif rapor formları basılamaz (`filterRelevantComponents`). Yalnızca aktif rota/ekran formu (`criteria_form:<activeScope>`), evrensel bileşenler ve sonuç ızgarası aktarılır (~4000 token israfı engellenir). Kart/master-data ekranları `entity_form:<name>` olarak ayrılır.
-  - **Active Screen Context & Grounding Rule**: Kullanıcı bir ekrandayken (örn. `/stock/stock-balance`) geçmiş, çalıştırma veya filtre sorduğunda (örn. *"kaç rapor çalışmış"*), model **asla hangi rapor olduğunu sormaz**; doğrudan o ekrandaki aktif raporu bağlam kabul eder.
-  - **14 Core Reliability Capabilities**: `SET_FIELDS`, `SUBMIT (Inline HITL)`, `Steer` queue, `Follow-up` queue, `Dual-Bound Truncation` (lines + bytes), `Mutation Line` (FIFO atomic), `Adaptive Publisher` (60 FPS batching), `Retry Backoff`, `Memory` (session + localStorage), `Plugin Registry`, `Multi-Lane Scheduler` (interactive vs. background isolation for DuckDB indexing), `Deferred Manager` (Arrow Job SSE suspend & resume), `Reconciliation Engine` (startup orphan cleanup), and `Remote RPC` (JSON-RPC 2.0).
-  - **Inline HITL Standard (No Modals)**: Modals are strictly forbidden in Yula AI; all user confirmations and choice prompts are rendered inline via interactive choice cards (`YulaChoiceCard`), keeping the side dock clean and preserving a full audit trail.
-  - **Domain-Agnostic & Language-Agnostic UI Primitives**: Genel UI kontrolleri (`YulaChoiceCard`, `YulaQuestionnaireCard`, `ArrowReportGrid`, `ArrowJobExecutionsPanel` vb.) kesinlikle belirli bir iş alanına (`retail`, `stock` vb.) özel kod veya hardcoded dil metni barındıramaz. Yalnızca kontrattan gelen veriyi saf (pure) render eder; tüm sabit etiketler `next-intl` (`messages/*.json`) sözlüklerinden çözülür.
-- **2-Stage Hybrid AI Router (Fast Intent Router + selected LLM)**: High-confidence report and suggestion requests resolve instantly via the local schema matcher (**~12 ms**); free-form requests go to the model on the active provider (default Microsoft Foundry / Azure, also OpenAI or local Ollama). Chat is provider-agnostic via `streamText({ tools })`; SDK selection lives in the `yula-provider.ts` adapter. AI telemetry is printed to the DevTools console (`🤖 [Yula AI Telemetry]`).
-- **Multilingual LLM & Context Poisoning Prevention**: All system feedback in tool outputs (`message`, `hint`, `error`, `directive`, `note`) stays in standard English. Never impose single-language directives; no artificial language regex gates on the client — the response language is determined by the user's preference and LLM semantics.
-- **Yula AI Panel (Side Dock)**: The Yula AI panel always keeps its side dock/drawer form regardless of screen size; it never switches to forced fullscreen on small screens.
-- **Exploration & Sampling Limit (Max 10 Records Rule)**: In exploration queries run by Yula AI (`run_expert_sql`, `analyze_grid_data`), schema samples (`get_report_schema`, `sampleRows`), or job history lists (`list_report_executions`), **never more than 10 records** may be returned to the model/context. This prevents context bloat, token waste, and model hallucination.
-- **Plug-and-Play Workspace Report Registration**: Workspaces declare reports via `YulaReportCardConfig` and the structured `x-ai` block of the JSON Schema (`aliases`, `quickPrompts`, `columnAliases`); they auto-register with both the Fast Router and the LLM without touching AI internals.
-- **Native Auto-Updater**: Update checks never pollute the web UI — they run only through the macOS/Windows native menu (`Check for Updates...`) and Rust dialogs.
+## ⚡ 5 Golden Rules (Enforced)
 
-### 📋 Checklist When Adding a New Report / Agent (Step by Step)
-When a new report or agent command is added to the project, apply the following steps without exception:
+1. **Shadcn UI Immutability:** Never modify `components/ui/*` directly (strictly protected by `.oxlintrc.json`).
+2. **500-Line Limit:** No source code, test, or documentation file may exceed 500 lines (`wc -l`).
+3. **Module Boundaries (Public API):** Cross-workspace direct imports are strictly forbidden; external modules must consume only the workspace's `index.ts` entry point.
+4. **English-Only Docs & Evolutive Wiki Protocol:** All repository documentation, instructions, and `.agents/**/*.md` files MUST be written and updated exclusively in technical English (while conversing with the user in their preferred language, e.g. Turkish). Whenever a permanent architectural decision or rule correction is made, the agent MUST update the relevant `.agents/*.md` document in English and append an entry to `.agents/log.md`.
+5. **Graph-Native (Node & Edge) Documentation Standard:** All architecture, agent workflows, and component interactions MUST be documented using the Directed Graph standard (Mermaid topology, Nodes with Inbound/Outbound contracts, Edges with feedback/safety loops, and traversable neighbor markdown links) per [Graph Documentation Standard](file:///Users/tmr/Source/ArrowApi/.agents/standards/graph-documentation-standard.md).
 
-1. **JSON Schema Definition (`schemas/<report>-criteria.schema.json`):**
-   - Define the criteria schema with `x-scope`, `x-page-path`, `x-job-endpoint`, and `x-ai` (`aliases`, `quickPrompts`, `resultsPrompts`, `columnHints`) fields.
-2. **YAML Agent Manifest Definition (`src/workspaces/<workspace>/agents/<name>.agent.yaml`):**
-   - When a new workspace or feature command/agent capability is needed, define the YAML manifest file in the relevant `agents/` folder instead of writing hardcoded code.
-3. **Report Registration (`src/features/reports/report-registry.ts`):**
-   - Export the created JSON schema through the relevant workspace's `index.ts` Public API and add it to the `REGISTERED_REPORTS` array with `scope`, `workspace`, `title`, `pagePath`, `aliases`, and `fullSchema`.
-4. **Next.js Route Page (`src/app/`):**
-   - Report Screen: `src/app/<workspace>/<report>/page.tsx` (single-page standard: criteria filters, execution history, and the result DuckDB grid are unified on one page; direct job links open via the `?jobId=<guid>` parameter).
-5. **Result Screen Component (`<Report>ResultGrid.tsx`):**
-   - Build the report result component on the standard OPFS + DuckDB WASM-backed `<ArrowReportGrid jobId={jobId} jobUrl={reportUrl} reportScope="<scope>" ... />` and bind it to the Form's `renderResult` prop.
-6. **Path & Title Formatting (`src/lib/workspace-paths.ts`):**
-   - Add the report's Turkish label to the `formatPathnameLabel(pathname)` function (`if (pathname.includes("/<workspace>/<report>")) return "<Rapor Adı>"`).
+---
 
-### 📊 Report Lifecycle, Single-Page Architecture, and SSE Flow
+## 🧭 Repository Map & Submodule Routers
 
-#### 1. Single-Page Architecture (Single-Page Unified Report Flow)
-- The report route always lives under `src/app/<workspace>/<report>/page.tsx`. Instead of separate old `[jobId]` pages, the `?jobId=<guid>` URL query parameter is used (legacy `/[jobId]` folders `redirect` to the `?jobId=` format for backward compatibility).
-- The report screen consists of 3 core blocks:
-  1. **Criteria Filter Form (`<Report>Form.tsx` & `<Report>Filter.tsx`)**: The user enters criteria or fills them via AI with schema-based completion.
-  2. **Unified Execution Panel (`<ArrowJobExecutionsPanel />`)**:
-     - Past executions list on the left (date, duration, row count, status icon).
-     - Selected job's criteria (JSON or criteria table) and live progress stream (`<RunProgressSteps />`) on the right.
-     - A delete trash icon appears on hover over `Completed`, `Failed`, and `Cancelled` jobs.
-     - `Cancel` actions for running jobs and `Delete` actions for terminated jobs are integrated in the page header and the panel.
-  3. **Result Grid Panel (`<ArrowJobResultPanel />` & `<ArrowReportGrid />`)**: Serves large data with zero memory overhead via DuckDB WASM and the W3C OPFS disk cache.
+Read the specialized instructions for your active scope before writing any code:
 
-#### 2. SSE Live Event Stream (Server-Sent Events)
-- **Backend (`src/Arrow.Jobs.AspNetCore/ArrowJobSse.cs`)**:
-  - Endpoint: `GET /api/arrow/jobs/{jobId}/events` (`Content-Type: text/event-stream`).
-  - **Anti-Buffering Headers**: `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`, `Connection: keep-alive`. Prevents proxy/Next.js layers from holding back small events.
-  - Each event is flushed to the client immediately via `await response.Body.FlushAsync(cancellationToken)` right after writing.
-  - Supported events: `status`, `info`, `progress`, `completed`, `failed`, `cancelled`.
-  - On connect, past events (`event-log`) are replayed first; then the live stream starts.
-- **Client Event Dispatcher (`src/features/jobs/services/arrow-job-event-hub.ts`)**:
-  - `ArrowJobEventHub`: A native `EventTarget`-based singleton Pub/Sub service independent of the React lifecycle (`arrowJobEventHub`).
-  - **Deduplication**: Even if multiple components subscribe to the same `jobId`, only one SSE connection opens.
-  - **Replay**: Components subscribing late via `arrowJobEventHub.subscribe(jobId, callback, { replay: true })` immediately receive the latest snapshot.
-  - **Instant First Step**: When `startStream` fires (`initialPhase === "running"`), the `Running — status` step is written to the snapshot at `0ms` and reflected in the UI immediately, before the network handshake completes.
-  - **Micro-Rhythm (`arrow-job-client.ts` -> `readJobSseEvents`)**: Even when the backend fires preparation steps (`status`, `info`) back-to-back within 2ms in the same TCP packet, ~70ms of visual tempo is inserted between steps so React doesn't burst them all in a single frame.
-  - **Progress Speed**: High-frequency `progress` (row count) steps stream at full speed with no delay; UI notifications render fluidly with ~60ms throttling.
-- **Job Status Management (`src/store/slices/active-jobs-store.ts`)**:
-  - Zustand-based store tracks active jobs (`Queued`, `Running`, `Completed`, `Failed`, `Cancelled`) globally.
-  - `isTerminalJobStatus(status)`: Confirms the job has terminated on `Completed`, `Failed`, `Cancelled` states.
+| Scope | Module / File | Responsibility Area |
+| :--- | :--- | :--- |
+| 🌐 **Master Graph Topology** | [`src/yula-ai/agent.md`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md) | Canonical system graph, node/edge catalog, and ReAct/HITL feedback loops. |
+| 📦 **Core Library** | [`src/yula-ai/AGENTS.md`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/AGENTS.md) | Pure `@my-agent` UI-Agent runtime, headless React hooks, Pi reliability layer (domain/ERP terms forbidden). |
+| 🖥️ **Yula Client App** | [`src/Sims/yula.client/AGENTS.md`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/AGENTS.md) | Next.js ERP/Sims views, DuckDB reports, single-page report lifecycle, and business workspaces. |
+| 📚 **Central Architecture Wiki** | [`.agents/index.md`](file:///Users/tmr/Source/ArrowApi/.agents/index.md) | System-wide ADRs, quality standards, new report checklist, and decision audit log. |
+
+---
+
+## 🗺️ Quick Wiki Reference Catalog
+
+- **Master System Graph:** [Canonical System Graph Index](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md)
+- **Graph Documentation Standard:** [Graph-Native Standards & Node Templates](file:///Users/tmr/Source/ArrowApi/.agents/standards/graph-documentation-standard.md)
+- **Agent Architecture & Tools:** [Headless React Agent & ReAct Modes](file:///Users/tmr/Source/ArrowApi/.agents/architecture/headless-react-agent.md)
+- **Core UI Components:** [Virtual Spreadsheet, Criteria Forms & Yula Client](file:///Users/tmr/Source/ArrowApi/.agents/architecture/core-ui-components.md)
+- **Arrow Jobs (.NET Backend):** [Distributed Job Engine & Execution](file:///Users/tmr/Source/ArrowApi/.agents/architecture/arrow-jobs-engine.md)
+- **Report Lifecycle:** [Single-Page Reports & SSE Stream](file:///Users/tmr/Source/ArrowApi/.agents/architecture/report-lifecycle-sse.md)
+- **Big Data & Tables:** [DuckDB WASM & OPFS Disk Cache](file:///Users/tmr/Source/ArrowApi/.agents/architecture/large-data-duckdb.md)
+- **Workspaces & Remotes:** [Module Federation Standards](file:///Users/tmr/Source/ArrowApi/.agents/architecture/module-federation.md)
+- **Coding Standards:** [Frontend Rules & i18n](file:///Users/tmr/Source/ArrowApi/.agents/standards/frontend-rules.md)
+- **Dev Operations & Ports:** [Process Lifecycle & Fast Shutdown](file:///Users/tmr/Source/ArrowApi/.agents/standards/dev-operations.md)
+- **Adding Reports:** [6-Step Report/Agent Checklist](file:///Users/tmr/Source/ArrowApi/.agents/standards/new-report-checklist.md)
+- **Human In The Loop:** [Inline HITL Standards](file:///Users/tmr/Source/ArrowApi/.agents/standards/inline-hitl-standards.md)
+- **Procedural Memory:** [Playbook & Layered Wiki](file:///Users/tmr/Source/ArrowApi/.agents/knowledge/playbook-procedural-memory.md)
+- **Decision History:** [Architecture Decision Log](file:///Users/tmr/Source/ArrowApi/.agents/log.md)

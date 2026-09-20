@@ -17,6 +17,8 @@ export * from './mutation-line';
 export * from './retry';
 export * from './prompt-templates';
 export * from './memory';
+export * from './playbook';
+export * from './playbook-graph';
 export * from './session-harness';
 export * from './progress';
 export * from './plugins';

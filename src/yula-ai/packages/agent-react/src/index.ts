@@ -12,4 +12,5 @@ export * from './use-agent-vision';
 export * from './use-agent-indexeddb';
 export * from './use-agent-component';
 export * from './use-agent-steering';
+export * from './use-agent-playbook';
 export * from './chat-helpers';
