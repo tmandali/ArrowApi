@@ -3,123 +3,73 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { SquarePen, Settings } from "lucide-react";
-import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
-import { PageHeaderTitle } from "@/components/layout/page-header-title";
-import { WorkspacePageShell } from "@/components/layout/workspace-page-shell";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { YulaFullscreenOverlay } from "@/components/layout/yula-fullscreen-overlay";
 import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
-import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
+import { YulaNewChatButton } from "@/components/layout/fullscreen-overlay/yula-dock-controls";
+import { useWorkspaceSearch } from "@/context/workspace-search-context";
+import { WorkspaceSearchMainView } from "@/components/layout/workspace-search-main-view";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
-import { YULA } from "@/components/layout/yula-brand-data";
-import { YulaExpandToggleButton } from "@/components/layout/fullscreen-overlay/yula-dock-controls";
 
 /**
- * Yula ana ekran başlığı — ajan oturumundaki desenin aynısı:
- * "{Ad} – {SohbetAdı} · #KISA_NO". Ad = aktif ajan yoksa "Yula".
- * Kayıtlı başlık yoksa "Yeni Sohbet" gösterilir.
+ * SystemHomeView:
+ * Ana ekran (/) doğrudan tam ekran Yula IDE (3 sütunlu: Sol Kenar Çubuğu,
+ * Merkez Sohbet, Sağ Tuval) modunu kullanır.
+ * Zaten ana ekran olduğu için küçültme / kapatma (collapse/close) butonlarına yer verilmez.
+ * AppHeader üzerinden veya Cmd+K ile tetiklenen arama açıkken WorkspaceSearchMainView render edilir.
  */
-function YulaSessionHeaderTitle({ displayName }: { displayName: string }) {
-  const t = useTranslations("SystemHome")
-  const activeId = useChatsStore((s) => s.activeId);
-  const conversations = useChatsStore((s) => s.conversations);
-  const activeConv = activeId
-    ? conversations.find((c) => c.id === activeId)
-    : undefined;
-  const chatName = activeConv?.title?.trim() || t("empty_chat_title");
-  const text = `${displayName} – ${chatName}`;
-  return (
-    <PageHeaderTitle
-      title={activeId ? `${text} (${activeId})` : text}
-      className="font-medium text-muted-foreground"
-    >
-      <span className="font-semibold text-primary">{displayName}</span>
-      <span>{` – ${chatName}`}</span>
-    </PageHeaderTitle>
-  );
-}
-
-/**
- * Başlık sağı aksiyonları: Yeni Sohbet + (ajan seçiliyse) Ajan Ayarları.
- */
-function YulaSessionHeaderActions({ agentId }: { agentId: string | null }) {
-  const t = useTranslations("SystemHome")
-  const router = useRouter();
-  const yula = useOptionalYulaChat();
-
-  const handleNewChat = () => {
-    if (yula) {
-      yula.newConversation();
-    } else {
-      useChatsStore.getState().newConversation();
-    }
-  };
-
-  const handleSettings = () => {
-    if (agentId) router.push(`/my/agents?edit=${encodeURIComponent(agentId)}`);
-  };
-
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 px-2.5 text-xs"
-        onClick={handleNewChat}
-        title={t("new_chat_btn")}
-        aria-label={t("new_chat_btn")}
-      >
-        <SquarePen className="size-3.5" />
-        <span className="hidden sm:inline">{t("new_chat_short")}</span>
-      </Button>
-      {agentId ? (
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-          onClick={handleSettings}
-          title={t("agent_settings_btn")}
-          aria-label={t("agent_settings_btn")}
-        >
-          <Settings className="size-3.5" />
-        </Button>
-      ) : null}
-      <YulaExpandToggleButton />
-    </div>
-  );
-}
-
 export function SystemHomeView() {
+  const t = useTranslations("SystemHome");
+  const router = useRouter();
+  const { open: searchOpen } = useWorkspaceSearch();
+
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
-  const agents = useUserAgentsStore((s) => s.agents);
   const storeActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
 
-  // Başlıktaki ad — dock başlığıyla aynı çözüm (konuşma kaydı > global
-  // seçim); ajan yoksa varsayılan Yula.
-  const { displayName, displayAgentId } = React.useMemo(() => {
+  const displayAgentId = React.useMemo(() => {
     const conv = conversations.find((c) => c.id === activeId);
-    const id = conv?.agentId ?? storeActiveAgentId ?? null;
-    const agent = id ? (agents.find((a) => a.id === id) ?? null) : null;
-    return {
-      displayName: agent?.name ?? YULA.name,
-      displayAgentId: agent?.id ?? null,
-    };
-  }, [conversations, activeId, agents, storeActiveAgentId]);
+    return conv?.agentId ?? storeActiveAgentId ?? null;
+  }, [conversations, activeId, storeActiveAgentId]);
 
-  // Ajan oturumundaki gibi yüzen header kartı: arama AppHeader'daki tetik +
-  // Cmd+K ile yürür (arama açıkken header gizlenir).
+  const handleSettings = React.useCallback(() => {
+    if (displayAgentId) {
+      router.push(`/my/agents?edit=${encodeURIComponent(displayAgentId)}`);
+    }
+  }, [displayAgentId, router]);
+
+  // Global arama açıkken arama görünümü tüm alanı kaplar
+  if (searchOpen) {
+    return <WorkspaceSearchMainView />;
+  }
+
   return (
-    <WorkspacePageShell
-      title={<YulaSessionHeaderTitle displayName={displayName} />}
-      startExtra={<YulaContextUsageBadge />}
-      actions={<YulaSessionHeaderActions agentId={displayAgentId} />}
-      showSearch={false}
-    >
-      <AIChatPanel mode="main" />
-    </WorkspacePageShell>
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+      <YulaFullscreenOverlay
+        isOverlay={false}
+        hideWindowControls={true}
+        headerActions={
+          <div className="flex min-w-0 items-center gap-0.5">
+            <YulaContextUsageBadge />
+            <YulaNewChatButton />
+            {displayAgentId ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={handleSettings}
+                title={t("agent_settings_btn")}
+                aria-label={t("agent_settings_btn")}
+              >
+                <Settings className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        }
+      />
+    </div>
   );
 }

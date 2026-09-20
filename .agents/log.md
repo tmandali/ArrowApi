@@ -2,6 +2,43 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-20] Architectural Separation of User Screen Navigation vs In-IDE Interactions
+- **Rationale:** When Yula is in Fullscreen Overlay mode (`expanded === true`), clicking any navigation element (in `ModuleSidebar`, `GlobalNavDrawer`, `AppHeader`, search results, or in-chat markdown links) signifies the user's explicit intent to view and interact with that application screen (`kullanıcı ekrana gitmek istiyor`). Previously:
+  1. *Per-page Mount Trap:* `WorkspaceAiChatProvider` was mounted per-page inside `AppLayout`. Route transitions unmounted the old provider and mounted a new one, causing `prevPathnameRef` to initialize to the destination route on mount and fail route-change detection.
+  2. *Same-Route / Link Clicks:* Clicking the active route in `ModuleSidebar` or other navigation elements did not trigger route changes, leaving the fullscreen overlay locked over the screen.
+  3. *In-IDE Collision:* In `YulaIdeSidebar`, selecting past conversation sessions invoked `navigateToConversationScreen` with `router.push(href)`. This triggered route changes that closed the IDE overlay even though the user was simply switching chat sessions within the IDE.
+- **Decision:**
+  - **Root-Level Provider Mounting:** Moved `WorkspaceAiChatProvider` to `src/app/providers.tsx` at the root application shell. It now mounts once, never unmounts across route transitions, and permanently tracks route changes and clicks across `AppHeader`, `GlobalNavDrawer`, `ModuleSidebar`, and page contents.
+  - **Universal Capture-Phase Navigation Interceptor:** Implemented `isScreenNavigationClick` and a capture-phase global click listener in `WorkspaceAiChatProvider`. Any click on internal screen links (`a[href]`) or screen navigation buttons (`[data-nav="screen"]`, `[data-slot="sidebar-menu-button"]`, `[data-slot="sidebar-menu-sub-button"]`) immediately collapses `expanded` to `false`. If the destination is home (`/`), it also closes the dock (`open = false`).
+  - **In-IDE Action Separation:** Isolated all internal IDE operations (`[data-ide-action="true"]`, `[data-slot="ide-conversation-item"]`, `[data-slot="ide-folder-toggle"]`, `[data-slot="ide-control"]`, `[data-slot="chat-composer"]`). In `YulaIdeSidebar`, selecting past conversation sessions now calls `selectConversation(id)` and `restoreConversationExecution(...)` without invoking `router.push`, keeping the user immersed in the IDE without collapsing or flashing.
+  - **Agent Programmatic Navigation:** Configured `useHeadlessSystemComponents` to explicitly set `expanded: false` and `open: true` when `app_router.NAVIGATE` is dispatched, ensuring report results are visible with the agent docked alongside.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Auto-Collapse Fullscreen Overlay on Navigation & Header Button Deduplication
+- **Rationale:** Two usability issues were identified in Yula's fullscreen overlay mode:
+  1. *Duplicate Actions:* The header previously displayed both an "Ekrana Odaklan" (`YulaFocusScreenButton`) on the left and a "Dock'a Küçül" (`YulaExpandToggleButton`) on the right. Both executed identical logic (`setExpanded(false)`), creating clutter and redundancy.
+  2. *Overlay Trapping during Left Navigation:* When users clicked navigation links on the left (`ModuleSidebar`, `GlobalNavDrawer`), the underlying URL and page changed, but the fullscreen overlay remained stuck on top (`expanded === true`), completely hiding the destination ERP page. Additionally, `expanded` was persisted in `localStorage`, causing the overlay to re-appear on reloads/navigations.
+- **Decision:**
+  - **Deduplication:** Removed `YulaFocusScreenButton` from `yula-fullscreen-overlay.tsx` and `yula-dock-controls.tsx`. The standard window control `[⤢]` (`YulaExpandToggleButton`) on the right now serves as the single canonical collapse action.
+  - **Navigation Awareness in Provider:** Updated `WorkspaceAiChatProvider` to monitor `pathname` transitions; whenever the route changes, `setExpanded(false)` is automatically triggered so that the target page is immediately revealed.
+  - **Direct Sidebar Click Handling:** Added `setExpanded(false)` handler to `ModuleSidebar` links and buttons for instant responsive dismissal upon click.
+  - **Non-Persistent Fullscreen State:** Updated `useYulaDockStore` persistence with `partialize: (s) => ({ open: s.open })`, ensuring `expanded` mode is never saved into `localStorage`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Direct 3-Column Fullscreen Workspace for SystemHomeView (Root Path)
+- **Rationale:** The system home view (`/`) is the primary landing screen of the Sims application. Having it render a single-column shell with an expand toggle to switch into fullscreen mode was redundant, as the home screen is already dedicated to the assistant workspace and has no underlying ERP view to collapse or minimize to.
+- **Decision:**
+  - `SystemHomeView` now directly renders `YulaFullscreenOverlay` in page flow (`isOverlay={false}`, `hideWindowControls={true}`).
+  - Collapse (`YulaExpandToggleButton`) and close (`YulaCloseButton`) controls are omitted on the home view, since there is no background page to return to.
+  - `YulaFullscreenHost` bypasses mounting on `pathname === "/"` to avoid duplicate overlay trees.
+  - Workspace Search (Cmd+K / AppHeader) continues to render `WorkspaceSearchMainView` covering the home area when search is triggered.
+  - In ERP pages, the side dock and fullscreen overlay behaviors remain intact with their full set of controls.
+- **Author:** Antigravity / Team
+
 ---
 
 ## [2026-09-20] Harmonized Card Container & Header Height Chrome between Yula Full Mode and Dock Mode

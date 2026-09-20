@@ -2,12 +2,11 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Eye, Maximize2, Minimize2, SquarePen, X } from "lucide-react";
+import { Maximize2, Minimize2, SquarePen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
-import { uiEventBus } from "@my-agent/core";
 import { cn } from "@/utils/cn";
 
 export function YulaNewChatButton({ className }: { className?: string }) {
@@ -27,6 +26,7 @@ export function YulaNewChatButton({ className }: { className?: string }) {
       type="button"
       size="icon"
       variant="ghost"
+      data-ide-action="true"
       className={cn(
         "size-7 shrink-0 text-muted-foreground hover:text-foreground",
         className,
@@ -58,6 +58,7 @@ export function YulaExpandToggleButton({ className }: { className?: string }) {
       type="button"
       size="icon"
       variant="ghost"
+      data-ide-action="true"
       className={cn(
         "size-7 shrink-0 text-muted-foreground hover:text-foreground",
         className,
@@ -75,50 +76,6 @@ export function YulaExpandToggleButton({ className }: { className?: string }) {
   );
 }
 
-export function YulaFocusScreenButton({
-  screenTitle,
-  pathname,
-  className,
-}: {
-  screenTitle: string;
-  pathname: string;
-  className?: string;
-}) {
-  const t = useTranslations("AiDock");
-  const { setExpanded } = useWorkspaceAiChat();
-
-  const handleFocus = () => {
-    uiEventBus.recordTelemetry({
-      source: "yula_dock",
-      type: "USER_FOCUS_SCREEN",
-      payload: { pathname, screen: screenTitle },
-    });
-    setExpanded(false);
-  };
-
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className={cn(
-        "h-7 gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground border-border/80 hover:bg-muted/80 shrink-0",
-        className,
-      )}
-      onClick={handleFocus}
-      title={t("focus_screen_tooltip", { screen: screenTitle })}
-      aria-label={t("focus_screen_tooltip", { screen: screenTitle })}
-    >
-      <Eye className="size-3.5 shrink-0 text-primary" />
-      <span className="font-medium text-foreground">{t("focus_screen")}</span>
-      <span className="hidden sm:inline-block max-w-[140px] truncate text-muted-foreground">
-        ({screenTitle})
-      </span>
-      <Minimize2 className="size-3 shrink-0 opacity-60 ml-0.5" />
-    </Button>
-  );
-}
-
 export function YulaCloseButton({ className }: { className?: string }) {
   const t = useTranslations("AiDock");
   const { setOpen } = useWorkspaceAiChat();
@@ -128,6 +85,7 @@ export function YulaCloseButton({ className }: { className?: string }) {
       type="button"
       size="icon"
       variant="ghost"
+      data-ide-action="true"
       className={cn(
         "size-7 shrink-0 text-muted-foreground hover:text-foreground",
         className,

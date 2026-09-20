@@ -30,6 +30,7 @@ export const useYulaDockStore = create<DockState>()(
     }),
     {
       name: "yula-dock-state",
+      partialize: (state) => ({ open: state.open }),
     }
   ),
 );

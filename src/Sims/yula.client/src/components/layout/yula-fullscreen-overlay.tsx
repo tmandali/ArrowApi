@@ -15,8 +15,7 @@ import { YULA } from "@/components/layout/yula-brand-data";
 import { useActiveDiagramStore } from "@/lib/stores/active-diagram-store";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
-import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
-import { formatPathnameLabel, workspaceLabelFromPath } from "@/lib/workspace-paths";
+import { workspaceLabelFromPath } from "@/lib/workspace-paths";
 import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { MermaidBlock } from "@/components/layout/chat-markdown/mermaid-block";
 import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
@@ -32,7 +31,6 @@ import { YulaIdeCanvasHeader } from "./fullscreen-overlay/yula-ide-canvas-header
 import {
   YulaCloseButton,
   YulaExpandToggleButton,
-  YulaFocusScreenButton,
   YulaNewChatButton,
 } from "./fullscreen-overlay/yula-dock-controls";
 
@@ -44,6 +42,8 @@ export interface YulaFullscreenOverlayProps {
   headerExtra?: React.ReactNode;
   headerActions?: React.ReactNode;
   defaultSidebarOpen?: boolean;
+  hideWindowControls?: boolean;
+  isOverlay?: boolean;
 }
 
 export function YulaFullscreenOverlay({
@@ -52,6 +52,8 @@ export function YulaFullscreenOverlay({
   headerExtra,
   headerActions,
   defaultSidebarOpen = true,
+  hideWindowControls = false,
+  isOverlay = true,
 }: YulaFullscreenOverlayProps) {
   const t = useTranslations("ChatMarkdown");
   const pathname = usePathname();
@@ -69,8 +71,9 @@ export function YulaFullscreenOverlay({
     [conversations, activeId],
   );
 
-  // Escape key collapses overlay back to side dock
+  // Escape key collapses overlay back to side dock (only in overlay mode)
   React.useEffect(() => {
+    if (!isOverlay) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setExpanded(false);
@@ -78,23 +81,19 @@ export function YulaFullscreenOverlay({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setExpanded]);
-
-  const activeReport = React.useMemo(
-    () => REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)),
-    [pathname],
-  );
-  const screenTitle = activeReport?.title ?? formatPathnameLabel(pathname);
+  }, [setExpanded, isOverlay]);
 
   const workspaceLabel = workspaceLabelFromPath(pathname) || "Yula";
   const conversationTitle = activeConv?.title || "New Conversation";
 
   return (
     <div
-      role="dialog"
+      role={isOverlay ? "dialog" : "region"}
       aria-label={YULA.name}
       className={cn(
-        "absolute inset-0 z-40 flex min-h-0 flex-col bg-background [background-image:var(--app-bg-gradient)]",
+        isOverlay
+          ? "absolute inset-0 z-40 flex min-h-0 flex-col bg-background [background-image:var(--app-bg-gradient)]"
+          : "flex h-full min-h-0 w-full flex-col bg-background [background-image:var(--app-bg-gradient)]",
         className,
       )}
     >
@@ -175,13 +174,7 @@ export function YulaFullscreenOverlay({
                         {conversationTitle}
                       </span>
                     </div>
-                    {headerExtra ??
-                      (screenTitle ? (
-                        <YulaFocusScreenButton
-                          screenTitle={screenTitle}
-                          pathname={pathname}
-                        />
-                      ) : null)}
+                    {headerExtra}
                   </div>
 
                   <div className="flex min-w-0 items-center gap-0.5">
@@ -189,8 +182,12 @@ export function YulaFullscreenOverlay({
                       <>
                         <YulaContextUsageBadge />
                         <YulaNewChatButton />
-                        <YulaExpandToggleButton />
-                        <YulaCloseButton />
+                        {!hideWindowControls && (
+                          <>
+                            <YulaExpandToggleButton />
+                            <YulaCloseButton />
+                          </>
+                        )}
                       </>
                     )}
                   </div>

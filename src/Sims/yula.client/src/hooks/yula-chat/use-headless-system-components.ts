@@ -10,6 +10,7 @@ import {
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
+import { useYulaDockStore } from "@/lib/stores/dock";
 
 /**
  * Headless UI-Agent Sistem Bileşenleri Kayıt Kancası
@@ -45,6 +46,8 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
         if (search) {
           targetPath = `${targetPath}?${search}`;
         }
+        useYulaDockStore.getState().setExpanded(false);
+        useYulaDockStore.getState().setOpen(true);
         router.push(targetPath);
         return { success: true, navigatedTo: targetPath };
       }

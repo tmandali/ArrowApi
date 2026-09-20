@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AppProviders } from "@/context/AppProviders";
 import { ThemeProvider } from "@/context/theme-provider";
 import { YulaChatProvider } from "@/hooks/yula-chat-provider";
+import { WorkspaceAiChatProvider } from "@/context/workspace-ai-chat";
 import { PagePanelProvider } from "@/context/page-panel-provider";
 import { DocLangSync } from "@/components/app/doc-lang-sync";
 import { AuthHeaderSync } from "@/components/app/auth-header-sync";
@@ -28,12 +29,14 @@ export function Providers({
         <PagePanelProvider>
           <AppProviders>
             <YulaChatProvider>
-              <AuthHeaderSync />
-              <CompanySessionSync />
-              <SessionDebug />
-              <AccountStatusGuard />
-              <DocLangSync />
-              {children}
+              <WorkspaceAiChatProvider>
+                <AuthHeaderSync />
+                <CompanySessionSync />
+                <SessionDebug />
+                <AccountStatusGuard />
+                <DocLangSync />
+                {children}
+              </WorkspaceAiChatProvider>
             </YulaChatProvider>
           </AppProviders>
         </PagePanelProvider>

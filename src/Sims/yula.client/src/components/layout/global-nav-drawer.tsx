@@ -140,6 +140,7 @@ export function GlobalNavDrawer() {
                   <Link
                     key={ws.id}
                     href={ws.url}
+                    data-nav="screen"
                     onClick={handleClose}
                     className={cn(
                       "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
@@ -173,6 +174,7 @@ export function GlobalNavDrawer() {
                   <Link
                     key={item.url}
                     href={item.url}
+                    data-nav="screen"
                     onClick={handleClose}
                     className={cn(
                       "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
@@ -207,6 +209,7 @@ export function GlobalNavDrawer() {
                     <Link
                       key={item.url}
                       href={item.url}
+                      data-nav="screen"
                       onClick={handleClose}
                       className={cn(
                         "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",

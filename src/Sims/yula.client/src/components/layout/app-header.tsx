@@ -53,6 +53,7 @@ export function AppHeader({ className }: { className?: string }) {
 
         <Link
           href="/"
+          data-nav="screen"
           className="flex items-center transition-opacity hover:opacity-85 mr-2"
         >
           {/* Marka: Omni (yula turuncusu) + Core (primary mavi) */}

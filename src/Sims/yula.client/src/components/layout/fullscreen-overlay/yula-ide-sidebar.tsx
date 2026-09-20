@@ -20,7 +20,7 @@ import { cn } from "@/utils/cn";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { workspaceLabelFromPath } from "@/lib/workspace-paths";
-import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
+import { restoreConversationExecution } from "@/lib/yula-history-navigation";
 import { formatTimeAgo } from "./time-ago";
 import { YULA } from "@/components/layout/yula-brand-data";
 import { YulaMarkIcon } from "@/components/layout/yula-brand";
@@ -106,14 +106,13 @@ export function YulaIdeSidebar({
   const handleSelect = React.useCallback(
     (session: YulaConversation) => {
       selectConversation(session.id);
-      navigateToConversationScreen(
+      restoreConversationExecution(
         session,
-        (href) => router.push(href),
         useChatsStore.getState().messagesById[session.id],
       );
       onSelectConversation?.(session.id);
     },
-    [selectConversation, router, onSelectConversation],
+    [selectConversation, onSelectConversation],
   );
 
   return (
@@ -136,6 +135,7 @@ export function YulaIdeSidebar({
       <div className="px-3 py-2">
         <button
           type="button"
+          data-ide-action="true"
           onClick={handleNewConversation}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60 transition-colors shadow-2xs cursor-pointer"
         >
@@ -148,6 +148,7 @@ export function YulaIdeSidebar({
       <div className="space-y-0.5 px-3 py-1 text-muted-foreground">
         <button
           type="button"
+          data-nav="screen"
           onClick={() => router.push("/my/history")}
           className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted/40 hover:text-foreground transition-colors cursor-pointer"
         >
@@ -156,6 +157,7 @@ export function YulaIdeSidebar({
         </button>
         <button
           type="button"
+          data-nav="screen"
           onClick={() => router.push("/system/jobs")}
           className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted/40 hover:text-foreground transition-colors cursor-pointer"
         >
@@ -191,6 +193,7 @@ export function YulaIdeSidebar({
                 {/* Project Folder Row */}
                 <button
                   type="button"
+                  data-slot="ide-folder-toggle"
                   onClick={() => toggleGroup(group.name)}
                   className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors cursor-pointer"
                 >
@@ -218,6 +221,7 @@ export function YulaIdeSidebar({
                         <button
                           key={conv.id}
                           type="button"
+                          data-slot="ide-conversation-item"
                           onClick={() => handleSelect(conv)}
                           className={cn(
                             "flex w-full items-center justify-between gap-1.5 rounded-md px-2.5 py-1 text-xs text-left transition-colors cursor-pointer group",
@@ -239,6 +243,7 @@ export function YulaIdeSidebar({
                     {hasMore ? (
                       <button
                         type="button"
+                        data-ide-action="true"
                         onClick={() => toggleShowAll(group.name)}
                         className="w-full text-left px-2.5 py-0.5 text-[11px] text-muted-foreground/70 hover:text-foreground cursor-pointer transition-colors"
                       >
@@ -259,6 +264,7 @@ export function YulaIdeSidebar({
       <div className="mt-auto border-t border-border px-3 py-2">
         <Link
           href="/my/settings"
+          data-nav="screen"
           className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
         >
           <Settings className="size-3.5" />

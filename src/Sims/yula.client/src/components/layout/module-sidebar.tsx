@@ -35,6 +35,7 @@ import { useEffectiveRole } from "@/features/auth/lib/use-effective-role";
 import { useNavTitleLocalizer } from "@/components/layout/module-nav-menu";
 import { workspaceIconFor } from "@/components/layout/workspace-brand";
 import { useActiveWorkspaceId } from "@/hooks/use-active-workspace";
+import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { cn } from "@/utils/cn";
 import type { WorkspaceId } from "@/types";
 
@@ -43,9 +44,14 @@ export function ModuleSidebar({ className }: { className?: string }) {
   const { status: sessionStatus } = useSession();
   const { ready: roleReady, isAdmin } = useEffectiveRole();
   const activeWorkspaceId = useActiveWorkspaceId();
+  const { setExpanded } = useWorkspaceAiChat();
   const tHeader = useTranslations("AppHeader");
   const tRail = useTranslations("WorkspaceRail");
   const localizedTitle = useNavTitleLocalizer(pathname);
+
+  const handleItemClick = React.useCallback(() => {
+    setExpanded(false);
+  }, [setExpanded]);
 
   const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
 
@@ -115,7 +121,11 @@ export function ModuleSidebar({ className }: { className?: string }) {
           {/* Workspace ismi: tıklanınca ilgili workspace'in root/ana sayfasına gider */}
           <button
             type="button"
-            onClick={() => router.push(workspaceRootUrl)}
+            data-nav="screen"
+            onClick={() => {
+              handleItemClick();
+              router.push(workspaceRootUrl);
+            }}
             className="min-w-0 flex-1 cursor-pointer rounded-md px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
           >
             <span className="block truncate text-base font-semibold tracking-tight text-sidebar-foreground transition-colors group-hover/name:text-foreground">
@@ -167,7 +177,7 @@ export function ModuleSidebar({ className }: { className?: string }) {
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                       )}
                     >
-                      <Link href={item.url} className="flex items-center gap-2">
+                      <Link href={item.url} data-nav="screen" onClick={handleItemClick} className="flex items-center gap-2">
                         {React.createElement(item.icon, {
                           className: cn(
                             "size-4.5 shrink-0 transition-colors",
@@ -239,7 +249,7 @@ export function ModuleSidebar({ className }: { className?: string }) {
                                   isSubActive && "bg-sidebar-accent text-sidebar-foreground font-medium"
                                 )}
                               >
-                                <Link href={subItem.url}>
+                                <Link href={subItem.url} data-nav="screen" onClick={handleItemClick}>
                                   <span className="truncate">{subTitle}</span>
                                 </Link>
                               </SidebarMenuSubButton>
