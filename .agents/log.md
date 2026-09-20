@@ -204,3 +204,14 @@ This document is the **append-only audit log** recording fundamental architectur
   - Wrapped interactive components natively via `useAgentComponent` in their own React lifecycle.
   - Strictly banned popup modals; implemented inline interactive choice cards (`YulaChoiceCard` via `ask_user_choice`).
 - **Author:** Antigravity / Team
+
+## [2026-09-20] Client-Side Pyodide Skills & Event Hub Architecture
+- **Rationale:** Executing user-created Python skills or data validation scripts on the server introduces significant RCE security vulnerabilities, complex infrastructure scaling, and PII/KVKK privacy risks. Running Python natively in the browser via WebAssembly provides complete process sandboxing, zero server compute overhead, and aligns with the existing DuckDB WASM architecture.
+- **Decision:**
+  - Integrated Pyodide WebAssembly in an isolated background thread (`pyodide.worker.ts`) pre-loading `pandas`, `openpyxl`, and `numpy`.
+  - Implemented `SkillEventHub` extending native `EventTarget` for streaming pub/sub (`stdout`, `stderr`, `progress`, `snapshot`, `replay`).
+  - Added a 30s timeout and crash watchdog calling `worker.terminate()` with seamless worker re-spawn.
+  - Implemented `duckdb-pyodide-bridge.ts` allowing direct injection of DuckDB WASM tabular records into Pyodide pandas `df`.
+  - Implemented `useSkillStore` with Zustand `persist` supporting local `Draft` authoring and `Released` status for DB syncing.
+  - Added public exports under `src/features/skills/index.ts` and UI terminal drawer `SkillTerminalDrawer`.
+- **Author:** Antigravity / Team
