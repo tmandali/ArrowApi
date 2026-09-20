@@ -24,9 +24,12 @@ describe("built-in SKILL.md files", () => {
       .sort();
     assert.deepEqual(dirs, [
       "ay-kapanis",
+      "doc-coauthoring",
+      "docx",
       "frontend-design",
       "mcp-builder",
       "pdf",
+      "pptx",
       "rapor-kalite",
       "sayim-fark",
       "skill-creator",

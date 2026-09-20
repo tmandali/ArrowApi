@@ -16,6 +16,9 @@ import pdfMd from "../../skills/pdf/SKILL.md";
 import mcpBuilderMd from "../../skills/mcp-builder/SKILL.md";
 import frontendDesignMd from "../../skills/frontend-design/SKILL.md";
 import skillCreatorMd from "../../skills/skill-creator/SKILL.md";
+import docCoauthoringMd from "../../skills/doc-coauthoring/SKILL.md";
+import docxMd from "../../skills/docx/SKILL.md";
+import pptxMd from "../../skills/pptx/SKILL.md";
 
 const SOURCES: Array<{ md: string; fallback: string }> = [
   { md: ayKapanisMd, fallback: "ay-kapanis" },
@@ -26,6 +29,9 @@ const SOURCES: Array<{ md: string; fallback: string }> = [
   { md: mcpBuilderMd, fallback: "mcp-builder" },
   { md: frontendDesignMd, fallback: "frontend-design" },
   { md: skillCreatorMd, fallback: "skill-creator" },
+  { md: docCoauthoringMd, fallback: "doc-coauthoring" },
+  { md: docxMd, fallback: "docx" },
+  { md: pptxMd, fallback: "pptx" },
 ];
 
 export const BUILT_IN_USER_SKILLS: UserSkill[] = SOURCES.map(

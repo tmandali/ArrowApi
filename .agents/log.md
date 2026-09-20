@@ -224,3 +224,11 @@ This document is the **append-only audit log** recording fundamental architectur
   - Linked `xlsx` directly with the Pyodide Web Worker runtime (`openpyxl` & `pandas`).
   - Verified 100% test passing across the test suite (212/212 tests pass).
 - **Author:** Antigravity / Team
+
+## [2026-09-20] Integration of Document & Presentation Skills (doc-coauthoring, docx, pptx)
+- **Rationale:** Providing the Yula Agent with production guidelines for collaborative technical document authoring (PRDs, specs, ADRs), programmatic Word (.docx) document generation via docx-js, and executive PowerPoint (.pptx) slide deck creation.
+- **Decision:**
+  - Added 3 built-in skills under `src/Sims/yula.client/skills/`: `doc-coauthoring`, `docx`, and `pptx`.
+  - Registered all skills into `built-in-skills.ts` and updated `built-in-skills.test.ts` (11 total built-in skills).
+  - Validated test suite passing (212/212 pass) and clean lint/types.
+- **Author:** Antigravity / Team
