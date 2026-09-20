@@ -5,9 +5,70 @@ import { pluginRegistry, type AgentPlugin } from "@/lib/plugins/yula-plugins";
 import { Badge } from "@/components/ui/badge";
 import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Blocks, CheckCircle2, Cpu, Wrench } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
+import { useAgentComponent } from "@my-agent/react";
 
 export function PluginsTabView() {
+  const t = useTranslations("Studio");
   const [plugins] = React.useState<AgentPlugin[]>(() => pluginRegistry.getAll());
+
+  useScreenAgentContext({
+    screenId: "my-plugins",
+    screenTitle: t("plugins_title"),
+    workspaceId: "my",
+    activeDataSummary: {
+      isViewingResults: false,
+      jobId: undefined,
+    },
+    quickPrompts: [
+      t("prompt_list_plugins"),
+      t("prompt_check_python_plugin"),
+    ],
+    stateExtra: {
+      pluginsCount: plugins.length,
+    },
+  });
+
+  useAgentComponent({
+    id: "entity_form:plugin_registry",
+    meta: {
+      entity: "plugin_registry",
+      screenTitle: "Kurumsal Eklentiler & Modüller",
+      workspace: "my",
+      pluginsCount: plugins.length,
+      plugins: plugins.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        version: p.version || "1.0.0",
+        tools: Object.keys(p.tools ?? {}),
+      })),
+    },
+    actions: {
+      READ: {
+        description: "Reads the list of registered corporate plugins and their tools.",
+        whenToCall: "When inspecting plugins or checking tool availability.",
+        whenNotToCall: "When not on plugins screen.",
+      },
+    },
+    onAction: async (action) => {
+      if (action === "READ") {
+        return {
+          success: true,
+          pluginsCount: plugins.length,
+          plugins: plugins.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            version: p.version || "1.0.0",
+            tools: Object.keys(p.tools ?? {}),
+          })),
+        };
+      }
+      return { success: false, error: `Unknown action: ${action}` };
+    },
+  });
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">

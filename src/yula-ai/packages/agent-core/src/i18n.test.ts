@@ -62,4 +62,20 @@ describe('🌍 Zero-Dependency i18n Subsystem', () => {
     expect(notifiedLocale).toBe('en');
     unsub();
   });
+
+  it('Komut aliasları ve commandResponses aktif dile göre dinamik çözümlenir', () => {
+    // tr
+    i18nManager.setLocale('tr');
+    const trDict = i18nManager.getDictionary();
+    expect(trDict.commandResponses.sessionCleared).toContain('Oturum temizlendi');
+    const yardimCmd = promptTemplateManager.get('/yardım');
+    expect(yardimCmd?.description).toBe(trDict.commands.help);
+
+    // en
+    i18nManager.setLocale('en');
+    const enDict = i18nManager.getDictionary();
+    expect(enDict.commandResponses.sessionCleared).toContain('Session cleared');
+    const helpCmd = promptTemplateManager.get('/help');
+    expect(helpCmd?.description).toBe(enDict.commands.help);
+  });
 });

@@ -130,4 +130,69 @@ describe('Autonomous Agent Loop (Pi Reference Implementation)', () => {
     expect(turnCount).toBe(1);
     expect(agent.isStreaming).toBe(false);
   });
+
+  it('declareToolChanges should detect added and removed tools properly', async () => {
+    const { declareToolChanges } = await import('./agent-loop');
+    const context = {
+      messages: [],
+      tools: [{ name: 'tool_a' }, { name: 'tool_c' }] as any,
+    };
+
+    const delta = declareToolChanges(context, ['tool_a', 'tool_b']);
+    expect(delta.updatedMessages.length).toBe(1);
+    expect(delta.updatedMessages[0].content).toContain('Added: [tool_c]');
+    expect(delta.updatedMessages[0].content).toContain('Removed: [tool_b]');
+  });
+
+  it('prepareNextTurn should dynamically cascade model and thinking level', async () => {
+    let turnCount = 0;
+    let receivedModel: string | undefined;
+    let receivedThinking: string | undefined;
+
+    const mockStreamFn: StreamFn = vi.fn(async (context, config) => {
+      turnCount++;
+      receivedModel = config.model;
+      receivedThinking = config.thinkingLevel;
+
+      if (turnCount === 1) {
+        return {
+          message: { role: 'assistant', content: 'Hızlı ön değerlendirme...' },
+          toolCalls: [
+            {
+              id: 'c1',
+              name: 'inspect_ui_state',
+              arguments: {},
+            },
+          ],
+        };
+      }
+      return {
+        message: { role: 'assistant', content: 'Derin analiz tamamlandı.' },
+        toolCalls: [],
+        stopReason: 'end_turn' as const,
+      };
+    });
+
+    const agent = new Agent({
+      tools: createStandardAgentTools(),
+      streamFn: mockStreamFn,
+      maxIterations: 5,
+      model: 'gpt-4o-mini',
+      thinkingLevel: 'low',
+      prepareNextTurn: async ({ turnIndex }) => {
+        if (turnIndex === 1) {
+          return {
+            model: 'claude-3-7-sonnet',
+            thinkingLevel: 'high',
+          };
+        }
+      },
+    });
+
+    await agent.run([{ role: 'user', content: 'Analiz yap' }]);
+
+    expect(turnCount).toBe(2);
+    expect(receivedModel).toBe('claude-3-7-sonnet');
+    expect(receivedThinking).toBe('high');
+  });
 });

@@ -23,6 +23,7 @@ import {
   Network,
 } from "lucide-react";
 import { WorkflowGraphCanvas } from "./workflow-graph-canvas";
+import { usePlaybookAgentBinding } from "./use-playbook-agent-binding";
 
 export function PlaybooksManagementView() {
   const t = useTranslations("Playbooks");
@@ -42,15 +43,30 @@ export function PlaybooksManagementView() {
     removeRule,
   } = useAgentPlaybook({ workspaceId: workspace });
 
+  const screenRules = entries.filter((e) => e.category === "screen_rule");
+  const workflowRecipes = entries.filter((e) => e.category === "workflow_recipe");
+
+  usePlaybookAgentBinding({
+    workspace,
+    searchQuery,
+    setSearchQuery,
+    screenRules,
+    workflowRecipes,
+    selectedWorkflowId,
+    setSelectedWorkflowId,
+    workflowViewMode,
+    setWorkflowViewMode,
+    removeRule,
+    refresh: loadData,
+    screenTitle: t("title"),
+  });
+
   const handleDelete = async (id: string) => {
     const success = await removeRule(id);
     if (success) {
       setDeleteConfirmId(null);
     }
   };
-
-  const screenRules = entries.filter((e) => e.category === "screen_rule");
-  const workflowRecipes = entries.filter((e) => e.category === "workflow_recipe");
 
   const filterBySearch = (item: { title: string; targetPath?: string; contentMarkdown?: string; summary?: string }) => {
     if (!searchQuery.trim()) return true;

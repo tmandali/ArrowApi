@@ -38,6 +38,7 @@ import {
 } from "@/lib/workspace-landing-data";
 import type { WorkspaceId } from "@/types";
 import { cn } from "@/utils/cn";
+import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
 
 export interface WorkspaceLandingTemplateProps {
   workspaceId?: WorkspaceId;
@@ -110,6 +111,25 @@ export function WorkspaceLandingTemplate({
   const activeId: WorkspaceId = detectedDef.id;
   const { pinnedItems, unpinItem } = usePinnedWorkspaceItems(activeId);
   const { pinnedCharts, unpinChart } = usePinnedCharts(activeId);
+
+  useScreenAgentContext({
+    screenId: `${activeId}-dashboard`,
+    screenTitle: detectedDef.title,
+    workspaceId: activeId,
+    activeDataSummary: {
+      isViewingResults: false,
+      jobId: undefined,
+    },
+    quickPrompts: [
+      t("quick_prompt_list_reports", { title: detectedDef.title }),
+      t("quick_prompt_show_analytics"),
+    ],
+    stateExtra: {
+      workspace: activeId,
+      workspaceTitle: detectedDef.title,
+      pinnedItemsCount: pinnedItems.length,
+    },
+  });
 
   // Ajan kartları: ayarlarında bu workspace (veya global) kapsamı tanımlı
   // ajan varsa gösterilir; kapsam dışı/hiç ajan yoksa bölüm render edilmez.

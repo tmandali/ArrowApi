@@ -2,6 +2,135 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-20] Typed Component & Action Contracts: Dual Schema Support (Input/Output), Emitted Events, and Deterministic Conditions
+- **Rationale:**
+  1. *Action Contract Schema Ambiguity:* `ActionContract.schema` was previously an input payload schema only, leaving return values untyped and unvalidated, and missing output introspection for tool-calling agents.
+  2. *Component Event Visibility:* UI components emitted events over `uiEventBus` (e.g. `field_change`, `filter_changed`, `job_queued`, `view_transformed`), but had no formal schema declaration for inspection or observability by agent tools like `inspect_ui_state`.
+  3. *Deterministic Guarding vs LLM Reasoning:* While natural language directives (`whenToCall` & `whenNotToCall`) are critical for LLM prompt reasoning, engine-level deterministic preflight conditions (`when?: ActionCondition`) were needed to prevent invalid action dispatches (e.g., executing grid actions when in criteria form phase).
+- **Decision:**
+  - **Core Types (`@my-agent/core`):**
+    - Added `ActionCondition` (`route?: string`, `phase?: string`, `custom?: (ctx) => boolean`).
+    - Added `EventContract` (`schema?: ZodTypeAny`, `description: string`, `whenEmitted?: string`).
+    - Enhanced `ActionContract` with `inputSchema` (aliasing `schema` for 100% backward compatibility), `outputSchema`, and `when?: ActionCondition`.
+    - Enhanced `ComponentSchema` with `events?: Record<string, EventContract>`.
+    - Added `postflightValidate` to `IComponentRegistry` for verifying action results against `outputSchema`.
+  - **Prompt & Registry Formatting (`component-registry.ts`):**
+    - Enforced deterministic `when` condition checking in `preflightValidate`.
+    - Enhanced `formatActiveComponentsPrompt` to cleanly format `Parameters:`, `Returns:`, and `Emitted Events:`.
+  - **React Hook Layer (`@my-agent/react`):**
+    - Enhanced `UseAgentComponentOptions` and `useAgentComponent` to accept and register typed `events`.
+  - **Application Migration (`Sims/yula.client`):**
+    - Added typed `outputSchema` and `events` across `criteria_form:*` (in `use-screen-agent-context.tsx`, `use-headless-system-components.ts`, and `yula-active-components.ts`) and `result_grid:active` (in `use-result-grid-agent.ts` and `yula-active-components.ts`).
+    - Enhanced `inspect_ui_state` tool's `outputSchema` with typed `recent_events` Zod schema.
+    - Extracted `useResultGridAgent` and `renderReportGridSubtitle` from `arrow-report-grid.tsx` to maintain clean separation and strictly adhere to the 500-line limit (486 lines).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Modernization of Yula.Client Flows & Removal of Legacy Custom Workarounds
+- **Rationale:**
+  1. *Prompt Bloat & Redundant Defensive Warnings:* Previously, without dynamic tool pruning (`prepareStep`) and native loop termination (`stopWhen: [hasToolCall("ask_user_choice")]`), system prompts had to explicitly forbid calling criteria forms when unmounted, forbid asking multiple questions, and forbid duplicate tool calls.
+  2. *Untyped Client Tools:* While server tools had Zod `outputSchema`, client-executed tools (`dispatch_component_action`, `inspect_ui_state`, `ask_user_choice`, `time_travel`) lacked formal output schemas.
+  3. *Arbitrary Sliding Window in Transport Slimming:* `context-slim.ts` previously truncated conversations at 16 messages and cut rows at 800 chars regardless of actual token consumption.
+  4. *Component Mount/Unmount Desynchronization:* Active UI components mounted/unmounted without broadcasting explicit `tool_loadout_updated` events to the Pi event stream.
+- **Decision:**
+  - **Prompt Streamlining (`yula-agent-prompt.ts`):** Removed redundant duplicate tool call prohibitions and defensive prompt walls, relying on engine-level `prepareStepRouting` and `stopWhen`.
+  - **Client Tool Output Schemas (`standard-agent-tools.ts`):** Added explicit Zod `outputSchema` definitions to `dispatch_component_action`, `inspect_ui_state`, `ask_user_choice`, and `time_travel`.
+  - **Deprecation of Manual Deduplication (`yula-tool-info.ts`):** Deprecated `findDuplicateQuestionCallIds` as native `stopWhen` stops the loop after 1 choice prompt.
+  - **Transport Window Consolidation (`context-slim.ts`):** Relaxed arbitrary 16-message transport cutoff to safety-net levels, delegating fine-grained compaction to SDK-native `pruneMessages` inside `prepareStepRouting`.
+  - **Tool Loadout Delta Broadcast (`use-agent-component.ts` & `use-screen-agent-context.tsx`):** Connected `piEventStream.emit({ type: 'tool_loadout_updated', added, removed })` on component mount and unmount.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Upgrading Yula AI with Reference-Pi Patterns & Vercel AI SDK Best Practices (Dynamic Routing, Tool Deltas, Failover, Output Schemas)
+- **Rationale:**
+  1. *Tool Hallucination & Token Waste:* Providing full tool definitions across all execution phases caused prompt bloat and allowed models to attempt grid SQL queries before data was loaded.
+  2. *Unannounced Tool Loadout Transitions:* As UI components mounted/unmounted across routes, models lacked explicit visibility into loadout deltas, causing unmounted tool invocation errors.
+  3. *Cloud Provider Outage & Rate Limits:* When Azure OpenAI or primary models returned 429 Rate Limits or 503 Service Unavailable, agent requests failed without transparent failover.
+  4. *Untyped Tool Outputs:* Server tools previously lacked formal Zod output schemas, reducing client-side runtime validation confidence.
+- **Decision:**
+  - **Dynamic Step Routing (`src/Sims/yula.client/src/lib/yula-step-router.ts`):** Integrated `prepareStepRouting` into Vercel AI SDK `prepareStep` to dynamically prune tools based on screen phase and manage token compaction cleanly under the 500-line limit.
+  - **Tool Output Schemas (`src/Sims/yula.client/src/lib/server-tools/standard-agent-tools.ts`):** Added explicit Zod `outputSchema` definitions to `remember_fact`, `recall_fact`, `query_playbook`, and `propose_playbook_update`.
+  - **Pi Tool Loadout Delta (`packages/agent-core/src/agent-loop.ts`):** Added `declareToolChanges` to detect added/removed tools between turns and inject transparent system notifications (`[Tools Loadout Updated]`).
+  - **Adaptive Model Cascading (`prepareNextTurn` in `agent-loop.ts` & `agent.ts`):** Added Pi-style `prepareNextTurn` support enabling turn-to-turn dynamic model promotion and thinking level adjustments.
+  - **Provider Resilience & Failover (`src/Sims/yula.client/src/lib/yula-provider-failover.ts`):** Implemented `createFailoverLanguageModel` using AI SDK `wrapLanguageModel`, seamlessly switching from primary (e.g. Azure OpenAI) to secondary fallbacks (OpenAI / Agnes) on 429/5xx errors.
+  - **Interactive Simulation Harness (`apps/demo-app`):** Implemented `useAdvancedArchitecturalSimulations.ts` and updated `PiTestPanel.tsx` / `PiDiagnosticsView.tsx` with 4 interactive test scenarios (Tool Loadout Delta, Model Cascading, Provider Failover, Dynamic Step Routing).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Architectural Dual-Layer Localization: Library-Agnostic i18n Dictionary vs Application Next-Intl
+- **Rationale:**
+  1. *Core Library Invariance:* Hardcoded Turkish string checks (e.g., `key === 'yardim' || key === 'yardım'`) in `@my-agent/core` and Turkish-only response messages in `@my-agent/react` (`chat-commands.ts`) violated the architectural principle that core agent libraries must be domain-agnostic and language-neutral by default.
+  2. *Application UI Localization:* Hardcoded Turkish quick prompts and strings in `yula.client` (`blank-workspace-landing.tsx`, `use-skill-agent-binding.ts`, `use-agent-management-binding.ts`, `use-system-users-agent-binding.ts`, `use-playbook-agent-binding.ts`, `my-settings-form.tsx`, `memory-tab-view.tsx`, `plugins-tab-view.tsx`) caused inconsistent multilingual experiences when switching between English and Turkish.
+- **Decision:**
+  - **Library Layer (`@my-agent/core` & `@my-agent/react`):**
+    - Extended `AgentDictionary` with `commandAliases` and `commandResponses`.
+    - Fully populated localized command dictionaries in `trDictionary` and `enDictionary`.
+    - Dynamic alias resolution in `prompt-templates.ts`: canonical commands are registered once in English, and locale-specific aliases are bound dynamically via `i18nManager.getDictionary()`.
+    - Removed hardcoded strings in `chat-commands.ts`; command responses now resolve dynamically from `i18nManager.getDictionary().commandResponses`.
+  - **Application Layer (`src/Sims/yula.client`):**
+    - Standardized all `quickPrompts` passed to `useScreenAgentContext` to use `next-intl` (`useTranslations`).
+    - Added comprehensive prompt message keys across `WorkspaceLanding`, `SystemUsers`, `MySettings`, `AgentManagement`, `SkillManagement`, `Playbooks`, and `Studio` in both `tr.json` and `en.json`.
+    - Enforced this architectural rule in `.agents/standards/frontend-rules.md` and `.agents/architecture/headless-react-agent.md`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Decoupling Built-in Slash Commands (Library Runtime) vs Application Tools (Yula Client)
+- **Rationale:** When executing `/yardim skil create` or typing `/yardım` (dotless-i), the command leaked past `@my-agent/core` into `/api/agent/chat` because `/yardım` was not recognized as a registered system command. Consequently, the backend LLM invoked the `ask_user_choice` tool to ask what the user meant while simultaneously rejecting it, whereas `yula-worked-steps.tsx` synthesized an artificial `slash_command (status: ok)` step.
+- **Decision:**
+  - **Core Library (`@my-agent/core`):** Added `normalizeCommandToken` to normalize Turkish character variants (`ı` vs `i`, case-folding). Explicitly registered `/yardım` as an alias alongside `/yardim` and `/help`.
+  - **Client Hook (`@my-agent/react`):** Enhanced `handleBuiltInCommand` in `chat-commands.ts` so that `/help` and `/yardim`/`/yardım` commands—even with argument hints (e.g. `/yardim model` or `/yardim skil create`)—are filtered and resolved 100% locally on the client and always return `true`, completely preventing unintended forwarding to the LLM backend.
+  - **Application UI (`yula.client`):**
+    - Updated `yula-commands.ts` to include `phase` in `parseYamlCommands` and normalize Turkish characters in `resolveYulaSlashCommand` and `matchYulaCommands`.
+    - In `yula-worked-steps.tsx`, excluded `phase === "system"` commands from synthesizing fake tool steps in server turn transcripts, and ensured error states accurately reflect tool failure.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Migration of Management Screens & Dashboards to useScreenAgentContext and entity_form:* Dynamic Tool Binding
+- **Rationale:** On screens like `/my/skills`, when a user asked contextual questions such as *"bu skili nasıl test ederim"*, Yula hallucinated unrelated ERP/stock report test instructions because the screen lacked both screen context and dynamic tool registration. The system prompt defaulted to global orchestration mode and injected irrelevant sample report catalog prompts.
+- **Decision:**
+  - **Controlled Tab Navigation Support:** Added `activeTab` and `onTabChange` to `TabbedDetail` (`tabbed-detail.tsx`), and forwarded them via `ManagementPageTemplate` (`management-page-template.tsx`) so agents can programmatically switch tabs and inspect tab states.
+  - **Dedicated Hook Extraction Pattern:** To maintain strict adherence to Golden Rule 2 (500-line ceiling), created dedicated binding hooks (`use-skill-agent-binding.ts`, `use-agent-management-binding.ts`, `use-playbook-agent-binding.ts`, `use-system-users-agent-binding.ts`).
+  - **Full Management & Settings Coverage:**
+    - Integrated `entity_form:skill_editor` into `SkillManagementView.tsx` (`/my/skills`, `/system/skills`).
+    - Integrated `entity_form:agent_editor` into `AgentManagementView.tsx` (`/my/agents`, `/system/agents`).
+    - Integrated `entity_form:playbook_manager` into `playbooks-management-view.tsx` (`/my/playbooks`).
+    - Integrated `entity_form:user_settings` into `my-settings-form.tsx` (`/my/settings`).
+    - Integrated `entity_form:plugin_registry` into `plugins-tab-view.tsx` (`/my/plugins`).
+    - Integrated `entity_form:agent_memory` into `memory-tab-view.tsx` (`/my/memory`).
+    - Integrated `entity_form:system_users` into `SystemUsersView.tsx` (`/system/users`), refactoring its guests tab into `SystemUsersGuestsTab.tsx`.
+  - **Workspace Dashboard Context Grounding:** Integrated `useScreenAgentContext` into `blank-workspace-landing.tsx` across all domain modules (`/stock`, `/accounting`, `/selling`, `/manufacturing`, `/subcontracting`), supplying module titles, descriptions, and contextual quick prompt chips.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Integration of Library Built-in System Commands into Yula Slash Palette
+- **Rationale:** The `@my-agent/core` runtime engine and `@my-agent/react` chat hook implement core built-in commands (`/plan`, `/compact`, `/model`, `/help`/`/yardim`, `/new`/`/yeni`), but these were previously absent from `yula.client`'s `system.agent.yaml` slash palette manifest, preventing discoverability and autocomplete for end users.
+- **Decision:**
+  - **Manifest Registration:** Added `/plan`, `/compact`, `/model`, and `/yardim` to `system.agent.yaml` with explicit icons (`ListTodo`, `Minimize2`, `Cpu`, `HelpCircle`).
+  - **Icon Resolution:** Expanded `ICON_MAP` in `yula-commands.ts` with the new Lucide icons.
+  - **I18n Localization:** Localized labels, descriptions, and prompts across `tr.json` and `en.json`.
+  - **Dual-Language Core Aliases:** Registered `/yeni` and `/yardim` aliases alongside `/new` and `/help` in `prompt-templates.ts` and `chat-commands.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Removal of Legacy Prototype Test Slash Commands & Emptying Skills Seed
+- **Rationale:** Following the integration of official Anthropic agent skills (`xlsx`, `pdf`, `docx`, `pptx`, `frontend-design`, `mcp-builder`, `skill-creator`, `doc-coauthoring`), the legacy prototype skills (`/ay-kapanis`, `/sayim-fark`, `/rapor-kalite`, `/gunluk-ozet`) and mock template commands (`/rapor`, `/sirala`, `/csv`, `/geri` in `@my-agent/core`) were obsolete and created confusion in the chat slash palette.
+- **Decision:**
+  - **Deleted Prototype Skills:** Removed `skills/ay-kapanis`, `skills/sayim-fark`, and `skills/rapor-kalite` from `src/Sims/yula.client/skills`.
+  - **Clean Built-in Skills Registry:** `built-in-skills.ts` and its test now register and verify exactly the 8 production Anthropic skills.
+  - **Removed Example Skill Seeding:** `ensureExampleSkill` in `user-skills.ts` no longer seeds `gunluk-ozet`; it actively cleans up any existing `gunluk-ozet` entry from user `localStorage`.
+  - **Localized Skills Namespace:** `LOCALIZABLE_SKILL_SLASHES` emptied in `yula-user-skill.ts`; removed orphaned commands (`attach`, `grid-top5`, `report-run-job`) and old skill entries from `tr.json` and `en.json`.
+  - **Pure Core Templates:** Removed domain-specific mock templates from `prompt-templates.ts` in `@my-agent/core`; system commands (`/new`, `/model`, `/login`, `/compact`, `/plan`, `/help`) preserved.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-20] Architectural Separation of User Screen Navigation vs In-IDE Interactions
 - **Rationale:** When Yula is in Fullscreen Overlay mode (`expanded === true`), clicking any navigation element (in `ModuleSidebar`, `GlobalNavDrawer`, `AppHeader`, search results, or in-chat markdown links) signifies the user's explicit intent to view and interact with that application screen (`kullanıcı ekrana gitmek istiyor`). Previously:
   1. *Per-page Mount Trap:* `WorkspaceAiChatProvider` was mounted per-page inside `AppLayout`. Route transitions unmounted the old provider and mounted a new one, causing `prevPathnameRef` to initialize to the destination route on mount and fail route-change detection.

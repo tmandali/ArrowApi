@@ -12,6 +12,11 @@ export interface AgentCommand extends PromptTemplate {
   category: 'system' | 'template';
 }
 
+export function normalizeCommandToken(token: string): string {
+  const t = token.startsWith('/') ? token : `/${token}`;
+  return t.toLowerCase().replace(/ı/g, 'i');
+}
+
 /**
  * Pi Prompt Templates & Built-in Slash Commands
  * Reference: earendil-works/pi/packages/coding-agent/src/modes/interactive/interactive-mode.ts (lines 2970-3075)
@@ -38,7 +43,32 @@ export class PromptTemplateManager {
 
   get(command: string): AgentCommand | undefined {
     const cmdName = command.startsWith('/') ? command : `/${command}`;
-    const cmd = this.commands.get(cmdName);
+    let cmd = this.commands.get(cmdName);
+    if (!cmd) {
+      const normalized = normalizeCommandToken(cmdName);
+      cmd = this.commands.get(normalized);
+      if (!cmd) {
+        for (const [key, val] of this.commands.entries()) {
+          if (normalizeCommandToken(key) === normalized) {
+            cmd = val;
+            break;
+          }
+        }
+      }
+      if (!cmd) {
+        // Dynamically resolve aliases via i18nManager
+        const dict = i18nManager.getDictionary();
+        const bareToken = normalized.replace('/', '');
+        if (dict.commandAliases) {
+          for (const [canonical, aliases] of Object.entries(dict.commandAliases)) {
+            if (aliases.some((a) => normalizeCommandToken(a).replace('/', '') === bareToken)) {
+              cmd = this.commands.get(`/${canonical}`);
+              break;
+            }
+          }
+        }
+      }
+    }
     return cmd ? this.localizeCommand(cmd) : undefined;
   }
 
@@ -48,10 +78,24 @@ export class PromptTemplateManager {
 
   private localizeCommand(cmd: AgentCommand): AgentCommand {
     if (cmd.category !== 'system') return cmd;
-    const dict = i18nManager.getDictionary().commands;
-    const key = cmd.command.replace('/', '') as keyof typeof dict;
-    if (dict[key]) {
-      return { ...cmd, description: dict[key] };
+    const dict = i18nManager.getDictionary();
+    const rawKey = cmd.command.replace('/', '');
+    let canonicalKey: keyof typeof dict.commands | undefined;
+
+    if (rawKey in dict.commands) {
+      canonicalKey = rawKey as keyof typeof dict.commands;
+    } else if (dict.commandAliases) {
+      const normRaw = normalizeCommandToken(rawKey).replace('/', '');
+      for (const [canonical, aliases] of Object.entries(dict.commandAliases)) {
+        if (aliases.some((a) => normalizeCommandToken(a).replace('/', '') === normRaw)) {
+          canonicalKey = canonical as keyof typeof dict.commands;
+          break;
+        }
+      }
+    }
+
+    if (canonicalKey && dict.commands[canonicalKey]) {
+      return { ...cmd, description: dict.commands[canonicalKey]! };
     }
     return cmd;
   }
@@ -66,12 +110,12 @@ export class PromptTemplateManager {
 
   /**
    * Verilen girdinin bir sistem eylemi (Built-in System Command) olup olmadığını doğrular.
-   * Örneğin: /new, /model, /login, /compact, /help
+   * Örneğin: /new, /model, /login, /compact, /help, /yardim, /yardım
    */
   isSystemCommand(input: string): boolean {
     const trimmed = input.trim();
     if (!trimmed.startsWith('/')) return false;
-    const cmdName = trimmed.split(' ')[0];
+    const cmdName = trimmed.split(/\s+/)[0];
     const cmd = this.get(cmdName);
     return cmd?.category === 'system';
   }
@@ -123,88 +167,62 @@ export class PromptTemplateManager {
   }
 
   private registerDefaultCommands(): void {
-    // ==========================================
-    // 1. Pi Built-in Sistem Komutları (System)
-    // ==========================================
+    // 1. Canonical Pi Built-in System Commands (baseline descriptions)
     this.register({
       command: '/new',
-      description: 'Oturumu sıfırlar ve temiz bir yeni konuşma başlatır',
+      description: 'Clears the session and starts a new conversation',
       category: 'system',
     });
 
     this.register({
       command: '/model',
-      description: 'Kullanılabilir modelleri listeler veya belirtilen modeli seçer',
-      argumentHint: '[model-id (opsiyonel)]',
+      description: 'Lists available models or switches to the specified model',
+      argumentHint: '[model-id (optional)]',
       category: 'system',
     });
 
     this.register({
       command: '/login',
-      description: 'Sağlayıcı (OAuth veya API Key) kimlik doğrulama penceresini açar',
-      argumentHint: '[provider (opsiyonel)]',
+      description: 'Opens provider authentication (OAuth or API Key) modal',
+      argumentHint: '[provider (optional)]',
       category: 'system',
     });
 
     this.register({
       command: '/compact',
-      description: 'Aktif bağlamı hemen özetleyerek sıkıştırır (Context Compaction)',
-      argumentHint: '[özel talimat (opsiyonel)]',
+      description: 'Compacts conversation history and summarizes token context',
+      argumentHint: '[instructions (optional)]',
       category: 'system',
     });
 
     this.register({
       command: '/plan',
-      description: 'Eylemleri doğrudan koşturmak yerine onay için yol haritası (Plan) modu açar',
-      argumentHint: '[hedef / analiz (opsiyonel)]',
+      description: 'Toggles plan-first mode to formulate a roadmap before executing actions',
+      argumentHint: '[goal / analysis (optional)]',
       category: 'system',
     });
 
     this.register({
       command: '/help',
-      description: 'Kullanılabilir tüm hazır sistem ve şablon komutlarını listeler',
+      description: 'Lists all available built-in system and template commands',
       category: 'system',
     });
 
-    // ==========================================
-    // 2. İş Alanı Prompt Şablonları (Templates)
-    // ==========================================
-    this.register({
-      command: '/rapor',
-      description: 'Belirtilen mağaza ve tarih için raporu doğrudan hazırlar',
-      argumentHint: '[mağaza] [tarih (opsiyonel)]',
-      category: 'template',
-      template: (args) => {
-        const store = args[0] || 'Kadıköy';
-        const date = args[1] || '2026-09';
-        return `${store} mağazası için ${date} tarihli satış ve stok raporunu hazırla ve getir.`;
-      },
-    });
-
-    this.register({
-      command: '/sirala',
-      description: 'Sonuç tablosunu artan (asc) veya azalan (desc) sırada sıralar',
-      argumentHint: '[asc | desc]',
-      category: 'template',
-      template: (args) => {
-        const dir = args[0]?.toLowerCase() === 'asc' ? 'artan' : 'azalan';
-        return `Sonuç tablosunu ${dir} sırada sırala.`;
-      },
-    });
-
-    this.register({
-      command: '/csv',
-      description: 'Sonuç verilerini CSV dosyası olarak dışa aktarır',
-      category: 'template',
-      template: () => 'Rapor sonuçlarını CSV dosyası olarak indir.',
-    });
-
-    this.register({
-      command: '/geri',
-      description: 'Rapor ekranından filtre kriterleri formuna geri döner',
-      category: 'template',
-      template: () => 'Sonuç ekranından filtre kriterleri ekranına geri dön.',
-    });
+    // 2. Register localized aliases dynamically from i18nManager
+    const dict = i18nManager.getDictionary();
+    if (dict.commandAliases) {
+      for (const [canonical, aliases] of Object.entries(dict.commandAliases)) {
+        const canonicalCmd = this.get(`/${canonical}`);
+        for (const alias of aliases) {
+          this.register({
+            command: `/${alias}`,
+            description: canonicalCmd?.description || canonical,
+            argumentHint: canonicalCmd?.argumentHint,
+            category: 'system',
+          });
+        }
+      }
+    }
   }
 }
 

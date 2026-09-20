@@ -18,11 +18,32 @@ export function tool<TInput = any, TOutput = any>(def: Tool<TInput, TOutput>): T
   return def;
 }
 
-export interface ActionContract<TSchema extends ZodTypeAny = ZodTypeAny> {
+export interface ActionCondition {
+  phase?: 'workspace' | 'results' | string;
+  route?: string;
+  requiresMounted?: boolean;
+  predicate?: (context: any) => boolean;
+}
+
+export interface ActionContract<TInputSchema extends ZodTypeAny = ZodTypeAny, TOutputSchema extends ZodTypeAny = ZodTypeAny> {
   description?: string;
-  schema?: TSchema;
-  whenToCall: string;     // Modelin bu aksiyonu tetiklemesi GEREKEN durumlar
-  whenNotToCall: string;  // Modelin bu aksiyonu ASLA tetiklememesi gereken durumlar
+  /** Girdi şeması (Modelin göndereceği payload parametreleri) */
+  inputSchema?: TInputSchema;
+  /** Geriye dönük uyumluluk takma adı (inputSchema ile eşdeğerdir) */
+  schema?: TInputSchema;
+  /** Çıktı şeması (Aksiyon çalıştığında dönen sonucun sözleşmesi) */
+  outputSchema?: TOutputSchema;
+  /** Modelin bu aksiyonu tetiklemesi GEREKEN durumlar (LLM prompt rehberi) */
+  whenToCall: string;
+  /** Modelin bu aksiyonu ASLA tetiklememesi gereken durumlar (LLM prompt rehberi) */
+  whenNotToCall: string;
+  /** Deterministik motor doğrulama kuralları (Preflight & Router kuralı) */
+  when?: ActionCondition;
+}
+
+export interface EventContract<TSchema extends ZodTypeAny = ZodTypeAny> {
+  description: string;
+  schema: TSchema;
 }
 
 export interface ComponentSchema {
@@ -31,6 +52,7 @@ export interface ComponentSchema {
   meta?: Record<string, any>;
   executionMode?: 'parallel' | 'sequential';
   actions?: Record<string, ActionContract>;
+  events?: Record<string, EventContract>;
 }
 
 export interface RecordTelemetryOptions {
@@ -55,7 +77,8 @@ export interface IComponentRegistry {
   unregister(componentId: string, schema?: ComponentSchema): void;
   get(componentId: string): ComponentSchema | undefined;
   getActiveComponents(): ComponentSchema[];
-  preflightValidate(componentId: string, action: string, payload?: any): PreflightValidationResult;
+  preflightValidate(componentId: string, action: string, payload?: any, context?: any): PreflightValidationResult;
+  postflightValidate(componentId: string, action: string, output?: any): { valid: boolean; error?: string };
   formatActiveComponentsPrompt(components?: ComponentSchema[]): string;
   clear(): void;
 }
@@ -137,7 +160,8 @@ export type AgentEvent =
   | { type: 'reconcile_completed'; recoveredCount: number; message: string; timestamp?: number }
   | { type: 'user_choice_prompt'; question: string; options: any[]; allow_custom?: boolean; timestamp?: number }
   | { type: 'compaction_start'; reason: 'threshold' | 'overflow' | 'manual'; tokensBefore: number; timestamp?: number }
-  | { type: 'compaction_end'; reason: 'threshold' | 'overflow' | 'manual'; tokensBefore: number; tokensAfter: number; summary: string; timestamp?: number };
+  | { type: 'compaction_end'; reason: 'threshold' | 'overflow' | 'manual'; tokensBefore: number; tokensAfter: number; summary: string; timestamp?: number }
+  | { type: 'tool_loadout_updated'; added: string[]; removed: string[]; timestamp?: number };
 
 /** 1. beforeToolCall & afterToolCall Hook Types (Pi) */
 export interface BeforeToolCallContext {

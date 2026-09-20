@@ -123,12 +123,9 @@ export function isDedupeSkipOutput(info: YulaToolPartInfo): boolean {
 }
 
 /**
- * Aynı adımda yinelenen `ask_user_question` çağrılarını bulur.
- * Model bazen tek adımda paralel iki soru çağrısı üretir (ikisi de çalışırsa
- * çift soru kartı çıkar); adım başına yalnız İLK çağrı yaşar, sonrakiler
- * bastırılmalıdır. Adım sınırı `step-start` parçalarıdır; farklı adım/mesajdaki
- * sorular (kullanıcı cevaplayıp model devam sorusu sorarsa) etkilenmez.
- * Dönüş: bastırılacak toolCallId kümesi.
+ * @deprecated Vercel AI SDK stopWhen: [hasToolCall("ask_user_choice")] motor seviyesinde
+ * adımı tek soruda durdurduğu için artık adımda çift soru üretilmez.
+ * Eski testler ve arşiv oturum kayıtları geriye dönük uyumluluğu için korunmaktadır.
  */
 export function findDuplicateQuestionCallIds(
   messages: Array<{ role?: string; parts?: unknown[] }>,

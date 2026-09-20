@@ -2,6 +2,7 @@
  * Yula agent active UI components resolver & filter.
  * Resolves mounted client components and Zod action contracts for the Headless React Agent.
  */
+import { z } from "zod";
 import type { ComponentSchema } from "@my-agent/core";
 import { REGISTERED_REPORTS, findReport } from "@/features/reports/report-registry";
 import type { YulaScreenContext } from "./yula-agent-prompt";
@@ -67,29 +68,50 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
         columns: context.grid.columns,
         filters: context.grid.filters,
       },
+      events: {
+        filter_changed: {
+          description: "Triggered when active grid filter is changed",
+          schema: z.object({ filters: z.record(z.string(), z.any()) }),
+        },
+      },
       actions: {
         RUN_SQL: {
           description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
+          inputSchema: z.object({ query: z.string() }),
+          outputSchema: z.object({ rows: z.array(z.any()).optional(), rowCount: z.number().optional(), error: z.string().optional() }),
+          when: { phase: "results" },
           whenToCall: "When the user requests calculations, top N, aggregations, or custom SQL analysis on active table data.",
           whenNotToCall: "For simple column filtering or sorting (use FILTER or SORT instead).",
         },
         QUERY: {
           description: "Updates the grid view via SQL or opens a derived view ({ query }).",
+          inputSchema: z.object({ query: z.string() }),
+          outputSchema: z.object({ success: z.boolean() }),
+          when: { phase: "results" },
           whenToCall: "When the user wants derived columns or grouped table views.",
           whenNotToCall: "When only changing simple filters or sorting.",
         },
         FILTER: {
           description: "Applies a filter to a single column ({ field, value, op }).",
+          inputSchema: z.object({ field: z.string(), value: z.any(), op: z.string().optional() }),
+          outputSchema: z.object({ success: z.boolean(), totalFiltered: z.number().optional() }),
+          when: { phase: "results" },
           whenToCall: "When the user wants to filter records by a single column value.",
           whenNotToCall: "When applying multiple filters simultaneously (use APPLY_FILTERS instead).",
         },
         APPLY_FILTERS: {
           description: "Applies multiple filters to the table simultaneously ({ filters, clearOthers }).",
+          inputSchema: z.object({ filters: z.record(z.string(), z.any()), clearOthers: z.boolean().optional() }),
+          outputSchema: z.object({ success: z.boolean() }),
+          when: { phase: "results" },
           whenToCall: "When multiple columns need to be filtered concurrently.",
           whenNotToCall: "When filtering only a single column.",
         },
         SORT: {
           description: "Sorts the column in ascending or descending order ({ column, direction }).",
+          inputSchema: z.object({ column: z.string(), direction: z.enum(["asc", "desc"]) }),
+          outputSchema: z.object({ success: z.boolean(), sortedColumn: z.string().optional() }),
+          when: { phase: "results" },
           whenToCall: "When sorting is requested.",
           whenNotToCall: "When sorting is not requested.",
         },
@@ -149,24 +171,38 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           scope,
           criteriaDraft: (context as any)?.screenState?.criteria ?? (context?.uiContext as any)?.criteria,
         },
+        events: {
+          field_change: {
+            description: `Triggered when criteria fields for ${reportTitle} are updated`,
+            schema: z.object({ field: z.string(), value: z.any() }),
+          },
+          job_queued: {
+            description: `Triggered when ${reportTitle} report execution starts`,
+            schema: z.object({ jobId: z.string(), report: z.string() }),
+          },
+        },
         actions: {
           SET_FIELDS: {
             description: "Primary action to mutate criteria form fields without executing the report ({ criteria }).",
+            outputSchema: z.object({ success: z.boolean(), updatedFields: z.array(z.string()).optional() }),
             whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
             whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT).",
           },
           SUBMIT: {
             description: "Primary action to submit criteria and execute the report job ({ criteria, report }).",
+            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), queued: z.boolean().optional() }),
             whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
             whenNotToCall: "When required fields are missing or user is only drafting parameters.",
           },
           APPLY: {
             description: "Alias for SET_FIELDS: Populates criteria form fields ({ criteria }).",
+            outputSchema: z.object({ success: z.boolean(), navigatedTo: z.string().optional() }),
             whenToCall: "When the user prepares or updates criteria parameters.",
             whenNotToCall: "When the user commands to run the report directly.",
           },
           RUN: {
             description: "Alias for SUBMIT: Submits criteria and executes the report ({ criteria, report }).",
+            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), navigatedTo: z.string().optional() }),
             whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
             whenNotToCall: "When required fields are missing or user is only drafting parameters.",
           },
@@ -177,11 +213,13 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
           },
           VALIDATE: {
             description: "Validates criteria parameters against schema rules ({ criteria }).",
+            outputSchema: z.object({ valid: z.boolean(), errors: z.array(z.string()).optional() }),
             whenToCall: "When checking whether parameters satisfy schema constraints.",
             whenNotToCall: "When the user directly commands execution.",
           },
           READ: {
             description: "Reads current draft criteria values from the active form.",
+            outputSchema: z.object({ criteria: z.record(z.string(), z.any()) }),
             whenToCall: "To inspect current form state or merge values.",
             whenNotToCall: "When assigning or overwriting new values.",
           },

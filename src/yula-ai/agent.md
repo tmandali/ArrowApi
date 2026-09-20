@@ -107,21 +107,29 @@ Every participant in the system is documented below with its role, registration 
 - **Neighbor References:** [Headless React Agent ADR](file:///Users/tmr/Source/ArrowApi/.agents/architecture/headless-react-agent.md#6-hybrid-router--multilingual-llm-guidelines).
 
 #### 🏷️ `AgentLoopNode`
-- **Role:** Autonomous ReAct State Machine (`streamText` in Next.js API route `/api/agent/chat` and `agentLoop` in `@my-agent/core`). Orchestrates multi-step reasoning, tool invocations, and context pruning.
+- **Role:** Autonomous ReAct State Machine (`streamText` in Next.js API route `/api/agent/chat` and `agentLoop` in `@my-agent/core`). Orchestrates multi-step reasoning, tool invocations, dynamic step routing, and context pruning.
 - **Inputs & State Contract:** `AgentContext` (messages, tools, system prompt, `playbookRules`, active screen grounding).
 - **Inbound Edges:**
   - Upstream: [`HybridRouterNode`](#hybridrouternode).
   - Upstream: [`ChoiceCardToolNode`](#choicecardtoolnode) on user choice submission.
   - Upstream: [`ProceduralMemoryNode`](#proceduralmemorynode) for dynamic injection of rules.
 - **Outbound Edges:**
-  - Downstream: [`PiReliabilityNode`](#pireliabilitynode) for step safety and loop health.
+  - Downstream: [`PiReliabilityNode`](#pireliabilitynode) for step safety, loadout delta tracking, and loop health.
   - Downstream: Standard Tool Nodes ([`DispatchBridgeNode`](#dispatchbridgenode), [`StateInspectorNode`](#stateinspectornode), [`ChoiceCardToolNode`](#choicecardtoolnode), [`MemoryToolNode`](#memorytoolnode), [`AppRouterToolNode`](#approutertoolnode)).
+- **Dynamic Step Routing & Resilience:**
+  - `prepareStep`: Uses `prepareStepRouting` to dynamically prune tools based on screen phase (`workspace` vs `results`) and token budgets.
+  - `createFailoverLanguageModel`: Transparent provider failover (e.g. Azure OpenAI $\rightarrow$ OpenAI/Agnes) on HTTP 429 rate-limits or 5xx outages.
 - **Feedback & Stop Conditions:**
   - `stopWhen`: Halts turn when `isStepCount(6)` or `hasToolCall("ask_user_choice")`.
-- **Neighbor References:** [`route.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/app/api/agent/chat/route.ts), [`agent-loop.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/agent-loop.ts).
+- **Neighbor References:** [`route.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/app/api/agent/chat/route.ts), [`agent-loop.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/agent-loop.ts), [`yula-step-router.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/yula-step-router.ts).
 
 #### 🏷️ `PiReliabilityNode`
-- **Role:** Pi Reliability and Safety Interceptor. Implements 14 reliability capabilities: Stagnation Detection (loop breaker on 3 identical calls), Dual-Bound Truncation (output limits), FIFO Mutation Line, and pre/post tool call hooks.
+- **Role:** Pi Reliability and Safety Interceptor. Implements core reliability capabilities:
+  - **Tool Loadout Delta (`declareToolChanges`):** Injects explicit `[Tools Loadout Updated]` system notifications when mounted tools change across turns.
+  - **Model Cascading (`prepareNextTurn`):** Dynamically escalates or de-escalates model selection and thinking effort across sequential turns.
+  - **Stagnation Detection:** Circuit breaker halting on 3 identical consecutive tool signatures.
+  - **Dual-Bound Truncation:** Line and byte bounds on large outputs before feeding observations back to context.
+  - **FIFO Mutation Line & Effect Gate:** Serialized, non-conflicting UI executions.
 - **Inbound Edges:**
   - Upstream: Intercepts all dispatches from [`AgentLoopNode`](#agentloopnode).
 - **Outbound Edges:**

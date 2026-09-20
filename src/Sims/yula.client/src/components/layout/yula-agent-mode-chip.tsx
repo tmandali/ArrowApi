@@ -7,7 +7,6 @@ import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { formatPathnameLabel, isWorkspaceHomePath } from "@/lib/workspace-paths";
 import { yulaToolPartInfo } from "@/lib/yula-tool-info";
-import { dispatchLiveStatus } from "@/components/layout/yula-chat-turn-helpers";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -71,10 +70,18 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
           ?.filter((p) => p.type === "text")
           .map((p: any) => p.text)
           .join(" ") || "";
-      if (text.includes("Planlama Modu Aktif") || text.startsWith("/plan")) {
+      if (
+        text.includes("Planlama Modu Aktif") ||
+        text.includes("Planning Mode Active") ||
+        text.startsWith("/plan")
+      ) {
         return true;
       }
-      if (text.includes("[DONE:") || text.includes("Planı Başlat ve İcra Et")) {
+      if (
+        text.includes("[DONE:") ||
+        text.includes("Planı Başlat ve İcra Et") ||
+        text.includes("Start and Execute Plan")
+      ) {
         return false;
       }
     }

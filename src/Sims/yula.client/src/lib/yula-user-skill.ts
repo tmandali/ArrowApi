@@ -161,12 +161,7 @@ export function getEffectiveUserSkills(
  * stabil key olarak kalır; prompt/gövde domain içeriktir → kaynak dilde
  * (TR) saklanır, LLM katmanına oradan gider.
  */
-const LOCALIZABLE_SKILL_SLASHES = [
-  "ay-kapanis",
-  "sayim-fark",
-  "rapor-kalite",
-  "gunluk-ozet",
-];
+const LOCALIZABLE_SKILL_SLASHES: string[] = [];
 
 /**
  * Skill görünüm metinlerini yerel dilde döndürür — saf.

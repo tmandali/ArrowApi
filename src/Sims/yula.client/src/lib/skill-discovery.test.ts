@@ -10,10 +10,10 @@ import {
 } from "./skill-discovery.ts";
 
 const SAMPLE = `---
-name: ay-kapanis
-slash: ay-kapanis
-label: Ay kapanış kontrolü
-description: Ay sonu rapor setini kontrol eder
+name: ornek-beceri
+slash: ornek-beceri
+label: Örnek Beceri
+description: Örnek test becerisi
 scope: global
 ---
 
@@ -24,9 +24,9 @@ Adım 2: raporu çalıştır.
 describe("parseSkillFile", () => {
   it("parses standard + extended frontmatter", () => {
     const parsed = parseSkillFile(SAMPLE, "fallback");
-    assert.equal(parsed.name, "ay-kapanis");
-    assert.equal(parsed.slash, "ay-kapanis");
-    assert.equal(parsed.label, "Ay kapanış kontrolü");
+    assert.equal(parsed.name, "ornek-beceri");
+    assert.equal(parsed.slash, "ornek-beceri");
+    assert.equal(parsed.label, "Örnek Beceri");
     assert.equal(parsed.scope, "global");
     assert.ok(parsed.prompt.startsWith("Adım 1:"));
     assert.ok(!parsed.prompt.includes("---"));

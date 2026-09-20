@@ -4,18 +4,12 @@ import * as React from "react"
 import { useTranslations } from "next-intl"
 import { useUserSkillsStore } from "@/lib/stores/user-skills";
 import {
-  validateUserSkill,
-  validateUserSkillFile,
-  userSkillFilesSize,
-  USER_SKILL_FILES_TOTAL_MAX_CHARS,
-  buildUserSkillMarkdown,
-  type UserSkill,
-  type UserSkillFile,
+  validateUserSkill, validateUserSkillFile, userSkillFilesSize,
+  USER_SKILL_FILES_TOTAL_MAX_CHARS, buildUserSkillMarkdown,
+  type UserSkill, type UserSkillFile,
 } from "@/lib/yula-user-skill";
 import { resolveValidationIssue } from "@/lib/yula-user-agent";
-import {
-  BUILT_IN_SKILL_SOURCES,
-} from "@/lib/built-in-skills";
+import { BUILT_IN_SKILL_SOURCES } from "@/lib/built-in-skills";
 import { getRailWorkspaces } from "@/lib/workspace-registry";
 import { getRegisteredYulaCommands } from "@/components/layout/yula-commands";
 import { TabsContent } from "@/components/ui/tabs";
@@ -26,11 +20,7 @@ import { FormGrid } from "@/components/layout/form-grid";
 import { DetailAsidePanel, type DetailMetaRow } from "@/components/layout/detail-aside";
 import { DetailFormLayout } from "@/components/layout/detail-form-layout";
 import {
-  FILE_KIND_LABEL,
-  fileChipClass,
-  fileDotClass,
-  fileKindForName,
-  type FileKind,
+  FILE_KIND_LABEL, fileChipClass, fileDotClass, fileKindForName, type FileKind,
 } from "@/components/layout/file-kind";
 import { formatMetaDate } from "@/utils/format";
 import { Field, FieldLabel } from "@/components/ui/field";

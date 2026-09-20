@@ -6,6 +6,9 @@ import {
   HelpCircle,
   Download,
   Sparkles,
+  ListTodo,
+  Minimize2,
+  Cpu,
   type LucideIcon,
 } from "lucide-react";
 import systemAgentYaml from "@/features/system/agents/system.agent.yaml";
@@ -28,6 +31,7 @@ export type YulaCommand = {
   pagePath?: string;
   /** Kullanıcı skill'i ise "user" — gönderimde {{input}} şablonu uygulanır. */
   source?: "user";
+  phase?: "system" | "grid" | "report";
 };
 
 export type YulaCommandYamlItem = {
@@ -51,6 +55,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   RotateCcw,
   ShieldAlert,
   Download,
+  ListTodo,
+  Minimize2,
+  Cpu,
+  HelpCircle,
 };
 
 function resolveIcon(iconName: string): LucideIcon {
@@ -69,6 +77,7 @@ function parseYamlCommands(yamlSource: string): YulaCommand[] {
       prompt: cmd.prompt,
       icon: resolveIcon(cmd.icon),
       pagePath: cmd.pagePath,
+      phase: cmd.phase,
     }));
   } catch (error) {
     console.error("YAML Command Parse Error:", error);
@@ -185,7 +194,13 @@ export function resolveYulaSlashCommand(
   if (!input.startsWith("/")) return null;
   const token = input.slice(1).trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   if (!token) return null;
-  return commands.find((c) => c.slash.toLowerCase() === token) ?? null;
+  const normToken = token.replace(/ı/g, "i");
+  return (
+    commands.find((c) => {
+      const slash = c.slash.toLowerCase();
+      return slash === token || slash.replace(/ı/g, "i") === normToken;
+    }) ?? null
+  );
 }
 
 export function isYulaGridSlashPrompt(
@@ -204,12 +219,16 @@ export function matchYulaCommands(
   allCommands: YulaCommand[] = getAllYulaCommands(),
 ): YulaCommand[] | null {
   if (!input.startsWith("/")) return null;
-  const query = input.slice(1).trim().toLowerCase();
+  const query = input.slice(1).trim().toLowerCase().replace(/ı/g, "i");
   if (!query) return allCommands;
-  return allCommands.filter(
-    (command) =>
-      command.slash.toLowerCase().includes(query) ||
-      command.label.toLowerCase().includes(query) ||
-      command.description.toLowerCase().includes(query),
-  );
+  return allCommands.filter((command) => {
+    const slash = command.slash.toLowerCase().replace(/ı/g, "i");
+    const label = command.label.toLowerCase().replace(/ı/g, "i");
+    const desc = (command.description || "").toLowerCase().replace(/ı/g, "i");
+    return (
+      slash.includes(query) ||
+      label.includes(query) ||
+      desc.includes(query)
+    );
+  });
 }

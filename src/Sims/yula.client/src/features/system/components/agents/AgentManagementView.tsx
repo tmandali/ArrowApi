@@ -19,6 +19,7 @@ import { cn } from "@/utils/cn";
 import { Bot, Check, FilePlus2, Filter, Loader2, Trash2, X } from "lucide-react";
 import { useUserAgentsStore, ensureExampleAgent } from "@/lib/stores/user-agents";
 import { AgentEditor, type AgentEditorHandle, type AgentEditorMode } from "./agent-editor";
+import { useAgentManagementBinding } from "./use-agent-management-binding";
 
 /**
  * Sistem → Ajan Ayarları: executions-paneli deseninde master-detail.
@@ -38,7 +39,12 @@ export function AgentManagementView() {
   } | null>(null);
 
   const editorRef = React.useRef<AgentEditorHandle | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = React.useState<string>("genel");
   const [historyOpen, setHistoryOpen] = React.useState(true);
+
+  React.useEffect(() => {
+    setActiveDetailTab("genel");
+  }, [selection?.id]);
   // Kaydet basışı geri bildirimi (buton içi spinner).
   const [isSaving, setIsSaving] = React.useState(false);
   const savingTimer = React.useRef<number | null>(null);
@@ -90,6 +96,23 @@ export function AgentManagementView() {
   // sistem ajanları için ayrıldı.
   const mode: AgentEditorMode | null =
     selection == null ? null : selection.id == null ? "new" : "edit";
+
+  useAgentManagementBinding({
+    selectedAgent,
+    selection,
+    setSelection,
+    mode,
+    agents,
+    activeAgentId,
+    setActiveAgentId,
+    activeDetailTab,
+    setActiveDetailTab,
+    editorRef,
+    screenTitle: t("title"),
+    onTestAgent: (agentId) => {
+      router.push(agentSessionPath(agentId));
+    },
+  });
 
   const detailTitle =
     selection == null
@@ -321,6 +344,8 @@ export function AgentManagementView() {
       tabs={detailTabs}
       tabResetKey={selection?.id ?? "new-agent"}
       showTabs={selection != null}
+      activeDetailTab={activeDetailTab}
+      onDetailTabChange={setActiveDetailTab}
       tabSubtitle={(() => {
         if (!selectedAgent) return undefined;
         const parts: string[] = [];

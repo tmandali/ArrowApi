@@ -16,6 +16,9 @@
     "subtitle": "Roles, access permissions and session states of all registered users.",
     "catalog_title": "System User Directory Catalog",
     "search_placeholder": "Search users...",
+    "prompt_search_users": "Search users...",
+    "prompt_active_count": "Show active users count",
+    "prompt_guest_ids": "List unauthorized guest identities",
     "col_id": "ID",
     "col_name": "Full Name",
     "col_email": "Email",
@@ -58,6 +61,8 @@
     "tab_settings": "Settings",
     "tab_yula_ai": "Yula AI & LLM",
     "tab_connections": "Connections",
+    "prompt_save_settings": "Save user preferences",
+    "prompt_change_store": "Change default branch",
     "pwd_password": "Password",
     "pwd_set": "Set Password",
     "pwd_reset": "Reset Password",
@@ -135,6 +140,8 @@
     "image_upload_generic": "Image could not be processed — try another file (e.g. PNG/JPEG)."
   },
   "WorkspaceLanding": {
+    "quick_prompt_list_reports": "List reports for {title}",
+    "quick_prompt_show_analytics": "Show analytics in this workspace",
     "pending_actions_title": "Pending Actions",
     "assigned_title": "Assigned to Me",
     "responsible": "Responsible",
@@ -974,6 +981,10 @@
   },
   "AgentManagement": {
     "title": "Agent Settings",
+    "prompt_test_agent": "Test {name} agent",
+    "prompt_explain_agent": "Explain instructions for {name}",
+    "prompt_create_agent": "Create a new agent",
+    "prompt_list_agents": "List available system agents",
     "delete_agent": "Delete agent",
     "empty_state": "No agents yet — define one with New Agent.",
     "records": "records",
@@ -1176,6 +1187,11 @@
     "remove": "Remove"
   },
   "SkillManagement": {
+    "prompt_test_skill": "How to test /{slash}?",
+    "prompt_explain_skill": "Explain the purpose of /{slash} skill",
+    "prompt_inspect_skill": "Inspect SKILL.md contents",
+    "prompt_create_skill": "Create a new skill",
+    "prompt_list_skills": "List available system skills",
     "new_skill": "New skill",
     "cancel": "Cancel",
     "skill": "skill",
@@ -1521,12 +1537,27 @@
     "new": {
       "label": "New chat",
       "description": "Reset the current conversation and chat history",
-      "prompt": "/new"
+      "prompt": "/yeni"
     },
-    "attach": {
-      "label": "Attach file",
-      "description": "Add a document or file to the chat",
-      "prompt": "/dosya"
+    "plan": {
+      "label": "Plan Mode",
+      "description": "Formulate an action roadmap and request approval before executing",
+      "prompt": "/plan"
+    },
+    "compact": {
+      "label": "Compact Context",
+      "description": "Summarize and compact the conversation token context",
+      "prompt": "/compact"
+    },
+    "model": {
+      "label": "Model Selection",
+      "description": "List available models or switch the active model",
+      "prompt": "/model"
+    },
+    "help": {
+      "label": "Help & Commands",
+      "description": "Print command syntax and parameter guide into the chat",
+      "prompt": "/help"
     },
     "dump": {
       "label": "Download Session Dump",
@@ -1538,11 +1569,6 @@
       "description": "Analyzes data quality and anomalies, listing problems with clickable action links",
       "prompt": "/analiz"
     },
-    "grid-top5": {
-      "label": "Top 5 Charts",
-      "description": "Summarize the top 5 records with a chart",
-      "prompt": "Summarize the top 5 records with a chart"
-    },
     "grid-temizle": {
       "label": "Reset View & Filters",
       "description": "Clears active filters, un-hides hidden columns, and resets the table to defaults",
@@ -1553,31 +1579,9 @@
       "description": "Downloads the active data in this table to your computer as Excel or CSV",
       "prompt": "Download the active data in this table as Excel"
     },
-    "report-run-job": {
-      "label": "Suggest & Run",
-      "description": "Interprets the open report''s schema, suggests options, and fills criteria per selection",
-      "prompt": "Interpret the report schema and its required fields, and suggest 1-2 options."
-    },
     "user_skill_default": "User skill"
   },
-  "Skills": {
-    "ay-kapanis": {
-      "label": "Month-end close check",
-      "description": "Runs the end-of-month report set in order and executes the missing items"
-    },
-    "sayim-fark": {
-      "label": "Count variance analysis",
-      "description": "Analyzes differences between physical counts and system stock"
-    },
-    "rapor-kalite": {
-      "label": "Report quality pass",
-      "description": "Profiles the open table, verifies anomalies, and reports them"
-    },
-    "gunluk-ozet": {
-      "label": "Daily summary",
-      "description": "Summarizes the day's highlights from the open report's latest data"
-    }
-  },
+  "Skills": {},
   "AgentCatalog": {
     "tool_dispatch_component_action": "Component and page actions (Form/Report/Grid/Navigation)",
     "tool_inspect_ui_state": "Inspect UI and schema state",
@@ -1984,8 +1988,17 @@
     "badge_workspace": "Workspace (Shared)",
     "badge_user": "Personal",
     "badge_screen": "Screen Rule",
-    "badge_workflow": "Workflow",
+    "prompt_create_playbook": "Create new playbook rule",
+    "prompt_list_playbooks": "List saved playbook rules",
     "filter_search_placeholder": "Search memory...",
     "btn_refresh": "Refresh"
+  },
+  "Studio": {
+    "memory_title": "Persistent Memory & Preferences",
+    "prompt_list_memory": "List remembered preferences",
+    "prompt_clear_memory": "Clear persistent memory records",
+    "plugins_title": "Enterprise Plugins & Modules",
+    "prompt_list_plugins": "List registered plugins and their tools",
+    "prompt_check_python_plugin": "What is the status of Python AI plugin?"
   }
 }

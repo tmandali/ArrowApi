@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { uiEventBus, ActionHandler, uiRegistry, ComponentSchema, ActionContract } from '@my-agent/core';
+import {
+  uiEventBus,
+  ActionHandler,
+  uiRegistry,
+  ComponentSchema,
+  ActionContract,
+  EventContract,
+  piEventStream,
+} from '@my-agent/core';
 
 export interface UseAgentComponentOptions {
   id: string;
@@ -9,6 +17,7 @@ export interface UseAgentComponentOptions {
   meta?: Record<string, any>;
   executionMode?: 'parallel' | 'sequential';
   actions?: Record<string, ActionContract>;
+  events?: Record<string, EventContract>;
   onAction: ActionHandler;
 }
 
@@ -18,6 +27,7 @@ export function useAgentComponent({
   meta,
   executionMode,
   actions,
+  events,
   onAction,
 }: UseAgentComponentOptions) {
   const onActionRef = useRef<ActionHandler>(onAction);
@@ -34,9 +44,15 @@ export function useAgentComponent({
       meta,
       executionMode,
       actions,
+      events,
     };
 
     uiRegistry.register(schema);
+    piEventStream.emit({
+      type: 'tool_loadout_updated',
+      added: [id],
+      removed: [],
+    });
 
     // onActionRef üzerinden dinlenerek onAction fonksiyonunun her render'da değişmesi
     // durumunda gereksiz unregister/register churn engellenir.
@@ -46,6 +62,11 @@ export function useAgentComponent({
 
     return () => {
       unsubscribe();
+      piEventStream.emit({
+        type: 'tool_loadout_updated',
+        added: [],
+        removed: [id],
+      });
       uiRegistry.unregister(id, schema);
     };
   }, [
@@ -63,5 +84,6 @@ export function useAgentComponent({
           }))
         : []
     ),
+    JSON.stringify(events ? Object.keys(events) : []),
   ]);
 }

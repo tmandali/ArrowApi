@@ -25,6 +25,10 @@ interface PiTestPanelProps {
   onExportHtml?: () => void;
   onStreamingUpdate?: () => void;
   onSessionRetry?: () => void;
+  onToolLoadoutDelta?: () => void;
+  onModelCascading?: () => void;
+  onProviderFailover?: () => void;
+  onStepRouting?: () => void;
 }
 
 export function PiTestPanel({
@@ -52,6 +56,10 @@ export function PiTestPanel({
   onExportHtml,
   onStreamingUpdate,
   onSessionRetry,
+  onToolLoadoutDelta,
+  onModelCascading,
+  onProviderFailover,
+  onStepRouting,
 }: PiTestPanelProps) {
   const btnStyle = (bg: string, border: string, color: string): React.CSSProperties => ({
     textAlign: 'left',
@@ -133,6 +141,34 @@ export function PiTestPanel({
             style={btnStyle('#f0fdf4', '#bbf7d0', '#166534')}
           >
             🧹 <strong>Context Compaction (Özetleme)</strong>
+          </button>
+
+          <button
+            onClick={onToolLoadoutDelta}
+            style={btnStyle('#fefce8', '#fef08a', '#854d0e')}
+          >
+            🔄 <strong>Tool Loadout Delta</strong> (declareToolChanges)
+          </button>
+
+          <button
+            onClick={onModelCascading}
+            style={btnStyle('#f5f3ff', '#ddd6fe', '#5b21b6')}
+          >
+            ⚡ <strong>Model Cascading</strong> (prepareNextTurn)
+          </button>
+
+          <button
+            onClick={onProviderFailover}
+            style={btnStyle('#eff6ff', '#bfdbfe', '#1e40af')}
+          >
+            🛡️ <strong>Sağlayıcı Failover</strong> (429 Kurtarma)
+          </button>
+
+          <button
+            onClick={onStepRouting}
+            style={btnStyle('#ecfdf5', '#a7f3d0', '#065f46')}
+          >
+            🧭 <strong>Dinamik Step Routing</strong> (prepareStep)
           </button>
         </div>
       </div>

@@ -67,6 +67,7 @@ export interface AgentOptions {
   beforeToolCall?: AgentLoopConfig['beforeToolCall'];
   afterToolCall?: AgentLoopConfig['afterToolCall'];
   shouldStopAfterTurn?: AgentLoopConfig['shouldStopAfterTurn'];
+  prepareNextTurn?: AgentLoopConfig['prepareNextTurn'];
 }
 
 export class Agent implements AgentState {
@@ -195,6 +196,7 @@ export class Agent implements AgentState {
       beforeToolCall: this.options.beforeToolCall,
       afterToolCall: this.options.afterToolCall,
       shouldStopAfterTurn: this.options.shouldStopAfterTurn,
+      prepareNextTurn: this.options.prepareNextTurn,
       getSteeringMessages: async () => this.steeringQueue.drain(),
       getFollowUpMessages: async () => this.followUpQueue.drain(),
     };

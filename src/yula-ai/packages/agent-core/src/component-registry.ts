@@ -59,7 +59,7 @@ export class UIComponentRegistry implements IComponentRegistry {
    * Doğrudan DOM etkileşimi öncesi bileşenin varlığı, aksiyon kabiliyeti
    * ve varsa Zod action contract şeması ile tip/format doğruluğunu denetler.
    */
-  preflightValidate(componentId: string, action: string, payload?: any): PreflightValidationResult {
+  preflightValidate(componentId: string, action: string, payload?: any, context?: any): PreflightValidationResult {
     const dict = i18nManager.getDictionary().errors;
     const comp = this.get(componentId);
     if (!comp) {
@@ -78,8 +78,27 @@ export class UIComponentRegistry implements IComponentRegistry {
       };
     }
 
-    // Zod Payload Doğrulaması (actions[action]?.schema)
-    const schema = comp.actions?.[action]?.schema;
+    // Deterministik when koşul doğrulaması
+    const contract = comp.actions?.[action];
+    if (contract?.when) {
+      if (contract.when.phase && context?.phase && contract.when.phase !== context.phase) {
+        return {
+          valid: false,
+          error: `Action "${action}" requires screen phase "${contract.when.phase}", but current phase is "${context.phase}".`,
+          component: comp,
+        };
+      }
+      if (contract.when.predicate && typeof contract.when.predicate === 'function' && !contract.when.predicate(context)) {
+        return {
+          valid: false,
+          error: `Action "${action}" conditions are not met for the current context.`,
+          component: comp,
+        };
+      }
+    }
+
+    // Zod Payload Doğrulaması (inputSchema || schema)
+    const schema = contract?.inputSchema || contract?.schema;
     if (schema && typeof schema.safeParse === 'function') {
       const parseResult = schema.safeParse(payload || {});
       if (!parseResult.success) {
@@ -99,6 +118,31 @@ export class UIComponentRegistry implements IComponentRegistry {
       valid: true,
       component: comp,
     };
+  }
+
+  /**
+   * Aksiyon tamamlandığında dönen çıktıyı outputSchema'ya göre doğrular.
+   */
+  postflightValidate(componentId: string, action: string, output?: any): { valid: boolean; error?: string } {
+    const comp = this.get(componentId);
+    const contract = comp?.actions?.[action];
+    const outputSchema = contract?.outputSchema;
+
+    if (outputSchema && typeof outputSchema.safeParse === 'function') {
+      const res = outputSchema.safeParse(output ?? {});
+      if (!res.success) {
+        const issues = (res.error as any)?.issues || (res.error as any)?.errors;
+        const formattedError = Array.isArray(issues) && issues.length > 0
+          ? issues.map((e: any) => `${e.path?.join?.('.') || 'root'}: ${e.message}`).join('; ')
+          : res.error?.message || 'Geçersiz çıktı nesnesi.';
+        return {
+          valid: false,
+          error: `Output validation failed for ${componentId}.${action}: ${formattedError}`,
+        };
+      }
+    }
+
+    return { valid: true };
   }
 
   /**
@@ -130,10 +174,17 @@ export class UIComponentRegistry implements IComponentRegistry {
           if (contract.description) {
             lines.push(`    - ${pDict.descriptionLabel}: ${contract.description}`);
           }
-          if (contract.schema && typeof contract.schema === 'object' && 'shape' in contract.schema) {
-            const shapeKeys = Object.keys((contract.schema as any).shape || {});
+          const inSchema = contract.inputSchema || contract.schema;
+          if (inSchema && typeof inSchema === 'object' && 'shape' in inSchema) {
+            const shapeKeys = Object.keys((inSchema as any).shape || {});
             if (shapeKeys.length > 0) {
               lines.push(`    - ${pDict.parametersLabel || 'Parameters'}: { ${shapeKeys.join(', ')} }`);
+            }
+          }
+          if (contract.outputSchema && typeof contract.outputSchema === 'object' && 'shape' in contract.outputSchema) {
+            const outShapeKeys = Object.keys((contract.outputSchema as any).shape || {});
+            if (outShapeKeys.length > 0) {
+              lines.push(`    - Returns: { ${outShapeKeys.join(', ')} }`);
             }
           }
           if (contract.whenToCall) {
@@ -141,6 +192,15 @@ export class UIComponentRegistry implements IComponentRegistry {
           }
           if (contract.whenNotToCall) {
             lines.push(`    - ${pDict.whenNotToCallLabel}: ${contract.whenNotToCall}`);
+          }
+        }
+      }
+
+      if (comp.events && Object.keys(comp.events).length > 0) {
+        lines.push(`  Emitted Events: ${Object.keys(comp.events).join(', ')}`);
+        for (const [eventName, eventContract] of Object.entries(comp.events)) {
+          if (eventContract.description) {
+            lines.push(`    - Event [${eventName}]: ${eventContract.description}`);
           }
         }
       }

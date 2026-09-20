@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UserSkill, UserSkillFile } from "@/lib/yula-user-skill";
-import { parseSeededLocales, withSeededLocale } from "./seed-flags";
 
 export type { UserSkill };
 
@@ -60,29 +59,11 @@ export const useUserSkillsStore = create<UserSkillsState>()(
   ),
 );
 
-const SKILL_SEED_FLAG = "yula-user-skills-seeded-v1";
-
-/**
- * İlk açılışta örnek skill üretir (locale başına tek seferlik; kullanıcı
- * silerse aynı locale'de yeniden eklenmez). Yönetim ekranı ilk bağlanışta
- * çağırır. Seed içerik TR ham metni olarak kalır — label/açıklama
- * gösterim katmanında `localizeUserSkills` (Skills namespace) ile
- * locale'lenir; prompt gövdesi TR kaynak politikası gereği.
- */
-export function ensureExampleSkill(locale: "tr" | "en" = "tr") {
+export function ensureExampleSkill() {
   if (typeof localStorage === "undefined") return;
-  const rawFlag = localStorage.getItem(SKILL_SEED_FLAG);
-  if (parseSeededLocales(rawFlag).includes(locale)) return;
-  localStorage.setItem(SKILL_SEED_FLAG, withSeededLocale(rawFlag, locale));
-  const { skills, upsertSkill } = useUserSkillsStore.getState();
-  if (skills.length > 0) return;
-  upsertSkill({
-    slash: "gunluk-ozet",
-    label: "Günlük özet",
-    description: "Açık raporun güncel verisinden günün öne çıkanlarını özetler",
-    prompt:
-      "Açık raporun güncel verisine bak: bugünün en kritik 3 hareketini bul, her birini tek cümleyle yaz. Kısa ol, sayı uydurma.\n{{input}}",
-    scope: "global",
-    files: [],
-  });
+  const { skills, deleteSkill } = useUserSkillsStore.getState();
+  const legacy = skills.find((s) => s.slash === "gunluk-ozet");
+  if (legacy) {
+    deleteSkill(legacy.id);
+  }
 }

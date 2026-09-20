@@ -36,16 +36,20 @@ Files under `src/components/ui/*` belong to shadcn/ui.
 
 ## 4. Internationalization & Localization (`next-intl`)
 
-- User-facing text must NEVER be hardcoded as static strings in JSX.
-- All labels and messages must be resolved from `src/messages/*.json` using `next-intl` (`useTranslations`).
+- User-facing text must NEVER be hardcoded as static strings in JSX or hook parameters.
+- All labels, messages, and contextual agent prompts (`quickPrompts` passed to `useScreenAgentContext`) must be resolved from `src/messages/*.json` using `next-intl` (`useTranslations`).
 
 ```tsx
 // WRONG
-<button>Apply Filters</button>
+useScreenAgentContext({
+  quickPrompts: ["Stok raporlarını listele"],
+});
 
 // CORRECT
-const t = useTranslations("reportCriteria");
-<button>{t("applyFilters")}</button>
+const t = useTranslations("WorkspaceLanding");
+useScreenAgentContext({
+  quickPrompts: [t("quick_prompt_list_reports", { title: workspaceTitle })],
+});
 ```
 
 ---

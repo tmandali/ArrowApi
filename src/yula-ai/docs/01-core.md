@@ -52,8 +52,11 @@ The agent operates through a canonical set of 6 tools:
 | `forget_fact` | Memory (D) | Deletes obsolete facts from agent memory. |
 | `time_travel` | Replay | Restores application state backward (`undo`) or forward (`redo`). |
 
-- **Server Tool Factory (`createAgentToolsForServer`):**
-  Dynamically builds tools for Vercel AI SDK (`streamText`) using runtime UI context, custom action schemas, and server-side validation callbacks (`onValidateAction`).
+- **Server Tool Factory & Schemas:**
+  - Standard tools define strict Zod `outputSchema` alongside `inputSchema` ensuring runtime type integrity for downstream clients.
+  - Dynamically builds tools for Vercel AI SDK (`streamText`) using runtime UI context, custom action schemas, and server-side validation callbacks (`onValidateAction`).
+- **Dynamic Step Routing (`prepareStepRouting`):**
+  - Prunes inactive tools dynamically during multi-step execution based on screen phase (`workspace` criteria setting vs `results` grid querying) to save prompt tokens and prevent hallucinated tool dispatches.
 - **Async Safety:** `executeComponentAction` securely awaits asynchronous execution pipelines through the `EffectGate` boundary.
 
 ---

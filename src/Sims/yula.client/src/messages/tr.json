@@ -16,6 +16,9 @@
     "subtitle": "Sistemdeki tüm kayıtlı kullanıcıların rolleri, erişim izinleri ve oturum durumları.",
     "catalog_title": "Sistem Kullanıcı Dizin Kataloğu",
     "search_placeholder": "Kullanıcı ara...",
+    "prompt_search_users": "Kullanıcı ara...",
+    "prompt_active_count": "Aktif kullanıcı sayısını göster",
+    "prompt_guest_ids": "Yetkilendirilmemiş misafir kimlikleri listele",
     "col_id": "ID",
     "col_name": "Ad Soyad",
     "col_email": "E-Posta",
@@ -58,6 +61,8 @@
     "tab_settings": "Ayarlar",
     "tab_yula_ai": "Yula AI & LLM",
     "tab_connections": "Bağlantılar",
+    "prompt_save_settings": "Kullanıcı tercihlerini kaydet",
+    "prompt_change_store": "Varsayılan şubeyi değiştir",
     "pwd_password": "Şifre",
     "pwd_set": "Şifre Belirle",
     "pwd_reset": "Şifre Sıfırla",
@@ -135,6 +140,8 @@
     "image_upload_generic": "Görsel işlenemedi — başka bir dosya (örn. PNG/JPEG) dene."
   },
   "WorkspaceLanding": {
+    "quick_prompt_list_reports": "{title} raporlarını listele",
+    "quick_prompt_show_analytics": "Bu çalışma alanındaki analizleri göster",
     "pending_actions_title": "İşlem Bekleyenler",
     "assigned_title": "Bana Atananlar",
     "responsible": "Sorumlu",
@@ -974,6 +981,10 @@
   },
   "AgentManagement": {
     "title": "Ajan Ayarları",
+    "prompt_test_agent": "{name} ajanını test et",
+    "prompt_explain_agent": "{name} talimatlarını açıkla",
+    "prompt_create_agent": "Yeni bir ajan oluştur",
+    "prompt_list_agents": "Mevcut sistem ajanlarını listele",
     "delete_agent": "Ajanı sil",
     "empty_state": "Henüz ajan yok — Yeni Ajan ile tanımlayın.",
     "records": "kayıt",
@@ -1176,6 +1187,11 @@
     "remove": "Kaldır"
   },
   "SkillManagement": {
+    "prompt_test_skill": "/{slash} nasıl test edilir?",
+    "prompt_explain_skill": "/{slash} becerisinin amacını açıkla",
+    "prompt_inspect_skill": "SKILL.md içeriğini incele",
+    "prompt_create_skill": "Yeni bir beceri oluştur",
+    "prompt_list_skills": "Mevcut sistem becerilerini listele",
     "new_skill": "Yeni skill",
     "cancel": "Vazgeç",
     "skill": "skill",
@@ -1521,12 +1537,27 @@
     "new": {
       "label": "Yeni sohbet",
       "description": "Mevcut konuşmayı ve sohbet geçmişini sıfırla",
-      "prompt": "/new"
+      "prompt": "/yeni"
     },
-    "attach": {
-      "label": "Dosya ekle",
-      "description": "Sohbete belge veya dosya ekle",
-      "prompt": "/dosya"
+    "plan": {
+      "label": "Plan Modu",
+      "description": "Eylemleri doğrudan koşturmak yerine onay için yol haritası (Plan) modu açar",
+      "prompt": "/plan"
+    },
+    "compact": {
+      "label": "Bağlamı Sıkıştır",
+      "description": "Aktif konuşma geçmişini ve token bağlamını özetleyerek sıkıştırır",
+      "prompt": "/compact"
+    },
+    "model": {
+      "label": "Model Seç & Listele",
+      "description": "Kullanılabilir modelleri listeler veya belirtilen modeli seçer",
+      "prompt": "/model"
+    },
+    "help": {
+      "label": "Yardım & Komutlar",
+      "description": "Komut ve parametre rehberini sohbet akışına yazdırır",
+      "prompt": "/yardim"
     },
     "dump": {
       "label": "Oturumu İndir",
@@ -1538,11 +1569,6 @@
       "description": "Veri kalitesi ve anomali analizi yaparak problemleri tıklanabilir aksiyon linkleriyle listeler",
       "prompt": "/analiz"
     },
-    "grid-top5": {
-      "label": "En Yüksek 5 Grafik",
-      "description": "En yüksek ilk 5 kaydı grafikle özetle",
-      "prompt": "En yüksek ilk 5 kaydı grafikle özetle"
-    },
     "grid-temizle": {
       "label": "Görünümü & Filtreleri Sıfırla",
       "description": "Aktif filtreleri temizler, gizli kolonları açar ve tabloyu fabrika ayarlarına döndürür",
@@ -1553,31 +1579,9 @@
       "description": "Tablodaki aktif veriyi Excel veya CSV formatında bilgisayarınıza indirir",
       "prompt": "Bu tablodaki verileri Excel olarak indir"
     },
-    "report-run-job": {
-      "label": "Öner & Çalıştır",
-      "description": "Açık raporun şemasını yorumlayarak öneriler sunar, seçime göre kriterleri forma doldurur",
-      "prompt": "Rapor şemasını ve zorunlu alanlarını yorumlayarak bana 1-2 öneri sun."
-    },
     "user_skill_default": "Kullanıcı skill''i"
   },
-  "Skills": {
-    "ay-kapanis": {
-      "label": "Ay kapanış kontrolü",
-      "description": "Ay sonu rapor setini sırayla kontrol eder ve eksikleri çalıştırır"
-    },
-    "sayim-fark": {
-      "label": "Sayım fark analizi",
-      "description": "Fiziksel sayım ile sistem stoku arasındaki farkları analiz eder"
-    },
-    "rapor-kalite": {
-      "label": "Rapor kalite turu",
-      "description": "Açık tabloyu profiller, anomalileri doğrular ve raporlar"
-    },
-    "gunluk-ozet": {
-      "label": "Günlük özet",
-      "description": "Açık raporun güncel verisinden günün öne çıkanlarını özetler"
-    }
-  },
+  "Skills": {},
   "AgentCatalog": {
     "tool_dispatch_component_action": "Bileşen ve sayfa aksiyonları (Form/Rapor/Grid/Navigasyon)",
     "tool_inspect_ui_state": "Arayüz ve şema durumunu okuma",
@@ -1982,8 +1986,17 @@
     "badge_workspace": "Çalışma Alanı (Ortak)",
     "badge_user": "Kişisel",
     "badge_screen": "Ekran Kuralı",
-    "badge_workflow": "İş Akışı",
+    "prompt_create_playbook": "Yeni playbook kuralı oluştur",
+    "prompt_list_playbooks": "Kayıtlı playbook kurallarını listele",
     "filter_search_placeholder": "Hafızada ara...",
     "btn_refresh": "Yenile"
+  },
+  "Studio": {
+    "memory_title": "Kalıcı Bellek & Tercihler",
+    "prompt_list_memory": "Hatırladığın tercihleri listele",
+    "prompt_clear_memory": "Kalıcı hafızadaki kayıtları temizle",
+    "plugins_title": "Kurumsal Eklentiler & Modüller",
+    "prompt_list_plugins": "Kayıtlı eklentileri ve araçlarını listele",
+    "prompt_check_python_plugin": "Python AI eklentisi durumu nedir?"
   }
 }

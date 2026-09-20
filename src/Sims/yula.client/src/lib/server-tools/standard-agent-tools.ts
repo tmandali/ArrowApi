@@ -24,12 +24,40 @@ export const STANDARD_AGENT_TOOLS = {
       action: z.string().describe("Canonical action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
       payload: z.record(z.string(), z.any()).optional().default({}).describe("Action parameters and payload data"),
     }),
+    outputSchema: z.object({
+      success: z.boolean().optional(),
+      result: z.any().optional(),
+      message: z.string().optional(),
+      error: z.string().optional(),
+      navigatedTo: z.string().optional(),
+      status: z.string().optional(),
+    }),
   }),
 
   inspect_ui_state: tool({
     description: "Inspect the current UI state, mounted components, route, active filters, or criteria draft values on the active screen.",
     inputSchema: z.object({
       component_id: z.string().optional().describe("Optional target component ID to inspect specifically (e.g. 'criteria_form:retail-sales' or 'result_grid:active')"),
+    }),
+    outputSchema: z.object({
+      success: z.boolean().optional(),
+      route: z.string().optional(),
+      phase: z.string().optional(),
+      activeComponents: z.array(z.string()).optional(),
+      state: z.any().optional(),
+      recent_events: z
+        .array(
+          z.object({
+            source: z.string().describe("Source component of the event"),
+            type: z.string().describe("Event type name"),
+            payload: z.any().optional().describe("Event payload data"),
+            timestamp: z.number().optional().describe("Event timestamp in milliseconds"),
+          }),
+        )
+        .optional()
+        .describe("Ring-buffer telemetry events from active UI components"),
+      message: z.string().optional(),
+      error: z.string().optional(),
     }),
   }),
 
@@ -56,12 +84,23 @@ export const STANDARD_AGENT_TOOLS = {
         .optional()
         .describe("Watermark/placeholder hint for the custom input box in the user's language (e.g. 'Örn: 2026-09-01..2026-09-15' or 'Örn: TJ01')"),
     }),
+    outputSchema: z.object({
+      selected: z.string().optional(),
+      value: z.string().optional(),
+      custom: z.string().optional(),
+      cancelled: z.boolean().optional(),
+    }),
   }),
 
   time_travel: tool({
     description: "Undo or redo the page and criteria state in time.",
     inputSchema: z.object({
       action: z.enum(["undo", "redo"]).describe("Direction of time travel: undo or redo"),
+    }),
+    outputSchema: z.object({
+      success: z.boolean().optional(),
+      action: z.string().optional(),
+      message: z.string().optional(),
     }),
   }),
 
@@ -72,6 +111,12 @@ export const STANDARD_AGENT_TOOLS = {
       value: z.any().describe("Value to store"),
       scope: z.enum(["session", "persistent"]).default("session").describe("Memory scope"),
       description: z.string().optional().describe("Description of this memory item"),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      key: z.string().optional(),
+      scope: z.string().optional(),
+      message: z.string().optional(),
     }),
     execute: async ({ key, value, scope, description }) => {
       try {
@@ -88,6 +133,13 @@ export const STANDARD_AGENT_TOOLS = {
     description: "Recall a stored preference or all memories from agent memory.",
     inputSchema: z.object({
       key: z.string().optional().describe("Memory key to query (empty to list all)"),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      key: z.string().optional(),
+      value: z.any().optional(),
+      memories: z.array(z.any()).optional(),
+      message: z.string().optional(),
     }),
     execute: async ({ key }) => {
       try {
@@ -108,6 +160,17 @@ export const STANDARD_AGENT_TOOLS = {
     inputSchema: z.object({
       task: z.string().describe("The task, topic, or screen path to search playbooks for (e.g. 'stok mutabakatı', 'fire analizi', '/stock/stock-balance')"),
       workspace: z.string().optional().default("stock").describe("Workspace ID (defaults to 'stock')"),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      level: z.string().optional(),
+      workspaceId: z.string().optional(),
+      task: z.string().optional(),
+      screenRules: z.array(z.string()).optional(),
+      recipe: z.any().optional(),
+      relevantIndex: z.array(z.any()).optional(),
+      rulesCount: z.number().optional(),
+      message: z.string().optional(),
     }),
     execute: async ({ task, workspace }) => {
       try {
@@ -146,6 +209,16 @@ export const STANDARD_AGENT_TOOLS = {
       content: z.string().describe("The markdown content of the rule or recipe"),
       target_path: z.string().optional().describe("Target screen route (e.g. /stock/stock-balance) if this is a screen rule"),
       workspace: z.string().optional().default("stock").describe("Target workspace"),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      level: z.string().optional(),
+      workspaceId: z.string().optional(),
+      category: z.string().optional(),
+      title: z.string().optional(),
+      targetPath: z.string().optional(),
+      entry: z.any().optional(),
+      message: z.string().optional(),
     }),
     execute: async ({ category, title, content, target_path, workspace }) => {
       try {

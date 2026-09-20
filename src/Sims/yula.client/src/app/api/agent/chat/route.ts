@@ -17,6 +17,8 @@ import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
 import { serverPlaybookService } from "@/lib/playbook-server";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
+import { prepareStepRouting } from "@/lib/yula-step-router";
+import { createFailoverLanguageModel } from "@/lib/yula-provider-failover";
 import { slimMessagesForTransport, normalizeUIMessagesForTransport } from "@/lib/context-slim";
 import {
   getYulaLanguageModel,
@@ -304,9 +306,21 @@ export async function POST(req: Request) {
       baseUrl,
     );
     const providerInfo = getYulaProviderInfo(provider);
-    const languageModel = getYulaLanguageModel(activeModel, {
+    const primaryLanguageModel = getYulaLanguageModel(activeModel, {
       provider,
       baseUrl,
+    });
+    const fallbackProvider = provider === "azure" ? "openai" : provider === "openai" ? "agnes" : undefined;
+    const fallbackLanguageModel = fallbackProvider && process.env.OPENAI_API_KEY
+      ? getYulaLanguageModel(undefined, { provider: fallbackProvider })
+      : undefined;
+
+    const languageModel = createFailoverLanguageModel({
+      primary: primaryLanguageModel,
+      fallback: fallbackLanguageModel,
+      onFailover: (err, step) => {
+        console.warn(`⚠️ [Yula Failover]: Primary provider failed during ${step}, falling back to ${fallbackProvider}. Error:`, err);
+      },
     });
 
     // Capability gate: efor desteklemeyen modelde reasoning/think gönderilmez
@@ -351,7 +365,7 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: wrapLanguageModel({
-        model: languageModel,
+        model: languageModel as any,
         middleware,
       }),
       ...(reasoning ? { reasoning } : {}),
@@ -365,25 +379,25 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools,
       prepareStep: async ({ messages, stepNumber }) => {
-        const activeTools = activeToolNames as Extract<
-          keyof typeof tools,
-          string
-        >[];
-        if (estimateMessagesTokens(messages) <= COMPACTION_TOKEN_BUDGET) {
-          return { activeTools };
-        }
-        const compacted = pruneMessages({
+        const result = prepareStepRouting({
+          phase,
+          stepNumber,
+          toolNames: activeToolNames,
+          hasImageInMessages,
           messages,
-          reasoning: "all",
-          toolCalls: "before-last-3-messages",
-          emptyMessages: "remove",
+          compactionBudget: COMPACTION_TOKEN_BUDGET,
         });
-        console.info(
-          `🤖 [Yula Compaction]: step ${stepNumber} over budget ` +
-            `(~${estimateMessagesTokens(messages)} tok > ${COMPACTION_TOKEN_BUDGET}); ` +
-            `pruned to ~${estimateMessagesTokens(compacted)} tok.`,
-        );
-        return { activeTools, messages: compacted };
+
+        if (result.compactedMessages) {
+          console.info(
+            `🤖 [Yula Compaction]: step ${stepNumber} over budget; messages pruned to ~${estimateMessagesTokens(result.compactedMessages)} tok.`,
+          );
+        }
+
+        return {
+          activeTools: result.activeTools as Extract<keyof typeof tools, string>[],
+          messages: result.compactedMessages,
+        };
       },
       onError({ error }) {
         console.error("🤖 [Yula AI Engine Error Details]:", error);

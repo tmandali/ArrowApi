@@ -60,3 +60,24 @@ Source Modules: `packages/agent-core/src/{execution-queue,retry,effect-gate,reco
 
 - **Purpose:** Executes high-risk or external plugin actions within a sandboxed boundary.
 - **Fault Tolerance:** Traps uncaught exceptions within plugin code to prevent global React tree unmounting.
+
+---
+
+## 8. Tool Loadout Delta (`agent-loop.ts`)
+
+- **Purpose:** Tracks tool set modifications as components mount and unmount across page transitions.
+- **Mechanism:** `declareToolChanges(context, lastToolNames)` detects added and removed tools, injecting a transparent system event (`[Tools Loadout Updated]: Added: [...], Removed: [...]`) to prevent unmounted component execution errors.
+
+---
+
+## 9. Dynamic Model Cascading (`prepareNextTurn`)
+
+- **Purpose:** Dynamically scales model capability and reasoning effort between conversation turns.
+- **Mechanism:** `prepareNextTurn` context hook allows lightweight models (e.g. `gpt-4o-mini`, `gemini-flash`) for routine forms, promoting to heavy analytical reasoning models (e.g. `claude-3-7-sonnet`, `high` effort) during complex SQL or aggregation steps.
+
+---
+
+## 10. Provider Resilience & Failover (`yula-provider-failover.ts`)
+
+- **Purpose:** Provides zero-downtime execution against cloud rate-limits and outages.
+- **Mechanism:** `createFailoverLanguageModel` wraps AI SDK language models. On HTTP 429 quota exhaustion or 5xx server errors, execution transparently switches to secondary fallbacks (Azure $\rightarrow$ OpenAI $\rightarrow$ Agnes) without dropping the client connection.

@@ -12,7 +12,10 @@
  */
 
 const SLIM_CHAR_LIMIT = 800;
-const MAX_TRANSPORT_MESSAGES = 16;
+
+// Safety net limit for extreme conversations; fine-grained token compaction
+// is handled dynamically by Vercel AI SDK's `pruneMessages` inside `prepareStepRouting`.
+const MAX_TRANSPORT_MESSAGES = 64;
 
 interface ToolLikePart {
   type?: string;

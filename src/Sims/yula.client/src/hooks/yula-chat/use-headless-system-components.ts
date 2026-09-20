@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { z } from "zod";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
   uiRegistry,
@@ -106,24 +107,38 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
           workspaceId: report.workspace,
           isHeadless: true,
         },
+        events: {
+          field_change: {
+            description: `Triggered when criteria fields for ${report.title} are updated`,
+            schema: z.object({ field: z.string(), value: z.any() }),
+          },
+          job_queued: {
+            description: `Triggered when ${report.title} report execution starts`,
+            schema: z.object({ jobId: z.string(), report: z.string() }),
+          },
+        },
         actions: {
           SET_FIELDS: {
             description: `Populates criteria form fields for ${report.title} without triggering execution ({ criteria }).`,
+            outputSchema: z.object({ success: z.boolean(), updatedFields: z.array(z.string()).optional() }),
             whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
             whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT or RUN).",
           },
           APPLY: {
             description: `Applies criteria field values for ${report.title} and navigates to the report screen.`,
+            outputSchema: z.object({ success: z.boolean(), navigatedTo: z.string().optional() }),
             whenToCall: `When the user wants to fill or update criteria for ${report.title} and inspect the form.`,
             whenNotToCall: "When the user wants to directly run the report or perform non-form operations.",
           },
           SUBMIT: {
             description: `Executes the ${report.title} report and queues the job ({ criteria, report }).`,
+            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), queued: z.boolean().optional() }),
             whenToCall: "When the user explicitly asks to 'run', 'start', 'fetch', or 'execute' the report.",
             whenNotToCall: "When required parameters are missing or when user is only drafting criteria.",
           },
           RUN: {
             description: `Executes the ${report.title} report and navigates to the result screen.`,
+            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), navigatedTo: z.string().optional() }),
             whenToCall: `When the user wants to execute ${report.title} and inspect the result grid.`,
             whenNotToCall: "When only drafting or setting criteria without execution.",
           },

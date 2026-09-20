@@ -47,6 +47,10 @@ type ManagementPageTemplateProps = {
   showSearch?: boolean;
   /** İç içe (sekme/başka sayfa kabuğu içinde) çalıştığında bağımsız header ve Yula dock oluşturmayı önler */
   embedded?: boolean;
+  /** Aktif detay sekme değeri (kontrollü sekme desteği) */
+  activeDetailTab?: string;
+  /** Detay sekmesi değişim callback'i */
+  onDetailTabChange?: (tab: string) => void;
 };
 
 /**
@@ -73,6 +77,8 @@ export function ManagementPageTemplate({
   detailPanelId,
   maximizable = true,
   embedded = false,
+  activeDetailTab,
+  onDetailTabChange,
 }: ManagementPageTemplateProps) {
   // Detay maksimize: örnekteki (rapor sonucu) desen — liste paneli gizlenir,
   // detay %100'e açılır; her şey WorkspaceAiDock içinde kalır, Yula kapanmaz.
@@ -121,6 +127,8 @@ export function ManagementPageTemplate({
         maximizable={maximizable}
         detailMaximized={detailMaximized}
         onToggleDetailMaximize={handleToggleDetailMaximize}
+        activeTab={activeDetailTab}
+        onTabChange={onDetailTabChange}
       >
         {children}
       </TabbedDetail>

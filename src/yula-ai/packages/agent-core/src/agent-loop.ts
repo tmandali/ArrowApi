@@ -32,6 +32,33 @@ interface ExecutedToolBatch {
   terminate: boolean;
 }
 
+/**
+ * Pi-Style Tool Loadout Delta: Aktif araç seti değiştiğinde transkripte sistem bildirimi ekler.
+ */
+export function declareToolChanges(
+  context: AgentContext,
+  lastToolNames: string[]
+): { updatedMessages: any[]; currentToolNames: string[] } {
+  const currentTools = context.tools?.map((t) => t.name) || [];
+  if (lastToolNames.length === 0) {
+    return { updatedMessages: [], currentToolNames: currentTools };
+  }
+
+  const added = currentTools.filter((name) => !lastToolNames.includes(name));
+  const removed = lastToolNames.filter((name) => !currentTools.includes(name));
+
+  if (added.length === 0 && removed.length === 0) {
+    return { updatedMessages: [], currentToolNames: currentTools };
+  }
+
+  const deltaMsg = {
+    role: 'system',
+    content: `[Tools Loadout Updated]: Added: [${added.join(', ') || 'none'}], Removed: [${removed.join(', ') || 'none'}].`,
+  };
+
+  return { updatedMessages: [deltaMsg], currentToolNames: currentTools };
+}
+
 export function agentLoop(
   prompts: any[],
   context: AgentContext,
@@ -100,6 +127,7 @@ async function runLoop(
 
   // Pi Outer Loop: Follow-up kuyruğu drain edilene kadar döner
   const recentToolSignatures: string[] = [];
+  let committedToolNames: string[] = currentContext.tools?.map((t) => t.name) || [];
 
   while (true) {
     let hasMoreToolCalls = true;
@@ -121,6 +149,18 @@ async function runLoop(
         await emit({ type: 'message_end', message: msg });
       }
       pendingMessages = [];
+
+      // Pi Tool Loadout Delta: Araç seti değişmişse modele açık sistem bildirimi yap
+      const toolDelta = declareToolChanges(currentContext, committedToolNames);
+      if (toolDelta.updatedMessages.length > 0) {
+        committedToolNames = toolDelta.currentToolNames;
+        for (const msg of toolDelta.updatedMessages) {
+          currentContext.messages.push(msg);
+          newMessages.push(msg);
+          await emit({ type: 'message_start', message: msg });
+          await emit({ type: 'message_end', message: msg });
+        }
+      }
 
       // LLM Çıkarımı
       const turnResult = await streamFn(currentContext, config, signal);
@@ -188,6 +228,24 @@ async function runLoop(
       if (await config.shouldStopAfterTurn?.(stopContext)) {
         await emit({ type: 'agent_end', messages: newMessages });
         return;
+      }
+
+      // Pi prepareNextTurn: Tur sonrası dinamik model/thinking terfisi veya bağlam hazırlığı
+      if (config.prepareNextTurn) {
+        const turnUpdate = await config.prepareNextTurn(stopContext);
+        if (turnUpdate) {
+          if (turnUpdate.context) currentContext = turnUpdate.context;
+          if (turnUpdate.model) config = { ...config, model: turnUpdate.model };
+          if (turnUpdate.thinkingLevel) config = { ...config, thinkingLevel: turnUpdate.thinkingLevel };
+          if (turnUpdate.messages && turnUpdate.messages.length > 0) {
+            for (const msg of turnUpdate.messages) {
+              currentContext.messages.push(msg);
+              newMessages.push(msg);
+              await emit({ type: 'message_start', message: msg });
+              await emit({ type: 'message_end', message: msg });
+            }
+          }
+        }
       }
 
       // Sonraki tur için steering kontrolü

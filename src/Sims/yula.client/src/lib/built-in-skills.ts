@@ -8,9 +8,6 @@
  */
 import { parseSkillFile } from "@/lib/skill-discovery";
 import type { UserSkill } from "@/lib/yula-user-skill";
-import ayKapanisMd from "../../skills/ay-kapanis/SKILL.md";
-import sayimFarkMd from "../../skills/sayim-fark/SKILL.md";
-import raporKaliteMd from "../../skills/rapor-kalite/SKILL.md";
 import xlsxMd from "../../skills/xlsx/SKILL.md";
 import pdfMd from "../../skills/pdf/SKILL.md";
 import mcpBuilderMd from "../../skills/mcp-builder/SKILL.md";
@@ -21,9 +18,6 @@ import docxMd from "../../skills/docx/SKILL.md";
 import pptxMd from "../../skills/pptx/SKILL.md";
 
 const SOURCES: Array<{ md: string; fallback: string }> = [
-  { md: ayKapanisMd, fallback: "ay-kapanis" },
-  { md: sayimFarkMd, fallback: "sayim-fark" },
-  { md: raporKaliteMd, fallback: "rapor-kalite" },
   { md: xlsxMd, fallback: "xlsx" },
   { md: pdfMd, fallback: "pdf" },
   { md: mcpBuilderMd, fallback: "mcp-builder" },

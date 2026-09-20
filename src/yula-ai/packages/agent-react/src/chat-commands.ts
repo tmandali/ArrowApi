@@ -3,7 +3,7 @@
  * Reference: Pi Reference System Commands (/new, /model, /login, /compact, /help)
  */
 
-import { promptTemplateManager } from '@my-agent/core';
+import { promptTemplateManager, i18nManager } from '@my-agent/core';
 import type { AgentMessage } from './chat-types';
 
 export interface CommandContext {
@@ -22,15 +22,20 @@ export async function handleBuiltInCommand(
   args: string[],
   ctx: CommandContext
 ): Promise<boolean> {
-  const cmd = rawCommand.startsWith('/') ? rawCommand : `/${rawCommand}`;
+  const canonical = promptTemplateManager.get(rawCommand);
+  if (!canonical || canonical.category !== 'system') return false;
 
-  if (cmd === '/new') {
+  const dict = i18nManager.getDictionary();
+  const resp = dict.commandResponses;
+  const key = canonical.command.replace('/', '');
+
+  if (key === 'new') {
     ctx.newConversation();
-    ctx.appendSystemMessage('🧹 Oturum temizlendi ve yeni bir konuşma başlatıldı.');
+    ctx.appendSystemMessage(resp.sessionCleared);
     return true;
   }
 
-  if (cmd === '/model') {
+  if (key === 'model') {
     if (args.length === 0) {
       const modelList = ctx.availableModels
         .map(
@@ -40,49 +45,83 @@ export async function handleBuiltInCommand(
             })`
         )
         .join('\n');
-      const content = `⚡ **Aktif Model:** \`${ctx.selectedProvider || 'openai'} / ${
-        ctx.selectedModel || 'gpt-4o-mini'
-      }\`\n\n**Kullanılabilir Modeller:**\n${modelList}\n\n*Model değiştirmek için \`/model <model-id>\` yazabilir veya başlıktaki seçiciyi kullanabilirsiniz.*`;
+      const content = `${resp.activeModel(ctx.selectedProvider || 'openai', ctx.selectedModel || 'gpt-4o-mini')}\n\n${resp.availableModelsIntro}\n${modelList}\n\n${resp.modelHint}`;
       ctx.appendSystemMessage(content);
       return true;
     }
 
     const targetModelId = args[0];
     ctx.selectModel(targetModelId);
-    ctx.appendSystemMessage(`⚡ Aktif model başarıyla değiştirildi: **${targetModelId}**`);
+    ctx.appendSystemMessage(resp.modelChanged(targetModelId));
     return true;
   }
 
-  if (cmd === '/login') {
+  if (key === 'login') {
     ctx.onOpenLogin?.(args[0]);
-    ctx.appendSystemMessage('🔑 Sağlayıcı kimlik doğrulama penceresi (OAuth / API Key) açıldı.');
+    ctx.appendSystemMessage(resp.loginOpened);
     return true;
   }
 
-  if (cmd === '/compact') {
+  if (key === 'compact') {
     await ctx.compact(args.join(' '), 'manual');
     return true;
   }
 
-  if (cmd === '/plan') {
-    const hint = args.length > 0 ? `\nHedef / Analiz: **${args.join(' ')}**` : '';
-    const content = `📋 **Planlama Modu Aktif:** Ajan eylemleri doğrudan çalıştırmayacak; önce adımları ve parametreleri içeren bir yol haritası (Plan) sunup onay isteyecektir.${hint}`;
-    ctx.appendSystemMessage(content);
+  if (key === 'plan') {
+    const hint = args.length > 0 ? args.join(' ') : undefined;
+    ctx.appendSystemMessage(resp.planningModeActive(hint));
     return true;
   }
 
-  if (cmd === '/help' || cmd === '/yardim') {
+  if (key === 'help') {
     const allCmds = promptTemplateManager.getAll();
-    const sysList = allCmds
+    const seen = new Set<string>();
+    const uniqueCmds = allCmds.filter((c) => {
+      const k = c.command.toLowerCase().replace(/ı/g, 'i');
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    if (args.length > 0) {
+      const query = args.join(' ').toLowerCase().replace(/ı/g, 'i');
+      const filtered = uniqueCmds.filter(
+        (c) =>
+          c.command.toLowerCase().replace(/ı/g, 'i').includes(query) ||
+          c.description.toLowerCase().replace(/ı/g, 'i').includes(query) ||
+          (c.argumentHint && c.argumentHint.toLowerCase().replace(/ı/g, 'i').includes(query))
+      );
+
+      if (filtered.length > 0) {
+        const matches = filtered
+          .map((c) => `- \`${c.command}${c.argumentHint ? ' ' + c.argumentHint : ''}\`: ${c.description}`)
+          .join('\n');
+        const content = `${resp.helpRelatedTitle(args.join(' '))}\n\n${matches}\n\n${resp.helpRelatedHint}`;
+        ctx.appendSystemMessage(content);
+        return true;
+      }
+
+      const available = uniqueCmds
+        .filter((c) => c.category === 'system')
+        .map((c) => `- \`${c.command}${c.argumentHint ? ' ' + c.argumentHint : ''}\`: ${c.description}`)
+        .join('\n');
+      const content = `${resp.commandNotFound(args.join(' '))}\n\n${resp.systemActionsLabel}\n${available}\n\n${resp.commandNotFoundHint}`;
+      ctx.appendSystemMessage(content);
+      return true;
+    }
+
+    const sysList = uniqueCmds
       .filter((c) => c.category === 'system')
       .map((c) => `- \`${c.command}${c.argumentHint ? ' ' + c.argumentHint : ''}\`: ${c.description}`)
       .join('\n');
-    const tplList = allCmds
+    const tplList = uniqueCmds
       .filter((c) => c.category === 'template')
       .map((c) => `- \`${c.command}${c.argumentHint ? ' ' + c.argumentHint : ''}\`: ${c.description}`)
       .join('\n');
 
-    const content = `### 🤖 Hazır Pi Sistem ve Şablon Komutları\n\n**Sistem Eylemleri (Yerel):**\n${sysList}\n\n**Hızlı Prompt Şablonları:**\n${tplList}`;
+    const content = `${resp.helpTitle}\n\n${resp.systemActionsLabel}\n${sysList}${
+      tplList ? `\n\n${resp.quickTemplatesLabel}\n${tplList}` : ''
+    }`;
     ctx.appendSystemMessage(content);
     return true;
   }

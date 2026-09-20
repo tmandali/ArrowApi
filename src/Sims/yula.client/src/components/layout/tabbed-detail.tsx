@@ -43,6 +43,10 @@ type TabbedDetailProps = {
   detailMaximized?: boolean;
   /** Maksimize aç/kapa */
   onToggleDetailMaximize?: () => void;
+  /** Aktif sekme değeri (kontrollü sekme desteği) */
+  activeTab?: string;
+  /** Sekme değişimi geri bildirimi */
+  onTabChange?: (tab: string) => void;
 };
 
 /**
@@ -62,11 +66,15 @@ export function TabbedDetail({
   maximizable = false,
   detailMaximized = false,
   onToggleDetailMaximize,
+  activeTab,
+  onTabChange,
 }: TabbedDetailProps) {
   const t = useTranslations("Detail")
   return (
     <Tabs
       key={resetKey}
+      value={activeTab}
+      onValueChange={onTabChange}
       defaultValue="genel"
       // gap-0: shadcn Tabs kökü gap-2 verir; başlık çizgisiyle gövde arası
       // 8px açılır, üst boşluk yanlardan (p-3) fazla görünür. Sıfırlanır.

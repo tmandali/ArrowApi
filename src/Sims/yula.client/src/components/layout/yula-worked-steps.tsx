@@ -134,8 +134,14 @@ export function extractWorkedSteps(
     ?.trim();
 
   const matchedCmd = userText ? resolveYulaSlashCommand(userText) : null;
-  if (matchedCmd) {
+  if (matchedCmd && matchedCmd.phase !== "system") {
     const cmdName = `/${matchedCmd.slash}`;
+    const hasError = Boolean(
+      message?.parts?.some((p) => {
+        const info = yulaToolPartInfo(p);
+        return info ? isFailedToolInfo(info) : false;
+      }),
+    );
     steps.push({
       id: `${message?.id ?? "cmd"}-command-execution`,
       kind: "explored",
@@ -145,9 +151,12 @@ export function extractWorkedSteps(
       info: {
         toolCallId: `${message?.id ?? "cmd"}-command`,
         toolName: "slash_command",
-        state: "output-available",
+        state: hasError ? "output-error" : "output-available",
         input: { command: cmdName, prompt: userText },
-        output: { status: "ok", message: L("cmd_executed", { cmd: cmdName, label: matchedCmd.label }) },
+        output: {
+          status: hasError ? "error" : "ok",
+          message: L("cmd_executed", { cmd: cmdName, label: matchedCmd.label }),
+        },
       },
     });
   }

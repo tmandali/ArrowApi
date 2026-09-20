@@ -16,22 +16,19 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const skillsDir = path.resolve(here, "../../skills");
 
 describe("built-in SKILL.md files", () => {
-  it("defines ay-kapanis, sayim-fark, rapor-kalite with valid frontmatter", () => {
+  it("defines the 8 built-in Anthropic skills with valid frontmatter", () => {
     const dirs = fs
       .readdirSync(skillsDir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort();
     assert.deepEqual(dirs, [
-      "ay-kapanis",
       "doc-coauthoring",
       "docx",
       "frontend-design",
       "mcp-builder",
       "pdf",
       "pptx",
-      "rapor-kalite",
-      "sayim-fark",
       "skill-creator",
       "xlsx",
     ]);
@@ -50,9 +47,7 @@ describe("built-in SKILL.md files", () => {
       );
       assert.ok(p.description.length > 0);
       assert.ok(p.prompt.length > 50);
-      assert.ok(["global", "stock"].includes(p.scope));
+      assert.equal(p.scope, "global");
     }
-    const scopes = Object.fromEntries(parsed.map((p) => [p.slash, p.scope]));
-    assert.equal(scopes["sayim-fark"], "stock");
   });
 });

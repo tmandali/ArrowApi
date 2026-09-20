@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"
-import { useLocale, useTranslations } from "next-intl"
+import { useTranslations } from "next-intl"
 import { ManagementPageTemplate } from "@/components/layout/management-page-template";
 import {
   DetailHistoryToggle,
@@ -16,6 +16,7 @@ import type { UserSkill } from "@/lib/yula-user-skill";
 import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
 import { SkillEditor, type SkillEditorHandle, type SkillDetailFileTab, type SkillEditorMode } from "./skill-editor";
 import { fileDotClass } from "@/components/layout/file-kind";
+import { useSkillAgentBinding } from "./use-skill-agent-binding";
 
 type Selection = { id: string | null; readOnly?: boolean } | null;
 
@@ -25,7 +26,6 @@ type Selection = { id: string | null; readOnly?: boolean } | null;
  */
 export function SkillManagementView() {
   const t = useTranslations("SkillManagement")
-  const locale = useLocale()
   const ts = useTranslations("Skills")
   const userSkills = useUserSkillsStore((s) => s.skills);
   const deleteSkill = useUserSkillsStore((s) => s.deleteSkill);
@@ -34,15 +34,20 @@ export function SkillManagementView() {
   const [selection, setSelection] = React.useState<Selection>(null);
   const editorRef = React.useRef<SkillEditorHandle | null>(null);
   const [fileTabs, setFileTabs] = React.useState<SkillDetailFileTab[]>([]);
+  const [activeDetailTab, setActiveDetailTab] = React.useState<string>("genel");
   const [historyOpen, setHistoryOpen] = React.useState(true);
   // Yeni kayda geçerken bırakılan seçim — Vazgeç buraya döner.
   const lastSelectionRef = React.useRef<Selection>(null);
+
+  React.useEffect(() => {
+    setActiveDetailTab("genel");
+  }, [selection?.id]);
 
   // İlk bağlanışta örnek skill üret ve varsayılan seçiliyi belirle.
   // `ensureExampleSkill` localStorage'a erişir → SSR'de no-op,
   // bu yüzden ilk render'da selection = null kalır (hydration uyumlu).
   React.useEffect(() => {
-    ensureExampleSkill(locale as "tr" | "en");
+    ensureExampleSkill();
     const first = useUserSkillsStore.getState().skills[0];
     if (first && selection == null) {
       setSelection({
@@ -99,6 +104,23 @@ export function SkillManagementView() {
     deleteSkill(id);
     if (selection?.id === id) setSelection(null);
   };
+
+  useSkillAgentBinding({
+    selectedSkill,
+    selection,
+    setSelection,
+    mode,
+    isReadOnly,
+    userSkills,
+    systemSkills,
+    listed,
+    tab,
+    setTab,
+    activeDetailTab,
+    setActiveDetailTab,
+    editorRef,
+    screenTitle: t("title"),
+  });
 
   const detailTabs: TabbedDetailTab[] = React.useMemo(
     () => [
@@ -314,6 +336,8 @@ export function SkillManagementView() {
       tabs={detailTabs}
       tabResetKey={selection?.id ?? "new-skill"}
       showTabs={selection != null}
+      activeDetailTab={activeDetailTab}
+      onDetailTabChange={setActiveDetailTab}
       containerClass="@container/skill-detail p-3"
       empty={
         <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 text-center">

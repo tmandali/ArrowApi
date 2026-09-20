@@ -69,12 +69,39 @@ export function ChatComposer({
     canSubmit,
   } = composer;
 
+  const commandPaletteRef = React.useRef<HTMLDivElement>(null);
+  const historyPaletteRef = React.useRef<HTMLDivElement>(null);
+
+  const selectedCommandValue = isNewAgentSelected
+    ? "__new-agent__"
+    : (commandMatches?.[selectedIndex]?.slash ?? "");
+
+  const selectedHistoryValue = historySuggestions[historyIndex]?.text ?? "";
+
+  React.useEffect(() => {
+    if (!showCommands) return;
+    commandPaletteRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex, showCommands]);
+
+  React.useEffect(() => {
+    if (!showHistory) return;
+    historyPaletteRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [historyIndex, showHistory]);
+
   return (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
       {showCommands ? (
-        <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
-          <Command shouldFilter={false} className="p-1">
-            <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
+        <div
+          ref={commandPaletteRef}
+          className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg"
+        >
+          <Command
+            shouldFilter={false}
+            disablePointerSelection
+            value={selectedCommandValue}
+            className="p-1"
+          >
+            <CommandList className="max-h-56 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
               <CommandEmpty className="py-2 text-[11px] text-muted-foreground text-center">
                 {t("command_empty")}
               </CommandEmpty>
@@ -87,7 +114,11 @@ export function ChatComposer({
                       key={command.id}
                       value={command.slash}
                       onSelect={() => applyCommand(command)}
-                      data-selected={isSelected ? "true" : undefined}
+                      onMouseMove={(e) => {
+                        if (e.movementX === 0 && e.movementY === 0) return;
+                        if (!isSelected) setSelectedIndex(idx);
+                      }}
+                      data-active={isSelected ? "true" : undefined}
                       className={cn(
                         "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
                         isSelected
@@ -114,7 +145,12 @@ export function ChatComposer({
                   <CommandItem
                     value="__new-agent__"
                     onSelect={() => router.push("/my/agents")}
-                    data-selected={isNewAgentSelected ? "true" : undefined}
+                    onMouseMove={(e) => {
+                      if (e.movementX === 0 && e.movementY === 0) return;
+                      if (!isNewAgentSelected)
+                        setSelectedIndex(commandMatches?.length ?? 0);
+                    }}
+                    data-active={isNewAgentSelected ? "true" : undefined}
                     className={cn(
                       "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
                       isNewAgentSelected
@@ -136,12 +172,20 @@ export function ChatComposer({
           </Command>
         </div>
       ) : showHistory ? (
-        <div className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg">
+        <div
+          ref={historyPaletteRef}
+          className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg"
+        >
           <div className="px-2.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
             {t("history_suggestions")}
           </div>
-          <Command shouldFilter={false} className="p-1 pt-0.5">
-            <CommandList className="max-h-48 overflow-y-auto no-scrollbar">
+          <Command
+            shouldFilter={false}
+            disablePointerSelection
+            value={selectedHistoryValue}
+            className="p-1 pt-0.5"
+          >
+            <CommandList className="max-h-56 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
               <CommandGroup className="p-0">
                 {historySuggestions.map((s, idx) => {
                   const isSelected = idx === historyIndex;
@@ -150,10 +194,11 @@ export function ChatComposer({
                       key={`${s.convId}-${s.text.slice(0, 48)}-${idx}`}
                       value={s.text}
                       onSelect={() => openHistoryConversation(s.convId)}
-                      onMouseMove={() => {
+                      onMouseMove={(e) => {
+                        if (e.movementX === 0 && e.movementY === 0) return;
                         if (!isSelected) setHistoryIndex(idx);
                       }}
-                      data-selected={isSelected ? "true" : undefined}
+                      data-active={isSelected ? "true" : undefined}
                       className={cn(
                         "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
                         isSelected
@@ -248,7 +293,7 @@ export function ChatComposer({
                   setSelectedIndex((prev) => (prev - 1 + paletteItemCount) % paletteItemCount);
                   return;
                 }
-                if (event.key === "Enter" && !event.shiftKey) {
+                if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
                   event.preventDefault();
                   if (isNewAgentSelected) {
                     router.push("/my/agents");
@@ -281,7 +326,7 @@ export function ChatComposer({
                   );
                   return;
                 }
-                if (event.key === "Enter" && !event.shiftKey) {
+                if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
                   event.preventDefault();
                   const target = historySuggestions[historyIndex] ?? historySuggestions[0];
                   if (target) {

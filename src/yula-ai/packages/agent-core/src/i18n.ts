@@ -10,6 +10,23 @@ export interface AgentDictionary {
     history: string;
     plan?: string;
   };
+  commandAliases?: Record<string, string[]>;
+  commandResponses: {
+    sessionCleared: string;
+    activeModel: (provider: string, model: string) => string;
+    availableModelsIntro: string;
+    modelHint: string;
+    modelChanged: (modelId: string) => string;
+    loginOpened: string;
+    planningModeActive: (hint?: string) => string;
+    helpTitle: string;
+    systemActionsLabel: string;
+    quickTemplatesLabel: string;
+    helpRelatedTitle: (query: string) => string;
+    helpRelatedHint: string;
+    commandNotFound: (query: string) => string;
+    commandNotFoundHint: string;
+  };
   errors: {
     componentNotMounted: (id: string) => string;
     actionNotSupported: (id: string, action: string, supported: string[]) => string;
@@ -48,6 +65,27 @@ export const trDictionary: AgentDictionary = {
     new: 'Yeni ve temiz bir konuşma oturumu başlatır.',
     history: 'Oturum geçmişi ve dallanma kontrol noktalarını listeler.',
     plan: 'Eylemleri doğrudan koşturmak yerine onay için yol haritası (Plan) modu açar.',
+  },
+  commandAliases: {
+    help: ['yardim', 'yardım'],
+    new: ['yeni'],
+  },
+  commandResponses: {
+    sessionCleared: '🧹 Oturum temizlendi ve yeni bir konuşma başlatıldı.',
+    activeModel: (provider, model) => `⚡ **Aktif Model:** \`${provider} / ${model}\``,
+    availableModelsIntro: '**Kullanılabilir Modeller:**',
+    modelHint: '*Model değiştirmek için `/model <model-id>` yazabilir veya başlıktaki seçiciyi kullanabilirsiniz.*',
+    modelChanged: (modelId) => `⚡ Aktif model başarıyla değiştirildi: **${modelId}**`,
+    loginOpened: '🔑 Sağlayıcı kimlik doğrulama penceresi (OAuth / API Key) açıldı.',
+    planningModeActive: (hint) =>
+      `📋 **Planlama Modu Aktif:** Ajan eylemleri doğrudan çalıştırmayacak; önce adımları ve parametreleri içeren bir yol haritası (Plan) sunup onay isteyecektir.${hint ? `\n${hint}` : ''}`,
+    helpTitle: '### 🤖 Hazır Pi Sistem ve Şablon Komutları',
+    systemActionsLabel: '**Sistem Eylemleri (Yerel):**',
+    quickTemplatesLabel: '**Hızlı Prompt Şablonları:**',
+    helpRelatedTitle: (query) => `### 🔍 "${query}" ile İlgili Komutlar`,
+    helpRelatedHint: '*Tüm komutları listelemek için `/yardim` veya `/help` yazabilirsiniz.*',
+    commandNotFound: (query) => `ℹ️ **"${query}"** adında bir komut bulunamadı.`,
+    commandNotFoundHint: '*Tüm komutları listelemek için `/yardim` veya `/help` yazabilirsiniz.*',
   },
   errors: {
     componentNotMounted: (id) => `Bileşen "${id}" şu an ekranda mount edilmemiş veya görünür değil.`,
@@ -92,6 +130,27 @@ export const enDictionary: AgentDictionary = {
     new: 'Starts a brand new, clean conversation session.',
     history: 'Lists session history and checkpoint branches.',
     plan: 'Toggles plan-first mode to formulate a roadmap before executing actions.',
+  },
+  commandAliases: {
+    help: ['help', '?'],
+    new: ['new', 'clear'],
+  },
+  commandResponses: {
+    sessionCleared: '🧹 Session cleared and brand new conversation started.',
+    activeModel: (provider, model) => `⚡ **Active Model:** \`${provider} / ${model}\``,
+    availableModelsIntro: '**Available Models:**',
+    modelHint: '*To switch the model, write `/model <model-id>` or use the model selector in the header.*',
+    modelChanged: (modelId) => `⚡ Active model successfully switched to: **${modelId}**`,
+    loginOpened: '🔑 Provider authentication window (OAuth / API Key) opened.',
+    planningModeActive: (hint) =>
+      `📋 **Plan-First Mode Active:** The agent will not execute actions directly; it will formulate a step-by-step roadmap for approval first.${hint ? `\n${hint}` : ''}`,
+    helpTitle: '### 🤖 Available Pi System and Template Commands',
+    systemActionsLabel: '**System Actions (Local):**',
+    quickTemplatesLabel: '**Quick Prompt Templates:**',
+    helpRelatedTitle: (query) => `### 🔍 Commands Related to "${query}"`,
+    helpRelatedHint: '*To list all available commands, type `/help`.*',
+    commandNotFound: (query) => `ℹ️ No command found matching **"${query}"**.`,
+    commandNotFoundHint: '*To list all available commands, type `/help`.*',
   },
   errors: {
     componentNotMounted: (id) => `Component "${id}" is currently not mounted or visible on screen.`,
@@ -162,6 +221,8 @@ export class I18nManager {
 
     return {
       commands: { ...base.commands, ...this.customOverrides.commands },
+      commandAliases: { ...base.commandAliases, ...this.customOverrides.commandAliases },
+      commandResponses: { ...base.commandResponses, ...this.customOverrides.commandResponses },
       errors: { ...base.errors, ...this.customOverrides.errors },
       prompts: { ...base.prompts, ...this.customOverrides.prompts },
       status: { ...base.status, ...this.customOverrides.status },

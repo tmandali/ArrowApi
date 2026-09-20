@@ -11,6 +11,7 @@ import {
   telemetryTracker,
 } from '@my-agent/core';
 import { usePiSimulations } from './hooks/usePiSimulations';
+import { useAdvancedArchitecturalSimulations } from './hooks/useAdvancedArchitecturalSimulations';
 import {
   HitlModal,
   PendingApproval,
@@ -313,7 +314,6 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
     runStreamingUpdateScenario,
     runSessionRetryScenario,
   } = usePiSimulations({
-
     setStoreId,
     setDateRange,
     storeIdRef,
@@ -323,6 +323,13 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
     onSteer: (msg) => chat.steer(msg),
     onFollowUp: (msg) => chat.followUp(msg),
   });
+
+  const {
+    runToolLoadoutDeltaScenario,
+    runModelCascadingScenario,
+    runProviderFailoverScenario,
+    runStepRoutingScenario,
+  } = useAdvancedArchitecturalSimulations({ addLog });
 
   return (
     <div
@@ -441,6 +448,10 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
               onExportHtml={runExportHtmlScenario}
               onStreamingUpdate={runStreamingUpdateScenario}
               onSessionRetry={runSessionRetryScenario}
+              onToolLoadoutDelta={runToolLoadoutDeltaScenario}
+              onModelCascading={runModelCascadingScenario}
+              onProviderFailover={runProviderFailoverScenario}
+              onStepRouting={runStepRoutingScenario}
               onLog={addLog}
               piEvents={piEvents}
 
