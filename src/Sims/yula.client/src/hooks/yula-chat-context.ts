@@ -35,6 +35,7 @@ export interface YulaChatContextValue {
   activeId: string;
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  deleteConversations?: (ids: string[]) => void;
   newConversation: () => void;
   model: string;
   setModel: (model: string) => void;

@@ -98,6 +98,7 @@ function toolEventToTrace(event: AgentEvent): {
   id: string;
   label: string;
   subLabel?: string;
+  detailText?: string;
   input?: unknown;
   output?: unknown;
   isError?: boolean;
@@ -105,41 +106,95 @@ function toolEventToTrace(event: AgentEvent): {
   toolName?: string;
 } | null {
   if (event.type === "tool_execution_start") {
-    const resolved =
-      event.toolName === "dispatch_component_action"
-        ? describeDispatchAction(event.args)
-        : event.toolName === "ask_user_choice"
-        ? {
-            kind: "confirmation" as WorkedStepItem["kind"],
-            label: typeof event.args?.question === "string" ? `Asked: ${event.args.question}` : "Asked user choice",
-            subLabel: "Waiting for user selection...",
-          }
-        : {
-            kind: "ran" as WorkedStepItem["kind"],
-            label: `Ran tool: ${event.toolName}`,
-            subLabel: "Executing operation...",
-          };
+    let resolved: { kind?: WorkedStepItem["kind"]; label: string; subLabel?: string };
+    if (event.toolName === "dispatch_component_action") {
+      resolved = describeDispatchAction(event.args);
+    } else if (event.toolName === "ask_user_choice") {
+      resolved = {
+        kind: "confirmation" as WorkedStepItem["kind"],
+        label: typeof event.args?.question === "string" ? `Asked: ${event.args.question}` : "Asked user choice",
+        subLabel: "Waiting for user selection...",
+      };
+    } else if (event.toolName === "query_playbook") {
+      const task = typeof event.args?.task === "string" ? event.args.task : "Rules & workflows";
+      const ws = typeof event.args?.workspace === "string" ? event.args.workspace : "stock";
+      resolved = {
+        kind: "explored" as WorkedStepItem["kind"],
+        label: `🤖 Playbook Sub-Agent · Queried Workspace Wiki (${ws}): "${task}"`,
+        subLabel: `🤖 Sub-Agent analiz ediyor · Searching Workspace Wiki (${ws})...`,
+      };
+    } else if (event.toolName === "propose_playbook_update") {
+      const title = typeof event.args?.title === "string" ? event.args.title : "Learned Rule";
+      const ws = typeof event.args?.workspace === "string" ? event.args.workspace : "stock";
+      resolved = {
+        kind: "edited" as WorkedStepItem["kind"],
+        label: `Updated Workspace Wiki (${ws}): ${title}`,
+        subLabel: "Recording to Workspace Wiki...",
+      };
+    } else {
+      resolved = {
+        kind: "ran" as WorkedStepItem["kind"],
+        label: `Ran tool: ${event.toolName}`,
+        subLabel: "Executing operation...",
+      };
+    }
+    const isInteractive =
+      event.toolName === "ask_user_choice" ||
+      event.toolName === "ask_user_question" ||
+      event.toolName === "request_user_confirmation" ||
+      event.toolName === "suggest_next_steps";
     return {
       id: piTraceId(event.toolCallId),
       toolName: event.toolName,
       label: resolved.label,
       subLabel: resolved.subLabel,
-      isLive: true,
+      isLive: isInteractive ? false : true,
       input: event.args,
     };
   }
   if (event.type === "tool_execution_end") {
     const optionsCount = Array.isArray(event.result?.options) ? event.result.options.length : 0;
+    let endSubLabel: string | undefined = undefined;
+    let endLabel: string | undefined = undefined;
+    let endDetail: string | undefined = undefined;
+
+    if (event.toolName === "ask_user_choice") {
+      endSubLabel = optionsCount > 0 ? `${optionsCount} options presented` : "User choice ready";
+    } else if (event.toolName === "query_playbook") {
+      const res = event.result as any;
+      const ws = typeof event.args?.workspace === "string" ? event.args.workspace : "stock";
+      const task = typeof event.args?.task === "string" ? event.args.task : "Rules & workflows";
+      const rulesFound = Array.isArray(res?.screenRules) ? res.screenRules.length : 0;
+      const hasRecipe = Boolean(res?.recipe);
+      const confPct = typeof res?.confidence === "number" ? Math.round(res.confidence * 100) : 100;
+      endLabel = `🤖 Playbook Sub-Agent · Queried Workspace Wiki (${ws}): "${task}"`;
+      if (hasRecipe) {
+        endSubLabel = `Workflow recipe found: ${res.recipe.title} (%${confPct} uyum · Sub-Agent verified)`;
+        endDetail = `🤖 Playbook Sub-Agent Doğrulaması (%${confPct} Güven):\n${res.recipe.title}\n\n${res.recipe.contentMarkdown || ""}${res.message ? `\n\nNot: ${res.message}` : ""}`;
+      } else if (rulesFound > 0) {
+        endSubLabel = `${rulesFound} rules found in Workspace Wiki (${ws}) · Sub-Agent verified`;
+        endDetail = `🤖 Playbook Sub-Agent Kuralları (${ws}):\n` + res.screenRules.map((r: string) => `• ${r}`).join("\n");
+      } else {
+        endSubLabel = `Searched Workspace Wiki (${ws}) · Sub-Agent: Kayıtlı reçete yok`;
+        endDetail = `Playbook fihristi tarandı (${ws}). Tanımlı kurumsal reçete bulunamadı; genel sistem politikaları devrede.`;
+      }
+    } else if (event.toolName === "propose_playbook_update") {
+      const res = event.result as any;
+      const ws = typeof event.args?.workspace === "string" ? event.args.workspace : "stock";
+      const title = typeof event.args?.title === "string" ? event.args.title : "Learned Rule";
+      const cat = typeof event.args?.category === "string" ? event.args.category : "screen_rule";
+      const catLabel = cat === "screen_rule" ? "Screen Rule" : "Workflow Recipe";
+      const isSaved = res?.status === "saved";
+      endLabel = `Updated Workspace Wiki (${ws}): ${title}`;
+      endSubLabel = isSaved ? `Saved to Workspace Wiki (${ws}) · ${catLabel}` : `Proposed ${catLabel}`;
+    }
+
     return {
       id: piTraceId(event.toolCallId),
       toolName: event.toolName,
-      label: event.toolName, // upsert mevcut satırla birleşir; etiket aşağıda korunur
-      subLabel:
-        event.toolName === "ask_user_choice"
-          ? optionsCount > 0
-            ? `${optionsCount} options presented`
-            : "User choice ready"
-          : undefined,
+      label: endLabel ?? event.toolName,
+      subLabel: endSubLabel,
+      detailText: endDetail,
       isLive: false,
       isError: event.isError === true,
       output: event.result,
@@ -166,12 +221,14 @@ export function installPiTraceBridge(getConversationId: () => string): void {
       if (event.type === "tool_execution_end") {
         // Bitiş olayı: mevcut satırı çıktı/hata ile güncelle, etiket + girdi korunur.
         const prev = getTurnTrace(conversationId).find((s) => s.id === step.id);
+        const resolvedLabel =
+          step.label && step.label !== step.toolName ? step.label : (prev?.label || step.label);
         upsertTurnTrace(conversationId, {
           id: step.id,
           toolName: step.toolName,
-          label: prev?.label || step.label,
-          subLabel: prev?.subLabel,
-          detailText: prev?.detailText,
+          label: resolvedLabel,
+          subLabel: step.subLabel ?? prev?.subLabel,
+          detailText: step.detailText ?? prev?.detailText,
           isLive: false,
           isError: step.isError,
           input: prev?.input,
@@ -184,7 +241,7 @@ export function installPiTraceBridge(getConversationId: () => string): void {
         toolName: step.toolName,
         label: step.label,
         subLabel: step.subLabel,
-        isLive: true,
+        isLive: Boolean(step.isLive),
         input: step.input,
       });
     } catch {

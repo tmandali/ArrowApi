@@ -171,9 +171,8 @@ export function createStandardAgentTools(): AgentTool[] {
           };
         }
         try {
-          const rules = await playbookManager.getScreenRules(task, workspace);
-          const recipe = await playbookManager.findRecipe(task, workspace);
-          if (rules.length === 0 && !recipe) {
+          const resolution = await playbookManager.resolveIntent(task, workspace);
+          if (!resolution.matched && (!resolution.screenRules || resolution.screenRules.length === 0)) {
             return {
               content: [
                 {
@@ -181,13 +180,16 @@ export function createStandardAgentTools(): AgentTool[] {
                   text: `No specific verified playbook found for "${task}". Explore dynamically using standard component actions.`,
                 },
               ],
-              details: { found: false, rules: [], recipe: null },
+              details: { found: false, rules: [], recipe: null, status: resolution.status },
             };
           }
           const details = {
-            found: true,
-            screen_rules: rules,
-            recipe: recipe ? { title: recipe.title, content: recipe.contentMarkdown } : null,
+            found: resolution.matched,
+            status: resolution.status,
+            confidence: resolution.confidence,
+            screen_rules: resolution.screenRules || [],
+            recipe: resolution.recipe ? { id: resolution.recipe.id, title: resolution.recipe.title, content: resolution.recipe.contentMarkdown } : null,
+            explanation: resolution.explanation,
           };
           return {
             content: [{ type: 'text', text: JSON.stringify(details, null, 2) }],

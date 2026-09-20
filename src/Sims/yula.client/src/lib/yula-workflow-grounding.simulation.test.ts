@@ -185,4 +185,24 @@ describe("Grounded ERP Workflow Protocol & Playbook Simulation", () => {
     // Temizlik
     await serverPlaybookStorage.deleteEntry(testId, "stock");
   });
+
+  it("6. Sunucu query_playbook aracı Playbook Sub-Agent entegrasyonu ile semantik eşleştirme ve DAG döndürmelidir", async () => {
+    const { STANDARD_AGENT_TOOLS } = await import("./server-tools/standard-agent-tools");
+    const queryTool = STANDARD_AGENT_TOOLS.query_playbook;
+
+    assert.ok(queryTool, "query_playbook sunucu aracı mevcut olmalıdır");
+    assert.ok(typeof queryTool.execute === "function", "query_playbook execute fonksiyonu olmalıdır");
+
+    const result = await queryTool.execute!(
+      { task: "Satınalma siparişi ve depo mal kabul süreci", workspace: "stock" },
+      { toolCallId: "call_subagent_1", messages: [] },
+    );
+
+    assert.ok(result, "Sonuç nesnesi dönmelidir");
+    assert.ok(result.status === "ok" || result.status === "fallback", "Durum ok veya fallback olmalıdır");
+    assert.ok(result.matched, "Sub-agent satınalma reçetesini eşleştirmelidir");
+    assert.equal(result.recipe?.id, "recipe-purchasing-flow");
+    assert.ok(result.recipe?.graph?.nodes?.length > 0, "DAG düğümleri mevcut olmalıdır");
+    assert.ok(result.message, "Açıklama mesajı dönmelidir");
+  });
 });

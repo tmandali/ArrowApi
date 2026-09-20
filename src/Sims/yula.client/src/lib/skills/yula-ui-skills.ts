@@ -6,7 +6,6 @@ import { skillsManager } from "@my-agent/core";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import {
   formatLocalizedRelativeDateTerms,
-  formatLocalizedRunVerbs,
 } from "../yula-prompt-directives";
 
 const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
@@ -25,9 +24,8 @@ export const AGENT_PREPARE_CHAIN_RULES = [
   "  1. Identify the target report (catalog / RAG router) and learn its fields via dispatch_component_action (component_id='criteria_form:<scope>', action='SCHEMA').",
   `  2. Extract criteria from the request and automatically expand relative dates (${formatLocalizedRelativeDateTerms()}) to exact ISO ranges without asking choice questions. Read draft with action='READ', merge, then call dispatch_component_action with component_id='criteria_form:<scope>', action='SET_FIELDS' (apply_criteria) with the COMPLETE set for the target scope BEFORE navigating.`,
   "  3. Open the target route via dispatch_component_action with component_id='app_router', action='NAVIGATE' (navigate_to_page) (payload: { path: '/...' }) in the SAME turn. Include the report link in your reply.",
-  "  4. Reply with what was filled (field names + values, user's language) plus the run confirmation as a separate clickable bold bullet (e.g. '• **Run the report**').",
-  `• Preparing ≠ running: NEVER call action='SUBMIT' (run_job) without an explicit run verb (${formatLocalizedRunVerbs()}). If mandatory fields are missing, ask via 'ask_user_choice'.`,
-  `• Explicit run verbs skip the confirmation: When user explicitly asks to run/create/start/fetch (${formatLocalizedRunVerbs()}) (e.g. 'satış raporunu al', 'raporu çalıştır', 'run sales report'): directly execute action='SUBMIT' (run_job) with component_id='criteria_form:<scope>' (chaining action='SET_FIELDS' only if specific criteria were provided in the request). Do NOT call action='READ' or 'SCHEMA' first on explicit run requests.`,
+  "  4. Reply with what was filled (field names + values in the user's language). If user intent is preparation/workflow consultation (not explicit execution), invoke 'ask_user_choice' to offer interactive choice cards to run the report or adjust filters (with label, description, and rationale). NEVER format text as fake clickable bullets.",
+  "• Preparing ≠ running: If user intent is preparation or workflow consultation, do NOT call action='SUBMIT' directly; present the plan/criteria and invoke 'ask_user_choice'. In DIRECT_EXECUTION mode (explicit run intent), directly execute action='SUBMIT' (chaining action='SET_FIELDS' if specific criteria were provided in the request).",
 ].join("\n");
 
 export function registerYulaSkills(): void {

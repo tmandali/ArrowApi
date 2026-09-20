@@ -83,3 +83,37 @@ graph TD
   - Auto-Layout Engine: `@dagrejs/dagre` calculates hierarchical layout coordinates dynamically in-browser, keeping disk Markdown files clean, human-readable, and git-diff friendly without hardcoding pixel coordinates.
   - Dual Mode View: [`PlaybooksManagementView.tsx`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/workspaces/my/components/playbooks/playbooks-management-view.tsx) supports instant switching between the list Card View and the interactive Graph (DAG) View.
 
+---
+
+## 6. Two-Tier Retrieval & Tool-as-a-Subagent Pattern
+
+To prevent **Context Window Bloat** as corporate recipe catalogs scale to hundreds of entries, the system uses a **Two-Tier Retrieval Architecture** based on the Vercel AI SDK "Tool-as-a-Subagent" (Nested Worker) pattern:
+
+```mermaid
+graph TD
+    classDef client fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef main fill:#0f172a,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+    classDef subagent fill:#4c1d95,stroke:#c084fc,stroke-width:2px,color:#f5f3ff;
+    classDef store fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5;
+
+    User["User Turn"]:::client --> Main["Main UI Agent (Level 0)"]:::main
+    Main -- "1. query_playbook(task, ws)" --> Sub["Playbook Retrieval Sub-Agent"]:::subagent
+    
+    subgraph SubagentSandbox ["Isolated Worker Sandbox (generateText)"]
+        Sub --> Search["search_catalog (Fuzzy Index)"]:::subagent
+        Sub --> Inspect["inspect_recipe (DAG Inspection)"]:::subagent
+        Sub --> Match["Semantic Intent Matchmaking"]:::subagent
+    end
+
+    Search <--> WikiStore[("Workspace Wiki Storage")]:::store
+    Inspect <--> WikiStore
+
+    Match -- "2. Curated DAG & Verified Steps" --> Main
+    Main -- "3. HITL Action Card (Approval)" --> User
+```
+
+### Key Architectural Benefits:
+1. **Zero Context Bloat:** Only active screen rules (1–3 lines) reside in Level-0 prompt. Workflow recipes are decoupled from the system prompt, saving 30k–100k tokens per request.
+2. **Semantic Intent Resolution:** Natural language business requests (e.g., *"ay sonu depo sayımını eşitle"*) are mapped to verified corporate recipe IDs (`recipe-stock-reconciliation`) via isolated subagent reasoning rather than brittle keyword overlap.
+3. **Resilient Pi Fallback:** If the subagent fails or times out (3500 ms limit), execution seamlessly drops into local deterministic index search without UI disruption.
+

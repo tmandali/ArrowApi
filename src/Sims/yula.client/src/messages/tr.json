@@ -828,6 +828,7 @@
   },
   "AiDock": {
     "new_chat": "Yeni Sohbet Başlat",
+    "delete_chat": "Sohbeti sil",
     "continue_main": "Ana ekranda devam et",
     "expand_overlay": "Tam ekrana genişlet",
     "collapse_overlay": "Dock'a geri dön",
@@ -927,7 +928,11 @@
   "ChoiceCard": {
     "option_selected": "Seçim yapıldı",
     "send": "Gönder",
-    "default_question": "Lütfen bir seçenek belirleyin:"
+    "custom_reply": "Farklı bir şey yaz...",
+    "default_question": "Lütfen bir seçenek belirleyin:",
+    "rationale_label": "Gerekçe / Etki",
+    "recommended": "Önerilen",
+    "select": "Seç"
   },
   "QuestionnaireCard": {
     "answered_questions": "Cevaplanan sorular",
@@ -1496,12 +1501,18 @@
     "new_conversation": "Yeni Sohbet",
     "conversation_history": "Konuşma Geçmişi",
     "scheduled_tasks": "Zamanlanmış Görevler",
-    "projects_header": "Projeler",
+    "workspaces_header": "Çalışma Alanları",
+    "projects_header": "Çalışma Alanları",
     "settings": "Ayarlar",
     "see_all": "Tümünü gör ({count})",
     "no_conversations_yet": "Henüz konuşma yok",
     "open_ide": "IDE Aç",
-    "active_tab": "Aktif Sekme"
+    "active_tab": "Aktif Sekme",
+    "delete_conversation": "Sohbeti sil",
+    "delete_folder": "Klasörü ve sohbetleri sil",
+    "confirm_clear_ask": "Silinsin mi?",
+    "confirm_yes": "Evet",
+    "confirm_no": "İptal"
   },
   "Welcome": {
     "description": "Yula, yol gösteren ışık veren anlamına gelir. Size yardımcı olmak için burada"

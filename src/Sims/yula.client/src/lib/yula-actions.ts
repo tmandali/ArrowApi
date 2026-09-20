@@ -225,17 +225,3 @@ export function runConfirmationClickPrompt(args: {
     scope,
   };
 }
-
-/** Tırnak içi komut önerisi tespiti — teknik araç adları ve rapor adları hariç. */
-export function isPromptSentenceLike(candidate: string): boolean {
-  const candidateLower = candidate.toLowerCase()
-  const isTechnicalTool = /^(filter_|update_|clear_|analyze_|detect_|get_|create_)/i.test(candidate)
-  const isSimpleReportName = KNOWN_SYSTEM_ACTIONS.some(
-    (a) => a.label.toLowerCase() === candidateLower || a.scope?.toLowerCase() === candidateLower,
-  )
-  const isPromptSentence =
-    candidate.includes(" ") &&
-    (/(hazırla|hazirla|göster|goster|listele|filtrele|süz|suz|aç|ac|analiz|trend|temizle|temiz)/i.test(candidate) ||
-      /^(son|bu|tüm|tum|hangi|geçen)/i.test(candidate))
-  return !isTechnicalTool && !isSimpleReportName && isPromptSentence
-}

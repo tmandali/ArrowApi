@@ -2,12 +2,54 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Maximize2, Minimize2, SquarePen, X } from "lucide-react";
+import { Maximize2, Minimize2, SquarePen, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { cn } from "@/utils/cn";
+
+export function YulaDeleteChatButton({ className }: { className?: string }) {
+  const t = useTranslations("AiDock");
+  const conversations = useChatsStore((s) => s.conversations);
+  const activeId = useChatsStore((s) => s.activeId);
+  const deleteConversation = useChatsStore((s) => s.deleteConversation);
+  const { deleteConversation: chatDeleteConversation } =
+    useOptionalYulaChat() ?? {};
+
+  const hasSavedConversation = React.useMemo(
+    () => Boolean(activeId && conversations.some((c) => c.id === activeId)),
+    [activeId, conversations],
+  );
+
+  if (!hasSavedConversation || !activeId) return null;
+
+  const handleDelete = () => {
+    if (chatDeleteConversation) {
+      chatDeleteConversation(activeId);
+    } else {
+      deleteConversation(activeId);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      data-ide-action="true"
+      className={cn(
+        "size-7 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+        className,
+      )}
+      onClick={handleDelete}
+      title={t("delete_chat")}
+      aria-label={t("delete_chat")}
+    >
+      <Trash2 className="size-3.5" />
+    </Button>
+  );
+}
 
 export function YulaNewChatButton({ className }: { className?: string }) {
   const t = useTranslations("AiDock");

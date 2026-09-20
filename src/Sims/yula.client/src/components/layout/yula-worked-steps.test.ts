@@ -120,6 +120,70 @@ describe("extractWorkedSteps - Wiki & Playbook Adımları", () => {
     );
   });
 
+  it("query_playbook tool çağrısı çalışırken (isPending/canlı) ekranda Playbook Sub-Agent analiz göstergesi yer alır", () => {
+    const msg: YulaMessage = {
+      id: "msg-2-live",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-query_playbook",
+          toolCallId: "tc-query-live",
+          state: "call",
+          input: {
+            task: "satınalma onay akışı",
+            workspace: "purchasing",
+          },
+        } as any,
+      ],
+    } as any;
+
+    const steps = extractWorkedSteps(msg, true);
+    const liveStep = steps.find((s) => s.id === "tc-query-live");
+
+    assert.ok(liveStep, "query_playbook canlı adımı bulunmalı");
+    assert.equal(liveStep.isLive, true, "isLive true olmalı (spinner/pulse aktif)");
+    assert.ok(liveStep.label.includes("🤖 Playbook Sub-Agent"), "Etikette Sub-Agent kimliği yer almalı");
+    assert.ok(liveStep.subLabel?.includes("🤖 Sub-Agent analiz ediyor"), "Alt etikette Sub-Agent analiz durumu yer almalı");
+  });
+
+  it("query_playbook bir reçete ile tamamlandığında Sub-Agent onay etiketi ve güven skoru gösterilir", () => {
+    const msg: YulaMessage = {
+      id: "msg-2-recipe",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-query_playbook",
+          toolCallId: "tc-query-recipe",
+          state: "output-available",
+          input: {
+            task: "satınalma siparişi",
+            workspace: "purchasing",
+          },
+          output: {
+            status: "ok",
+            recipe: {
+              id: "recipe-purchasing-flow",
+              title: "Satın Alma Onay Akışı",
+              contentMarkdown: "1. Sipariş oluşturulur.\n2. Bütçe onayı alınır.",
+            },
+            confidence: 0.95,
+            message: "Semantik olarak eşleşti",
+          },
+        } as any,
+      ],
+    } as any;
+
+    const steps = extractWorkedSteps(msg);
+    const recipeStep = steps.find((s) => s.id === "tc-query-recipe");
+
+    assert.ok(recipeStep, "reçete adımı üretilmeli");
+    assert.equal(recipeStep.isLive, false);
+    assert.ok(recipeStep.label.includes("🤖 Playbook Sub-Agent"));
+    assert.ok(recipeStep.subLabel?.includes("Workflow recipe found: Satın Alma Onay Akışı (%95 uyum · Sub-Agent verified)"));
+    assert.ok(recipeStep.detailText?.includes("%95 Güven"));
+    assert.ok(recipeStep.detailText?.includes("Bütçe onayı alınır"));
+  });
+
   it("propose_playbook_update tool çağrısı yapıldığında wiki güncelleme adımı ve detayları açıkça görülür", () => {
     const msg: YulaMessage = {
       id: "msg-3",
@@ -201,4 +265,35 @@ describe("extractWorkedSteps - Wiki & Playbook Adımları", () => {
     assert.ok(recStep, "recall_fact adımı üretilmeli");
     assert.ok(recStep.label.includes("preferred_store"));
   });
+
+  it("ask_user_choice ve ask_user_question onay adımlarında asla spinner (isLive: true) görünmez", () => {
+    const msg: YulaMessage = {
+      id: "msg-choice-1",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-ask_user_choice",
+          toolCallId: "tc-choice-1",
+          state: "input-available",
+          input: {
+            question: "Hangi tarih aralığı?",
+            options: [{ label: "Son 15 gün", value: "15d" }],
+          },
+        } as any,
+      ],
+    } as any;
+
+    // Canlı akışta bile onay kartı spinner göstermemelidir
+    const liveSteps = extractWorkedSteps(msg, true);
+    const choiceLiveStep = liveSteps.find((s) => s.id === "tc-choice-1");
+    assert.ok(choiceLiveStep, "choice adımı üretilmeli");
+    assert.equal(choiceLiveStep.isLive, false, "ask_user_choice canlı akışta spinner olmamalı");
+
+    // Akış bittiğinde (false) kesinlikle isLive false olmalı
+    const doneSteps = extractWorkedSteps(msg, false);
+    const choiceDoneStep = doneSteps.find((s) => s.id === "tc-choice-1");
+    assert.ok(choiceDoneStep, "choice adımı üretilmeli");
+    assert.equal(choiceDoneStep.isLive, false, "ask_user_choice tamamlandığında spinner olmamalı");
+  });
 });
+

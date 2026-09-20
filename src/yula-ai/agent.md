@@ -167,12 +167,13 @@ Every participant in the system is documented below with its role, registration 
 - **Outbound Edges:** Downstream: Reads live state and telemetry of UI component nodes.
 
 #### 🏷️ `ChoiceCardToolNode` (`ask_user_choice`)
-- **Role:** Human-in-the-Loop (HITL) Inline Decision Card generator. Renders interactive choice buttons (`YulaChoiceCard`) directly inside the chat stream.
-- **Contract:** `{ question: string, choices: Array<{ id: string, label: string, variant?: string }> }`.
+- **Role:** Human-in-the-Loop (HITL) Inline Decision Card generator. Renders interactive choice cards (`YulaChoiceCard`) directly inside the chat stream with full descriptions and rationales.
+- **Contract:** `{ question: string, options: Array<{ label: string, value?: string, description?: string, rationale?: string, badge?: string } | string>, allow_custom?: boolean, custom_placeholder?: string }`.
 - **Inbound Edges:** Upstream: [`AgentLoopNode`](#agentloopnode).
-- **Outbound Edges:** Downstream: Presents selectable options to [`UserNode`](#user-node).
+- **Outbound Edges:** Downstream: Presents selectable options and trade-offs to [`UserNode`](#user-node).
 - **Feedback Loop (Pause & Resume):**
-  - Triggers `stopWhen: hasToolCall("ask_user_choice")`, freezing agent turn execution until the user clicks an option.
+  - Triggers `stopWhen: hasToolCall("ask_user_choice")`, freezing agent turn execution until the user clicks an option or enters custom input.
+  - Strictly supersedes raw markdown text heuristics; the frontend never infers buttons from markdown prose regexes.
 
 #### 🏷️ `MemoryToolNode` (`remember_fact`, `recall_fact`, `forget_fact`)
 - **Role:** Session and persistent memory manager for user preferences and ad-hoc facts.

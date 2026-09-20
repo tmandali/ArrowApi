@@ -251,7 +251,7 @@ export function hasScreenActionSuccess(toolParts: YulaToolPartInfo[]): boolean {
     (i) =>
       SCREEN_TOOLS.has(i.toolName) &&
       !isFailedToolInfo(i) &&
-      i.state === "output-available",
+      (i.state === "output-available" || i.state === "input-available"),
   );
 }
 

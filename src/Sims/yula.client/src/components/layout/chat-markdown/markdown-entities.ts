@@ -1,7 +1,6 @@
 import { marked } from "marked";
 import {
   KNOWN_SYSTEM_ACTIONS,
-  isPromptSentenceLike,
 } from "@/lib/yula-actions";
 import { findReport, REGISTERED_REPORTS } from "@/features/reports/report-registry";
 
@@ -40,14 +39,12 @@ export function extractInteractiveNodes(value: string): Array<Record<string, unk
     });
   }
 
-  // 2) Tırnaklı komut önerileri
+  // 2) Tırnaklı bilinen rapor/ekran adları
   for (const qm of value.matchAll(QUOTE_RE)) {
     const inner = qm[2].trim();
     const known = KNOWN_SYSTEM_ACTIONS.find((a) => a.pattern.test(inner));
-    if (!known && !isPromptSentenceLike(inner)) continue;
-    const url = known
-      ? `yula-report:${encodeURIComponent(known.prompt)}|${encodeURIComponent(known.label)}`
-      : `yula-prompt:${encodeURIComponent(inner)}`;
+    if (!known) continue;
+    const url = `yula-report:${encodeURIComponent(known.prompt)}|${encodeURIComponent(known.label)}`;
     matches.push({
       start: qm.index!,
       end: qm.index! + qm[0].length,

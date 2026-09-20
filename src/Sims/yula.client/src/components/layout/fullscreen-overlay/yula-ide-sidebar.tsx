@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Plus,
   Settings,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
@@ -47,7 +48,15 @@ export function YulaIdeSidebar({
   const conversations = useChatsStore((s) => s.conversations);
   const activeId = useChatsStore((s) => s.activeId);
   const selectConversation = useChatsStore((s) => s.selectConversation);
-  const { newConversation } = useOptionalYulaChat() ?? {};
+  const deleteConversation = useChatsStore((s) => s.deleteConversation);
+  const deleteConversations = useChatsStore((s) => s.deleteConversations);
+  const {
+    newConversation,
+    deleteConversation: chatDeleteConversation,
+    deleteConversations: chatDeleteConversations,
+  } = useOptionalYulaChat() ?? {};
+
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = React.useState<string | null>(null);
 
   const [expandedGroups, setExpandedGroups] = React.useState<
     Record<string, boolean>
@@ -57,7 +66,7 @@ export function YulaIdeSidebar({
   >({});
 
   // Group conversations by workspace name
-  const projectGroups = React.useMemo(() => {
+  const workspaceGroups = React.useMemo(() => {
     const groupsMap: Record<string, YulaConversation[]> = {};
 
     const sorted = [...conversations].sort((a, b) => b.createdAt - a.createdAt);
@@ -115,6 +124,31 @@ export function YulaIdeSidebar({
     [selectConversation, onSelectConversation],
   );
 
+  const handleDelete = React.useCallback(
+    (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (chatDeleteConversation) {
+        chatDeleteConversation(id);
+      } else {
+        deleteConversation(id);
+      }
+    },
+    [chatDeleteConversation, deleteConversation],
+  );
+
+  const handleDeleteGroup = React.useCallback(
+    (group: { name: string; items: YulaConversation[] }) => {
+      const ids = group.items.map((c) => c.id);
+      if (ids.length === 0) return;
+      if (chatDeleteConversations) {
+        chatDeleteConversations(ids);
+      } else {
+        deleteConversations(ids);
+      }
+    },
+    [chatDeleteConversations, deleteConversations],
+  );
+
   return (
     <aside
       className={cn(
@@ -166,23 +200,23 @@ export function YulaIdeSidebar({
         </button>
       </div>
 
-      {/* Projects Section Header */}
+      {/* Workspaces Section Header */}
       <div className="mt-2 flex items-center justify-between px-4 py-1 text-[11px] font-medium text-muted-foreground">
-        <span>{t("projects_header")}</span>
+        <span>{t("workspaces_header")}</span>
         <div className="flex items-center gap-1">
           <ListFilter className="size-3 text-muted-foreground/60" />
         </div>
       </div>
 
-      {/* Projects Tree List */}
+      {/* Workspaces Tree List */}
       <div className="flex-1 overflow-y-auto px-2 space-y-1 overscroll-contain">
-        {projectGroups.length === 0 ? (
+        {workspaceGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground/60">
             <MessageSquare className="size-6 text-muted-foreground/30 mb-1" />
             <span>{t("no_conversations_yet")}</span>
           </div>
         ) : (
-          projectGroups.map((group) => {
+          workspaceGroups.map((group) => {
             const isExpanded = expandedGroups[group.name] ?? true;
             const showAll = showAllPerGroup[group.name] ?? false;
             const visibleItems = showAll ? group.items : group.items.slice(0, 5);
@@ -190,25 +224,75 @@ export function YulaIdeSidebar({
 
             return (
               <div key={group.name} className="space-y-0.5">
-                {/* Project Folder Row */}
-                <button
-                  type="button"
-                  data-slot="ide-folder-toggle"
-                  onClick={() => toggleGroup(group.name)}
-                  className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="size-3 text-muted-foreground/60" />
+                {/* Workspace Folder Row */}
+                <div className="group/folder flex w-full items-center justify-between gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors">
+                  <button
+                    type="button"
+                    data-slot="ide-folder-toggle"
+                    onClick={() => toggleGroup(group.name)}
+                    className="flex items-center gap-1.5 min-w-0 flex-1 text-left cursor-pointer focus-visible:outline-none"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="size-3 text-muted-foreground/60 shrink-0" />
+                    ) : (
+                      <ChevronRight className="size-3 text-muted-foreground/60 shrink-0" />
+                    )}
+                    {isExpanded ? (
+                      <FolderOpen className="size-3.5 text-amber-500/80 shrink-0" />
+                    ) : (
+                      <Folder className="size-3.5 text-amber-500/80 shrink-0" />
+                    )}
+                    <span className="truncate">{group.name}</span>
+                    <span className="text-[10px] text-muted-foreground/50 font-normal">
+                      ({group.items.length})
+                    </span>
+                  </button>
+
+                  {confirmDeleteGroup === group.name ? (
+                    <div className="flex items-center gap-1 shrink-0 animate-in fade-in-50 duration-100">
+                      <span className="text-[10px] text-destructive font-medium">
+                        {t("confirm_clear_ask")}
+                      </span>
+                      <button
+                        type="button"
+                        data-ide-action="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteGroup(group);
+                          setConfirmDeleteGroup(null);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground font-medium text-[10px] transition-colors cursor-pointer"
+                      >
+                        {t("confirm_yes")}
+                      </button>
+                      <button
+                        type="button"
+                        data-ide-action="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteGroup(null);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-muted hover:bg-accent text-[10px] font-medium transition-colors cursor-pointer"
+                      >
+                        {t("confirm_no")}
+                      </button>
+                    </div>
                   ) : (
-                    <ChevronRight className="size-3 text-muted-foreground/60" />
+                    <button
+                      type="button"
+                      data-ide-action="true"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteGroup(group.name);
+                      }}
+                      title={t("delete_folder")}
+                      aria-label={t("delete_folder")}
+                      className="hidden group-hover/folder:flex group-focus-within/folder:flex size-4 items-center justify-center rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 focus-visible:text-destructive focus-visible:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
                   )}
-                  {isExpanded ? (
-                    <FolderOpen className="size-3.5 text-amber-500/80" />
-                  ) : (
-                    <Folder className="size-3.5 text-amber-500/80" />
-                  )}
-                  <span className="truncate">{group.name}</span>
-                </button>
+                </div>
 
                 {/* Group Conversation Items */}
                 {isExpanded ? (
@@ -218,25 +302,44 @@ export function YulaIdeSidebar({
                       const timeAgo = formatTimeAgo(conv.createdAt);
 
                       return (
-                        <button
+                        <div
                           key={conv.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
                           data-slot="ide-conversation-item"
                           onClick={() => handleSelect(conv)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleSelect(conv);
+                            }
+                          }}
                           className={cn(
-                            "flex w-full items-center justify-between gap-1.5 rounded-md px-2.5 py-1 text-xs text-left transition-colors cursor-pointer group",
+                            "group flex w-full items-center justify-between gap-1.5 rounded-md px-2.5 py-1 text-xs text-left transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                             isActive
                               ? "bg-background font-medium text-foreground shadow-2xs border border-border/40"
                               : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
                           )}
                         >
-                          <span className="truncate flex-1">
+                          <span className="truncate flex-1 min-w-0">
                             {conv.title || "Untitled Session"}
                           </span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground/60 group-hover:text-muted-foreground">
-                            {timeAgo}
-                          </span>
-                        </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] text-muted-foreground/60 group-hover:hidden group-focus-within:hidden">
+                              {timeAgo}
+                            </span>
+                            <button
+                              type="button"
+                              data-ide-action="true"
+                              onClick={(e) => handleDelete(e, conv.id)}
+                              title={t("delete_conversation")}
+                              aria-label={t("delete_conversation")}
+                              className="hidden group-hover:flex group-focus-within:flex size-4 items-center justify-center rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 focus-visible:text-destructive focus-visible:bg-destructive/10 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="size-3" />
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
 

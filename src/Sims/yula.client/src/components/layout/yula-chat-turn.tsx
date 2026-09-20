@@ -33,6 +33,7 @@ import {
   liveStatusLabel,
   SilentTurnFallback,
   hasVisibleTurnContent,
+  INTERACTIVE_CARD_TOOLS,
 } from "./yula-chat-turn-helpers";
 import { modelCatalog } from "@my-agent/core";
 
@@ -363,76 +364,30 @@ export function YulaChatTurn({
           conversationId={conversationId}
         />
 
-        {/* Özel Görsel Kartlar (Grafik Kartı) */}
-        {toolParts.map((info) => {
-          const isError = isFailedToolInfo(info);
-          if (isError && recoveredToolCallIds.has(info.toolCallId)) {
-            return null;
-          }
-          return (
-            <React.Fragment key={info.toolCallId}>
-              {info.toolName === "visualize_grid_data" &&
-              !isError &&
-              info.state === "output-available" ? (
-                <YulaChartCard output={info.output} />
-              ) : null}
-              {info.toolName === "ask_user_choice" &&
-              !isError &&
-              (info.state === "output-available" ||
-                info.state === "input-available") ? (
-                <YulaChoiceCard
-                  messageId={assistantMessage?.id}
-                  input={info.input}
-                  output={info.state === "output-available" ? info.output : undefined}
-                />
-              ) : null}
-              {info.toolName === "ask_user_question" &&
-              !isError &&
-              (info.state === "output-available" ||
-                info.state === "input-available") ? (
-                <YulaQuestionnaireCard
-                  messageId={assistantMessage?.id}
-                  input={info.input}
-                  output={info.state === "output-available" ? info.output : undefined}
-                />
-              ) : null}
-              {info.toolName === "suggest_next_steps" &&
-              !isError &&
-              (info.state === "output-available" ||
-                info.state === "input-available") ? (
-                <YulaSuggestionChips
-                  input={info.input}
-                  output={info.state === "output-available" ? info.output : undefined}
-                />
-              ) : null}
-              {(info.toolName === "run_job" ||
-                (info.toolName === "dispatch_component_action" &&
-                  (info.input as { action?: string } | undefined)?.action === "RUN") ||
-                (info.toolName === "dispatch_component_action" &&
-                  typeof info.output === "object" &&
-                  info.output !== null &&
-                  (info.output as { status?: unknown }).status === "executed")) &&
+        {/* 1. İçerik Araç Kartları (Grafik Kartı, Başlatılan İş vb.) */}
+        {toolParts
+          .filter((i) => !INTERACTIVE_CARD_TOOLS.has(i.toolName))
+          .map((info) => {
+            const isError = isFailedToolInfo(info);
+            if (isError && recoveredToolCallIds.has(info.toolCallId)) return null;
+            if (info.toolName === "visualize_grid_data" && !isError && info.state === "output-available") {
+              return <YulaChartCard key={info.toolCallId} output={info.output} />;
+            }
+            const isJob =
+              (info.toolName === "run_job" ||
+                (info.input as { action?: string } | undefined)?.action === "RUN" ||
+                (info.output as { status?: string } | undefined)?.status === "executed") &&
               !isError &&
               info.state === "output-available" &&
-              typeof info.output === "object" &&
-              info.output !== null &&
-              (info.output as { status?: unknown }).status === "executed" &&
-              typeof (info.output as { navigateTo?: unknown }).navigateTo ===
-                "string" ? (
-                <YulaJobStartedCard
-                  jobId={
-                    typeof (info.output as { jobId?: unknown }).jobId === "string"
-                      ? (info.output as { jobId: string }).jobId
-                      : undefined
-                  }
-                  navigateTo={(info.output as { navigateTo: string }).navigateTo}
-                />
-              ) : null}
-            </React.Fragment>
-          );
-        })}
+              typeof (info.output as { navigateTo?: unknown })?.navigateTo === "string";
+            if (isJob) {
+              const out = info.output as { jobId?: string; navigateTo: string };
+              return <YulaJobStartedCard key={info.toolCallId} jobId={out.jobId} navigateTo={out.navigateTo} />;
+            }
+            return null;
+          })}
 
-        {/* Nihai Akan Markdown Cevap — boş metinde sessiz kalma: canlı durum veya fallback */}
+        {/* 2. Nihai Akan Markdown Cevap / Plan Metni — Kullanıcı önce planı okur */}
         {assistantText.trim() && displayAssistantMessage ? (
           <AiChatMessage
             message={displayAssistantMessage}
@@ -445,6 +400,39 @@ export function YulaChatTurn({
             onRunReport={runAction ? handleRunReportClick : undefined}
           />
         ) : null}
+
+        {/* 3. Etkileşimli Karar ve Takip Kartları (Seçenekler, Anketler, Öneriler) — Planın hemen altında */}
+        {toolParts
+          .filter((i) => INTERACTIVE_CARD_TOOLS.has(i.toolName))
+          .map((info) => {
+            const isError = isFailedToolInfo(info);
+            if (isError && recoveredToolCallIds.has(info.toolCallId)) return null;
+            const isReady = info.state === "output-available" || info.state === "input-available";
+            if (info.toolName === "ask_user_choice" && !isError && isReady) {
+              return (
+                <YulaChoiceCard
+                  key={info.toolCallId}
+                  messageId={assistantMessage?.id}
+                  input={info.input}
+                  output={info.state === "output-available" ? info.output : undefined}
+                />
+              );
+            }
+            if (info.toolName === "ask_user_question" && !isError && isReady) {
+              return (
+                <YulaQuestionnaireCard
+                  key={info.toolCallId}
+                  messageId={assistantMessage?.id}
+                  input={info.input}
+                  output={info.state === "output-available" ? info.output : undefined}
+                />
+              );
+            }
+            if (info.toolName === "suggest_next_steps" && !isError && isReady) {
+              return <YulaSuggestionChips key={info.toolCallId} input={info.input} output={info.state === "output-available" ? info.output : undefined} />;
+            }
+            return null;
+          })}
 
         {isLive ? (
           <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground">

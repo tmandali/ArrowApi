@@ -34,6 +34,7 @@ interface ChatsState {
   newConversation: () => void;
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
+  deleteConversations: (ids: string[]) => void;
   renameConversation: (id: string, title: string) => void;
   renameFromFirstMessage: (id: string, text: string, agentId?: string | null) => void;
   clearAllConversations: () => void;
@@ -134,6 +135,37 @@ export const useChatsStore = create<ChatsState>()(
           delete messagesById[id];
           // Silinen aktif sohbette başka kayda geçmek yerine taze sohbet açılır.
           const activeId = s.activeId === id ? makeId() : s.activeId;
+          return { conversations, messagesById, activeId };
+        });
+      },
+
+      deleteConversations: (ids) => {
+        if (!ids.length) return;
+        const idSet = new Set(ids);
+        void import("@/services/duckdb-vector")
+          .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
+            try {
+              await removeConversationVectors(ids);
+            } catch (err) {
+              console.warn("[Yula chats] toplu vektör silme başarısız:", err);
+            }
+            try {
+              const remaining = get().conversations.map((c) => c.id).filter((id) => !idSet.has(id));
+              await purgeOrphanConversationVectors(remaining);
+            } catch (err) {
+              console.warn("[Yula chats] yetim vektör taraması başarısız:", err);
+            }
+          })
+          .catch((err) => {
+            console.warn("[Yula chats] vektör modülü yüklenemedi:", err);
+          });
+        set((s) => {
+          const conversations = s.conversations.filter((c) => !idSet.has(c.id));
+          const messagesById = { ...s.messagesById };
+          for (const id of ids) {
+            delete messagesById[id];
+          }
+          const activeId = s.activeId && idSet.has(s.activeId) ? makeId() : s.activeId;
           return { conversations, messagesById, activeId };
         });
       },

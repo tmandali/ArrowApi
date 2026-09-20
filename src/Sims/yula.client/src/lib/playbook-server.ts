@@ -391,3 +391,9 @@ export const serverPlaybookStorage = new ServerFsPlaybookStorage();
 
 /** Sunucu tarafında singleton playbook servisi */
 export const serverPlaybookService = new PlaybookService(serverPlaybookStorage);
+
+// Vercel AI SDK tabanlı Playbook Sub-Agent çözümleyicisini çekirdek servise bağla
+serverPlaybookService.setSubagentResolver(async (task, ws) => {
+  const { runPlaybookSubagent } = await import("./server-tools/playbook-subagent");
+  return runPlaybookSubagent({ task, workspace: ws });
+});

@@ -140,11 +140,30 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
     },
     [router],
   );
+  const [liveHelpers, setLiveHelpers] = React.useState<LiveHelpers | null>(null);
+
   const deleteConversation = React.useCallback(
-    (id: string) => useChatsStore.getState().deleteConversation(id),
-    [],
+    (id: string) => {
+      if (useChatsStore.getState().activeId === id) {
+        liveHelpers?.stop();
+        void resetGridCustomView();
+      }
+      useChatsStore.getState().deleteConversation(id);
+    },
+    [liveHelpers],
   );
-  const [liveHelpers, setLiveHelpers] = React.useState<LiveHelpers | null>(null)
+
+  const deleteConversations = React.useCallback(
+    (ids: string[]) => {
+      const activeId = useChatsStore.getState().activeId;
+      if (activeId && ids.includes(activeId)) {
+        liveHelpers?.stop();
+        void resetGridCustomView();
+      }
+      useChatsStore.getState().deleteConversations(ids);
+    },
+    [liveHelpers],
+  );
 
   const newConversation = React.useCallback(() => {
     // Devam eden akış/araç döngüsünü KES — aksi halde eski tur arka planda
@@ -229,6 +248,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       activeId: activeId ?? '',
       selectConversation,
       deleteConversation,
+      deleteConversations,
       newConversation,
       model,
       setModel,
@@ -246,6 +266,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
 	setThinkingEnabled,
 	selectConversation,
 	deleteConversation,
+	deleteConversations,
 	newConversation
   ]);
 

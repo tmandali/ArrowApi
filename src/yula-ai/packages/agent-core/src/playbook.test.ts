@@ -204,5 +204,56 @@ describe('PlaybookService & LLM Wiki Çekirdek Motoru', () => {
       expect(emptyProposals).toHaveLength(0);
     });
   });
+
+  describe('Two-Tier Intent Resolution & Subagent Resolver', () => {
+    it('alt ajan çözümleyicisi kayıtlıysa öncelikle onu çalıştırmalı ve sonucu dönmelidir', async () => {
+      await service.recordEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'workflow_recipe',
+        title: 'Depo Sayım ve Envanter Eşitleme',
+        contentMarkdown: '1. Sayımı başlat\n2. Farkları raporla',
+      });
+
+      // Alt ajan simülasyonu
+      service.setSubagentResolver(async (query, ws) => {
+        if (query.includes('stok mutabakatı')) {
+          const all = await storage.readEntries(ws);
+          const found = all.find((e) => e.title.includes('Depo Sayım'));
+          return {
+            status: 'ok',
+            matched: true,
+            confidence: 0.95,
+            recipe: found || null,
+            screenRules: [],
+            explanation: 'Subagent matched intent to Depo Sayım',
+          };
+        }
+        return null;
+      });
+
+      const res = await service.resolveIntent('ay sonu stok mutabakatı yapalım', 'stock');
+      expect(res.matched).toBe(true);
+      expect(res.status).toBe('ok');
+      expect(res.confidence).toBe(0.95);
+      expect(res.recipe?.title).toBe('Depo Sayım ve Envanter Eşitleme');
+      expect(res.explanation).toContain('Subagent matched');
+    });
+
+    it('alt ajan tanımlı değilse veya null dönerse deterministik yerel aramaya düşmelidir', async () => {
+      await service.recordEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'workflow_recipe',
+        title: 'Fason Sevk Süreci',
+        contentMarkdown: '1. Sevk irsaliyesi kes',
+      });
+
+      const res = await service.resolveIntent('Fason Sevk Süreci', 'stock');
+      expect(res.matched).toBe(true);
+      expect(res.status).toBe('fallback');
+      expect(res.recipe?.title).toBe('Fason Sevk Süreci');
+    });
+  });
 });
 

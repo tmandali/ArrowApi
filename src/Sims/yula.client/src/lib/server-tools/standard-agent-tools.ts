@@ -62,7 +62,7 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   ask_user_choice: tool({
-    description: "Prompt the user with interactive choice buttons or a clarification question with predefined options and an optional custom input.",
+    description: "Prompt the user with interactive choice buttons or a decision card. Whenever asking the user to make a choice or decision, each option should include a label, a clear description of what the option executes, and a rationale/business impact so the user can evaluate properly.",
     inputSchema: z.object({
       question: z.string().describe("Question or decision prompt to present to the user"),
       options: z
@@ -70,14 +70,16 @@ export const STANDARD_AGENT_TOOLS = {
           z.union([
             z.string(),
             z.object({
-              label: z.string().describe("Option button label"),
+              label: z.string().describe("Option button label / title"),
               value: z.string().optional().describe("Returned value when selected"),
-              description: z.string().optional().describe("Additional description"),
+              description: z.string().optional().describe("Clear explanation of what will happen if selected (Açıklama)"),
+              rationale: z.string().optional().describe("Why this option is proposed and its business impact / justification (Gerekçe)"),
+              badge: z.string().optional().describe("Optional badge tag, e.g. 'Önerilen', 'Standart', 'Kurumsal Kural'"),
             }),
           ]),
         )
         .min(1)
-        .describe("List of selectable options. ONLY concrete choices (e.g. 'Son 7 gün', 'Son 30 gün', 'TJ01'). Do not add placeholder options for typing; if custom input is allowed, provide a format hint in custom_placeholder instead."),
+        .describe("List of selectable options. Provide clear descriptions and rationales for strategic or workflow choices."),
       allow_custom: z.boolean().optional().default(true).describe("Allow custom text input below options"),
       custom_placeholder: z
         .string()
@@ -166,6 +168,8 @@ export const STANDARD_AGENT_TOOLS = {
       level: z.string().optional(),
       workspaceId: z.string().optional(),
       task: z.string().optional(),
+      matched: z.boolean().optional(),
+      confidence: z.number().optional(),
       screenRules: z.array(z.string()).optional(),
       recipe: z.any().optional(),
       relevantIndex: z.array(z.any()).optional(),
@@ -176,24 +180,19 @@ export const STANDARD_AGENT_TOOLS = {
       try {
         const { serverPlaybookService } = await import("@/lib/playbook-server");
         const wsId = workspace || "stock";
-        const screenRules = await serverPlaybookService.getScreenRules(task, wsId);
-        const recipe = await serverPlaybookService.findRecipe(task, wsId);
-        const index = await serverPlaybookService.getIndex(wsId);
-        const relevantIndex = index.filter(
-          (i) =>
-            i.title.toLowerCase().includes(task.toLowerCase()) ||
-            (i.targetPath && i.targetPath.includes(task)) ||
-            (i.summary && i.summary.toLowerCase().includes(task.toLowerCase())),
-        );
+        const result = await serverPlaybookService.resolveIntent(task, wsId);
         return {
-          status: "ok",
+          status: result.status,
           level: "workspace",
           workspaceId: wsId,
           task,
-          screenRules,
-          recipe,
-          relevantIndex,
-          rulesCount: screenRules.length,
+          matched: result.matched,
+          confidence: result.confidence,
+          screenRules: result.screenRules,
+          recipe: result.recipe,
+          relevantIndex: result.relevantIndex,
+          rulesCount: result.screenRules?.length ?? 0,
+          message: result.explanation,
         };
       } catch (err: any) {
         return { status: "error", message: err?.message || "Failed to query playbook" };

@@ -74,3 +74,11 @@ The Yula AI interface must always retain its **side dock/drawer** form factor re
 - All architecture guides, guidelines, checklists, and `.agents/**/*.md` documents must be authored and maintained strictly in English.
 - Whenever coding agents receive a new architectural directive or rule correction from the user, they must record it in the corresponding `.agents/*.md` document in English and append a dated entry to `.agents/log.md`.
 
+---
+
+## 8. Strict Ban on Regex Text-to-Button Heuristics in Markdown
+
+- **Prose Immutability:** Markdown text in chat turns is strictly a read-only presentation format.
+- **No Regex Buttonization:** The chat UI renderer (`markdown-blocks.tsx`, `markdown-entities.ts`) must NEVER parse assistant prose, bullet points, or quotes with regular expressions (e.g. searching for action verbs like `"sorgula"`, `"filtrele"`, `"aç"`, `"çalıştır"`, `"hazırla"`, `"göster"`) to fabricate clickable buttons or prompt chips.
+- **First-Class Tool Calls:** All interactive choices, workflow branches, and user decisions MUST be emitted by the model as structured `ask_user_choice` tool calls rendering via `YulaChoiceCard`.
+

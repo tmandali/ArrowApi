@@ -4,8 +4,6 @@ import { cn } from "@/utils/cn";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import {
   KNOWN_SYSTEM_ACTIONS,
-  isPromptSentenceLike,
-  isRunConfirmPhrase,
 } from "@/lib/yula-actions";
 import { parseColonTitleLine, extractFindingFilterPrompt } from "@/lib/finding-actions";
 import { buildFindingDrillPrompt } from "@/lib/yula-finding-drill";
@@ -76,8 +74,14 @@ export function renderBulletedItem(
   if (!parsed) return null;
 
   const { title: itemTitle, desc: itemDesc } = parsed;
-  // Kriter yankısı ("Hareket Tarihi: ...") bulgu değildir — statik satır.
-  if (cb.staticTitles?.includes(itemTitle.trim().toLowerCase())) {
+  // Plan adımları ("Stok Bakiye Raporu ekranını aç:", "1. Adım:", "Hazırlık:") veya genel yönergeler
+  // bulgu/buton değildir — temiz, statik ve okunabilir kalır.
+  const isInstructionOrPlan =
+    cb.staticTitles?.includes(itemTitle.trim().toLowerCase()) ||
+    /(?:aç|ekranı|ekranını|adım|uygula|sorgula|belirle|hazırla|plan|öğret)\b/i.test(itemTitle) ||
+    /^\d+\.?\s*(?:adım|step)?/i.test(itemTitle);
+
+  if (isInstructionOrPlan || !cb.sourceTable) {
     return (
       <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
         <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
@@ -90,9 +94,6 @@ export function renderBulletedItem(
       </div>
     );
   }
-  // "Çalıştır" başlığı doğrudan koşar (ekranın Run akışı); delege yoksa
-  // eski bulgu/aksiyon çözümüne düşer.
-  const isRunTitle = isRunConfirmPhrase(itemTitle);
   const knownAction = KNOWN_SYSTEM_ACTIONS.find((a) => a.pattern.test(itemTitle));
   // Bulgu tıklaması iki kademeli çözülür: önce yapısal filtre çıkarımı
   // (ucuz, deterministik grid filtresi), çıkarılamazsa başlık + açıklamayı
@@ -122,7 +123,7 @@ export function renderBulletedItem(
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
       <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
       <div className="flex-1 leading-relaxed text-[12px]">
-        {knownAction && knownPage && !isRunTitle ? (
+        {knownAction && knownPage ? (
           <Link
             href={knownPage}
             title={t("open_report_screen", { title: itemTitle })}
@@ -131,29 +132,24 @@ export function renderBulletedItem(
             {itemTitle}:
           </Link>
         ) : (
-        <button
-          type="button"
-          onClick={() => {
-            if (isRunTitle && cb.onRunReport?.()) return;
-            if (knownAction) {
-              if (cb.isExecutionConfirmation) {
-                const navigated = cb.onNavigateReport(knownAction.label);
-                if (navigated) return;
+          <button
+            type="button"
+            onClick={() => {
+              if (knownAction) {
+                if (cb.isExecutionConfirmation) {
+                  const navigated = cb.onNavigateReport(knownAction.label);
+                  if (navigated) return;
+                }
+                cb.onPrompt(knownAction.prompt);
+                return;
               }
-              cb.onPrompt(knownAction.prompt);
-              return;
-            }
-            cb.onPrompt(findingClickPrompt);
-          }}
-          title={
-            isRunTitle && cb.onRunReport
-              ? t("run_report")
-              : t("ask_finding", { prompt: findingClickPrompt })
-          }
-          className={titleClass}
-        >
-          {itemTitle}:
-        </button>
+              cb.onPrompt(findingClickPrompt);
+            }}
+            title={t("ask_finding", { prompt: findingClickPrompt })}
+            className={titleClass}
+          >
+            {itemTitle}:
+          </button>
         )}
         <span className="text-foreground/90 line-clamp-2 break-words">{itemDesc}</span>
       </div>
@@ -178,39 +174,18 @@ export function renderPlainBullet(
   const boldParts = cleanBulletText.split(/(\*\*[^*]+\*\*)/g);
   const hasBold = boldParts.some((bp) => bp.startsWith("**") && bp.endsWith("**"));
 
+  // Asistanın kendi yapacağı/yaptığı 1. şahıs plan/anlatım cümleleri (örn: inceleyeceğim, özetleyeceğim) aksiyon butonu olamaz
+  const isNarrativePlan =
+    /(?:ceğim|cağım|cegim|cagim|eceğim|acağım|dim|dım|tim|tım|dum|düm|tum|tüm)\b/i.test(cleanBulletText);
+
   if (hasBold) {
     return (
       <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
-        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
+        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>
         <p className="flex-1 leading-relaxed text-[12px] text-foreground/90">
           {boldParts.map((bp, bIdx) => {
             if (bp.startsWith("**") && bp.endsWith("**")) {
               const boldText = bp.slice(2, -2).trim();
-              const isRunBold = isRunConfirmPhrase(boldText);
-              // Kriter yankısı bold'u da statik kalır (tıklama yok).
-              const isStaticBold = Boolean(
-                cb?.staticTitles?.includes(boldText.toLowerCase()),
-              );
-              if (cb?.onPrompt && boldText.length > 1 && !isStaticBold) {
-                return (
-                  <button
-                    key={bIdx}
-                    type="button"
-                    onClick={() => {
-                      if (isRunBold && cb.onRunReport?.()) return;
-                      cb.onPrompt(boldText);
-                    }}
-                    title={
-                      isRunBold && cb.onRunReport
-                        ? t ? t("run_report") : ""
-                        : t ? t("run_cmd", { cmd: boldText }) : ""
-                    }
-                    className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline"
-                  >
-                    {boldText}
-                  </button>
-                );
-              }
               return (
                 <strong key={bIdx} className="font-semibold text-foreground">
                   {boldText}
@@ -224,60 +199,7 @@ export function renderPlainBullet(
     );
   }
 
-  // Bold yoksa: parantez öncesi başlığı tıklanabilir yap (örn: "En çok satılan ürün (ItemName bazlı Qty)")
-  const parenMatch = cleanBulletText.match(/^([^()\n]{2,60})\s*(\(.+\))$/);
-  if (parenMatch && cb?.onPrompt) {
-    const titleText = parenMatch[1].trim();
-    const descText = parenMatch[2].trim();
-    return (
-      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
-        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
-        <div className="flex-1 leading-relaxed text-[12px]">
-          <button
-            type="button"
-            onClick={() => cb.onPrompt(titleText)}
-            title={t ? t("run_cmd", { cmd: titleText }) : ""}
-            className="font-semibold text-foreground hover:text-orange-600 dark:hover:text-orange-400 cursor-pointer border-0 bg-transparent p-0 transition-colors inline mr-1"
-          >
-            {titleText}
-          </button>
-          <span className="text-foreground/90">{descText}</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Standart düz madde: Eğer öneri/aksiyon cümlesiyse tıklanabilir aksiyon düğmesi yap.
-  // Run cümlesi önce doğrudan koşmaya çalışır (ekranın Run akışı).
-  const isRunBullet = isRunConfirmPhrase(cleanBulletText);
-  const isActionLike =
-    isPromptSentenceLike(cleanBulletText) ||
-    /(?:filtrele|özetle|çıkar|analiz|grafik|hesapla|göster|listele|hazırla|yap|incele|sorgula|çalıştır|calistir|run|execute|başlat)/i.test(cleanBulletText);
-
-  if (isActionLike && cb?.onPrompt) {
-    return (
-      <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
-        <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70 group-hover:text-orange-500 transition-colors">●</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (isRunBullet && cb.onRunReport?.()) return;
-              cb.onPrompt(cleanBulletText);
-            }}
-            title={
-              isRunBullet && cb.onRunReport
-                ? t ? t("run_report") : ""
-                : t ? t("run_cmd", { cmd: cleanBulletText }) : ""
-            }
-            className="flex-1 leading-snug text-[12px] text-left border-0 bg-transparent p-0 text-foreground/90 hover:text-orange-600 dark:hover:text-orange-400 underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer transition-colors line-clamp-2"
-          >
-          {cleanBulletText}
-        </button>
-      </div>
-    );
-  }
-
-  // Düz bilgilendirme maddesi
+  // Düz bilgilendirme veya plan maddesi — Kesinlikle kör regex ile butona dönüştürülmez
   return (
     <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
       <span className="mt-1 shrink-0 text-[10px] text-orange-500/70 dark:text-orange-400/70">●</span>

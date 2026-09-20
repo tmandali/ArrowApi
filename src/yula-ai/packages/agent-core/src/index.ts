@@ -3,6 +3,7 @@ export * from './effect-gate';
 export * from './event-bus';
 export * from './component-registry';
 export * from './standard-tools';
+export * from './server-tools';
 export * from './pi-event-stream';
 export * from './hooks';
 export * from './execution-queue';

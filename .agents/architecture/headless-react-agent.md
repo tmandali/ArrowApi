@@ -194,6 +194,9 @@ The underlying runtime guarantees reliability via core execution primitives:
 ## 6. Hybrid Router & Multilingual LLM Guidelines
 
 - **2-Stage Hybrid Router:** High-confidence report navigation requests resolve locally via schema matcher in **~12 ms**; free-text queries route to the LLM.
+- **Intent Router & Classifier (`yula-intent-router.ts`):** Before invoking the language model, incoming user turns are classified into high-level intent categories (`WORKFLOW_CONSULTATION`, `DIRECT_EXECUTION`, `DATA_ANALYSIS`, `POLICY_LEARNING`, `GENERAL_CONVERSATION`). Tailored prompt directives are dynamically injected:
+  - `WORKFLOW_CONSULTATION`: Enforces a clean, static Markdown plan (`| Plan`) and requires calling `ask_user_choice` with structured options containing `description` and `rationale`.
+  - `DIRECT_EXECUTION`: Executes actions (`dispatch_component_action` with `SUBMIT`) immediately without redundant confirmation prompts.
 - **Context Poisoning Prevention:** All system feedback in tool outputs (`message`, `hint`, `error`, `directive`, `note`) MUST stay in standard English. The final answer language is determined by user preference and LLM semantics.
 
 ---

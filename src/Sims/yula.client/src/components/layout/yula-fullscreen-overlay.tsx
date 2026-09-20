@@ -30,6 +30,7 @@ import { YulaIdeSidebar } from "./fullscreen-overlay/yula-ide-sidebar";
 import { YulaIdeCanvasHeader } from "./fullscreen-overlay/yula-ide-canvas-header";
 import {
   YulaCloseButton,
+  YulaDeleteChatButton,
   YulaExpandToggleButton,
   YulaNewChatButton,
 } from "./fullscreen-overlay/yula-dock-controls";
@@ -182,6 +183,7 @@ export function YulaFullscreenOverlay({
                       <>
                         <YulaContextUsageBadge />
                         <YulaNewChatButton />
+                        <YulaDeleteChatButton />
                         {!hideWindowControls && (
                           <>
                             <YulaExpandToggleButton />

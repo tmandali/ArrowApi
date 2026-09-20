@@ -828,6 +828,7 @@
   },
   "AiDock": {
     "new_chat": "New Chat",
+    "delete_chat": "Delete chat",
     "continue_main": "Continue in main screen",
     "expand_overlay": "Expand to fullscreen",
     "collapse_overlay": "Back to dock",
@@ -927,7 +928,11 @@
   "ChoiceCard": {
     "option_selected": "Option selected",
     "send": "Send",
-    "default_question": "Please select an option:"
+    "custom_reply": "Type custom reply...",
+    "default_question": "Please select an option:",
+    "rationale_label": "Rationale / Impact",
+    "recommended": "Recommended",
+    "select": "Select"
   },
   "QuestionnaireCard": {
     "answered_questions": "Answered questions",
@@ -1496,12 +1501,18 @@
     "new_conversation": "New Conversation",
     "conversation_history": "Conversation History",
     "scheduled_tasks": "Scheduled Tasks",
-    "projects_header": "Projects",
+    "workspaces_header": "Workspaces",
+    "projects_header": "Workspaces",
     "settings": "Settings",
     "see_all": "See all ({count})",
     "no_conversations_yet": "No conversations yet",
     "open_ide": "Open IDE",
-    "active_tab": "Active Tab"
+    "active_tab": "Active Tab",
+    "delete_conversation": "Delete conversation",
+    "delete_folder": "Delete folder and conversations",
+    "confirm_clear_ask": "Delete all?",
+    "confirm_yes": "Yes",
+    "confirm_no": "Cancel"
   },
   "Welcome": {
     "description": "Yula means the light that guides. Here to help you"

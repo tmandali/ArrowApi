@@ -134,4 +134,40 @@ describe("YulaChoiceCard dynamic custom_placeholder and choice parsing", () => {
     assert.equal(data.options[0].label, "Option A");
     assert.equal(data.options[1].label, "Option B");
   });
+
+  it("parses description, rationale, and badge in detailed choice options", () => {
+    const input = {
+      question: "Planı nasıl başlatmak istersiniz?",
+      options: [
+        {
+          label: "Satış Kriterlerini Gir",
+          value: "enter_criteria",
+          description: "Kadıköy mağazası ve bu ayın tarih aralığını forma uygular.",
+          rationale: "Raporu çalıştırmadan önce hedef filtrelerin doğru yapılandırılmasını sağlar.",
+          badge: "Önerilen",
+        },
+        {
+          label: "Doğrudan Raporu Çalıştır",
+          value: "run_directly",
+          description: "Varsayılan filtrelerle rapor sorgusunu başlatır.",
+          rationale: "Zaman kazandırır ancak tüm mağaza verilerini getirebilir.",
+        },
+      ],
+      allow_custom: true,
+      custom_placeholder: "Farklı bir mağaza veya kriter belirtin...",
+    };
+
+    const data = parseChoiceData(input);
+    assert.ok(data);
+    assert.equal(data.options.length, 2);
+    assert.equal(data.options[0].label, "Satış Kriterlerini Gir");
+    assert.equal(data.options[0].value, "enter_criteria");
+    assert.equal(data.options[0].description, "Kadıköy mağazası ve bu ayın tarih aralığını forma uygular.");
+    assert.equal(data.options[0].rationale, "Raporu çalıştırmadan önce hedef filtrelerin doğru yapılandırılmasını sağlar.");
+    assert.equal(data.options[0].badge, "Önerilen");
+
+    assert.equal(data.options[1].label, "Doğrudan Raporu Çalıştır");
+    assert.equal(data.options[1].rationale, "Zaman kazandırır ancak tüm mağaza verilerini getirebilir.");
+    assert.equal(data.options[1].badge, undefined);
+  });
 });

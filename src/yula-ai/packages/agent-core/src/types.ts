@@ -142,7 +142,7 @@ export type AgentEvent =
   // Tool execution lifecycle
   | { type: 'tool_execution_start'; toolCallId: string; toolName: string; args: any; timestamp?: number }
   | { type: 'tool_execution_update'; toolCallId: string; toolName: string; args: any; partialResult?: any; timestamp?: number }
-  | { type: 'tool_execution_end'; toolCallId: string; toolName: string; result: any; isError: boolean; timestamp?: number }
+  | { type: 'tool_execution_end'; toolCallId: string; toolName: string; args?: any; result: any; isError: boolean; timestamp?: number }
   // Pi Advanced: Steering, Branch & Telemetry events
   | { type: 'steer_injected'; message: string; timestamp?: number }
   | { type: 'follow_up_queued'; message: string; timestamp?: number }
