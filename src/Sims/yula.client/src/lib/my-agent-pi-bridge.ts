@@ -108,6 +108,12 @@ function toolEventToTrace(event: AgentEvent): {
     const resolved =
       event.toolName === "dispatch_component_action"
         ? describeDispatchAction(event.args)
+        : event.toolName === "ask_user_choice"
+        ? {
+            kind: "confirmation" as WorkedStepItem["kind"],
+            label: typeof event.args?.question === "string" ? `Asked: ${event.args.question}` : "Asked user choice",
+            subLabel: "Waiting for user selection...",
+          }
         : {
             kind: "ran" as WorkedStepItem["kind"],
             label: `Ran tool: ${event.toolName}`,
@@ -123,10 +129,17 @@ function toolEventToTrace(event: AgentEvent): {
     };
   }
   if (event.type === "tool_execution_end") {
+    const optionsCount = Array.isArray(event.result?.options) ? event.result.options.length : 0;
     return {
       id: piTraceId(event.toolCallId),
       toolName: event.toolName,
       label: event.toolName, // upsert mevcut satırla birleşir; etiket aşağıda korunur
+      subLabel:
+        event.toolName === "ask_user_choice"
+          ? optionsCount > 0
+            ? `${optionsCount} options presented`
+            : "User choice ready"
+          : undefined,
       isLive: false,
       isError: event.isError === true,
       output: event.result,

@@ -9,6 +9,7 @@ import { describe, it } from "node:test";
 import { buildSystemPrompt } from "./yula-agent-prompt";
 import { serverPlaybookStorage, serverPlaybookService } from "./playbook-server";
 import { createStandardAgentTools } from "@my-agent/core";
+import { normalizeToolState } from "./yula-tool-info";
 
 describe("Grounded ERP Workflow Protocol & Playbook Simulation", () => {
   it("1. Sunucu depolaması ve Playbook servisi kayıtlı satınalma reçetesini keşfedebilmelidir", async () => {
@@ -21,6 +22,14 @@ describe("Grounded ERP Workflow Protocol & Playbook Simulation", () => {
     const found = await serverPlaybookService.findRecipe("Satınalma", "stock");
     assert.ok(found, "Satınalma sorgusuyla reçete bulunmalıdır");
     assert.equal(found.id, "recipe-purchasing-flow");
+
+    // Kullanıcının sorduğu tam doğal dil cümlesiyle akıllı eşleşme testi
+    const foundLong = await serverPlaybookService.findRecipe(
+      "Satınalma siparişi ve depo mal kabul iş akışı adımları",
+      "stock",
+    );
+    assert.ok(foundLong, "Uzun doğal dil sorusuyla da reçete bulunmalıdır");
+    assert.equal(foundLong.id, "recipe-purchasing-flow");
 
     // Bilinmeyen görev için null dönmeli (confabulation yok)
     const notFound = await serverPlaybookService.findRecipe("Uydurma Bir Süreç", "stock");
@@ -84,6 +93,12 @@ describe("Grounded ERP Workflow Protocol & Playbook Simulation", () => {
       workspace: "stock",
     });
     assert.ok(proposeResult.content[0].text.includes("Özel Depo Transferi Akışı"));
+
+    // Tool state normalizasyon kontrolü (call -> input-available, result -> output-available)
+    assert.equal(normalizeToolState("call", false), "input-available");
+    assert.equal(normalizeToolState("result", true), "output-available");
+    assert.equal(normalizeToolState("input-available", false), "input-available");
+    assert.equal(normalizeToolState("output-available", true), "output-available");
   });
 
   it("4. Reçetesiz sorguda model genel ezber yerine ask_user_choice ile interaktif Playbook öğrenme teklifi sunmalıdır", () => {

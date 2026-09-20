@@ -9,6 +9,17 @@ export interface YulaToolPartInfo {
   errorText?: string;
 }
 
+/** SDK ve Pi araç durumlarını UI tarafından beklenen kanonik durumlara eşler */
+export function normalizeToolState(rawState: unknown, hasOutput: boolean): string {
+  if (typeof rawState === "string") {
+    if (rawState === "call" || rawState === "input-available") return "input-available";
+    if (rawState === "result" || rawState === "output-available") return "output-available";
+    if (rawState === "error" || rawState === "output-error") return "output-error";
+    return rawState;
+  }
+  return hasOutput ? "output-available" : "input-available";
+}
+
 export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
   const p = part as Record<string, unknown> | null;
   if (!p || typeof p !== "object") return null;
@@ -17,7 +28,7 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
   if (typeof p.tool === "string" && p.tool.length > 0) {
     const toolName = p.tool;
     const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
-    const state = typeof p.state === "string" ? p.state : (p.output !== undefined ? "output-available" : "input-available");
+    const state = normalizeToolState(p.state, p.output !== undefined);
     return {
       toolName,
       state,
@@ -32,7 +43,7 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
   if (typeof p.toolName === "string" && p.toolName.length > 0 && p.type !== "dynamic-tool") {
     const toolName = p.toolName;
     const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
-    const state = typeof p.state === "string" ? p.state : (p.output !== undefined ? "output-available" : "input-available");
+    const state = normalizeToolState(p.state, p.output !== undefined);
     return {
       toolName,
       state,
@@ -56,7 +67,7 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
     return q.toolName && q.state && q.toolCallId
       ? {
           toolName: q.toolName,
-          state: q.state,
+          state: normalizeToolState(q.state, q.output !== undefined),
           toolCallId: q.toolCallId,
           input: q.input,
           output: q.output,
@@ -77,7 +88,7 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
     if ("state" in q && "toolCallId" in q) {
       return {
         toolName: p.type.slice("tool-".length),
-        state: String(q.state),
+        state: normalizeToolState(q.state, q.output !== undefined),
         toolCallId: String(q.toolCallId),
         input: (q as { input?: unknown }).input,
         output: (q as { output?: unknown }).output,
@@ -91,7 +102,7 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
     const toolName = String(p.toolName || p.name || "");
     if (toolName) {
       const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
-      const state = typeof p.state === "string" ? p.state : (p.result !== undefined || p.output !== undefined ? "output-available" : "input-available");
+      const state = normalizeToolState(p.state, p.result !== undefined || p.output !== undefined);
       return {
         toolName,
         state,

@@ -343,23 +343,26 @@ export class PlaybookService {
   async findRecipe(taskQuery: string, workspaceId: string = 'stock'): Promise<PlaybookEntry | null> {
     const q = taskQuery.toLowerCase().trim();
     if (!q) return null;
-
     const entries = await this.adapter.readEntries(workspaceId);
     const workflows = entries.filter((e) => e.category === 'workflow_recipe');
+    const qWords = q.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter((w) => w.length >= 3);
 
-    // 1. Doğrudan başlık ve tag eşleştirmesi
+    let bestMatch: PlaybookEntry | null = null;
+    let maxOverlap = 0;
     for (const wf of workflows) {
-      if (wf.title.toLowerCase().includes(q)) return wf;
-      if (wf.tags?.some((t) => t.toLowerCase().includes(q) || q.includes(t.toLowerCase()))) {
-        return wf;
+      const titleLower = wf.title.toLowerCase();
+      if (titleLower.includes(q) || q.includes(titleLower)) return wf;
+      const tWords = titleLower.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter((w) => w.length >= 3);
+      const overlap = tWords.filter((tw) => qWords.some((qw) => qw.includes(tw) || tw.includes(qw))).length;
+      if (overlap >= 2 && overlap > maxOverlap) {
+        maxOverlap = overlap;
+        bestMatch = wf;
       }
     }
-
-    // 2. İçerik eşleştirmesi
+    if (bestMatch) return bestMatch;
     for (const wf of workflows) {
       if (wf.contentMarkdown.toLowerCase().includes(q)) return wf;
     }
-
     return null;
   }
 
