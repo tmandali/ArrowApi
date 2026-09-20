@@ -6,7 +6,8 @@ import {
   executeComponentAction,
   type ComponentSchema,
   hookPipeline,
-  steeringManager,
+  Agent,
+  AgentSession,
   truncateContent,
   mutationLine,
   adaptivePublisher,
@@ -25,11 +26,22 @@ import {
 import { pingRpc, sendRpcAction } from "@/lib/rpc/yula-rpc-client";
 
 describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () => {
+  let session: AgentSession;
+
   beforeEach(() => {
     uiRegistry.clear();
     uiEventBus.clear();
-    steeringManager.clearSteering();
-    steeringManager.clearFollowUp();
+    session = new AgentSession({
+      agent: new Agent({
+        tools: [],
+        streamFn: async () => ({
+          message: { role: "assistant", content: "" },
+          toolCalls: [],
+        }),
+      }),
+    });
+    session.clearSteering();
+    session.clearFollowUp();
   });
 
   // 1. ✍️ SET_FIELDS (Kadıköy/2026-09)
@@ -107,29 +119,29 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
 
   // 3. ⚡ Steer (Araya Gir)
   it("3. Steer araya girme mesajı enjekte edilip öncelikle tüketilmelidir", () => {
-    steeringManager.clearSteering();
-    assert.equal(steeringManager.hasSteering(), false);
+    session.clearSteering();
+    assert.equal(session.hasSteering(), false);
 
-    steeringManager.steer("Durdur! Kadıköy yerine Beşiktaş'ı seç.");
-    assert.equal(steeringManager.hasSteering(), true);
-    assert.equal(steeringManager.getSteeringQueue().length, 1);
+    session.steer("Durdur! Kadıköy yerine Beşiktaş'ı seç.");
+    assert.equal(session.hasSteering(), true);
+    assert.equal(session.getSteeringQueue().length, 1);
 
-    const popped = steeringManager.popSteer();
+    const popped = session.popSteer();
     assert.equal(popped?.content, "Durdur! Kadıköy yerine Beşiktaş'ı seç.");
-    assert.equal(steeringManager.hasSteering(), false);
+    assert.equal(session.hasSteering(), false);
   });
 
   // 4. 📥 Follow-up (Takip İşi)
   it("4. Follow-up takip işi kuyruğa alınıp tur bitiminde sırayla tüketilmelidir", () => {
-    steeringManager.clearFollowUp();
-    assert.equal(steeringManager.hasFollowUp(), false);
+    session.clearFollowUp();
+    assert.equal(session.hasFollowUp(), false);
 
-    steeringManager.followUp("Rapor bittikten sonra sonuçları Excel olarak dışa aktar.");
-    assert.equal(steeringManager.hasFollowUp(), true);
+    session.followUp("Rapor bittikten sonra sonuçları Excel olarak dışa aktar.");
+    assert.equal(session.hasFollowUp(), true);
 
-    const nextJob = steeringManager.popFollowUp();
+    const nextJob = session.popFollowUp();
     assert.equal(nextJob?.content, "Rapor bittikten sonra sonuçları Excel olarak dışa aktar.");
-    assert.equal(steeringManager.hasFollowUp(), false);
+    assert.equal(session.hasFollowUp(), false);
   });
 
   // 5. ✂️ Dual-Bound Truncation

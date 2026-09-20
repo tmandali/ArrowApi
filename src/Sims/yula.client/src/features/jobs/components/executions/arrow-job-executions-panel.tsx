@@ -24,6 +24,8 @@ import { useJobOwner } from "@/features/jobs/hooks/use-job-owners";
 import { useSession } from "next-auth/react";
 import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-jobs-store";
 import { useYulaGridStore } from "@/lib/stores/grid";
+import { useAgentComponent } from "@my-agent/react";
+import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { cn } from "@/utils/cn";
 import { formatCount } from "@/utils/format";
 import { ApiError } from "@/services";
@@ -174,6 +176,86 @@ export function ArrowJobExecutionsPanel({
   const { items, setItems, total, loading, refreshing, error, loadList } = list;
 
   const [selectedId, setSelectedId] = React.useState<string | null>(activeJobId);
+
+  // Ekrana mount olan Execution paneli canlı React state'iyle (@my-agent/react)
+  // job_history bileşeni olarak kendini dinamik kaydeder.
+  useAgentComponent({
+    id: "job_history",
+    meta: {
+      description: `Execution History Panel (${jobName})`,
+      reportScope: jobName,
+      executionCount: items.length,
+      totalExecutions: total,
+      selectedJobId: selectedId,
+      recentExecutions: items.slice(0, 5).map((j) => ({
+        jobId: j.id,
+        status: j.status,
+        createdAt: j.createdAt,
+        rowCount: j.totalRows,
+      })),
+    },
+    actions: {
+      LIST: {
+        description: "Lists past execution runs from the active panel state ({ limit?: number }).",
+        whenToCall: "When the user asks about past runs, execution history, or how many reports ran ('kaç rapor çalışmış').",
+        whenNotToCall: "When executing a new report.",
+      },
+      SELECT: {
+        description: "Selects a past execution in the panel to inspect its details ({ jobId }).",
+        whenToCall: "When the user wants to view or select a specific run.",
+        whenNotToCall: "When the user is executing a new report or filtering.",
+      },
+      REFRESH: {
+        description: "Refreshes the execution list from the server.",
+        whenToCall: "When the user asks to reload or refresh past runs.",
+        whenNotToCall: "When the current list is already up to date.",
+      },
+      CANCEL: {
+        description: "Cancels an active running execution ({ jobId }).",
+        whenToCall: "When the user asks to cancel or stop an active run.",
+        whenNotToCall: "When the job is already completed, failed, or cancelled.",
+      },
+    },
+    onAction: async (action, payload) => {
+      if (action === "LIST") {
+        const limit = typeof payload?.limit === "number" ? Math.min(10, Math.max(1, payload.limit)) : 10;
+        const slice = items.slice(0, limit).map((j) => ({
+          jobId: j.id,
+          report: jobName,
+          status: j.status,
+          createdAt: j.createdAt,
+          rowCount: j.totalRows,
+          href: openJobHref ? openJobHref(j.id) : undefined,
+        }));
+        return {
+          status: "ok",
+          report: jobName,
+          total,
+          loadedCount: items.length,
+          executions: slice,
+          message: `Panel has ${items.length} execution(s) loaded (total: ${total}) for ${jobName}.`,
+        };
+      }
+      if (action === "REFRESH") {
+        await loadList();
+        return { status: "ok", message: `Refreshed execution list for ${jobName}.` };
+      }
+      if (action === "SELECT" && payload?.jobId) {
+        const targetId = String(payload.jobId);
+        setSelectedId(targetId);
+        onOpenJob?.(targetId);
+        return { status: "ok", selectedJobId: targetId };
+      }
+      if (action === "CANCEL") {
+        const targetId = String(payload?.jobId || activeJobId || "");
+        if (targetId) {
+          await cancelArrowJob(targetId);
+          return { status: "ok", jobId: targetId, message: `Cancelled job ${targetId}` };
+        }
+      }
+      return executeDispatchComponentAction({ component_id: "job_history", action, payload });
+    },
+  });
   // Seçili job satırlardan türetilir (state değil) — seçim/silme/silinme
   // otomatik yansır.
   const selectedJob = React.useMemo(() => {

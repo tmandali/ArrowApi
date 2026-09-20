@@ -68,6 +68,7 @@ export function ChatInstance({
   const chat = useAgentChat(currentPath, {
     initialMessages: initialMessages as any,
     compactEndpoint: "/api/compact",
+    modelsEndpoint: "/api/agent/models",
     compactionSettings: {
       enabled: true,
       reserveTokens: 16384,

@@ -54,18 +54,167 @@ function slimOutput(output: unknown): unknown {
 export interface SlimmableMessage {
   role: string;
   parts?: unknown[];
+  content?: unknown;
+}
+
+/**
+ * AI SDK'nın convertToModelMessages fonksiyonu her mesajda `parts` dizisi olmasını
+ * şart koşar (dahili warnIfUIMessageHasDeprecatedRawInput doğrudan message.parts.some çağırır)
+ * ve yalnızca 'system' | 'user' | 'assistant' rollerini destekler.
+ *
+ * Pi Code Agent döngüsünden gelen `role: 'toolResult'` mesajları, AI SDK UIMessage
+ * modeline uygun şekilde önceki asistan mesajının `parts` dizisindeki ilgili araç
+ * çağrısına (state: 'output-available', output: ...) katlanır (fold).
+ */
+export function normalizeUIMessagesForTransport<
+  T extends SlimmableMessage,
+>(rawMessages: T[] | undefined): T[] {
+  if (!Array.isArray(rawMessages)) return [];
+
+  // 1) toolResult mesajlarını toolCallId'ye göre indeksle
+  const toolResultsByCallId = new Map<string, Record<string, unknown>>();
+  for (const msg of rawMessages) {
+    if (!msg || typeof msg !== "object") continue;
+    const m = msg as Record<string, unknown>;
+    const role = String(m.role || "").toLowerCase();
+    if (role === "toolresult" || role === "tool_result" || role === "tool") {
+      const callId = String(m.toolCallId || m.tool_call_id || m.id || "");
+      if (callId) {
+        toolResultsByCallId.set(callId, m);
+      }
+    }
+  }
+
+  // 2) Mesajları dönüştür; toolResult mesajlarını asistan parçalarına katlayıp listeden çıkar
+  const folded: Record<string, unknown>[] = [];
+  let lastAssistantMsg: Record<string, unknown> | null = null;
+
+  for (let idx = 0; idx < rawMessages.length; idx++) {
+    const msg = rawMessages[idx];
+    if (!msg || typeof msg !== "object") {
+      folded.push({
+        id: `msg-${idx}`,
+        role: "user",
+        parts: [{ type: "text", text: String(msg ?? "") }],
+      });
+      continue;
+    }
+
+    const m = { ...(msg as Record<string, unknown>) };
+    const rawRole = String(m.role || "user");
+    const lowerRole = rawRole.toLowerCase();
+
+    // Pi toolResult mesajı: asistan mesajına katlanacağı için ayrı mesaj olarak eklenmez
+    if (lowerRole === "toolresult" || lowerRole === "tool_result" || lowerRole === "tool") {
+      const callId = String(m.toolCallId || m.tool_call_id || m.id || "");
+      const isError = Boolean(m.isError);
+      const outputData = m.details ?? m.output ?? m.content ?? m.result;
+
+      // İlgili veya en son asistan mesajının parçalarını güncelle
+      if (lastAssistantMsg) {
+        const parts = Array.isArray(lastAssistantMsg.parts)
+          ? [...(lastAssistantMsg.parts as Record<string, unknown>[])]
+          : [];
+        let matched = false;
+
+        for (let pi = 0; pi < parts.length; pi++) {
+          const p = parts[pi];
+          if (p && typeof p === "object" && String(p.toolCallId || "") === callId) {
+            parts[pi] = {
+              ...p,
+              state: isError ? "output-error" : "output-available",
+              ...(isError
+                ? { errorText: String(m.content ?? "Araç yürütme hatası") }
+                : { output: outputData }),
+            };
+            matched = true;
+            break;
+          }
+        }
+
+        if (!matched && callId) {
+          // Asistan parçasında yoksa yeni parça olarak ekle
+          parts.push({
+            type: `tool-${m.toolName || "action"}`,
+            toolCallId: callId,
+            toolName: m.toolName || "action",
+            input: m.args ?? m.arguments ?? {},
+            state: isError ? "output-error" : "output-available",
+            ...(isError
+              ? { errorText: String(m.content ?? "Araç yürütme hatası") }
+              : { output: outputData }),
+          });
+        }
+        lastAssistantMsg.parts = parts;
+      }
+      continue;
+    }
+
+    const id = typeof m.id === "string" ? m.id : `msg-${idx}`;
+    const role = lowerRole === "system" ? "system" : lowerRole === "assistant" ? "assistant" : "user";
+
+    let parts: unknown[] = [];
+    if (Array.isArray(m.parts)) {
+      parts = [...m.parts];
+    } else if (typeof m.content === "string" && m.content.trim()) {
+      parts.push({ type: "text", text: m.content });
+    } else if (Array.isArray(m.content)) {
+      parts.push(...m.content);
+    }
+
+    const processedMsg: Record<string, unknown> = {
+      ...m,
+      id,
+      role,
+      parts,
+    };
+
+    if (role === "assistant") {
+      lastAssistantMsg = processedMsg;
+    }
+
+    folded.push(processedMsg);
+  }
+
+  // 3) Geriye kalan asistan mesajlarındaki toolResult eşleşmelerini uygula
+  if (toolResultsByCallId.size > 0) {
+    for (const msg of folded) {
+      if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+      msg.parts = msg.parts.map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const part = p as Record<string, unknown>;
+        const callId = String(part.toolCallId || "");
+        if (callId && toolResultsByCallId.has(callId)) {
+          const tr = toolResultsByCallId.get(callId)!;
+          const isError = Boolean(tr.isError);
+          const outputData = tr.details ?? tr.output ?? tr.content ?? tr.result;
+          return {
+            ...part,
+            state: isError ? "output-error" : "output-available",
+            ...(isError
+              ? { errorText: String(tr.content ?? "Araç yürütme hatası") }
+              : { output: outputData }),
+          };
+        }
+        return p;
+      });
+    }
+  }
+
+  return folded as unknown as T[];
 }
 
 export function slimMessagesForTransport<
   T extends SlimmableMessage,
 >(messages: T[]): T[] {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
+  const safeMessages = normalizeUIMessagesForTransport(messages);
 
   // 1) Çok uzun sohbetlerde kayan pencere (sliding window): İlk 2 mesaj (orijin) + Son N mesaj
-  let windowedMessages = messages;
-  if (messages.length > MAX_TRANSPORT_MESSAGES) {
-    const head = messages.slice(0, 2);
-    const tail = messages.slice(messages.length - (MAX_TRANSPORT_MESSAGES - 2));
+  let windowedMessages = safeMessages;
+  if (safeMessages.length > MAX_TRANSPORT_MESSAGES) {
+    const head = safeMessages.slice(0, 2);
+    const tail = safeMessages.slice(safeMessages.length - (MAX_TRANSPORT_MESSAGES - 2));
     windowedMessages = [...head, ...tail];
   }
 

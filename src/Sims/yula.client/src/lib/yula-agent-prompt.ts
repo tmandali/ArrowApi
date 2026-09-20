@@ -112,6 +112,14 @@ const BASE_PROMPT = [
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "• Avoid duplicate tool calls with identical parameters in the same conversation turn.",
   "",
+  "AUTONOMOUS MULTI-STEP EXECUTION (ReAct Loop):",
+  "• You operate within a continuous autonomous agent loop. For multi-step tasks, chain actions methodically:",
+  "  1. Form criteria: Apply parameters via dispatch_component_action (component_id='criteria_form:<scope>', action='SET_FIELDS').",
+  "  2. Clarify if needed: If mandatory fields are genuinely missing or ambiguous, prompt via 'ask_user_choice'.",
+  "  3. Execute: When criteria are ready or explicit run is requested, trigger dispatch_component_action (component_id='criteria_form:<scope>', action='SUBMIT').",
+  "  4. Explore & analyze: Once the result grid opens, run calculations via dispatch_component_action (component_id='result_grid:active', action='RUN_SQL').",
+  "• Do not ask confirmation for routine sequential actions (e.g. applying criteria before running when the user asked to 'run sales report for Kadıköy').",
+  "",
   "GROUNDING, MISSING ASSETS & OUT-OF-SCOPE PROTOCOL:",
   "• MISSING ASSETS (Anti-Confabulation): If the user asks about or references an image, screenshot, attachment, file, or document (e.g. 'bu ne resmi', 'resimdeki sorun ne', 'bu PDF'i özetle') but NO image or file is present in their turn/context:",
   "  - Immediately state in the user's language that no image or file was received/attached.",
@@ -120,8 +128,8 @@ const BASE_PROMPT = [
   "• OUT-OF-SCOPE & AMBIGUITY: If a user request is ambiguous, unclear, or outside enterprise data analysis/reporting capabilities, do NOT make assumptions or force ERP reporting summaries; instead, transparently state your limitation or ask a concise clarifying question (optionally using 'ask_user_choice').",
   "",
   "INTERACTIVE QUESTIONS & CONFIRMATION PROTOCOL (ask_user_choice):",
+  "• MANDATORY INTERACTIVE BUTTONS (NO PLAIN-TEXT DECISION QUESTIONS): Whenever you ask the user a choice, preference, decision, or confirmation question (e.g. 'Raporu çalıştırmamı ister misiniz?', 'Do you want me to run the report?', choosing between companies TJ01/TJ02, selecting a date preset, or asking whether to proceed), you MUST invoke the 'ask_user_choice' tool. NEVER write questions ending with 'ister misiniz?', 'mısınız?', 'seçmek ister misiniz?', 'would you like to run?', 'confirm?' as plain text alone without calling 'ask_user_choice'. The user must always receive clickable button chips to reply with a single click.",
   `• RELATIVE DATE EXPANSION: When the user specifies natural relative date terms (${formatLocalizedRelativeDateTerms()}), immediately calculate and expand them into exact ISO date ranges (e.g. '2026-09-07..2026-09-13') based on the Current Date. Do NOT ask clarifying questions or choices for standard calendar terms like 'geçen hafta' or 'bu ay'.`,
-  "• ONLY call 'ask_user_choice' when mandatory criteria (such as required company or store code) are genuinely missing, when input is ambiguous, or when the user explicitly requests alternatives/confirmation.",
   "• DATA-GROUNDED CHOICES ONLY: NEVER invent, fabricate, or hallucinate dummy/placeholder codes (such as 1000, 2000, 3000 or generic numbers). Options MUST always be grounded in real schema enums, actual company/store catalog entries, or concrete context data. If actual codes are not defined in the schema or catalog, do NOT propose fake numbers — ask the user to type their code or choose an option.",
   "• STEP-BY-STEP (DEPENDENT) CRITERIA GATHERING: When multiple criteria are required or when subsequent choices depend on earlier answers (e.g. Date -> Company -> Store/Branch -> Final Confirmation):",
   "  - Gather them step-by-step, asking ONE question per turn.",
@@ -143,7 +151,8 @@ export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
  */
 export function resolveActiveComponents(context?: YulaScreenContext): ComponentSchema[] {
   const comps: ComponentSchema[] = [];
-  const pathname = context?.pathname ?? "/";
+  const href = context?.pathname || context?.uiContext?.route || "/";
+  const pathname = href.split("?")[0] || "/";
   const phase = context?.phase ?? "workspace";
 
   // 1. Evrensel Yönlendirici ve İş Geçmişi Bileşenleri
@@ -166,17 +175,17 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
     meta: { description: "Report Execution History and Job Tracker" },
     actions: {
       OPEN_LAST: {
-        description: "Opens the most recently completed report result on the screen.",
+        description: "Opens the most recently completed report result on the screen ({ report?: string }). Defaults to active report if omitted.",
         whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
         whenNotToCall: "When the user intends to execute a new report.",
       },
       LIST: {
-        description: "Lists past execution jobs.",
-        whenToCall: "When the user asks 'which reports ran', 'show history', 'list past jobs', etc.",
-        whenNotToCall: "When actively inspecting or filtering the current report.",
+        description: "Lists past execution jobs ({ report?: string, limit?: number }). If report is omitted, defaults to the active screen's report, or lists recent runs across all reports if not on a report screen.",
+        whenToCall: "When the user asks 'how many reports ran' ('kaç rapor çalışmış'), 'which reports ran', 'show history', 'list past jobs', etc.",
+        whenNotToCall: "When the user wants to execute a new report run (use SUBMIT or RUN).",
       },
       FIND: {
-        description: "Searches past report executions or matching jobs ({ query }).",
+        description: "Searches past report executions or matching jobs ({ query, report?: string }). Defaults to active report if omitted.",
         whenToCall: "When the user wants to find a specific job, execution, or report run.",
         whenNotToCall: "When requesting the entire list or running a new report.",
       },
@@ -281,22 +290,22 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
       },
       actions: {
         SET_FIELDS: {
-          description: "Populates criteria form fields without executing the report ({ criteria }).",
+          description: "Primary action to mutate criteria form fields without executing the report ({ criteria }).",
           whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
-          whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT or RUN).",
-        },
-        APPLY: {
-          description: "Populates criteria form fields and updates the form ({ criteria }).",
-          whenToCall: "When the user prepares or updates criteria parameters.",
-          whenNotToCall: "When the user commands to run the report directly.",
+          whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT).",
         },
         SUBMIT: {
-          description: "Submits criteria, executes the report, and queues the job ({ criteria, report }).",
+          description: "Primary action to submit criteria and execute the report job ({ criteria, report }).",
           whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
           whenNotToCall: "When required fields are missing or user is only drafting parameters.",
         },
+        APPLY: {
+          description: "Alias for SET_FIELDS: Populates criteria form fields ({ criteria }).",
+          whenToCall: "When the user prepares or updates criteria parameters.",
+          whenNotToCall: "When the user commands to run the report directly.",
+        },
         RUN: {
-          description: "Submits criteria, executes the report, and queues the job ({ criteria, report }).",
+          description: "Alias for SUBMIT: Submits criteria and executes the report ({ criteria, report }).",
           whenToCall: "When the user explicitly asks to run, start, fetch, or execute the report.",
           whenNotToCall: "When required fields are missing or user is only drafting parameters.",
         },
@@ -320,6 +329,50 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
   }
 
   return comps;
+}
+
+/**
+ * Aktif ekranın kapsamına ve fazına göre bileşenleri filtreler.
+ * Özellikle bir rapor sayfasındayken diğer inaktif raporların criteria_form
+ * bileşenlerini çıkararak LLM context bloat ve token israfını engeller.
+ */
+export function filterRelevantComponents(
+  comps: ComponentSchema[],
+  context?: YulaScreenContext,
+): ComponentSchema[] {
+  const href = context?.pathname || context?.uiContext?.route || "/";
+  const pathname = href.split("?")[0] || "/";
+  const phase = context?.phase ?? "workspace";
+
+  const activeReport =
+    REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
+    (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
+
+  const activeScope = activeReport?.scope || context?.screen?.reportScope;
+
+  return comps.filter((comp) => {
+    // 1. Evrensel bileşenler her zaman kalır
+    if (comp.id === "app_router" || comp.id === "job_history") {
+      return true;
+    }
+
+    // 2. Sonuç Izgarası
+    if (comp.id.startsWith("result_grid:")) {
+      return phase === "results" || Boolean(context?.grid);
+    }
+
+    // 3. Kriter Formları: Aktif ekranda bir rapor varsa sadece onun formu kalır
+    if (comp.id.startsWith("criteria_form:")) {
+      const scope = comp.id.replace("criteria_form:", "");
+      if (activeScope) {
+        return scope === activeScope;
+      }
+      return true;
+    }
+
+    // 4. Diğer bileşenler (entity_form, plugin vb.)
+    return true;
+  });
 }
 
 export function buildSystemPrompt(context?: YulaScreenContext): string {
@@ -357,25 +410,45 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     }
   }
 
-  const href = context?.pathname ?? "/";
+  const href = context?.pathname || context?.uiContext?.route || "/";
   const pathname = href.split("?")[0] || "/";
   const phase = context?.phase ?? "workspace";
   const jobId = context?.jobId ?? extractJobIdFromHref(href);
   const todayStr = new Date().toISOString().split("T")[0];
 
+  const activeReport =
+    REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
+    (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
+
   lines.push(
     "",
     `• Current Date: ${todayStr} (Use for expanding relative date terms like today, yesterday, this month into ISO format)`,
     `• Current Route: ${pathname}`,
+    activeReport
+      ? `• Active Report Screen: "${activeReport.title}" (scope: "${activeReport.scope}", workspace: "${activeReport.workspace}")`
+      : "",
     jobId ? `• Active Job Id: ${jobId}` : "",
   );
 
+  if (activeReport) {
+    lines.push(
+      "",
+      `ACTIVE REPORT CONTEXT RULE (${activeReport.title} — ${activeReport.scope}):`,
+      `• The user is currently on the "${activeReport.title}" report screen (scope: "${activeReport.scope}").`,
+      `• When the user asks about report executions, past runs, job counts, criteria, or results (e.g. 'kaç rapor çalışmış', 'çalışma geçmişini göster', 'önceki sonuçlar', 'raporu çalıştır', 'filtrele') without specifying a different report:`,
+      `  - NEVER ask which report they mean. They are ALREADY viewing this report screen.`,
+      `  - Directly assume the request refers to "${activeReport.title}" (scope: "${activeReport.scope}").`,
+      `  - To answer past runs / count questions, call dispatch_component_action with component_id="job_history" and action="LIST" (payload: { report: "${activeReport.scope}" }) and summarize the executions clearly in the user's language.`,
+    );
+  }
+
   // 1. DİNAMİK BİLEŞEN SÖZLEŞMELERİ (@my-agent/core formatActiveComponentsPrompt)
   const clientComps = context?.uiContext?.active_components;
-  const activeComps: ComponentSchema[] =
+  const rawComps: ComponentSchema[] =
     Array.isArray(clientComps) && clientComps.length > 0
       ? (clientComps as ComponentSchema[])
       : resolveActiveComponents(context);
+  const activeComps = filterRelevantComponents(rawComps, context);
   const activeCompIds = activeComps.map((c) => c.id);
   const activeCompsPrompt = formatActiveComponentsPrompt(activeComps);
   if (activeCompsPrompt) {

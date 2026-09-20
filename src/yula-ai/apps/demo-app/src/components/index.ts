@@ -14,4 +14,6 @@ export * from './OAuthLoginModal';
 export * from './PiDiagnosticsView';
 export * from './ReportsView';
 export * from './HeaderBanner';
+export * from './NavigationTabs';
 export * from './agent-widget';
+

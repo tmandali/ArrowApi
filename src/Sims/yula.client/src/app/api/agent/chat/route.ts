@@ -16,7 +16,7 @@ import {
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
-import { slimMessagesForTransport } from "@/lib/context-slim";
+import { slimMessagesForTransport, normalizeUIMessagesForTransport } from "@/lib/context-slim";
 import {
   getYulaLanguageModel,
   getYulaProviderInfo,
@@ -128,8 +128,9 @@ async function prepareModelMessages(
   provider: ReturnType<typeof resolveProvider>,
 ) {
   const supportsVision = isModelVisionCapable(activeModel, provider);
+  const normalized = normalizeUIMessagesForTransport(rawMessages);
   const modelMessages = await convertToModelMessages(
-    slimMessagesForTransport(rawMessages),
+    slimMessagesForTransport(normalized),
   );
 
   return modelMessages.map((msg) => {
@@ -237,7 +238,13 @@ export async function POST(req: Request) {
       return Response.json({ error: "messages required" }, { status: 400 });
     }
 
-    const phase = context?.phase ?? "workspace";
+    const effectivePathname = context?.pathname || uiContext?.route || "/";
+    const effectivePhase =
+      context?.phase ??
+      (uiContext?.active_components?.some((c: any) => c.id === "result_grid:active" || c.id.startsWith("result_grid"))
+        ? "results"
+        : "workspace");
+    const phase = effectivePhase;
 
     // Standart Headless React UI-Agent (@my-agent/core) araç seti
     const tools = { ...STANDARD_AGENT_TOOLS };
@@ -259,7 +266,12 @@ export async function POST(req: Request) {
     });
     // Araç çağrısı yalnız streamText({ tools }) ile gider (AI SDK). Prompt'a
     // "<think> sonra araç yaz" demek Qwen/Harmony'nin to=functions metnini basmasına yol açar.
-    const systemPrompt = buildSystemPrompt({ ...context, uiContext });
+    const systemPrompt = buildSystemPrompt({
+      ...context,
+      pathname: effectivePathname,
+      phase: effectivePhase,
+      uiContext,
+    });
 
     // Çıkarım önceliği: ajan sabiti > sohbet modeli > sağlayıcı varsayılanı.
     // resolveModel listede bulamazsa sağlayıcı varsayılanına düşer.

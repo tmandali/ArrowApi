@@ -42,7 +42,7 @@ const CHAT_HISTORY_CATEGORY = "Sohbet Geçmişi";
 /** Sohbetin ilk kullanıcı mesajının metnini döner (geçmiş arama bağlamı için). */
 function firstUserText(messages: YulaMessage[] | undefined): string {
   const firstUser = messages?.find((m) => m.role === "user");
-  const textPart = firstUser?.parts.find(
+  const textPart = firstUser?.parts?.find(
     (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
   );
   return textPart && textPart.type === "text" ? (textPart.text ?? "") : "";

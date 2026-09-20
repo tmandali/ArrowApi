@@ -23,24 +23,78 @@ export interface UserChoiceData {
 
 // eslint-disable-next-line react/only-export-components -- parser + bileşen aynı dosyada; saf veri çözümleyici
 export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceData | null {
-  const source = (
-    input && typeof input === "object"
-      ? input
-      : output && typeof output === "object"
-        ? output
-        : null
-  ) as Record<string, unknown> | null;
+  const inObj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const outObj = (output && typeof output === "object" ? output : {}) as Record<string, unknown>;
+  const outDetails = (outObj.details && typeof outObj.details === "object" ? outObj.details : {}) as Record<string, unknown>;
 
-  if (!source) return null;
+  if (Object.keys(inObj).length === 0 && Object.keys(outObj).length === 0) {
+    return null;
+  }
 
-  const question = typeof source.question === "string" ? source.question.trim() : "";
-  const allowCustom = source.allow_custom !== false;
+  // 1. Soru metnini çöz: input.question -> output.details.question -> output.question -> text parsing
+  let question = "";
+  if (typeof inObj.question === "string" && inObj.question.trim()) {
+    question = inObj.question.trim();
+  } else if (typeof outDetails.question === "string" && outDetails.question.trim()) {
+    question = outDetails.question.trim();
+  } else if (typeof outObj.question === "string" && outObj.question.trim()) {
+    question = outObj.question.trim();
+  }
+
+  // Eğer hâlâ soru bulunamadıysa content text parsing ([User Decision Required]: ...)
+  if (!question && Array.isArray(outObj.content)) {
+    const textPart = outObj.content.find(
+      (c: any) => c && typeof c === "object" && c.type === "text" && typeof c.text === "string"
+    ) as { text: string } | undefined;
+    if (textPart?.text) {
+      const match = textPart.text.match(/\[User Decision Required\]:\s*(.*?)(?:\nOptions:|$)/s);
+      if (match && match[1]) {
+        question = match[1].trim();
+      }
+    }
+  }
+
+  // 2. Seçenekleri çöz: input.options -> output.details.options -> output.options -> text options JSON parsing
+  let rawOptions: unknown[] = [];
+  if (Array.isArray(inObj.options) && inObj.options.length > 0) {
+    rawOptions = inObj.options;
+  } else if (Array.isArray(outDetails.options) && outDetails.options.length > 0) {
+    rawOptions = outDetails.options;
+  } else if (Array.isArray(outObj.options) && outObj.options.length > 0) {
+    rawOptions = outObj.options;
+  } else if (Array.isArray(outObj.content)) {
+    const textPart = outObj.content.find(
+      (c: any) => c && typeof c === "object" && c.type === "text" && typeof c.text === "string"
+    ) as { text: string } | undefined;
+    if (textPart?.text) {
+      const optMatch = textPart.text.match(/Options:\s*(\[.*?\])/s);
+      if (optMatch && optMatch[1]) {
+        try {
+          const parsed = JSON.parse(optMatch[1]);
+          if (Array.isArray(parsed)) rawOptions = parsed;
+        } catch {}
+      }
+    }
+  }
+
+  // 3. allow_custom bayrağı
+  const allowCustom =
+    inObj.allow_custom !== undefined
+      ? inObj.allow_custom !== false
+      : outDetails.allow_custom !== undefined
+        ? outDetails.allow_custom !== false
+        : outObj.allow_custom !== undefined
+          ? outObj.allow_custom !== false
+          : true;
+
+  // 4. custom_placeholder
+  const rawPlaceholder =
+    inObj.custom_placeholder ?? outDetails.custom_placeholder ?? outObj.custom_placeholder;
   const customPlaceholder =
-    typeof source.custom_placeholder === "string" && source.custom_placeholder.trim().length > 0
-      ? source.custom_placeholder.trim()
+    typeof rawPlaceholder === "string" && rawPlaceholder.trim().length > 0
+      ? rawPlaceholder.trim()
       : undefined;
 
-  const rawOptions = Array.isArray(source.options) ? source.options : [];
   const options: UserChoiceOption[] = rawOptions
     .map((opt) => {
       if (typeof opt === "string") {
@@ -60,7 +114,7 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
   if (!question && options.length === 0 && !allowCustom) return null;
 
   return {
-    question: question || "Lütfen bir seçenek belirleyin:",
+    question: question || "",
     options,
     allowCustom,
     customPlaceholder,
@@ -154,7 +208,7 @@ export function YulaChoiceCard({
       <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08] px-3.5 py-2.5 text-[12.5px] transition-all">
         <div className="flex items-center gap-2 text-muted-foreground font-medium">
           <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
-          <span className="line-clamp-1">{choiceData.question}</span>
+          <span className="line-clamp-1">{choiceData.question || t("default_question")}</span>
         </div>
         <div className="pl-5 font-semibold text-foreground">
           {displayText}
@@ -169,7 +223,7 @@ export function YulaChoiceCard({
       {/* Soru Başlığı */}
       <div className="flex items-start gap-2 text-[13px] font-semibold text-foreground leading-snug">
         <HelpCircle className="size-4 text-primary shrink-0 mt-0.5" />
-        <span>{choiceData.question}</span>
+        <span>{choiceData.question || t("default_question")}</span>
       </div>
 
       {/* Seçenek Butonları */}

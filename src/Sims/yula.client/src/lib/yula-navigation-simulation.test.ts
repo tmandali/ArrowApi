@@ -6,7 +6,8 @@ import {
   executeComponentAction,
   type ComponentSchema,
   piEventStream,
-  steeringManager,
+  Agent,
+  AgentSession,
 } from "@my-agent/core";
 import { executeAgentToolCall } from "@my-agent/react";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
@@ -505,47 +506,57 @@ describe("🤖 Yula Client UI-Agent Rota ve Navigasyon Simülasyonu", () => {
   });
 
   it("⚡ Pi Steering ve 📥 Follow-up kuyruğu doğru yönetilmeli ve sırayla tüketilmelidir", async () => {
-    // 1. Temiz başlangıç
-    steeringManager.clearSteering();
-    steeringManager.clearFollowUp();
+    const session = new AgentSession({
+      agent: new Agent({
+        tools: [],
+        streamFn: async () => ({
+          message: { role: "assistant", content: "" },
+          toolCalls: [],
+        }),
+      }),
+    });
 
-    assert.equal(steeringManager.hasSteering(), false);
-    assert.equal(steeringManager.hasFollowUp(), false);
+    // 1. Temiz başlangıç
+    session.clearSteering();
+    session.clearFollowUp();
+
+    assert.equal(session.hasSteering(), false);
+    assert.equal(session.hasFollowUp(), false);
 
     // 2. Anlık araya girme (Steering) ekle
-    steeringManager.steer("Dur, Kadıköy yerine Beşiktaş'ı seç!");
-    assert.equal(steeringManager.hasSteering(), true);
-    assert.equal(steeringManager.getSteeringQueue().length, 1);
+    session.steer("Dur, Kadıköy yerine Beşiktaş'ı seç!");
+    assert.equal(session.hasSteering(), true);
+    assert.equal(session.getSteeringQueue().length, 1);
     assert.equal(
-      steeringManager.getSteeringQueue()[0].content,
+      session.getSteeringQueue()[0].content,
       "Dur, Kadıköy yerine Beşiktaş'ı seç!",
     );
 
     // 3. Takip görevi (Follow-up) ekle
-    steeringManager.followUp("Rapor bitince sonuçları CSV olarak indir.");
-    assert.equal(steeringManager.hasFollowUp(), true);
-    assert.equal(steeringManager.getFollowUpQueue().length, 1);
+    session.followUp("Rapor bitince sonuçları CSV olarak indir.");
+    assert.equal(session.hasFollowUp(), true);
+    assert.equal(session.getFollowUpQueue().length, 1);
     assert.equal(
-      steeringManager.getFollowUpQueue()[0].content,
+      session.getFollowUpQueue()[0].content,
       "Rapor bitince sonuçları CSV olarak indir.",
     );
 
     // 4. Kuyruktan ilk steer mesajı tüketilsin
-    const nextSteer = steeringManager.popSteer();
+    const nextSteer = session.popSteer();
     assert.ok(nextSteer);
     assert.equal(nextSteer.role, "user");
     assert.equal(nextSteer.content, "Dur, Kadıköy yerine Beşiktaş'ı seç!");
-    assert.equal(steeringManager.hasSteering(), false);
+    assert.equal(session.hasSteering(), false);
 
     // 5. Steering bitince follow-up tüketilsin
-    const nextFollowUp = steeringManager.popFollowUp();
+    const nextFollowUp = session.popFollowUp();
     assert.ok(nextFollowUp);
     assert.equal(nextFollowUp.role, "user");
     assert.equal(nextFollowUp.content, "Rapor bitince sonuçları CSV olarak indir.");
-    assert.equal(steeringManager.hasFollowUp(), false);
+    assert.equal(session.hasFollowUp(), false);
 
     // 6. Kuyruklar tamamen boşalmış olmalı
-    assert.equal(steeringManager.popSteer(), undefined);
-    assert.equal(steeringManager.popFollowUp(), undefined);
+    assert.equal(session.popSteer(), undefined);
+    assert.equal(session.popFollowUp(), undefined);
   });
 });

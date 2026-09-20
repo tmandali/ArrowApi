@@ -2,7 +2,6 @@ import React from 'react';
 import {
   piEventStream,
   executeComponentAction,
-  steeringManager,
   truncateContent,
   mutationLine,
   adaptivePublisher,
@@ -11,7 +10,9 @@ import {
   pluginRegistry,
   hookPipeline,
 } from '@my-agent/core';
+
 import { loyaltyDiscountPlugin } from '../plugins/loyaltyDiscountPlugin';
+import { useExtendedPiSimulations } from './useExtendedPiSimulations';
 
 interface UsePiSimulationsParams {
   setStoreId: (s: string) => void;
@@ -20,6 +21,8 @@ interface UsePiSimulationsParams {
   dateRangeRef: React.MutableRefObject<string>;
   handleGenerateReport: () => any;
   addLog: (msg: string) => void;
+  onSteer?: (msg: string) => void;
+  onFollowUp?: (msg: string) => void;
 }
 
 export function usePiSimulations({
@@ -29,7 +32,10 @@ export function usePiSimulations({
   dateRangeRef,
   handleGenerateReport,
   addLog,
+  onSteer,
+  onFollowUp,
 }: UsePiSimulationsParams) {
+  // 1. SET_FIELDS Ön Doğrulama
   const runPreflightTestValid = async () => {
     piEventStream.emit({
       type: 'tool_execution_start',
@@ -52,6 +58,7 @@ export function usePiSimulations({
     addLog(`[Agent Tool]: ${JSON.stringify(res)}`);
   };
 
+  // 2. SUBMIT Ön Doğrulama
   const runPreflightTestSubmit = async () => {
     piEventStream.emit({
       type: 'tool_execution_start',
@@ -74,16 +81,31 @@ export function usePiSimulations({
     addLog(`[Agent Tool SUBMIT]: ${JSON.stringify(res)}`);
   };
 
+  // 3. Steer Araya Girme
   const triggerSteerSimulation = () => {
-    steeringManager.steer("Durdur! Kadıköy yerine Beşiktaş mağazasını seç.");
-    addLog("⚡ [Steering Araya Girme]: 'Durdur! Kadıköy yerine Beşiktaş mağazasını seç.' kuyruğa enjekte edildi.");
+    if (onSteer) {
+      onSteer("Durdur! Kadıköy yerine Beşiktaş mağazasını seç.");
+    }
+    piEventStream.emit({
+      type: 'steer_injected',
+      message: "Durdur! Kadıköy yerine Beşiktaş mağazasını seç.",
+    });
+    addLog("⚡ [Steering Araya Girme]: 'Durdur! Kadıköy yerine Beşiktaş mağazasını seç.' oturum kuyruğuna enjekte edildi.");
   };
 
+  // 4. Follow-Up Takip İşi
   const triggerFollowUpSimulation = () => {
-    steeringManager.followUp("Raporu hazırladıktan sonra sonuçları azalan sırada sırala.");
-    addLog("📥 [Follow-up Takip]: 'Rapor bitince azalan sırada sırala' kuyruğa eklendi.");
+    if (onFollowUp) {
+      onFollowUp("Raporu hazırladıktan sonra sonuçları azalan sırada sırala.");
+    }
+    piEventStream.emit({
+      type: 'follow_up_queued',
+      message: "Raporu hazırladıktan sonra sonuçları azalan sırada sırala.",
+    });
+    addLog("📥 [Follow-up Takip]: 'Rapor bitince azalan sırada sırala' oturum kuyruğuna eklendi.");
   };
 
+  // 5. Dual-Bound Truncation
   const runTruncateTest = () => {
     const hugeMock = Array.from({ length: 1000 }, (_, i) => `Satır ${i + 1}: SKU-ITEM-${i} -> Detaylı telemetri log kaydı`).join('\n');
     const truncated = truncateContent(hugeMock, { maxLines: 12, maxBytes: 600 });
@@ -93,6 +115,7 @@ export function usePiSimulations({
     alert(`Dual-bound Kesme Sonucu (Truncated):\n${truncated.content}`);
   };
 
+  // 6. Mutation Line (FIFO Atomik Kuyruk)
   const runMutationLineTest = async () => {
     addLog(`⛓️ [MutationLine]: 3 ardışık atomik mutasyon kuyruğa alındı...`);
     mutationLine.enqueue(async () => {
@@ -114,6 +137,7 @@ export function usePiSimulations({
     });
   };
 
+  // 7. Adaptive Publisher (60 FPS Birleştirme)
   const runAdaptivePublisherTest = () => {
     addLog(`🌊 [AdaptivePublisher]: 15 yüksek hızlı mikro-güncelleme gönderiliyor (16ms batch penceresi)...`);
     for (let i = 1; i <= 15; i++) {
@@ -125,6 +149,7 @@ export function usePiSimulations({
     addLog(`🌊 [AdaptivePublisher]: 15 mikro-güncelleme 60fps sınırına uyumlu tek frame içinde birleştirildi.`);
   };
 
+  // 8. Retry Backoff
   const runRetryTest = async () => {
     let attempts = 0;
     addLog(`🔁 [Retry]: Ağ isteği simülasyonu başlatılıyor (2 yapay hata, 3. denemede başarı)...`);
@@ -149,12 +174,14 @@ export function usePiSimulations({
     }
   };
 
+  // 9. Memory (Kalıcı ve Oturum Hafızası)
   const runMemoryTest = () => {
     agentMemory.remember('preferred_store', 'Kadıköy', 'persistent', 'Kullanıcının varsayılan mağaza tercihi');
     agentMemory.remember('last_quarter', '2026-Q3', 'session', 'İncelenen son finansal çeyrek');
     addLog(`🧠 [Bellek]: 'preferred_store=Kadıköy' ve 'last_quarter=2026-Q3' kaydedildi.`);
   };
 
+  // 10. Plugin Sistemi
   const runPluginTest = async () => {
     const { pluginRegistry } = await import('@my-agent/core');
     await pluginRegistry.register({
@@ -174,29 +201,28 @@ export function usePiSimulations({
     alert(`✅ Eklenti başarıyla sisteme bağlandı!\nYeni Beceri: predictive-analytics`);
   };
 
+  // 11. Multi-Lane Scheduler
   const runLanesTest = async () => {
     const { multiLaneScheduler } = await import('@my-agent/core');
     addLog(`🛤️ [Multi-Lane]: 'interactive' ve 'background' şeritlerine aynı anda görevler gönderildi.`);
     
-    // Arka plan görevi
     multiLaneScheduler.enqueue('background', 'Arka Plan Stok Denetimi', async () => {
       await new Promise((r) => setTimeout(r, 200));
       addLog(`🛤️ [Multi-Lane / Background]: Arka plan stok taraması tamamlandı (0 açık).`);
     });
 
-    // İnteraktif sohbet görevi
     multiLaneScheduler.enqueue('interactive', 'Kullanıcı Form Doldurma', async () => {
       setStoreId('Kadıköy');
       addLog(`🛤️ [Multi-Lane / Interactive]: Kullanıcı formuna öncelikli yanıt verildi.`);
     });
   };
 
+  // 12. Deferred Manager (Askıya Al & Uyandır)
   const runDeferredTest = async () => {
     const { deferredManager } = await import('@my-agent/core');
     addLog(`⏱️ [Deferred]: Uzun süren asenkron PDF ihracı askıya alınıyor...`);
     const { handle, promise } = deferredManager.createDeferred('async_pdf_export', { format: 'PDF-A' });
 
-    // 1 saniye sonra simüle edilmiş arka plan tamamlama
     setTimeout(() => {
       deferredManager.resume(handle.handleId, { downloadUrl: '/downloads/sales_2026.pdf', sizeMb: 2.4 });
     }, 1000);
@@ -206,19 +232,20 @@ export function usePiSimulations({
     alert(`✅ Asenkron Görev Başarıyla Uyandırıldı (Resumed):\n${JSON.stringify(res, null, 2)}`);
   };
 
+  // 13. Reconciliation Engine
   const runReconcileTest = async () => {
     const { reconciliationEngine } = await import('@my-agent/core');
-    // Kasti askıda kalan işlem üret
     reconciliationEngine.simulateCrashOrphan('sim_orphan_99', 'uncommitted_payment_flow');
     addLog(`⚠️ [Reconciliation]: Kasti yarım kalmış işlem enjekte edildi (sim_orphan_99).`);
     
-    // Kurtarma motorunu çalıştır
     const report = reconciliationEngine.reconcile();
     addLog(`🔄 [Reconciliation Sonucu]: ${report.message}`);
     alert(`🔄 Kurtarma Raporu:\n${report.message}\nDetaylar: ${report.details.join(', ')}`);
   };
 
-  const runRpcTest = async () => {    const { defaultRpcTransport } = await import('@my-agent/core');
+  // 14. Remote RPC (JSON-RPC 2.0)
+  const runRpcTest = async () => {
+    const { defaultRpcTransport } = await import('@my-agent/core');
     addLog(`🌐 [RPC İstemcisi]: JSON-RPC 2.0 üzerinden 'execute_action' gönderiliyor...`);
     const response = await defaultRpcTransport.send('execute_action', {
       component_id: 'filter_form',
@@ -229,12 +256,11 @@ export function usePiSimulations({
     alert(`🌐 JSON-RPC 2.0 Yanıtı:\n${JSON.stringify(response, null, 2)}`);
   };
 
+  // 15. Plugin VIP Kupon Senaryosu
   const runVipCouponScenario = async () => {
-    // 1. Custom plugin'i tak (zaten takılıysa register no-op)
     await pluginRegistry.register(loyaltyDiscountPlugin as any);
     addLog(`🎟️ [VIP Senaryo 1/3]: '${loyaltyDiscountPlugin.name}' takıldı — skill + tool + guard aktif.`);
 
-    // 2. Geçerli kupon: %20 → hook'tan geçer, tool çalışır
     const tool = (loyaltyDiscountPlugin as any).tools?.apply_vip_discount;
     const hookOk = await hookPipeline.runBeforeHooks({
       toolName: 'apply_vip_discount',
@@ -249,7 +275,6 @@ export function usePiSimulations({
       addLog(`🎟️ [VIP Senaryo 2/3]: ${res.message}`);
     }
 
-    // 3. Kural ihlali: %45 → guard hook engeller
     const hookBlocked = await hookPipeline.runBeforeHooks({
       toolName: 'apply_vip_discount',
       toolCallId: `sim_vip_45_${Date.now()}`,
@@ -262,6 +287,14 @@ export function usePiSimulations({
       addLog(`❌ [VIP Senaryo 3/3]: %45 engellenemedi, guard çalışmıyor!`);
     }
   };
+
+  // İleri Düzey Pi Simülasyonları
+  const extended = useExtendedPiSimulations({
+    addLog,
+    setStoreId,
+    setDateRange,
+    handleGenerateReport,
+  });
 
   return {
     runPreflightTestValid,
@@ -279,5 +312,6 @@ export function usePiSimulations({
     runReconcileTest,
     runRpcTest,
     runVipCouponScenario,
+    ...extended,
   };
 }

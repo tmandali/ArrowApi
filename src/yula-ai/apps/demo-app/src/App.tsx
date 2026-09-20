@@ -19,8 +19,10 @@ import {
   OAuthLoginModal,
   PiDiagnosticsView,
   HeaderBanner,
+  NavigationTabs,
   AgentWidget,
 } from './components';
+
 import { useAgentRouter, useAgentChat, useAgentComponent } from '@my-agent/react';
 
 export interface DemoAppProps {
@@ -54,11 +56,9 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
   const [models, setModels] = useState<any[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('agnes-3.0-flash');
   const [isOAuthModalOpen, setIsOAuthModalOpen] = useState<boolean>(false);
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const [dockOpen, setDockOpen] = useState<boolean>(false);
   const [locale, setLocale] = useState<'tr' | 'en'>('tr');
 
-  // Paylaşılan Yula Chat Oturumu (Ana Ekran ile Dock arasında kesintisiz devamlılık)
+  // Paylaşılan Yula Chat Oturumu
   const chat = useAgentChat(currentRoute, {
     model: selectedModel,
     locale,
@@ -66,12 +66,6 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
     onSelectModel: (m) => setSelectedModel(m),
   });
 
-  // Yula başka bir forma/sayfaya geçtiğinde (currentRoute !== '/') otomatik Dock modunda devam eder
-  useEffect(() => {
-    if (currentRoute !== '/') {
-      setDockOpen(true);
-    }
-  }, [currentRoute]);
 
   const refreshModels = () => {
     fetch('/api/models')
@@ -310,13 +304,24 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
     runReconcileTest,
     runRpcTest,
     runVipCouponScenario,
+    runAutonomousLoopScenario,
+    runUserChoiceScenario,
+    runStagnationScenario,
+    runCompactionScenario,
+    runForkCloneScenario,
+    runExportHtmlScenario,
+    runStreamingUpdateScenario,
+    runSessionRetryScenario,
   } = usePiSimulations({
+
     setStoreId,
     setDateRange,
     storeIdRef,
     dateRangeRef,
     handleGenerateReport,
     addLog,
+    onSteer: (msg) => chat.steer(msg),
+    onFollowUp: (msg) => chat.followUp(msg),
   });
 
   return (
@@ -349,28 +354,17 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
           onToggleHitl={setHitlEnabled}
           canUndo={canUndo}
           canRedo={canRedo}
-          onUndo={() => {
-            sessionManager.undo();
-            updateUndoRedoStatus();
-          }}
-          onRedo={() => {
-            sessionManager.redo();
-            updateUndoRedoStatus();
-          }}
+          onUndo={() => { sessionManager.undo(); updateUndoRedoStatus(); }}
+          onRedo={() => { sessionManager.redo(); updateUndoRedoStatus(); }}
           onNewConversation={() => {
-            setStoreId('');
-            setDateRange('');
-            setStage('CRITERIA');
-            sessionManager.checkpoint('Yeni Oturum Başlatıldı', { storeId: '', dateRange: '', stage: 'CRITERIA' });
+            setStoreId(''); setDateRange(''); setStage('CRITERIA');
+            sessionManager.checkpoint('Yeni Oturum', { storeId: '', dateRange: '', stage: 'CRITERIA' });
             updateUndoRedoStatus();
-            addLog('Yeni oturum başlatıldı, form sıfırlandı.');
+            addLog('Yeni oturum başlatıldı.');
           }}
-          onDumpSession={() => {
-            addLog('Oturum dump alındı.');
-          }}
-          onRestoreSession={() => {
-            addLog('Oturum geri yüklendi.');
-          }}
+          onDumpSession={() => addLog('Oturum dump alındı.')}
+          onRestoreSession={() => addLog('Oturum geri yüklendi.')}
+
           telemetrySummary={telemetrySummary}
           contextUsage={chat.contextUsage}
           autoCompactEnabled={chat.autoCompactEnabled}
@@ -389,33 +383,10 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
         />
 
         {/* Sekmeler Navigasyonu */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {[
-            { route: '/reports', label: '📊 Raporlar & Form' },
-            { route: '/dashboard', label: '📈 Dashboard' },
-            { route: '/tests', label: '🧪 Pi Simülasyon Testleri' },
-          ].map((tab) => (
-            <button
-              key={tab.route}
-              type="button"
-              onClick={() => onNavigate?.(tab.route)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: currentRoute === tab.route ? '1px solid #3b82f6' : '1px solid #334155',
-                backgroundColor: currentRoute === tab.route ? '#1e3a8a' : '#1e293b',
-                color: currentRoute === tab.route ? '#ffffff' : '#94a3b8',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <NavigationTabs currentRoute={currentRoute} onNavigate={onNavigate} />
 
         {/* Ana İçerik */}
+
         <main>
           {currentRoute === '/reports' && (
             <ReportsView
@@ -423,23 +394,19 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
               storeId={storeId}
               dateRange={dateRange}
               validationError={validationError}
-              onStoreIdChange={(v) => {
-                setStoreId(v);
-                setValidationError(null);
-              }}
-              onDateRangeChange={(v) => {
-                setDateRange(v);
-                setValidationError(null);
-              }}
+              onStoreIdChange={(v) => { setStoreId(v); setValidationError(null); }}
+
+              onDateRangeChange={(v) => { setDateRange(v); setValidationError(null); }}
               onSubmit={handleGenerateReport}
               onBackToCriteria={() => {
                 setStage('CRITERIA');
-                sessionManager.checkpoint('Kriterlere Geri Dönüldü', { storeId, dateRange, stage: 'CRITERIA' });
+                sessionManager.checkpoint('Kriterlere Dönüldü', { storeId, dateRange, stage: 'CRITERIA' });
                 updateUndoRedoStatus();
                 addLog('Aşama geri alındı -> CRITERIA');
               }}
               onLog={addLog}
             />
+
           )}
 
           {currentRoute === '/dashboard' && (
@@ -466,8 +433,17 @@ export function DemoApp({ currentRoute = '/reports', onNavigate }: DemoAppProps)
               onReconcile={runReconcileTest}
               onRpc={runRpcTest}
               onVipCoupon={runVipCouponScenario}
+              onAutonomousLoop={runAutonomousLoopScenario}
+              onUserChoice={runUserChoiceScenario}
+              onStagnation={runStagnationScenario}
+              onCompaction={runCompactionScenario}
+              onForkClone={runForkCloneScenario}
+              onExportHtml={runExportHtmlScenario}
+              onStreamingUpdate={runStreamingUpdateScenario}
+              onSessionRetry={runSessionRetryScenario}
               onLog={addLog}
               piEvents={piEvents}
+
               testLogs={testLogs}
               onClearLogs={() => setTestLogs([])}
             />

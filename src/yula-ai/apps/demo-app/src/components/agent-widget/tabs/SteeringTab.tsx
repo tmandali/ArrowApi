@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { steeringManager } from '@my-agent/core';
 
 interface SteeringTabProps {
   onSteer: (msg: string) => void;
   onFollowUp: (msg: string) => void;
+  steeringQueueLength?: number;
+  followUpQueueLength?: number;
 }
 
-export function SteeringTab({ onSteer, onFollowUp }: SteeringTabProps) {
+export function SteeringTab({
+  onSteer,
+  onFollowUp,
+  steeringQueueLength,
+  followUpQueueLength,
+}: SteeringTabProps) {
   const [steeringText, setSteeringText] = useState('');
   const [followUpText, setFollowUpText] = useState('');
 
@@ -70,11 +76,14 @@ export function SteeringTab({ onSteer, onFollowUp }: SteeringTabProps) {
 
       <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
         <div style={{ fontWeight: 600, color: '#334155', marginBottom: 6 }}>
-          Aktif Kuyruk Durumu:
+          ⚡ Pi Reaktif Döngü Modu:
         </div>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          • Bekleyen Steering: {steeringManager.getSteeringQueue().length} adet<br />
-          • Bekleyen Follow-up: {steeringManager.getFollowUpQueue().length} adet
+          • Steering: Model araç çalıştırırken tur sınırında anında devreye girer.<br />
+          • Follow-up: Model boşta kaldığında sıradaki iş otomatik yürütülür.
+          {typeof steeringQueueLength === 'number' && (
+            <div style={{ marginTop: 4 }}>• Bekleyen Kuyruk: {steeringQueueLength} steer, {followUpQueueLength ?? 0} follow-up</div>
+          )}
         </div>
       </div>
     </div>

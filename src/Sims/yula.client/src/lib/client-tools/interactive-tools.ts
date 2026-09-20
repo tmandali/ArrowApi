@@ -7,6 +7,10 @@ import { buildUserSkillPrompt } from "@/lib/yula-user-skill";
  * skill'leri. Davranış `yula-client-tools.ts` ile birebirdir.
  */
 
+/**
+ * @deprecated Use `@my-agent/core` standard `ask_user_choice` tool instead for inline HITL choice cards.
+ * Retained for backward compatibility with external callers.
+ */
 export async function askUserQuestionTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
@@ -15,7 +19,7 @@ export async function askUserQuestionTool(
   return {
     status: "awaiting_user",
     questions,
-    message: "Questions presented to the user. Wait for their answers, which arrive as a new user message.",
+    message: "Questions presented to the user. Prefer ask_user_choice for modern inline HITL selection.",
   };
 }
 

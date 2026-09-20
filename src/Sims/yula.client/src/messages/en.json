@@ -898,7 +898,8 @@
   },
   "ChoiceCard": {
     "option_selected": "Option selected",
-    "send": "Send"
+    "send": "Send",
+    "default_question": "Please select an option:"
   },
   "QuestionnaireCard": {
     "answered_questions": "Answered questions",

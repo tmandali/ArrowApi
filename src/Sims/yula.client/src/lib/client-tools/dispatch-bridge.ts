@@ -134,6 +134,9 @@ export async function executeDispatchComponentAction({
 
   // 4. İş Geçmişi / Rapor Yönetimi
   if (family === "job_history") {
+    if (subId && !args.report) {
+      args.report = subId;
+    }
     switch (action) {
       case "OPEN_LAST":
         return openLastReportTool(args);
@@ -156,6 +159,16 @@ export async function executeDispatchComponentAction({
       return tool.execute(args);
     }
     return { status: "unknown-plugin-tool", component_id, action };
+  }
+
+  // 6. Master Data / Varlık Formları (Entity Forms)
+  if (family === "entity_form") {
+    return {
+      status: "unhandled-entity-form",
+      component_id,
+      action,
+      message: `Entity form action ${action} for ${subId} must be handled by the mounted UI component.`,
+    };
   }
 
   return { status: "unknown-component", component_id, action };

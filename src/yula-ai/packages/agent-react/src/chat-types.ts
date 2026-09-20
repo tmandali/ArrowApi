@@ -42,6 +42,7 @@ export interface UseAgentChatOptions {
   messages?: Partial<import('@my-agent/core').AgentDictionary>;
   apiEndpoint?: string;
   compactEndpoint?: string;
+  modelsEndpoint?: string;
   initialMessages?: AgentMessage[];
   compactionSettings?: Partial<CompactionSettings>;
   onToolCall?: (params: { toolCall: AgentToolInvocation }) => Promise<any>;

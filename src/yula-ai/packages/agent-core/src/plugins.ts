@@ -28,7 +28,6 @@ export class PluginRegistry {
 
   async register(plugin: AgentPlugin): Promise<void> {
     if (this.plugins.has(plugin.id)) {
-      console.warn(`[PluginRegistry] Eklenti zaten kayıtlı: ${plugin.id}`);
       return;
     }
 
@@ -99,6 +98,10 @@ export class PluginRegistry {
 
   get(pluginId: string): AgentPlugin | undefined {
     return this.plugins.get(pluginId);
+  }
+
+  has(pluginId: string): boolean {
+    return this.plugins.has(pluginId);
   }
 
   getAll(): AgentPlugin[] {

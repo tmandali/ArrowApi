@@ -9,24 +9,27 @@ export const STANDARD_AGENT_TOOLS = {
   dispatch_component_action: tool({
     description: [
       "Dispatch an action to an active UI component on the screen (criteria form, result grid, app router, job history).",
-      "Usage:",
-      "- Criteria Form: component_id='criteria_form:<scope>', action='SET_FIELDS' | 'APPLY' | 'SUBMIT' | 'RUN' | 'VALIDATE' | 'READ', payload={ criteria, report }.",
-      "- Result Grid: component_id='result_grid:active', action='RUN_SQL' | 'QUERY' | 'FILTER' | 'SORT' | 'EXPORT' | 'COLUMNS' | 'PIN' | 'RESET_LAYOUT' | 'VISUALIZE' | 'ANALYZE' | 'PROFILE', payload={ ... }.",
-      "- App Router: component_id='app_router', action='NAVIGATE', payload={ path }.",
-      "- Job History: component_id='job_history', action='OPEN_LAST' | 'LIST' | 'FIND' | 'CANCEL', payload={ ... }.",
-      "- Plugins: component_id='plugin:<name>', action='<toolName>', payload={ ... }.",
+      "Canonical actions & examples:",
+      "- Fill criteria: component_id='criteria_form:<scope>', action='SET_FIELDS', payload={ storeId: 'Kadıköy', dateRange: '2026-09-01..2026-09-30' }.",
+      "- Run report: component_id='criteria_form:<scope>', action='SUBMIT', payload={ report: '<scope>' }.",
+      "- Query grid data: component_id='result_grid:active', action='RUN_SQL', payload={ query: 'SELECT Category, SUM(Amount) FROM active_view GROUP BY 1' }.",
+      "- Filter column: component_id='result_grid:active', action='FILTER', payload={ field: 'Category', value: 'Elektronik', op: 'eq' }.",
+      "- Sort column: component_id='result_grid:active', action='SORT', payload={ column: 'Amount', direction: 'desc' }.",
+      "- Export grid: component_id='result_grid:active', action='EXPORT', payload={ format: 'xlsx' }.",
+      "- Navigate: component_id='app_router', action='NAVIGATE', payload={ path: '/retail/sales' }.",
+      "- Open last report: component_id='job_history', action='OPEN_LAST', payload={}.",
     ].join(" "),
     inputSchema: z.object({
-      component_id: z.string().describe("Target component identifier (e.g. 'criteria_form:retail-sales', 'result_grid:active', 'app_router', 'job_history', 'plugin:stock-predictive-analytics')"),
-      action: z.string().describe("Action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'APPLY', 'RUN', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
-      payload: z.record(z.string(), z.any()).optional().default({}).describe("Action parameters and criteria"),
+      component_id: z.string().describe("Target component identifier (e.g. 'criteria_form:retail-sales', 'result_grid:active', 'app_router', 'job_history')"),
+      action: z.string().describe("Canonical action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
+      payload: z.record(z.string(), z.any()).optional().default({}).describe("Action parameters and payload data"),
     }),
   }),
 
   inspect_ui_state: tool({
-    description: "Inspect the current UI state, active screen components, route, or open table schema.",
+    description: "Inspect the current UI state, mounted components, route, active filters, or criteria draft values on the active screen.",
     inputSchema: z.object({
-      component_id: z.string().optional().describe("Optional target component ID to inspect specifically"),
+      component_id: z.string().optional().describe("Optional target component ID to inspect specifically (e.g. 'criteria_form:retail-sales' or 'result_grid:active')"),
     }),
   }),
 

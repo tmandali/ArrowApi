@@ -51,6 +51,7 @@ import { ItemTaxTab } from "./ItemTaxTab"
 import { printStockItemReport } from "../services/print-stock-report"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
+import { useAgentComponent } from "@my-agent/react"
 import { useTranslations } from "next-intl"
 
 export type ItemFormTab =
@@ -125,6 +126,7 @@ export function ItemFormShell({
     defaultTab && visibleTabs.has(defaultTab)
       ? defaultTab
       : (tabs.find((tab) => visibleTabs.has(tab)) ?? "details")
+  const [activeTab, setActiveTab] = React.useState<ItemFormTab>(initialTab)
   const [descriptionOpen, setDescriptionOpen] = React.useState(false)
   const [uomOpen, setUomOpen] = React.useState(false)
   const [maintainStock, setMaintainStock] = React.useState(true)
@@ -134,6 +136,71 @@ export function ItemFormShell({
   const [isExempt, setIsExempt] = React.useState(false)
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
   const [showBanner, setShowBanner] = React.useState(variant === "item")
+
+  useAgentComponent({
+    id: "entity_form:stock_item",
+    meta: {
+      entity: "stock_item",
+      screenTitle: "Item Details",
+      workspace: "stock",
+      activeTab,
+      maintainStock,
+      disabled,
+      allowAlternative,
+      isZeroRated,
+      isExempt,
+      isFixedAsset,
+    },
+    actions: {
+      SET_FIELDS: {
+        description: "Updates item master data attributes ({ maintainStock, disabled, allowAlternative, isZeroRated, isExempt, isFixedAsset }).",
+        whenToCall: "When the user wants to enable/disable stock tracking, toggle exemption, or update item flags.",
+        whenNotToCall: "When switching tabs or inspecting values.",
+      },
+      SWITCH_TAB: {
+        description: "Switches the active tab in the item form ({ tab: 'details'|'dashboard'|'inventory'|'variants'|'accounting'|'purchasing'|'sales'|'tax'|'report'|'quality'|'manufacturing' }).",
+        whenToCall: "When the user asks to switch to a specific tab of the item details.",
+        whenNotToCall: "When the requested tab is already active.",
+      },
+      READ: {
+        description: "Reads the current fields, toggles, and active tab of the item form.",
+        whenToCall: "When inspecting the current state of the item details form.",
+        whenNotToCall: "When modifying values.",
+      },
+    },
+    onAction: async (action, payload) => {
+      if (action === "SWITCH_TAB" && typeof payload?.tab === "string") {
+        const targetTab = payload.tab as ItemFormTab;
+        if (visibleTabs.has(targetTab)) {
+          setActiveTab(targetTab);
+          return { success: true, activeTab: targetTab, message: `Switched to tab ${targetTab}` };
+        }
+        return { success: false, error: `Tab '${payload.tab}' is not available on this screen.` };
+      }
+      if (action === "SET_FIELDS" && payload) {
+        if (typeof payload.maintainStock === "boolean") setMaintainStock(payload.maintainStock);
+        if (typeof payload.disabled === "boolean") setDisabled(payload.disabled);
+        if (typeof payload.allowAlternative === "boolean") setAllowAlternative(payload.allowAlternative);
+        if (typeof payload.isZeroRated === "boolean") setIsZeroRated(payload.isZeroRated);
+        if (typeof payload.isExempt === "boolean") setIsExempt(payload.isExempt);
+        if (typeof payload.isFixedAsset === "boolean") setIsFixedAsset(payload.isFixedAsset);
+        return { success: true, updated: payload, message: "Item fields updated successfully." };
+      }
+      if (action === "READ") {
+        return {
+          success: true,
+          activeTab,
+          maintainStock,
+          disabled,
+          allowAlternative,
+          isZeroRated,
+          isExempt,
+          isFixedAsset,
+        };
+      }
+      return { success: false, error: `Unsupported action '${action}' for stock item form.` };
+    },
+  })
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([
@@ -276,7 +343,7 @@ export function ItemFormShell({
           )}
         >
         <div className={cn(panelCardClass, "min-h-0 flex-1")}>
-        <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as ItemFormTab)} className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden">
           <div className="shrink-0 border-b border-border px-3">
             <ScrollArea type="hover" className="w-full whitespace-nowrap">
               <div className="py-1">

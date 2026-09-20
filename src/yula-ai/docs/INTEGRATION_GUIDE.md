@@ -363,7 +363,8 @@ import {
   executeComponentAction,
   hookPipeline,
   sessionManager,
-  steeringManager,
+  Agent,
+  AgentSession,
   telemetryTracker,
   truncateContent,
   mutationLine,
@@ -440,11 +441,12 @@ describe('🤖 Headless UI-Agent 16 Aşamalı Uçtan Uca Simülasyonu', () => {
     unsub();
   });
 
-  it('Aşama 3: Steering (Araya Girme) ve Follow-up Kuyruğu', () => {
-    steeringManager.clear();
-    steeringManager.steer('Kadıköy yerine Beşiktaş seç.');
-    expect(steeringManager.hasSteering()).toBe(true);
-    expect(steeringManager.popSteer()?.content).toContain('Beşiktaş');
+  it('Aşama 3: Steering (Araya Girme) ve Follow-up Kuyruğu (Pure Pi AgentSession)', () => {
+    const session = new AgentSession({ agent: new Agent({ tools: [] }) });
+    session.clear();
+    session.steer('Kadıköy yerine Beşiktaş seç.');
+    expect(session.hasSteering()).toBe(true);
+    expect(session.popSteer()?.content).toContain('Beşiktaş');
   });
 
   it('Aşama 4: Dual-Bound Truncation (Token Guard)', () => {

@@ -15,10 +15,39 @@ import { deferredManager } from "@my-agent/core";
  * Davranış `yula-client-tools.ts` ile birebirdir.
  */
 
+/**
+ * Aktif ekranın rapor kapsamını dinamik olarak çözer.
+ * Eğer araç çağrısında explicit scope verilmemişse:
+ * 1. Aktif ekran grid/screen mağazası (screen?.reportScope)
+ * 2. Tarayıcı URL yolu (REGISTERED_REPORTS eşleşmesi)
+ * kontrollerini yaparak ekrandaki aktif raporu bulur.
+ */
+export async function resolveCurrentReportScope(explicit?: unknown): Promise<string> {
+  const explicitStr = typeof explicit === "string" ? explicit.trim().toLowerCase() : "";
+  if (explicitStr) return explicitStr;
+
+  try {
+    const { useYulaGridStore } = await import("@/lib/stores/grid");
+    const screenScope = useYulaGridStore.getState().screen?.reportScope;
+    if (screenScope) return screenScope.trim().toLowerCase();
+  } catch {}
+
+  if (typeof window !== "undefined") {
+    try {
+      const currentPath = window.location.pathname;
+      const { REGISTERED_REPORTS } = await import("@/features/reports/report-registry");
+      const matched = REGISTERED_REPORTS.find((r) => currentPath.startsWith(r.pagePath));
+      if (matched) return matched.scope.toLowerCase();
+    } catch {}
+  }
+
+  return "";
+}
+
 export async function runJobTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
+  const scope = await resolveCurrentReportScope(args.report);
   if (!scope) {
     return {
       status: "validation-error",
@@ -176,7 +205,7 @@ export async function runJobTool(
 export async function applyCriteriaTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
+  const scope = await resolveCurrentReportScope(args.report);
   if (!scope) {
     return {
       status: "error",
@@ -272,7 +301,10 @@ export async function openLastReportTool(
     const { REGISTERED_REPORTS } = await import(
       "@/features/reports/report-registry"
     );
-    const scope = typeof args.report === "string" ? args.report.trim().toLowerCase() : "";
+    let scope = typeof args.report === "string" ? args.report.trim().toLowerCase() : "";
+    if (!scope) {
+      scope = await resolveCurrentReportScope();
+    }
     const matched = scope
       ? REGISTERED_REPORTS.filter(
           (r) =>
@@ -354,7 +386,7 @@ export async function openLastReportTool(
 export async function validateCriteriaInputTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
+  const scope = await resolveCurrentReportScope(args.report);
   if (!scope) {
     return {
       valid: false,
@@ -386,7 +418,7 @@ export async function validateCriteriaInputTool(
 export async function getCurrentCriteriaTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
+  const scope = await resolveCurrentReportScope(args.report);
   if (!scope) {
     return {
       status: "error",
@@ -429,7 +461,7 @@ export async function getCurrentCriteriaTool(
 export async function findMatchingReportTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
+  const scope = await resolveCurrentReportScope(args.report);
   if (!scope) {
     return { status: "error", error: "'report' (report scope) is required — identify the target report first, never assume a default." };
   }
@@ -554,38 +586,128 @@ export async function findMatchingReportTool(
 export async function listReportExecutionsTool(
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const scope = String(args.report ?? "");
-  if (!scope) {
-    return {
-      status: "error",
-      executions: [],
-      message: "'report' (report scope) is required — identify the target report first, never assume a default.",
-    };
-  }
+  const scope = await resolveCurrentReportScope(args.report);
   const limit =
     typeof args.limit === "number"
       ? Math.min(10, Math.max(1, args.limit))
       : 10;
   try {
-    const { findReport } = await import("@/features/reports/report-registry");
-    const meta = findReport(scope);
-    const endpoint =
-      typeof meta?.fullSchema?.["x-job-endpoint"] === "string"
-        ? (meta.fullSchema["x-job-endpoint"] as string)
-        : "/api/arrow/jobs";
+    const { findReport, REGISTERED_REPORTS } = await import("@/features/reports/report-registry");
     const { listArrowJobs } = await import("@/features/jobs/arrow-job-client");
-    const res = await listArrowJobs(endpoint, { take: limit });
-    const executions = (res.items || []).slice(0, limit).map((j) => ({
-      jobId: j.id,
-      status: j.status,
-      createdAt: j.createdAt,
-      rowCount: j.totalRows,
-      href: meta ? `${meta.pagePath}/${j.id}` : undefined,
-    }));
+    const { useActiveJobsStore } = await import("@/store/slices/active-jobs-store");
+
+    type ExecutionItem = {
+      jobId: string;
+      report: string;
+      reportTitle: string;
+      status: string;
+      createdAt: string;
+      rowCount?: number;
+      href?: string;
+    };
+
+    if (scope) {
+      const meta = findReport(scope);
+      const endpoint =
+        typeof meta?.fullSchema?.["x-job-endpoint"] === "string"
+          ? (meta.fullSchema["x-job-endpoint"] as string)
+          : `/api/arrow/jobs/${scope}`;
+
+      let jobsFromApi: import("@/features/jobs/types").ArrowJobStatus[] = [];
+      try {
+        const res = await listArrowJobs(endpoint, { take: limit });
+        jobsFromApi = res.items || [];
+      } catch {
+        // Fallback to active store if server endpoint not reachable
+      }
+
+      const executions: ExecutionItem[] = jobsFromApi.slice(0, limit).map((j) => ({
+        jobId: j.id,
+        report: scope,
+        reportTitle: meta?.title || scope,
+        status: j.status,
+        createdAt: j.createdAt ?? "",
+        rowCount: j.totalRows,
+        href: meta ? `${meta.pagePath}/${j.id}` : undefined,
+      }));
+
+      // Include matching in-flight jobs from active store
+      for (const job of Object.values(useActiveJobsStore.getState().jobs)) {
+        if ((job.name ?? "").toLowerCase() !== scope) continue;
+        if (executions.some((e) => e.jobId === job.id)) continue;
+        executions.push({
+          jobId: job.id,
+          report: scope,
+          reportTitle: meta?.title || job.title || job.name,
+          status: job.status,
+          createdAt: job.createdAt ?? "",
+          rowCount: undefined,
+          href: job.href ?? (meta ? `${meta.pagePath}/${job.id}` : undefined),
+        });
+      }
+
+      executions.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      const finalExecutions = executions.slice(0, limit);
+
+      return {
+        status: "ok",
+        report: scope,
+        reportTitle: meta?.title || scope,
+        executions: finalExecutions,
+        total: finalExecutions.length,
+        message: `Listed ${finalExecutions.length} report execution(s) for ${meta?.title || scope}.`,
+      };
+    }
+
+    // No specific report scope (e.g. general dashboard / root page):
+    // List executions across all registered reports + active jobs store
+    const allExecutions: ExecutionItem[] = [];
+
+    for (const report of REGISTERED_REPORTS) {
+      const endpoint = (report.fullSchema as Record<string, unknown>)["x-job-endpoint"];
+      if (typeof endpoint !== "string" || !endpoint) continue;
+      try {
+        const { items } = await listArrowJobs(endpoint, { take: limit });
+        for (const j of items) {
+          allExecutions.push({
+            jobId: j.id,
+            report: report.scope,
+            reportTitle: report.title,
+            status: j.status,
+            createdAt: j.createdAt ?? "",
+            rowCount: j.totalRows,
+            href: `${report.pagePath}/${j.id}`,
+          });
+        }
+      } catch {
+        // Continue if single endpoint fails
+      }
+    }
+
+    // In-flight jobs from active store
+    for (const job of Object.values(useActiveJobsStore.getState().jobs)) {
+      if (allExecutions.some((e) => e.jobId === job.id)) continue;
+      const inFlightScope = (job.name ?? "").toLowerCase();
+      const inFlightReport = REGISTERED_REPORTS.find((r) => r.scope === inFlightScope);
+      allExecutions.push({
+        jobId: job.id,
+        report: inFlightScope,
+        reportTitle: job.title || inFlightReport?.title || job.name,
+        status: job.status,
+        createdAt: job.createdAt ?? "",
+        rowCount: undefined,
+        href: job.href ?? (inFlightReport ? `${inFlightReport.pagePath}/${job.id}` : undefined),
+      });
+    }
+
+    allExecutions.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const slice = allExecutions.slice(0, limit);
     return {
       status: "ok",
-      executions,
-      message: `Listed ${executions.length} report execution(s).`,
+      report: "all",
+      executions: slice,
+      total: allExecutions.length,
+      message: `Listed ${slice.length} past execution(s) across all reports (total: ${allExecutions.length}).`,
     };
   } catch (err) {
     return {

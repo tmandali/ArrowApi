@@ -1,6 +1,7 @@
 export * from './agent-provider';
 export * from './chat-types';
 export * from './use-agent-chat';
+export * from './use-agent-session';
 export * from './use-agent-skill';
 export * from './use-agent-router';
 export * from './use-agent-plugin';

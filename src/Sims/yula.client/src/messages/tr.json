@@ -898,7 +898,8 @@
   },
   "ChoiceCard": {
     "option_selected": "Seçim yapıldı",
-    "send": "Gönder"
+    "send": "Gönder",
+    "default_question": "Lütfen bir seçenek belirleyin:"
   },
   "QuestionnaireCard": {
     "answered_questions": "Cevaplanan sorular",

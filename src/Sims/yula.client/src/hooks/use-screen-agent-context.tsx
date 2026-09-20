@@ -4,6 +4,7 @@ import * as React from "react";
 import { uiRegistry, uiEventBus, type ComponentSchema } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { useYulaGridStore } from "@/lib/stores/grid";
+import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 
 /**
  * Revize karşılığı: eski sidecar scope-kayıt sözleşmesinin yerine
@@ -64,7 +65,11 @@ export function useScreenAgentContext(input: {
     const screenId = current.screenId || (current.activeReportScope as string) || "screen";
     const screenTitle = current.screenTitle || "";
     const workspaceId = (current.workspaceId as string) || "stock";
-    const reportScope = (current.activeReportScope as string) || (current.screenId as string);
+    const rawScope = (current.activeReportScope as string) || (current.screenId as string);
+    const registeredReport = REGISTERED_REPORTS.find(
+      (r) => r.scope === rawScope || (r.pagePath && current.screenId && current.screenId.includes(r.scope))
+    );
+    const reportScope = registeredReport?.scope || (current.activeReportScope as string) || undefined;
     const isViewingResults = Boolean(currentSummary?.isViewingResults);
     const quickPrompts = (current.quickPrompts as string[]) || [];
     const criteriaDigest = (current.criteriaDigest as Array<Record<string, unknown>>) || [];
@@ -87,7 +92,7 @@ export function useScreenAgentContext(input: {
       screenId,
       screenTitle,
       workspaceId,
-      reportScope,
+      reportScope: reportScope || screenId,
       isViewingResults,
       registeredTools: tools,
       quickPrompts,
@@ -101,96 +106,9 @@ export function useScreenAgentContext(input: {
     const unsubscribes: Array<() => void> = [];
 
     // Headless UI-Agent (@my-agent/core) Bileşen Kaydı
-    if (isViewingResults) {
-      const gridCompId = "result_grid:active";
-      const gridSchema: ComponentSchema = {
-        id: gridCompId,
-        meta: {
-          tableName: currentSummary?.tableName,
-          columns: currentSummary?.columns,
-          rowCount: currentSummary?.totalFiltered,
-        },
-        actions: {
-          RUN_SQL: {
-            description: "Executes a DuckDB SQL query against the active dataset ({ query }).",
-            whenToCall: "When the user requests custom SQL queries, aggregations, or calculations.",
-            whenNotToCall: "When the table is not loaded or simple column filtering is sufficient.",
-          },
-          SQL: {
-            description: "Executes a DuckDB SQL query against the active dataset ({ query }).",
-            whenToCall: "When the user requests custom SQL queries, aggregations, or calculations.",
-            whenNotToCall: "When the table is not loaded or simple column filtering is sufficient.",
-          },
-          QUERY: {
-            description: "Updates the grid view via SQL or opens a derived view ({ query }).",
-            whenToCall: "When the user wants derived columns or grouped table views.",
-            whenNotToCall: "When only changing simple filters or sorting.",
-          },
-          FILTER: {
-            description: "Filters the grid ({ field, value, op }).",
-            whenToCall: "To filter table data by a column value.",
-            whenNotToCall: "When filtering is not requested.",
-          },
-          APPLY_FILTERS: {
-            description: "Applies multiple filters to the table simultaneously ({ filters, clearOthers }).",
-            whenToCall: "When multiple columns need to be filtered concurrently.",
-            whenNotToCall: "When filtering only a single column.",
-          },
-          SORT: {
-            description: "Sorts the grid by column ({ column, direction }).",
-            whenToCall: "When sorting is requested.",
-            whenNotToCall: "When sorting is not requested.",
-          },
-          COLUMNS: {
-            description: "Shows, hides, or reorders columns ({ visibleColumns, hiddenColumns }).",
-            whenToCall: "To adjust column visibility or layout.",
-            whenNotToCall: "When column layout should remain untouched.",
-          },
-          PIN: {
-            description: "Pins columns to the left or right ({ columns }).",
-            whenToCall: "When column freezing or pinning is requested.",
-            whenNotToCall: "When pinning is not requested.",
-          },
-          RESET_LAYOUT: {
-            description: "Resets the grid to default layout and visibility.",
-            whenToCall: "When the user wants to reset custom column arrangements.",
-            whenNotToCall: "When keeping the current layout.",
-          },
-          EXPORT: {
-            description: "Exports data to Excel, CSV, or Parquet ({ format }).",
-            whenToCall: "When downloading or exporting grid data is requested.",
-            whenNotToCall: "When export is not requested.",
-          },
-          VISUALIZE: {
-            description: "Generates a chart or visual plot ({ type, dimension, metric }).",
-            whenToCall: "When a chart or graph visualization is requested.",
-            whenNotToCall: "When no visual chart is requested.",
-          },
-          CHART: {
-            description: "Generates a chart or visual plot ({ type, dimension, metric }).",
-            whenToCall: "When a chart or graph visualization is requested.",
-            whenNotToCall: "When no visual chart is requested.",
-          },
-          ANALYZE: {
-            description: "Generates a statistical summary of the active data.",
-            whenToCall: "When statistical summary or data distribution is requested.",
-            whenNotToCall: "When summary analysis is not requested.",
-          },
-          PROFILE: {
-            description: "Profiles column data quality, null counts, and distinct values.",
-            whenToCall: "When inspecting data quality or anomalies.",
-            whenNotToCall: "When profiling is not requested.",
-          },
-        },
-      };
-      uiRegistry.register(gridSchema);
-      registeredCompIds.push(gridCompId);
-      unsubscribes.push(
-        uiEventBus.subscribe(gridCompId, (action, payload) =>
-          executeDispatchComponentAction({ component_id: gridCompId, action, payload }) as any
-        )
-      );
-    } else if (reportScope) {
+    // Note: 'result_grid:active' is natively registered by ArrowReportGrid via useAgentComponent.
+    // Note: Only register criteria_form if this is truly a registered report.
+    if (!isViewingResults && registeredReport && reportScope) {
       const formCompId = `criteria_form:${reportScope}`;
       const formSchema: ComponentSchema = {
         id: formCompId,

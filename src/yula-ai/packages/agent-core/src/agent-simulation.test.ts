@@ -6,7 +6,8 @@ import {
   executeComponentAction,
   hookPipeline,
   sessionManager,
-  steeringManager,
+  Agent,
+  AgentSession,
   telemetryTracker,
   truncateContent,
   mutationLine,
@@ -211,22 +212,32 @@ describe('🤖 Pi Headless UI-Agent Uçtan Uca Simülasyonu', () => {
     unsub();
   });
 
-  it('Aşama 3: Steering (Araya Girme) ve Follow-up (Takip İşi) Kuyruğu', async () => {
-    steeringManager.clear();
+  it('Aşama 3: Steering (Araya Girme) ve Follow-up (Takip İşi) Kuyruğu (Pure Pi AgentSession)', async () => {
+    const session = new AgentSession({
+      agent: new Agent({
+        tools: [],
+        streamFn: async () => ({
+          message: { role: 'assistant', content: '' },
+          toolCalls: [],
+        }),
+      }),
+    });
+    session.clear();
 
     // Kullanıcı araya girer
-    steeringManager.steer('Durdur! Kadıköy yerine Beşiktaş mağazasını seç.');
-    expect(steeringManager.hasSteering()).toBe(true);
+    session.steer('Durdur! Kadıköy yerine Beşiktaş mağazasını seç.');
+    expect(session.hasSteering()).toBe(true);
 
-    const steerMsg = steeringManager.popSteer()?.content;
+    const steerMsg = session.popSteer()?.content;
     expect(steerMsg).toContain('Beşiktaş');
-    expect(steeringManager.hasSteering()).toBe(false);
+    expect(session.hasSteering()).toBe(false);
 
     // Follow-up ekleme
-    steeringManager.followUp('Rapor bitince CSV indir.');
-    expect(steeringManager.hasFollowUp()).toBe(true);
-    const followUpMsg = steeringManager.popFollowUp()?.content;
+    session.followUp('Rapor bitince CSV indir.');
+    expect(session.hasFollowUp()).toBe(true);
+    const followUpMsg = session.popFollowUp()?.content;
     expect(followUpMsg).toContain('CSV indir');
+    expect(session.hasFollowUp()).toBe(false);
   });
 
   it('Aşama 4: Dual-Bound Truncation (Çift Yönlü Güvenli Kesme)', () => {

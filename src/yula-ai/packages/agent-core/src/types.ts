@@ -103,10 +103,10 @@ export type AgentEvent =
   | { type: 'turn_start'; turnIndex?: number; timestamp?: number }
   | { type: 'turn_end'; message?: any; toolResults?: any[]; timestamp?: number }
   // Message lifecycle - emitted for system, user, assistant, and toolResult messages
-  | { type: 'message_start'; message: { role: 'user' | 'assistant' | 'system' | 'tool'; content: string }; timestamp?: number }
+  | { type: 'message_start'; message: { role: string; content?: any; [key: string]: any }; timestamp?: number }
   // Only emitted for assistant messages during streaming
   | { type: 'message_update'; chunk?: string; fullContent?: string; timestamp?: number }
-  | { type: 'message_end'; message: { role: 'user' | 'assistant' | 'system' | 'tool'; content: string }; timestamp?: number }
+  | { type: 'message_end'; message: { role: string; content?: any; [key: string]: any }; timestamp?: number }
   // Tool execution lifecycle
   | { type: 'tool_execution_start'; toolCallId: string; toolName: string; args: any; timestamp?: number }
   | { type: 'tool_execution_update'; toolCallId: string; toolName: string; args: any; partialResult?: any; timestamp?: number }

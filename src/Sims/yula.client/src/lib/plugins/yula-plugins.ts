@@ -36,6 +36,7 @@ export const stockPredictiveAnalyticsPlugin: AgentPlugin = {
  * Yula varsayılan eklentilerini başlatır ve pluginRegistry'ye kaydeder.
  */
 export async function registerDefaultYulaPlugins(): Promise<void> {
+  if (pluginRegistry.has(stockPredictiveAnalyticsPlugin.id)) return;
   await pluginRegistry.register(stockPredictiveAnalyticsPlugin);
 }
 

@@ -5,7 +5,6 @@ export * from './component-registry';
 export * from './standard-tools';
 export * from './pi-event-stream';
 export * from './hooks';
-export * from './steering';
 export * from './execution-queue';
 export * from './dynamic-tools';
 export * from './session-branch';
@@ -32,9 +31,34 @@ export * from './indexeddb-storage';
 export * from './model-catalog';
 export * from './cbor-codec';
 export * from './isolated-runner';
+export * from './event-stream';
+export {
+  type ToolExecutionMode,
+  type QueueMode,
+  type ThinkingLevel,
+  type AgentToolCall,
+  type AgentToolResult,
+  type AgentTool,
+  type AgentContext,
+  type StreamFn,
+  type AssistantTurnResult,
+  type AgentLoopConfig,
+  type AgentState,
+  type ShouldStopAfterTurnContext,
+  type PrepareNextTurnContext,
+  type AgentLoopTurnUpdate,
+} from './agent-loop-types';
+export * from './agent-loop';
+export * from './agent';
+export * from './ui-tool-adapter';
+export * from './ui-delegation';
+export * from './agent-session';
+export * from './export-html';
+
 export type { AvailableModelInfo } from './models-config';
 export type * from './oauth/types';
 export { generatePKCE } from './oauth/pkce';
 export * from './i18n';
 export { z } from 'zod';
+
 

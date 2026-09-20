@@ -7,6 +7,8 @@ import { TriangleAlert } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useDuckReport } from "../../hooks/use-duck-report";
 import { duckDbClient } from "@/services/duckdb";
+import { useAgentComponent } from "@my-agent/react";
+import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { VirtualSpreadsheet } from "../VirtualSpreadsheet";
 import {
   ROW_HEIGHT,
@@ -303,6 +305,81 @@ export function ArrowReportGrid({
   React.useEffect(() => {
     useYulaGridStore.getState().register(yulaContext);
   }, [yulaContext]);
+
+  // Headless React UI-Agent (@my-agent/react): Grid mount edildiğinde kendini
+  // canlı React state'iyle result_grid:active olarak kaydeder.
+  useAgentComponent({
+    id: "result_grid:active",
+    meta: {
+      description: `Active Result Grid (${duckTableName}) - ${totalFiltered ?? "?"} rows`,
+      tableName: duckTableName,
+      columns: effectiveColumns.map((c) => c.name),
+      rowCount: totalFiltered,
+      filters,
+      customQuerySql,
+      isTableReady,
+    },
+    actions: {
+      RUN_SQL: {
+        description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
+        whenToCall: "When custom SQL queries, aggregations, or calculations are requested.",
+        whenNotToCall: "When simple column filtering or sorting is sufficient.",
+      },
+      FILTER: {
+        description: "Filters the grid by a column value ({ field, value, op }).",
+        whenToCall: "To filter table data by a column value.",
+        whenNotToCall: "When filtering is not requested.",
+      },
+      APPLY_FILTERS: {
+        description: "Applies multiple column filters simultaneously ({ filters, clearOthers }).",
+        whenToCall: "When multiple columns need to be filtered concurrently.",
+        whenNotToCall: "When filtering only a single column.",
+      },
+      SORT: {
+        description: "Sorts the grid by column ({ column, direction }).",
+        whenToCall: "When sorting is requested.",
+        whenNotToCall: "When sorting is not requested.",
+      },
+      COLUMNS: {
+        description: "Shows, hides, or reorders columns ({ visibleColumns, hiddenColumns }).",
+        whenToCall: "To adjust column visibility or layout.",
+        whenNotToCall: "When column layout should remain untouched.",
+      },
+      PIN: {
+        description: "Pins columns to the left or right ({ columns }).",
+        whenToCall: "When column freezing or pinning is requested.",
+        whenNotToCall: "When pinning is not requested.",
+      },
+      RESET_LAYOUT: {
+        description: "Resets the grid to default layout and visibility.",
+        whenToCall: "When the user wants to reset custom column arrangements.",
+        whenNotToCall: "When keeping the current layout.",
+      },
+      EXPORT: {
+        description: "Exports data to Excel, CSV, or Parquet ({ format }).",
+        whenToCall: "When downloading or exporting grid data is requested.",
+        whenNotToCall: "When export is not requested.",
+      },
+      VISUALIZE: {
+        description: "Generates a chart or visual plot ({ type, dimension, metric }).",
+        whenToCall: "When a chart or graph visualization is requested.",
+        whenNotToCall: "When no visual chart is requested.",
+      },
+      ANALYZE: {
+        description: "Generates a statistical summary of the active data.",
+        whenToCall: "When statistical summary or data distribution is requested.",
+        whenNotToCall: "When summary analysis is not requested.",
+      },
+      PROFILE: {
+        description: "Profiles column data quality, null counts, and distinct values.",
+        whenToCall: "When inspecting data quality or anomalies.",
+        whenNotToCall: "When profiling is not requested.",
+      },
+    },
+    onAction: async (action, payload) => {
+      return executeDispatchComponentAction({ component_id: "result_grid:active", action, payload });
+    },
+  });
 
   React.useEffect(() => {
     return () => {

@@ -7,6 +7,7 @@ import {
 
 export interface AgentContextType {
   apiEndpoint: string;
+  modelsEndpoint?: string;
   systemName?: string;
   locale: AgentLocale;
   dictionary: AgentDictionary;
@@ -18,12 +19,14 @@ const AgentContext = createContext<AgentContextType | null>(null);
 export function AgentProvider({
   children,
   apiEndpoint = '/api/agent/chat',
+  modelsEndpoint = '/api/agent/models',
   systemName = 'DefaultSystem',
   locale = 'tr',
   messages,
 }: {
   children: React.ReactNode;
   apiEndpoint?: string;
+  modelsEndpoint?: string;
   systemName?: string;
   locale?: AgentLocale;
   messages?: Partial<AgentDictionary>;
@@ -59,6 +62,7 @@ export function AgentProvider({
     <AgentContext.Provider
       value={{
         apiEndpoint,
+        modelsEndpoint,
         systemName,
         locale: currentLocale,
         dictionary,
@@ -75,6 +79,7 @@ export function useAgentContext(): AgentContextType {
   if (context) return context;
   return {
     apiEndpoint: '/api/agent/chat',
+    modelsEndpoint: '/api/agent/models',
     systemName: 'DefaultSystem',
     locale: i18nManager.getLocale(),
     dictionary: i18nManager.getDictionary(),

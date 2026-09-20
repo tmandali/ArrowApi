@@ -154,6 +154,77 @@ describe("buildSystemPrompt agent katmanı", () => {
       "tur başına tek soru ve dinamik daraltma talimatı yer almalı",
     );
   });
+
+  it("karar ve onay sorularının düz metin yerine zorunlu olarak ask_user_choice çağırmasını zorunlu kılar", () => {
+    const prompt = buildSystemPrompt({ pathname: "/" });
+    assert.ok(
+      prompt.includes("MANDATORY INTERACTIVE BUTTONS (NO PLAIN-TEXT DECISION QUESTIONS)"),
+      "Zorunlu interaktif buton kuralı bulunmalı",
+    );
+    assert.ok(
+      prompt.includes("NEVER write questions ending with 'ister misiniz?'"),
+      "Düz metin soru yasağı kuralı bulunmalı",
+    );
+  });
+
+  it("rapor ekranındayken (pathname üzerinden) aktif rapor topraklaması ve kuralı eklenir", () => {
+    const prompt = buildSystemPrompt({ pathname: "/stock/stock-balance" });
+    assert.ok(
+      prompt.includes("Active Report Screen:"),
+      "Aktif rapor ekranı satırı olmalı",
+    );
+    assert.ok(
+      prompt.includes("ACTIVE REPORT CONTEXT RULE"),
+      "Aktif rapor bağlam kuralı olmalı",
+    );
+    assert.ok(
+      prompt.includes("NEVER ask which report they mean"),
+      "Kullanıcıya hangi rapor diye sormama kuralı olmalı",
+    );
+  });
+
+  it("pathname verilmediğinde uiContext.route üzerinden aktif rapor ve rota çözülür", () => {
+    const prompt = buildSystemPrompt({
+      uiContext: {
+        route: "/stock/stock-balance",
+        active_components: [],
+        recent_events: [],
+      },
+    });
+    assert.ok(
+      prompt.includes("Current Route: /stock/stock-balance"),
+      "uiContext.route'tan rota çözülmeli",
+    );
+    assert.ok(
+      prompt.includes("Active Report Screen:"),
+      "uiContext.route üzerinden aktif rapor tanınmalı",
+    );
+    assert.ok(
+      prompt.includes("ACTIVE REPORT CONTEXT RULE"),
+      "Aktif rapor bağlam kuralı gömülmeli",
+    );
+  });
+
+  it("aktif rapor ekranındayken diğer inaktif raporların criteria_form bileşenleri filtrelenir", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/stock/stock-balance",
+      uiContext: {
+        route: "/stock/stock-balance",
+        active_components: [
+          { id: "app_router", capabilities: ["NAVIGATE"] },
+          { id: "job_history", capabilities: ["LIST"] },
+          { id: "criteria_form:stock-balance", capabilities: ["SET_FIELDS", "SUBMIT"] },
+          { id: "criteria_form:store-sales", capabilities: ["SET_FIELDS", "SUBMIT"] },
+          { id: "criteria_form:cash-flow", capabilities: ["SET_FIELDS", "SUBMIT"] },
+        ],
+        recent_events: [],
+      },
+    });
+
+    assert.ok(prompt.includes("criteria_form:stock-balance"), "Aktif form promptta yer almalı");
+    assert.ok(!prompt.includes("criteria_form:store-sales"), "İnaktif store-sales formu filtrelenmeli");
+    assert.ok(!prompt.includes("criteria_form:cash-flow"), "İnaktif cash-flow formu filtrelenmeli");
+  });
 });
 
 

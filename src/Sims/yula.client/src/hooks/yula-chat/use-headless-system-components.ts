@@ -56,17 +56,17 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
       meta: { description: "Report Execution History and Job Tracker" },
       actions: {
         OPEN_LAST: {
-          description: "Opens the most recently completed report result on the screen.",
+          description: "Opens the most recently completed report result on the screen ({ report?: string }). Defaults to active report if omitted.",
           whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
           whenNotToCall: "When the user intends to execute a new report.",
         },
         LIST: {
-          description: "Lists past execution jobs.",
-          whenToCall: "When the user asks 'which reports ran', 'show history', 'list past jobs', etc.",
-          whenNotToCall: "When actively inspecting or filtering the current report.",
+          description: "Lists past execution jobs ({ report?: string, limit?: number }). If report is omitted, defaults to the active screen's report, or lists recent runs across all reports if not on a report screen.",
+          whenToCall: "When the user asks 'how many reports ran' ('kaç rapor çalışmış'), 'which reports ran', 'show history', 'list past jobs', etc.",
+          whenNotToCall: "When the user wants to execute a new report run (use SUBMIT or RUN).",
         },
         FIND: {
-          description: "Searches past report executions or matching jobs ({ query }).",
+          description: "Searches past report executions or matching jobs ({ query, report?: string }). Defaults to active report if omitted.",
           whenToCall: "When the user wants to find a specific job, execution, or report run.",
           whenNotToCall: "When requesting the entire list or running a new report.",
         },
@@ -78,8 +78,16 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
       },
     };
     uiRegistry.register(jobHistorySchema);
-    const unsubJob = uiEventBus.subscribe("job_history", (action, payload) => {
-      return executeDispatchComponentAction({ component_id: "job_history", action, payload }) as any;
+    const unsubJob = uiEventBus.subscribe("job_history", async (action, payload) => {
+      let finalPayload = payload || {};
+      if (!finalPayload.report) {
+        const { useYulaGridStore } = await import("@/lib/stores/grid");
+        const activeScope = useYulaGridStore.getState().screen?.reportScope;
+        if (activeScope) {
+          finalPayload = { ...finalPayload, report: activeScope };
+        }
+      }
+      return executeDispatchComponentAction({ component_id: "job_history", action, payload: finalPayload }) as any;
     });
 
     // Headless Platform Rapor Kriter Formları (REGISTERED_REPORTS):

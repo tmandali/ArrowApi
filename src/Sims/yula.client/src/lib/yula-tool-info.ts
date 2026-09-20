@@ -10,8 +10,40 @@ export interface YulaToolPartInfo {
 }
 
 export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
-  const p = part as { type?: string } | null;
-  if (!p?.type) return null;
+  const p = part as Record<string, unknown> | null;
+  if (!p || typeof p !== "object") return null;
+
+  // 1. Canonical / Core format: { tool: "ask_user_choice", input, output, ... }
+  if (typeof p.tool === "string" && p.tool.length > 0) {
+    const toolName = p.tool;
+    const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
+    const state = typeof p.state === "string" ? p.state : (p.output !== undefined ? "output-available" : "input-available");
+    return {
+      toolName,
+      state,
+      toolCallId,
+      input: p.input,
+      output: p.output,
+      errorText: typeof p.errorText === "string" ? p.errorText : undefined,
+    };
+  }
+
+  // 2. Direct toolName format: { toolName: "ask_user_choice", ... }
+  if (typeof p.toolName === "string" && p.toolName.length > 0 && p.type !== "dynamic-tool") {
+    const toolName = p.toolName;
+    const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
+    const state = typeof p.state === "string" ? p.state : (p.output !== undefined ? "output-available" : "input-available");
+    return {
+      toolName,
+      state,
+      toolCallId,
+      input: p.input,
+      output: p.output,
+      errorText: typeof p.errorText === "string" ? p.errorText : undefined,
+    };
+  }
+
+  // 3. Vercel AI SDK dynamic-tool
   if (p.type === "dynamic-tool") {
     const q = p as {
       toolName?: string;
@@ -32,7 +64,9 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
         }
       : null;
   }
-  if (p.type.startsWith("tool-")) {
+
+  // 4. Vercel AI SDK tool-<name>
+  if (typeof p.type === "string" && p.type.startsWith("tool-")) {
     const q = p as {
       state?: string;
       toolCallId?: string;
@@ -51,6 +85,24 @@ export function yulaToolPartInfo(part: unknown): YulaToolPartInfo | null {
       };
     }
   }
+
+  // 5. Tool Call / Tool Result (AI SDK v5 / agent-core format)
+  if (p.type === "tool-call" || p.type === "tool_call" || p.type === "tool-result" || p.type === "toolResult") {
+    const toolName = String(p.toolName || p.name || "");
+    if (toolName) {
+      const toolCallId = String(p.toolCallId || p.id || `tc_${toolName}`);
+      const state = typeof p.state === "string" ? p.state : (p.result !== undefined || p.output !== undefined ? "output-available" : "input-available");
+      return {
+        toolName,
+        state,
+        toolCallId,
+        input: p.input ?? p.args ?? p.arguments,
+        output: p.output ?? p.result,
+        errorText: typeof p.errorText === "string" ? p.errorText : undefined,
+      };
+    }
+  }
+
   return null;
 }
 
