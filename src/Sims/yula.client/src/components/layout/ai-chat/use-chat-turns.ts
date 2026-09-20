@@ -25,6 +25,69 @@ export function useDedupedMessages(messages: YulaMessage[]): YulaMessage[] {
   return React.useMemo(() => computeDedupedMessages(messages), [messages]);
 }
 
+/**
+ * Pi DAG & Vercel AI SDK Standardı:
+ * Çok adımlı/turlu işlemlerde (Step 1 Tool -> Step 2 Terminal Answer):
+ * - Akordiyon ve Tool kartları tüm adımların araç/durum parçalarını görebilmelidir.
+ * - Ana sohbet balonu ise YALNIZCA terminal (son) asistan mesajının metin parçalarını basmalıdır.
+ * - Ara adımların (tool çağıran turların) metin parçaları ana balona sızmaz;
+ *   akordiyonda adım geçmişinde kalması için "reasoning" (intermediate_plan) olarak korunur.
+ */
+export function buildTurnAssistantMessage(
+  assistantMessages: YulaMessage[],
+): YulaMessage | undefined {
+  if (assistantMessages.length === 0) return undefined;
+  if (assistantMessages.length === 1) {
+    const single = assistantMessages[0];
+    return {
+      ...single,
+      parts: single.parts ?? [],
+    };
+  }
+
+  const lastAssistant = assistantMessages[assistantMessages.length - 1];
+
+  // Metin içeren terminal (son) asistan mesajını bul
+  const terminalWithText =
+    [...assistantMessages].reverse().find((a) =>
+      a.parts?.some(
+        (p) => p.type === "text" && Boolean((p as { text?: string }).text?.trim()),
+      ),
+    ) ?? lastAssistant;
+
+  const combinedParts: any[] = [];
+
+  for (const msg of assistantMessages) {
+    const isTerminal = msg.id === terminalWithText.id;
+    for (const part of msg.parts ?? []) {
+      if (part.type === "text") {
+        if (isTerminal) {
+          // Terminal metin parçası doğrudan nihai cevap balonu için eklenir
+          combinedParts.push(part);
+        } else {
+          // Ara adım metni: Ana balona basılmaz; akordiyonda ara plan/düşünce olarak korunur
+          const txt = (part as { text?: string }).text?.trim();
+          if (txt) {
+            combinedParts.push({
+              type: "reasoning",
+              text: txt,
+              meta: "intermediate_plan",
+            });
+          }
+        }
+      } else {
+        // Tool çağrıları, tool sonuçları, reasoning, step-start vb. aynen korunur
+        combinedParts.push(part);
+      }
+    }
+  }
+
+  return {
+    ...lastAssistant,
+    parts: combinedParts,
+  };
+}
+
 /** Sohbet mesajlarını Soru-Cevap turlarına (YulaChatTurn) grupla (Çok adımlı araç çağrılarını birleştirir). */
 export function computeChatTurns(dedupedMessages: YulaMessage[]): ChatTurn[] {
   const list: ChatTurn[] = [];
@@ -38,12 +101,10 @@ export function computeChatTurns(dedupedMessages: YulaMessage[]): ChatTurn[] {
   for (const m of dedupedMessages) {
     if (m.role === "user") {
       if (currentTurn) {
-        const combinedParts = currentTurn.assistantMessages.flatMap((a) => a.parts ?? []);
-        const lastAssistant = currentTurn.assistantMessages[currentTurn.assistantMessages.length - 1];
         list.push({
           id: currentTurn.id,
           userMessage: currentTurn.userMessage,
-          assistantMessage: lastAssistant ? { ...lastAssistant, parts: combinedParts } : undefined,
+          assistantMessage: buildTurnAssistantMessage(currentTurn.assistantMessages),
           assistantMessages: currentTurn.assistantMessages,
         });
       }
@@ -57,12 +118,10 @@ export function computeChatTurns(dedupedMessages: YulaMessage[]): ChatTurn[] {
     }
   }
   if (currentTurn) {
-    const combinedParts = currentTurn.assistantMessages.flatMap((a) => a.parts ?? []);
-    const lastAssistant = currentTurn.assistantMessages[currentTurn.assistantMessages.length - 1];
     list.push({
       id: currentTurn.id,
       userMessage: currentTurn.userMessage,
-      assistantMessage: lastAssistant ? { ...lastAssistant, parts: combinedParts } : undefined,
+      assistantMessage: buildTurnAssistantMessage(currentTurn.assistantMessages),
       assistantMessages: currentTurn.assistantMessages,
     });
   }

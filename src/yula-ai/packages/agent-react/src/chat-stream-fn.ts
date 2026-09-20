@@ -84,6 +84,21 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                 stopReason = 'tool_use';
               }
             } catch {}
+          } else if (trimmed.startsWith('a:')) {
+            // Sunucuda yürütülen tool sonucu paketi (AI SDK a: formatı)
+            try {
+              const resData = JSON.parse(trimmed.slice(2));
+              if (resData?.toolCallId) {
+                const existingPart = assistantParts.find((p) => p.toolCallId === resData.toolCallId);
+                if (existingPart) {
+                  existingPart.state = 'result';
+                  existingPart.output = resData.result ?? resData.output;
+                }
+                const idx = toolCalls.findIndex((c) => c.id === resData.toolCallId);
+                if (idx !== -1) toolCalls.splice(idx, 1);
+                if (toolCalls.length === 0) stopReason = 'end_turn';
+              }
+            } catch {}
           } else if (trimmed.startsWith('d:') || trimmed.startsWith('e:')) {
             try {
               const fin = JSON.parse(trimmed.slice(2));
@@ -115,6 +130,18 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                   state: 'call',
                 });
                 stopReason = 'tool_use';
+              } else if (parsed?.type === 'tool-output-available' || parsed?.type === 'tool-result') {
+                // Sunucuda yürütülen araç sonucu (AI SDK SSE formatı)
+                const toolCallId = parsed.toolCallId;
+                const output = parsed.output ?? parsed.result;
+                const existingPart = assistantParts.find((p) => p.toolCallId === toolCallId);
+                if (existingPart) {
+                  existingPart.state = 'result';
+                  existingPart.output = output;
+                }
+                const idx = toolCalls.findIndex((c) => c.id === toolCallId);
+                if (idx !== -1) toolCalls.splice(idx, 1);
+                if (toolCalls.length === 0) stopReason = 'end_turn';
               }
             } catch {
               accumulatedText += ssePayload;

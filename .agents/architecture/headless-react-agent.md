@@ -73,17 +73,37 @@ Interactive components are never manipulated through artificial external stores 
 - **Feedback Loop:** Emits row counts, applied filter states, and aggregation statistics back to `[AgentLoopNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#agentloopnode)` as observations.
 
 ```tsx
-// Typical registration pattern
+// Typical typed registration pattern
 useAgentComponent({
-  id: "job_history",
-  name: "Execution History",
-  description: "Report execution history, status, and selection",
-  actions: {
-    SELECT: async ({ jobId }) => selectJob(jobId),
-    CANCEL: async ({ jobId }) => cancelJob(jobId),
-    REFRESH: async () => refetchHistory(),
+  id: "result_grid:active",
+  meta: {
+    description: `Active Result Grid (${duckTableName}) - ${rowCount ?? "?"} rows`,
+    tableName: duckTableName,
+    columns,
   },
-  getState: () => ({ selectedJobId, count: history.length }),
+  events: {
+    filter_change: {
+      description: "Triggered when grid column filters are updated",
+      schema: z.object({ filters: z.record(z.string(), z.any()) }),
+    },
+    view_transformed: {
+      description: "Triggered when SQL, sorting, or projection transforms active view",
+      schema: z.object({ query: z.string().optional(), rowCount: z.number().optional() }),
+    },
+  },
+  actions: {
+    RUN_SQL: {
+      description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
+      inputSchema: z.object({ query: z.string() }),
+      outputSchema: z.object({ success: z.boolean(), rowCount: z.number().optional() }),
+      whenToCall: "When custom SQL queries, aggregations, or calculations are requested.",
+      whenNotToCall: "When simple column filtering or sorting is sufficient.",
+      when: { phase: "results" },
+    },
+  },
+  onAction: async (action, payload) => {
+    return executeDispatchComponentAction({ component_id: "result_grid:active", action, payload });
+  },
 });
 ```
 
@@ -165,7 +185,9 @@ The underlying runtime guarantees reliability via core execution primitives:
 16. **Dynamic Model Cascading (`prepareNextTurn`)**: Dynamically scales model selection and reasoning effort between turns.
 17. **Dynamic Step Routing (`prepareStepRouting`)**: Prunes unneeded tools per execution phase (`workspace` vs `results`) to conserve tokens and block hallucinations.
 18. **Provider Failover (`createFailoverLanguageModel`)**: Transparently falls back to secondary LLM endpoints on HTTP 429 quota exhaustion or 5xx server outages.
-19. **Strict Output Schemas (`outputSchema`)**: Validates tool return structures via Zod schemas for end-to-end client type safety.
+19. **Strict Output Schemas (`outputSchema`)**: Validates tool return structures via Zod schemas and executes `postflightValidate` in `IComponentRegistry` for end-to-end type safety.
+20. **Component Event Contracts (`events`)**: Declares telemetry and state events emitted by components over `uiEventBus` for observability and reflection tools (`inspect_ui_state`).
+21. **Deterministic Guard Conditions (`when`)**: Complements natural-language directives (`whenToCall` / `whenNotToCall`) with deterministic preflight checks matching current screen route and execution phase.
 
 ---
 

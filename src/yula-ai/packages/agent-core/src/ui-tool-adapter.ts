@@ -156,5 +156,83 @@ export function createStandardAgentTools(): AgentTool[] {
         };
       },
     },
+
+    {
+      name: 'query_playbook',
+      description:
+        'Query verified organizational playbooks, operational screen rules, or multi-step workflow recipes from the LLM Wiki.',
+      execute: async (_toolCallId, args: any): Promise<AgentToolResult> => {
+        const { task, workspace = 'stock' } = args || {};
+        if (!task) {
+          return {
+            content: [{ type: 'text', text: 'Error: task parameter is required.' }],
+            details: { valid: false, error: 'Missing task' },
+          };
+        }
+        try {
+          const rules = await playbookManager.getScreenRules(task, workspace);
+          const recipe = await playbookManager.findRecipe(task, workspace);
+          if (rules.length === 0 && !recipe) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `No specific verified playbook found for "${task}". Explore dynamically using standard component actions.`,
+                },
+              ],
+              details: { found: false, rules: [], recipe: null },
+            };
+          }
+          const details = {
+            found: true,
+            screen_rules: rules,
+            recipe: recipe ? { title: recipe.title, content: recipe.contentMarkdown } : null,
+          };
+          return {
+            content: [{ type: 'text', text: JSON.stringify(details, null, 2) }],
+            details,
+          };
+        } catch (err: any) {
+          return {
+            content: [{ type: 'text', text: `Failed to query playbook: ${err?.message || String(err)}` }],
+            details: { error: err?.message },
+          };
+        }
+      },
+    },
+
+    {
+      name: 'propose_playbook_update',
+      description:
+        'Propose a learned operational rule or multi-step workflow recipe to be saved into the organizational Playbook wiki with user confirmation.',
+      execute: async (_toolCallId, args: any): Promise<AgentToolResult> => {
+        const { category = 'screen_rule', title, content, target_path, workspace = 'stock' } = args || {};
+        try {
+          const entry = await playbookManager.recordEntry({
+            category,
+            title: title || 'Learned Rule',
+            contentMarkdown: content || '',
+            targetPath: target_path,
+            workspaceId: workspace,
+            scope: 'workspace',
+            author: 'Yula AI (Learned)',
+          });
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Proposed ${category} "${title}" successfully recorded to Workspace Wiki (${workspace}).`,
+              },
+            ],
+            details: { status: 'saved', entry },
+          };
+        } catch (err: any) {
+          return {
+            content: [{ type: 'text', text: `Failed to record playbook: ${err?.message || String(err)}` }],
+            details: { error: err?.message },
+          };
+        }
+      },
+    },
   ];
 }

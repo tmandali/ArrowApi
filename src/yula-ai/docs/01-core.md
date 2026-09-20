@@ -31,26 +31,31 @@ Source Modules: `packages/agent-core/src/{types,event-bus,component-registry,sta
 - **Singleton:** `uiRegistry`
 - **Hierarchical / Stacked Lifecycle:** `register(schema)` and `unregister(id)` manage active components. Multiple instances can share an `id` across layers (e.g. root shell headless fallback vs. page-specific DOM instance). When a page component unregisters on unmount, the registry safely falls back to the underlying schema in the stack.
 - **Introspection:** `getActiveComponents()`, `hasCapability(id, action)`, `get(id)` (resolves the top-of-stack active schema).
-- **Preflight Validation:** `preflightValidate(componentId, action, payload)` verifies:
+- **Preflight Validation:** `preflightValidate(componentId, action, payload, context?)` verifies:
   1. Target component exists and is mounted (or has an active headless fallback).
-  2. Target action is registered in the component's `capabilities`.
-  3. Action payload passes the component's Zod schema (returning detailed issue messages on failure).
-- **Dynamic Prompt Formatting:** `formatActiveComponentsPrompt()` translates mounted components and their `whenToCall` / `whenNotToCall` contracts into formatted XML for the LLM system prompt.
+  2. Target action is registered in the component's `capabilities` / `actions`.
+  3. Action payload passes the component's `inputSchema` (or `schema` alias), returning detailed issue messages on failure.
+  4. Deterministic guard conditions (`when?: ActionCondition`) match the current runtime context (`route`, `phase`, `custom`).
+- **Postflight Validation:** `postflightValidate(componentId, action, output)` verifies action return payloads against the registered `outputSchema` (ZodTypeAny).
+- **Emitted Events Contract:** `events?: Record<string, EventContract>` declares events emitted over `uiEventBus` with Zod schemas and descriptions for reflection tools (`inspect_ui_state`).
+- **Dynamic Prompt Formatting:** `formatActiveComponentsPrompt()` translates mounted components, natural language directives (`whenToCall` / `whenNotToCall`), `Parameters:`, `Returns:`, and `Emitted Events:` into structured text for the LLM system prompt.
 
 ---
 
-## 4. The 6 Standard Core Tools (`standard-tools.ts`)
+## 4. The Standard Core Tools (`standard-tools.ts`, `ui-tool-adapter.ts`)
 
-The agent operates through a canonical set of 6 tools:
+The agent operates through a canonical set of standard tools:
 
 | Tool Name | Domain | Primary Responsibility |
 | :--- | :--- | :--- |
 | `dispatch_component_action` | UI Bridge | Dispatches actions to active components after preflight validation. Fully awaits asynchronous handler results (`Promise<ActionResult>`). |
 | `inspect_ui_state` | Reflection | Reads currently mounted components, active capabilities, and ring-buffer telemetries. |
+| `ask_user_choice` | Interaction | Prompts user with interactive choice chips or confirmation cards (inline HITL). |
 | `remember_fact` | Memory (C) | Stores user preferences or facts into `session` or `persistent` storage. |
 | `recall_fact` | Memory (R) | Queries stored memory facts. |
-| `forget_fact` | Memory (D) | Deletes obsolete facts from agent memory. |
 | `time_travel` | Replay | Restores application state backward (`undo`) or forward (`redo`). |
+| `query_playbook` | Wiki / Knowledge | Queries verified organizational playbooks, operational screen rules, or workflow recipes. |
+| `propose_playbook_update` | Wiki / Knowledge | Proposes learned operational rules or workflow recipes to be persisted into procedural memory. |
 
 - **Server Tool Factory & Schemas:**
   - Standard tools define strict Zod `outputSchema` alongside `inputSchema` ensuring runtime type integrity for downstream clients.
@@ -63,8 +68,8 @@ The agent operates through a canonical set of 6 tools:
 
 ## 5. React Integration (`use-agent-component.ts`)
 
-- Hook: `useAgentComponent({ id, capabilities, executionMode?, meta?, actions?, onAction })`
-- Automatically registers the component with `uiRegistry` and attaches listeners to `uiEventBus` on mount.
+- Hook: `useAgentComponent({ id, capabilities?, executionMode?, meta?, actions?, events?, onAction })`
+- Automatically registers the component, its action schemas, and emitted `events` with `uiRegistry` and attaches listeners to `uiEventBus` on mount.
 - Automatically unregisters and cleans up event listeners on unmount.
 
 ---

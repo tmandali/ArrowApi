@@ -86,4 +86,59 @@ describe("use-chat-turns savunmacı yapı testleri", () => {
     const recovered = computeRecoveredToolCallIds(messages);
     assert.equal(recovered instanceof Set, true);
   });
+
+  it("çok adımlı (multi-step) asistan mesajlarında sadece terminal cevabın metnini balona yansıtmalı, ara metinleri reasoning yapmalıdır", () => {
+    const multiStepMessages = [
+      {
+        id: "m1",
+        role: "user",
+        parts: [{ type: "text", text: "İş akışını göster" }],
+      } as unknown as YulaMessage,
+      {
+        id: "m2",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Taslak akış şudur (ara metin)..." },
+          {
+            type: "tool-call",
+            toolName: "query_playbook",
+            state: "output-available",
+            toolCallId: "c1",
+            args: { task: "akış" },
+          },
+        ],
+      } as unknown as YulaMessage,
+      {
+        id: "m3",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur." },
+        ],
+      } as unknown as YulaMessage,
+    ];
+
+    const turns = computeChatTurns(multiStepMessages);
+    assert.equal(turns.length, 1);
+    assert.equal(turns[0].assistantMessages.length, 2);
+
+    const asstMsg = turns[0].assistantMessage;
+    assert.ok(asstMsg);
+
+    // Sadece terminal (m3) mesajının metni 'text' parçası olarak kalmalıdır
+    const textParts = asstMsg.parts?.filter((p) => p.type === "text");
+    assert.equal(textParts?.length, 1);
+    assert.equal((textParts?.[0] as { text: string }).text, "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur.");
+
+    // Ara adımın (m2) metni ise akordiyonda kalması için 'reasoning' (intermediate_plan) yapılmış olmalıdır
+    const intermediateReasoning = asstMsg.parts?.find(
+      (p) => p.type === "reasoning" && (p as { meta?: string }).meta === "intermediate_plan",
+    );
+    assert.ok(intermediateReasoning);
+    assert.equal((intermediateReasoning as { text: string }).text, "Taslak akış şudur (ara metin)...");
+
+    // Tool çağrısı korunmalıdır
+    const toolPart = asstMsg.parts?.find((p) => p.type === "tool-call");
+    assert.ok(toolPart);
+  });
 });
+

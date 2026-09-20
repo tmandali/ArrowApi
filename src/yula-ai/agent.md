@@ -156,14 +156,15 @@ Every participant in the system is documented below with its role, registration 
   - Upstream: [`AgentLoopNode`](#agentloopnode), [`HybridRouterNode`](#hybridrouternode).
 - **Outbound Edges:**
   - Downstream: Dispatches targeted mutations to [`CriteriaFormNode`](#criteriaformnode), [`ResultGridNode`](#resultgridnode), [`JobHistoryNode`](#jobhistorynode).
-- **Feedback Loop (Self-Healing):**
-  - Runs `uiRegistry.preflightValidate()`. If the target component is unmounted or payload fails Zod schema, returns a structured error to [`AgentLoopNode`](#agentloopnode) for self-correction.
+- **Feedback Loop (Self-Healing & Validation):**
+  - Runs `uiRegistry.preflightValidate()` checking component mounting, deterministic `when` conditions (`route`, `phase`), and `inputSchema`.
+  - Runs `uiRegistry.postflightValidate()` against `outputSchema` on action completion. Returns structured errors to [`AgentLoopNode`](#agentloopnode) for self-correction.
 
 #### 🏷️ `StateInspectorNode` (`inspect_ui_state`)
-- **Role:** Live state inspection tool. Reads synchronous snapshot metadata from any registered component at 0 ms.
-- **Contract:** `{ targetId: string }` $\rightarrow$ returns component live state and schema metadata.
+- **Role:** Live state inspection tool. Reads synchronous snapshot metadata, capability schemas, and circular ring-buffer telemetry events from registered components at 0 ms.
+- **Contract:** `{ component_id?: string }` $\rightarrow$ returns component live state, active components, and `recent_events`.
 - **Inbound Edges:** Upstream: [`AgentLoopNode`](#agentloopnode).
-- **Outbound Edges:** Downstream: Reads live state of UI component nodes.
+- **Outbound Edges:** Downstream: Reads live state and telemetry of UI component nodes.
 
 #### 🏷️ `ChoiceCardToolNode` (`ask_user_choice`)
 - **Role:** Human-in-the-Loop (HITL) Inline Decision Card generator. Renders interactive choice buttons (`YulaChoiceCard`) directly inside the chat stream.

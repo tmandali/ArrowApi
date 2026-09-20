@@ -438,6 +438,47 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     unsubForm();
     uiRegistry.unregister("criteria_form:retail-sales-report");
   });
+
+  // 16. 🔄 Multi-Step ReAct & Tool Sentez Ayrımı
+  it("16. Çok adımlı ReAct döngüsünde ara araç çağrısı (query_playbook) ve nihai sentez akışında tekil cevap ve akordiyon ayrımını doğrulamalıdır", async () => {
+    const { createStandardAgentTools } = await import("@my-agent/core");
+    const { computeChatTurns } = await import("@/components/layout/ai-chat/use-chat-turns");
+
+    // 1. İstemci araç setinde query_playbook bulunmalıdır
+    const tools = createStandardAgentTools();
+    const playbookTool = tools.find((t) => t.name === "query_playbook");
+    assert.ok(playbookTool, "query_playbook istemci araç setinde kayıtlı olmalıdır");
+
+    const toolResult = await playbookTool.execute("call_1", { task: "satınalma" });
+    assert.ok(toolResult.content[0].text);
+    assert.notEqual(toolResult.content[0].text, 'Tool "query_playbook" not found.');
+
+    // 2. Çok adımlı konuşma simülasyonu
+    const turns = computeChatTurns([
+      { id: "u1", role: "user", parts: [{ type: "text", text: "Satınalma akışı" }] } as any,
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Ara açıklama ve taslak şema" },
+          { type: "tool-call", toolName: "query_playbook", toolCallId: "call_1", state: "output-available" },
+        ],
+      } as any,
+      {
+        id: "a2",
+        role: "assistant",
+        parts: [{ type: "text", text: "Nihai onaylanmış akış şeması ```mermaid\nflowchart TD\n...```" }],
+      } as any,
+    ]);
+
+    assert.equal(turns.length, 1);
+    const textParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "text");
+    assert.equal(textParts?.length, 1, "Balonda yalnızca terminal metin yer almalıdır");
+    assert.ok((textParts?.[0] as any).text.includes("Nihai onaylanmış akış şeması"));
+
+    const reasoningParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "reasoning");
+    assert.equal(reasoningParts?.length, 1, "Ara adım metni akordiyon için reasoning olmalıdır");
+  });
 });
 
 
