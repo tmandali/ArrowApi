@@ -22,7 +22,16 @@ describe("built-in SKILL.md files", () => {
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort();
-    assert.deepEqual(dirs, ["ay-kapanis", "rapor-kalite", "sayim-fark"]);
+    assert.deepEqual(dirs, [
+      "ay-kapanis",
+      "frontend-design",
+      "mcp-builder",
+      "pdf",
+      "rapor-kalite",
+      "sayim-fark",
+      "skill-creator",
+      "xlsx",
+    ]);
     const parsed = dirs.map((d) =>
       parseSkillFile(
         fs.readFileSync(path.join(skillsDir, d, "SKILL.md"), "utf-8"),

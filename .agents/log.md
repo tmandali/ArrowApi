@@ -215,3 +215,12 @@ This document is the **append-only audit log** recording fundamental architectur
   - Implemented `useSkillStore` with Zustand `persist` supporting local `Draft` authoring and `Released` status for DB syncing.
   - Added public exports under `src/features/skills/index.ts` and UI terminal drawer `SkillTerminalDrawer`.
 - **Author:** Antigravity / Team
+
+## [2026-09-20] Integration of Anthropic Agent Skills (xlsx, pdf, mcp-builder, frontend-design, skill-creator)
+- **Rationale:** Equipping the Yula Agent and developers with production-tested domain guidelines for Excel modeling, PDF document extraction, Model Context Protocol server development, distinctive UI design, and meta-skill authoring.
+- **Decision:**
+  - Added 5 new built-in skills under `src/Sims/yula.client/skills/`: `xlsx`, `pdf`, `mcp-builder`, `frontend-design`, `skill-creator`.
+  - Registered all 5 skills into `built-in-skills.ts` and updated `built-in-skills.test.ts`.
+  - Linked `xlsx` directly with the Pyodide Web Worker runtime (`openpyxl` & `pandas`).
+  - Verified 100% test passing across the test suite (212/212 tests pass).
+- **Author:** Antigravity / Team
