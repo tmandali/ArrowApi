@@ -3,6 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { duckDbClient } from "@/services/duckdb";
+import { uiEventBus } from "@my-agent/core";
 import { opfsReportCache } from "@/services/opfs/opfs-cache";
 import {
   exportOpfsMergedParquet,
@@ -84,6 +85,19 @@ export function useGridExport(args: {
       setExportWarning(null);
       if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
       setIsExporting(true);
+      try {
+        uiEventBus.recordTelemetry({
+          source: "result_grid",
+          type: "EXPORT_TRIGGERED",
+          payload: {
+            format,
+            rowCount: totalFiltered,
+            title,
+          },
+        });
+      } catch {
+        // Telemetry best-effort
+      }
       const formatLabel =
         format === "xlsx"
           ? t("export_format_xlsx")
@@ -242,6 +256,7 @@ export function useGridExport(args: {
       hiddenColumns,
       columnDuckTypes,
       booleanColumns,
+      totalFiltered,
       t,
     ]
   );

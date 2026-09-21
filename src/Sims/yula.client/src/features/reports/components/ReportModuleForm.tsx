@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { Ban, FileText, Loader2, Table2, Trash2 } from "lucide-react"
 import { sameJobId, useArrowJobRunner, type ArrowJobStatus } from "@/features/jobs"
+import { uiEventBus } from "@my-agent/core"
 import {
   selectPendingJobByName,
   type TrackedJob,
@@ -98,8 +99,20 @@ export function ReportModuleForm({
     (job: ArrowJobStatus, request: Record<string, unknown>) => {
       setLastJobId(null)
       handleSubmitted(job, request)
+      try {
+        uiEventBus.recordTelemetry({
+          source: "criteria_form",
+          type: "CRITERIA_SUBMITTED",
+          payload: {
+            report: scope,
+            criteria: request,
+          },
+        })
+      } catch {
+        // Telemetry best-effort
+      }
     },
-    [handleSubmitted]
+    [handleSubmitted, scope]
   )
 
   const [viewMode, setViewMode] = React.useState<"result" | "detail">("result")
@@ -129,8 +142,22 @@ export function ReportModuleForm({
       setLastJobId(null)
       setComposing(false)
       handleSelectJob(job ?? jobId)
+      try {
+        uiEventBus.recordTelemetry({
+          source: "arrow_job",
+          type: "JOB_SELECTED",
+          payload: {
+            jobId,
+            title: job?.name || title,
+            totalRows: job?.totalRows,
+            createdAt: job?.createdAt,
+          },
+        })
+      } catch {
+        // Telemetry best-effort
+      }
     },
-    [setComposing, handleSelectJob]
+    [setComposing, handleSelectJob, title]
   )
 
   // ?jobId= ile gelinirse satır tıklamasıyla BİREBİR aynı yol işletilir
@@ -163,7 +190,16 @@ export function ReportModuleForm({
     setCanCancel(false)
     setComposing(true)
     handleSelectJob(null)
-  }, [activeJobId, handleSelectJob, setComposing])
+    try {
+      uiEventBus.recordTelemetry({
+        source: "criteria_form",
+        type: "CRITERIA_RESET",
+        payload: { report: scope },
+      })
+    } catch {
+      // Telemetry best-effort
+    }
+  }, [activeJobId, handleSelectJob, setComposing, scope])
 
   const handleCancelNewReport = React.useCallback(() => {
     const restoreId = lastJobId

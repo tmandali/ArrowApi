@@ -2,6 +2,19 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-21] Type-Safe App Telemetry & Semantic Report Lifecycle Events
+- **Rationale:**
+  1. *Decoupled Upstream Sensing:* Telemetry must act as ambient observability (UI $\rightarrow$ Agent) stored in a bounded 10-event ring buffer (`uiEventBus`), eliminating obsolete UI cancellation badges (`deferredManager` locks).
+  2. *High-Value Semantic Signal vs Keystroke Noise:* Keystroke telemetry quickly overflows ring buffers. Telemetry should capture high-level domain transitions: job selection, criteria submission/reset, export triggers, and terminal execution states.
+- **Decision:**
+  - **Type-Safe Contract (`types.ts` & `event-bus.ts`):** Defined `AppTelemetryEvent` discriminated union in `@my-agent/core`. Enhanced `recordTelemetry` signature to enforce typed schemas.
+  - **Report Page Integration:** Integrated `JOB_SELECTED`, `CRITERIA_SUBMITTED`, and `CRITERIA_RESET` into `ReportModuleForm.tsx`. Integrated `EXPORT_TRIGGERED` into `use-grid-export.ts`.
+  - **Clean UI & Job Lifecycle:** Removed obsolete deferred chip from `yula-queue-badge.tsx`. Retained direct job lifecycle notifications via terminal state SSE telemetry (`REPORT_COMPLETED`, `REPORT_FAILED`, `REPORT_CANCELLED`).
+  - **Verification:** All 103 unit tests pass in `@my-agent/core`, 258 simulation and unit tests pass in `yula.client`, 0 oxlint warnings/errors, all files <= 450 lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] System UI Component Action Contract Standardization (app_router, criteria_form, result_grid:active)
 - **Rationale:**
   1. *Prompt Engine Parameter Omission:* In `@my-agent/core` (`component-registry.ts`), the LLM system prompt outputs action parameters (`- Parameters: { ... }`) and return types (`- Returns: { ... }`) only when `inputSchema` and `outputSchema` are declared on the action contract. Components lacking explicit `inputSchema` caused the agent to guess parameter names.

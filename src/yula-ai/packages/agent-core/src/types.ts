@@ -101,6 +101,11 @@ export type AppTelemetryEvent =
       payload: { jobId: string; reason?: string };
     }
   | {
+      source: 'arrow_job';
+      type: 'JOB_SELECTED';
+      payload: { jobId: string; title?: string; totalRows?: number; createdAt?: string | null };
+    }
+  | {
       source: 'result_grid';
       type: 'ROW_SELECTED';
       payload: { id: string | number; rowData?: Record<string, unknown> };
@@ -116,6 +121,11 @@ export type AppTelemetryEvent =
       payload: { query?: string; rowCount?: number };
     }
   | {
+      source: 'result_grid';
+      type: 'EXPORT_TRIGGERED';
+      payload: { format: string; rowCount?: number; title?: string };
+    }
+  | {
       source: 'criteria_form';
       type: 'FIELD_CHANGED';
       payload: { field: string; value: unknown };
@@ -124,6 +134,11 @@ export type AppTelemetryEvent =
       source: 'criteria_form';
       type: 'CRITERIA_SUBMITTED';
       payload: { report: string; criteria?: Record<string, unknown> };
+    }
+  | {
+      source: 'criteria_form';
+      type: 'CRITERIA_RESET';
+      payload: { report: string };
     };
 
 export type InferEventPayload<T> = T extends { schema: infer TSchema }
