@@ -1,36 +1,15 @@
 import * as React from "react"
 import { duckDbClient, type SortConfig } from "@/services/duckdb"
-import { useYulaGridStore } from "@/lib/stores/grid"
-import { resolveActiveViewReferences } from "@/lib/sql-guard"
-import { duckStreamManager } from "../services/duck-stream-manager"
 import type { ColumnSortConfigs } from "../components/virtual-spreadsheet/types"
+import {
+  type ReportColumnMeta,
+  type UseDuckReportOptions,
+  isCustomQueryActive,
+} from "./duck-report-types"
+import { useDuckStreamSubscription } from "./use-duck-stream-subscription"
+import { useDuckCustomSql } from "./use-duck-custom-sql"
 
-export type ReportColumnMeta = {
-  name: string
-  label?: string
-  align?: "left" | "right"
-  isNumeric?: boolean
-  /** Ham tipi (DATE, TIMESTAMP, VARCHAR, DECIMAL...) — AI şema grounding'i için. */
-  duckType?: string
-}
-
-export type UseDuckReportOptions = {
-  jobId: string | null | undefined
-  jobUrl: string | null | undefined
-  columns?: ReportColumnMeta[]
-  expectedTotalRows?: number | null
-  pageSize?: number
-  onError?: (err: string | null) => void
-  /**
-   * Setliyken grid temel tablo sorgusu yerine bu salt-okunur SELECT'in
-   * sonucunu gösterir (Yula set_grid_query → gruplama/aggregate görünümü).
-   */
-  customSql?: string | null
-}
-
-/** Özel SQL modu sorgusu aktif mi — store'dan canlı okunur (closure-güvenli). */
-const isCustomQueryActive = () =>
-  useYulaGridStore.getState().customQuerySql !== null
+export type { ReportColumnMeta, UseDuckReportOptions }
 
 export function useDuckReport<T extends Record<string, unknown> = Record<string, unknown>>({
   jobId,
@@ -60,13 +39,9 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [page, setPage] = React.useState(0)
 
   React.useEffect(() => {
-    const syncInitialColumns = () => {
-      if (isCustomQueryActive()) return
-      if (initialColumns.length > 0) {
-        setColumns(initialColumns)
-      }
+    if (!isCustomQueryActive() && initialColumns.length > 0) {
+      setColumns(initialColumns)
     }
-    syncInitialColumns()
   }, [initialColumns])
 
   const tableName = React.useMemo(() => {
@@ -92,13 +67,8 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     tableReadyRef.current = v
     setIsTableReady(v)
   }, [])
-  // Akış ilerlemesinin en güncel değerleri — callback'ler ref okur
   const latestStreamedRef = React.useRef(streamedRows)
   const latestExpectedRef = React.useRef(expectedTotalRows)
-  React.useEffect(() => {
-    latestStreamedRef.current = streamedRows
-    latestExpectedRef.current = expectedTotalRows
-  })
   const querySeqRef = React.useRef(0)
   const baseTotalRowsRef = React.useRef(0)
   const filtersRef = React.useRef(filters)
@@ -106,12 +76,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const sortDescRef = React.useRef(sortDesc)
   const sortConfigsRef = React.useRef(sortConfigs)
   React.useEffect(() => {
+    latestStreamedRef.current = streamedRows
+    latestExpectedRef.current = expectedTotalRows
     filtersRef.current = filters
     sortByRef.current = sortBy
     sortDescRef.current = sortDesc
     sortConfigsRef.current = sortConfigs
   })
-  // Tablo ingest tamamlandığında özel sorguyu (yeniden) tetiklemek için tık
   const [customQueryTick, setCustomQueryTick] = React.useState(0)
 
   // SQL Sorgusunu çalıştırır (Filtreleme, sıralama, sayfalama)
@@ -124,25 +95,15 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       activeSortConfigs = sortConfigsRef.current,
       orderedColumnNames?: string[]
     ) => {
-      // Özel SQL modu: temel tablo sorgusu sonucu ezmeyesin diye atlanır
       if (!tableReadyRef.current || isCustomQueryActive()) return
       const seq = ++querySeqRef.current
 
-      // Çoklu Kolon Sıralaması ("soldan sağa doğru çalışır" kuralı):
-      // Tablodaki kolonların soldan sağa sırası (orderedColumnNames veya columns)
-      // öncelik sırasını belirler.
       const order =
         orderedColumnNames && orderedColumnNames.length > 0
           ? orderedColumnNames
           : columns.map((c) => c.name)
 
-      // describeTable sonucu henüz React state'e yazılmadan önce de doğru
-      // kolon kümesiyle doğrula (cache açılış yarışı).
-      const knownColSet = new Set(
-        orderedColumnNames && orderedColumnNames.length > 0
-          ? orderedColumnNames
-          : columns.map((c) => c.name)
-      )
+      const knownColSet = new Set(order)
       const sortList: SortConfig[] = []
 
       for (const colName of order) {
@@ -152,7 +113,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
         }
       }
 
-      // Fallback: Eğer sortConfigs boşsa ancak tekli sortBy aktifse (geriye dönük API)
       if (
         sortList.length === 0 &&
         activeSort &&
@@ -181,7 +141,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           offset: activePage * pageSize,
         })
 
-        // Eski (geçersiz) sorgu sonucu ise uygulama
         if (seq !== querySeqRef.current) return
 
         const normalizedRows = (result.rows as T[]) ?? []
@@ -196,8 +155,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           (val) => typeof val === "string" && val.trim().length > 0
         )
 
-        // Sadece ilk sayfada (activePage === 0) filtrelenmiş satır sayısı güncellenir.
-        // Sonsuz kaydırmada (activePage > 0) totalFiltered ve totalRows değerleri korunur.
         if (activePage === 0) {
           if (result.totalFiltered !== undefined) {
             setTotalFiltered(result.totalFiltered)
@@ -217,8 +174,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
           }
         }
       } catch (err) {
-        // Bellek tavanı (kontrollü OOM) beklenen/yönetilen durum: warn bas,
-        // dev overlay'e sahte Console Error düşürme.
         const msg = String(err)
         if (
           msg.includes("Out of Memory") ||
@@ -263,7 +218,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
 
       if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
       queryTimeoutRef.current = setTimeout(() => {
-        // Özel SQL modunda filtre hücreleri sorgu sonucunu yeniden süzer
         if (isCustomQueryActive()) {
           setCustomQueryTick((t) => t + 1)
           return
@@ -326,7 +280,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     [columns]
   )
 
-  // Programatik sıralama (tekli veya eski API uyumluluğu için)
   const setSorting = React.useCallback(
     (columnName: string | null, desc = false) => {
       const nextConfigs: ColumnSortConfigs = columnName
@@ -337,7 +290,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     [setMultiSorting]
   )
 
-  // Çoklu filtre uygulama (AI veya toplu filtre işlemleri için)
   const applyFilters = React.useCallback(
     (newFilters: Record<string, string>, clearOthers = false) => {
       const nextFilters = clearOthers ? {} : { ...filtersRef.current }
@@ -371,8 +323,6 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     []
   )
 
-  // 3 aşamalı kolon sıralama döngüsü: None -> ASC -> DESC -> None
-  // Birden fazla kolon sıralı kalabilir; soldan sağa sırayla çalışır.
   const toggleSort = React.useCallback(
     (columnName: string, orderedColumnNames?: string[]) => {
       const nextConfigs: ColumnSortConfigs = { ...sortConfigsRef.current }
@@ -390,98 +340,34 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     [setMultiSorting]
   )
 
-  // Arka plan akış yöneticisine abone ol (Kullanıcı sayfa değiştirse dahi akış kesilmez)
-  React.useEffect(() => {
-    const resetStreamState = () => {
-      markTableReady(false)
-      setRows([])
-      setTotalRows(0)
-      setTotalFiltered(0)
-      setHasMoreRows(false)
-      setStreamedRows(0)
-      setIsPartial(false)
-    }
-    if (!jobId || !jobUrl) {
-      resetStreamState()
-      return
-    }
-
-    const unsubscribe = duckStreamManager.subscribe(
-      {
-        jobId,
-        jobUrl,
-        tableName,
-        expectedTotalRows,
-        onError,
-      },
-      (state) => {
-        setStreamedRows(state.streamedRows)
-        setIsStreaming(state.isStreaming)
-        setIsSavingDisk(state.isSavingDisk)
-        setIsFromCache(state.isFromCache)
-        setIsPartial(state.isPartial)
-
-        if ((state.isTableReady && state.streamedRows > 0) || state.isComplete || state.isFromCache) {
-          if (state.streamedRows > 0) baseTotalRowsRef.current = state.streamedRows
-          setTotalRows(state.streamedRows)
-          const hasActive = Object.values(filtersRef.current).some(
-            (val) => typeof val === "string" && val.trim().length > 0
-          )
-          if (!hasActive) {
-            setTotalFiltered(state.streamedRows)
-          }
-
-          const shouldQuery = !tableReadyRef.current
-          if (shouldQuery) {
-            markTableReady(true)
-            void duckDbClient.describeTable(tableName).then((discovered) => {
-              if (discovered.length > 0 && !isCustomQueryActive()) {
-                setColumns(discovered)
-              }
-              // OPFS/cache açılışında localStorage sıralaması çoğu zaman önce
-              // restore edilir; burada null sort ile ezmeyip ref'teki aktif
-              // filtre/sıralamayı kullan (aksi halde ORDER BY kolonları UI'da
-              // görünür ama veri sırasız kalır).
-              void executeQueryRef.current(
-                filtersRef.current,
-                sortByRef.current,
-                sortDescRef.current,
-                0,
-                sortConfigsRef.current,
-                discovered.length > 0
-                  ? discovered.map((c) => c.name)
-                  : undefined
-              )
-              // Tablo bu turda hazır olduysa bekleyen özel sorguyu koştur
-              if (isCustomQueryActive()) setCustomQueryTick((t) => t + 1)
-            })
-          } else if (state.isComplete && !prevCompleteRef.current) {
-            prevCompleteRef.current = true
-            void duckDbClient.describeTable(tableName).then((discovered) => {
-              if (discovered.length > 0 && !isCustomQueryActive()) {
-                setColumns(discovered)
-              }
-              void executeQueryRef.current(
-                filtersRef.current,
-                sortByRef.current,
-                sortDescRef.current,
-                0,
-                sortConfigsRef.current,
-                discovered.length > 0
-                  ? discovered.map((c) => c.name)
-                  : undefined
-              )
-            })
-          }
-        }
-      }
-    )
-
-    return () => {
-      unsubscribe()
-      if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
-    }
-  }, [jobId, jobUrl, tableName, expectedTotalRows, onError, markTableReady])
+  useDuckStreamSubscription<T>({
+    jobId,
+    jobUrl,
+    tableName,
+    expectedTotalRows,
+    onError,
+    markTableReady,
+    tableReadyRef,
+    prevCompleteRef,
+    baseTotalRowsRef,
+    filtersRef,
+    sortByRef,
+    sortDescRef,
+    sortConfigsRef,
+    queryTimeoutRef,
+    executeQueryRef,
+    setStreamedRows,
+    setIsStreaming,
+    setIsSavingDisk,
+    setIsFromCache,
+    setIsPartial,
+    setTotalRows,
+    setTotalFiltered,
+    setRows,
+    setHasMoreRows,
+    setColumns,
+    setCustomQueryTick,
+  })
 
   const refresh = React.useCallback(async () => {
     if (!jobId || !jobUrl || !tableName) return
@@ -500,6 +386,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
       setHasMoreRows(false)
       setStreamedRows(0)
       setPage(0)
+      const { duckStreamManager } = await import("../services/duck-stream-manager")
       await duckStreamManager.restart({
         jobId,
         jobUrl,
@@ -520,184 +407,32 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     return Math.min(100, Math.round((streamedRows / expectedTotalRows) * 100))
   }, [streamedRows, expectedTotalRows])
 
-  // Özel SQL modu — Yula set_grid_query: guard'dan geçmiş SELECT'i koşturur,
-  // kolonları sonuçtan türetir; temel tabloya dönüşte görünümü onarır.
-  React.useEffect(() => {
-    if (!customSql) {
-      if (!tableReadyRef.current) return
-      let cancelledRestore = false
-      void (async () => {
-        // Kolonlar özel sorgu sonucuna göre değişmiş olabilir; şemayı geri yükle
-        const discovered = await duckDbClient.describeTable(tableName)
-        if (cancelledRestore) return
-        if (discovered.length > 0) setColumns(discovered)
-        const restoredBase =
-          baseTotalRowsRef.current > 0
-            ? baseTotalRowsRef.current
-            : latestStreamedRef.current > 0
-              ? latestStreamedRef.current
-              : latestExpectedRef.current ?? 0
-        setTotalRows(restoredBase)
-        setTotalFiltered(restoredBase)
-
-        // Özel sorgudan kalan türetilmiş sıralama kolonları temel tabloda yoksa temizle
-        const discSet = new Set(discovered.map((c) => c.name))
-        const nextConfigs: ColumnSortConfigs = {}
-        for (const [col, dir] of Object.entries(sortConfigsRef.current)) {
-          if (discSet.has(col)) {
-            nextConfigs[col] = dir
-          }
-        }
-        sortConfigsRef.current = nextConfigs
-        setSortConfigs(nextConfigs)
-
-        const sortStillValid = Boolean(
-          sortByRef.current && discSet.has(sortByRef.current)
-        )
-        const nextSort = sortStillValid ? sortByRef.current : null
-        const nextDesc = sortStillValid ? sortDescRef.current : false
-        if (!sortStillValid && sortByRef.current) {
-          sortByRef.current = null
-          sortDescRef.current = false
-          setSortBy(null)
-          setSortDesc(false)
-        }
-
-        void executeQueryRef.current(filtersRef.current, nextSort, nextDesc, 0, nextConfigs)
-      })()
-      return () => {
-        cancelledRestore = true
-      }
-    }
-
-    if (!tableReadyRef.current) return
-
-    const seq = ++querySeqRef.current
-    let cancelled = false
-    const runCustomSql = async () => {
-      setIsLoadingQuery(true)
-      try {
-        const resolvedSql = resolveActiveViewReferences(customSql, tableName)
-        const result = await duckDbClient.executeCustomSql(resolvedSql)
-        if (cancelled || seq !== querySeqRef.current) return
-        markTableReady(true)
-        let resultRows = (result as T[]) ?? []
-        const first = resultRows[0] as Record<string, unknown> | undefined
-        const viewCols = new Set(first ? Object.keys(first) : [])
-
-        // Bayat filtre hücreleri: temel tabloya ait (özel görünümde olmayan)
-        // kolon filtreleri Binder Error üretir → hücreleri sessizce temizle.
-        const staleKeys = Object.keys(filtersRef.current).filter(
-          (k) => !viewCols.has(k)
-        )
-        if (staleKeys.length > 0) {
-          const next = { ...filtersRef.current }
-          staleKeys.forEach((k) => delete next[k])
-          filtersRef.current = next
-          setFilters(next)
-        }
-
-        // Sıralama kontrolü: görünümde olan kolonlar sıralanabilir
-        const validCustomSortList: SortConfig[] = []
-        for (const [col, dir] of Object.entries(sortConfigsRef.current)) {
-          if (viewCols.has(col)) {
-            validCustomSortList.push({ column: col, desc: dir === "desc" })
-          }
-        }
-
-        const activeSort = sortByRef.current
-        const activeSortDesc = sortDescRef.current
-        const hasValidSort = Boolean(activeSort && viewCols.has(activeSort))
-        if (activeSort && !hasValidSort) {
-          sortByRef.current = null
-          sortDescRef.current = false
-          setSortBy(null)
-          setSortDesc(false)
-        }
-
-        // Aktif filtre veya sıralama özel sorgu SONUÇLARI üzerinde de çalışsın:
-        // SELECT * FROM (<özel sorgu>) AS __custom_view [WHERE ...] [ORDER BY ...]
-        // ÖNEMLİ: sarmalayıcıda da resolvedSql kullan — ham customSql içinde
-        // `active_view` varsa wrap Binder Error verir ve ORDER BY sessizce düşer.
-        const activeFilters = filtersRef.current
-        const hasActiveFilters = Object.values(activeFilters).some(
-          (v) => v && v.trim()
-        )
-        let orderClause = ""
-        if (validCustomSortList.length > 0) {
-          orderClause = `ORDER BY ${validCustomSortList
-            .map((s) => `"${s.column.replace(/"/g, '""')}" ${s.desc ? "DESC" : "ASC"}`)
-            .join(", ")}`
-        } else if (hasValidSort) {
-          orderClause = `ORDER BY "${activeSort!.replace(/"/g, '""')}" ${activeSortDesc ? "DESC" : "ASC"}`
-        }
-
-        if (hasActiveFilters || orderClause) {
-          let where = ""
-          if (hasActiveFilters) {
-            const numericSet = new Set<string>(
-              Object.entries(first ?? {})
-                .filter(([, v]) => typeof v === "number" || typeof v === "bigint")
-                .map(([k]) => k)
-            )
-            const { buildCombinedWhereClause } = await import(
-              "@/services/duckdb/filter-parser"
-            )
-            where = buildCombinedWhereClause(activeFilters, numericSet)
-          }
-
-          try {
-            const cleanResolved = resolvedSql.trim().replace(/;+$/, "")
-            const wrappedSql = `SELECT * FROM (${cleanResolved}) AS __custom_view ${where} ${orderClause}`
-            const filteredAndSorted = await duckDbClient.executeCustomSql(wrappedSql)
-            if (cancelled || seq !== querySeqRef.current) return
-            resultRows = (filteredAndSorted as T[]) ?? []
-          } catch (filterErr) {
-            // Süzülmüş/sıralanmış sorgu patlarsa banner çıkarmadan devam et
-            console.warn(
-              "[useDuckReport] özel görünüm filtre/sıralama uygulanamadı:",
-              filterErr
-            )
-          }
-        }
-        const capped = resultRows.slice(0, 5000)
-        const derivedCols: ReportColumnMeta[] = first
-          ? Object.keys(first).map((name) => {
-              const v = first[name]
-              const isNumeric =
-                typeof v === "number" ||
-                typeof v === "bigint" ||
-                (typeof v === "string" &&
-                  v.trim() !== "" &&
-                  Number.isFinite(Number(v)))
-              return {
-                name,
-                label: name,
-                isNumeric,
-                align: isNumeric ? "right" : "left",
-              }
-            })
-          : []
-        if (derivedCols.length > 0) setColumns(derivedCols)
-        setRows(capped)
-        setTotalRows(capped.length)
-        setTotalFiltered(capped.length)
-        setHasMoreRows(false)
-      } catch (err) {
-        // Özel görünüm hataları banner'a düşürülmez: model akışı zaten
-        // düzeltir; kullanıcıyı kırmızı banner ile endişelendirmeye gerek yok.
-        if (!cancelled) {
-          console.warn("custom query error:", err)
-        }
-      } finally {
-        if (!cancelled && seq === querySeqRef.current) setIsLoadingQuery(false)
-      }
-    }
-    void runCustomSql()
-    return () => {
-      cancelled = true
-    }
-  }, [customSql, customQueryTick, tableName, onError, markTableReady])
+  useDuckCustomSql<T>({
+    customSql,
+    customQueryTick,
+    tableName,
+    tableReadyRef,
+    querySeqRef,
+    baseTotalRowsRef,
+    latestStreamedRef,
+    latestExpectedRef,
+    filtersRef,
+    sortByRef,
+    sortDescRef,
+    sortConfigsRef,
+    executeQueryRef,
+    markTableReady,
+    setColumns,
+    setRows,
+    setTotalRows,
+    setTotalFiltered,
+    setSortConfigs,
+    setSortBy,
+    setSortDesc,
+    setFilters,
+    setHasMoreRows,
+    setIsLoadingQuery,
+  })
 
   const hasMore = hasMoreRows && rows.length > 0
   const loadingMoreRef = React.useRef(false)
