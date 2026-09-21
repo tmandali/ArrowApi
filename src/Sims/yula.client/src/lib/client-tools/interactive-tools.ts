@@ -3,39 +3,8 @@ import { BUILT_IN_USER_SKILLS } from "@/lib/built-in-skills";
 import { buildUserSkillPrompt } from "@/lib/yula-user-skill";
 
 /**
- * Etkileşimli / skill araçları — soru kartı, öneri çipleri ve kullanıcı
- * skill'leri. Davranış `yula-client-tools.ts` ile birebirdir.
+ * Kullanıcı cihaz-içi skill araçları.
  */
-
-/**
- * @deprecated Use `@my-agent/core` standard `ask_user_choice` tool instead for inline HITL choice cards.
- * Retained for backward compatibility with external callers.
- */
-export async function askUserQuestionTool(
-  args: Record<string, unknown>,
-): Promise<unknown> {
-  const raw = (args as { questions?: unknown }).questions;
-  const questions = Array.isArray(raw) ? raw.slice(0, 3) : [];
-  return {
-    status: "awaiting_user",
-    questions,
-    message: "Questions presented to the user. Prefer ask_user_choice for modern inline HITL selection.",
-  };
-}
-
-export async function suggestNextStepsTool(
-  args: Record<string, unknown>,
-): Promise<unknown> {
-  // Yapılandırılmış öneri çipleri: şekil bozukları elenir (en fazla 10).
-  // Kart girdiden basılır (çıktı yalnız sunum onayıdır).
-  const { asSuggestions } = await import("@/lib/yula-suggestions");
-  const suggestions = asSuggestions(args);
-  return {
-    status: "presented",
-    count: suggestions.length,
-    message: "Suggestions presented to the user as clickable chips. Finding/analysis clicks arrive as a new user message; report/navigation clicks navigate in-app.",
-  };
-}
 
 export async function runUserSkillTool(
   args: Record<string, unknown>,

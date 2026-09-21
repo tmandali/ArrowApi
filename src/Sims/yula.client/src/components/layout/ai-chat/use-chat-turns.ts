@@ -3,6 +3,13 @@
 import * as React from "react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { yulaToolPartInfo, isFailedToolInfo } from "@/lib/yula-tool-info";
+import {
+  isTextPart,
+  isReasoningPart,
+  classifyTextPart,
+  getMessageText,
+  type TextPartRole,
+} from "@my-agent/core";
 
 export type ChatTurn = {
   id: string;
@@ -28,10 +35,11 @@ export function useDedupedMessages(messages: YulaMessage[]): YulaMessage[] {
 /**
  * Pi DAG & Vercel AI SDK Standardı:
  * Çok adımlı/turlu işlemlerde (Step 1 Tool -> Step 2 Terminal Answer):
- * - Akordiyon ve Tool kartları tüm adımların araç/durum parçalarını görebilmelidir.
- * - Ana sohbet balonu ise YALNIZCA terminal (son) asistan mesajının metin parçalarını basmalıdır.
- * - Ara adımların (tool çağıran turların) metin parçaları ana balona sızmaz;
- *   akordiyonda adım geçmişinde kalması için "reasoning" (intermediate_plan) olarak korunur.
+ * - Bir turda birden fazla asistan mesajı varsa tek bir `assistantMessage`
+ *   içinde birleştirilir.
+ * - Sadece terminal (nihai) cevabın `text` parçası ana sohbet balonuna aktarılır.
+ * - Ara adımların metinleri (planlama, eylem gerekçesi) akordeonda ara düşünce
+ *   veya plan olarak korunur.
  */
 export function buildTurnAssistantMessage(
   assistantMessages: YulaMessage[],
@@ -50,28 +58,38 @@ export function buildTurnAssistantMessage(
   // Metin içeren terminal (son) asistan mesajını bul
   const terminalWithText =
     [...assistantMessages].reverse().find((a) =>
-      a.parts?.some(
-        (p) => p.type === "text" && Boolean((p as { text?: string }).text?.trim()),
-      ),
+      a.parts?.some((p) => isTextPart(p) && Boolean(p.text.trim())),
     ) ?? lastAssistant;
 
   const combinedParts: any[] = [];
 
   for (const msg of assistantMessages) {
     const isTerminal = msg.id === terminalWithText.id;
+    const hasToolsInMsg = (msg.parts ?? []).some(
+      (p) =>
+        (p as { type?: string }).type?.startsWith("tool-") ||
+        (p as { type?: string }).type === "dynamic-tool",
+    );
+
     for (const part of msg.parts ?? []) {
-      if (part.type === "text") {
+      if (isTextPart(part)) {
         if (isTerminal) {
           // Terminal metin parçası doğrudan nihai cevap balonu için eklenir
-          combinedParts.push(part);
+          const role: TextPartRole =
+            part.role ?? classifyTextPart(part.text, hasToolsInMsg);
+          combinedParts.push({
+            ...part,
+            role,
+          });
         } else {
-          // Ara adım metni: Ana balona basılmaz; akordiyonda ara plan/düşünce olarak korunur
-          const txt = (part as { text?: string }).text?.trim();
+          // Ara adım metni: Ana balona basılmaz; akordeonda ara plan/düşünce olarak korunur
+          const txt = part.text.trim();
           if (txt) {
             combinedParts.push({
               type: "reasoning",
               text: txt,
               meta: "intermediate_plan",
+              role: "plan_rationale" as TextPartRole,
             });
           }
         }
@@ -151,16 +169,13 @@ export function computeStreamingPreview(
   const streamingThinking =
     streaming && lastAssistant
       ? lastParts
-          .filter((p) => p.type === "reasoning")
-          .map((p: { text?: string }) => p.text ?? "")
+          .filter(isReasoningPart)
+          .map((p) => p.text)
           .join("")
       : "";
   const streamingContent =
     streaming && lastAssistant
-      ? lastParts
-          .filter((p) => p.type === "text")
-          .map((p) => (p as { text?: string }).text ?? "")
-          .join("")
+      ? getMessageText(lastAssistant, { excludeRoles: ["plan_rationale"] })
       : "";
   return { lastAssistant, streaming, streamingThinking, streamingContent };
 }
@@ -214,10 +229,7 @@ export function computeRecoveredToolCallIds(messages: YulaMessage[]): Set<string
         ) {
           progresses.push({ msgIdx: mi, partIdx: pi });
         }
-      } else if (
-        p.type === "text" &&
-        ((p as { text?: string }).text ?? "").trim()
-      ) {
+      } else if (isTextPart(p) && p.text.trim()) {
         progresses.push({ msgIdx: mi, partIdx: pi });
       }
     });

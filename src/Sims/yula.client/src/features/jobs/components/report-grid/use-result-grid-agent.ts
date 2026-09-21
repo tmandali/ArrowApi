@@ -22,11 +22,15 @@ import {
 
 export interface UseResultGridAgentOptions {
   jobId?: string;
-  duckTableName: string;
+  tableName?: string;
+  duckTableName?: string;
   totalFiltered?: number;
   columns: string[];
   filters: unknown;
   customQuerySql?: string | null;
+  customQueryTitle?: string | null;
+  activeAiViewId?: string | null;
+  savedViews?: Array<{ id?: string; name?: string; title: string; sql: string }>;
   isTableReady: boolean;
 }
 
@@ -35,27 +39,40 @@ export interface UseResultGridAgentOptions {
  * Grid mount edildiğinde kendini canlı React state'i, olay şemaları
  * ve eylem çıktı sözleşmeleriyle 'result_grid:active' olarak kaydeder.
  */
-export function useResultGridAgent({
-  jobId,
-  duckTableName,
-  totalFiltered,
-  columns,
-  filters,
-  customQuerySql,
-  isTableReady,
-}: UseResultGridAgentOptions) {
+export function useResultGridAgent(options: UseResultGridAgentOptions) {
+  const {
+    jobId,
+    totalFiltered,
+    columns,
+    filters,
+    customQuerySql,
+    customQueryTitle,
+    activeAiViewId,
+    savedViews,
+    isTableReady,
+  } = options;
+  const tableName = options.tableName ?? options.duckTableName ?? "";
   const [selectedRow, setSelectedRow] = React.useState<Record<string, unknown> | null>(null);
+
+  const isBaseTable = !customQuerySql && !activeAiViewId;
+  const activeView = customQuerySql ? "active_view" : tableName;
 
   const { emit } = useAgentComponent({
     id: "result_grid:active",
     meta: {
-      description: `Active Result Grid (${duckTableName}) - ${totalFiltered ?? "?"} rows`,
-      tableName: duckTableName,
+      description: `Active Result Grid (${tableName}) - ${totalFiltered ?? "?"} rows`,
+      tableName,
+      baseTable: tableName,
+      isBaseTable,
+      activeView,
+      activeAiViewId: activeAiViewId ?? null,
+      customQueryTitle: customQueryTitle ?? null,
+      customQuerySql: customQuerySql ?? null,
+      savedViews: savedViews ?? [],
       columns,
       rowCount: totalFiltered,
       selectedRow,
       filters,
-      customQuerySql,
       isTableReady,
     },
     events: {
@@ -79,8 +96,25 @@ export function useResultGridAgent({
         }),
       },
       view_transformed: {
-        description: "Triggered when SQL, sorting, or projection transforms active view",
-        schema: z.object({ query: z.string().optional(), rowCount: z.number().optional() }),
+        description: "Triggered when SQL, saved query navigation, or projection transforms active view",
+        schema: z.object({
+          baseTable: z.string(),
+          activeView: z.string(),
+          isBaseTable: z.boolean(),
+          viewId: z.string().nullable().optional(),
+          title: z.string().nullable().optional(),
+          query: z.string().nullable().optional(),
+          rowCount: z.number().optional(),
+        }),
+      },
+      table_loaded: {
+        description: "Triggered when DuckDB report table is fully loaded and ready in the virtual grid",
+        schema: z.object({
+          tableName: z.string(),
+          activeView: z.string(),
+          columns: z.array(z.string()),
+          rowCount: z.number().optional(),
+        }),
       },
     },
     actions: {
@@ -102,6 +136,40 @@ export function useResultGridAgent({
     },
   });
 
+  const tableLoadedKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (isTableReady && tableName && Array.isArray(columns) && columns.length > 0) {
+      const key = `${tableName}:${columns.join(",")}:${totalFiltered ?? "?"}`;
+      if (tableLoadedKeyRef.current !== key) {
+        tableLoadedKeyRef.current = key;
+        emit("table_loaded", {
+          tableName,
+          activeView: "active_view",
+          columns,
+          rowCount: totalFiltered,
+        });
+        try {
+          uiEventBus.recordTelemetry(
+            {
+              topic: "data",
+              source: "result_grid:active",
+              type: "TABLE_LOADED",
+              payload: {
+                tableName,
+                activeView: "active_view",
+                rowCount: totalFiltered,
+                columns,
+              },
+            },
+            { coalesceKey: "result_grid:table_loaded", correlationId: jobId }
+          );
+        } catch {
+          // Telemetry best-effort
+        }
+      }
+    }
+  }, [isTableReady, tableName, columns, totalFiltered, emit, jobId]);
+
   const prevFiltersRef = React.useRef(filters);
   React.useEffect(() => {
     if (filters && filters !== prevFiltersRef.current) {
@@ -112,7 +180,7 @@ export function useResultGridAgent({
           uiEventBus.recordTelemetry(
             {
               topic: "data",
-              source: "result_grid",
+              source: "result_grid:active",
               type: "FILTER_APPLIED",
               payload: { filters: filters as Record<string, unknown> },
             },
@@ -134,7 +202,7 @@ export function useResultGridAgent({
           uiEventBus.recordTelemetry(
             {
               topic: "data",
-              source: "result_grid",
+              source: "result_grid:active",
               type: "ROW_SELECTED",
               payload: { id: rowIndex, rowData: raw as Record<string, unknown> },
             },
@@ -154,7 +222,7 @@ export function useResultGridAgent({
         uiEventBus.recordTelemetry(
           {
             topic: "data",
-            source: "result_grid",
+            source: "result_grid:active",
             type: "SORT_CHANGED",
             payload: { column, direction, sortConfigs },
           },
@@ -168,14 +236,27 @@ export function useResultGridAgent({
   );
 
   const handleViewTransformed = React.useCallback(
-    (viewId?: string | null, title?: string, query?: string) => {
+    (viewId?: string | null, title?: string | null, query?: string | null) => {
+      const isBase = !viewId && !query;
+      const payload = {
+        baseTable: tableName,
+        activeView: isBase ? tableName : "active_view",
+        isBaseTable: isBase,
+        viewId: viewId ?? null,
+        title: title ?? (isBase ? "Base Table" : "Custom View"),
+        query: query ?? null,
+        rowCount: totalFiltered,
+      };
+
+      emit("view_transformed", payload);
+
       try {
         uiEventBus.recordTelemetry(
           {
             topic: "data",
-            source: "result_grid",
+            source: "result_grid:active",
             type: "VIEW_TRANSFORMED",
-            payload: { viewId: viewId ?? undefined, title, query },
+            payload,
           },
           { coalesceKey: "result_grid:view_transformed", correlationId: jobId }
         );
@@ -183,8 +264,22 @@ export function useResultGridAgent({
         // Telemetry best-effort
       }
     },
-    [jobId]
+    [tableName, totalFiltered, emit, jobId]
   );
+
+  const prevViewKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!isTableReady) return;
+    const currentKey = `${activeAiViewId ?? ""}:${customQuerySql ?? ""}:${customQueryTitle ?? ""}`;
+    if (prevViewKeyRef.current === null) {
+      prevViewKeyRef.current = currentKey;
+      return;
+    }
+    if (prevViewKeyRef.current !== currentKey) {
+      prevViewKeyRef.current = currentKey;
+      handleViewTransformed(activeAiViewId, customQueryTitle, customQuerySql);
+    }
+  }, [isTableReady, activeAiViewId, customQuerySql, customQueryTitle, handleViewTransformed]);
 
   return {
     emit,

@@ -1,3 +1,75 @@
+/**
+ * Canonical Arrow Job lifecycle states matching backend ArrowJobState enum.
+ */
+export type ArrowJobLifecycleState =
+  | "Queued"
+  | "Running"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Idle";
+
+/**
+ * Normalizes loose or alternate status strings into a type-safe canonical lifecycle state.
+ */
+export function normalizeJobState(raw?: unknown): ArrowJobLifecycleState {
+  if (typeof raw !== "string" || !raw.trim()) return "Idle";
+  const s = raw.trim().toLowerCase();
+  switch (s) {
+    case "running":
+      return "Running";
+    case "queued":
+      return "Queued";
+    case "completed":
+    case "done":
+      return "Completed";
+    case "failed":
+    case "error":
+      return "Failed";
+    case "cancelled":
+    case "canceled":
+      return "Cancelled";
+    case "idle":
+      return "Idle";
+    default:
+      return "Idle";
+  }
+}
+
+/**
+ * Checks if a job has reached an irreversible terminal state.
+ */
+export function isTerminalJobState(status: ArrowJobLifecycleState): boolean {
+  return status === "Completed" || status === "Failed" || status === "Cancelled";
+}
+
+/**
+ * State snapshot summary of an Arrow Job execution.
+ */
+export interface ArrowJobSummary {
+  jobId: string;
+  status: ArrowJobLifecycleState;
+  progressPhase?: string;
+  currentStep?: string;
+  durationMs?: number;
+  totalRows?: number;
+  error?: string;
+}
+
+/**
+ * Execution context of an Arrow Job.
+ */
+export interface ArrowJobContext {
+  reportScope?: string;
+  activeJobId?: string | null;
+  activeJob?: ArrowJobSummary | null;
+  executionCount?: number;
+}
+
+/** Legacy type aliases for backward compatibility */
+export type YulaActiveJobSummary = ArrowJobSummary;
+export type YulaJobContext = ArrowJobContext;
+
 export type ArrowJobStatus = {
   id: string
   status: string
@@ -39,20 +111,3 @@ export type ArrowJobHubMessage = {
   payload: ArrowJobEvent
 }
 
-export type ReportColumn = {
-  name: string
-  label: string
-  type: string
-  kind: "account" | "money" | "meta"
-  align: "left" | "right"
-}
-
-export type ReportGridRow = {
-  id: string
-  parentId: string | null
-  name: string
-  level: number
-  isGroup: boolean
-  values: Record<string, string>
-  children?: ReportGridRow[]
-}

@@ -4,6 +4,18 @@ Archived decisions from September 2026 to ensure active documentation files stri
 
 ---
 
+## [2026-09-20] Decoupling Built-in Slash Commands (Library Runtime) vs Application Tools (Yula Client)
+- **Rationale:** When executing `/yardim skil create` or typing `/yardım` (dotless-i), the command leaked past `@my-agent/core` into `/api/agent/chat` because `/yardım` was not recognized as a registered system command. Consequently, the backend LLM invoked the `ask_user_choice` tool to ask what the user meant while simultaneously rejecting it, whereas `yula-worked-steps.tsx` synthesized an artificial `slash_command (status: ok)` step.
+- **Decision:**
+  - **Core Library (`@my-agent/core`):** Added `normalizeCommandToken` to normalize Turkish character variants (`ı` vs `i`, case-folding). Explicitly registered `/yardım` as an alias alongside `/yardim` and `/help`.
+  - **Client Hook (`@my-agent/react`):** Enhanced `handleBuiltInCommand` in `chat-commands.ts` so that `/help` and `/yardim`/`/yardım` commands—even with argument hints (e.g. `/yardim model` or `/yardim skil create`)—are filtered and resolved 100% locally on the client and always return `true`, completely preventing unintended forwarding to the LLM backend.
+  - **Application UI (`yula.client`):**
+    - Updated `yula-commands.ts` to include `phase` in `parseYamlCommands` and normalize Turkish characters in `resolveYulaSlashCommand` and `matchYulaCommands`.
+    - In `yula-worked-steps.tsx`, excluded `phase === "system"` commands from synthesizing fake tool steps in server turn transcripts, and ensured error states accurately reflect tool failure.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-18] Single-Page Unified Report Flow & SSE Anti-Buffering
 - **Rationale:** Separate `[jobId]` pages polluted browser history and triggered full reload overhead on navigation.
 - **Decision:**
@@ -149,4 +161,152 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - **100% Approach 2 Adoption across `yula.client`:** Extracted dedicated binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`) and migrated their actions to the new `handlers` map.
   - **File Size Compliance:** Modularized `ItemFormShell.tsx` from 691 lines down to 404 lines ($\le 500$).
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Procedural Memory & Playbook (Karpathy LLM Wiki Pattern)
+- **Rationale:** The AI agent had amnesia regarding screen-specific operational procedures and repeated exploratory trial-and-error queries from scratch on every turn.
+- **Decision:**
+  - Implemented `PlaybookService`, `MemoryPlaybookStorage`, `RestPlaybookStorage`, and `LocalStoragePlaybookStorage` in `@my-agent/core`.
+  - Added `AgentProvider` DI support and `useAgentPlaybook` hook in `@my-agent/react`.
+  - Added Markdown-backed server storage (`ServerFsPlaybookStorage`) in `yula.client` under `storage/wiki/workspaces/<workspace>/`.
+  - Surfaced active Wiki reading tier (`Workspace Wiki`, `User Wiki`, `System Baseline`) and playbook updates (`propose_playbook_update`) transparently in the Worked Steps UI.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Harmonized Card Container & Header Height Chrome between Yula Full Mode and Dock Mode
+- **Rationale:** The visual presentation of Yula in `full` mode (3-column IDE overlay) previously felt detached from the Sims workspace design language: columns lacked card boundaries, resize handles were thin border lines rather than standard 8px gutters, and the diagram canvas header had a 2-tier stacked bar (`h-16+`) rather than matching the uniform `h-11` (`panelHeaderClass`) height of dock mode and other workspace cards.
+- **Decision:**
+  - Standardized all 3 columns inside `panelCardClass` (`rounded-md border bg-card shadow-none`) with `panelResizeHandleClass` (`w-2 bg-transparent`).
+  - Standardized canvas header to single `h-11` row matching `panelHeaderClass` (`bg-card`, `border-b border-border px-3`).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] AppLayout Content-Frame Architecture for Yula Fullscreen Overlay Host
+- **Rationale:** `YulaFullscreenOverlay` was mounted deep inside individual page docks, causing layout clipping and trapping within leaf pages.
+- **Decision:**
+  - Created `yula-fullscreen-host.tsx` mounted inside `AppLayout`'s `<main>` frame with `absolute inset-0 z-40 rounded-t-2xl overflow-hidden`.
+  - Extracted shared buttons into `yula-dock-controls.tsx`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] 3-Column Antigravity IDE Workspace for Yula Fullscreen Overlay Mode
+- **Rationale:** Slide-out right drawers felt cramped in fullscreen mode. A 3-column split view (Left: Sidebar/History, Center: Chat Stream, Right: Diagram Canvas) provides full workspace ergonomics.
+- **Decision:** Built `yula-fullscreen-overlay.tsx` using Shadcn `<ResizablePanelGroup orientation="horizontal">` with 3 columns.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Artifact & Side Canvas Architecture for Mermaid Diagrams
+- **Rationale:** Narrow chat bubbles forced horizontal scroll on wide diagrams.
+- **Decision:** Compact `MermaidChip` in chat opening either wide `<Sheet side="right">` (Dock mode) or split `<ResizablePanelGroup>` canvas (Fullscreen mode) via `active-diagram-store.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Dynamic Client-Side Mermaid Integration for Markdown
+- **Rationale:** `next-mdx-remote` caused token streaming chokes and RCE security risks.
+- **Decision:** Preserved token streaming `react-markdown` and added zero-overhead lazy-loaded `MermaidBlock` with light/dark theme support.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Graph-Native (DAG) Architecture for Yula Playbook Wiki
+- **Rationale:** Multi-step workflow recipes were prone to hallucinations when stored as free-form prose.
+- **Decision:** Implemented `PlaybookDAG` in `@my-agent/core` with Tarjan DFS cycle detection, Kahn's topological sort, and interactive Dagre graph visualization in `WorkflowGraphCanvas.tsx`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Direct 3-Column Fullscreen Workspace for SystemHomeView (Root Path)
+- **Rationale:** The system home view (`/`) is the primary landing screen of the Sims application. Having it render a single-column shell with an expand toggle to switch into fullscreen mode was redundant.
+- **Decision:** `SystemHomeView` directly renders `YulaFullscreenOverlay` in page flow. Collapse and close controls are omitted on the home view.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Auto-Collapse Fullscreen Overlay on Navigation & Header Button Deduplication
+- **Rationale:** Duplicate actions in header and overlay trapping during navigation.
+- **Decision:** Unified on `YulaExpandToggleButton` [⤢], updated `WorkspaceAiChatProvider` to auto-collapse on route changes, and ensured `expanded` mode is not persisted.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Architectural Separation of User Screen Navigation vs In-IDE Interactions
+- **Rationale:** Clicking screen navigation elements in Fullscreen Overlay mode signifies intent to view screens, whereas in-IDE interactions (switching chat sessions) should not collapse the overlay.
+- **Decision:** Root-level provider mounting, capture-phase navigation interceptor, and clear separation of in-IDE actions (`selectConversation` without `router.push`).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Integration of Library Built-in System Commands into Yula Slash Palette
+- **Rationale:** The `@my-agent/core` runtime engine and `@my-agent/react` chat hook implement core built-in commands (`/plan`, `/compact`, `/model`, `/help`/`/yardim`, `/new`/`/yeni`), but these were previously absent from `yula.client`'s `system.agent.yaml` slash palette manifest, preventing discoverability and autocomplete for end users.
+- **Decision:**
+  - **Manifest Registration:** Added `/plan`, `/compact`, `/model`, and `/yardim` to `system.agent.yaml` with explicit icons (`ListTodo`, `Minimize2`, `Cpu`, `HelpCircle`).
+  - **Icon Resolution:** Expanded `ICON_MAP` in `yula-commands.ts` with the new Lucide icons.
+  - **I18n Localization:** Localized labels, descriptions, and prompts across `tr.json` and `en.json`.
+  - **Dual-Language Core Aliases:** Registered `/yeni` and `/yardim` aliases alongside `/new` and `/help` in `prompt-templates.ts` and `chat-commands.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Removal of Legacy Prototype Test Slash Commands & Emptying Skills Seed
+- **Rationale:** Following the integration of official Anthropic agent skills (`xlsx`, `pdf`, `docx`, `pptx`, `frontend-design`, `mcp-builder`, `skill-creator`, `doc-coauthoring`), the legacy prototype skills (`/ay-kapanis`, `/sayim-fark`, `/rapor-kalite`, `/gunluk-ozet`) and mock template commands (`/rapor`, `/sirala`, `/csv`, `/geri` in `@my-agent/core`) were obsolete and created confusion in the chat slash palette.
+- **Decision:**
+  - **Deleted Prototype Skills:** Removed `skills/ay-kapanis`, `skills/sayim-fark`, and `skills/rapor-kalite` from `src/Sims/yula.client/skills`.
+  - **Clean Built-in Skills Registry:** `built-in-skills.ts` and its test now register and verify exactly the 8 production Anthropic skills.
+  - **Removed Example Skill Seeding:** `ensureExampleSkill` in `user-skills.ts` no longer seeds `gunluk-ozet`; it actively cleans up any existing `gunluk-ozet` entry from user `localStorage`.
+  - **Localized Skills Namespace:** `LOCALIZABLE_SKILL_SLASHES` emptied in `yula-user-skill.ts`; removed orphaned commands (`attach`, `grid-top5`, `report-run-job`) and old skill entries from `tr.json` and `en.json`.
+  - **Pure Core Templates:** Removed domain-specific mock templates from `prompt-templates.ts` in `@my-agent/core`; system commands (`/new`, `/model`, `/login`, `/compact`, `/plan`, `/help`) preserved.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Migration of Management Screens & Dashboards to useScreenAgentContext and entity_form:* Dynamic Tool Binding
+- **Rationale:** On screens like `/my/skills`, when a user asked contextual questions such as *"bu skili nasıl test ederim"*, Yula hallucinated unrelated ERP/stock report test instructions because the screen lacked both screen context and dynamic tool registration. The system prompt defaulted to global orchestration mode and injected irrelevant sample report catalog prompts.
+- **Decision:**
+  - **Controlled Tab Navigation Support:** Added `activeTab` and `onTabChange` to `TabbedDetail` (`tabbed-detail.tsx`), and forwarded them via `ManagementPageTemplate` (`management-page-template.tsx`) so agents can programmatically switch tabs and inspect tab states.
+  - **Dedicated Hook Extraction Pattern:** To maintain strict adherence to Golden Rule 2 (500-line ceiling), created dedicated binding hooks (`use-skill-agent-binding.ts`, `use-agent-management-binding.ts`, `use-playbook-agent-binding.ts`, `use-system-users-agent-binding.ts`).
+  - **Full Management & Settings Coverage:**
+    - Integrated `entity_form:skill_editor` into `SkillManagementView.tsx` (`/my/skills`, `/system/skills`).
+    - Integrated `entity_form:agent_editor` into `AgentManagementView.tsx` (`/my/agents`, `/system/agents`).
+    - Integrated `entity_form:playbook_manager` into `playbooks-management-view.tsx` (`/my/playbooks`).
+    - Integrated `entity_form:user_settings` into `my-settings-form.tsx` (`/my/settings`).
+    - Integrated `entity_form:plugin_registry` into `plugins-tab-view.tsx` (`/my/plugins`).
+    - Integrated `entity_form:agent_memory` into `memory-tab-view.tsx` (`/my/memory`).
+    - Integrated `entity_form:system_users` into `SystemUsersView.tsx` (`/system/users`), refactoring its guests tab into `SystemUsersGuestsTab.tsx`.
+  - **Workspace Dashboard Context Grounding:** Integrated `useScreenAgentContext` into `blank-workspace-landing.tsx` across all domain modules (`/stock`, `/accounting`, `/selling`, `/manufacturing`, `/subcontracting`), supplying module titles, descriptions, and contextual quick prompt chips.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Architectural Dual-Layer Localization: Library-Agnostic i18n Dictionary vs Application Next-Intl
+- **Rationale:**
+  1. *Core Library Invariance:* Hardcoded Turkish string checks in `@my-agent/core` and Turkish-only response messages in `@my-agent/react` (`chat-commands.ts`) violated the architectural principle that core agent libraries must be domain-agnostic and language-neutral by default.
+  2. *Application UI Localization:* Hardcoded Turkish quick prompts and strings in `yula.client` caused inconsistent multilingual experiences when switching between English and Turkish.
+- **Decision:**
+  - **Library Layer (`@my-agent/core` & `@my-agent/react`):** Extended `AgentDictionary` with `commandAliases` and `commandResponses`. Fully populated localized command dictionaries in `trDictionary` and `enDictionary`. Dynamic alias resolution in `prompt-templates.ts`. Removed hardcoded strings in `chat-commands.ts`.
+  - **Application Layer (`src/Sims/yula.client`):** Standardized all `quickPrompts` passed to `useScreenAgentContext` to use `next-intl` (`useTranslations`). Added prompt message keys across management views in `tr.json` and `en.json`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Upgrading Yula AI with Reference-Pi Patterns & Vercel AI SDK Best Practices (Dynamic Routing, Tool Deltas, Failover, Output Schemas)
+- **Rationale:**
+  1. *Tool Hallucination & Token Waste:* Providing full tool definitions across all execution phases caused prompt bloat and allowed models to attempt grid SQL queries before data was loaded.
+  2. *Unannounced Tool Loadout Transitions:* As UI components mounted/unmounted across routes, models lacked explicit visibility into loadout deltas, causing unmounted tool invocation errors.
+  3. *Cloud Provider Outage & Rate Limits:* When Azure OpenAI or primary models returned 429 Rate Limits or 503 Service Unavailable, agent requests failed without transparent failover.
+  4. *Untyped Tool Outputs:* Server tools previously lacked formal Zod output schemas, reducing client-side runtime validation confidence.
+- **Decision:**
+  - **Dynamic Step Routing (`src/Sims/yula.client/src/lib/yula-step-router.ts`):** Integrated `prepareStepRouting` into Vercel AI SDK `prepareStep` to dynamically prune tools based on screen phase and manage token compaction cleanly under the 500-line limit.
+  - **Tool Output Schemas (`src/Sims/yula.client/src/lib/server-tools/standard-agent-tools.ts`):** Added explicit Zod `outputSchema` definitions to `remember_fact`, `recall_fact`, `query_playbook`, and `propose_playbook_update`.
+  - **Pi Tool Loadout Delta (`packages/agent-core/src/agent-loop.ts`):** Added `declareToolChanges` to detect added/removed tools between turns and inject transparent system notifications (`[Tools Loadout Updated]`).
+  - **Adaptive Model Cascading (`prepareNextTurn` in `agent-loop.ts` & `agent.ts`):** Added Pi-style `prepareNextTurn` support enabling turn-to-turn dynamic model promotion and thinking level adjustments.
+  - **Provider Resilience & Failover (`src/Sims/yula.client/src/lib/yula-provider-failover.ts`):** Implemented `createFailoverLanguageModel` using AI SDK `wrapLanguageModel`, seamlessly switching from primary (e.g. Azure OpenAI) to secondary fallbacks (OpenAI / Agnes) on 429/5xx errors.
+  - **Interactive Simulation Harness (`apps/demo-app`):** Implemented `useAdvancedArchitecturalSimulations.ts` and updated `PiTestPanel.tsx` / `PiDiagnosticsView.tsx` with 4 interactive test scenarios (Tool Loadout Delta, Model Cascading, Provider Failover, Dynamic Step Routing).
+- **Author:** Antigravity / Team
+
 

@@ -18,30 +18,43 @@ import {
   extractJobIdFromHref,
 } from "@/lib/workspace-paths";
 import { formatLocalizedRelativeDateTerms } from "./yula-prompt-directives";
+import {
+  type YulaGridContext,
+  type ResultGridMetaPayload,
+  isResultGridMeta,
+  resolveEffectiveGrid,
+  formatGridPromptGrounding,
+} from "@/features/jobs/components/report-grid/ai";
+import { formatCriteriaPromptGrounding } from "@/features/report-criteria/ai";
+import {
+  type ArrowJobContext,
+  type ArrowJobSummary,
+  type ArrowJobLifecycleState,
+  type YulaJobContext,
+  type YulaActiveJobSummary,
+  resolveEffectiveJobContext,
+  formatJobEnginePromptGrounding,
+  normalizeJobState,
+  isTerminalJobState,
+} from "@/features/jobs/ai";
 
-export interface YulaGridContext {
-  tableName: string;
-  columns: string[];
-  rowCount?: number | null;
-  /** Aktif UYGULANMIŞ filtreler — model gerçek tablo durumunu görsün */
-  filters?: Record<string, string>;
-  /** Modelin aktif özel SQL sorgusu; setliyken gruplanmış/türetilmiş görünüm aktiftir */
-  customQuerySql?: string | null;
-  /** Özel SQL görünümünün kullanıcı dostu ad etiketi */
-  customQueryTitle?: string | null;
-  /** Kolon → tip ("date"|"number"|"bool"|"text") — Arrow/şemasından (şema grounding) */
-  columnTypes?: Record<string, string>;
-  /** İlk örnek satırlar — model değerleri gerçek veri dokusuyla eşlesin (few-shot grounding) */
-  sampleRows?: Array<Record<string, unknown>>;
-  /** Düşük kardinaliteli kolonların gerçek değerleri (DISTINCT) — değer uydurma savunması */
-  columnValues?: Record<string, string[]>;
-  /** Kolon → yetkili semantik tanım (rapor şeması x-ai.columnDescriptions) */
-  columnDescriptions?: Record<string, string>;
-  /** DuckDB'de aktif süzülmüş/canlı görünümün SQL VIEW adı (varsayılan: "active_view") */
-  activeViewName?: string;
-  /** DuckDB'de kayıtlı özel görünümlerin listesi (view_xxx adıyla erişilebilir) */
-  savedViews?: Array<{ name: string; title: string; sql: string }>;
-}
+export {
+  type YulaGridContext,
+  type ResultGridMetaPayload,
+  isResultGridMeta,
+  resolveEffectiveGrid,
+  formatGridPromptGrounding,
+  formatCriteriaPromptGrounding,
+  type ArrowJobContext,
+  type ArrowJobSummary,
+  type ArrowJobLifecycleState,
+  type YulaJobContext,
+  type YulaActiveJobSummary,
+  resolveEffectiveJobContext,
+  formatJobEnginePromptGrounding,
+  normalizeJobState,
+  isTerminalJobState,
+};
 
 export type YulaScreenPhase =
   /** İşin SONUÇ tablosu görüntüleniyor (grid hazır) */
@@ -116,10 +129,9 @@ const BASE_PROMPT = [
   "  1. 'dispatch_component_action': To interact with active UI components (form criteria, result grid, routing, job history).",
   "  2. 'inspect_ui_state': To inspect current screen state, active components, and ring buffer telemetry events.",
   "  3. 'ask_user_choice': To present interactive choice chips or ask clarifying questions when input is ambiguous or confirmation is needed.",
-  "  4. 'time_travel': To undo or redo state transitions when requested by user.",
-  "  5. 'remember_fact' & 'recall_fact': To persist and retrieve session preferences and facts.",
-  "  6. 'query_playbook': To search verified company/screen procedural recipes, business rules, and how-tos.",
-  "  7. 'propose_playbook_update': When the user instructs a new procedural rule, correction, or best practice for a screen/workspace, propose it to procedural memory (always confirmed via inline HITL).",
+  "  4. 'remember_fact' & 'recall_fact': To persist and retrieve session preferences and facts.",
+  "  5. 'query_playbook': To search verified company/screen procedural recipes, business rules, and how-tos.",
+  "  6. 'propose_playbook_update': When the user instructs a new procedural rule, correction, or best practice for a screen/workspace, propose it to procedural memory (always confirmed via inline HITL).",
   "• PERSISTENT PREFERENCES (remember_fact): When the user states a recurring habit or preference (e.g. 'ben her zaman Kadıköy mağazasına bakarım', 'always download as Excel'), call 'remember_fact' with type='preference' and scope='persistent'. Leverage recalled preferences with 'recall_fact' when applicable.",
   "• PLAYBOOK PROCEDURAL KNOWLEDGE & GROUNDED WORKFLOW PROTOCOL (query_playbook & propose_playbook_update):",
   "  - ERP OPERATIONAL WORKFLOWS & HOW-TO QUESTIONS: When the user asks how a multi-step ERP process or business workflow works (e.g. purchasing orders, approvals, goods receipt, invoicing, variance reconciliation):",
@@ -133,16 +145,21 @@ const BASE_PROMPT = [
   "  - Specific company/screen rules or custom workflow how-tos: Call 'query_playbook' to search verified procedural recipes.",
   "  - When the user explicitly corrects a workflow, teaches a rule (e.g. 'bu ekranda filtreleri her zaman şöyle seç', 'bu raporda mağaza kodu boş bırakılamaz'): Call 'propose_playbook_update' with category='workflow_recipe' or 'screen_rule'.",
   "  - For corrections or modifications: Call 'propose_playbook_update'.",
-  "  - Always present proposed procedural rules to the user clearly or confirm via 'ask_user_choice'.",
-  "• Do NOT announce tool execution or generate conversational conclusions in pre-tool steps. Call the tool; after results, answer in the user's language.",
+  "• CAUSAL REASONING & TRANSPARENCY: When taking multi-step actions or asking user choices, briefly state your evaluated context (route, matched report, calculated date ranges) and decision rationale so that your causal reasoning is transparent. After tool results, summarize findings in the user's language.",
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "",
   "AUTONOMOUS MULTI-STEP EXECUTION (ReAct Loop):",
   "• You operate within a continuous autonomous agent loop. For multi-step tasks, chain actions methodically:",
   "  1. Form criteria: Apply parameters via dispatch_component_action (component_id='criteria_form:<scope>', action='SET_FIELDS').",
   "  2. Clarify if needed: If mandatory fields are genuinely missing or ambiguous, prompt via 'ask_user_choice'.",
-  "  3. Execute: When criteria are ready or explicit run is requested, trigger dispatch_component_action (component_id='criteria_form:<scope>', action='SUBMIT').",
-  "  4. Explore & analyze: Once the result grid opens, run calculations via dispatch_component_action (component_id='result_grid:active', action='RUN_SQL').",
+  "  3. Execute: When criteria are ready or explicit run is requested, trigger dispatch_component_action (component_id='criteria_form:<scope>', action='SUBMIT'). Report execution is asynchronous (queued/running on backend); you MUST END YOUR TURN immediately after SUBMIT with the started line ('📊 <Report Title> çalıştırılıyor...'). NEVER call 'result_grid:active' (RUN_SQL, FILTER, SORT, VISUALIZE) in the same turn as SUBMIT, because the result grid is not mounted yet while the job is calculating.",
+  "  4. Monitor & Manage Jobs: While an Arrow job is calculating or queued, monitor its progress via 'arrow_job'. To abort a calculation, call dispatch_component_action (component_id='arrow_job', action='CANCEL'). To inspect, list, or open past executions, call dispatch_component_action with component_id='arrow_job_manager' (action='LIST', 'SELECT', 'OPEN_LAST', 'REFRESH').",
+  "  5. Filter & explore: When the result grid is loaded and visible on screen (phase === 'results' or result_grid:active is mounted):",
+  "     - To FILTER rows by a column value (e.g. 'T006 yı süz', 'Depo T006 olanları filtrele'): IMMEDIATELY call dispatch_component_action (component_id='result_grid:active', action='FILTER', payload={ field: '<column>', value: '<value>', op: 'eq' }). All available columns are listed under 'Columns: ...'. DO NOT run 'DESCRIBE' SQL queries to discover column names.",
+  "     - To run custom SQL aggregations or analytics: call dispatch_component_action (component_id='result_grid:active', action='RUN_SQL', payload={ query: 'SELECT ... FROM active_view ...' }).",
+  "     - If the user asks which table or report is open, answer directly with the active report name, table name, row count, and listed columns without running unnecessary tools.",
+  "  6. Visualize charts: When the user requests a chart, plot, or graph visualization (e.g. 'grafik çiz', 'pasta grafik', 'en çok satan 5 mağazayı göster', 'görselleştir'), IMMEDIATELY call dispatch_component_action (component_id='result_grid:active', action='VISUALIZE', payload={ type: 'bar'|'line'|'pie', dimension: '<column>', metric: '<column>', limit: 5, orderMode: 'value_desc', title: '<title>' }). DO NOT use RUN_SQL or QUERY when a visual chart is requested; the VISUALIZE action natively queries the data and renders the interactive chart card.",
+  "  7. Headless WebAssembly SQL ('wasm_sql_engine'): To query, inspect schemas, or compute aggregates without affecting the visual table grid state or user layout, call dispatch_component_action (component_id='wasm_sql_engine', action='RUN_SQL', payload={ query: 'SELECT ... FROM active_view ...', limit: 100 }). Use action='DESCRIBE_TABLE' (payload={ tableOrView: 'active_view' }) or 'LIST_TABLES' for catalog inspection. Runs 100% in-browser in WebAssembly with zero network latency.",
   "• Do not ask confirmation for routine sequential actions (e.g. applying criteria before running when the user asked to 'run sales report for Kadıköy').",
   "",
   "GROUNDING, MISSING ASSETS & OUT-OF-SCOPE PROTOCOL:",
@@ -170,9 +187,10 @@ const BASE_PROMPT = [
   "• After starting a report job (action='SUBMIT' or 'RUN'), write one short started/queued line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically.",
   "• When navigating (component_id='app_router', action='NAVIGATE'), write 1 short visible sentence in the user's language explaining that the target screen is opening (e.g. 'Stok bakiye ekranını açıyorum...'). Never leave the turn text empty.",
   "",
-  "CRITICAL ERROR TRIAGE & SELF-HEALING PROTOCOL:",
-  "• If a tool result contains 'diagnostic.isRecoverable === true', read 'diagnostic.recoveryHint' and correct the parameters (e.g. fix argument types, dates, or query syntax) and retry the tool call (up to 2 times).",
-  "• If 'diagnostic.isRecoverable === false' or 'diagnostic.action === \"ASK_USER_CHOICE\"' (business logic constraint, 401/403 permissions, 500 infrastructure crash, or record not found), DO NOT repeat the failed action. Never hallucinate fake data. Instead, summarize the situation in 1 concise sentence using 'diagnostic.userFriendlyExplanation' and immediately invoke 'ask_user_choice' providing the suggested options (with concise label and optional brief description).",
+  "CAUSAL ERROR RECOVERY & INTERVENTION PROTOCOL:",
+  "• When a tool call encounters an error or empty result, analyze the root cause and execute an intelligent recovery step (e.g. adjust column names, inspect active schema with inspect_ui_state, or correct parameter values).",
+  "• If an error cannot be resolved automatically (e.g. business logic constraint, record not found, permission denied), do NOT repeat the failing call or fabricate data. Summarize the issue in 1 concise sentence and call 'ask_user_choice' to offer actionable next steps (e.g. modify criteria, retry, or cancel).",
+  "• When the user intervenes during execution (via inline Steer or follow-up), immediately pivot your plan and honor their latest direction without arguing or restarting from scratch.",
 ].join("\n");
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
 export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
@@ -224,6 +242,17 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   const jobId = context?.jobId ?? extractJobIdFromHref(href);
   const todayStr = new Date().toISOString().split("T")[0];
 
+  const clientComps = context?.uiContext?.active_components;
+  const rawComps: ComponentSchema[] =
+    Array.isArray(clientComps) && clientComps.length > 0
+      ? (clientComps as ComponentSchema[])
+      : resolveActiveComponents(context);
+  const activeComps = filterRelevantComponents(rawComps, context);
+  const activeCompIds = activeComps.map((c) => c.id);
+
+  const effectiveJob = resolveEffectiveJobContext(context, activeComps);
+  const jobGrounding = formatJobEnginePromptGrounding(effectiveJob);
+
   const activeReport =
     REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
     (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
@@ -236,20 +265,11 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     activeReport
       ? `• Active Report Screen: "${activeReport.title}" (scope: "${activeReport.scope}", workspace: "${activeReport.workspace}")`
       : "",
-    jobId ? `• Active Job Id: ${jobId}` : "",
+    jobGrounding ?? (jobId ? `• Active Job Id: ${jobId}` : ""),
   );
 
   if (activeReport) {
-    lines.push(
-      "",
-      `ACTIVE REPORT CONTEXT RULE & DIRECT EXECUTION (${activeReport.title} — ${activeReport.scope}):`,
-      `• The user is currently on the "${activeReport.title}" report screen (scope: "${activeReport.scope}").`,
-      `• When the user asks about report executions, past runs, job counts, criteria, or results (e.g. 'kaç rapor çalışmış', 'çalışma geçmişini göster', 'önceki sonuçlar', 'raporu çalıştır', 'filtrele') without specifying a different report:`,
-      `  - NEVER ask which report they mean. They are ALREADY viewing this report screen.`,
-      `  - Directly assume the request refers to "${activeReport.title}" (scope: "${activeReport.scope}").`,
-      `  - To answer past runs / count questions, call dispatch_component_action with component_id="job_history" and action="LIST" (payload: { report: "${activeReport.scope}" }) and summarize the executions clearly in the user's language.`,
-      `• DIRECT EXECUTION MODE: The criteria form is active. Apply criteria via 'SET_FIELDS' and execute via 'SUBMIT' directly as requested by the user without introducing an unnecessary plan approval card first.`,
-    );
+    lines.push("", formatCriteriaPromptGrounding(activeReport));
   } else {
     lines.push(
       "",
@@ -260,8 +280,11 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       `  - Do NOT ask for plan approval or propose multi-step confirmation for simple direct navigation.`,
       `• PLAN-FIRST FOR MULTI-STEP & ACTION REQUESTS: If the user requests running a report, performing analysis, or executing operations from outside the screen:`,
       `  1. Do NOT call 'SUBMIT' or 'SET_FIELDS' directly on criteria_form, as no form is mounted on this page.`,
-      `  2. Formulate a structured, concise numbered plan under a 'Plan:' header with concrete steps (Target screen, filter parameters, and execution).`,
-      `  3. Invoke 'ask_user_choice' to offer interactive choice chips to the user (e.g. 'Planı Başlat ve İcra Et', 'Planı Düzenle', 'Vazgeç').`,
+      `  2. Formulate a structured, concise numbered plan under a 'Plan:' header with concrete steps:`,
+      `     - Target report screen (e.g. Perakende Satış Raporu)`,
+      `     - Resolved criteria (e.g. exact expanded date range '2026-09-14..2026-09-20', store 'T006')`,
+      `     - Decision rationale / missing parameter (e.g. Company code required or plan execution confirmation)`,
+      `  3. Invoke 'ask_user_choice' to offer interactive choice chips to the user (e.g. company code choices or plan approval).`,
       `  4. Never invent fictitious reports or codes; ground targets in registered catalog routes.`,
       `• PLAN CONFIRMATION & EXECUTION (When user approves or starts the plan, e.g. 'Planı Başlat ve İcra Et', 'start', 'başlat', 'planı uygula'):`,
       `  1. Do NOT re-formulate the plan or call 'ask_user_choice' again.`,
@@ -289,13 +312,6 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   }
 
   // 1. DİNAMİK BİLEŞEN SÖZLEŞMELERİ (@my-agent/core formatActiveComponentsPrompt)
-  const clientComps = context?.uiContext?.active_components;
-  const rawComps: ComponentSchema[] =
-    Array.isArray(clientComps) && clientComps.length > 0
-      ? (clientComps as ComponentSchema[])
-      : resolveActiveComponents(context);
-  const activeComps = filterRelevantComponents(rawComps, context);
-  const activeCompIds = activeComps.map((c) => c.id);
   const activeCompsPrompt = formatActiveComponentsPrompt(activeComps);
   if (activeCompsPrompt) {
     lines.push("", activeCompsPrompt);
@@ -312,28 +328,11 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     lines.push("", AGENT_PREPARE_CHAIN_RULES);
   }
 
-  // 3. Tablo açıkken canlı veri ve DuckDB şema grounding'i
-  if (phase === "results" && context?.grid) {
-    const isCustomActive = Boolean(context.grid.customQuerySql);
-    const viewModeNotice = isCustomActive
-      ? `VIEW MODE: CUSTOM QUERY / GROUPED VIEW ("${context.grid.customQueryTitle ?? "Custom Query"}").`
-      : `VIEW MODE: BASE TABLE VIEW (No grouping, all detail rows active).`;
+  // 3. Tablo açıkken canlı veri ve DuckDB şema grounding'i (Virtual Grid AI)
+  const effectiveGrid = resolveEffectiveGrid(context, activeComps);
 
-    const activeFiltersText =
-      Object.keys(context.grid.filters ?? {}).length > 0
-        ? `CURRENT ACTIVE FILTERS: ${JSON.stringify(context.grid.filters)}`
-        : "CURRENT ACTIVE FILTERS: None.";
-
-    const gridLines = [
-      viewModeNotice,
-      isCustomActive ? `ACTIVE CUSTOM QUERY SQL: ${context.grid.customQuerySql}` : null,
-      `Active table: ${context.grid.tableName} · ${context.grid.rowCount ?? "?"} rows.`,
-      `Active DuckDB View: "active_view" (Represents currently visible & filtered rows on screen).`,
-      `Columns: ${context.grid.columns.join(", ")}.`,
-      activeFiltersText,
-    ].filter(Boolean);
-
-    lines.push("", gridLines.join(" "));
+  if ((phase === "results" || effectiveGrid) && effectiveGrid) {
+    lines.push("", formatGridPromptGrounding(effectiveGrid));
   }
 
   // 4. Ring Buffer UI Olayları Telemetrisi

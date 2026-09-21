@@ -35,7 +35,7 @@ import {
   hasVisibleTurnContent,
   INTERACTIVE_CARD_TOOLS,
 } from "./yula-chat-turn-helpers";
-import { modelCatalog } from "@my-agent/core";
+import { modelCatalog, getMessageText, isTextPart, isReasoningPart } from "@my-agent/core";
 
 export interface YulaChatTurnProps {
   userMessage?: YulaMessage;
@@ -73,11 +73,7 @@ export function YulaChatTurn({
   // Kullanıcı mesajının metni
   const t = useTranslations("ChatTurn")
   const userText = React.useMemo(() => {
-    if (!userMessage) return "";
-    return userMessage.parts
-      .filter((p) => p.type === "text")
-      .map((p) => (p as { text: string }).text)
-      .join("\n");
+    return getMessageText(userMessage);
   }, [userMessage]);
 
   // Kullanıcı mesajındaki ekli dosyalar / görseller
@@ -95,11 +91,7 @@ export function YulaChatTurn({
 
   // Asistan mesajının metni
   const assistantText = React.useMemo(() => {
-    if (!assistantMessage) return "";
-    return assistantMessage.parts
-      .filter((p) => p.type === "text")
-      .map((p) => (p as { text: string }).text)
-      .join("\n");
+    return getMessageText(assistantMessage, { excludeRoles: ["plan_rationale"] });
   }, [assistantMessage]);
 
   const turnCostFormatted = React.useMemo(() => {
@@ -150,7 +142,7 @@ export function YulaChatTurn({
     });
     return hasSqlTool
       ? assistantMessage.parts.some(
-          (p) => p.type === "text" && p.text.includes("|")
+          (p) => isTextPart(p) && p.text.includes("|")
         )
       : false;
   }, [assistantMessage, toolParts]);
@@ -158,14 +150,14 @@ export function YulaChatTurn({
   const displayAssistantMessage: YulaMessage | undefined = React.useMemo(() => {
     if (!assistantMessage) return undefined;
     const cleanedParts = assistantMessage.parts.map((p) => {
-      if (p.type === "text") {
+      if (isTextPart(p)) {
         const raw = hasSqlCard
-          ? stripMarkdownTables((p as { text: string }).text)
-          : (p as { text: string }).text;
+          ? stripMarkdownTables(p.text)
+          : p.text;
         return { ...p, text: raw };
       }
-      if (p.type === "reasoning" && "text" in p) {
-        return { ...p, text: String((p as { text?: string }).text ?? "") };
+      if (isReasoningPart(p)) {
+        return { ...p, text: p.text };
       }
       return p;
     });
@@ -370,7 +362,14 @@ export function YulaChatTurn({
           .map((info) => {
             const isError = isFailedToolInfo(info);
             if (isError && recoveredToolCallIds.has(info.toolCallId)) return null;
-            if (info.toolName === "visualize_grid_data" && !isError && info.state === "output-available") {
+            const isChart =
+              (info.toolName === "visualize_grid_data" ||
+                (info.toolName === "dispatch_component_action" &&
+                  ((info.input as { action?: string } | undefined)?.action === "VISUALIZE" ||
+                   (info.input as { action?: string } | undefined)?.action === "CHART"))) &&
+              !isError &&
+              info.state === "output-available";
+            if (isChart) {
               return <YulaChartCard key={info.toolCallId} output={info.output} />;
             }
             const isJob =

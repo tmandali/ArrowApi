@@ -7,6 +7,7 @@ import {
   computeRecoveredToolCallIds,
 } from "./use-chat-turns";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { isTextPart } from "@my-agent/core";
 
 describe("use-chat-turns savunmacı yapı testleri", () => {
   it("parts alanı tanımsız (undefined) olan mesajlarda computeRecoveredToolCallIds çökmemelidir", () => {
@@ -125,9 +126,10 @@ describe("use-chat-turns savunmacı yapı testleri", () => {
     assert.ok(asstMsg);
 
     // Sadece terminal (m3) mesajının metni 'text' parçası olarak kalmalıdır
-    const textParts = asstMsg.parts?.filter((p) => p.type === "text") || [];
+    const textParts = asstMsg.parts?.filter(isTextPart) || [];
     assert.equal(textParts.length, 1);
-    assert.equal((textParts[0] as { text: string }).text, "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur.");
+    assert.equal(textParts[0].text, "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur.");
+    assert.equal(textParts[0].role, "final_synthesis");
 
     // Ara adımın (m2) metni ise akordiyonda kalması için 'reasoning' (intermediate_plan) yapılmış olmalıdır
     const intermediateReasoning = asstMsg.parts?.find(

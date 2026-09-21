@@ -127,15 +127,20 @@ export async function runExpertSql(
     };
   }
 
-  const rawSql = typeof input.sql === "string" ? input.sql : "";
+  const rawSql =
+    typeof input.query === "string" && input.query.trim().length > 0
+      ? input.query
+      : typeof input.sql === "string"
+        ? input.sql
+        : "";
   const guard = guardReadOnlySelect(rawSql);
   if (!guard.ok) {
     return { status: "error", error: guard.error, hint: guard.hint };
   }
 
   try {
-    const { duckDbClient } = await import("@/services/duckdb");
-    const rows = await duckDbClient.executeCustomSql(guard.sql);
+    const { wasmSqlClient } = await import("@/services/wasmsql");
+    const rows = await wasmSqlClient.executeCustomSql(guard.sql);
     const MAX_OUTPUT_ROWS = 10;
     return {
       status: "ok",
@@ -172,7 +177,13 @@ export async function setGridQuery(
     };
   }
 
-  const hasSql = typeof input.sql === "string" && input.sql.trim().length > 0;
+  const rawSqlCandidate =
+    typeof input.query === "string" && input.query.trim().length > 0
+      ? input.query
+      : typeof input.sql === "string"
+        ? input.sql
+        : "";
+  const hasSql = rawSqlCandidate.trim().length > 0;
 
   if (!hasSql) {
     if (input.reset === true) {
@@ -190,7 +201,10 @@ export async function setGridQuery(
     };
   }
 
-  const cleanedSql = (input.sql as string).replace(/\s+LIMIT\s+\d+\s*$/i, "").trim();
+  // Otomatik guard limiti olan LIMIT 200/500/1000'i temizle; ancak modelin/kullanıcının açıkça belirttiği Top-N (örn: LIMIT 5, LIMIT 10) limitlerini koru
+  const cleanedSql = rawSqlCandidate
+    .replace(/\s+LIMIT\s+(?:200|500|1000)\s*$/i, "")
+    .trim();
   const guard = guardReadOnlySelect(cleanedSql, 0);
   if (!guard.ok) {
     return { status: "error", error: guard.error, hint: guard.hint };
@@ -208,9 +222,9 @@ export async function setGridQuery(
   }
 
   try {
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     const resolvedSql = resolveActiveViewReferences(guard.sql, spec.tableName);
-    const rows = await duckDbClient.executeCustomSql(resolvedSql);
+    const rows = await wasmSqlClient.executeCustomSql(resolvedSql);
     const first = rows[0] as Record<string, unknown> | undefined;
     const columns = first ? Object.keys(first) : [];
     const title = typeof input.title === "string" && input.title.trim()

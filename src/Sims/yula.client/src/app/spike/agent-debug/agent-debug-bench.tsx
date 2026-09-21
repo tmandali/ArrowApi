@@ -13,7 +13,7 @@ import {
   lintAgentInstructions,
 } from "@/lib/yula-user-agent";
 import { getRailWorkspaces } from "@/lib/workspace-registry";
-import type { RagVectorItem } from "@/services/duckdb-vector";
+import type { RagVectorItem } from "@/services/wasmsql-vector";
 
 /**
  * Spike: custom agent (persona) + workspace RAG teşhisi.
@@ -163,7 +163,7 @@ export function AgentDebugBench() {
     try {
       // Chat ile birebir aynı yol (tier-çeşitli seçim dahil).
       const { searchChatRagContext } = await import(
-        "@/services/duckdb-vector"
+        "@/services/wasmsql-vector"
       );
       const t0 = performance.now();
       const items = await searchChatRagContext(q, 3, {
@@ -184,7 +184,7 @@ export function AgentDebugBench() {
     try {
       const [{ purgeOrphanConversationVectors }, { useChatsStore }] =
         await Promise.all([
-          import("@/services/duckdb-vector"),
+          import("@/services/wasmsql-vector"),
           import("@/lib/stores/chats"),
         ]);
       const existing = useChatsStore.getState().conversations.map((c) => c.id);

@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSystemPrompt } from "./yula-agent-prompt.ts";
+import { buildSystemPrompt, isResultGridMeta, resolveEffectiveGrid } from "./yula-agent-prompt.ts";
 
 const testAgent = {
   name: "Satış Danışmanı",
@@ -308,6 +308,144 @@ describe("buildSystemPrompt agent katmanı", () => {
       prompt.includes("Available Enterprise Modules"),
       "Sistem modül envanteri yer almalı",
     );
+  });
+
+  it("context.grid olmadan uiContext.active_components meta bilgisinden grid şema grounding türetilir", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/stock/retail-sales-report",
+      phase: "results",
+      uiContext: {
+        route: "/stock/retail-sales-report",
+        active_components: [
+          {
+            id: "result_grid:active",
+            meta: {
+              tableName: "report_c07ec130_7f37_41e1_b196_e666ecd33293",
+              columns: ["Depo", "Satis ID", "Miktar", "Tutar"],
+              rowCount: 450398,
+            },
+            capabilities: ["RUN_SQL", "FILTER"],
+          },
+        ] as any,
+      },
+    });
+
+    assert.ok(
+      prompt.includes("Active table: report_c07ec130_7f37_41e1_b196_e666ecd33293 · 450398 rows."),
+      "Tablo adı ve satır sayısı promptta yer almalı",
+    );
+    assert.ok(
+      prompt.includes("Columns: Depo, Satis ID, Miktar, Tutar."),
+      "Kolon listesi promptta yer almalı",
+    );
+    assert.ok(
+      prompt.includes('Active DuckDB View: "active_view"'),
+      "active_view referansı promptta yer almalı",
+    );
+  });
+});
+
+describe("isResultGridMeta & resolveEffectiveGrid type guards", () => {
+  it("validates correct result grid metadata structure", () => {
+    assert.equal(
+      isResultGridMeta({
+        tableName: "report_123",
+        columns: ["Depo", "Tutar"],
+        rowCount: 100,
+      }),
+      true
+    );
+
+    assert.equal(isResultGridMeta(null), false);
+    assert.equal(isResultGridMeta(undefined), false);
+    assert.equal(isResultGridMeta({ tableName: "", columns: ["Depo"] }), false);
+    assert.equal(isResultGridMeta({ tableName: "report_123", columns: [] }), false);
+    assert.equal(isResultGridMeta({ tableName: "report_123", columns: [123] }), false);
+  });
+
+  it("resolves effective grid prioritizing explicit context.grid", () => {
+    const explicitGrid = { tableName: "explicit_table", columns: ["ColA"] };
+    const res = resolveEffectiveGrid({ grid: explicitGrid }, [
+      {
+        id: "result_grid:active",
+        meta: { tableName: "mounted_table", columns: ["ColB"] },
+      } as any,
+    ]);
+    assert.equal(res?.tableName, "explicit_table");
+  });
+
+  it("extracts and normalizes grid metadata from mounted result_grid:active component", () => {
+    const res = resolveEffectiveGrid(undefined, [
+      {
+        id: "result_grid:active",
+        meta: {
+          tableName: "report_c07ec130",
+          baseTable: "report_c07ec130",
+          isBaseTable: false,
+          activeAiViewId: "view_stores",
+          customQueryTitle: "Mağaza Satışları",
+          savedViews: [{ id: "view_stores", title: "Mağaza Satışları", sql: "SELECT Mağaza..." }],
+          columns: ["Depo", "Tutar"],
+          rowCount: 450,
+          filters: { Depo: "T006", Status: 1 },
+          customQuerySql: "SELECT Depo FROM active_view",
+        },
+      } as any,
+    ]);
+
+    assert.equal(res?.tableName, "report_c07ec130");
+    assert.equal(res?.baseTable, "report_c07ec130");
+    assert.equal(res?.isBaseTable, false);
+    assert.equal(res?.activeAiViewId, "view_stores");
+    assert.equal(res?.customQueryTitle, "Mağaza Satışları");
+    assert.equal(res?.savedViews?.length, 1);
+    assert.deepEqual(res?.columns, ["Depo", "Tutar"]);
+    assert.equal(res?.rowCount, 450);
+    assert.deepEqual(res?.filters, { Depo: "T006", Status: "1" });
+    assert.equal(res?.customQuerySql, "SELECT Depo FROM active_view");
+    assert.equal(res?.activeViewName, "active_view");
+  });
+
+  it("buildSystemPrompt explicitly grounds base table and active saved query distinction", () => {
+    const prompt = buildSystemPrompt({
+      pathname: "/stock/retail-sales-report",
+      phase: "results",
+      grid: {
+        tableName: "report_raw_table_guid",
+        baseTable: "report_raw_table_guid",
+        isBaseTable: false,
+        activeAiViewId: "view_top_5",
+        customQueryTitle: "En Çok Satan 5 Depo",
+        customQuerySql: 'SELECT "Depo", SUM("Miktar") FROM "report_raw_table_guid" GROUP BY "Depo"',
+        columns: ["Depo", "Toplam Miktar"],
+        rowCount: 5,
+        savedViews: [
+          { id: "view_top_5", title: "En Çok Satan 5 Depo", sql: 'SELECT "Depo"...' },
+          { id: "view_all", title: "Tüm Depolar", sql: 'SELECT * FROM...' },
+        ],
+      },
+    });
+
+    assert.ok(
+      prompt.includes('VIEW MODE: SAVED QUERY [ID: "view_top_5"] ("En Çok Satan 5 Depo")'),
+      "Seçili kayıtlı sorgu ID ve başlık promptta yer almalı",
+    );
+    assert.ok(
+      prompt.includes('• Base Physical Table: "report_raw_table_guid" (Stores all raw detail records).'),
+      "Fiziksel ham veri tablosu açıkça belirtilmeli",
+    );
+    assert.ok(
+      prompt.includes('AVAILABLE SAVED VIEWS: ["En Çok Satan 5 Depo" (ID: view_top_5), "Tüm Depolar" (ID: view_all)].'),
+      "Mevcut kayıtlı sorgular listesi promptta yer almalı",
+    );
+  });
+
+  it("returns undefined if no matching result_grid component is mounted", () => {
+    const res = resolveEffectiveGrid(undefined, [
+      { id: "app_router", meta: {} } as any,
+      { id: "job_history", meta: {} } as any,
+    ]);
+    assert.equal(res, undefined);
   });
 });
 

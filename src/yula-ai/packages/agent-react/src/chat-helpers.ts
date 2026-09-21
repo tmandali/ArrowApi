@@ -56,10 +56,6 @@ export async function executeAgentToolCall(
             : (res.details ?? res.message))
         : res.error;
       isError = !res.success;
-    } else if (toolName === 'time_travel') {
-      const res = await (agentUiTools.time_travel as any).execute(args);
-      result = res.success ? res.message : res.error;
-      isError = !res.success;
     } else if (toolName in agentUiTools) {
       const toolDef = (agentUiTools as Record<string, any>)[toolName];
       const res = await toolDef.execute(args);

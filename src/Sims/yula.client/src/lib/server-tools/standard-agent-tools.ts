@@ -16,12 +16,13 @@ export const STANDARD_AGENT_TOOLS = {
       "- Filter column: component_id='result_grid:active', action='FILTER', payload={ field: 'Category', value: 'Elektronik', op: 'eq' }.",
       "- Sort column: component_id='result_grid:active', action='SORT', payload={ column: 'Amount', direction: 'desc' }.",
       "- Export grid: component_id='result_grid:active', action='EXPORT', payload={ format: 'xlsx' }.",
+      "- Visualize chart: component_id='result_grid:active', action='VISUALIZE', payload={ type: 'bar', dimension: 'Store', metric: 'Amount', limit: 5, orderMode: 'value_desc', title: 'Top 5 Stores' }.",
       "- Navigate: component_id='app_router', action='NAVIGATE', payload={ path: '/retail/sales' }.",
       "- Open last report: component_id='job_history', action='OPEN_LAST', payload={}.",
     ].join(" "),
     inputSchema: z.object({
       component_id: z.string().describe("Target component identifier (e.g. 'criteria_form:retail-sales', 'result_grid:active', 'app_router', 'job_history')"),
-      action: z.string().describe("Canonical action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'RUN_SQL', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
+      action: z.string().describe("Canonical action to perform (e.g. 'SET_FIELDS', 'SUBMIT', 'RUN_SQL', 'VISUALIZE', 'FILTER', 'SORT', 'EXPORT', 'NAVIGATE')"),
       payload: z.record(z.string(), z.any()).optional().default({}).describe("Action parameters and payload data"),
     }),
     outputSchema: z.object({
@@ -102,18 +103,6 @@ export const STANDARD_AGENT_TOOLS = {
       value: z.string().optional(),
       custom: z.string().optional(),
       cancelled: z.boolean().optional(),
-    }),
-  }),
-
-  time_travel: tool({
-    description: "Undo or redo the page and criteria state in time.",
-    inputSchema: z.object({
-      action: z.enum(["undo", "redo"]).describe("Direction of time travel: undo or redo"),
-    }),
-    outputSchema: z.object({
-      success: z.boolean().optional(),
-      action: z.string().optional(),
-      message: z.string().optional(),
     }),
   }),
 

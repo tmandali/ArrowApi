@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useYulaGridStore } from "@/lib/stores/grid";
-import type { AiSqlView } from "../virtual-spreadsheet";
+import type { AiSqlView } from "@/components/virtual-spreadsheet";
 import {
   subscribeAiView,
   takePendingAiView,

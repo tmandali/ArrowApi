@@ -115,24 +115,6 @@ export function createStandardAgentTools(): AgentTool[] {
     },
 
     {
-      name: 'time_travel',
-      description: 'Undo or redo the page and criteria state in time.',
-      execute: async (_toolCallId, args: any): Promise<AgentToolResult> => {
-        const action = args?.action;
-        let success = false;
-        if (action === 'undo') {
-          success = Boolean(sessionManager.undo());
-        } else if (action === 'redo') {
-          success = Boolean(sessionManager.redo());
-        }
-        return {
-          content: [{ type: 'text', text: success ? `Time travel ${action} succeeded.` : `Cannot ${action} further.` }],
-          details: { action, success },
-        };
-      },
-    },
-
-    {
       name: 'remember_fact',
       description: 'Save a user preference, fact, or custom rule into memory.',
       execute: async (_toolCallId, args: any): Promise<AgentToolResult> => {

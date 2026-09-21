@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import type { SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 
 /**
  * Airtable benzeri kolon görsel kuralları (hücre bar'ı, renk çipleri,

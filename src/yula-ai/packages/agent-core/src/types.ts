@@ -1,4 +1,5 @@
 import type { ZodTypeAny, z } from 'zod';
+import type { AgentStepFrame, AgentTurnStateStatus } from './step-frame-types';
 
 export interface StorageAdapter {
   getItem: (key: string) => string | null;
@@ -367,7 +368,11 @@ export type AgentEvent =
   | { type: 'user_choice_prompt'; question: string; options: any[]; allow_custom?: boolean; timestamp?: number }
   | { type: 'compaction_start'; reason: 'threshold' | 'overflow' | 'manual'; tokensBefore: number; timestamp?: number }
   | { type: 'compaction_end'; reason: 'threshold' | 'overflow' | 'manual'; tokensBefore: number; tokensAfter: number; summary: string; timestamp?: number }
-  | { type: 'tool_loadout_updated'; added: string[]; removed: string[]; timestamp?: number };
+  | { type: 'tool_loadout_updated'; added: string[]; removed: string[]; timestamp?: number }
+  // Pi Causal Step Frame & Turn State Machine events
+  | { type: 'step_frame_start'; stepIndex: number; stepId: string; parentStepId?: string; timestamp?: number }
+  | { type: 'step_frame_end'; frame: AgentStepFrame; timestamp?: number }
+  | { type: 'state_transition'; from: AgentTurnStateStatus; to: AgentTurnStateStatus; reason?: string; stepIndex?: number; timestamp?: number };
 
 /** 1. beforeToolCall & afterToolCall Hook Types (Pi) */
 export interface BeforeToolCallContext {

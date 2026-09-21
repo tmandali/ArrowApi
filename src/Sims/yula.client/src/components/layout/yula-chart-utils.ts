@@ -45,17 +45,46 @@ export interface ParsedChart {
 }
 
 export function parseChartOutput(output: unknown): ParsedChart | null {
-  const o =
+  let o =
     typeof output === "object" && output !== null
       ? (output as Record<string, unknown>)
       : null;
-  if (!o || o.status !== "ok") return null;
+  if (!o && typeof output === "string") {
+    const trimmed = output.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        o = JSON.parse(trimmed);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (!o) return null;
+  if (
+    o.details &&
+    typeof o.details === "object" &&
+    (o.details as Record<string, unknown>).status === "ok"
+  ) {
+    o = o.details as Record<string, unknown>;
+  } else if (o.status !== "ok" && Array.isArray(o.content) && o.content[0]?.text) {
+    try {
+      const parsedText = JSON.parse(o.content[0].text);
+      if (parsedText && typeof parsedText === "object" && parsedText.status === "ok") {
+        o = parsedText;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (!o || typeof o !== "object") return null;
+  if (o.status !== "ok") return null;
   const chart =
     typeof o.chart === "object" && o.chart !== null
       ? (o.chart as Record<string, unknown>)
       : null;
   if (!chart || !Array.isArray(o.rows) || o.rows.length === 0) return null;
-  const chartType = chart.chartType;
+  let chartType = chart.chartType;
+  if (chartType === "area") chartType = "line";
   if (
     typeof chartType !== "string" ||
     !["bar", "line", "pie"].includes(chartType)

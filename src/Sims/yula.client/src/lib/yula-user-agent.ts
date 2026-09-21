@@ -232,7 +232,6 @@ export const AGENT_TOOL_CATALOG: Array<{ name: string; label: string }> = [
   { name: "dispatch_component_action", label: "Bileşen ve sayfa aksiyonları (Form/Rapor/Grid/Navigasyon)" },
   { name: "inspect_ui_state", label: "Arayüz ve şema durumunu okuma" },
   { name: "ask_user_choice", label: "İnteraktif seçenek ve onay sunma" },
-  { name: "time_travel", label: "Zaman yolculuğu (Geri/İleri alma)" },
   { name: "remember_fact", label: "Oturum hafızasına kaydetme" },
   { name: "recall_fact", label: "Oturum hafızasından hatırlama" },
   { name: GRID_TOOLS_TOKEN, label: "Grid araçları (tablo/SQL/grafik)" },

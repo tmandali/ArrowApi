@@ -8,6 +8,7 @@ import { useYulaChat } from "@/hooks/use-yula-chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { isTextPart, getMessageText } from "@my-agent/core";
 
 export interface UserChoiceOption {
   label: string;
@@ -46,9 +47,7 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
 
   // Eğer hâlâ soru bulunamadıysa content text parsing ([User Decision Required]: ...)
   if (!question && Array.isArray(outObj.content)) {
-    const textPart = outObj.content.find(
-      (c: any) => c && typeof c === "object" && c.type === "text" && typeof c.text === "string"
-    ) as { text: string } | undefined;
+    const textPart = outObj.content.find(isTextPart);
     if (textPart?.text) {
       const match = textPart.text.match(/\[User Decision Required\]:\s*(.*?)(?:\nOptions:|$)/s);
       if (match && match[1]) {
@@ -66,9 +65,7 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
   } else if (Array.isArray(outObj.options) && outObj.options.length > 0) {
     rawOptions = outObj.options;
   } else if (Array.isArray(outObj.content)) {
-    const textPart = outObj.content.find(
-      (c: any) => c && typeof c === "object" && c.type === "text" && typeof c.text === "string"
-    ) as { text: string } | undefined;
+    const textPart = outObj.content.find(isTextPart);
     if (textPart?.text) {
       const optMatch = textPart.text.match(/Options:\s*(\[.*?\])/s);
       if (optMatch && optMatch[1]) {
@@ -171,12 +168,7 @@ export function YulaChoiceCard({
     const idx = yula.messages.findIndex((m) => m.id === messageId);
     if (idx < 0) return "";
     const nextUser = yula.messages.slice(idx + 1).find((m) => m.role === "user");
-    if (!nextUser?.parts) return "";
-    const text = nextUser.parts
-      .filter((p) => p.type === "text")
-      .map((p) => (p as { text?: string }).text ?? "")
-      .join("\n")
-      .trim();
+    const text = getMessageText(nextUser);
     return text.length > 80 ? `${text.slice(0, 80)}…` : text;
   }, [yula.messages, messageId]);
 

@@ -74,7 +74,9 @@ export function inferChartOrderMode(
   explicit: string | undefined | null,
   hints: { title?: string; description?: string; takeaway?: string } = {},
 ): ChartOrderMode {
-  const raw = String(explicit ?? "").trim().toLowerCase();
+  let raw = String(explicit ?? "").trim().toLowerCase();
+  if (raw === "desc") raw = "value_desc";
+  if (raw === "asc") raw = "value_asc";
   if (
     raw === "value_asc" ||
     raw === "label_asc" ||

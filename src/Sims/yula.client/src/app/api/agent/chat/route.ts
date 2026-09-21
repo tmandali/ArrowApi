@@ -14,10 +14,12 @@ import {
 } from "ai";
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
+import { isResultGridComponent } from "@/lib/yula-tool-info";
 import { serverPlaybookService } from "@/lib/playbook-server";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
 import { prepareStepRouting } from "@/lib/yula-step-router";
 import { createFailoverLanguageModel } from "@/lib/yula-provider-failover";
+import { createRunRecorder } from "@/server/db/agent-telemetry-service";
 import { slimMessagesForTransport, normalizeUIMessagesForTransport } from "@/lib/context-slim";
 import {
   getYulaLanguageModel,
@@ -52,6 +54,13 @@ export type YulaMessageMetadata = {
     rulesCount: number;
     rules: string[];
     recipesCount?: number;
+  };
+  inspection?: {
+    route: string;
+    phase: string;
+    activeReportScope?: string;
+    hasMountedForm: boolean;
+    today: string;
   };
 };
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
@@ -254,9 +263,7 @@ export async function POST(req: Request) {
     const effectivePathname = context?.pathname || uiContext?.route || "/";
     const effectivePhase =
       context?.phase ??
-      (uiContext?.active_components?.some((c: any) => c.id === "result_grid:active" || c.id.startsWith("result_grid"))
-        ? "results"
-        : "workspace");
+      (uiContext?.active_components?.some(isResultGridComponent) ? "results" : "workspace");
     const phase = effectivePhase;
 
     // Standart Headless React UI-Agent (@my-agent/core) araç seti
@@ -363,6 +370,13 @@ export async function POST(req: Request) {
     );
 
     const activeToolNames = hasImageInMessages ? [] : toolNames;
+    const conversationId =
+      (body as Record<string, unknown>)?.conversationId ||
+      (body as Record<string, unknown>)?.id ||
+      (context as Record<string, unknown>)?.conversationId ||
+      "conv_default";
+    const runId = `${String(conversationId)}:${Date.now()}`;
+    const runRecorder = createRunRecorder(runId, String(conversationId));
 
     const result = streamText({
       model: wrapLanguageModel({
@@ -400,6 +414,13 @@ export async function POST(req: Request) {
           messages: result.compactedMessages,
         };
       },
+      onStepFinish: async (step) => {
+        try {
+          await runRecorder.onStepFinish(step as any);
+        } catch (err) {
+          console.warn("[Yula onStepFinish warning]:", err);
+        }
+      },
       onError({ error }) {
         console.error("🤖 [Yula AI Engine Error Details]:", error);
       },
@@ -414,6 +435,7 @@ export async function POST(req: Request) {
         const pTokens = u.promptTokens ?? u.inputTokens ?? 0;
         const cTokens = u.completionTokens ?? u.outputTokens ?? 0;
         const tTokens = u.totalTokens ?? pTokens + cTokens;
+        void runRecorder.onFinish({ finishReason, totalTokens: tTokens });
         console.info(
           `🤖 [Yula AI Telemetry]: Prompt Tokens: ${pTokens} · Completion Tokens: ${cTokens} · Total: ${tTokens} (Reason: ${finishReason})`
         );
@@ -432,6 +454,14 @@ export async function POST(req: Request) {
       rules: playbookRules ?? [],
     };
 
+    const inspectionInfo: YulaMessageMetadata["inspection"] = {
+      route: effectivePathname,
+      phase,
+      activeReportScope: context?.screen?.reportScope,
+      hasMountedForm: phase === "workspace" && Boolean(context?.screen?.reportScope),
+      today: new Date().toISOString().split("T")[0],
+    };
+
     const uiStream = toUIMessageStream<typeof tools, YulaMessage>({
       stream: result.stream,
       onError(error) {
@@ -443,6 +473,7 @@ export async function POST(req: Request) {
           return {
             usage: part.usage,
             wiki: wikiInfo,
+            inspection: inspectionInfo,
           };
         }
       },

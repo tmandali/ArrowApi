@@ -158,7 +158,12 @@ describe("system-contracts", () => {
       const sqlIn = GRID_RUN_SQL_CONTRACT.inputSchema.parse({
         query: "SELECT Depo, SUM(Tutar) FROM active_view GROUP BY 1",
       });
-      assert.ok(sqlIn.query.includes("SELECT"));
+      assert.ok(sqlIn.query?.includes("SELECT"));
+
+      const sqlAliasIn = GRID_RUN_SQL_CONTRACT.inputSchema.parse({
+        sql: "SELECT * FROM active_view LIMIT 5",
+      });
+      assert.ok(sqlAliasIn.sql?.includes("SELECT"));
 
       const sqlOut = GRID_RUN_SQL_CONTRACT.outputSchema.parse({
         rows: [{ Depo: "D01", Tutar: 100 }],
@@ -170,6 +175,11 @@ describe("system-contracts", () => {
         query: "SELECT * FROM active_view",
       });
       assert.equal(queryIn.query, "SELECT * FROM active_view");
+
+      const queryResetIn = GRID_QUERY_CONTRACT.inputSchema.parse({
+        reset: true,
+      });
+      assert.equal(queryResetIn.reset, true);
     });
 
     it("GRID_FILTER_CONTRACT & GRID_APPLY_FILTERS_CONTRACT validate filter operations", () => {
@@ -241,6 +251,40 @@ describe("system-contracts", () => {
       });
       assert.equal(visIn.type, "bar");
       assert.equal(visIn.dimension, "Depo");
+
+      const visInAliases = GRID_VISUALIZE_CONTRACT.inputSchema.parse({
+        chartType: "line",
+        dimensionX: "Mağaza",
+        dimensionY: "Satış Tutarı",
+        limit: 5,
+        extraFlag: true,
+      });
+      assert.equal(visInAliases.chartType, "line");
+      assert.equal(visInAliases.dimensionX, "Mağaza");
+      assert.equal(visInAliases.dimensionY, "Satış Tutarı");
+      assert.equal(visInAliases.limit, 5);
+      assert.equal((visInAliases as any).extraFlag, true);
+    });
+
+    it("records TABLE_LOADED event on uiEventBus under data topic", async () => {
+      const { uiEventBus } = await import("@my-agent/core");
+      uiEventBus.recordTelemetry({
+        source: "result_grid",
+        type: "TABLE_LOADED",
+        payload: {
+          tableName: "report_12345",
+          activeView: "active_view",
+          columns: ["Depo", "Tutar"],
+          rowCount: 50,
+        },
+      });
+
+      const events = uiEventBus.getRecentEvents({ topic: "data", type: "TABLE_LOADED" });
+      assert.ok(events.length > 0);
+      const last = events[events.length - 1];
+      assert.equal(last.source, "result_grid");
+      assert.equal(last.topic, "data");
+      assert.deepEqual(last.payload.columns, ["Depo", "Tutar"]);
     });
   });
 });

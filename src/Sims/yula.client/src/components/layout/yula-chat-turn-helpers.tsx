@@ -218,7 +218,12 @@ export function hasVisibleTurnCard(toolParts: YulaToolPartInfo[]): boolean {
     ) {
       return true;
     }
-    if (info.toolName === "visualize_grid_data" && info.state === "output-available") {
+    const isChart =
+      info.toolName === "visualize_grid_data" ||
+      (info.toolName === "dispatch_component_action" &&
+        ((info.input as { action?: string } | undefined)?.action === "VISUALIZE" ||
+         (info.input as { action?: string } | undefined)?.action === "CHART"));
+    if (isChart && info.state === "output-available") {
       return true;
     }
     if (

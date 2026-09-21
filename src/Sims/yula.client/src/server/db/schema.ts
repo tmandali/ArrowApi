@@ -168,3 +168,59 @@ export const smsCodesSchema = pgTable("sms_codes", {
 });
 
 export type SmsCodeRow = typeof smsCodesSchema.$inferSelect;
+
+/**
+ * `agent_runs` — LLM turn / run summary for session persistence & triage.
+ */
+export const agentRunsSchema = pgTable(
+  "agent_runs",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id").notNull(),
+    status: text("status").notNull().default("in_progress"),
+    totalSteps: integer("total_steps").default(0),
+    totalDurationMs: integer("total_duration_ms").default(0),
+    totalTokens: integer("total_tokens").default(0),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("agent_runs_conversation_key").on(table.conversationId),
+  ],
+);
+
+export type AgentRunRow = typeof agentRunsSchema.$inferSelect;
+
+/**
+ * `agent_steps` — Individual ReAct Step Frames in the Causal Decision Tree.
+ * Each row connects to `parent_step_id` to form an inspectable DAG.
+ */
+export const agentStepsSchema = pgTable(
+  "agent_steps",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull().references(() => agentRunsSchema.id),
+    conversationId: text("conversation_id").notNull(),
+    stepIndex: integer("step_index").notNull(),
+    parentStepId: text("parent_step_id"),
+    status: text("status").notNull().default("running"),
+    thought: text("thought"),
+    toolName: text("tool_name"),
+    toolInput: jsonb("tool_input"),
+    toolOutput: jsonb("tool_output"),
+    errorMessage: text("error_message"),
+    transitionReason: text("transition_reason"),
+    durationMs: integer("duration_ms").default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("agent_steps_run_key").on(table.runId),
+    index("agent_steps_conversation_key").on(table.conversationId),
+    index("agent_steps_parent_key").on(table.parentStepId),
+  ],
+);
+
+export type AgentStepRow = typeof agentStepsSchema.$inferSelect;

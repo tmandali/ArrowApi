@@ -26,58 +26,87 @@ export async function visualizeGrid(
     };
   }
 
-  const chartType = String(input.chartType ?? "bar");
-  if (!["bar", "line", "pie"].includes(chartType)) {
-    return {
-      status: "error",
-      error: `Invalid chart type: ${chartType}`,
-      hint: "chartType must be bar | line | pie.",
-    };
-  }
+  let rawChartType = String(input.chartType ?? input.type ?? "bar").toLowerCase();
+  if (rawChartType === "area") rawChartType = "line";
+  const chartType = ["bar", "line", "pie"].includes(rawChartType)
+    ? rawChartType
+    : "bar";
 
-  const labelKey = String(input.dimensionX ?? input.labelKey ?? "").trim();
+  const labelKey = String(
+    input.dimensionX ?? input.dimension ?? input.labelKey ?? "",
+  ).trim();
+  const rawMetrics = input.dimensionY ?? input.metric ?? input.valueKeys;
   const valueKeys = (
-    Array.isArray(input.dimensionY)
-      ? input.dimensionY
-      : typeof input.dimensionY === "string"
-        ? [input.dimensionY]
-        : Array.isArray(input.valueKeys)
-          ? input.valueKeys
-          : []
-  ).map(String);
+    Array.isArray(rawMetrics)
+      ? rawMetrics
+      : typeof rawMetrics === "string"
+        ? [rawMetrics]
+        : []
+  )
+    .map(String)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const aggregation = (["sum", "avg", "min", "max", "count"] as const).includes(
     input.aggregation as "sum",
   )
     ? (input.aggregation as "sum" | "avg" | "min" | "max" | "count")
     : "sum";
 
-  if (!labelKey || !ds.columns.includes(labelKey)) {
+  let activeColumns = ds.columns;
+  let activeNumeric = ds.numeric;
+  let activeFrom = ds.from;
+
+  // Özel görünüm aktifse ancak istenen kolonlar yalnız temel tabloda varsa, temel tabloya geç
+  if (
+    ds.isCustom &&
+    ds.baseColumns &&
+    (!activeColumns.includes(labelKey) || valueKeys.some((k) => !activeColumns.includes(k))) &&
+    ds.baseColumns.includes(labelKey)
+  ) {
+    activeFrom = sqlSafeId(ds.tableName);
+    activeColumns = ds.baseColumns;
+    try {
+      const { wasmSqlClient } = await import("@/services/wasmsql");
+      const described = await wasmSqlClient.describeTable(ds.tableName);
+      activeNumeric = new Set(described.filter((c) => c.isNumeric).map((c) => c.name));
+    } catch {
+      activeNumeric = new Set(
+        ds.baseColumns.filter((c) =>
+          /qty|total|sum|avg|count|amount|price|balance|miktar|tutar|bakiye/i.test(c),
+        ),
+      );
+    }
+  }
+
+  if (!labelKey || !activeColumns.includes(labelKey)) {
     return {
       status: "error",
-      error: `Invalid category column: ${labelKey}`,
-      availableColumns: ds.columns,
-      hint: "dimensionX must be a text column from availableColumns.",
+      error: labelKey
+        ? `Invalid category column: ${labelKey}`
+        : "Category column (dimension / dimensionX) cannot be empty.",
+      availableColumns: activeColumns,
+      hint: "dimension (or dimensionX) must be a text column from availableColumns.",
     };
   }
 
-  const invalid = valueKeys.filter((k) => !ds.columns.includes(k));
+  const invalid = valueKeys.filter((k) => !activeColumns.includes(k));
   if (aggregation !== "count" && (valueKeys.length === 0 || invalid.length > 0)) {
     return {
       status: "error",
       error:
         invalid.length > 0
           ? `Invalid metric column(s): ${invalid.join(", ")}`
-          : "dimensionY cannot be empty.",
-      numericColumns: [...ds.numeric],
-      hint: "dimensionY must be numeric column(s) from numericColumns.",
+          : "metric (or dimensionY) cannot be empty.",
+      numericColumns: [...activeNumeric],
+      hint: "metric (or dimensionY) must be numeric column(s) from numericColumns.",
     };
   }
-  const nonNumeric = valueKeys.filter((k) => !ds.numeric.has(k));
+  const nonNumeric = valueKeys.filter((k) => !activeNumeric.has(k));
   if (nonNumeric.length > 0) {
     return {
       status: "error",
       error: `Non-numeric metric column(s): ${nonNumeric.join(", ")}`,
-      numericColumns: [...ds.numeric],
+      numericColumns: [...activeNumeric],
       hint: "Retry calling this tool with columns from numericColumns.",
     };
   }
@@ -110,7 +139,7 @@ export async function visualizeGrid(
     }
   }
 
-  let fromExpr = ds.from;
+  let fromExpr = activeFrom;
   const viewName = useYulaGridStore.getState().spec?.activeViewName?.trim();
   if (viewName && !ds.isCustom) {
     fromExpr = sqlSafeId(viewName);
@@ -130,10 +159,10 @@ export async function visualizeGrid(
   }
 
   try {
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     let rows: Record<string, unknown>[];
     try {
-      rows = await duckDbClient.executeCustomSql(sql);
+      rows = await wasmSqlClient.executeCustomSql(sql);
     } catch (viewErr) {
       if (fromExpr !== ds.from) {
         const fallbackSql = buildChartQuery({
@@ -146,19 +175,43 @@ export async function visualizeGrid(
           appearanceOrderBy,
         });
         if (!fallbackSql) throw viewErr;
-        rows = await duckDbClient.executeCustomSql(fallbackSql);
+        rows = await wasmSqlClient.executeCustomSql(fallbackSql);
       } else {
         throw viewErr;
       }
     }
     if (rows.length === 0) {
-      return {
-        status: "error",
-        error: "Query returned empty results; try different columns.",
-      };
+      if (
+        ds.isCustom &&
+        fromExpr !== sqlSafeId(ds.tableName) &&
+        ds.baseColumns?.includes(labelKey)
+      ) {
+        const baseSql = buildChartQuery({
+          fromExpr: sqlSafeId(ds.tableName),
+          labelKey,
+          valueKeys: aggregation === "count" ? [] : valueKeys,
+          aggregation,
+          limit: typeof input.limit === "number" ? input.limit : undefined,
+          orderMode,
+          appearanceOrderBy,
+        });
+        if (baseSql) {
+          const baseRows = await wasmSqlClient.executeCustomSql(baseSql);
+          if (baseRows.length > 0) {
+            rows = baseRows;
+          }
+        }
+      }
+      if (rows.length === 0) {
+        return {
+          status: "error",
+          error: "Query returned empty results; try different columns.",
+        };
+      }
     }
     return {
       status: "ok",
+      success: true,
       sql,
       chart: {
         chartType,

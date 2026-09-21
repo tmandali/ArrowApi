@@ -657,7 +657,7 @@
           "change": "99.98% uptime",
           "subtext": "All services running"
         },
-        "duckdb-status": {
+        "wasmsql-status": {
           "title": "Local Data Engine",
           "value": "Active",
           "change": "Local cache",

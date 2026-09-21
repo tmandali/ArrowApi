@@ -33,14 +33,14 @@ export async function analyzeGrid(
       };
     }
 
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     const tableLabel = ds.isCustom ? "(aktif özel görünüm)" : ds.tableName;
 
     if (op === "count") {
       if (byColumn && ds.columns.includes(byColumn)) {
         const gcol = sqlSafeId(byColumn);
         const limitN = Math.max(1, Math.min(50, topN));
-        const rows = await duckDbClient.executeCustomSql(
+        const rows = await wasmSqlClient.executeCustomSql(
           `SELECT ${gcol} AS label, COUNT(*) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${limitN}`,
         );
         return {
@@ -58,7 +58,7 @@ export async function analyzeGrid(
         column && ds.columns.includes(column)
           ? `COUNT(${sqlSafeId(column)})`
           : "COUNT(*)";
-      const rows = await duckDbClient.executeCustomSql(
+      const rows = await wasmSqlClient.executeCustomSql(
         `SELECT ${countExpr} AS cnt FROM ${ds.from}`,
       );
       return {
@@ -85,7 +85,7 @@ export async function analyzeGrid(
       if (op === "top") {
         const col = sqlSafeId(column);
         const limitN = Math.max(1, Math.min(10, topN));
-        const rows = await duckDbClient.executeCustomSql(
+        const rows = await wasmSqlClient.executeCustomSql(
           `SELECT ${col} AS label, COUNT(*) AS value FROM ${ds.from} GROUP BY ${col} ORDER BY value DESC LIMIT ${limitN}`,
         );
         return {
@@ -111,7 +111,7 @@ export async function analyzeGrid(
     if (op === "sum" || op === "avg" || op === "min" || op === "max") {
       if (byColumn && ds.columns.includes(byColumn)) {
         const gcol = sqlSafeId(byColumn);
-        const rows = await duckDbClient.executeCustomSql(
+        const rows = await wasmSqlClient.executeCustomSql(
           `SELECT ${gcol} AS label, ROUND(${op.toUpperCase()}(${col}), 2) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(10, topN))}`,
         );
         return {
@@ -127,7 +127,7 @@ export async function analyzeGrid(
         };
       }
 
-      const rows = await duckDbClient.executeCustomSql(
+      const rows = await wasmSqlClient.executeCustomSql(
         `SELECT ${op.toUpperCase()}(${col}) AS value FROM ${ds.from}`,
       );
       return {
@@ -153,7 +153,7 @@ export async function analyzeGrid(
           ds.columns.find((c) => c !== column && !ds.numeric.has(c)) ||
           column;
     const gcol = sqlSafeId(groupCol);
-    const rows = await duckDbClient.executeCustomSql(
+    const rows = await wasmSqlClient.executeCustomSql(
       `SELECT ${gcol} AS label, SUM(${col}) AS value FROM ${ds.from} GROUP BY ${gcol} ORDER BY value DESC LIMIT ${Math.max(1, Math.min(10, topN))}`,
     );
     return {
@@ -180,11 +180,11 @@ export async function analyzeGrid(
 
 type ProfileColumnKind = "numeric" | "text" | "date" | "boolean" | "other";
 
-function classifyDuckType(
-  duckType: string | undefined,
+function classifyWasmType(
+  wasmType: string | undefined,
   isNumeric: boolean
 ): ProfileColumnKind {
-  const t = (duckType ?? "").toLowerCase();
+  const t = (wasmType ?? "").toLowerCase();
   if (/bool/.test(t)) return "boolean";
   if (/timestamp|date/.test(t)) return "date";
   if (isNumeric || /int|decimal|double|float|real|numeric|hugeint/.test(t)) {
@@ -217,16 +217,16 @@ export async function profileGrid(): Promise<unknown> {
       };
     }
 
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     const { buildCombinedWhereClause } = await import(
-      "@/services/duckdb/filter-parser"
+      "@/services/wasmsql/filter-parser"
     );
     const filters = useYulaGridStore.getState().filters;
     const where = buildCombinedWhereClause(filters, ds.numeric);
 
     const kindOf = (name: string): ProfileColumnKind => {
       const meta = ds.described?.find((c) => c.name === name);
-      if (meta) return classifyDuckType(meta.duckType, meta.isNumeric);
+      if (meta) return classifyWasmType(meta.duckType, meta.isNumeric);
       return ds.numeric.has(name) ? "numeric" : "text";
     };
 
@@ -248,7 +248,7 @@ export async function profileGrid(): Promise<unknown> {
       }
     }
 
-    const aggRows = await duckDbClient.executeCustomSql(
+    const aggRows = await wasmSqlClient.executeCustomSql(
       `SELECT ${aggParts.join(", ")} FROM ${ds.from} ${where}`
     );
     const agg = aggRows[0] ?? {};
@@ -260,7 +260,7 @@ export async function profileGrid(): Promise<unknown> {
     for (const col of textCols) {
       const q = sqlSafeId(col);
       try {
-        const rows = await duckDbClient.executeCustomSql(
+        const rows = await wasmSqlClient.executeCustomSql(
           `SELECT CAST(${q} AS VARCHAR) AS value, COUNT(*) AS cnt FROM (SELECT * FROM (SELECT * FROM ${ds.from} ${where}) AS __yula_profile_filtered USING SAMPLE 10% (bernoulli)) AS __yula_profile_sample GROUP BY 1 ORDER BY cnt DESC LIMIT 3`,
         );
         topValuesByColumn[col] = rows.map((r) => ({

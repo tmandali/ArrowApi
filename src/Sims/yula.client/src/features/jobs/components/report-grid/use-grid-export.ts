@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { duckDbClient } from "@/services/duckdb";
+import { wasmSqlClient } from "@/services/wasmsql";
 import { uiEventBus } from "@my-agent/core";
 import { opfsReportCache } from "@/services/opfs/opfs-cache";
 import {
@@ -10,7 +10,7 @@ import {
   exportQueryToParquetStream,
 } from "@/services/opfs/opfs-parquet-merge";
 import { formatCount } from "@/utils/format";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import type { SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 
 export type ExportFormat = "xlsx" | "parquet" | "csv" | "gz";
 
@@ -27,12 +27,15 @@ function sanitizeFileStem(title: string): string {
     .slice(0, 40);
 }
 
+const EMPTY_COLUMN_TYPES: Record<string, string> = {};
+
 /**
- * Dışa aktarma: Excel/CSV (DuckDB), Parquet (OPFS birleştirme veya
+ * Dışa aktarma: Excel/CSV (WasmSQL), Parquet (OPFS birleştirme veya
  * lazy-stream; 32-bit WASM OOM korumalı) + satır-sınır uyarıları.
  */
 export function useGridExport(args: {
-  duckTableName: string;
+  tableName?: string;
+  duckTableName?: string;
   jobId: string | null | undefined;
   title: string;
   effectiveColumns: SpreadsheetColumn[];
@@ -42,7 +45,8 @@ export function useGridExport(args: {
   sortBy: string | null;
   sortDesc: boolean;
   sortConfigs: Record<string, "asc" | "desc">;
-  columnDuckTypes: Record<string, string>;
+  columnTypes?: Record<string, string>;
+  columnDuckTypes?: Record<string, string>;
   customQuerySql: string | null;
   hiddenColumns?: string[];
   totalFiltered: number;
@@ -52,8 +56,9 @@ export function useGridExport(args: {
   isSavingDisk: boolean;
   t: (key: string, values?: Record<string, string | number>) => string;
 }) {
+  const tableName = args.tableName ?? args.duckTableName ?? "";
+  const columnTypes = args.columnTypes ?? args.columnDuckTypes ?? EMPTY_COLUMN_TYPES;
   const {
-    duckTableName,
     jobId,
     title,
     effectiveColumns,
@@ -63,7 +68,6 @@ export function useGridExport(args: {
     sortBy,
     sortDesc,
     sortConfigs,
-    columnDuckTypes,
     customQuerySql,
     hiddenColumns,
     totalFiltered,
@@ -83,7 +87,7 @@ export function useGridExport(args: {
       maxTotalRows?: number
     ) => {
       setExportWarning(null);
-      if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
+      if (!tableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
       setIsExporting(true);
       try {
         uiEventBus.recordTelemetry({
@@ -145,7 +149,7 @@ export function useGridExport(args: {
         // PARQUET: Filtrelenmiş veya özel görünüm sorgusu için 32-bit OOM'u önleyen lazy-stream ihracı
         if (format === "parquet") {
           const result = await exportQueryToParquetStream({
-            tableName: duckTableName,
+            tableName,
             customSql: customQuerySql ?? undefined,
             columns: exportCols.length > 0 ? exportCols : effectiveColumns.map((c) => c.name),
             filters,
@@ -163,8 +167,8 @@ export function useGridExport(args: {
           return;
         }
 
-        const result = await duckDbClient.exportReportTable({
-          tableName: duckTableName,
+        const result = await wasmSqlClient.exportReportTable({
+          tableName,
           fileName,
           filters,
           numericColumns,
@@ -173,7 +177,7 @@ export function useGridExport(args: {
           sortDesc,
           sortConfigs: sortList,
           columns: exportCols.length > 0 ? exportCols : effectiveColumns.map((c) => c.name),
-          columnDuckTypes,
+          columnDuckTypes: columnTypes,
           preferredFormat: format,
           maxTotalRows,
           customSql: customQuerySql ?? undefined,
@@ -240,7 +244,7 @@ export function useGridExport(args: {
       }
     },
     [
-      duckTableName,
+      tableName,
       isExporting,
       isStreaming,
       isSavingDisk,
@@ -254,7 +258,7 @@ export function useGridExport(args: {
       jobId,
       customQuerySql,
       hiddenColumns,
-      columnDuckTypes,
+      columnTypes,
       booleanColumns,
       totalFiltered,
       t,
@@ -263,7 +267,7 @@ export function useGridExport(args: {
 
   const handleExportClick = React.useCallback(
     (format: ExportFormat = "xlsx") => {
-      if (!duckTableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
+      if (!tableName || isExporting || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
       const exportRowCount = hasActiveFilters ? totalFiltered : totalRows;
 
       // Parquet ve CSV için Excel'in 1M/2M satır sınırı kısıtlayıcı değildir
@@ -281,7 +285,7 @@ export function useGridExport(args: {
       void runExport(format);
     },
     [
-      duckTableName,
+      tableName,
       isExporting,
       isStreaming,
       isSavingDisk,

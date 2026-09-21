@@ -12,6 +12,7 @@ import {
   type ComponentSchema,
   uiRegistry,
   uiEventBus,
+  isTextPart,
 } from "@my-agent/core";
 
 export interface DetailedSessionDump extends SessionDump {
@@ -52,7 +53,7 @@ function formatStepByStepTranscript(
     // Parçaları ve araç çağrılarını detaylandır
     const parts = Array.isArray(msg.parts) ? msg.parts : [];
     parts.forEach((p: any, pIdx: number) => {
-      if (p.type === "text" && p.text !== msg.content) {
+      if (isTextPart(p) && p.text !== msg.content) {
         lines.push(`  [Metin Parçası ${pIdx + 1}]: ${p.text}`);
       } else if (p.type === "tool-invocation" || p.toolName) {
         const tName = p.toolName || p.toolInvocation?.toolName || "bilinmeyen-araç";

@@ -1,6 +1,7 @@
 import { extractAgentIdFromPath } from "@/lib/workspace-paths";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { getMessageText } from "@my-agent/core";
 import type { YulaChatContextValue } from "../yula-chat-context";
 
 /** ChatInstance onContextReady imzasındaki canlı yardımcı alt kümesi. */
@@ -107,10 +108,7 @@ export function isApplyNavigateOutput(output: unknown): boolean {
 /** Sohbetin ilk kullanıcı mesajının metnini döner (geçmiş indeksleme bağlamı için). */
 export function firstUserMessageText(messages?: YulaMessage[]): string {
   const firstUser = messages?.find((m) => m.role === "user");
-  const textPart = firstUser?.parts?.find(
-    (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
-  );
-  return textPart && textPart.type === "text" ? (textPart.text ?? "") : "";
+  return getMessageText(firstUser);
 }
 
 export const customFetchWithTimeout: typeof fetch = async (url, init) => {

@@ -1,6 +1,7 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import type { WorkedStepItem } from "./yula-worked-steps";
 import { formatTokenCount } from "./yula-chat-turn-helpers";
+import { isTextPart, isReasoningPart } from "@my-agent/core";
 
 /** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
 export function stepPayload(step: WorkedStepItem): string | null {
@@ -82,9 +83,9 @@ export function buildFullCopyText({
   if (message) {
     const fullText = message.parts
       .map((p) => {
-        if (p.type === "text") return (p as { text: string }).text;
-        if (p.type === "reasoning" && (p as { text?: string }).text) {
-          return `[Thinking / Reasoning]\n${(p as { text: string }).text}`;
+        if (isTextPart(p)) return p.text;
+        if (isReasoningPart(p) && p.text) {
+          return `[Thinking / Reasoning]\n${p.text}`;
         }
         return "";
       })

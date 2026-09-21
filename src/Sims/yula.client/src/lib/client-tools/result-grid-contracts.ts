@@ -7,11 +7,20 @@ import type { ActionContract } from "@my-agent/core";
 export const GRID_RUN_SQL_CONTRACT = {
   description:
     "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
-  inputSchema: z.object({
-    query: z
-      .string()
-      .describe("DuckDB SQL query string against 'active_view' (e.g. 'SELECT Depo, SUM(Tutar) FROM active_view GROUP BY 1')"),
-  }),
+  inputSchema: z
+    .object({
+      query: z
+        .string()
+        .optional()
+        .describe("DuckDB SQL query string against 'active_view' (e.g. 'SELECT Depo, SUM(Tutar) FROM active_view GROUP BY 1')"),
+      sql: z
+        .string()
+        .optional()
+        .describe("DuckDB SQL query string against 'active_view' (alias for query)"),
+    })
+    .refine((d) => Boolean(d.query?.trim() || d.sql?.trim()), {
+      message: "SQL query is required (pass 'query' or 'sql').",
+    }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     rows: z.array(z.any()).optional().describe("Query result rows"),
@@ -31,11 +40,28 @@ export const GRID_RUN_SQL_CONTRACT = {
 export const GRID_QUERY_CONTRACT = {
   description:
     "Updates the grid view via SQL or opens a derived view ({ query }).",
-  inputSchema: z.object({
-    query: z
-      .string()
-      .describe("SQL query to project or transform active view"),
-  }),
+  inputSchema: z
+    .object({
+      query: z
+        .string()
+        .optional()
+        .describe("SQL query to project or transform active view"),
+      sql: z
+        .string()
+        .optional()
+        .describe("SQL query to project or transform active view (alias for query)"),
+      reset: z
+        .boolean()
+        .optional()
+        .describe("Whether to reset to the base table view"),
+      title: z
+        .string()
+        .optional()
+        .describe("Optional title for the transformed view"),
+    })
+    .refine((d) => Boolean(d.query?.trim() || d.sql?.trim() || d.reset), {
+      message: "SQL query or reset: true is required.",
+    }),
   outputSchema: z.object({
     success: z.boolean(),
     rowCount: z.number().optional(),
@@ -267,24 +293,79 @@ export const GRID_ANALYZE_CONTRACT = {
  */
 export const GRID_VISUALIZE_CONTRACT = {
   description:
-    "Generates a visual chart or plot from table data ({ type?, dimension?, metric? }).",
-  inputSchema: z.object({
-    type: z
-      .enum(["bar", "line", "pie", "area"])
-      .optional()
-      .default("bar")
-      .describe("Visualization chart type"),
-    dimension: z
-      .string()
-      .optional()
-      .describe("Category or grouping column"),
-    metric: z
-      .string()
-      .optional()
-      .describe("Numeric metric column"),
-  }),
+    "Generates a visual chart or plot from table data ({ type?, chartType?, dimension?, dimensionX?, metric?, dimensionY?, aggregation?, limit?, orderMode?, title? }).",
+  inputSchema: z
+    .object({
+      type: z
+        .enum(["bar", "line", "pie", "area"])
+        .optional()
+        .describe("Visualization chart type ('bar', 'line', 'pie', 'area')"),
+      chartType: z
+        .enum(["bar", "line", "pie", "area"])
+        .optional()
+        .describe("Alias for type"),
+      dimension: z
+        .string()
+        .optional()
+        .describe("Category or grouping column name (alias: dimensionX)"),
+      dimensionX: z
+        .string()
+        .optional()
+        .describe("Category or grouping column name (alias: dimension)"),
+      labelKey: z
+        .string()
+        .optional()
+        .describe("Category column name"),
+      metric: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe("Numeric metric column(s) (alias: dimensionY)"),
+      dimensionY: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe("Numeric metric column(s) (alias: metric)"),
+      valueKeys: z
+        .array(z.string())
+        .optional()
+        .describe("Numeric metric columns array"),
+      aggregation: z
+        .enum(["sum", "avg", "min", "max", "count"])
+        .optional()
+        .default("sum")
+        .describe("Aggregation function ('sum', 'avg', 'min', 'max', 'count')"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Maximum number of category slices/bars (default 30, max 50)"),
+      orderMode: z
+        .enum([
+          "value_desc",
+          "value_asc",
+          "label_asc",
+          "label_desc",
+          "appearance",
+          "desc",
+          "asc",
+        ])
+        .optional()
+        .describe("Ordering mode for bars/slices ('value_desc', 'value_asc', 'label_asc', 'label_desc', 'appearance', 'desc', 'asc')"),
+      title: z
+        .string()
+        .optional()
+        .describe("Optional title for the chart card"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional brief description for the chart"),
+      takeaway: z
+        .string()
+        .optional()
+        .describe("Optional key insight or takeaway text"),
+    })
+    .passthrough(),
   outputSchema: z.object({
-    success: z.boolean(),
+    success: z.boolean().optional(),
+    status: z.string().optional(),
     chartType: z.string().optional(),
     error: z.string().optional(),
   }),

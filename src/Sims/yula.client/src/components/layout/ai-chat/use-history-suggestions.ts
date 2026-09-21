@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useChatsStore } from "@/lib/stores/chats";
+import { getMessageText } from "@my-agent/core";
 
 export type HistorySuggestion = {
   text: string;
@@ -58,11 +59,7 @@ export function useHistorySuggestions(
         for (let i = msgs.length - 1; i >= 0 && out.length < 10; i -= 1) {
           const m = msgs[i];
           if (m.role !== "user") continue;
-          const text = m.parts
-            .filter((p) => p.type === "text")
-            .map((p) => (p as { text?: string }).text ?? "")
-            .join("\n")
-            .trim();
+          const text = getMessageText(m);
           if (!text || text.length < 2) continue;
           const key = text.toLowerCase();
           if (key === q || seen.has(key)) continue;

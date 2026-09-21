@@ -12,6 +12,7 @@ import { FileOpenChip } from "./chat-markdown/markdown-chips";
 import { criteriaStaticTitles } from "@/lib/yula-actions";
 import { yulaToolPartInfo } from "@/lib/yula-tool-info";
 import { extractSourceTable } from "@/lib/yula-source-table";
+import { isTextPart } from "@my-agent/core";
 
 type AiChatMessageProps = {
   message: YulaMessage;
@@ -261,7 +262,10 @@ export function AiChatMessage({
       )}
     >
       {message.parts?.map((part, index) => {
-        if (part.type === "text") {
+        if (isTextPart(part)) {
+          if (part.role === "plan_rationale") {
+            return null;
+          }
           return (
             <TextPart
               key={`${message.id}-t-${index}`}
@@ -270,9 +274,9 @@ export function AiChatMessage({
               message={message}
               onRunReport={onRunReport}
             />
-          )
+          );
         }
-        return null
+        return null;
       })}
     </div>
   )

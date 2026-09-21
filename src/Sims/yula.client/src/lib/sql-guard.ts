@@ -97,11 +97,11 @@ export function guardReadOnlySelect(
     }
   }
 
-  if (!/^(select|with)\b/i.test(body)) {
+  if (!/^(select|with|describe|desc|show|summarize)\b/i.test(body)) {
     return {
       ok: false,
-      error: "Only SELECT or WITH (CTE) queries can be executed.",
-      hint: "Write query starting with SELECT or WITH.",
+      error: "Only SELECT, WITH, DESCRIBE, SHOW, or SUMMARIZE queries can be executed.",
+      hint: "Write query starting with SELECT, WITH, DESCRIBE, or SHOW.",
     }
   }
 
@@ -128,7 +128,8 @@ export function guardReadOnlySelect(
     }
   }
 
-  const shouldAddLimit = rowLimit > 0 && !/\blimit\b/i.test(lowered);
+  const isSelectOrWith = /^(select|with)\b/i.test(body);
+  const shouldAddLimit = isSelectOrWith && rowLimit > 0 && !/\blimit\b/i.test(lowered);
   const sql = shouldAddLimit ? `${body} LIMIT ${rowLimit}` : body;
   return { ok: true, sql, limited: shouldAddLimit };
 }

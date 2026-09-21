@@ -36,8 +36,24 @@ export {
   cancelJobTool,
 } from "./job-lifecycle-tools";
 export {
-  askUserQuestionTool,
-  suggestNextStepsTool,
   runUserSkillTool,
   readUserFileTool,
 } from "./interactive-tools";
+export {
+  executeDispatchComponentAction,
+  isJobFamily,
+  isComponentFamily,
+  parseComponentId,
+  type JobComponentFamily,
+  type ComponentFamily,
+  type ComponentId,
+  type ComponentAction,
+  type ComponentActionMap,
+  type DispatchActionParams,
+  type JobHistoryAction,
+  type JobAction,
+  type CriteriaFormAction,
+  type ResultGridAction,
+  type AppRouterAction,
+  type WasmSqlAction,
+} from "./dispatch-bridge";

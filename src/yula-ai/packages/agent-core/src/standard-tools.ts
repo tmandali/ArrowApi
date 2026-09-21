@@ -384,25 +384,6 @@ export const agentUiTools: Record<string, Tool> = {
     },
   }),
 
-  time_travel: tool({
-    description: 'Undo or redo the page and criteria state in time.',
-    inputSchema: z.object({
-      action: z.enum(['undo', 'redo']).describe('Time travel direction: undo or redo'),
-    }),
-    execute: async ({ action }) => {
-      const dict = i18nManager.getDictionary();
-      if (action === 'undo') {
-        const cp = sessionManager.undo();
-        if (!cp) return { success: false, error: dict.errors.undoUnavailable };
-        return { success: true, message: dict.status.undoSuccess(cp.label), checkpoint: cp };
-      } else {
-        const cp = sessionManager.redo();
-        if (!cp) return { success: false, error: dict.errors.redoUnavailable };
-        return { success: true, message: dict.status.redoSuccess(cp.label), checkpoint: cp };
-      }
-    },
-  }),
-
   ask_user_choice: tool({
     description: 'Prompt the user with interactive choice buttons or a clarification question with predefined options and optional freeform input.',
     inputSchema: z.object({

@@ -103,7 +103,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
       }))
       .filter((i) => i.snippet.trim().length > 0);
     if (items.length === 0) return;
-    void import("@/services/duckdb-vector").then(
+    void import("@/services/wasmsql-vector").then(
       ({ indexConversationHistory, purgeOrphanConversationVectors }) => {
         void indexConversationHistory(items)
           .then(() =>

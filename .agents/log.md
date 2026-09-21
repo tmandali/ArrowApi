@@ -2,6 +2,173 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-21] Decoupling & Relocation of VirtualSpreadsheet to Standalone Component
+- **Rationale:**
+  1. *Domain Independence:* `VirtualSpreadsheet` was historically placed inside `features/jobs/components/` as a job result viewer. In reality, it is a generic, high-performance in-browser spreadsheet component (`VirtualSpreadsheet<T>`) independent of Arrow Jobs.
+  2. *Modular Architecture:* Decoupled the spreadsheet engine and its 10 hooks from the backend computation domain, elevating it to a first-class shared UI component.
+- **Decision:**
+  - **Relocated Standalone Subsystem:** Moved `VirtualSpreadsheet` and its hooks, types, Canvas 2D sizing, and test suite to `src/components/virtual-spreadsheet/`.
+  - **Backward-Compatible Proxy:** Converted `src/features/jobs/components/VirtualSpreadsheet.tsx` into a thin proxy re-exporting types and component. Updated report-grid consumers and `package.json`'s `test:grid` script.
+  - **Verification:** 8/8 grid tests pass (`npm run test:grid`), 309/309 client tests pass, 0 oxlint warnings/errors, 0 tsc errors, all files $\le 500$ lines (`VirtualSpreadsheet.tsx`: 478 lines, `arrow-report-grid.tsx`: 489 lines).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Arrow Jobs Domain Types Relocation & Decoupling from Yula Namespace
+- **Rationale:**
+  1. *Domain Ownership & Layering:* `YulaActiveJobSummary` and `YulaJobContext` were previously declared inside prompt formatting utilities and loosely associated with the Yula client app. In reality, Arrow Jobs are a general distributed compute engine (`Arrow.Jobs`) on the backend (`ArrowJobModels.cs`), independent of Yula.
+  2. *Status Completeness & Type Safety:* Jobs exist in multiple states beyond "active" (e.g. `Queued`, `Running`, `Completed`, `Failed`, `Cancelled`, `Idle`). Confining the naming to `ActiveJobSummary` obscured terminal and pending lifecycle phases.
+- **Decision:**
+  - **Canonical Domain Model (`src/features/jobs/types.ts`):** Moved canonical models (`ArrowJobLifecycleState`, `normalizeJobState`, `isTerminalJobState`, `ArrowJobSummary`, `ArrowJobContext`) into `types.ts` alongside existing job domain types.
+  - **Backward-Compatible Aliasing:** Preserved `YulaActiveJobSummary = ArrowJobSummary` and `YulaJobContext = ArrowJobContext` aliases in `types.ts`, `job-agent-grounding.ts`, and `yula-agent-prompt.ts`.
+  - **Verification:** 309/309 tests passing, 0 oxlint warnings/errors, 0 tsc errors, all files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Arrow Jobs Decoupled State Machine (`arrow_job`) and Catalog Manager (`arrow_job_manager`)
+- **Rationale:**
+  1. *Jobs as State Machines, Not Static Panels:* Arrow Jobs transition across 5 discrete lifecycle states (`queued` -> `running` -> `completed` | `failed` | `cancelled`). Treating them merely as an "active" flag or blending them into `job_history` conflated the runtime execution monitor with the archival history catalog.
+  2. *Clear ReAct Responsibility:* An agent cancelling or inspecting an in-flight computation should target `arrow_job`, whereas listing, selecting, or searching historical executions should target `arrow_job_manager`.
+- **Decision:**
+  - **Focused Job State Machine (`arrow_job` & `useArrowJobAgent`):** Created `useArrowJobAgent` (200 lines) binding `id: "arrow_job"`. Manages state-aware metadata (`status`, `phase`, `currentStep`, `durationMs`, `totalRows`, `error`), lifecycle events (`job_started`, `job_progress`, `job_completed`, `job_failed`, `job_cancelled`), and actions (`CANCEL`, `GET_STATUS`, `GET_SUMMARY`).
+  - **Catalog Manager (`arrow_job_manager` & `useJobExecutionsAgent`):** Refactored `useJobExecutionsAgent` (206 lines) to focus on catalog management (`LIST`, `SELECT`, `OPEN_LAST`, `FIND`, `REFRESH`). Simultaneously registers `job_history` for 100% backward compatibility.
+  - **Dispatch Bridge & Prompt Grounding:** Updated `dispatch-bridge.ts` to route actions for `arrow_job`, `arrow_job_manager`, and `job_history`. Updated `yula-agent-prompt.ts` with explicit ReAct guidance and state-aware prompt grounding.
+  - **Verification:** 307/307 tests pass, 0 oxlint errors/warnings, 0 tsc errors, all files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Colocated Component AI Architecture (VirtualGrid, CriteriaGrid, LocalSqlEngine)
+- **Rationale:**
+  1. *Monolithic Prompt Bloat:* `yula-agent-prompt.ts` had bloated to 477 lines, dangerously close to the 500-line ceiling (Rule 2). It centralized internal state formatting, DuckDB table naming, view mode string logic, and action contracts for generic UI components (VirtualGrid, CriteriaForm, DuckDB).
+  2. *Violation of Feature-First Colocation:* Each generic component should own its AI capabilities (prompt grounding, action contracts, metadata type guards, and hooks) rather than relying on a global prompt builder knowing every component's internal structure.
+- **Decision:**
+  - **VirtualGrid AI Module (`features/jobs/components/report-grid/ai/`):** Created `grid-agent-grounding.ts` (pure TypeScript, server-safe) encapsulating `YulaGridContext`, `ResultGridMetaPayload`, `isResultGridMeta`, `resolveEffectiveGrid`, and `formatGridPromptGrounding`. Re-exported contracts from `index.ts`. Added isolated unit test `grid-agent-grounding.test.ts`.
+  - **CriteriaGrid AI Module (`features/report-criteria/ai/`):** Created `criteria-agent-grounding.ts` and `index.ts` encapsulating active report context rules, direct execution directives, and criteria contracts. Added isolated unit test `criteria-agent-grounding.test.ts`.
+  - **Local SQL Engine AI Module (`services/duckdb/ai/`):** Created `duckdb-agent-grounding.ts` and `index.ts` encapsulating DuckDB engine constants (`DUCKDB_ACTIVE_VIEW_NAME`) and read-only execution directives.
+  - **Orchestrator Delegation & Line Reduction:** `yula-agent-prompt.ts` delegates to `formatGridPromptGrounding` and `formatCriteriaPromptGrounding`, while maintaining 100% backward-compatible re-exports. Reduced `yula-agent-prompt.ts` from 477 lines down to 346 lines (-131 lines).
+  - **Verification:** 300/300 unit tests pass, 0 oxlint errors, 0 tsc errors, all files strictly comply with the 500-line limit.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Explicit Base Table vs Active Saved Query Distinction in Telemetry, Component Meta & System Prompt
+- **Rationale:**
+  1. *Ambiguous View State in Telemetry:* When users navigated between saved queries or reverted to the base table, `VIEW_TRANSFORMED` emitted only `{ viewId, title, query }` to `uiEventBus.recordTelemetry`. It omitted the physical DuckDB table name (`baseTable`), the active view name (`activeView`), and `isBaseTable: boolean`. Additionally, it was never emitted to `@my-agent/react` component ring buffer via `emit("view_transformed", ...)`.
+  2. *Incomplete Component Metadata:* `useResultGridAgent` was called in `arrow-report-grid.tsx` without passing `customQueryTitle`, `activeAiViewId`, or `savedViews`. Consequently, `result_grid:active.meta` lacked visibility into the currently active saved query or the catalog of available views.
+  3. *Unclear LLM System Prompt Grounding:* `buildSystemPrompt` previously displayed `Active table: <tableName>` without explicitly distinguishing the physical base table (which holds all raw detail records) from the active screen view (which may be grouped or projected by a saved query).
+- **Decision:**
+  - **Enriched Hook Contracts (`use-result-grid-agent.ts`):** Extended `UseResultGridAgentOptions` with `customQueryTitle`, `activeAiViewId`, and `savedViews`. Registered `baseTable`, `isBaseTable`, `activeView`, `activeAiViewId`, `customQueryTitle`, and `savedViews` into `result_grid:active.meta`. Updated `events.view_transformed` schema to enforce `{ baseTable, activeView, isBaseTable, viewId, title, query, rowCount }`.
+  - **Component Event & Telemetry Parity (`use-result-grid-agent.ts`):** In `handleViewTransformed`, both `emit("view_transformed", payload)` and `uiEventBus.recordTelemetry` are invoked with the complete payload. Added automatic transition tracking via `useEffect` ref across `[isTableReady, activeAiViewId, customQuerySql, customQueryTitle]` so transitions from tab selection, agent `RUN_SQL`, or `RESET_LAYOUT` are always captured.
+  - **Props Threading & Line Economy (`arrow-report-grid.tsx`):** Threaded `customQueryTitle`, `activeAiViewId`, and `savedViews` into `useResultGridAgent` while compacting the `yulaContext` dependency array to maintain the file strictly at 489 lines ($\le 500$).
+  - **Clear Prompt Grounding (`yula-agent-prompt.ts`):** Grounded `VIEW MODE: SAVED QUERY [ID: "..."]` vs `BASE TABLE VIEW`, explicit `• Base Physical Table: "<baseTable>" (Stores all raw detail records)`, `• Active Screen View: "active_view"`, and `AVAILABLE SAVED VIEWS: [...]`.
+  - **Verification:** 295/295 tests pass, 0 oxlint warnings/errors, clean `tsc --noEmit`, all modified files comply with the 500-line rule.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Grid Schema Grounding from Mounted Components, Read-Only DuckDB Inspection & Telemetry Source Alignment
+- **Rationale:**
+  1. *Missing Grid Schema Grounding (`yula-agent-prompt.ts`):* In the `@my-agent/react` runtime, client-side requests send `uiContext` containing `active_components` and `recent_events`. While `result_grid:active` was mounted and registered with full table/column metadata, `buildSystemPrompt` only checked `if (phase === "results" && context?.grid)`. When `context.grid` was omitted over the wire, active table name, row count, and available columns were never injected into the system prompt. Consequently, when the user asked "hangi tablo açık", the agent had no grid context and hallucinated that the results table was not loaded/accessible.
+  2. *DuckDB Read-Only Inspection Blocked by SQL Guard (`sql-guard.ts`):* When the user asked to filter by a store (e.g. "T006 yı süz"), the agent attempted schema inspection via `DESCRIBE active_view`. `guardReadOnlySelect` strictly required queries to start with `SELECT` or `WITH`, rejecting safe read-only commands (`DESCRIBE`, `DESC`, `SHOW`, `SUMMARIZE`). When `RUN_SQL` errored, the agent concluded that the result table was inaccessible. Furthermore, appending `LIMIT 200` to `DESCRIBE` is invalid in DuckDB syntax.
+  3. *Telemetry Source Mismatch in `inspect_ui_state`:* `useResultGridAgent` emitted telemetry with `source: "result_grid"`, but registered the component as `result_grid:active`. When `inspect_ui_state` queried by `component_id: "result_grid:active"`, `getRecentEvents` filtered strictly with `e.source === src || e.source.startsWith(src)`, yielding empty telemetry results.
+- **Decision:**
+  - **Type-Safe Component-Driven Grid Grounding (`yula-agent-prompt.ts` & `yula-tool-info.ts`):** Replaced unsafe type casts (`as Partial<YulaGridContext>`) and raw magic strings (`(c: any) => c.id === "result_grid:active" || c.id.startsWith("result_grid")`) with strictly typed guards: `isResultGridComponentId(id: unknown): id is ResultGridComponentId`, `isResultGridComponent(comp: unknown): comp is ComponentSchema & { id: ResultGridComponentId }`, `isResultGridMeta(meta: unknown): meta is ResultGridMetaPayload`, and `resolveEffectiveGrid(context, activeComps)` pure helpers. `normalizeFiltersRecord` safely maps filter objects. Active table, row count, DuckDB view, and columns are cleanly extracted and grounded into the system prompt without runtime assumptions.
+  - **Safe Read-Only Inspection Support (`sql-guard.ts`):** Expanded `guardReadOnlySelect` to permit `select`, `with`, `describe`, `desc`, `show`, and `summarize`. Added `isSelectOrWith` guard so automatic `LIMIT` is only appended to `SELECT`/`WITH` statements and not to schema inspection commands. Added unit test suite `sql-guard.test.ts` (9/9 passing).
+  - **Direct Filter Action Guidance (`yula-agent-prompt.ts`):** Instructed the ReAct loop prompt to use `action: 'FILTER'` (with `field`, `value`, `op: 'eq'`) directly when the user requests filtering a column value, eliminating unnecessary `DESCRIBE` calls since columns are already grounded in context.
+  - **Telemetry Source Alignment (`use-result-grid-agent.ts` & `event-bus.ts`):** Updated `useResultGridAgent` telemetry calls to emit `source: "result_grid:active"`, and enhanced `getRecentEvents` to match bidirectionally (`src.startsWith(e.source)`).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Type-Safe Tool Error Guards, Grid Visualize Schema Alignment & Card Rendering
+- **Rationale:**
+  1. *Untyped Error Extraction (False-Positive Errors):* `extractToolErrorMessage` in `yula-tool-info.ts` cast objects to `Record<string, unknown>` and inspected `det.message` without verifying `det.status === "error"`. Consequently, successful query transformations (e.g. `Grid view updated to "..." (519 rows)`) were misclassified as failures and rendered as red `Hata: ...` in the UI.
+  2. *Schema & Tool Parameter Mismatch (Infinite Retry Loop):* `GRID_VISUALIZE_CONTRACT` exposed `dimension` and `metric`, whereas `visualizeGrid` looked for `dimensionX` and `dimensionY`. When models adhered to the schema, `labelKey` remained empty, throwing `Invalid category column: `. When models pivoted to `dimensionX` per error hint, default Zod stripping removed the unknown key, causing persistent failure.
+  3. *Missing Chart Card Dispatch Handling:* `yula-chat-turn.tsx` and `yula-chat-turn-helpers.tsx` only matched the legacy `visualize_grid_data` tool name and missed `dispatch_component_action` with action `VISUALIZE` / `CHART`.
+  4. *Agressive Top-N Limit Stripping:* `setGridQuery` stripped all `LIMIT \d+` regexes, turning intentional Top-N views (e.g. `LIMIT 5`) into full table loads (519 rows).
+- **Decision:**
+  - **Type-Safe Status & Error Guards (`yula-tool-info.ts`):** Introduced `FAILED_TOOL_STATUSES`, `FailedToolStatus`, `ToolStatus`, `ToolErrorPayload`, and type guards `isFailedToolStatus(status)` and `isToolErrorPayload(val)`. Updated `extractToolErrorMessage` and `isFailedToolInfo` to safely discriminate errors from success messages.
+  - **Bilingual & Passthrough Visualize Contract (`result-grid-contracts.ts` & `grid-visualize-tool.ts`):** Added aliases `dimension`/`dimensionX`/`labelKey`, `metric`/`dimensionY`/`valueKeys`, `type`/`chartType`, chart options (`limit`, `aggregation`, `orderMode`, `title`, `description`, `takeaway`), and `.passthrough()`.
+  - **Unified Dispatch Card Rendering (`yula-chat-turn.tsx` & `yula-chat-utils.ts`):** Enabled `<YulaChartCard>` rendering for `dispatch_component_action:VISUALIZE` and added unwrapping for `output.details`.
+  - **Preserve Top-N Intent (`grid-sql-tools.ts`):** Retained user/agent Top-N limits (e.g. `LIMIT 5`) while only stripping default auto-guard limits (200/500/1000).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Semantic Text Taxonomy, Role-Based Extraction & Type-Safe Text Guards
+- **Rationale:**
+  1. *Fragile & Untyped Text Checking:* Across the codebase, components checked `part.type === "text"` using raw type-casting (`(p as { text: string }).text`), which was prone to runtime errors, code duplication, and lint warnings.
+  2. *Loss of Semantic Meaning:* A generic `text` part failed to express what the text represented (e.g. an intermediate plan, a pre-choice prompt, an in-flight progress notice, or a final synthesis). This caused intermediate plans to either leak into main chat bubbles or require artificial hacks like masking as `type: "reasoning"`.
+- **Decision:**
+  - **Semantic Text Taxonomy (`@my-agent/core/step-frame-types.ts`):** Introduced `TextPartRole` (`plan_rationale`, `decision_prompt`, `progress_notice`, `final_synthesis`) and `SemanticTextPart`.
+  - **Zero-Regex Structural Classification:** Completely eliminated regex patterns (`/^[📊🚀...]/`), emoji matching, and Turkish keyword heuristics (`seçin`, `belirtin`, `açılıyor`). Role assignment in `classifyTextPart` is now 100% structural and deterministic based on ReAct execution context (pre-tool text = `plan_rationale`, tool-free text = `final_synthesis`).
+  - **Type Guards & Extraction:** Added `isTextPart(part)` and `isReasoningPart(part)` type guards, `classifyTextPart(text, hasTools)` for structural role assignment, and `getMessageText(message, options)` with role filtering/exclusion.
+  - **Client-Wide Adoption:** Replaced raw `part.type === "text"` filters and casts in `yula-chat-turn.tsx`, `ai-chat-message.tsx`, `yula-worked-steps.tsx`, `yula-worked-accordion.tsx`, `yula-worked-copy.ts`, `use-chat-turns.ts`, `yula-choice-card.tsx`, `yula-questionnaire-card.tsx`, `yula-execution-terminal.tsx`, `yula-agent-mode-chip.tsx`, `use-history-suggestions.ts`, `chat-shared.ts`, `yula-chat-instance.tsx`, `use-workspace-rag-search.ts`, `context-slim.ts`, `chats.ts`, and `yula-session-dump.ts`.
+  - **Bubble vs Accordion Clean Separation:** Chat bubbles exclude `plan_rationale` (which renders cleanly inside the Worked Accordion step cards), while final syntheses render in the message row.
+  - **Verification:** 129/129 `@my-agent/core` vitest tests pass, 269/269 `yula.client` tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), Next.js 16.3.5 Turbopack production build succeeds with 0 errors, and all files strictly comply with the 500-line limit.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Text-First Causal Transparency: Context Inspection, Plan Extraction & Decision Flow Diagram Cancellation
+- **Rationale:**
+  1. *Premature Visual Diagram & Obscure Pre-Action State:* When an agent formulated a plan and presented an interactive user choice (e.g. `ask_user_choice` for store or company code clarification), the visual Mermaid flowchart only showed the solitary final action node (`Adım 1: ask_user_choice`), offering zero insight into what the agent checked or why it made that decision.
+  2. *User Direction (Text-First Priority):* The user explicitly instructed to cancel/disable visual diagram generation for decision trees and prioritize rich, structured textual transparency detailing the entire chain of inspection and causal reasoning.
+  3. *Discarded LLM Planning Text:* `extractWorkedSteps` previously threw away non-reasoning text parts (`part.type === "text"`), causing pre-tool planning headers, calculated date ranges (e.g. `2026-09-14..2026-09-20`), target report matching, and missing-parameter rationales to disappear from step accordions.
+- **Decision:**
+  - **Diagram Cancellation:** Removed the "Karar Ağacı" Mermaid trigger button from `YulaWorkedAccordion` (`yula-worked-accordion.tsx`). Decision flows are now rendered natively as structured textual cards.
+  - **Context & Screen Inspection Step:** Added `inspection` telemetry to `YulaMessageMetadata` and `/api/agent/chat/route.ts` (`toUIMessageStream`). `extractWorkedSteps` generates a dedicated `🔍 Ekran & Bağlam İncelemesi` step reporting active route, screen phase, mounted form status, target report, and reference date.
+  - **Pre-Action Plan & Rationale Extraction:** Enhanced `extractWorkedSteps` (`yula-worked-steps.tsx`) so that whenever text precedes tool executions, it is captured as a `📋 Değerlendirme & Eylem Planı` or `💡 Karar Gerekçesi` thought step with full detail text.
+  - **Causal Transition Reasoning:** Enhanced `groupStepsByPhase` to automatically establish `transitionReason` for choices (`Kullanıcı tercihi ve eksik kriter doğrulama adımı`), navigation, field application, job execution, and recovery.
+  - **Phase Card UX Enhancement:** Updated `YulaWorkedPhaseCard` (`yula-worked-phase-card.tsx`) to auto-open inspection steps and render formatted multi-line detail text with full readability.
+  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 269/269 `yula.client` tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), Next.js 16.3.5 Turbopack production build succeeds with 0 errors, and all files strictly comply with the 500-line limit.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Retirement of Obsolete Intervention Tools (time_travel, ask_user_question) & Elimination of Artificial Triage Prompts
+- **Rationale:**
+  1. *Redundant Intervention Tools:* With the deterministic Turn State Machine and inline Steer/Abort controls (`YulaWorkedPhaseCard`), legacy intervention tools such as `time_travel` (Undo/Redo via LLM call) and deprecated functions (`askUserQuestionTool`, `suggestNextStepsTool`) were unnecessary, cluttered the agent's tool loadout, and wasted context window tokens.
+  2. *Artificial Triage Prompting:* The system prompt previously contained a convoluted `CRITICAL ERROR TRIAGE & SELF-HEALING PROTOCOL` commanding the LLM to inspect non-existent telemetry properties (`diagnostic.isRecoverable`, `diagnostic.action === "ASK_USER_CHOICE"`).
+- **Decision:**
+  - **Pruned Obsolete Tools:** Removed `time_travel` from `STANDARD_AGENT_TOOLS` (`standard-agent-tools.ts`), `@my-agent/core` (`standard-tools.ts`, `ui-tool-adapter.ts`), `chat-helpers.ts`, and catalog manifests. Removed deprecated `askUserQuestionTool` and `suggestNextStepsTool` from `interactive-tools.ts` and `client-tools/index.ts`.
+  - **Streamlined Causal Recovery Protocol:** Replaced the legacy triage instructions in `yula-agent-prompt.ts` with `CAUSAL ERROR RECOVERY & INTERVENTION PROTOCOL`, instructing the model to analyze root causes, execute intelligent schema/parameter adjustments (matching the State Machine's `isRecovery` flag), ask user choices when unresolvable, and immediately pivot on inline steering.
+  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 266/266 `yula.client` tests pass, 0 oxlint warnings/errors, clean Next.js 16.3.5 Turbopack production build (`next build`), and all files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Causal ReAct Step Frame Architecture, PostgreSQL Telemetry & Live Mermaid Decision Tree
+- **Rationale:**
+  1. *Opaque LLM Reasoning & Debugging Complexity:* In multi-step agent runs, detecting why tools failed or why subsequent steps were chosen was exceedingly difficult. The agent could not inspect pre-action context, raw tool inputs/outputs, or the causal transition link explaining why Step $N+1$ followed Step $N$.
+  2. *Lack of Live Intervention:* Users had no ability to steer or abort an in-flight tool run when observing aberrant trajectories.
+  3. *Unpersisted Telemetry:* Turn state and step transitions existed only ephemerally in client memory, lacking durable auditability for post-incident diagnostics.
+- **Decision:**
+  - **Core Causal Types (`@my-agent/core`):** Introduced `AgentTurnState`, `AgentStepFrame`, and `StepFrameStatus` in `step-frame-types.ts` establishing causal chaining (`parentStepId`, `transitionReason`, `isRecovery`, `preActionContext`). Extended `AgentEvent` with `step_frame_start`, `step_frame_end`, and `state_transition`.
+  - **PostgreSQL Telemetry Service (`src/server/db`):** Defined `agentRunsSchema` and `agentStepsSchema` with DAG foreign-key chaining. Built `AgentTelemetryService` (`createRunRecorder`) saving step frames and token counts asynchronously on each `onStepFinish` and `onFinish` in `route.ts`.
+  - **Visual Mermaid Decision Tree (`decision-tree-mermaid.ts`):** Implemented automatic DAG generation (`flowchart TD`) linking causal steps with status-based CSS styling (success, error, recovery, running) directly openable in `MermaidCanvasPanel` via `openDecisionTreeDiagram`.
+  - **Interactive ReAct Step UI (`yula-worked-phase-card.tsx` & `yula-worked-accordion.tsx`):** Extracted `YulaWorkedPhaseCard` with inline Live Steer & Abort controls, thought disclosure, formatted tool input/output JSON inspection, and causal transition reasoning. Added "Karar Ağacı" header trigger.
+  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 11/11 `yula.client` node tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), and all files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Event-Driven Result Grid Table Loading Telemetry & Query Contract Parameter Parity
+- **Rationale:**
+  1. *Parameter Contract Desynchronization (`query` vs `sql`):* `GRID_RUN_SQL_CONTRACT` and `GRID_QUERY_CONTRACT` declared `query` as their input parameter, while backend handlers in `grid-sql-tools.ts` strictly looked for `input.sql`. This caused queries generated by LLM tools to fail silently with misleading `"SQL query is empty"` errors.
+  2. *Missing Lifecycle Telemetry on Grid Ready:* When DuckDB WASM finished rendering a dataset into the virtual grid, no component-level lifecycle event was emitted. The LLM only received the backend `REPORT_COMPLETED` event (which lacks column schemas), leading the agent to blindly guess column names or fail during data aggregation.
+  3. *Incomplete `inspect_ui_state` Filtering in Local Delegation:* In `ui-delegation.ts`, local invocation ignored filter parameters (`component_id`, `topic`), preventing the model from cleanly discovering active component schemas and domain events.
+- **Decision:**
+  - **Parameter Parity (`grid-sql-tools.ts` & `result-grid-contracts.ts`):** Updated `runExpertSql` and `setGridQuery` to accept both `input.query` and `input.sql`. Extended Zod input schemas with `.refine()` to accept either parameter name as well as `{ reset: true }`.
+  - **Event-Driven `TABLE_LOADED` Emission (`use-result-grid-agent.ts`):** Registered `table_loaded` in `useAgentComponent.events` and added a dedicated lifecycle effect that emits `table_loaded` and records `TABLE_LOADED` on `uiEventBus` under the `data` topic with `tableName`, `activeView: "active_view"`, `rowCount`, and `columns`.
+  - **Telemetry Filtering in `ui-delegation.ts`:** Updated `inspect_ui_state` execution in `ui-delegation.ts` to respect `component_id` (returning the mounted component schema with its metadata) and telemetry filter options (`topic`, `source`, `limit`).
+  - **Verification:** 12/12 `system-contracts.test.ts` pass, 124/124 `@my-agent/core` vitest tests pass, 0 oxlint warnings/errors, and all files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] Streamlined Single-Line Shadcn Choice Cards & Deprecation of Verbose "Gerekçe / Etki" Boxes
 - **Rationale:**
   1. *Visual Clutter & Disproportionate Vertical Footprint:* Interactive choices (`ask_user_choice`) rendered oversized multi-level cards with separate "Seç" buttons, descriptive paragraphs, and dedicated gray boxes labeled "Gerekçe / Etki: ...", dominating the chat stream and pushing conversation context out of view.
@@ -281,212 +448,32 @@ This document is the **append-only audit log** recording fundamental architectur
 
 ---
 
-## [2026-09-20] Upgrading Yula AI with Reference-Pi Patterns & Vercel AI SDK Best Practices (Dynamic Routing, Tool Deltas, Failover, Output Schemas)
+## [2026-09-21] Robust Chart Visualization Dispatch, Parameter Aliases & Base Table Fallback
+- **Rationale:** When users requested chart visualizations (e.g. "top 5 stores"), the agent defaulted to issuing raw SQL queries on `active_view` instead of triggering visualization, failed Zod validation on `orderMode: "desc"`, and encountered DuckDB Binder Errors when previous custom views masked underlying columns or filtered out requested entities (like `T999`).
+- **Decision:**
+  - **Tool & ReAct Prompt Grounding:** Added `VISUALIZE` example to `dispatch_component_action` in `standard-agent-tools.ts` and registered an autonomous execution step in `yula-agent-prompt.ts`.
+  - **Schema & Order Mode Normalization:** Allowed `"desc"` and `"asc"` in `GRID_VISUALIZE_CONTRACT` and mapped them to `"value_desc"` and `"value_asc"` in `inferChartOrderMode`.
+  - **Custom View & Base Table Fallbacks:** Derived columns from the probe row in `resolveActiveDataset` (`dataset.ts`) and added automatic fallback to `baseColumns` / base table in `visualizeGrid` when custom views lack requested columns or yield empty rows.
+  - **UI Chart Rendering:** Guaranteed unwrap of nested `details` in `parseChartOutput` and normalized AI SDK tool call parts in `yula-tool-info.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Comprehensive WasmSql Architecture Migration & Legacy DuckDB Cleanup
 - **Rationale:**
-  1. *Tool Hallucination & Token Waste:* Providing full tool definitions across all execution phases caused prompt bloat and allowed models to attempt grid SQL queries before data was loaded.
-  2. *Unannounced Tool Loadout Transitions:* As UI components mounted/unmounted across routes, models lacked explicit visibility into loadout deltas, causing unmounted tool invocation errors.
-  3. *Cloud Provider Outage & Rate Limits:* When Azure OpenAI or primary models returned 429 Rate Limits or 503 Service Unavailable, agent requests failed without transparent failover.
-  4. *Untyped Tool Outputs:* Server tools previously lacked formal Zod output schemas, reducing client-side runtime validation confidence.
+  1. *Architectural Disambiguation:* The browser-side WebAssembly SQL engine was historically named after a specific vendor implementation (`duckdb`). Renaming to `wasmsql` cleanly distinguishes client-side WASM execution from Next.js server-side SQL, while opening up engine-agnostic AI tooling.
+  2. *Full System Cleansing:* Beyond hook aliases, a complete cleanup was needed across localization dictionaries (`tr.json`, `en.json`), KPI landing specs, core service folders (`src/services/wasmsql`), vector memory stores (`wasmsql-vector`), Pyodide skill bridges, and internal hook state variables (`tableName`, `applyFilters`, `columnWasmTypes`, `gridAggregations`).
 - **Decision:**
-  - **Dynamic Step Routing (`src/Sims/yula.client/src/lib/yula-step-router.ts`):** Integrated `prepareStepRouting` into Vercel AI SDK `prepareStep` to dynamically prune tools based on screen phase and manage token compaction cleanly under the 500-line limit.
-  - **Tool Output Schemas (`src/Sims/yula.client/src/lib/server-tools/standard-agent-tools.ts`):** Added explicit Zod `outputSchema` definitions to `remember_fact`, `recall_fact`, `query_playbook`, and `propose_playbook_update`.
-  - **Pi Tool Loadout Delta (`packages/agent-core/src/agent-loop.ts`):** Added `declareToolChanges` to detect added/removed tools between turns and inject transparent system notifications (`[Tools Loadout Updated]`).
-  - **Adaptive Model Cascading (`prepareNextTurn` in `agent-loop.ts` & `agent.ts`):** Added Pi-style `prepareNextTurn` support enabling turn-to-turn dynamic model promotion and thinking level adjustments.
-  - **Provider Resilience & Failover (`src/Sims/yula.client/src/lib/yula-provider-failover.ts`):** Implemented `createFailoverLanguageModel` using AI SDK `wrapLanguageModel`, seamlessly switching from primary (e.g. Azure OpenAI) to secondary fallbacks (OpenAI / Agnes) on 429/5xx errors.
-  - **Interactive Simulation Harness (`apps/demo-app`):** Implemented `useAdvancedArchitecturalSimulations.ts` and updated `PiTestPanel.tsx` / `PiDiagnosticsView.tsx` with 4 interactive test scenarios (Tool Loadout Delta, Model Cascading, Provider Failover, Dynamic Step Routing).
+  - **Core Service Migration (`src/services/wasmsql/`):** Established `src/services/wasmsql/` as the single source of truth (`wasm-sql-client.ts`, `wasm-sql.worker.ts`, `filter-parser.ts`, `wasmsql-vector-*`, `ai/`). Completely removed legacy `src/services/duckdb` directory and deleted obsolete proxy files.
+  - **Localization & KPI Keys:** Migrated `duckdb-status` to `wasmsql-status` across Turkish and English translation files and `workspace-landing-data.ts`.
+  - **Grid Props & State Variable Cleanup:** Replaced `duckTableName` with `tableName`, `duckApplyFilters` with `applyFilters`, `columnDuckTypes` with `columnWasmTypes`, and `duckDbAggregations` with `gridAggregations` across all report-grid hooks and `arrow-report-grid.tsx`.
+  - **Headless AI Wasm SQL Engine:** Bound `wasm_sql_engine` component (`use-wasm-sql-agent.ts`) with `RUN_SQL`, `DESCRIBE_TABLE`, and `LIST_TABLES` action contracts and strict read-only SQL guard routing in `dispatch-bridge.ts`.
+  - **Skills & Tools Integration:** Renamed Pyodide bridge to `wasmsql-pyodide-bridge.ts` and updated dataset resolver, profiler, visualizer, and RAG vector indexing to import directly from `@/services/wasmsql` and `@/services/wasmsql-vector`.
+  - **Verification:** All 316 unit tests passed, all 8/8 grid test suites passed (`npm run test:grid`), 0 oxlint warnings/errors, 0 tsc errors, all files strictly $\le 500$ lines.
 - **Author:** Antigravity / Team
 
 ---
-
-## [2026-09-20] Architectural Dual-Layer Localization: Library-Agnostic i18n Dictionary vs Application Next-Intl
-- **Rationale:**
-  1. *Core Library Invariance:* Hardcoded Turkish string checks (e.g., `key === 'yardim' || key === 'yardım'`) in `@my-agent/core` and Turkish-only response messages in `@my-agent/react` (`chat-commands.ts`) violated the architectural principle that core agent libraries must be domain-agnostic and language-neutral by default.
-  2. *Application UI Localization:* Hardcoded Turkish quick prompts and strings in `yula.client` (`blank-workspace-landing.tsx`, `use-skill-agent-binding.ts`, `use-agent-management-binding.ts`, `use-system-users-agent-binding.ts`, `use-playbook-agent-binding.ts`, `my-settings-form.tsx`, `memory-tab-view.tsx`, `plugins-tab-view.tsx`) caused inconsistent multilingual experiences when switching between English and Turkish.
-- **Decision:**
-  - **Library Layer (`@my-agent/core` & `@my-agent/react`):**
-    - Extended `AgentDictionary` with `commandAliases` and `commandResponses`.
-    - Fully populated localized command dictionaries in `trDictionary` and `enDictionary`.
-    - Dynamic alias resolution in `prompt-templates.ts`: canonical commands are registered once in English, and locale-specific aliases are bound dynamically via `i18nManager.getDictionary()`.
-    - Removed hardcoded strings in `chat-commands.ts`; command responses now resolve dynamically from `i18nManager.getDictionary().commandResponses`.
-  - **Application Layer (`src/Sims/yula.client`):**
-    - Standardized all `quickPrompts` passed to `useScreenAgentContext` to use `next-intl` (`useTranslations`).
-    - Added comprehensive prompt message keys across `WorkspaceLanding`, `SystemUsers`, `MySettings`, `AgentManagement`, `SkillManagement`, `Playbooks`, and `Studio` in both `tr.json` and `en.json`.
-    - Enforced this architectural rule in `.agents/standards/frontend-rules.md` and `.agents/architecture/headless-react-agent.md`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Decoupling Built-in Slash Commands (Library Runtime) vs Application Tools (Yula Client)
-- **Rationale:** When executing `/yardim skil create` or typing `/yardım` (dotless-i), the command leaked past `@my-agent/core` into `/api/agent/chat` because `/yardım` was not recognized as a registered system command. Consequently, the backend LLM invoked the `ask_user_choice` tool to ask what the user meant while simultaneously rejecting it, whereas `yula-worked-steps.tsx` synthesized an artificial `slash_command (status: ok)` step.
-- **Decision:**
-  - **Core Library (`@my-agent/core`):** Added `normalizeCommandToken` to normalize Turkish character variants (`ı` vs `i`, case-folding). Explicitly registered `/yardım` as an alias alongside `/yardim` and `/help`.
-  - **Client Hook (`@my-agent/react`):** Enhanced `handleBuiltInCommand` in `chat-commands.ts` so that `/help` and `/yardim`/`/yardım` commands—even with argument hints (e.g. `/yardim model` or `/yardim skil create`)—are filtered and resolved 100% locally on the client and always return `true`, completely preventing unintended forwarding to the LLM backend.
-  - **Application UI (`yula.client`):**
-    - Updated `yula-commands.ts` to include `phase` in `parseYamlCommands` and normalize Turkish characters in `resolveYulaSlashCommand` and `matchYulaCommands`.
-    - In `yula-worked-steps.tsx`, excluded `phase === "system"` commands from synthesizing fake tool steps in server turn transcripts, and ensured error states accurately reflect tool failure.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Migration of Management Screens & Dashboards to useScreenAgentContext and entity_form:* Dynamic Tool Binding
-- **Rationale:** On screens like `/my/skills`, when a user asked contextual questions such as *"bu skili nasıl test ederim"*, Yula hallucinated unrelated ERP/stock report test instructions because the screen lacked both screen context and dynamic tool registration. The system prompt defaulted to global orchestration mode and injected irrelevant sample report catalog prompts.
-- **Decision:**
-  - **Controlled Tab Navigation Support:** Added `activeTab` and `onTabChange` to `TabbedDetail` (`tabbed-detail.tsx`), and forwarded them via `ManagementPageTemplate` (`management-page-template.tsx`) so agents can programmatically switch tabs and inspect tab states.
-  - **Dedicated Hook Extraction Pattern:** To maintain strict adherence to Golden Rule 2 (500-line ceiling), created dedicated binding hooks (`use-skill-agent-binding.ts`, `use-agent-management-binding.ts`, `use-playbook-agent-binding.ts`, `use-system-users-agent-binding.ts`).
-  - **Full Management & Settings Coverage:**
-    - Integrated `entity_form:skill_editor` into `SkillManagementView.tsx` (`/my/skills`, `/system/skills`).
-    - Integrated `entity_form:agent_editor` into `AgentManagementView.tsx` (`/my/agents`, `/system/agents`).
-    - Integrated `entity_form:playbook_manager` into `playbooks-management-view.tsx` (`/my/playbooks`).
-    - Integrated `entity_form:user_settings` into `my-settings-form.tsx` (`/my/settings`).
-    - Integrated `entity_form:plugin_registry` into `plugins-tab-view.tsx` (`/my/plugins`).
-    - Integrated `entity_form:agent_memory` into `memory-tab-view.tsx` (`/my/memory`).
-    - Integrated `entity_form:system_users` into `SystemUsersView.tsx` (`/system/users`), refactoring its guests tab into `SystemUsersGuestsTab.tsx`.
-  - **Workspace Dashboard Context Grounding:** Integrated `useScreenAgentContext` into `blank-workspace-landing.tsx` across all domain modules (`/stock`, `/accounting`, `/selling`, `/manufacturing`, `/subcontracting`), supplying module titles, descriptions, and contextual quick prompt chips.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Integration of Library Built-in System Commands into Yula Slash Palette
-- **Rationale:** The `@my-agent/core` runtime engine and `@my-agent/react` chat hook implement core built-in commands (`/plan`, `/compact`, `/model`, `/help`/`/yardim`, `/new`/`/yeni`), but these were previously absent from `yula.client`'s `system.agent.yaml` slash palette manifest, preventing discoverability and autocomplete for end users.
-- **Decision:**
-  - **Manifest Registration:** Added `/plan`, `/compact`, `/model`, and `/yardim` to `system.agent.yaml` with explicit icons (`ListTodo`, `Minimize2`, `Cpu`, `HelpCircle`).
-  - **Icon Resolution:** Expanded `ICON_MAP` in `yula-commands.ts` with the new Lucide icons.
-  - **I18n Localization:** Localized labels, descriptions, and prompts across `tr.json` and `en.json`.
-  - **Dual-Language Core Aliases:** Registered `/yeni` and `/yardim` aliases alongside `/new` and `/help` in `prompt-templates.ts` and `chat-commands.ts`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Removal of Legacy Prototype Test Slash Commands & Emptying Skills Seed
-- **Rationale:** Following the integration of official Anthropic agent skills (`xlsx`, `pdf`, `docx`, `pptx`, `frontend-design`, `mcp-builder`, `skill-creator`, `doc-coauthoring`), the legacy prototype skills (`/ay-kapanis`, `/sayim-fark`, `/rapor-kalite`, `/gunluk-ozet`) and mock template commands (`/rapor`, `/sirala`, `/csv`, `/geri` in `@my-agent/core`) were obsolete and created confusion in the chat slash palette.
-- **Decision:**
-  - **Deleted Prototype Skills:** Removed `skills/ay-kapanis`, `skills/sayim-fark`, and `skills/rapor-kalite` from `src/Sims/yula.client/skills`.
-  - **Clean Built-in Skills Registry:** `built-in-skills.ts` and its test now register and verify exactly the 8 production Anthropic skills.
-  - **Removed Example Skill Seeding:** `ensureExampleSkill` in `user-skills.ts` no longer seeds `gunluk-ozet`; it actively cleans up any existing `gunluk-ozet` entry from user `localStorage`.
-  - **Localized Skills Namespace:** `LOCALIZABLE_SKILL_SLASHES` emptied in `yula-user-skill.ts`; removed orphaned commands (`attach`, `grid-top5`, `report-run-job`) and old skill entries from `tr.json` and `en.json`.
-  - **Pure Core Templates:** Removed domain-specific mock templates from `prompt-templates.ts` in `@my-agent/core`; system commands (`/new`, `/model`, `/login`, `/compact`, `/plan`, `/help`) preserved.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Architectural Separation of User Screen Navigation vs In-IDE Interactions
-- **Rationale:** When Yula is in Fullscreen Overlay mode (`expanded === true`), clicking any navigation element (in `ModuleSidebar`, `GlobalNavDrawer`, `AppHeader`, search results, or in-chat markdown links) signifies the user's explicit intent to view and interact with that application screen (`kullanıcı ekrana gitmek istiyor`). Previously:
-  1. *Per-page Mount Trap:* `WorkspaceAiChatProvider` was mounted per-page inside `AppLayout`. Route transitions unmounted the old provider and mounted a new one, causing `prevPathnameRef` to initialize to the destination route on mount and fail route-change detection.
-  2. *Same-Route / Link Clicks:* Clicking the active route in `ModuleSidebar` or other navigation elements did not trigger route changes, leaving the fullscreen overlay locked over the screen.
-  3. *In-IDE Collision:* In `YulaIdeSidebar`, selecting past conversation sessions invoked `navigateToConversationScreen` with `router.push(href)`. This triggered route changes that closed the IDE overlay even though the user was simply switching chat sessions within the IDE.
-- **Decision:**
-  - **Root-Level Provider Mounting:** Moved `WorkspaceAiChatProvider` to `src/app/providers.tsx` at the root application shell. It now mounts once, never unmounts across route transitions, and permanently tracks route changes and clicks across `AppHeader`, `GlobalNavDrawer`, `ModuleSidebar`, and page contents.
-  - **Universal Capture-Phase Navigation Interceptor:** Implemented `isScreenNavigationClick` and a capture-phase global click listener in `WorkspaceAiChatProvider`. Any click on internal screen links (`a[href]`) or screen navigation buttons (`[data-nav="screen"]`, `[data-slot="sidebar-menu-button"]`, `[data-slot="sidebar-menu-sub-button"]`) immediately collapses `expanded` to `false`. If the destination is home (`/`), it also closes the dock (`open = false`).
-  - **In-IDE Action Separation:** Isolated all internal IDE operations (`[data-ide-action="true"]`, `[data-slot="ide-conversation-item"]`, `[data-slot="ide-folder-toggle"]`, `[data-slot="ide-control"]`, `[data-slot="chat-composer"]`). In `YulaIdeSidebar`, selecting past conversation sessions now calls `selectConversation(id)` and `restoreConversationExecution(...)` without invoking `router.push`, keeping the user immersed in the IDE without collapsing or flashing.
-  - **Agent Programmatic Navigation:** Configured `useHeadlessSystemComponents` to explicitly set `expanded: false` and `open: true` when `app_router.NAVIGATE` is dispatched, ensuring report results are visible with the agent docked alongside.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Auto-Collapse Fullscreen Overlay on Navigation & Header Button Deduplication
-- **Rationale:** Two usability issues were identified in Yula's fullscreen overlay mode:
-  1. *Duplicate Actions:* The header previously displayed both an "Ekrana Odaklan" (`YulaFocusScreenButton`) on the left and a "Dock'a Küçül" (`YulaExpandToggleButton`) on the right. Both executed identical logic (`setExpanded(false)`), creating clutter and redundancy.
-  2. *Overlay Trapping during Left Navigation:* When users clicked navigation links on the left (`ModuleSidebar`, `GlobalNavDrawer`), the underlying URL and page changed, but the fullscreen overlay remained stuck on top (`expanded === true`), completely hiding the destination ERP page. Additionally, `expanded` was persisted in `localStorage`, causing the overlay to re-appear on reloads/navigations.
-- **Decision:**
-  - **Deduplication:** Removed `YulaFocusScreenButton` from `yula-fullscreen-overlay.tsx` and `yula-dock-controls.tsx`. The standard window control `[⤢]` (`YulaExpandToggleButton`) on the right now serves as the single canonical collapse action.
-  - **Navigation Awareness in Provider:** Updated `WorkspaceAiChatProvider` to monitor `pathname` transitions; whenever the route changes, `setExpanded(false)` is automatically triggered so that the target page is immediately revealed.
-  - **Direct Sidebar Click Handling:** Added `setExpanded(false)` handler to `ModuleSidebar` links and buttons for instant responsive dismissal upon click.
-  - **Non-Persistent Fullscreen State:** Updated `useYulaDockStore` persistence with `partialize: (s) => ({ open: s.open })`, ensuring `expanded` mode is never saved into `localStorage`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Direct 3-Column Fullscreen Workspace for SystemHomeView (Root Path)
-- **Rationale:** The system home view (`/`) is the primary landing screen of the Sims application. Having it render a single-column shell with an expand toggle to switch into fullscreen mode was redundant, as the home screen is already dedicated to the assistant workspace and has no underlying ERP view to collapse or minimize to.
-- **Decision:**
-  - `SystemHomeView` now directly renders `YulaFullscreenOverlay` in page flow (`isOverlay={false}`, `hideWindowControls={true}`).
-  - Collapse (`YulaExpandToggleButton`) and close (`YulaCloseButton`) controls are omitted on the home view, since there is no background page to return to.
-  - `YulaFullscreenHost` bypasses mounting on `pathname === "/"` to avoid duplicate overlay trees.
-  - Workspace Search (Cmd+K / AppHeader) continues to render `WorkspaceSearchMainView` covering the home area when search is triggered.
-  - In ERP pages, the side dock and fullscreen overlay behaviors remain intact with their full set of controls.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Harmonized Card Container & Header Height Chrome between Yula Full Mode and Dock Mode
-- **Rationale:** The visual presentation of Yula in `full` mode (3-column IDE overlay) previously felt detached from the Sims workspace design language: columns lacked card boundaries, resize handles were thin border lines rather than standard 8px gutters, and the diagram canvas header had a 2-tier stacked bar (`h-16+`) rather than matching the uniform `h-11` (`panelHeaderClass`) height of dock mode and other workspace cards.
-- **Decision:**
-  - **Shared Chrome Standard:** Extended the design tokens defined in `panel-chrome.ts` to `YulaFullscreenOverlay`:
-    - Root overlay container now applies `pageInsetGutterClass` (`p-2` / 8px outer gutter) so that the entire workspace cards float over the background canvas.
-    - Wrapped all 3 columns (Sidebar, Chat, Canvas) inside `panelCardClass` (`rounded-md border bg-card shadow-none`).
-    - Standardized resize handles to `panelResizeHandleClass` (`w-2 bg-transparent`), establishing consistent 8px transparent gaps between cards identical to the workspace query/report split layout.
-    - Replaced the 2-tier canvas header with a single `h-11` row matching `panelHeaderClass` (`bg-card`, `border-b border-border px-3`), with diagram icon/title/type-badge on the left and action buttons (`Download SVG`, `Copy Code`, `Maximize`, `Close`) on the right.
-    - Maximized canvas view now also adopts `panelCardClass` and `h-11` header within the same `p-2` outer gutter.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] AppLayout Content-Frame Architecture for Yula Fullscreen Overlay Host
-- **Rationale:** Previously, `YulaFullscreenOverlay` was mounted deep inside each individual page's `WorkspaceAiDock`. This caused layout clipping in screens with custom headers/banners (e.g. `ItemFormShell`), trapped the IDE overlay within leaf page containers, and risked duplicate chat instance mounts. The overlay must sit strictly at the application layout level (`AppLayout`), occupying the exact content canvas (`<main>`) bounded between the top `AppHeader` and the left `ModuleSidebar` (Sol Nav).
-- **Decision:**
-  - Created `yula-fullscreen-host.tsx` mounted inside `AppLayout`'s `<main>` frame, dynamically rendering `YulaFullscreenOverlay` with `absolute inset-0 z-40 rounded-t-2xl overflow-hidden` when `open && expanded` is active.
-  - Extracted shared buttons (`YulaNewChatButton`, `YulaExpandToggleButton`, `YulaFocusScreenButton`, `YulaCloseButton`) into `yula-dock-controls.tsx`, shrinking `workspace-ai-dock.tsx` from 452 down to 312 lines (well below the 500-line ceiling).
-  - Configured `WorkspaceSidePanelLayout` inside `WorkspaceAiDock` to use `open={open && !expanded}`, preventing duplicate chat panel instances when fullscreen overlay is active.
-  - Retained `AppHeader` on top and `ModuleSidebar` on the left in full view and operation, allowing Yula IDE 3-column workspace to smoothly occupy 100% of the active main canvas.
-  - Replaced decorative macOS window accent dots with a native Sims/Yula brand header bar aligned across all three IDE columns (`h-11 border-b border-border/40`).
-  - Simplified the Dock Mode (side dock) header: stripped the bulky token usage badge and mode chip; streamlined the layout to just `[Agent Avatar / Mark] [Title]` on the left and `[+] [⤢] [✕]` on the right.
-  - Formalized Yula's 3 distinct presentation modes: (1) `landingpage` mode (the default home screen format with centered hero greeting and spacious prompt), (2) `full` mode (the 3-column Antigravity IDE workspace with sidebar, chat stream, and diagram canvas), and (3) `dock` mode (the side dock for multi-tasking alongside ERP screens). Added mode switching between `landingpage` and `full` directly from the home screen header.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] 3-Column Antigravity IDE Workspace for Yula Fullscreen Overlay Mode
-- **Rationale:** In Yula Fullscreen mode, opening diagrams as a slide-out right drawer/sheet conflicted with the user's mental model and workspace productivity. As demonstrated in Antigravity IDE and modern developer tools, fullscreen workspaces naturally benefit from an authentic 3-column split view (Left: Conversations, History & Projects, Center: Chat Stream & Input, Right: IDE Canvas & Artifacts).
-- **Decision:**
-  - Built `yula-fullscreen-overlay.tsx` using Shadcn `<ResizablePanelGroup orientation="horizontal">` with 3 columns:
-    1. *Column 1 (Left Sidebar):* Integrated `yula-ide-sidebar.tsx` with top `+ New Conversation` button, navigation quick links (Conversation History, Scheduled Tasks), Projects/Workspaces collapsible tree with relative time badges (`2m`, `4h`, `1d`, `2d`), and pinned bottom `Settings` button.
-    2. *Column 2 (Center Chat):* Primary `AIChatPanel mode="main"` chat stream with IDE breadcrumb header (`Workspace > Session Title`), worked steps, and prompt composer.
-    3. *Column 3 (Right Canvas):* Dynamic `yula-ide-canvas-header.tsx` with IDE tab bar, breadcrumbs (`Sims > yula.client > diagrams > Type > Title`), SVG export, code copy, and full-screen maximize toggle.
-  - Refactored `workspace-ai-dock.tsx` to delegate fullscreen rendering to `yula-fullscreen-overlay.tsx`, reducing its size from 476 to 451 lines and preserving the strict 500-line limit.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Artifact & Side Canvas Architecture for Mermaid Diagrams (Dock & Fullscreen Split)
-- **Rationale:** While lazy-rendered Mermaid diagrams worked well in general Markdown, wide diagrams (flowcharts, sequence diagrams, ERDs) rendered directly inside narrow chat bubbles in the AI side dock felt cramped and forced excessive horizontal scrolling. An adaptive "Artifact / Side Canvas" paradigm was required to deliver an expansive workspace experience.
-- **Decision:**
-  - **Dock Mode (Side Panel, ~32% width):** The chat renders a compact, interactive `MermaidChip` showing diagram type badge (`Flowchart`, `Sequence`, `ERD`, `State`, etc.), title, and line count. Clicking "Tuvalde Aç" (Open in Canvas) slides out a wide Shadcn `<Sheet side="right">` (`MermaidCanvasSheet`) with full-scale pan & zoom, code toggle, and SVG download. Users can also toggle an inline accordion preview directly in the message.
-  - **Fullscreen Mode (Overlay):** Activating a diagram transitions the overlay into a split-view workspace using Shadcn `<ResizablePanelGroup orientation="horizontal">`. The left pane keeps chat history with a draggable split handle, while the right pane (`MermaidCanvasPanel`) renders the diagram in high fidelity with zoom controls, code copy, and SVG export.
-  - **State Management:** Implemented `active-diagram-store.ts` via Zustand to coordinate active diagram payload (`id`, `chart`, `title`, `type`) and open/close state across dock, sheet, and split-panel layouts.
-  - **Metadata Helper:** Extracted `detectDiagramMeta` into pure `mermaid-meta.ts` for regex-based metadata extraction without dependencies.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Dynamic Client-Side Mermaid Integration for Markdown (Chat & Docs)
-- **Rationale:** Evaluated migrating markdown parsing to `next-mdx-remote`, `mdx-mermaid`, and `mermaid`. The MDX compiler approach was rejected due to critical flaws for conversational UI:
-  1. *Streaming Choke:* Real-time token streaming (20-50 tokens/sec) causes browser freezing when running full MDX AST compilation on each chunk.
-  2. *Security (RCE Risk):* MDX evaluates arbitrary JS/JSX expressions, creating Remote Code Execution and prompt-injection vulnerabilities in chat.
-  3. *Heavy / Deprecated Dependencies:* `mdx-mermaid` requires Puppeteer (300MB headless browser) for SSR and is pinned to MDX v2.
-- **Decision:**
-  - Preserved the high-performance, token-streaming `react-markdown` + `marked.lexer` block memoization pipeline.
-  - Installed only `mermaid` (v12) into `yula.client` and implemented a zero-overhead, lazy-loaded client component (`MermaidBlock`).
-  - Integrated with Next.js themes (`useTheme()`) for automatic dark/light diagram styling.
-  - Built streaming fault tolerance: during LLM token emission, incomplete syntax is gracefully handled without uncaught exceptions or screen flicker.
-  - Added a dual-view segmented toggle (`[Diagram / Code]`) with one-click code copy and zoom controls in `MarkdownPreBlock` and `MarkdownDoc`.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Graph-Native (DAG) Architecture for Yula Playbook Wiki
-- **Rationale:** While single-screen rules (`screen_rule`) operate well as simple markdown lists, multi-step workflow recipes (`workflow_recipe`) were prone to execution ambiguity and halucinations when stored as free-form prose. A Directed Acyclic Graph (DAG) model provides deterministic ReAct execution order, topological dependency checks, mathematical cycle detection, and live observability.
-- **Decision:**
-  - Implemented `PlaybookDAG` in `@my-agent/core` (`playbook-graph.ts`) as a zero-dependency, type-safe DAG container with Tarjan DFS cycle detection, Kahn's topological sort, and Markdown step parsing/serialization.
-  - Enhanced `PlaybookService.lint()` to validate workflow recipe graph integrity during Karpathy procedural memory checks.
-  - Installed `@xyflow/react` and `@dagrejs/dagre` in `yula.client` for interactive DAG visualization.
-  - Created `WorkflowGraphCanvas.tsx` with dynamic in-browser Dagre auto-layout, avoiding hardcoded coordinate pollution in Git-tracked storage.
-  - Upgraded `PlaybooksManagementView.tsx` with a dual-mode switcher (Card View vs. Graph Canvas) in the Workflows tab.
-  - Preserved simple card/list layout for single-screen rules (`screen_rule`) to prevent overengineering.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Procedural Memory & Playbook (Karpathy LLM Wiki Pattern)
-- **Rationale:** The AI agent had amnesia regarding screen-specific operational procedures and repeated exploratory trial-and-error queries from scratch on every turn.
-- **Decision:**
-  - Implemented `PlaybookService`, `MemoryPlaybookStorage`, `RestPlaybookStorage`, and `LocalStoragePlaybookStorage` in `@my-agent/core`.
-  - Added `AgentProvider` DI support and `useAgentPlaybook` hook in `@my-agent/react`.
-  - Added Markdown-backed server storage (`ServerFsPlaybookStorage`) in `yula.client` under `storage/wiki/workspaces/<workspace>/`.
-  - Surfaced active Wiki reading tier (`Workspace Wiki`, `User Wiki`, `System Baseline`) and playbook updates (`propose_playbook_update`) transparently in the Worked Steps UI.
-- **Author:** Antigravity / Team
 
 ## 📜 Prior Decisions Archive
 Older architectural decisions have been archived to adhere to the 500-line limit:
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
-
-

@@ -77,22 +77,22 @@ export async function computeColumnValuesDigest(
       .slice(0, COLUMN_VALUES_MAX_COLUMNS);
     if (candidates.length === 0) return null;
 
-    let duckDb = input.client;
-    if (!duckDb) {
-      const mod = await import("@/services/duckdb").catch(() => null);
-      duckDb = mod?.duckDbClient;
+    let sqlEngine = input.client;
+    if (!sqlEngine) {
+      const mod = await import("@/services/wasmsql").catch(() => null);
+      sqlEngine = mod?.wasmSqlClient;
     }
-    if (!duckDb) return null;
+    if (!sqlEngine) return null;
 
     if (input.signal?.aborted) return null;
-    const tableCheck = await duckDb.checkTableExists(input.tableName).catch(() => ({ exists: false }));
+    const tableCheck = await sqlEngine.checkTableExists(input.tableName).catch(() => ({ exists: false }));
     if (!tableCheck.exists || input.signal?.aborted) return null;
 
     const out: Record<string, string[]> = {};
     for (const col of candidates) {
       if (input.signal?.aborted) return null;
       try {
-        const rows = await duckDb.executeCustomSql(
+        const rows = await sqlEngine.executeCustomSql(
           buildColumnValuesQuery(
             input.tableName,
             col,

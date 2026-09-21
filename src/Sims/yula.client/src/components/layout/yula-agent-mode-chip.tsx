@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
 import { Brain, Cpu, ListOrdered, Sparkles, Zap, ArrowRight } from "lucide-react";
+import { getMessageText } from "@my-agent/core";
 
 export type YulaAgentModeChipProps = {
   className?: string;
@@ -66,11 +67,7 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
     if (!messages) return false;
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      const text =
-        msg.parts
-          ?.filter((p) => p.type === "text")
-          .map((p: any) => p.text)
-          .join(" ") || "";
+      const text = getMessageText(msg);
       if (
         text.includes("Planlama Modu Aktif") ||
         text.includes("Planning Mode Active") ||

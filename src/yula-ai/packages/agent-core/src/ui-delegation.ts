@@ -177,12 +177,39 @@ export class DelegatedToolRegistry {
       }
 
       if (req.method === 'inspect_ui_state') {
+        const p = (req.payload || {}) as any;
+        const filterOpts = {
+          topic: p.topic,
+          source: p.source,
+          type: p.event_type,
+          correlationId: p.correlation_id,
+          minSeverity: p.min_severity,
+          limit: p.limit,
+        };
+        if (p.component_id) {
+          const comp = uiRegistry.get(p.component_id);
+          if (!comp) {
+            return {
+              id: req.id,
+              success: false,
+              error: `Component "${p.component_id}" is not currently mounted on screen.`,
+            };
+          }
+          return {
+            id: req.id,
+            success: true,
+            result: {
+              component: comp,
+              recent_events: uiEventBus.getRecentEvents({ ...filterOpts, source: p.component_id }),
+            } as any,
+          };
+        }
         return {
           id: req.id,
           success: true,
           result: {
             active_components: uiRegistry.getActiveComponents(),
-            recent_events: uiEventBus.getRecentEvents(),
+            recent_events: uiEventBus.getRecentEvents(filterOpts),
           } as any,
         };
       }

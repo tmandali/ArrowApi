@@ -5,6 +5,13 @@ import {
   isFailedToolInfo,
   type YulaToolPartInfo,
 } from "@/lib/yula-tool-info";
+import {
+  isTextPart,
+  isReasoningPart,
+  classifyTextPart,
+  getMessageText,
+  type AgentStepFrame,
+} from "@my-agent/core";
 import type { useTranslations } from "next-intl";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { resolveYulaSlashCommand } from "@/components/layout/yula-commands";
@@ -12,6 +19,8 @@ import { getTurnTrace } from "@/lib/yula-turn-trace";
 import type { TurnTraceStep } from "@/lib/yula-turn-trace";
 import { PI_TRACE_ID_PREFIX } from "@/lib/my-agent-pi-bridge";
 import { mapToolInfoToWorkedSteps } from "./yula-worked-steps-tools";
+
+import { findReport } from "@/features/reports/report-registry";
 
 /** Modül-seviyesi adım üreticileri hook kullanamadığından, bileşen tarafı
  * `useTranslations("WorkedSteps")`'ı buraya taşır. */
@@ -38,18 +47,14 @@ export interface WorkedStepPhase {
   steps: WorkedStepItem[];
   hasError: boolean;
   isLive: boolean;
+  isRecovery?: boolean;
+  thought?: string;
+  errorMessage?: string;
+  transitionReason?: string;
 }
 
-const PHASE_LABEL_BY_KIND: Record<WorkedStepItem["kind"], string> = {
-  explored: "Exploration",
-  edited: "Updates",
-  ran: "Execution",
-  confirmation: "Confirmation",
-  thought: "Thinking",
-};
-
-/** Düz adım listesini stepIndex (step-start sınırı) bazında fazlara böler.
- *  Faz etiketi, fazdaki ilk düşünce-dışı adımın türünden türetilir (İngilizce). */
+/** Düz adım listesini stepIndex (step-start sınırı) bazında ReAct Step Framelerine böler.
+ *  Her faz bir düşünce (Thought) + eylem (Action) + sonuç (Observation) ünitesidir. */
 export function groupStepsByPhase(steps: WorkedStepItem[]): WorkedStepPhase[] {
   const buckets = new Map<number, WorkedStepItem[]>();
   for (const step of steps) {
@@ -58,18 +63,84 @@ export function groupStepsByPhase(steps: WorkedStepItem[]): WorkedStepPhase[] {
     if (list) list.push(step);
     else buckets.set(key, [step]);
   }
-  return [...buckets.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([phaseIndex, phaseSteps]) => {
-      const anchor = phaseSteps.find((s) => s.kind !== "thought") ?? phaseSteps[0];
-      return {
-        phaseIndex,
-        label: anchor ? PHASE_LABEL_BY_KIND[anchor.kind] : "Thinking",
-        steps: phaseSteps,
-        hasError: phaseSteps.some((s) => s.isError),
-        isLive: phaseSteps.some((s) => s.isLive),
-      };
-    });
+  const sorted = [...buckets.entries()].sort((a, b) => a[0] - b[0]);
+  let prevError: string | undefined = undefined;
+
+  return sorted.map(([phaseIndex, phaseSteps]) => {
+    const anchor = phaseSteps.find((s) => s.kind !== "thought") ?? phaseSteps[0];
+    const thoughtStep = phaseSteps.find((s) => s.kind === "thought");
+    const errorStep = phaseSteps.find((s) => s.isError);
+    const hasError = Boolean(errorStep);
+
+    let errorMessage: string | undefined = undefined;
+    if (errorStep) {
+      if (errorStep.subLabel && errorStep.subLabel.startsWith("Hata:")) {
+        errorMessage = errorStep.subLabel.replace(/^Hata:\s*/, "");
+      } else if (errorStep.detailText) {
+        errorMessage = errorStep.detailText;
+      }
+    }
+
+    const isRecovery = Boolean(prevError);
+    let transitionReason: string | undefined = undefined;
+    if (isRecovery) {
+      transitionReason = prevError ? `Hata sonrası kurtarma (${prevError.slice(0, 30)})` : "Kurtarma adımı";
+    } else if (anchor?.info?.toolName === "ask_user_choice") {
+      transitionReason = "Kullanıcı tercihi ve eksik kriter doğrulama adımı";
+    } else if (anchor?.info?.toolName === "dispatch_component_action") {
+      const action = (anchor.info.input as Record<string, unknown> | undefined)?.action;
+      if (action === "NAVIGATE") {
+        transitionReason = "Hedef ekrana yönlendirme adımı";
+      } else if (action === "SET_FIELDS" || action === "APPLY") {
+        transitionReason = "Kriter parametrelerini uygulama adımı";
+      } else if (action === "SUBMIT" || action === "RUN") {
+        transitionReason = "Rapor yürütme / iş başlatma adımı";
+      } else if (action === "RUN_SQL") {
+        transitionReason = "Veri analizi ve DuckDB SQL sorgulama adımı";
+      }
+    }
+
+    prevError = hasError ? (errorMessage || "İşlem hatası") : undefined;
+
+    return {
+      phaseIndex,
+      label: anchor ? anchor.label : "Thinking & Planning",
+      steps: phaseSteps,
+      hasError,
+      isLive: phaseSteps.some((s) => s.isLive),
+      isRecovery,
+      thought: thoughtStep?.detailText,
+      errorMessage,
+      transitionReason,
+    };
+  });
+}
+
+/**
+ * Converts live UI phases into standard AgentStepFrame array for Mermaid or Postgres.
+ */
+export function phasesToStepFrames(
+  phases: WorkedStepPhase[],
+  conversationId = "active",
+): AgentStepFrame[] {
+  return phases.map((p, idx) => {
+    const anchor = p.steps.find((s) => s.kind !== "thought") ?? p.steps[0];
+    const toolCall = anchor?.info;
+    return {
+      id: `${conversationId}-step-${p.phaseIndex}`,
+      conversationId,
+      stepIndex: p.phaseIndex,
+      parentStepId: idx > 0 ? `${conversationId}-step-${phases[idx - 1].phaseIndex}` : undefined,
+      status: p.hasError ? "error" : p.isRecovery ? "recovered" : p.isLive ? "running" : "success",
+      thought: p.thought,
+      actionTool: toolCall?.toolName || anchor?.label,
+      actionInput: toolCall?.input,
+      observation: toolCall?.output,
+      isError: p.hasError,
+      errorMessage: p.errorMessage,
+      transitionReason: p.transitionReason,
+    };
+  });
 }
 
 function traceToWorkedStep(step: TurnTraceStep, isLiveStreaming?: boolean): WorkedStepItem {
@@ -127,11 +198,7 @@ export function extractWorkedSteps(
     }
   }
 
-  const userText = userMessage?.parts
-    ?.filter((p) => p.type === "text")
-    ?.map((p) => (p as { text: string }).text)
-    ?.join("\n")
-    ?.trim();
+  const userText = getMessageText(userMessage).trim();
 
   const matchedCmd = userText ? resolveYulaSlashCommand(userText) : null;
   if (matchedCmd && matchedCmd.phase !== "system") {
@@ -222,11 +289,43 @@ export function extractWorkedSteps(
     });
   }
 
+  // 0b. Proaktif Ekran & Bağlam İncelemesi Adımı
+  const inspection = (message as any)?.metadata?.inspection;
+  if (inspection) {
+    const isGlobal = !inspection.hasMountedForm;
+    const reportMeta = inspection.activeReportScope ? findReport(inspection.activeReportScope) : undefined;
+    const reportTitle = reportMeta?.title || inspection.activeReportScope;
+    pushStep({
+      id: `${message.id}-context-inspection`,
+      kind: "explored",
+      label: `🔍 Ekran & Bağlam İncelemesi (${inspection.route})`,
+      subLabel: isGlobal ? "Global alan · DOM'da kriter formu yok" : "Kriter formu aktif",
+      detailText: [
+        `• Aktif Rota: ${inspection.route}`,
+        `• Ekran Fazı: ${inspection.phase}`,
+        `• Ekran Durumu: ${isGlobal ? "Landing Ekranı (DOM üzerinde form yüklü değil)" : "Kriter formu yüklü"}`,
+        reportTitle ? `• Eşleşen Rapor: ${reportTitle}` : undefined,
+        `• Referans Tarih: ${inspection.today}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      isLive: false,
+      isError: false,
+      info: {
+        toolCallId: `${message.id}-context-inspection`,
+        toolName: "context_inspection",
+        state: "output-available",
+        input: { route: inspection.route, phase: inspection.phase },
+        output: inspection,
+      },
+    });
+  }
+
   message.parts.forEach((part, index) => {
-    if (part.type === "reasoning") {
-      const raw = part.text ?? "";
-      if (!raw.trim()) return;
-      const meta = (part as { meta?: string }).meta;
+    if (isReasoningPart(part)) {
+      const raw = part.text.trim();
+      if (!raw) return;
+      const meta = part.meta;
       const isThinking = !meta || meta === "thinking";
       const approxDuration = Math.max(1, Math.round(raw.length / 60));
 
@@ -247,8 +346,26 @@ export function extractWorkedSteps(
       return;
     }
 
-    if (part.type === "text") {
-      // Metin parçaları doğrudan sohbet mesajı balonunda render edilir.
+    if (isTextPart(part)) {
+      const raw = part.text.trim();
+      const hasToolsInMessage = message.parts.some(
+        (p) =>
+          (p as { type?: string }).type?.startsWith("tool-") ||
+          (p as { type?: string }).type === "dynamic-tool",
+      );
+      const role = part.role ?? classifyTextPart(raw, hasToolsInMessage);
+
+      if (raw && hasToolsInMessage && role === "plan_rationale") {
+        pushStep({
+          id: `${message.id}-plan-evaluation-${index}`,
+          kind: "thought",
+          label: "📋 Değerlendirme & Eylem Planı",
+          subLabel: "Plan oluşturuldu · Parametre analizi",
+          detailText: raw,
+          isLive: false,
+          isError: false,
+        });
+      }
       return;
     }
 
@@ -302,7 +419,7 @@ export function extractWorkedSteps(
   // (thinking kapalıyken tipik durum) adım listesi boş kalır: tek satırlık özet ekle
   if (!isLiveStreaming && steps.length === 0 && message) {
     const hasText = message.parts.some(
-      (p) => p.type === "text" && ((p as { text?: string }).text ?? "").trim().length > 0,
+      (p) => isTextPart(p) && p.text.trim().length > 0,
     );
     if (hasText) {
       steps.push({

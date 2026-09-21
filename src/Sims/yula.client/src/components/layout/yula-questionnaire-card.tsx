@@ -21,6 +21,7 @@ import { useTranslations } from "next-intl";
 import { useYulaChat } from "@/hooks/use-yula-chat";
 import { cn } from "@/utils/cn";
 import { MessageCircleQuestionMark, Check } from "lucide-react";
+import { getMessageText } from "@my-agent/core";
 
 export interface YulaQuestionChoice {
   value: string;
@@ -112,12 +113,8 @@ export function YulaQuestionnaireCard({
     return yula.messages
       .slice(idx + 1)
       .filter((m) => m.role === "user")
-      .map((m) =>
-        m.parts
-          .filter((p) => p.type === "text")
-          .map((p) => (p as { text?: string }).text ?? "")
-          .join("\n"),
-      )
+      .map((m) => getMessageText(m))
+      .filter(Boolean)
       .join("\n")
       .trim();
   }, [yula.messages, messageId]);

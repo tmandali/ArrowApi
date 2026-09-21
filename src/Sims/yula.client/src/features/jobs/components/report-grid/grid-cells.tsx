@@ -5,9 +5,13 @@ import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatGridCellValue } from "@/utils/format-cell";
 import { cn } from "@/utils/cn";
-import { cellInputClass, cellClass } from "../virtual-spreadsheet";
-import { evaluateColorRules } from "../virtual-spreadsheet/conditional-rules";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import {
+  cellInputClass,
+  cellClass,
+  evaluateColorRules,
+  type SpreadsheetColumn,
+  type ConditionalColorRule,
+} from "@/components/virtual-spreadsheet";
 import type { ColumnStyleSpec } from "./use-column-style-stats";
 
 /** Arrow/DuckDB hücre değerlerini sayıya çevirir (valueOf tabanlı nesneler dahil). */
@@ -76,7 +80,7 @@ export function createRowRenderer(args: {
   /** Airtable benzeri kolon görsel kuralları (bar / çip). Opsiyonel. */
   columnStyles?: Record<string, ColumnStyleSpec>;
   /** Eşik tabanlı koşullu renk kuralları (kolon adı → kurallar). Opsiyonel. */
-  columnRules?: Record<string, import("../virtual-spreadsheet/conditional-rules").ConditionalColorRule[]>;
+  columnRules?: Record<string, ConditionalColorRule[]>;
 }) {
   const { effectiveColumns, columnTypes, columnDuckTypes, columnStyles, columnRules } = args;
   return (

@@ -315,10 +315,11 @@ export class UIEventBus implements IEventBus {
     }
     if (options?.source) {
       const src = options.source;
-      result = result.filter((e) => e.source === src || e.source.startsWith(src));
+      result = result.filter((e) => e.source === src || e.source.startsWith(src) || src.startsWith(e.source));
     }
     if (options?.type) {
-      result = result.filter((e) => e.type === options.type);
+      const targetType = options.type.toLowerCase();
+      result = result.filter((e) => e.type.toLowerCase() === targetType);
     }
     if (options?.correlationId) {
       result = result.filter((e) => e.correlationId === options.correlationId);

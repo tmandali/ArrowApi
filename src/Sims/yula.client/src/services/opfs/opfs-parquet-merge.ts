@@ -1,5 +1,5 @@
 import { opfsReportCache } from "@/services/opfs/opfs-cache"
-import { duckDbClient } from "@/services/duckdb/duckdb-client"
+import { wasmSqlClient } from "@/services/wasmsql"
 import initParquetWasm, {
   readParquet,
   Table as ParquetWasmTable,
@@ -196,7 +196,7 @@ export async function exportQueryToParquetStream(options: {
   const finalFileName = fileName.endsWith(".parquet") ? fileName : `${fileName}.parquet`
 
   // 1. Toplam satır sayısını al
-  const totalRows = await duckDbClient.getQueryRowCount({
+  const totalRows = await wasmSqlClient.getQueryRowCount({
     tableName,
     customSql,
     filters,
@@ -217,7 +217,7 @@ export async function exportQueryToParquetStream(options: {
   let currentOffset = 0
   let totalProcessed = 0
 
-  // 3. DuckDB'den parça parça çekip parquet-wasm'a akıtan lazy stream
+  // 3. WasmSQL'den parça parça çekip parquet-wasm'a akıtan lazy stream
   const lazyRecordBatchStream = new ReadableStream({
     async pull(controller) {
       if (currentOffset >= totalRows) {
@@ -227,7 +227,7 @@ export async function exportQueryToParquetStream(options: {
 
       const limit = Math.min(chunkSize, totalRows - currentOffset)
       try {
-        const { ipcBytes, rowCount } = await duckDbClient.fetchArrowIpcChunk({
+        const { ipcBytes, rowCount } = await wasmSqlClient.fetchArrowIpcChunk({
           tableName,
           customSql,
           columns,

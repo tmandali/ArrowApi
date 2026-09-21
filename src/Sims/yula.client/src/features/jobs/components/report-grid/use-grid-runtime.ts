@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useYulaGridStore } from "@/lib/stores/grid";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import type { SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 
 /**
  * AI & kontrollü grid düzeni: kolon gizleme/sabitleme/sıra + filtre satırı +
@@ -10,7 +10,7 @@ import type { SpreadsheetColumn } from "../virtual-spreadsheet";
  */
 export function useGridRuntime(args: {
   setFilter: (column: string, value: string) => void;
-  duckApplyFilters: (filters: Record<string, string>, clearOthers?: boolean) => void;
+  applyFilters: (filters: Record<string, string>, clearOthers?: boolean) => void;
   clearFilters: () => void;
   setSorting: (column: string | null, desc: boolean) => void;
   effectiveColumns: SpreadsheetColumn[];
@@ -25,7 +25,7 @@ export function useGridRuntime(args: {
 }) {
   const {
     setFilter,
-    duckApplyFilters,
+    applyFilters,
     clearFilters,
     setSorting,
     effectiveColumns,
@@ -87,7 +87,7 @@ export function useGridRuntime(args: {
         revealFilterRow();
       },
       applyFilters: (newFilters, clearOthers) => {
-        duckApplyFilters(newFilters, clearOthers);
+        applyFilters(newFilters, clearOthers);
         revealFilterRow();
       },
       clearAll: () => {
@@ -151,7 +151,7 @@ export function useGridRuntime(args: {
     };
   }, [
     setFilter,
-    duckApplyFilters,
+    applyFilters,
     clearFilters,
     setSorting,
     effectiveColumns,

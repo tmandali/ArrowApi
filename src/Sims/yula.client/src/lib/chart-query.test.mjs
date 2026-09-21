@@ -18,6 +18,11 @@ describe("inferChartOrderMode", () => {
     assert.equal(inferChartOrderMode(undefined), "value_desc");
   });
 
+  it("handles desc and asc aliases", () => {
+    assert.equal(inferChartOrderMode("desc"), "value_desc");
+    assert.equal(inferChartOrderMode("asc"), "value_asc");
+  });
+
   it("respects explicit appearance", () => {
     assert.equal(inferChartOrderMode("appearance"), "appearance");
   });

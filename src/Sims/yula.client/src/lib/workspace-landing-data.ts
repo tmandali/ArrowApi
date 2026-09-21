@@ -284,7 +284,7 @@ export const WORKSPACE_LANDING_STRUCTURE: Record<WorkspaceId, StructuralLanding>
     kpis: [
       { id: "active-users", trend: "up", tone: "blue", icon: Users },
       { id: "system-status", trend: "up", tone: "emerald", icon: CheckCircle2 },
-      { id: "duckdb-status", trend: "flat", tone: "violet", icon: Briefcase },
+      { id: "wasmsql-status", trend: "flat", tone: "violet", icon: Briefcase },
       { id: "unread-notifications", trend: "flat", tone: "amber", icon: AlertCircle },
     ],
     pendingActions: [

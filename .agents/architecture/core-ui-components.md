@@ -8,6 +8,10 @@ This document serves as the comprehensive architectural guide for the primary us
 
 The tabular reporting experience in Yula combines the reactive simplicity of **Airtable** with the computational power and keyboard fluidity of **Microsoft Excel**, powered natively by in-browser WebAssembly.
 
+### Component Architecture & Modular Boundaries
+- **Standalone Shared Component:** `<VirtualSpreadsheet />` resides in [`src/components/virtual-spreadsheet/`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/components/virtual-spreadsheet/) as a reusable, domain-agnostic spreadsheet engine with Canvas 2D sizing, multi-sort, cell selection, and persistence hooks.
+- **Report Domain Adapter:** `<ArrowReportGrid />` (`src/features/jobs/components/report-grid/`) bridges DuckDB analytical report streams (`useDuckReport`) to `<VirtualSpreadsheet />` and binds with the AI agent (`useResultGridAgent`).
+
 ### Key Capabilities & Mechanics
 - **Zero-Reflow Text Measurement:** Uses an off-screen HTML5 Canvas 2D context (`column-sizing.ts`) to calculate precise column widths. Never inserts hidden DOM nodes or calls `getBoundingClientRect()`, ensuring 60 FPS rendering during high-speed data streams.
 - **Bi-Directional Virtualization:** Renders only visible rows and columns in the DOM window (`use-grid-scroll-sync.ts`), smoothly navigating hundreds of thousands of records without memory leaks.

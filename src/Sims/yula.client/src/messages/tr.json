@@ -657,7 +657,7 @@
           "change": "%99.98 uptime",
           "subtext": "Tüm servisler devrede"
         },
-        "duckdb-status": {
+        "wasmsql-status": {
           "title": "Yerel Veri Motoru",
           "value": "Aktif",
           "change": "Yerel önbellek",

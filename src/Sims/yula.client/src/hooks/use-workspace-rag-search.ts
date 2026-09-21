@@ -3,11 +3,12 @@
 import { useState, useEffect, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import { ALL_WORKSPACE_MENU_ITEMS, type WorkspaceMenuItem } from "@/lib/workspace-search-catalog";
-import { searchVectorContext } from "@/services/duckdb-vector";
+import { searchVectorContext } from "@/services/wasmsql-vector";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { extractAgentIdFromPath } from "@/lib/workspace-paths";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { getMessageText } from "@my-agent/core";
 
 export interface WorkspaceSearchResultItem {
   id: string;
@@ -42,10 +43,7 @@ const CHAT_HISTORY_CATEGORY = "Sohbet Geçmişi";
 /** Sohbetin ilk kullanıcı mesajının metnini döner (geçmiş arama bağlamı için). */
 function firstUserText(messages: YulaMessage[] | undefined): string {
   const firstUser = messages?.find((m) => m.role === "user");
-  const textPart = firstUser?.parts?.find(
-    (p): p is Extract<(typeof p), { type: "text" }> => p.type === "text",
-  );
-  return textPart && textPart.type === "text" ? (textPart.text ?? "") : "";
+  return getMessageText(firstUser);
 }
 
 /** Token setinin (kök eki temizlemeli) metinle eşleşip eşleşmediğini kontrol eder. */

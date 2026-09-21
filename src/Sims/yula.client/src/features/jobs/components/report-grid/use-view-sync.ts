@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { duckDbClient } from "@/services/duckdb";
+import { wasmSqlClient } from "@/services/wasmsql";
 import { resolveActiveViewReferences } from "@/lib/sql-guard";
-import { buildCombinedWhereClause } from "@/services/duckdb/filter-parser";
-import type { AiSqlView, SpreadsheetColumn } from "../virtual-spreadsheet";
+import { buildCombinedWhereClause } from "@/services/wasmsql/filter-parser";
+import type { AiSqlView, SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 
 // Helper: Görünüm adını güvenli SQL tanımlayıcısına dönüştürür (örn: "Ege Bölgesi Satışları" -> "view_ege_bolgesi_satislari")
 export function sanitizeViewIdentifier(name: string, id: string): string {
@@ -29,7 +29,8 @@ export function sanitizeViewIdentifier(name: string, id: string): string {
  */
 export function useViewSync(args: {
   aiViews: AiSqlView[];
-  duckTableName: string;
+  tableName?: string;
+  duckTableName?: string;
   isTableReady: boolean;
   isStreaming: boolean;
   isSavingDisk: boolean;
@@ -42,9 +43,9 @@ export function useViewSync(args: {
   sortConfigs: Record<string, "asc" | "desc">;
   customQuerySql: string | null;
 }) {
+  const tableName = args.tableName ?? args.duckTableName ?? "";
   const {
     aiViews,
-    duckTableName,
     isTableReady,
     isStreaming,
     isSavingDisk,
@@ -69,12 +70,12 @@ export function useViewSync(args: {
 
   // Kayıtlı görünümleri DuckDB içinde SQL VIEW olarak senkronize et
   React.useEffect(() => {
-    if (!duckTableName || !isTableReady || isStreaming || isSavingDisk) return;
+    if (!tableName || !isTableReady || isStreaming || isSavingDisk) return;
     for (const v of savedViewSpecs) {
       // Kayıtlı görünüm SQL'i 'active_view' içeriyorsa döngüsel bağımlılığı (infinite recursion)
       // önlemek için temel tablo adına çözümlenir
-      const resolvedSql = resolveActiveViewReferences(v.sql, duckTableName);
-      void duckDbClient
+      const resolvedSql = resolveActiveViewReferences(v.sql, tableName);
+      void wasmSqlClient
         .createOrReplaceView({
           viewName: v.name,
           selectSql: resolvedSql,
@@ -83,11 +84,11 @@ export function useViewSync(args: {
           console.warn(`[ArrowReportGrid] Saved view (${v.name}) DuckDB view sync error:`, err);
         });
     }
-  }, [duckTableName, isTableReady, isStreaming, isSavingDisk, savedViewSpecs]);
+  }, [tableName, isTableReady, isStreaming, isSavingDisk, savedViewSpecs]);
 
   // Canlı aktif görünümü ("active_view") DuckDB VIEW olarak 300ms debounce ile senkronize et
   React.useEffect(() => {
-    if (!duckTableName || !isTableReady || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
+    if (!tableName || !isTableReady || isStreaming || isSavingDisk || effectiveColumns.length === 0) return;
 
     const timer = setTimeout(() => {
       // 1. Sıralama clause'u (soldan sağa çoklu sıralama)
@@ -118,15 +119,15 @@ export function useViewSync(args: {
         // active_view tanımlanırken kendi içine 'active_view' yazılması özyinelemeli döngü
         // ("infinite recursion detected: attempting to recursively bind view active_view") üretir.
         // Bu nedenle sorgu içindeki 'active_view' referansları fiziksel temel tabloya çözülür.
-        const resolvedQuery = resolveActiveViewReferences(customQuerySql, duckTableName);
+        const resolvedQuery = resolveActiveViewReferences(customQuerySql, tableName);
         const cleanQuery = resolvedQuery.trim().replace(/;+$/, "");
         selectSql = `SELECT * FROM (${cleanQuery}) AS __active_base ${whereClause} ${orderClause}`;
       } else {
         const selectCols = effectiveColumns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(", ");
-        selectSql = `SELECT ${selectCols} FROM "${duckTableName.replace(/"/g, '""')}" ${whereClause} ${orderClause}`;
+        selectSql = `SELECT ${selectCols} FROM "${tableName.replace(/"/g, '""')}" ${whereClause} ${orderClause}`;
       }
 
-      void duckDbClient
+      void wasmSqlClient
         .createOrReplaceView({
           viewName: "active_view",
           selectSql,
@@ -138,7 +139,7 @@ export function useViewSync(args: {
 
     return () => clearTimeout(timer);
   }, [
-    duckTableName,
+    tableName,
     isTableReady,
     isStreaming,
     isSavingDisk,

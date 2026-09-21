@@ -21,6 +21,7 @@ import {
   retryWithBackoff,
   uiEventBus,
   classifyDiagnosticError,
+  getMessageText,
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
@@ -146,8 +147,8 @@ export function ChatInstance({
       const { initYulaStorageBuckets } = await import("@/lib/yula-storage-buckets");
       await initYulaStorageBuckets().catch(() => {});
     });
-    multiLaneScheduler.enqueue("background", "DuckDB RAG Schema Indexing", async () => {
-      const { indexReportSchemas } = await import("@/services/duckdb-vector");
+    multiLaneScheduler.enqueue("background", "WasmSQL RAG Schema Indexing", async () => {
+      const { indexReportSchemas } = await import("@/services/wasmsql-vector");
       await indexReportSchemas().catch((err) =>
         console.warn("[Yula RAG] Background indexing error:", err),
       );
@@ -164,10 +165,7 @@ export function ChatInstance({
     const currentAgentId = currentPath ? resolveCurrentAgentId(currentPath) : null;
     saveMessages(conversationId, chat.messages, currentPath, currentAgentId);
     const firstUser = chat.messages.find((m) => m.role === "user");
-    const textPart = firstUser?.parts?.find(
-      (p): p is Extract<(typeof p), { type: "text" }> => (p as { type: string }).type === "text",
-    );
-    const text = textPart && "text" in textPart ? textPart.text : "";
+    const text = getMessageText(firstUser);
     if (text) renameFromFirstMessage(conversationId, text, currentAgentId);
   }, [status, chat.messages, conversationId, saveMessages, renameFromFirstMessage]);
 
@@ -240,10 +238,7 @@ export function ChatInstance({
       if (idx === -1) return undefined;
 
       const targetMsg = chat.messages[idx];
-      const textPart = targetMsg.parts?.find((p) => (p as { type: string }).type === "text") as
-        | { text?: string }
-        | undefined;
-      const userText = textPart?.text ?? "";
+      const userText = getMessageText(targetMsg);
 
       const remainingMessages = chat.messages.slice(0, idx);
       chat.setMessages(remainingMessages);

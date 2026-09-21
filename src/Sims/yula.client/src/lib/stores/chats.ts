@@ -1,4 +1,5 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { getMessageText } from "@my-agent/core";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { extractJobIdFromHref, resolveConversationPathname } from "@/lib/workspace-paths";
@@ -112,7 +113,7 @@ export const useChatsStore = create<ChatsState>()(
         // Vektör katmanı temizliği: silinen sohbetin hayalet embedding'i
         // RAG top-K'yu doldurmasın (duckdb-vector tembel yüklenir).
         // Hata sessize gömülmez (console.warn) + yetim taramasıyla uzlaşılır.
-        void import("@/services/duckdb-vector")
+        void import("@/services/wasmsql-vector")
           .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
             try {
               await removeConversationVectors([id]);
@@ -142,7 +143,7 @@ export const useChatsStore = create<ChatsState>()(
       deleteConversations: (ids) => {
         if (!ids.length) return;
         const idSet = new Set(ids);
-        void import("@/services/duckdb-vector")
+        void import("@/services/wasmsql-vector")
           .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
             try {
               await removeConversationVectors(ids);
@@ -218,7 +219,7 @@ export const useChatsStore = create<ChatsState>()(
       clearAllConversations: () => {
         const ids = get().conversations.map((c) => c.id);
         if (ids.length > 0) {
-          void import("@/services/duckdb-vector")
+          void import("@/services/wasmsql-vector")
             .then(async ({ removeConversationVectors, purgeOrphanConversationVectors }) => {
               try {
                 await removeConversationVectors(ids);
@@ -254,8 +255,7 @@ export const useChatsStore = create<ChatsState>()(
 
           if (userMsgs.length > 0) {
             const existingIndex = conversations.findIndex((c) => c.id === id);
-            const textPart = userMsgs[0].parts.find((p) => p.type === "text");
-            const firstText = textPart && "text" in textPart ? String(textPart.text) : "";
+            const firstText = getMessageText(userMsgs[0]);
             const derivedTitle = firstText.slice(0, 40) || "Yeni Sohbet";
 
             if (existingIndex === -1) {

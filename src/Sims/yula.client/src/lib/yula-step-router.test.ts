@@ -11,7 +11,6 @@ describe("yula-step-router", () => {
     "dispatch_component_action",
     "inspect_ui_state",
     "ask_user_choice",
-    "time_travel",
     "remember_fact",
     "recall_fact",
     "query_playbook",

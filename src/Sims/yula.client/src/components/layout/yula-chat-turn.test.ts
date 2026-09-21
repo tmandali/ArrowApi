@@ -92,6 +92,27 @@ describe("hasVisibleTurnCard & hasVisibleTurnContent", () => {
     );
   });
 
+  it("dispatch_component_action VISUALIZE grafiği output-available olduğunda görünür kart sayılır", () => {
+    const chartActionTool: YulaToolPartInfo[] = [
+      {
+        toolName: "dispatch_component_action",
+        state: "output-available",
+        toolCallId: "call-c2",
+        input: {
+          component_id: "result_grid:active",
+          action: "VISUALIZE",
+          payload: { type: "bar", dimension: "Depo", metric: "Tutar" },
+        },
+        output: { status: "ok", chart: { chartType: "bar", dimensionX: "Depo", dimensionY: ["Tutar"] }, rows: [{ Depo: "D1", Tutar: 100 }] },
+      },
+    ];
+    assert.equal(hasVisibleTurnCard(chartActionTool), true);
+    assert.equal(
+      hasVisibleTurnContent({ toolParts: chartActionTool, assistantText: "" }),
+      true,
+    );
+  });
+
   it("dispatch_component_action ekran etkisi (SET_FIELDS vb.) hasScreenActionSuccess döner", () => {
     const setFieldsTool: YulaToolPartInfo[] = [
       {

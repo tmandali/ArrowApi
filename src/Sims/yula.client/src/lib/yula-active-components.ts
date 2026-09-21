@@ -5,14 +5,20 @@
 import { z } from "zod";
 import type { ComponentSchema } from "@my-agent/core";
 import { REGISTERED_REPORTS, findReport } from "@/features/reports/report-registry";
+import { isResultGridComponent } from "./yula-tool-info";
 import type { YulaScreenContext } from "./yula-agent-prompt";
 import {
+  ARROW_JOB_STATUS_ACTION_CONTRACT,
+  ARROW_JOB_CANCEL_ACTION_CONTRACT,
+  ARROW_JOB_SUMMARY_ACTION_CONTRACT,
   JOB_OPEN_LAST_ACTION_CONTRACT,
   JOB_DETAIL_ACTION_CONTRACT,
   JOB_LIST_ACTION_CONTRACT,
   JOB_FIND_ACTION_CONTRACT,
   JOB_CANCEL_ACTION_CONTRACT,
-} from "./client-tools/job-history-contracts";
+  JOB_REFRESH_ACTION_CONTRACT,
+  JOB_SELECT_ACTION_CONTRACT,
+} from "@/features/jobs/ai";
 import { APP_ROUTER_NAVIGATE_CONTRACT } from "./client-tools/app-router-contracts";
 import {
   GRID_RUN_SQL_CONTRACT,
@@ -27,7 +33,7 @@ import {
   GRID_PROFILE_CONTRACT,
   GRID_ANALYZE_CONTRACT,
   GRID_VISUALIZE_CONTRACT,
-} from "./client-tools/result-grid-contracts";
+} from "@/features/jobs/components/report-grid/ai";
 import {
   CRITERIA_SET_FIELDS_CONTRACT,
   CRITERIA_APPLY_CONTRACT,
@@ -36,7 +42,7 @@ import {
   CRITERIA_VALIDATE_CONTRACT,
   CRITERIA_READ_CONTRACT,
   CRITERIA_SCHEMA_CONTRACT,
-} from "./client-tools/criteria-form-contracts";
+} from "@/features/report-criteria/ai";
 
 /**
  * Ekranda mount edilmiş bileşenleri ve Zod aksiyon sözleşmelerini çözer.
@@ -47,7 +53,7 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
   const pathname = href.split("?")[0] || "/";
   const phase = context?.phase ?? "workspace";
 
-  // 1. Evrensel Yönlendirici ve İş Geçmişi Bileşenleri
+  // 1. Evrensel Yönlendirici, Odaklanılmış İş ve İş Kataloğu Bileşenleri
   comps.push({
     id: "app_router",
     capabilities: ["NAVIGATE"],
@@ -58,9 +64,37 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
   });
 
   comps.push({
+    id: "arrow_job",
+    capabilities: ["GET_STATUS", "CANCEL", "GET_SUMMARY"],
+    meta: {
+      description: "Focused Arrow Job Execution State Machine",
+      jobId: context?.jobId,
+    },
+    actions: {
+      GET_STATUS: ARROW_JOB_STATUS_ACTION_CONTRACT,
+      CANCEL: ARROW_JOB_CANCEL_ACTION_CONTRACT,
+      GET_SUMMARY: ARROW_JOB_SUMMARY_ACTION_CONTRACT,
+    },
+  });
+
+  comps.push({
+    id: "arrow_job_manager",
+    capabilities: ["LIST", "SELECT", "REFRESH", "OPEN_LAST", "FIND"],
+    meta: { description: "Report Execution Catalog & Manager" },
+    actions: {
+      LIST: JOB_LIST_ACTION_CONTRACT,
+      SELECT: JOB_SELECT_ACTION_CONTRACT,
+      REFRESH: JOB_REFRESH_ACTION_CONTRACT,
+      OPEN_LAST: JOB_OPEN_LAST_ACTION_CONTRACT,
+      FIND: JOB_FIND_ACTION_CONTRACT,
+    },
+  });
+
+  // Geriye dönük uyumluluk için job_history alias'ı
+  comps.push({
     id: "job_history",
     capabilities: ["OPEN_LAST", "GET_DETAIL", "LIST", "FIND", "CANCEL"],
-    meta: { description: "Report Execution History and Job Tracker" },
+    meta: { description: "Report Execution History and Job Tracker (Legacy Alias)" },
     actions: {
       OPEN_LAST: JOB_OPEN_LAST_ACTION_CONTRACT,
       GET_DETAIL: JOB_DETAIL_ACTION_CONTRACT,
@@ -167,12 +201,17 @@ export function filterRelevantComponents(
 
   return comps.filter((comp) => {
     // 1. Evrensel bileşenler her zaman kalır
-    if (comp.id === "app_router" || comp.id === "job_history") {
+    if (
+      comp.id === "app_router" ||
+      comp.id === "arrow_job" ||
+      comp.id === "arrow_job_manager" ||
+      comp.id === "job_history"
+    ) {
       return true;
     }
 
     // 2. Sonuç Izgarası
-    if (comp.id.startsWith("result_grid:")) {
+    if (isResultGridComponent(comp)) {
       return phase === "results" || Boolean(context?.grid);
     }
 

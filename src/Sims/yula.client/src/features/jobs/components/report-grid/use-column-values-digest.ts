@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { duckDbClient } from "@/services/duckdb";
+import { wasmSqlClient } from "@/services/wasmsql";
 import { computeColumnValuesDigest } from "@/lib/grid-column-values";
 
 /**
@@ -11,13 +11,15 @@ import { computeColumnValuesDigest } from "@/lib/grid-column-values";
  * yeniden tetiklemez.
  */
 export function useColumnValuesDigest(args: {
-  duckTableName: string;
+  tableName?: string;
+  duckTableName?: string;
   columnNames: string[];
   columnTypes: Record<string, string>;
   totalRows: number;
   isStreaming: boolean;
 }) {
-  const { duckTableName, columnNames, columnTypes, totalRows, isStreaming } = args;
+  const tableName = args.tableName ?? args.duckTableName ?? "";
+  const { columnNames, columnTypes, totalRows, isStreaming } = args;
 
   const [columnValuesDigest, setColumnValuesDigest] = React.useState<
     Record<string, string[]> | undefined
@@ -26,19 +28,19 @@ export function useColumnValuesDigest(args: {
   React.useEffect(() => {
     // Rapor hala akıyorsa (streaming) veya toplam satır sayısı 5 milyonu aşıyorsa digest sorgusu koşturma
     if (isStreaming || !totalRows || totalRows > 5_000_000) return;
-    const key = `${duckTableName}:${Object.keys(columnTypes).length > 0 ? 1 : 0}:${totalRows ?? ""}`;
+    const key = `${tableName}:${Object.keys(columnTypes).length > 0 ? 1 : 0}:${totalRows ?? ""}`;
     if (columnValuesDoneRef.current === key) return;
     columnValuesDoneRef.current = key;
     const abortCtrl = new AbortController();
     void (async () => {
       try {
         const digest = await computeColumnValuesDigest({
-          tableName: duckTableName,
+          tableName,
           columns: columnNames,
           columnTypes,
           rowCount: totalRows,
           signal: abortCtrl.signal,
-          client: duckDbClient,
+          client: wasmSqlClient,
         });
         if (!abortCtrl.signal.aborted) setColumnValuesDigest(digest ?? undefined);
       } catch {
@@ -49,7 +51,7 @@ export function useColumnValuesDigest(args: {
       abortCtrl.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duckTableName, columnTypes, totalRows, isStreaming]);
+  }, [tableName, columnTypes, totalRows, isStreaming]);
 
   return columnValuesDigest;
 }

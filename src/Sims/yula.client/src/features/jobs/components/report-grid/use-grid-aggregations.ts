@@ -1,23 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { duckDbClient } from "@/services/duckdb";
-import { buildCombinedWhereClause } from "@/services/duckdb/filter-parser";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import { wasmSqlClient } from "@/services/wasmsql";
+import { buildCombinedWhereClause } from "@/services/wasmsql/filter-parser";
 import {
+  type SpreadsheetColumn,
   buildDuckDbAggregationSql,
   formatAggregatedValue,
   AGGREGATION_SHORT_LABELS,
   type ColumnAggregationConfig,
   type ColumnAggregationValues,
-} from "../virtual-spreadsheet";
+} from "@/components/virtual-spreadsheet";
 
 /**
  * Alt toplamlar (footer row): aktif filtreler + aggregationConfigs ile
  * DuckDB üzerinde hesaplanır (150ms debounce).
  */
 export function useGridAggregations(args: {
-  duckTableName: string;
+  tableName?: string;
+  duckTableName?: string;
   effectiveColumns: SpreadsheetColumn[];
   filters: Record<string, string>;
   numericColumns: Set<string>;
@@ -25,8 +26,8 @@ export function useGridAggregations(args: {
   isStreaming: boolean;
   isSavingDisk: boolean;
 }) {
+  const tableName = args.tableName ?? args.duckTableName ?? "";
   const {
-    duckTableName,
     effectiveColumns,
     filters,
     numericColumns,
@@ -36,7 +37,7 @@ export function useGridAggregations(args: {
   } = args;
 
   const [aggregationConfigs, setAggregationConfigs] = React.useState<ColumnAggregationConfig>({});
-  const [duckDbAggregations, setDuckDbAggregations] = React.useState<ColumnAggregationValues | undefined>(undefined);
+  const [gridAggregations, setGridAggregations] = React.useState<ColumnAggregationValues | undefined>(undefined);
   const [showFooterRow, setShowFooterRow] = React.useState(false);
 
   // Footer'da en az bir kolon için aktif aggregation var mı (render'da türet — setState yok).
@@ -49,7 +50,7 @@ export function useGridAggregations(args: {
   React.useEffect(() => {
     if (
       !showFooterRow ||
-      !duckTableName ||
+      !tableName ||
       effectiveColumns.length === 0 ||
       !hasAny ||
       isStreaming ||
@@ -62,9 +63,9 @@ export function useGridAggregations(args: {
     const timer = setTimeout(async () => {
       try {
         const where = buildCombinedWhereClause(filters, numericColumns, booleanColumns);
-        const query = buildDuckDbAggregationSql(duckTableName, where, effectiveColumns, aggregationConfigs);
+        const query = buildDuckDbAggregationSql(tableName, where, effectiveColumns, aggregationConfigs);
         if (!query) return;
-        const rows = await duckDbClient.executeCustomSql(query.sql);
+        const rows = await wasmSqlClient.executeCustomSql(query.sql);
         if (cancelled || !rows || rows.length === 0) return;
         const row = rows[0];
         const values: ColumnAggregationValues = {};
@@ -80,7 +81,7 @@ export function useGridAggregations(args: {
             };
           }
         }
-        setDuckDbAggregations(values);
+        setGridAggregations(values);
       } catch {
         // Tablo henüz oluşmamışsa veya geçici sorgu hatası varsa
       }
@@ -90,13 +91,13 @@ export function useGridAggregations(args: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [showFooterRow, duckTableName, hasAny, filters, aggregationConfigs, effectiveColumns, numericColumns, booleanColumns, isStreaming, isSavingDisk]);
+  }, [showFooterRow, tableName, hasAny, filters, aggregationConfigs, effectiveColumns, numericColumns, booleanColumns, isStreaming, isSavingDisk]);
 
   return {
     aggregationConfigs,
     setAggregationConfigs,
-    // !hasAny iken stale state'i render'a sızmaz — kaynakta gate (setState yok).
-    duckDbAggregations: hasAny ? duckDbAggregations : undefined,
+    gridAggregations: hasAny ? gridAggregations : undefined,
+    duckDbAggregations: hasAny ? gridAggregations : undefined,
     showFooterRow,
     setShowFooterRow,
   };

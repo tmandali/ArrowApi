@@ -16,6 +16,8 @@
 import { piEventStream, type AgentEvent } from "@my-agent/core";
 import { getTurnTrace, upsertTurnTrace } from "@/lib/yula-turn-trace";
 import type { WorkedStepItem } from "@/components/layout/yula-worked-steps";
+import { extractToolErrorMessage } from "@/lib/yula-tool-info";
+import { isJobFamily, parseComponentId } from "./client-tools/dispatch-types";
 
 export const PI_TRACE_ID_PREFIX = "pi:";
 
@@ -26,6 +28,7 @@ export function piTraceId(toolCallId: string): string {
 type DispatchInput = {
   component_id?: string;
   action?: string;
+  payload?: Record<string, unknown>;
 } & Record<string, unknown>;
 
 /** `dispatch_component_action` girdisini mevcut adım diline çevirir. */
@@ -34,8 +37,11 @@ export function describeDispatchAction(input: unknown): {
   label: string;
   subLabel?: string;
 } {
-  const { component_id: comp = "", action = "" } = (input ?? {}) as DispatchInput;
-  const [family] = comp.split(":");
+  const inp = (input ?? {}) as DispatchInput;
+  const comp = inp.component_id ?? "";
+  const action = inp.action ?? "";
+  const payload = (inp.payload && typeof inp.payload === "object" ? inp.payload : inp) as Record<string, unknown>;
+  const { family, subId } = parseComponentId(comp);
   if (family === "criteria_form") {
     switch (action) {
       case "SET_FIELDS":
@@ -54,12 +60,34 @@ export function describeDispatchAction(input: unknown): {
   }
   if (family === "result_grid") {
     switch (action) {
-      case "QUERY":
-        return { kind: "edited", label: "Updated grid view query", subLabel: "Refreshing grid view table..." };
-      case "SORT":
-        return { kind: "edited", label: "Sorted grid", subLabel: "Sorting" };
-      case "FILTER":
-        return { kind: "edited", label: "Filtered grid", subLabel: "Applying grid column filters..." };
+      case "QUERY": {
+        const title = typeof payload.title === "string" ? payload.title : "";
+        const rawSql = typeof payload.sql === "string" ? payload.sql : "";
+        const shortSql = rawSql.replace(/\s+/g, " ").trim().slice(0, 35);
+        return {
+          kind: "edited",
+          label: title ? `Updated grid query: ${title}` : (shortSql ? `Grid query: ${shortSql}…` : "Updated grid view query"),
+          subLabel: "Refreshing grid view table...",
+        };
+      }
+      case "SORT": {
+        const col = typeof payload.column === "string" ? payload.column : "";
+        const dir = typeof payload.direction === "string" ? payload.direction : "asc";
+        return {
+          kind: "edited",
+          label: col ? `Sorted grid: ${col} (${dir})` : "Sorted grid",
+          subLabel: dir,
+        };
+      }
+      case "FILTER": {
+        const field = typeof payload.field === "string" ? payload.field : "";
+        const val = typeof payload.value === "string" ? payload.value : "";
+        return {
+          kind: "edited",
+          label: field ? `Filtered: ${field}${val ? ` = ${val}` : ""}` : "Filtered grid",
+          subLabel: "Applying grid column filters...",
+        };
+      }
       case "COLUMNS":
         return { kind: "edited", label: "Configured grid columns", subLabel: undefined };
       case "PIN":
@@ -72,8 +100,21 @@ export function describeDispatchAction(input: unknown): {
         return { kind: "explored", label: "Explored 1 table, RAG schema", subLabel: "Data profile" };
       case "PROFILE":
         return { kind: "explored", label: "Explored 1 table, RAG schema", subLabel: "Profiling table & analyzing RAG schema..." };
-      case "RUN_SQL":
-        return { kind: "ran", label: "Ran SQL: query", subLabel: "query" };
+      case "RUN_SQL": {
+        const rawSql =
+          typeof payload.query === "string"
+            ? payload.query
+            : typeof payload.sql === "string"
+              ? payload.sql
+              : "";
+        const cleanSql = rawSql.replace(/\s+/g, " ").trim();
+        const shortSql = cleanSql.length > 40 ? `${cleanSql.slice(0, 40)}…` : cleanSql;
+        return {
+          kind: "ran",
+          label: shortSql ? `Ran SQL: ${shortSql}` : "Ran SQL: query",
+          subLabel: shortSql || "query",
+        };
+      }
       case "VISUALIZE":
         return { kind: "ran", label: "Ran Chart: Visualization", subLabel: "Chart visualization" };
       default:
@@ -83,8 +124,12 @@ export function describeDispatchAction(input: unknown): {
   if (family === "app_router" || comp === "app_router") {
     return { kind: "explored", label: "Navigated: Page navigation", subLabel: "Page opened" };
   }
-  if (family === "job_history") {
-    return { kind: "explored", label: `Job history: ${action || "query"}`, subLabel: undefined };
+  if (isJobFamily(family) || isJobFamily(comp)) {
+    if (action === "CANCEL") {
+      return { kind: "ran", label: "Cancelled job", subLabel: subId ? `Job ${subId}` : "Arrow Job" };
+    }
+    const jobLabel = family === "arrow_job" ? "Job execution" : "Job history";
+    return { kind: "explored", label: `${jobLabel}: ${action || "query"}`, subLabel: subId };
   }
   if (family === "plugin") {
     const pluginName = comp.slice("plugin:".length) || action || "plugin";
@@ -189,14 +234,17 @@ function toolEventToTrace(event: AgentEvent): {
       endSubLabel = isSaved ? `Saved to Workspace Wiki (${ws}) · ${catLabel}` : `Proposed ${catLabel}`;
     }
 
+    const detectedError = extractToolErrorMessage(event.result);
+    const isError = event.isError === true || Boolean(detectedError);
+
     return {
       id: piTraceId(event.toolCallId),
       toolName: event.toolName,
       label: endLabel ?? event.toolName,
-      subLabel: endSubLabel,
-      detailText: endDetail,
+      subLabel: detectedError ? `Hata: ${detectedError}` : endSubLabel,
+      detailText: detectedError || endDetail,
       isLive: false,
-      isError: event.isError === true,
+      isError,
       output: event.result,
     };
   }

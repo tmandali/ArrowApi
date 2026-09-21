@@ -18,6 +18,7 @@ import {
   deferredManager,
   reconciliationEngine,
   piEventStream,
+  isTextPart,
 } from "@my-agent/core";
 import {
   stockPredictiveAnalyticsPlugin,
@@ -472,9 +473,10 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     ]);
 
     assert.equal(turns.length, 1);
-    const textParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "text") || [];
+    const textParts = turns[0].assistantMessage?.parts?.filter(isTextPart) || [];
     assert.equal(textParts.length, 1, "Balonda yalnızca terminal metin yer almalıdır");
-    assert.ok((textParts[0] as any).text.includes("Nihai onaylanmış akış şeması"));
+    assert.ok(textParts[0].text.includes("Nihai onaylanmış akış şeması"));
+    assert.equal(textParts[0].role, "final_synthesis");
 
     const reasoningParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "reasoning") || [];
     assert.equal(reasoningParts.length, 1, "Ara adım metni akordiyon için reasoning olmalıdır");

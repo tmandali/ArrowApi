@@ -19,7 +19,7 @@
     "copy:duckdb": "node scripts/copy-duckdb-assets.mjs",
     "copy:parquet": "node scripts/copy-parquet-assets.mjs",
     "copy:pyodide": "node scripts/copy-pyodide-assets.mjs",
-    "test:grid": "node src/features/jobs/components/virtual-spreadsheet/tests/run-all.mjs",
+    "test:grid": "node src/components/virtual-spreadsheet/tests/run-all.mjs",
     "test": "tsx --require ./scripts/register-md.cjs --test \"src/**/*.test.ts\"",
     "test:ui": "vitest run",
     "test:all": "pnpm test && pnpm test:grid",

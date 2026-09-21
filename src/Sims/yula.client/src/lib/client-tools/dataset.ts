@@ -18,13 +18,15 @@ export type ActiveDataset = {
   from: string;
   /** Aktif görünümün kolon adları */
   columns: string[];
+  /** Temel tablo kolonları (özel görünüm aktifken de geri düşebilmek için) */
+  baseColumns?: string[];
   /** Sayısal kolonlar (özel görünümde örnek satır tipinden saptanır) */
   numeric: Set<string>;
   isCustom: boolean;
   tableName: string;
-  /** Yalnız temel tablo: şema metası (duckType/tarih tespiti için) */
+  /** Yalnız temel tablo: şema metası (wasmType/tarih tespiti için) */
   described?: Awaited<
-    ReturnType<typeof import("@/services/duckdb")["duckDbClient"]["describeTable"]>
+    ReturnType<typeof import("@/services/wasmsql")["wasmSqlClient"]["describeTable"]>
   >;
 };
 
@@ -37,10 +39,10 @@ export async function resolveActiveDataset(): Promise<ActiveDataset | null> {
   const spec = await ensureGridSpec();
   if (!spec || spec.columns.length === 0) return null;
 
-  const { duckDbClient } = await import("@/services/duckdb");
+  const { wasmSqlClient } = await import("@/services/wasmsql");
   const customSql = useYulaGridStore.getState().customQuerySql;
   if (!customSql) {
-    const described = await duckDbClient.describeTable(spec.tableName);
+    const described = await wasmSqlClient.describeTable(spec.tableName);
     return {
       from: sqlSafeId(spec.tableName),
       columns: spec.columns,
@@ -55,10 +57,11 @@ export async function resolveActiveDataset(): Promise<ActiveDataset | null> {
   const from = `(${resolvedCustomSql}) AS __yula_active_view`;
   let numeric = new Set<string>();
   try {
-    const probe = await duckDbClient.executeCustomSql(
+    const probe = await wasmSqlClient.executeCustomSql(
       `SELECT * FROM ${from} LIMIT 1`
     );
     const row = probe[0];
+    const customColumns = row ? Object.keys(row) : spec.columns;
     if (row) {
       numeric = new Set(
         Object.entries(row)
@@ -73,6 +76,14 @@ export async function resolveActiveDataset(): Promise<ActiveDataset | null> {
           .map(([k]) => k)
       );
     }
+    return {
+      from,
+      columns: customColumns,
+      baseColumns: spec.columns,
+      numeric,
+      isCustom: true,
+      tableName: spec.tableName,
+    };
   } catch {
     // Tip saptanamadıysa kolon adından tahmin (total_qty, avg_price vb.)
     numeric = new Set(
@@ -80,8 +91,15 @@ export async function resolveActiveDataset(): Promise<ActiveDataset | null> {
         /qty|total|sum|avg|count|amount|price|balance|miktar|tutar|bakiye/i.test(c),
       )
     );
+    return {
+      from,
+      columns: spec.columns,
+      baseColumns: spec.columns,
+      numeric,
+      isCustom: true,
+      tableName: spec.tableName,
+    };
   }
-  return { from, columns: spec.columns, numeric, isCustom: true, tableName: spec.tableName };
 }
 
 export async function ensureGridSpec(): Promise<
@@ -113,9 +131,9 @@ export async function ensureGridSpec(): Promise<
     new Promise((r) => setTimeout(r, ms));
 
   try {
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     for (let attempt = 0; attempt < 5; attempt++) {
-      const cols = await duckDbClient.describeTable(tableName);
+      const cols = await wasmSqlClient.describeTable(tableName);
       if (cols.length > 0) {
         // Self-heal kaydı ekrandan türetir; rapor varsayımı yazılmaz.
         const { REGISTERED_REPORTS } = await import(
@@ -145,9 +163,9 @@ export async function ensureGridSpec(): Promise<
 
 export async function gridStillStreaming(tableName: string): Promise<boolean> {
   try {
-    const { duckStreamManager } = await import(
-      "@/features/jobs/services/duck-stream-manager"
-    )
+    const { wasmStreamManager } = await import(
+      "@/features/jobs/services/wasm-stream-manager"
+    );
     const jobId = tableName.startsWith("report_")
       ? tableName
           .slice("report_".length)
@@ -155,9 +173,9 @@ export async function gridStillStreaming(tableName: string): Promise<boolean> {
             /([0-9a-f]{8})_([0-9a-f]{4})_([0-9a-f]{4})_([0-9a-f]{4})_([0-9a-f]{12})/i,
             "$1-$2-$3-$4-$5",
           )
-      : tableName
-    const state = duckStreamManager.getState(jobId)
-    return Boolean(state?.isStreaming || state?.isSavingDisk)
+      : null;
+    const state = jobId ? wasmStreamManager.getState(jobId) : null;
+    return Boolean(state?.isStreaming || state?.isSavingDisk);
   } catch {
     return false
   }
@@ -180,11 +198,11 @@ export async function resetGridCustomView(): Promise<void> {
   const spec = store.spec;
   if (!spec) return;
   try {
-    const { duckDbClient } = await import("@/services/duckdb");
+    const { wasmSqlClient } = await import("@/services/wasmsql");
     const { deriveColumnKind } = await import(
       "@/features/jobs/lib/column-type-utils"
     );
-    const base = await duckDbClient.describeTable(spec.tableName);
+    const base = await wasmSqlClient.describeTable(spec.tableName);
     if (base.length > 0) {
       store.register({
         ...spec,

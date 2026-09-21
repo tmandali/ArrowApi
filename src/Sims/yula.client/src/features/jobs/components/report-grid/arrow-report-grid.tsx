@@ -3,15 +3,16 @@
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { useDuckReport } from "../../hooks/use-duck-report";
-import { duckDbClient } from "@/services/duckdb";
+import { useWasmSqlReport } from "../../hooks/use-wasm-sql-report";
+import { wasmSqlClient, useWasmSqlAgent } from "@/services/wasmsql";
 import { useResultGridAgent } from "./use-result-grid-agent";
 import { renderReportGridSubtitle } from "./report-grid-subtitle";
-import { VirtualSpreadsheet } from "../VirtualSpreadsheet";
 import {
+  VirtualSpreadsheet,
   ROW_HEIGHT,
   type SpreadsheetColumn,
-} from "../virtual-spreadsheet";
+  type ConditionalColorRule,
+} from "@/components/virtual-spreadsheet";
 import { useAiSqlViews } from "./use-ai-sql-views";
 import { useGridColumns } from "./use-grid-columns";
 import { useColumnValuesDigest } from "./use-column-values-digest";
@@ -24,7 +25,6 @@ import { ExportWarningDialog } from "./export-warning-dialog";
 import { createFilterCellRenderer, createRowRenderer } from "./grid-cells";
 import { useColumnStyleStats, type ColumnVisuals } from "./use-column-style-stats";
 import { useVisualPushdown } from "./use-visual-pushdown";
-import type { ConditionalColorRule } from "../virtual-spreadsheet/conditional-rules";
 
 export type ArrowReportGridProps = {
   title?: string;
@@ -48,22 +48,12 @@ export type ArrowReportGridProps = {
   onError?: (err: string | null) => void;
 };
 
-/**
- * Kararlı boş kolon varsayılansı: modül düzeyinde tek referans.
- * `columns` prop'u geçilmeyen rapor grid'lerinde her render'da yeni bir
- * `[]` oluşmasını önler — yeni referans metaColumns → columnTypes →
- * effectiveColumns → numeric/booleanColumns zincirini çalkalar ve
- * useVisualPushdown'un useEffect bağımlılıklarını her render'da bozarak
- * "Maximum update depth exceeded" döngüsüne yol açardı.
- */
+/** Kararlı boş kolon referansı (re-render zincirini ve sonsuz döngüyü önler). */
 const EMPTY_COLUMNS: SpreadsheetColumn[] = [];
 
 /**
  * Uygulama genelinde tüm Arrow raporları için ortak, Wasm + OPFS destekli
  * yüksek performanslı sanal spreadsheet bileşeni.
- *
- * Herhangi bir workspace'teki (Stok, Satış, Muhasebe, Üretim vb.) rapor için
- * tek satırla bağlanır; 100k-1M+ satırlık verilerde anında SQL filtreleme sağlar.
  */
 export function ArrowReportGrid({
   title = "Report Result",
@@ -134,9 +124,9 @@ export function ArrowReportGrid({
     toggleSort,
     setSorting,
     setMultiSorting,
-    applyFilters: duckApplyFilters,
+    applyFilters,
     clearFilters,
-  } = useDuckReport({
+  } = useWasmSqlReport({
     jobId,
     jobUrl,
     columns: metaColumns,
@@ -154,9 +144,9 @@ export function ArrowReportGrid({
     customQuerySql,
   });
   const {
-    duckTableName,
+    tableName,
     columnTypes,
-    columnDuckTypes,
+    columnWasmTypes,
     effectiveColumns,
     numericColumns,
     booleanColumns,
@@ -164,7 +154,7 @@ export function ArrowReportGrid({
   } = cols;
 
   const columnValuesDigest = useColumnValuesDigest({
-    duckTableName,
+    tableName,
     columnNames: effectiveColumns.map((c) => c.name),
     columnTypes,
     totalRows,
@@ -186,7 +176,7 @@ export function ArrowReportGrid({
 
   const runtime = useGridRuntime({
     setFilter,
-    duckApplyFilters,
+    applyFilters,
     clearFilters,
     setSorting,
     effectiveColumns,
@@ -210,7 +200,7 @@ export function ArrowReportGrid({
   } = runtime;
 
   const gridExport = useGridExport({
-    duckTableName,
+    tableName,
     jobId,
     title,
     effectiveColumns,
@@ -220,7 +210,7 @@ export function ArrowReportGrid({
     sortBy,
     sortDesc,
     sortConfigs,
-    columnDuckTypes,
+    columnTypes,
     customQuerySql,
     hiddenColumns,
     totalFiltered,
@@ -236,7 +226,7 @@ export function ArrowReportGrid({
 
   const { savedViewSpecs } = useViewSync({
     aiViews,
-    duckTableName,
+    tableName,
     isTableReady,
     isStreaming,
     isSavingDisk,
@@ -251,7 +241,7 @@ export function ArrowReportGrid({
   });
 
   const agg = useGridAggregations({
-    duckTableName,
+    tableName,
     effectiveColumns,
     filters,
     numericColumns,
@@ -261,11 +251,9 @@ export function ArrowReportGrid({
   });
 
   // Yula bağlamı — TEK yerden doğrudan store kaydı (aracı katman yok).
-  // Gridin tüm verisi burada hesaplanır; veri geldikçe (DESCRIBE, örnek
-  // satırlar, değer sözlüğü, active_view) spec otomatik güncellenir.
   const yulaContext = React.useMemo(
     () => ({
-      tableName: duckTableName,
+      tableName,
       title,
       columns: effectiveColumns.map((c) => c.name),
       rowCount: totalFiltered,
@@ -278,16 +266,8 @@ export function ArrowReportGrid({
       savedViews: savedViewSpecs,
     }),
     [
-      duckTableName,
-      title,
-      effectiveColumns,
-      totalFiltered,
-      columnTypes,
-      sampleRows,
-      columnValuesDigest,
-      columnDescriptions,
-      reportScope,
-      savedViewSpecs,
+      tableName, title, effectiveColumns, totalFiltered, columnTypes,
+      sampleRows, columnValuesDigest, columnDescriptions, reportScope, savedViewSpecs,
     ]
   );
 
@@ -299,18 +279,24 @@ export function ArrowReportGrid({
   // canlı React state'i, olay şemaları ve tip güvenli eylemleriyle kaydeder.
   const { handleRowSelect, handleSortChange, handleViewTransformed } = useResultGridAgent({
     jobId: jobId ?? undefined,
-    duckTableName,
+    tableName,
     totalFiltered,
     columns: effectiveColumns.map((c) => c.name),
     filters,
     customQuerySql,
+    customQueryTitle,
+    activeAiViewId,
+    savedViews: savedViewSpecs,
     isTableReady,
   });
+
+  // Headless Wasm SQL Engine: Görsel grid'den bağımsız saf WebAssembly SQL yürütme
+  useWasmSqlAgent({ baseTable: tableName, isTableReady });
 
   React.useEffect(() => {
     return () => {
       useYulaGridStore.getState().unregister();
-      void duckDbClient.dropView("active_view").catch(() => {});
+      void wasmSqlClient.dropView("active_view").catch(() => {});
     };
   }, []);
 
@@ -348,11 +334,9 @@ export function ArrowReportGrid({
     });
   }, []);
 
-  // Bar ölçeği için TAM veri seti MIN/MAX (DuckDB pushdown): 100M satırda bile
-  // bar doğru çizilir. Yalnızca açık görsel kolonlar sorgulanır; kapalıysa sıfır maliyet.
-  // Fallback: pushdown sonuç gelene kadar / başarısız olursa örneklem min/max kullanılır.
+  // Bar ölçeği için TAM veri seti MIN/MAX (WasmSql pushdown)
   const visualBounds = useVisualPushdown({
-    duckTableName,
+    tableName,
     effectiveColumns,
     numericColumns,
     booleanColumns,
@@ -372,7 +356,6 @@ export function ArrowReportGrid({
   });
 
   // Eşik tabanlı koşullu renk kuralları (kolon menüsünden düzenlenir).
-  // MVP: oturum içi state; kalıcılık (localStorage/store) sonraki adım.
   const [columnRules, setColumnRules] = React.useState<Record<string, ConditionalColorRule[]>>({});
   const handleColumnRulesChange = React.useCallback(
     (column: string, rules: ConditionalColorRule[]) => {
@@ -391,11 +374,11 @@ export function ArrowReportGrid({
       createRowRenderer({
         effectiveColumns,
         columnTypes,
-        columnDuckTypes,
+        columnDuckTypes: columnWasmTypes,
         columnStyles,
         columnRules,
       }),
-    [effectiveColumns, columnTypes, columnDuckTypes, columnStyles, columnRules]
+    [effectiveColumns, columnTypes, columnWasmTypes, columnStyles, columnRules]
   );
 
   return (
@@ -455,7 +438,7 @@ export function ArrowReportGrid({
         onToggleFooterRow={agg.setShowFooterRow}
         aggregationConfigs={agg.aggregationConfigs}
         onAggregationConfigsChange={agg.setAggregationConfigs}
-        aggregationValues={agg.duckDbAggregations}
+        aggregationValues={agg.gridAggregations}
         columnVisuals={columnVisuals}
         onColumnVisualToggle={handleColumnVisualToggle}
         onNeedMore={loadMore}

@@ -13,6 +13,8 @@
 
 const SLIM_CHAR_LIMIT = 800;
 
+import { getMessageText } from "@my-agent/core";
+
 // Safety net limit for extreme conversations; fine-grained token compaction
 // is handled dynamically by Vercel AI SDK's `pruneMessages` inside `prepareStepRouting`.
 const MAX_TRANSPORT_MESSAGES = 64;
@@ -213,15 +215,10 @@ export function normalizeUIMessagesForTransport<
     const nextUser = folded.slice(i + 1).find((m) => m.role === "user");
     let userText = "";
     if (nextUser) {
-      if (typeof nextUser.content === "string") {
-        userText = nextUser.content;
-      } else if (Array.isArray(nextUser.parts)) {
-        userText = (nextUser.parts as Record<string, unknown>[])
-          .filter((p) => p && p.type === "text" && typeof p.text === "string")
-          .map((p) => String(p.text))
-          .join("\n")
-          .trim();
-      }
+      userText =
+        typeof nextUser.content === "string" && nextUser.content
+          ? nextUser.content
+          : getMessageText(nextUser);
     }
 
     msg.parts = msg.parts.map((p) => {

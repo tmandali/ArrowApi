@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { extractWorkedSteps } from "./yula-worked-steps.tsx";
+import {
+  extractWorkedSteps,
+  groupStepsByPhase,
+  phasesToStepFrames,
+  type WorkedStepItem,
+} from "./yula-worked-steps.tsx";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 
 describe("extractWorkedSteps - Wiki & Playbook Adımları", () => {
@@ -294,6 +299,144 @@ describe("extractWorkedSteps - Wiki & Playbook Adımları", () => {
     const choiceDoneStep = doneSteps.find((s) => s.id === "tc-choice-1");
     assert.ok(choiceDoneStep, "choice adımı üretilmeli");
     assert.equal(choiceDoneStep.isLive, false, "ask_user_choice tamamlandığında spinner olmamalı");
+  });
+});
+
+describe("groupStepsByPhase - Causal Step Frame & ReAct Entegrasyonu", () => {
+  it("hata alan adımdan sonraki adım kurtarma (recovery) olarak işaretlenir", () => {
+    const rawSteps: WorkedStepItem[] = [
+      {
+        id: "step-0-thought",
+        kind: "thought",
+        label: "Thinking...",
+        detailText: "Kolonları keşfetmek için DESCRIBE deniyorum",
+        stepIndex: 0,
+      },
+      {
+        id: "step-0-tool",
+        kind: "ran",
+        label: "Ran SQL: DESCRIBE active_view",
+        subLabel: "Hata: SQL query is empty.",
+        isError: true,
+        stepIndex: 0,
+      },
+      {
+        id: "step-1-thought",
+        kind: "thought",
+        label: "Thinking...",
+        detailText: "DESCRIBE çalışmadı, SELECT * LIMIT 1 ile devam ediyorum",
+        stepIndex: 1,
+      },
+      {
+        id: "step-1-tool",
+        kind: "ran",
+        label: "Ran SQL: SELECT * FROM active_view LIMIT 1",
+        isError: false,
+        stepIndex: 1,
+      },
+    ];
+
+    const phases = groupStepsByPhase(rawSteps);
+    assert.equal(phases.length, 2, "2 faz üretilmeli");
+
+    // Faz 0: Hata
+    assert.equal(phases[0].hasError, true, "1. adım hata bayrağı taşımalı");
+    assert.equal(phases[0].thought, "Kolonları keşfetmek için DESCRIBE deniyorum");
+    assert.equal(phases[0].errorMessage, "SQL query is empty.");
+    assert.equal(phases[0].isRecovery, false, "1. adım kurtarma değil ilk adımdır");
+
+    // Faz 1: Kurtarma
+    assert.equal(phases[1].hasError, false);
+    assert.equal(phases[1].isRecovery, true, "2. adım bir önceki hata yüzünden kurtarma olmalı");
+    assert.ok(phases[1].transitionReason?.includes("Hata sonrası kurtarma"));
+    assert.equal(phases[1].thought, "DESCRIBE çalışmadı, SELECT * LIMIT 1 ile devam ediyorum");
+
+    // phasesToStepFrames
+    const frames = phasesToStepFrames(phases, "test-conv");
+    assert.equal(frames.length, 2);
+    assert.equal(frames[0].status, "error");
+    assert.equal(frames[1].status, "recovered");
+    assert.equal(frames[1].parentStepId, "test-conv-step-0");
+  });
+
+  it("ask_user_choice içeren faz kullanıcı tercihi doğrulama transitionReason taşır", () => {
+    const rawSteps: WorkedStepItem[] = [
+      {
+        id: "step-0-choice",
+        kind: "confirmation",
+        label: "Asked: T006 mağazası hangi şirket koduna bağlı?",
+        subLabel: "3 options presented",
+        info: {
+          toolCallId: "tc-choice",
+          toolName: "ask_user_choice",
+          state: "output-available",
+          input: { question: "T006 mağazası hangi şirket koduna bağlı?" },
+        },
+        stepIndex: 0,
+      },
+    ];
+
+    const phases = groupStepsByPhase(rawSteps);
+    assert.equal(phases.length, 1);
+    assert.equal(phases[0].transitionReason, "Kullanıcı tercihi ve eksik kriter doğrulama adımı");
+  });
+});
+
+describe("extractWorkedSteps - Ekran Bağlamı ve Metinsel Neden-Sonuç Analizi", () => {
+  it("metadata.inspection varsa Ekran & Bağlam İncelemesi adımı açık detaylarla üretilir", () => {
+    const msg: YulaMessage = {
+      id: "msg-inspect-1",
+      role: "assistant",
+      parts: [{ type: "text", text: "Hazırlanıyor..." }],
+      metadata: {
+        inspection: {
+          route: "/stock",
+          phase: "workspace",
+          activeReportScope: "retail-sales-report",
+          hasMountedForm: false,
+          today: "2026-09-21",
+        },
+      },
+    } as any;
+
+    const steps = extractWorkedSteps(msg);
+    const inspectStep = steps.find((s) => s.id.includes("context-inspection"));
+
+    assert.ok(inspectStep, "Ekran bağlam inceleme adımı üretilmeli");
+    assert.equal(inspectStep.kind, "explored");
+    assert.ok(inspectStep.label.includes("/stock"));
+    assert.ok(inspectStep.subLabel?.includes("Global alan"));
+    assert.ok(inspectStep.detailText?.includes("Perakende Satış Raporu"));
+    assert.ok(inspectStep.detailText?.includes("2026-09-21"));
+  });
+
+  it("araç çağrısı öncesindeki text parçası (Plan) yapılandırılmış düşünce adımı olarak adımlara eklenir", () => {
+    const msg: YulaMessage = {
+      id: "msg-plan-1",
+      role: "assistant",
+      parts: [
+        {
+          type: "text",
+          text: "Plan:\n• Perakende Satış Raporu açılacak.\n• Tarih: 2026-09-14—2026-09-20.\nMağaza T006 için şirket kodunu seçin:",
+        },
+        {
+          type: "tool-ask_user_choice",
+          toolCallId: "tc-choice-p1",
+          state: "input-available",
+          input: { question: "Hangi şirket kodu?" },
+        } as any,
+      ],
+    } as any;
+
+    const steps = extractWorkedSteps(msg);
+    const planStep = steps.find((s) => s.id.includes("plan-evaluation"));
+    const choiceStep = steps.find((s) => s.id === "tc-choice-p1");
+
+    assert.ok(planStep, "Plan değerlendirme adımı üretilmeli");
+    assert.equal(planStep.kind, "thought");
+    assert.ok(planStep.label.includes("Değerlendirme & Eylem Planı"));
+    assert.ok(planStep.detailText?.includes("Perakende Satış Raporu açılacak"));
+    assert.ok(choiceStep, "Tool çağrısı adımı da korunmalı");
   });
 });
 

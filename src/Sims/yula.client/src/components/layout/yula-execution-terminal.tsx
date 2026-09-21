@@ -23,6 +23,7 @@ import {
 import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/utils/cn";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
+import { getMessageText } from "@my-agent/core";
 import type { WorkedStepItem } from "./yula-worked-steps";
 import { formatTokenCount } from "./yula-chat-turn-helpers";
 
@@ -72,11 +73,7 @@ export function YulaExecutionTerminal({
 
   const rows = React.useMemo<TerminalRow[]>(() => {
     const list: TerminalRow[] = [];
-    const userText = userMessage?.parts
-      ?.filter((p) => p.type === "text")
-      ?.map((p) => (p as { text: string }).text)
-      ?.join(" ")
-      ?.trim();
+    const userText = getMessageText(userMessage);
 
     if (userText) {
       const snippet = userText.length > 80 ? `${userText.slice(0, 80)}…` : userText;

@@ -5,22 +5,14 @@ import { useTranslations } from "next-intl"
 import { copyToClipboard } from "@/lib/clipboard";
 import {
   ChevronRight,
-  Loader2,
   Copy,
   Check,
-  TriangleAlert,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
@@ -28,12 +20,12 @@ import { subscribeTurnTrace } from "@/lib/yula-turn-trace";
 import {
   extractWorkedSteps,
   groupStepsByPhase,
-  type WorkedStepItem,
 } from "./yula-worked-steps";
-import { modelCatalog } from "@my-agent/core";
+import { modelCatalog, getMessageText } from "@my-agent/core";
 import { formatTokenCount } from "./yula-chat-turn-helpers";
 import { buildFullCopyText } from "./yula-worked-copy";
 import { YulaExecutionTerminal } from "./yula-execution-terminal";
+import { YulaWorkedPhaseCard } from "./yula-worked-phase-card";
 
 interface YulaWorkedAccordionProps {
   userMessage?: YulaMessage;
@@ -60,7 +52,6 @@ export function YulaWorkedAccordion({
   const [open, setOpen] = React.useState(isLive);
   const [userToggled, setUserToggled] = React.useState(false);
   const [liveTimer, setLiveTimer] = React.useState(0);
-  const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
   const [copiedAnswer, setCopiedAnswer] = React.useState(false);
   /** Kullanıcının kapattığı fazlar — tüm fazlar varsayılan açık (şeffaf iz) */
   const [collapsedPhases, setCollapsedPhases] = React.useState<Set<number>>(new Set());
@@ -140,9 +131,7 @@ export function YulaWorkedAccordion({
   // Nihai cevap metni tamamlandığında (akış bittiğinde) akordeon otomatik katlanır
   const hasTextContent = React.useMemo(() => {
     if (!message) return false;
-    return message.parts.some(
-      (p) => p.type === "text" && (p.text ?? "").trim().length > 0
-    );
+    return getMessageText(message, { excludeRoles: ["plan_rationale"] }).length > 0;
   }, [message]);
 
   const [traceRev, bumpTrace] = React.useReducer((n: number) => n + 1, 0);
@@ -167,16 +156,6 @@ export function YulaWorkedAccordion({
       lastStepRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [steps.length, isLive, open]);
-
-  /** Hover tooltip: subLabel + araç durumu + detay önizlemesi */
-  const stepTooltip = (step: WorkedStepItem): string | null => {
-    const bits: string[] = [];
-    if (step.subLabel) bits.push(step.subLabel);
-    if (step.info) bits.push(`${step.info.toolName} · ${step.info.state}`);
-    const preview = (step.detailText ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
-    if (preview) bits.push(preview);
-    return bits.length > 0 ? bits.join("\n") : null;
-  };
 
   React.useEffect(() => {
     const syncOpen = () => {
@@ -249,25 +228,26 @@ export function YulaWorkedAccordion({
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-data-[state=open]/worked:rotate-90" />
         </CollapsibleTrigger>
 
-        {/* Worked For Satırının En Sağındaki Çerçevesiz Transparan Hover Kopyalama Butonu —
-            her turda görünür (adım izi ve/veya cevap metni varsa) */}
-        {!isLive && (hasTextContent || steps.length > 0) ? (
-          <button
-            type="button"
-            onClick={handleCopyAnswer}
-            title={copiedAnswer ? ws("tour_copy_done") : ws("tour_copy")}
-            className="ml-auto flex items-center justify-center p-0.5 rounded-md border-0 bg-transparent text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/worked:opacity-100 transition-opacity cursor-pointer select-none"
-          >
-            {copiedAnswer ? (
-              <Check className="size-3.5 text-emerald-500" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
-          </button>
-        ) : null}
+        <div className="ml-auto flex items-center gap-1">
+          {/* Worked For Satırının En Sağındaki Çerçevesiz Transparan Hover Kopyalama Butonu */}
+          {!isLive && (hasTextContent || steps.length > 0) ? (
+            <button
+              type="button"
+              onClick={handleCopyAnswer}
+              title={copiedAnswer ? ws("tour_copy_done") : ws("tour_copy")}
+              className="flex items-center justify-center p-0.5 rounded-md border-0 bg-transparent text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/worked:opacity-100 transition-opacity cursor-pointer select-none"
+            >
+              {copiedAnswer ? (
+                <Check className="size-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {/* Gemini Stili Adım Adım Çalıştırma ve Düşünme Çizelgesi */}
+      {/* Causal Step Frame & ReAct Faz Çizelgesi */}
       {hasExpandableContent ? (
         <CollapsibleContent className="mt-1.5 space-y-1.5 pl-1">
           <div className="flex flex-col gap-2 text-[12.5px] font-sans text-muted-foreground/90">
@@ -275,174 +255,23 @@ export function YulaWorkedAccordion({
               const phaseOpen = !collapsedPhases.has(phase.phaseIndex);
               const isLastPhase = phasePos === phases.length - 1;
               return (
-                <div key={`phase-${phase.phaseIndex}`} className="flex flex-col gap-1">
-                  {/* Faz Başlığı */}
-                  <div
-                    onClick={() => {
-                      setCollapsedPhases((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(phase.phaseIndex)) next.delete(phase.phaseIndex);
-                        else next.add(phase.phaseIndex);
-                        return next;
-                      });
-                    }}
-                    className="group/phase flex cursor-pointer items-center gap-1.5 py-0.5 select-none"
-                  >
-                    {phase.isLive ? (
-                      <Loader2 className="size-3 animate-spin text-orange-500" />
-                    ) : phase.hasError ? (
-                      <TriangleAlert className="size-3 text-red-500" />
-                    ) : (
-                      <Check className="size-3 text-emerald-500" />
-                    )}
-                    <span className="font-sans text-[12.5px] font-medium text-foreground/90">
-                      {phase.label}
-                    </span>
-                    <span className="font-mono text-[10.5px] text-muted-foreground/70">
-                      {phase.steps.length} {phase.steps.length === 1 ? t("step") : t("steps")}
-                    </span>
-                    <ChevronRight
-                      className={cn(
-                        "size-3.5 text-muted-foreground/50 transition-transform duration-200 group-hover/phase:text-foreground/70",
-                        phaseOpen && "rotate-90 text-foreground/70"
-                      )}
-                    />
-                  </div>
-
-                  {/* Faz İçi Adımlar */}
-                  {phaseOpen ? (
-                    <div className="ml-[5px] flex flex-col gap-1.5 border-l border-border/40 pl-2.5">
-                      {phase.steps.map((step, stepPos) => {
-                        // Düşünme adımları varsayılan olarak açık başlar (Gemini stili)
-                        const isThought = step.kind === "thought";
-                        const autoOpen = isThought || Boolean(step.isError);
-                        const isManuallyToggled = expandedStepId === step.id;
-                        const isExpanded = autoOpen
-                          ? expandedStepId === null || expandedStepId === step.id
-                          : isManuallyToggled;
-
-                        const hasDetails = Boolean(step.detailText || step.info?.input || step.info?.output);
-                        const outputObj = (step.info?.output as Record<string, unknown> | null) ?? {};
-                        const isLastStep = isLastPhase && stepPos === phase.steps.length - 1;
-                        const tooltip = stepTooltip(step);
-
-                        return (
-                          <div
-                            key={step.id}
-                            ref={isLastStep ? lastStepRef : undefined}
-                            className="animate-in fade-in-0 slide-in-from-left-2 flex flex-col gap-1 duration-200"
-                          >
-                            {/* Adım Başlığı Satırı — hover tooltip + click expand */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  onClick={() => {
-                      if (hasDetails) {
-                        setExpandedStepId(isExpanded ? `closed-${step.id}` : step.id);
-                      }
-                    }}
-                    className={cn(
-                      "group/step flex items-center gap-1.5 py-0.5 text-foreground/90 transition-colors select-none",
-                      hasDetails ? "cursor-pointer hover:text-foreground" : "cursor-default"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "font-sans font-normal text-[12.5px]",
-                        step.isError
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-foreground/85",
-                      )}
-                    >
-                      {step.label}
-                    </span>
-                    {step.subLabel ? (
-                      <span className="truncate font-mono text-[10.5px] text-muted-foreground/70">
-                        {step.subLabel}
-                      </span>
-                    ) : null}
-
-                    {step.diffBadge ? (
-                      <span className="inline-flex items-center gap-1 font-mono text-[10.5px]">
-                        <span className="text-emerald-500 dark:text-emerald-400 font-medium">
-                          +{step.diffBadge.added}
-                        </span>
-                        <span className="text-red-500 dark:text-red-400 font-medium">
-                          -{step.diffBadge.removed}
-                        </span>
-                      </span>
-                    ) : null}
-
-                    {step.isLive ? (
-                      <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-orange-500 animate-pulse">
-                        <Loader2 className="size-3 animate-spin" />
-                      </span>
-                    ) : hasDetails ? (
-                      <ChevronRight
-                        className={cn(
-                          "size-3.5 text-muted-foreground/50 transition-transform duration-200 group-hover/step:text-foreground/70",
-                          isExpanded && "rotate-90 text-foreground/70"
-                        )}
-                      />
-                    ) : null}
-                                </div>
-                              </TooltipTrigger>
-                              {tooltip ? (
-                                <TooltipContent side="top" align="start" className="whitespace-pre-line">
-                                  {tooltip}
-                                </TooltipContent>
-                              ) : null}
-                            </Tooltip>
-
-                  {/* Gemini Stili Doğrudan İçe Girintili Düşünme / Detay Metni */}
-                  {isExpanded && hasDetails ? (
-                    isThought && step.detailText ? (
-                      <div className="pl-4 py-0.5 text-[12px] leading-relaxed text-muted-foreground/80 font-sans whitespace-pre-wrap select-text">
-                        {step.detailText}
-                      </div>
-                    ) : (
-                      <div className="ml-4 mt-1 overflow-hidden rounded-lg border border-border/30 bg-muted/20 p-2 space-y-1.5 font-mono text-[11px] backdrop-blur-xs select-none">
-                        {step.detailText ? (
-                          <div className="text-muted-foreground leading-snug px-0.5">{step.detailText}</div>
-                        ) : null}
-
-                        {/* Araç Adı, Giden Parametreler (Input) ve Gelen Çıktı (Output) ile Tek Renkli JSON Bloğu */}
-                        {step.info ? (
-                          <CodeBlock
-                            value={(() => {
-                              const out = (() => {
-                                if (!step.info?.output || typeof step.info.output !== "object") return step.info?.output ?? null;
-                                const cleaned = { ...(step.info.output as Record<string, unknown>) };
-                                if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-                                  delete cleaned.sql;
-                                  delete cleaned.display;
-                                }
-                                return cleaned;
-                              })();
-                              const body: Record<string, unknown> = {
-                                tool: step.info.toolName,
-                                input: step.info.input,
-                              };
-                              if (out !== null && out !== undefined) body.output = out;
-                              return JSON.stringify(body, null, 2);
-                            })()}
-                            language="json"
-                            className="max-h-52 border border-border/20 rounded-md p-1.5 text-[10.5px] font-mono leading-tight shadow-none"
-                          />
-                        ) : outputObj.error ? (
-                          <div className="text-[10.5px] text-red-500 font-medium px-0.5">
-                            Hata: {String(outputObj.error)}
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
+                <YulaWorkedPhaseCard
+                  key={`phase-${phase.phaseIndex}`}
+                  phase={phase}
+                  phasePos={phasePos}
+                  isLastPhase={isLastPhase}
+                  isLive={isLive}
+                  isOpen={phaseOpen}
+                  onToggle={() => {
+                    setCollapsedPhases((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(phase.phaseIndex)) next.delete(phase.phaseIndex);
+                      else next.add(phase.phaseIndex);
+                      return next;
+                    });
+                  }}
+                  lastStepRef={isLastPhase ? lastStepRef : undefined}
+                />
               );
             })}
           </div>

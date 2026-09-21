@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { duckDbClient } from "@/services/duckdb";
-import { buildCombinedWhereClause } from "@/services/duckdb/filter-parser";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import { wasmSqlClient } from "@/services/wasmsql";
+import { buildCombinedWhereClause } from "@/services/wasmsql/filter-parser";
+import type { SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 import type { ColumnVisuals } from "./use-column-style-stats";
 
 /**
@@ -59,8 +59,9 @@ function sameBounds(a: VisualBounds, b: VisualBounds): boolean {
 }
 
 export function useVisualPushdown(args: {
-  duckTableName: string | undefined;
-  effectiveColumns: readonly SpreadsheetColumn[];
+  tableName?: string;
+  duckTableName?: string;
+  effectiveColumns?: readonly SpreadsheetColumn[];
   numericColumns: Set<string>;
   booleanColumns: Set<string>;
   filters: Record<string, string>;
@@ -69,9 +70,8 @@ export function useVisualPushdown(args: {
   isStreaming: boolean;
   isSavingDisk: boolean;
 }): VisualBounds {
+  const tableName = args.tableName ?? args.duckTableName;
   const {
-    duckTableName,
-    effectiveColumns,
     numericColumns,
     booleanColumns,
     filters,
@@ -83,16 +83,16 @@ export function useVisualPushdown(args: {
   const [bounds, setBounds] = React.useState<VisualBounds>({});
 
   // Yalnızca sayısal + açık görsel katmanı olan kolonlar bar ölçeğine adaydır.
-  const enabled = React.useMemo(
-    () =>
-      effectiveColumns.filter(
-        (c) => enabledColumns[c.name] && numericColumns.has(c.name)
-      ),
-    [effectiveColumns, enabledColumns, numericColumns]
-  );
-  // Sorgulanabilir mi? Kapalıyken render tarafı EMPTY_BOUNDS gösterir (setState yok).
+  const enabled = React.useMemo(() => {
+    const list: string[] = [];
+    for (const [col, v] of Object.entries(enabledColumns)) {
+      if (v && numericColumns.has(col)) list.push(col);
+    }
+    return list;
+  }, [enabledColumns, numericColumns]);
+
   const canQuery =
-    Boolean(duckTableName) && enabled.length > 0 && !isStreaming && !isSavingDisk;
+    Boolean(tableName) && enabled.length > 0 && !isStreaming && !isSavingDisk;
 
   React.useEffect(() => {
     // Kapalı → burada state'e DEĞİNMİYORUZ (render EMPTY_BOUNDS döndürür);
@@ -102,40 +102,38 @@ export function useVisualPushdown(args: {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
+        const selects = enabled.flatMap((col) => {
+          const esc = `"${col.replace(/"/g, '""')}"`;
+          return [`MIN(${esc}) AS "${aliasFor(col, "min")}"`, `MAX(${esc}) AS "${aliasFor(col, "max")}"`];
+        });
         const where = buildCombinedWhereClause(filters, numericColumns, booleanColumns);
-        const selectParts: string[] = [];
-        for (const c of enabled) {
-          const safeCol = `"${c.name.replace(/"/g, '""')}"`;
-          selectParts.push(`MIN(${safeCol}) AS "${aliasFor(c.name, "vmin")}"`);
-          selectParts.push(`MAX(${safeCol}) AS "${aliasFor(c.name, "vmax")}"`);
-        }
-        const escapedTable = `"${duckTableName!.replace(/"/g, '""')}"`;
-        const sql = `SELECT ${selectParts.join(", ")} FROM ${escapedTable} ${where};`;
-        const rows = await duckDbClient.executeCustomSql(sql);
+        const whereClause = where ? `WHERE ${where}` : "";
+        const escapedTable = `"${tableName!.replace(/"/g, '""')}"`;
+        const sql = `SELECT ${selects.join(", ")} FROM ${escapedTable} ${whereClause}`;
+        const rows = await wasmSqlClient.executeCustomSql(sql);
         if (cancelled || !rows || rows.length === 0) return;
         const row = rows[0];
-
         const next: VisualBounds = {};
-        for (const c of enabled) {
-          const min = toNumber(row[aliasFor(c.name, "vmin")]);
-          const max = toNumber(row[aliasFor(c.name, "vmax")]);
-          if (Number.isFinite(min) && Number.isFinite(max) && min <= max) {
-            next[c.name] = { min, max };
+        for (const col of enabled) {
+          const minNum = toNumber(row[aliasFor(col, "min")]);
+          const maxNum = toNumber(row[aliasFor(col, "max")]);
+          if (Number.isFinite(minNum) && Number.isFinite(maxNum) && minNum <= maxNum) {
+            next[col] = { min: minNum, max: maxNum };
           }
         }
         if (!cancelled) {
           setBounds((prev) => (sameBounds(prev, next) ? prev : next));
         }
       } catch {
-        // Tablo henüz hazır değil / geçici hata — örneklem fallback'i devrede kalır.
+        // Tablo hazır değilse veya geçici sorgu hatasında sessiz kal
       }
-    }, 250);
+    }, 150);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [canQuery, duckTableName, enabled, filters, numericColumns, booleanColumns]);
+  }, [canQuery, tableName, enabled, filters, numericColumns, booleanColumns]);
 
   // Kapalı → stale state'i göstermeyiz; açık → asenkron pushdown sonucu.
   return canQuery ? bounds : EMPTY_BOUNDS;

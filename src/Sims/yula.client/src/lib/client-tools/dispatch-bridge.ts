@@ -59,56 +59,14 @@ import {
   GRID_VISUALIZE_CONTRACT,
 } from "./result-grid-contracts";
 import { pluginRegistry } from "@/lib/plugins/yula-plugins";
+import { guardReadOnlySelect } from "@/lib/sql-guard";
 
-export type JobHistoryAction =
-  | "OPEN_LAST"
-  | "GET_DETAIL"
-  | "DETAIL"
-  | "LIST"
-  | "FIND"
-  | "CANCEL"
-  | "SELECT"
-  | "REFRESH";
-
-export type CriteriaFormAction =
-  | "SET_FIELDS"
-  | "APPLY"
-  | "SUBMIT"
-  | "RUN"
-  | "VALIDATE"
-  | "READ"
-  | "SCHEMA";
-
-export type ResultGridAction =
-  | "RUN_SQL"
-  | "SQL"
-  | "QUERY"
-  | "FILTER"
-  | "APPLY_FILTERS"
-  | "SORT"
-  | "COLUMNS"
-  | "PIN"
-  | "RESET_LAYOUT"
-  | "EXPORT"
-  | "VISUALIZE"
-  | "CHART"
-  | "ANALYZE"
-  | "PROFILE";
-
-export type AppRouterAction = "NAVIGATE";
-
-export type ComponentAction =
-  | JobHistoryAction
-  | CriteriaFormAction
-  | ResultGridAction
-  | AppRouterAction
-  | string;
-
-export interface DispatchActionParams {
-  component_id: string;
-  action: ComponentAction;
-  payload?: Record<string, unknown>;
-}
+export * from "./dispatch-types";
+import {
+  type DispatchActionParams,
+  isJobFamily,
+  parseComponentId,
+} from "./dispatch-types";
 
 /**
  * Headless React UI-Agent standart eylem yürütücüsü (`dispatch_component_action`).
@@ -119,7 +77,7 @@ export async function executeDispatchComponentAction({
   action,
   payload = {},
 }: DispatchActionParams): Promise<unknown> {
-  const [family, subId] = component_id.split(":");
+  const { family, subId } = parseComponentId(component_id);
   const args = { ...payload };
 
   // 1. Kriter Formu Eylemleri
@@ -265,8 +223,8 @@ export async function executeDispatchComponentAction({
     return navigateToPageTool(parsed.data);
   }
 
-  // 4. İş Geçmişi / Rapor Yönetimi
-  if (family === "job_history") {
+  // 4. Arrow Job (Tekil İş) ve Arrow Job Manager / İş Geçmişi (Katalog)
+  if (isJobFamily(family)) {
     if (subId && !args.report) {
       args.report = subId;
     }
@@ -275,6 +233,9 @@ export async function executeDispatchComponentAction({
         const parsed = JOB_OPEN_LAST_ACTION_CONTRACT.inputSchema.safeParse(args);
         return openLastReportTool(parsed.success ? parsed.data : args);
       }
+      case "GET_STATUS":
+      case "STATUS":
+      case "GET_SUMMARY":
       case "GET_DETAIL":
       case "DETAIL": {
         const parsed = JOB_DETAIL_ACTION_CONTRACT.inputSchema.safeParse(args);
@@ -339,6 +300,86 @@ export async function executeDispatchComponentAction({
       action,
       message: `Entity form action ${action} for ${subId} must be handled by the mounted UI component.`,
     };
+  }
+
+  // 7. Wasm SQL Engine (Headless Browser-Side WebAssembly SQL Engine)
+  if (family === "wasm_sql_engine" || component_id === "wasm_sql_engine") {
+    switch (action) {
+      case "RUN_SQL":
+      case "SQL":
+      case "QUERY": {
+        const rawSql =
+          typeof args.query === "string" && args.query.trim().length > 0
+            ? args.query
+            : typeof args.sql === "string"
+              ? args.sql
+              : "";
+        const guard = guardReadOnlySelect(rawSql);
+        if (!guard.ok) {
+          return { status: "error", error: guard.error, hint: guard.hint };
+        }
+        try {
+          const { wasmSqlClient } = await import("@/services/wasmsql");
+          const limit = typeof args.limit === "number" && args.limit > 0 ? args.limit : 100;
+          const rows = await wasmSqlClient.executeCustomSql(guard.sql);
+          const truncated = rows.length > limit;
+          const resultRows = truncated ? rows.slice(0, limit) : rows;
+          const columns = resultRows.length > 0 ? Object.keys(resultRows[0]) : [];
+          return {
+            status: "ok",
+            rowCount: resultRows.length,
+            columns,
+            rows: resultRows,
+            truncated,
+          };
+        } catch (err) {
+          return {
+            status: "error",
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+      case "DESCRIBE_TABLE":
+      case "DESCRIBE": {
+        try {
+          const target =
+            typeof args.tableOrView === "string" && args.tableOrView.trim().length > 0
+              ? args.tableOrView.trim()
+              : "active_view";
+          const safeTarget = target.replace(/[^a-zA-Z0-9_]/g, "");
+          const { wasmSqlClient } = await import("@/services/wasmsql");
+          const columns = await wasmSqlClient.describeTable(safeTarget);
+          return {
+            status: "ok",
+            tableOrView: target,
+            columns,
+          };
+        } catch (err) {
+          return {
+            status: "error",
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+      case "LIST_TABLES": {
+        try {
+          const { wasmSqlClient } = await import("@/services/wasmsql");
+          const rows = await wasmSqlClient.executeCustomSql("SHOW TABLES;");
+          const tables = rows.map((r: Record<string, unknown>) => String(Object.values(r)[0] ?? ""));
+          return {
+            status: "ok",
+            tables,
+          };
+        } catch (err) {
+          return {
+            status: "error",
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+      default:
+        return { status: "unknown-action", component_id, action };
+    }
   }
 
   return { status: "unknown-component", component_id, action };

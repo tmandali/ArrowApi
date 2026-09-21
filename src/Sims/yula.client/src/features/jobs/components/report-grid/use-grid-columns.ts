@@ -1,35 +1,33 @@
 "use client";
 
 import * as React from "react";
-import { duckDbClient } from "@/services/duckdb";
+import { wasmSqlClient } from "@/services/wasmsql";
 import { deriveColumnKind } from "../../lib/column-type-utils";
 import { formatColumnLabel } from "@/utils/format-cell";
-import type { ReportColumnMeta } from "../../hooks/use-duck-report";
-import type { SpreadsheetColumn } from "../virtual-spreadsheet";
+import type { WasmSqlColumnMeta } from "../../hooks/wasm-sql-types";
+import type { SpreadsheetColumn } from "@/components/virtual-spreadsheet";
 
 /**
  * Kolon şeması: DESCRIBE (yetkili kaynak) > keşif > align sezgisi.
- * columns prop'u hizalama sezgisiyle gelir ve duckType taşımaz; "Qty (text)"
- * gibi yanlış grounding modelin araç çağırmayı reddetmesine yol açıyordu.
  */
 export function useGridColumns(args: {
   jobId: string | null | undefined;
   columns: SpreadsheetColumn[];
-  metaColumns: ReportColumnMeta[];
-  discoveredCols: ReportColumnMeta[];
+  metaColumns: WasmSqlColumnMeta[];
+  discoveredCols: WasmSqlColumnMeta[];
   rows: Record<string, unknown>[];
   customQuerySql: string | null;
 }) {
   const { jobId, columns, metaColumns, discoveredCols, rows, customQuerySql } = args;
 
   // tablo adı — şema (DESCRIBE), kolon değerleri ve Yula bağlamı için
-  const duckTableName = jobId
+  const tableName = jobId
     ? `report_${jobId.replace(/[^a-zA-Z0-9_]/g, "_")}`
     : "current_report";
 
   const [described, setDescribed] = React.useState<{
     table: string;
-    cols: Awaited<ReturnType<typeof duckDbClient.describeTable>>;
+    cols: Awaited<ReturnType<typeof wasmSqlClient.describeTable>>;
   } | undefined>();
 
   React.useEffect(() => {
@@ -37,9 +35,9 @@ export function useGridColumns(args: {
     let cancelled = false;
     void (async () => {
       try {
-        const cols = await duckDbClient.describeTable(duckTableName);
+        const cols = await wasmSqlClient.describeTable(tableName);
         if (!cancelled && cols.length > 0) {
-          setDescribed({ table: duckTableName, cols });
+          setDescribed({ table: tableName, cols });
         }
       } catch {
         // DESCRIBE hazır olmadıysa sezgisel map devrede kalır
@@ -48,26 +46,24 @@ export function useGridColumns(args: {
     return () => {
       cancelled = true;
     };
-  }, [duckTableName, discoveredCols.length, jobId]);
+  }, [tableName, discoveredCols.length, jobId]);
 
   // Türetilmiş: DESCRIBE sonucu yalnızca GÜNCEL tabloya aitse kullanılır.
-  // Tablo değişince otomatik undefined → stale reset için senkron setState gerekmez.
   const describedCols =
-    described && described.table === duckTableName ? described.cols : undefined;
+    described && described.table === tableName ? described.cols : undefined;
 
   const columnTypes = React.useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const c of metaColumns) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric);
     for (const c of discoveredCols) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric);
-    // Öncelik: DESCRIBE > keşif > align sezgisi
     if (describedCols) {
       for (const c of describedCols) map[c.name] = deriveColumnKind(c.duckType, c.isNumeric);
     }
     return map;
   }, [metaColumns, discoveredCols, describedCols]);
 
-  // Şemadan gelen fiziksel ham DuckDB tipleri (BIGINT, INTEGER, DECIMAL, DATE...)
-  const columnDuckTypes = React.useMemo<Record<string, string>>(() => {
+  // Şemadan gelen fiziksel ham SQL tipleri (BIGINT, INTEGER, DECIMAL, DATE...)
+  const columnWasmTypes = React.useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const c of metaColumns) if (c.duckType) map[c.name] = c.duckType;
     for (const c of discoveredCols) if (c.duckType) map[c.name] = c.duckType;
@@ -85,14 +81,14 @@ export function useGridColumns(args: {
         label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
         align: c.align ?? (c.isNumeric ? "right" : "left"),
         kind: columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.isNumeric),
-        duckType: columnDuckTypes[c.name] ?? c.duckType,
+        duckType: columnWasmTypes[c.name] ?? c.duckType,
       }));
     }
     if (columns.length > 0) {
       return columns.map((c) => ({
         ...c,
         kind: c.kind ?? columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.align === "right"),
-        duckType: c.duckType ?? columnDuckTypes[c.name],
+        duckType: c.duckType ?? columnWasmTypes[c.name],
       }));
     }
     return discoveredCols.map((c) => ({
@@ -100,9 +96,9 @@ export function useGridColumns(args: {
       label: c.label && c.label !== c.name ? c.label : formatColumnLabel(c.name),
       align: c.align ?? (c.isNumeric ? "right" : "left"),
       kind: columnTypes[c.name] ?? deriveColumnKind(c.duckType, c.isNumeric),
-      duckType: columnDuckTypes[c.name] ?? c.duckType,
+      duckType: columnWasmTypes[c.name] ?? c.duckType,
     }));
-  }, [customQuerySql, columns, discoveredCols, columnTypes, columnDuckTypes]);
+  }, [customQuerySql, columns, discoveredCols, columnTypes, columnWasmTypes]);
 
   const numericColumns = React.useMemo(() => {
     const set = new Set<string>();
@@ -117,13 +113,13 @@ export function useGridColumns(args: {
   const booleanColumns = React.useMemo(() => {
     const set = new Set<string>();
     for (const col of effectiveColumns) {
-      const type = (columnDuckTypes[col.name] ?? col.duckType ?? "").toUpperCase();
+      const type = (columnWasmTypes[col.name] ?? col.duckType ?? "").toUpperCase();
       if (col.kind === "bool" || type.includes("BOOL") || type === "BIT") {
         set.add(col.name);
       }
     }
     return set;
-  }, [effectiveColumns, columnDuckTypes]);
+  }, [effectiveColumns, columnWasmTypes]);
 
   const sampleRows = React.useMemo(() => {
     return rows.slice(0, 3).map((r) => {
@@ -136,10 +132,12 @@ export function useGridColumns(args: {
   }, [rows, effectiveColumns]);
 
   return {
-    duckTableName,
+    tableName,
+    duckTableName: tableName,
     metaColumns,
     columnTypes,
-    columnDuckTypes,
+    columnWasmTypes,
+    columnDuckTypes: columnWasmTypes,
     effectiveColumns,
     numericColumns,
     booleanColumns,
