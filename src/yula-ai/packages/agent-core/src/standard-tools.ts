@@ -11,7 +11,7 @@ import { agentMemory } from './memory';
 import { playbookManager } from './playbook';
 import { sessionManager } from './session-branch';
 import { piEventStream } from './pi-event-stream';
-import { ComponentSchema, ActionContract, Tool, tool } from './types';
+import { ComponentSchema, ActionContract, Tool, tool, TELEMETRY_TOPICS } from './types';
 import { i18nManager } from './i18n';
 
 export interface ExecuteActionParams {
@@ -210,22 +210,38 @@ export const agentUiTools: Record<string, Tool> = {
   }),
 
   inspect_ui_state: tool({
-    description: 'Inspect active screen components, capabilities, or current UI state snapshot.',
+    description: 'Inspect active screen components, capabilities, or targeted UI telemetry events.',
     inputSchema: z.object({
       component_id: z.string().optional().describe('Target component ID to inspect (if omitted, all active components return)'),
+      topic: z
+        .enum(['jobs', 'data', 'form', 'navigation', 'system'])
+        .optional()
+        .describe(
+          `Filter telemetry events by topic: ${Object.values(TELEMETRY_TOPICS)
+            .map((t) => `"${t.key}" (${t.description})`)
+            .join('; ')}`
+        ),
+      source: z.string().optional().describe('Filter telemetry events by source component identifier'),
+      event_type: z.string().optional().describe('Filter telemetry events by event type (e.g. ROW_SELECTED, REPORT_COMPLETED)'),
+      limit: z.number().optional().describe('Maximum number of events to return (default: 10)'),
     }),
-    execute: async ({ component_id }) => {
+    execute: async ({ component_id, topic, source, event_type, limit }) => {
       if (component_id) {
         const comp = uiRegistry.get(component_id);
         if (!comp) {
           return { success: false, error: `Component "${component_id}" is not currently mounted on screen.` };
         }
-        return { success: true, component: comp };
+        return {
+          success: true,
+          component: comp,
+          recent_events: uiEventBus.getRecentEvents({ source: component_id, topic, type: event_type, limit }),
+        };
       }
       return {
         success: true,
         active_components: uiRegistry.getActiveComponents(),
-        recent_events: uiEventBus.getRecentEvents(),
+        recent_events: uiEventBus.getRecentEvents({ topic, source, type: event_type, limit }),
+        available_topics: TELEMETRY_TOPICS,
       };
     },
   }),

@@ -27,6 +27,8 @@ export interface CellSelectionParams {
    * index tabanlı eski seçim/sürükleme geçersiz sayılır ve sıfırlanır.
    */
   dataIdentity?: unknown
+  /** Kullanıcı fare veya klavye ile satır seçtiğinde çağrılır */
+  onRowSelect?: (rowIndex: number, rowData: any) => void
 }
 
 export interface CellSelectionReturn {
@@ -61,6 +63,7 @@ export function useCellSelection({
   displayItemsRef,
   bodyTableRef,
   dataIdentity,
+  onRowSelect,
 }: CellSelectionParams): CellSelectionReturn {
   const [activeCell, setActiveCell] = React.useState<{ row: number; col: number } | null>(null)
   const [selection, setSelection] = React.useState<CellSelection | null>(null)
@@ -100,8 +103,14 @@ export function useCellSelection({
       } else {
         setSelection({ startRow: row, startCol: col, endRow: row, endCol: col })
       }
+      if (onRowSelect && displayItemsRef.current) {
+        const item = displayItemsRef.current[row]
+        if (item != null) {
+          onRowSelect(row, item)
+        }
+      }
     },
-    []
+    [onRowSelect, displayItemsRef]
   )
 
   const extendSelection = React.useCallback(
@@ -255,6 +264,10 @@ export function useCellSelection({
       if (rangeMode && selection) {
         setActiveCell({ row: nextRow, col: nextCol })
         setSelection((prev) => (prev ? { ...prev, endRow: nextRow, endCol: nextCol } : prev))
+        if (nextRow !== currentActive.row && onRowSelect && displayItemsRef.current) {
+          const item = displayItemsRef.current[nextRow]
+          if (item != null) onRowSelect(nextRow, item)
+        }
       } else {
         startSelection(nextRow, nextCol, false)
       }
@@ -262,7 +275,7 @@ export function useCellSelection({
         targetCell.scrollIntoView({ block: "nearest", inline: "nearest" })
       }
     },
-    [displayItemsRef, visibleColumns, selection, startSelection, bodyTableRef, clearSelection]
+    [displayItemsRef, visibleColumns, selection, startSelection, bodyTableRef, clearSelection, onRowSelect]
   )
 
   // Fare ile çoklu hücre seçimi sürüklemesi

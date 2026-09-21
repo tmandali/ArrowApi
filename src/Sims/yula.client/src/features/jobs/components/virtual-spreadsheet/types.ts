@@ -279,4 +279,6 @@ export type VirtualSpreadsheetProps<T> = {
    */
   columnRules?: Record<string, ConditionalColorRule[]>
   onColumnRulesChange?: (column: string, rules: ConditionalColorRule[]) => void
+  /** Kullanıcı fare veya klavye ile bir satır seçtiğinde çağrılır */
+  onRowSelect?: (rowIndex: number, rowData: T) => void
 }

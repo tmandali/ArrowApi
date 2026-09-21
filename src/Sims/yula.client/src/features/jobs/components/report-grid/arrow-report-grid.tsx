@@ -105,13 +105,7 @@ export function ArrowReportGrid({
   } = views;
 
   const metaColumns = React.useMemo(
-    () =>
-      columns.map((col) => ({
-        name: col.name,
-        label: col.label,
-        align: col.align,
-        isNumeric: col.align === "right",
-      })),
+    () => columns.map((c) => ({ name: c.name, label: c.label, align: c.align, isNumeric: c.align === "right" })),
     [columns]
   );
 
@@ -188,9 +182,7 @@ export function ArrowReportGrid({
 
   // Yula runtimeApi → export köprüsü (ref ile döngü kırılır; orijinal desen).
   const handleExportClickRef = React.useRef<(format?: ExportFormat) => void>(undefined);
-  const requestExport = React.useCallback((format?: ExportFormat) => {
-    handleExportClickRef.current?.(format);
-  }, []);
+  const requestExport = React.useCallback((format?: ExportFormat) => { handleExportClickRef.current?.(format); }, []);
 
   const runtime = useGridRuntime({
     setFilter,
@@ -305,7 +297,7 @@ export function ArrowReportGrid({
 
   // Headless React UI-Agent (@my-agent/react): Grid mount edildiğinde kendini
   // canlı React state'i, olay şemaları ve tip güvenli eylemleriyle kaydeder.
-  useResultGridAgent({
+  const { handleRowSelect, handleSortChange, handleViewTransformed } = useResultGridAgent({
     duckTableName,
     totalFiltered,
     columns: effectiveColumns.map((c) => c.name),
@@ -425,7 +417,11 @@ export function ArrowReportGrid({
         activeAiViewId={activeAiViewId}
         currentQuerySql={customQuerySql}
         currentQueryTitle={customQueryTitle}
-        onSelectAiView={handleSelectAiView}
+        onSelectAiView={(viewId) => {
+          handleSelectAiView(viewId);
+          const v = aiViews.find((item) => item.id === viewId);
+          handleViewTransformed(viewId, v?.title, v?.sql);
+        }}
         onSaveCurrentAiView={handleSaveCurrentAiView}
         onRenameAiView={handleRenameAiView}
         onDeleteAiView={handleDeleteAiView}
@@ -464,12 +460,23 @@ export function ArrowReportGrid({
         onNeedMore={loadMore}
         hasMore={hasMore}
         loadingMore={isLoadingMore}
+        onRowSelect={handleRowSelect}
         sortColumn={sortBy}
         sortDirection={sortBy ? (sortDesc ? "desc" : "asc") : null}
         sortConfigs={sortConfigs}
-        onSortConfigsChange={(configs, orderedCols) => setMultiSorting(configs, orderedCols)}
-        onSortChange={(colName) => toggleSort(colName, effectiveColumns.map((c) => c.name))}
-        onSortSettingChange={(colName, desc) => setSorting(colName, desc)}
+        onSortConfigsChange={(configs, orderedCols) => {
+          setMultiSorting(configs, orderedCols);
+          const first = Object.keys(configs)[0];
+          if (first) handleSortChange(first, configs[first], configs);
+        }}
+        onSortChange={(colName) => {
+          toggleSort(colName, effectiveColumns.map((c) => c.name));
+          handleSortChange(colName, sortBy === colName ? (sortDesc ? "asc" : "desc") : "asc");
+        }}
+        onSortSettingChange={(colName, desc) => {
+          setSorting(colName, desc);
+          handleSortChange(colName, desc ? "desc" : "asc");
+        }}
         rowHeight={ROW_HEIGHT}
         isMaximized={isMaximized}
         renderFilterCell={renderFilterCell}

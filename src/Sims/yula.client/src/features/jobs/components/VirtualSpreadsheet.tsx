@@ -79,6 +79,7 @@ export function VirtualSpreadsheet<T>(props: VirtualSpreadsheetProps<T>) {
     isMaximized: controlledMaximized,
     onToggleMaximize,
     cellLocator = true,
+    onRowSelect,
   } = props
 
   // ── Maximize / minimize (global store + Esc tuşu) ─────────────────────
@@ -231,6 +232,7 @@ export function VirtualSpreadsheet<T>(props: VirtualSpreadsheetProps<T>) {
     displayItemsRef,
     bodyTableRef,
     dataIdentity: resetKey,
+    onRowSelect,
   })
 
   // ── Name Box & TSV Kopyalama ─────────────────────────────────────────

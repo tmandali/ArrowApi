@@ -71,71 +71,132 @@ export interface EventContract<TSchema extends ZodTypeAny = ZodTypeAny> {
   schema: TSchema;
 }
 
+export interface TopicDefinition {
+  key: string;
+  label: string;
+  description: string;
+  typicalEvents: readonly string[];
+}
+
+export const TELEMETRY_TOPICS = {
+  jobs: {
+    key: 'jobs',
+    label: 'Rapor ve İş Yaşam Döngüsü',
+    description: 'Background report execution lifecycle (started, completed, failed, cancelled, job selection).',
+    typicalEvents: ['REPORT_STARTED', 'REPORT_COMPLETED', 'REPORT_FAILED', 'REPORT_CANCELLED', 'JOB_SELECTED'],
+  },
+  data: {
+    key: 'data',
+    label: 'Izgara ve Veri Etkileşimi',
+    description: 'Spreadsheet grid interactions (row selections, column filtering, sorting, SQL view transformations, file exports).',
+    typicalEvents: ['ROW_SELECTED', 'FILTER_APPLIED', 'SORT_CHANGED', 'VIEW_TRANSFORMED', 'EXPORT_TRIGGERED'],
+  },
+  form: {
+    key: 'form',
+    label: 'Kriter Formu',
+    description: 'Criteria form inputs, parameter changes, query submissions, and resets.',
+    typicalEvents: ['FIELD_CHANGED', 'CRITERIA_SUBMITTED', 'CRITERIA_RESET'],
+  },
+  navigation: {
+    key: 'navigation',
+    label: 'Sayfa Gezintisi',
+    description: 'Screen routing, page navigation, and workspace view switching.',
+    typicalEvents: ['ROUTE_CHANGED'],
+  },
+  system: {
+    key: 'system',
+    label: 'Sistem Olayları',
+    description: 'General system, dock collapse/focus, or uncategorized environment telemetry.',
+    typicalEvents: ['USER_FOCUS_SCREEN'],
+  },
+} as const satisfies Record<string, TopicDefinition>;
+
+export type TelemetryTopic = keyof typeof TELEMETRY_TOPICS;
+
 /**
  * Canonical Application Telemetry Events Discriminated Union
  */
 export type AppTelemetryEvent =
   | {
+      topic?: 'navigation';
       source: 'app_router';
       type: 'ROUTE_CHANGED';
       payload: { path: string; from?: string; title?: string };
     }
   | {
+      topic?: 'jobs';
       source: 'arrow_job';
       type: 'REPORT_STARTED';
       payload: { jobId: string; scope?: string; title?: string };
     }
   | {
+      topic?: 'jobs';
       source: 'arrow_job';
       type: 'REPORT_COMPLETED';
       payload: { jobId: string; totalRows?: number; durationMs?: number };
     }
   | {
+      topic?: 'jobs';
       source: 'arrow_job';
       type: 'REPORT_FAILED';
       payload: { jobId: string; error: string };
     }
   | {
+      topic?: 'jobs';
       source: 'arrow_job';
       type: 'REPORT_CANCELLED';
       payload: { jobId: string; reason?: string };
     }
   | {
+      topic?: 'jobs';
       source: 'arrow_job';
       type: 'JOB_SELECTED';
       payload: { jobId: string; title?: string; totalRows?: number; createdAt?: string | null };
     }
   | {
-      source: 'result_grid';
+      topic?: 'data';
+      source: 'result_grid' | 'result_grid:active';
       type: 'ROW_SELECTED';
       payload: { id: string | number; rowData?: Record<string, unknown> };
     }
   | {
-      source: 'result_grid';
+      topic?: 'data';
+      source: 'result_grid' | 'result_grid:active';
       type: 'FILTER_APPLIED';
-      payload: { field: string; value: unknown; op?: string };
+      payload: { field?: string; value?: unknown; op?: string; filters?: Record<string, unknown> };
     }
   | {
-      source: 'result_grid';
+      topic?: 'data';
+      source: 'result_grid' | 'result_grid:active';
+      type: 'SORT_CHANGED';
+      payload: { column: string; direction?: 'asc' | 'desc' | null; sortConfigs?: Record<string, 'asc' | 'desc'> };
+    }
+  | {
+      topic?: 'data';
+      source: 'result_grid' | 'result_grid:active';
       type: 'VIEW_TRANSFORMED';
-      payload: { query?: string; rowCount?: number };
+      payload: { query?: string; rowCount?: number; viewId?: string; title?: string };
     }
   | {
-      source: 'result_grid';
+      topic?: 'data';
+      source: 'result_grid' | 'result_grid:active';
       type: 'EXPORT_TRIGGERED';
       payload: { format: string; rowCount?: number; title?: string };
     }
   | {
+      topic?: 'form';
       source: 'criteria_form';
       type: 'FIELD_CHANGED';
       payload: { field: string; value: unknown };
     }
   | {
+      topic?: 'form';
       source: 'criteria_form';
       type: 'CRITERIA_SUBMITTED';
       payload: { report: string; criteria?: Record<string, unknown> };
     }
   | {
+      topic?: 'form';
       source: 'criteria_form';
       type: 'CRITERIA_RESET';
       payload: { report: string };
@@ -169,13 +230,31 @@ export interface RecordTelemetryOptions {
   coalesce?: boolean;
   /** Tekilleştirme ve birleştirmeyi atlayıp olayı doğrudan yeni kayıt olarak ekleme */
   force?: boolean;
+  /** İsteğe bağlı özel tekilleştirme / birleştirme anahtarı (örn. 'result_grid:row_selected') */
+  coalesceKey?: string;
+}
+
+export interface GetRecentEventsOptions {
+  /** Filtrelenecek telemetri konusu/kategorisi */
+  topic?: TelemetryTopic;
+  /** Filtrelenecek kaynak bileşen ID'si */
+  source?: string;
+  /** Filtrelenecek olay tipi */
+  type?: string;
+  /** Döndürülecek maksimum olay sayısı */
+  limit?: number;
+  /** Topic başına dengeli dağıtım (varsayılan: false) */
+  balanced?: boolean;
+  /** Aynı topic içinde her olay tipinden (type) yalnızca en sonuncusunu tutma (varsayılan: false) */
+  distinctByType?: boolean;
 }
 
 export interface IEventBus {
   subscribe(componentId: string, handler: (action: string, payload: any) => any): () => void;
   dispatch(actionPayload: UIAction): { success: boolean; result?: any; error?: string };
   recordTelemetry(event: AppTelemetryEvent | Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
-  getRecentEvents(): UIEvent[];
+  getRecentEvents(options?: GetRecentEventsOptions): UIEvent[];
+  getTopicBalancedEvents?(perTopicLimit?: number, distinctByType?: boolean): UIEvent[];
   clear(): void;
 }
 
@@ -191,6 +270,7 @@ export interface IComponentRegistry {
 }
 
 export interface UIEvent {
+  topic?: TelemetryTopic;
   source: string;
   type: string;
   payload?: any;

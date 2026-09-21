@@ -1,6 +1,14 @@
-import { UIEvent, UIAction, IEventBus, RecordTelemetryOptions, AppTelemetryEvent } from './types';
+import {
+  UIEvent,
+  UIAction,
+  IEventBus,
+  RecordTelemetryOptions,
+  AppTelemetryEvent,
+  TelemetryTopic,
+  GetRecentEventsOptions,
+} from './types';
 
-export { type RecordTelemetryOptions, type AppTelemetryEvent };
+export { type RecordTelemetryOptions, type AppTelemetryEvent, type TelemetryTopic, type GetRecentEventsOptions };
 
 export interface DispatchResult {
   success: boolean;
@@ -14,6 +22,44 @@ export type ActionHandler = (
 ) => { success?: boolean; error?: string; [key: string]: any } | boolean | void;
 
 type TelemetryListener = (event: UIEvent) => void;
+
+export function inferTelemetryTopic(source: string, type?: string): TelemetryTopic {
+  if (
+    source === 'arrow_job' ||
+    source.startsWith('arrow_job') ||
+    type?.startsWith('REPORT_') ||
+    type === 'JOB_SELECTED'
+  ) {
+    return 'jobs';
+  }
+  if (
+    source === 'result_grid' ||
+    source.startsWith('result_grid') ||
+    type?.startsWith('GRID_') ||
+    type === 'ROW_SELECTED' ||
+    type === 'FILTER_APPLIED' ||
+    type === 'SORT_CHANGED' ||
+    type === 'VIEW_TRANSFORMED' ||
+    type === 'EXPORT_TRIGGERED'
+  ) {
+    return 'data';
+  }
+  if (
+    source === 'criteria_form' ||
+    source.startsWith('criteria_form') ||
+    type?.startsWith('CRITERIA_')
+  ) {
+    return 'form';
+  }
+  if (
+    source === 'app_router' ||
+    source.startsWith('app_router') ||
+    type === 'ROUTE_CHANGED'
+  ) {
+    return 'navigation';
+  }
+  return 'system';
+}
 
 function arePayloadsEqual(a: any, b: any): boolean {
   if (a === b) return true;
@@ -30,7 +76,7 @@ export class UIEventBus implements IEventBus {
   private subscribers: Map<string, ActionHandler[]> = new Map();
   private telemetryListeners: Set<TelemetryListener> = new Set();
   private ringBuffer: UIEvent[] = [];
-  private readonly bufferLimit: number = 10;
+  private readonly bufferLimit: number = 50;
   private dedupWindowMs: number = 250;
   private pendingNotificationTimer: any = null;
   private pendingNotificationEvent: UIEvent | null = null;
@@ -124,6 +170,20 @@ export class UIEventBus implements IEventBus {
     const windowMs = options?.dedupWindowMs ?? this.dedupWindowMs;
     const shouldCoalesce = options?.coalesce ?? true;
     const isForced = options?.force === true;
+    const topic: TelemetryTopic = (event as any).topic ?? inferTelemetryTopic(event.source, event.type);
+    const coalesceKey = options?.coalesceKey;
+
+    // Özel tekilleştirme/birleştirme anahtarı varsa ringBuffer içinde eşleşeni doğrudan güncelle
+    if (!isForced && coalesceKey) {
+      const match = this.ringBuffer.find((e) => (e as any)._coalesceKey === coalesceKey);
+      if (match) {
+        match.payload = event.payload;
+        match.timestamp = now;
+        match.topic = topic;
+        this.notifyListeners(match);
+        return;
+      }
+    }
 
     if (!isForced && windowMs > 0 && this.ringBuffer.length > 0) {
       const last = this.ringBuffer[this.ringBuffer.length - 1];
@@ -133,6 +193,7 @@ export class UIEventBus implements IEventBus {
         // Durum 1: Birebir aynı payload -> Tam Tekilleştirme (Identical Dedup)
         if (arePayloadsEqual(last.payload, event.payload)) {
           last.timestamp = now;
+          last.topic = topic;
           return;
         }
 
@@ -140,6 +201,7 @@ export class UIEventBus implements IEventBus {
         if (shouldCoalesce) {
           last.payload = event.payload;
           last.timestamp = now;
+          last.topic = topic;
 
           // Dinleyicileri sakinleştiren mikro trailing debounce (UI bildirim fırtınasını önler)
           this.pendingNotificationEvent = last;
@@ -163,7 +225,15 @@ export class UIEventBus implements IEventBus {
     this.flushPendingNotification();
 
     // Durum 3: Yeni / farklı olay veya tekilleştirme penceresi dışı
-    const fullEvent: UIEvent = { ...event, timestamp: now };
+    const fullEvent: UIEvent = { ...event, topic, timestamp: now };
+    if (coalesceKey) {
+      Object.defineProperty(fullEvent, '_coalesceKey', {
+        value: coalesceKey,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+      });
+    }
     this.ringBuffer.push(fullEvent);
     if (this.ringBuffer.length > this.bufferLimit) {
       this.ringBuffer.shift();
@@ -178,8 +248,62 @@ export class UIEventBus implements IEventBus {
     };
   }
 
-  getRecentEvents(): UIEvent[] {
-    return [...this.ringBuffer];
+  getRecentEvents(options?: GetRecentEventsOptions): UIEvent[] {
+    let result = [...this.ringBuffer];
+    if (options?.topic) {
+      result = result.filter((e) => e.topic === options.topic);
+    }
+    if (options?.source) {
+      result = result.filter((e) => e.source === options.source || e.source.startsWith(options.source));
+    }
+    if (options?.type) {
+      result = result.filter((e) => e.type === options.type);
+    }
+
+    // Aynı topic içinde her farklı olay tipinin (type) yalnızca en sonuncusunu tut
+    if (options?.distinctByType) {
+      const seen = new Set<string>();
+      const distinctReversed: UIEvent[] = [];
+      for (let i = result.length - 1; i >= 0; i--) {
+        const ev = result[i];
+        const key = `${ev.topic ?? 'system'}:${ev.type}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          distinctReversed.push(ev);
+        }
+      }
+      result = distinctReversed.reverse();
+    }
+
+    // Topic bazında dengeli seçim (her aktif topic'ten en son N olay)
+    if (options?.balanced) {
+      const perTopic = options.limit ?? 2;
+      const byTopic = new Map<string, UIEvent[]>();
+      for (const ev of result) {
+        const t = ev.topic ?? 'system';
+        if (!byTopic.has(t)) byTopic.set(t, []);
+        byTopic.get(t)!.push(ev);
+      }
+      const balancedList: UIEvent[] = [];
+      for (const [, events] of byTopic) {
+        balancedList.push(...events.slice(-perTopic));
+      }
+      result = balancedList.sort((a, b) => a.timestamp - b.timestamp);
+    } else if (options?.limit && options.limit > 0) {
+      result = result.slice(-options.limit);
+    } else if (!options) {
+      result = result.slice(-10);
+    }
+
+    return result;
+  }
+
+  getTopicBalancedEvents(perTopicLimit: number = 2, distinctByType: boolean = true): UIEvent[] {
+    return this.getRecentEvents({
+      balanced: true,
+      distinctByType,
+      limit: perTopicLimit,
+    });
   }
 
   clearTelemetry(): void {

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { z } from "zod";
 import { useAgentComponent } from "@my-agent/react";
+import { uiEventBus } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import {
   GRID_RUN_SQL_CONTRACT,
@@ -41,6 +42,8 @@ export function useResultGridAgent({
   customQuerySql,
   isTableReady,
 }: UseResultGridAgentOptions) {
+  const [selectedRow, setSelectedRow] = React.useState<Record<string, unknown> | null>(null);
+
   const { emit } = useAgentComponent({
     id: "result_grid:active",
     meta: {
@@ -48,6 +51,7 @@ export function useResultGridAgent({
       tableName: duckTableName,
       columns,
       rowCount: totalFiltered,
+      selectedRow,
       filters,
       customQuerySql,
       isTableReady,
@@ -56,6 +60,14 @@ export function useResultGridAgent({
       filter_change: {
         description: "Triggered when user or agent filters the grid columns",
         schema: z.object({ filters: z.record(z.string(), z.any()) }),
+      },
+      sort_changed: {
+        description: "Triggered when user or agent sorts the grid columns",
+        schema: z.object({
+          column: z.string(),
+          direction: z.enum(["asc", "desc"]).nullable().optional(),
+          sortConfigs: z.record(z.string(), z.enum(["asc", "desc"])).optional(),
+        }),
       },
       row_selected: {
         description: "Triggered when user selects a row in the result grid",
@@ -94,9 +106,89 @@ export function useResultGridAgent({
       prevFiltersRef.current = filters;
       if (typeof filters === "object" && Object.keys(filters).length > 0) {
         emit("filter_change", { filters: filters as Record<string, any> });
+        try {
+          uiEventBus.recordTelemetry(
+            {
+              topic: "data",
+              source: "result_grid",
+              type: "FILTER_APPLIED",
+              payload: { filters: filters as Record<string, unknown> },
+            },
+            { coalesceKey: "result_grid:filters" }
+          );
+        } catch {
+          // Telemetry best-effort
+        }
       }
     }
   }, [filters, emit]);
 
-  return { emit };
+  const handleRowSelect = React.useCallback(
+    (rowIndex: number, rowData: unknown) => {
+      const raw = (rowData as any)?.values ?? rowData;
+      if (raw && typeof raw === "object") {
+        setSelectedRow(raw as Record<string, unknown>);
+        try {
+          uiEventBus.recordTelemetry(
+            {
+              topic: "data",
+              source: "result_grid",
+              type: "ROW_SELECTED",
+              payload: { id: rowIndex, rowData: raw as Record<string, unknown> },
+            },
+            { coalesceKey: "result_grid:row_selected" }
+          );
+        } catch {
+          // Telemetry best-effort
+        }
+      }
+    },
+    []
+  );
+
+  const handleSortChange = React.useCallback(
+    (column: string, direction?: "asc" | "desc" | null, sortConfigs?: Record<string, "asc" | "desc">) => {
+      try {
+        uiEventBus.recordTelemetry(
+          {
+            topic: "data",
+            source: "result_grid",
+            type: "SORT_CHANGED",
+            payload: { column, direction, sortConfigs },
+          },
+          { coalesceKey: "result_grid:sort" }
+        );
+      } catch {
+        // Telemetry best-effort
+      }
+    },
+    []
+  );
+
+  const handleViewTransformed = React.useCallback(
+    (viewId?: string | null, title?: string, query?: string) => {
+      try {
+        uiEventBus.recordTelemetry(
+          {
+            topic: "data",
+            source: "result_grid",
+            type: "VIEW_TRANSFORMED",
+            payload: { viewId: viewId ?? undefined, title, query },
+          },
+          { coalesceKey: "result_grid:view_transformed" }
+        );
+      } catch {
+        // Telemetry best-effort
+      }
+    },
+    []
+  );
+
+  return {
+    emit,
+    selectedRow,
+    handleRowSelect,
+    handleSortChange,
+    handleViewTransformed,
+  };
 }

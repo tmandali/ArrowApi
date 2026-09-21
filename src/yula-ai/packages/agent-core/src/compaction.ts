@@ -312,40 +312,38 @@ export async function compactConversation(
 // ============================================================================
 
 export function compactUIEvents(events: UIEvent[], maxCount: number = 6): UIEvent[] {
-  if (events.length <= maxCount) return events;
+  if (events.length <= 1) return events;
 
-  // 1. Tekrarlayan ardışık olayları birleştir (Deduplication)
-  const compacted: UIEvent[] = [];
-  let repeatCount = 1;
-
-  for (let i = 0; i < events.length; i++) {
+  // 1. Topic içi tekil son durum: Aynı topic + type için yalnızca EN GÜNCEL olanı koru
+  const seen = new Set<string>();
+  const distinctReversed: UIEvent[] = [];
+  for (let i = events.length - 1; i >= 0; i--) {
     const current = events[i];
-    const next = events[i + 1];
-
-    if (next && next.source === current.source && next.type === current.type) {
-      repeatCount++;
-    } else {
-      if (repeatCount > 1) {
-        compacted.push({
-          ...current,
-          payload: {
-            ...current.payload,
-            _compactedCount: repeatCount,
-          },
-        });
-        repeatCount = 1;
-      } else {
-        compacted.push(current);
-      }
+    const key = `${current.topic ?? 'system'}:${current.type}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      distinctReversed.push(current);
     }
   }
+  const distinct = distinctReversed.reverse();
 
-  // 2. Maksimum limit aşılıyorsa en son olayları koru
-  if (compacted.length > maxCount) {
-    return compacted.slice(-maxCount);
+  if (distinct.length <= maxCount) return distinct;
+
+  // 2. Maksimum limit aşılıyorsa topic bazında dengeli seçerek sınırla
+  const byTopic = new Map<string, UIEvent[]>();
+  for (const ev of distinct) {
+    const t = ev.topic ?? 'system';
+    if (!byTopic.has(t)) byTopic.set(t, []);
+    byTopic.get(t)!.push(ev);
   }
 
-  return compacted;
+  const perTopic = Math.max(1, Math.floor(maxCount / Math.max(1, byTopic.size)));
+  const balanced: UIEvent[] = [];
+  for (const [, topicEvents] of byTopic) {
+    balanced.push(...topicEvents.slice(-perTopic));
+  }
+
+  return balanced.sort((a, b) => a.timestamp - b.timestamp).slice(-maxCount);
 }
 
 export function compactContextSnapshot(snapshot: UIContextSnapshot): UIContextSnapshot {

@@ -2,15 +2,19 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
-## [2026-09-21] Type-Safe App Telemetry & Semantic Report Lifecycle Events
+## [2026-09-21] Topic-Segmented UI Telemetry, Topic Schema Catalog & Live Grid Selection
 - **Rationale:**
-  1. *Decoupled Upstream Sensing:* Telemetry must act as ambient observability (UI $\rightarrow$ Agent) stored in a bounded 10-event ring buffer (`uiEventBus`), eliminating obsolete UI cancellation badges (`deferredManager` locks).
-  2. *High-Value Semantic Signal vs Keystroke Noise:* Keystroke telemetry quickly overflows ring buffers. Telemetry should capture high-level domain transitions: job selection, criteria submission/reset, export triggers, and terminal execution states.
+  1. *Starvation Immunity & Decoupled Upstream Sensing:* A naive, unindexed chronological buffer allows high-frequency UI events to push out critical domain events (e.g. job completion or criteria submission). Telemetry streams require topic segmentation (`jobs`, `data`, `form`, `navigation`, `system`).
+  2. *Targeted Reflection Tooling & Schema Grounding:* Coding agents inspect logs via targeted grep/tail filters rather than dumping all system events. The LLM reflection tool (`inspect_ui_state`) requires a schema catalog (`TELEMETRY_TOPICS`) describing each topic, typical event types, and parameter descriptions to prevent hallucinated keys.
+  3. *Topic-Balanced Compaction & Deduping:* LLM turns need a compact, starvation-free summary of UI activity. Naive chronological tails omit critical job or form events if user browses the grid; balanced compaction retains the latest event per event type per topic (`getTopicBalancedEvents`).
+  4. *Event vs State Disambiguation:* While user clicks are events, active row selection is a persistent state. The virtual spreadsheet grid must project selection into live component `meta.selectedRow`.
 - **Decision:**
-  - **Type-Safe Contract (`types.ts` & `event-bus.ts`):** Defined `AppTelemetryEvent` discriminated union in `@my-agent/core`. Enhanced `recordTelemetry` signature to enforce typed schemas.
-  - **Report Page Integration:** Integrated `JOB_SELECTED`, `CRITERIA_SUBMITTED`, and `CRITERIA_RESET` into `ReportModuleForm.tsx`. Integrated `EXPORT_TRIGGERED` into `use-grid-export.ts`.
-  - **Clean UI & Job Lifecycle:** Removed obsolete deferred chip from `yula-queue-badge.tsx`. Retained direct job lifecycle notifications via terminal state SSE telemetry (`REPORT_COMPLETED`, `REPORT_FAILED`, `REPORT_CANCELLED`).
-  - **Verification:** All 103 unit tests pass in `@my-agent/core`, 258 simulation and unit tests pass in `yula.client`, 0 oxlint warnings/errors, all files <= 450 lines.
+  - **Topic Schema Catalog (`types.ts`):** Defined `TopicDefinition` interface and `TELEMETRY_TOPICS` catalog (`key`, `label`, `description`, `typicalEvents`), deriving `TelemetryTopic = keyof typeof TELEMETRY_TOPICS`.
+  - **Event Bus Topic Engine (`event-bus.ts`):** Added automatic topic inference, `coalesceKey`, expanded ring buffer to 50, `distinctByType`, and `getTopicBalancedEvents(limitPerTopic, distinctByType)`.
+  - **Targeted Inspection & Tool Grounding (`standard-tools.ts`):** Bound `inspect_ui_state` parameter schema directly to `TELEMETRY_TOPICS` descriptions and exposed `available_topics` in tool outputs.
+  - **Compaction Integration (`compaction.ts`):** Updated `compactUIEvents` to deduplicate by topic and event type, preserving critical state across turns.
+  - **Virtual Grid Selection & Telemetry:** Added `onRowSelect` to `VirtualSpreadsheet` and `useCellSelection`. Wired `selectedRow` state, `ROW_SELECTED`, `SORT_CHANGED`, and `FILTER_APPLIED` into `useResultGridAgent` and `ArrowReportGrid`.
+  - **Verification:** 110 unit tests in `@my-agent/core` pass, 258 simulation and unit tests in `yula.client` pass, 0 oxlint warnings/errors, all files <= 493 lines.
 - **Author:** Antigravity / Team
 
 ---

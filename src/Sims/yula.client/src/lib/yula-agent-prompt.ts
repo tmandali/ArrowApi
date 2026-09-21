@@ -335,7 +335,12 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   // 4. Ring Buffer UI Olayları Telemetrisi
   const recentEvents = context?.uiContext?.recent_events;
   if (Array.isArray(recentEvents) && recentEvents.length > 0) {
-    lines.push("", "RECENT UI TELEMETRY EVENTS:", JSON.stringify(recentEvents, null, 2));
+    lines.push(
+      "",
+      "RECENT UI TELEMETRY EVENTS (LATEST PER TOPIC / STATE):",
+      JSON.stringify(recentEvents, null, 2),
+      "(Note: Use inspect_ui_state tool with { topic, event_type } to inspect deeper historical events if needed.)"
+    );
   }
 
   // 5. RAG ve Kullanıcı Becerileri
