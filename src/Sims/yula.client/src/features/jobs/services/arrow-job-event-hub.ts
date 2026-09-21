@@ -1,45 +1,21 @@
 import type { ArrowJobEvent } from "../types"
 import { type RunEventItem, appendOrUpdateRunEvent } from "../run-events"
-import { fetchJobStatus, readJobSseEvents } from "../arrow-job-client"
+import { fetchJobStatus } from "../arrow-job-client"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
-import { deferredManager } from "@my-agent/core"
+import {
+  type JobPhase,
+  type JobHubSnapshot,
+  type JobHubEventDetail,
+  type JobHubSession,
+  normId,
+  prettyJson,
+} from "./arrow-job-hub-types"
+import { executeJobSseStream } from "./arrow-job-hub-stream"
 
-export type JobPhase = "idle" | "running" | "done" | "cancelled"
-
-export type JobHubSnapshot = {
-  jobId: string
-  status: string
-  phase: JobPhase
-  events: RunEventItem[]
-  requestJson?: string
-  totalRows?: number | null
-  batchCount?: number | null
-  error?: string | null
-  isStreaming: boolean
-  eventsUrl?: string
-  jobUrl?: string
-  name?: string
-  createdAt?: string
-  completedAt?: string
-}
-
-export type JobHubEventDetail = {
-  jobId: string
-  eventName: string
-  payload: ArrowJobEvent
-  snapshot: JobHubSnapshot
-}
-
-function normId(id: string | null | undefined): string {
-  return id ? id.trim().toLowerCase() : ""
-}
-
-function prettyJson(value: unknown): string {
-  try {
-    return JSON.stringify(value ?? {}, null, 2)
-  } catch {
-    return "{\n  \n}"
-  }
+export {
+  type JobPhase,
+  type JobHubSnapshot,
+  type JobHubEventDetail,
 }
 
 /**
@@ -49,18 +25,7 @@ function prettyJson(value: unknown): string {
  * kaçırmadan (replay) dinlemesini sağlar.
  */
 export class ArrowJobEventHub extends EventTarget {
-  private sessions = new Map<
-    string,
-    {
-      snapshot: JobHubSnapshot
-      abortController: AbortController
-      subscribersCount: number
-      cleanupTimer?: ReturnType<typeof setTimeout> | null
-      lastProgressEmitMs?: number
-      pendingProgressTimer?: ReturnType<typeof setTimeout> | null
-      lastProgressPayload?: ArrowJobEvent | null
-    }
-  >()
+  private sessions = new Map<string, JobHubSession>()
 
   /** Belirtilen job için mevcut bellek snapshot'ını döner. */
   getSnapshot(jobId: string): JobHubSnapshot | undefined {
@@ -162,195 +127,15 @@ export class ArrowJobEventHub extends EventTarget {
     this.emitEvent(key, "init", { id: key, status: snapshot.status })
 
     if (initialPhase === "running") {
-      void this.runSseStream(key, session, job.eventsUrl)
+      void executeJobSseStream(
+        key,
+        session,
+        (k, eventName, payload) => this.emitEvent(k, eventName, payload),
+        job.eventsUrl
+      )
     }
 
     return abortController
-  }
-
-  private async runSseStream(
-    key: string,
-    session: NonNullable<ReturnType<typeof this.sessions.get>>,
-    eventsUrl?: string
-  ) {
-    const url = eventsUrl || `/api/arrow/jobs/${key}/events`
-    const { abortController } = session
-
-    const onSseEvent = (eventName: string, payload: ArrowJobEvent) => {
-      if (abortController.signal.aborted) return
-
-      const prev = session.snapshot
-      const nextEvents = appendOrUpdateRunEvent(prev.events, eventName, payload)
-
-      let phase: JobPhase = prev.phase
-      if (payload.status === "Cancelled" || eventName === "cancelled") {
-        phase = "cancelled"
-      } else if (payload.status === "Completed" || eventName === "completed") {
-        phase = "done"
-      } else if (payload.status === "Failed" || eventName === "failed") {
-        phase = "idle"
-      } else if (!isTerminalJobStatus(prev.status)) {
-        phase = "running"
-      }
-
-      session.snapshot = {
-        ...prev,
-        events: nextEvents,
-        status: payload.status || prev.status,
-        phase,
-        totalRows:
-          typeof payload.totalRows === "number"
-            ? payload.totalRows
-            : prev.totalRows,
-        batchCount:
-          typeof payload.batchCount === "number"
-            ? payload.batchCount
-            : prev.batchCount,
-        error: payload.error ?? prev.error,
-        completedAt: payload.completedAt ?? prev.completedAt,
-        isStreaming: phase === "running",
-      }
-
-      // ⏱️ Pi Deferred: Terminal durumda (Completed, Failed, Cancelled) askıya alınmış ajanı uyandır
-      if (phase === "done" || phase === "cancelled" || payload.status === "Failed" || eventName === "failed") {
-        try {
-          deferredManager.resume(normId(session.snapshot.jobId || key), session.snapshot);
-        } catch {
-          // Deferred resume best-effort
-        }
-      }
-
-      // Progress olayları yüksek frekansta (saniyede onlarca kez) gelebilir.
-      // Snapshot her zaman anında güncellenirken, UI yayınları ~60ms aralıkla akıcı dağıtılır.
-      // Diğer tüm olaylar (status, info, completed, failed, cancelled) bekletilmeden derhal iletilir.
-      if (eventName === "progress") {
-        const now = Date.now()
-        const elapsed = now - (session.lastProgressEmitMs ?? 0)
-        if (elapsed >= 60) {
-          if (session.pendingProgressTimer) {
-            clearTimeout(session.pendingProgressTimer)
-            session.pendingProgressTimer = null
-          }
-          session.lastProgressEmitMs = now
-          this.emitEvent(key, eventName, payload)
-        } else {
-          session.lastProgressPayload = payload
-          if (!session.pendingProgressTimer) {
-            session.pendingProgressTimer = setTimeout(() => {
-              session.pendingProgressTimer = null
-              session.lastProgressEmitMs = Date.now()
-              const pending = session.lastProgressPayload
-              session.lastProgressPayload = null
-              if (pending && !abortController.signal.aborted) {
-                this.emitEvent(key, "progress", pending)
-              }
-            }, Math.max(16, 60 - elapsed))
-          }
-        }
-      } else {
-        if (session.pendingProgressTimer) {
-          clearTimeout(session.pendingProgressTimer)
-          session.pendingProgressTimer = null
-          session.lastProgressPayload = null
-        }
-        this.emitEvent(key, eventName, payload)
-      }
-    }
-
-    try {
-      const terminal = await readJobSseEvents(
-        url,
-        abortController.signal,
-        onSseEvent
-      )
-
-      const prev = session.snapshot
-      let events = prev.events
-      let phase: JobPhase = "idle"
-
-      if (terminal.status === "Cancelled") {
-        phase = "cancelled"
-        events = appendOrUpdateRunEvent(events, "cancelled", {
-          id: key,
-          status: "Cancelled",
-          totalRows: terminal.totalRows,
-          batchCount: terminal.batchCount,
-        })
-      } else if (terminal.status === "Failed") {
-        phase = "idle"
-        if (!events.some((e) => e.eventName === "failed")) {
-          events = appendOrUpdateRunEvent(events, "failed", {
-            id: key,
-            status: "Failed",
-            error: terminal.error || "job failed",
-          })
-        }
-      } else if (terminal.status === "Completed") {
-        phase = "done"
-        if (!events.some((e) => e.eventName === "completed")) {
-          events = appendOrUpdateRunEvent(events, "completed", {
-            id: key,
-            status: "Completed",
-            totalRows: terminal.totalRows,
-            batchCount: terminal.batchCount,
-          })
-        }
-      }
-
-      session.snapshot = {
-        ...prev,
-        events,
-        status: terminal.status,
-        phase,
-        isStreaming: false,
-        totalRows:
-          typeof terminal.totalRows === "number"
-            ? terminal.totalRows
-            : prev.totalRows,
-        batchCount:
-          typeof terminal.batchCount === "number"
-            ? terminal.batchCount
-            : prev.batchCount,
-      }
-
-      if (session.pendingProgressTimer) {
-        clearTimeout(session.pendingProgressTimer)
-        session.pendingProgressTimer = null
-        session.lastProgressPayload = null
-      }
-
-      const terminalEventName = terminal.status.toLowerCase()
-      this.emitEvent(key, terminalEventName, terminal)
-    } catch (err) {
-      if (session.pendingProgressTimer) {
-        clearTimeout(session.pendingProgressTimer)
-        session.pendingProgressTimer = null
-        session.lastProgressPayload = null
-      }
-      if (abortController.signal.aborted) return
-
-      const prev = session.snapshot
-      const events = appendOrUpdateRunEvent(prev.events, "failed", {
-        id: key,
-        status: "Failed",
-        error: (err as Error)?.message || "stream error",
-      })
-
-      session.snapshot = {
-        ...prev,
-        events,
-        status: "Failed",
-        phase: "idle",
-        isStreaming: false,
-        error: (err as Error)?.message || "stream error",
-      }
-
-      this.emitEvent(key, "failed", {
-        id: key,
-        status: "Failed",
-        error: (err as Error)?.message || "stream error",
-      })
-    }
   }
 
   private emitEvent(key: string, eventName: string, payload: ArrowJobEvent) {
