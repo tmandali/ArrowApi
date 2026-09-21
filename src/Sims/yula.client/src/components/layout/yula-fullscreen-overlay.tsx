@@ -13,6 +13,7 @@ import {
 import { cn } from "@/utils/cn";
 import { YULA } from "@/components/layout/yula-brand-data";
 import { useActiveDiagramStore } from "@/lib/stores/active-diagram-store";
+import { useTelemetryMonitorStore } from "@/lib/stores/telemetry-monitor";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { workspaceLabelFromPath } from "@/lib/workspace-paths";
@@ -27,12 +28,14 @@ import {
   panelResizeHandleClass,
 } from "@/components/layout/panel-chrome";
 import { YulaIdeSidebar } from "./fullscreen-overlay/yula-ide-sidebar";
-import { YulaIdeCanvasHeader } from "./fullscreen-overlay/yula-ide-canvas-header";
+import { YulaIdeDetailHeader } from "./fullscreen-overlay/yula-ide-detail-header";
+import { TelemetryDetailView } from "./fullscreen-overlay/telemetry-detail-view";
 import {
   YulaCloseButton,
   YulaDeleteChatButton,
   YulaExpandToggleButton,
   YulaNewChatButton,
+  YulaDetailToggleButton,
 } from "./fullscreen-overlay/yula-dock-controls";
 
 export interface YulaFullscreenOverlayProps {
@@ -62,8 +65,34 @@ export function YulaFullscreenOverlay({
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const { setExpanded } = useWorkspaceAiChat();
-  const { activeDiagram, isMaximized: isCanvasMaximized } =
-    useActiveDiagramStore();
+  const {
+    isOpen: isTelemetryOpen,
+    activeView: telemetryActiveView,
+    setActiveView: setTelemetryActiveView,
+    close: closeTelemetry,
+  } = useTelemetryMonitorStore();
+
+  const {
+    activeDiagram,
+    isMaximized: isCanvasMaximized,
+    closeDiagram,
+  } = useActiveDiagramStore();
+
+  const isDetailOpen = isTelemetryOpen || Boolean(activeDiagram);
+  const currentDetailView = telemetryActiveView;
+
+  React.useEffect(() => {
+    if (activeDiagram) {
+      setTelemetryActiveView("diagram");
+    }
+  }, [activeDiagram, setTelemetryActiveView]);
+
+  const handleCloseDetail = React.useCallback(() => {
+    closeTelemetry();
+    if (activeDiagram) {
+      closeDiagram();
+    }
+  }, [closeTelemetry, activeDiagram, closeDiagram]);
 
   const conversations = useChatsStore((s) => s.conversations);
   const activeId = useChatsStore((s) => s.activeId);
@@ -99,22 +128,31 @@ export function YulaFullscreenOverlay({
       )}
     >
       <div className={cn("flex min-h-0 flex-1 overflow-hidden", pageInsetGutterClass)}>
-        {isCanvasMaximized && activeDiagram ? (
+        {isCanvasMaximized && isDetailOpen ? (
           <div className={cn(panelCardClass, "h-full w-full")}>
-            <YulaIdeCanvasHeader
+            <YulaIdeDetailHeader
+              activeView={currentDetailView}
+              onViewChange={setTelemetryActiveView}
               activeDiagram={activeDiagram}
               containerRef={containerRef}
+              onClose={handleCloseDetail}
             />
-            <div
-              ref={containerRef}
-              className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/5 min-h-0"
-            >
-              <MermaidBlock
-                chart={activeDiagram.chart}
-                fitCanvas
-                className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col items-center justify-center"
-              />
-            </div>
+            {currentDetailView === "diagram" && activeDiagram ? (
+              <div
+                ref={containerRef}
+                className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/5 min-h-0"
+              >
+                <MermaidBlock
+                  chart={activeDiagram.chart}
+                  fitCanvas
+                  className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col items-center justify-center"
+                />
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <TelemetryDetailView />
+              </div>
+            )}
           </div>
         ) : (
           <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
@@ -136,7 +174,7 @@ export function YulaFullscreenOverlay({
             {/* Column 2: Center Chat Stream */}
             <ResizablePanel
               defaultSize={
-                activeDiagram
+                isDetailOpen
                   ? sidebarOpen
                     ? "38%"
                     : "45%"
@@ -148,7 +186,7 @@ export function YulaFullscreenOverlay({
               className="flex min-h-0 flex-col"
             >
               <div className={cn(panelCardClass, "h-full w-full")}>
-                {/* Column 2 Top Header Bar (Breadcrumb) */}
+                {/* Column 2 Top Header Bar (Breadcrumb & Actions) */}
                 <div className={cn(panelHeaderClass, "bg-card")}>
                   <div className="flex min-w-0 items-center gap-2">
                     <Button
@@ -182,6 +220,7 @@ export function YulaFullscreenOverlay({
                     {headerActions ?? (
                       <>
                         <YulaContextUsageBadge />
+                        <YulaDetailToggleButton />
                         <YulaNewChatButton />
                         <YulaDeleteChatButton />
                         {!hideWindowControls && (
@@ -202,8 +241,8 @@ export function YulaFullscreenOverlay({
               </div>
             </ResizablePanel>
 
-            {/* Column 3: Right Canvas (IDE Tab + Breadcrumb + Diagram) */}
-            {activeDiagram ? (
+            {/* Column 3: Right Detail Panel (Diagram Canvas + Telemetry Monitor) */}
+            {isDetailOpen ? (
               <>
                 <ResizableHandle withHandle className={panelResizeHandleClass} />
                 <ResizablePanel
@@ -213,20 +252,29 @@ export function YulaFullscreenOverlay({
                   className="flex min-h-0 flex-col"
                 >
                   <div className={cn(panelCardClass, "h-full w-full")}>
-                    <YulaIdeCanvasHeader
+                    <YulaIdeDetailHeader
+                      activeView={currentDetailView}
+                      onViewChange={setTelemetryActiveView}
                       activeDiagram={activeDiagram}
                       containerRef={containerRef}
+                      onClose={handleCloseDetail}
                     />
-                    <div
-                      ref={containerRef}
-                      className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/5 min-h-0"
-                    >
-                      <MermaidBlock
-                        chart={activeDiagram.chart}
-                        fitCanvas
-                        className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col items-center justify-center"
-                      />
-                    </div>
+                    {currentDetailView === "diagram" && activeDiagram ? (
+                      <div
+                        ref={containerRef}
+                        className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/5 min-h-0"
+                      >
+                        <MermaidBlock
+                          chart={activeDiagram.chart}
+                          fitCanvas
+                          className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col items-center justify-center"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-h-0 overflow-hidden">
+                        <TelemetryDetailView />
+                      </div>
+                    )}
                   </div>
                 </ResizablePanel>
               </>
@@ -236,4 +284,5 @@ export function YulaFullscreenOverlay({
       </div>
     </div>
   );
+
 }

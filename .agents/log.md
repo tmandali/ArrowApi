@@ -2,6 +2,21 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-21] Telemetry Monitor Relocation to Yula Full-Mode Right Detail Panel & Shadcn UI Modernization
+- **Rationale:**
+  1. *Detached Overlay vs Integrated Canvas:* The previous telemetry monitor opened as an invasive slide-over drawer anchored to the right browser viewport edge, overlaying the active workspace rather than residing within the Yula IDE layout.
+  2. *Design Consistency:* The drawer relied on bespoke custom CSS and raw HTML controls rather than the repository's standard Shadcn UI design system.
+  3. *Unified Detail Panel:* Yula Fullscreen Overlay needed a flexible, multi-view right detail pane capable of seamlessly hosting both Mermaid diagram canvases and the live telemetry stream with dedicated toggle controls.
+- **Decision:**
+  - **Unified Right Detail Panel (`yula-fullscreen-overlay.tsx`, `yula-ide-detail-header.tsx`):** Generalized Column 3 into a tabbed detail panel. When both a diagram and telemetry exist, a sleek header switcher allows instant toggling between `Diyagram` and `Telemetri`.
+  - **Header Toggle Button (`yula-dock-controls.tsx`):** Added `YulaDetailToggleButton` (`PanelRight` icon) to Column 2's header bar, allowing users to collapse or expand the right detail panel on demand.
+  - **MDX Collapsible Stream & Sleek Button Tabs (`telemetry-detail-view.tsx`, `yula-ide-detail-header.tsx`):** Rebuilt telemetry into an elegant developer-log stream with collapsible items (`<Collapsible>`), severity pulse dots, dynamic topic filter tabs hiding zero-count categories, and a unified `panelHeaderClass` segmented button tab bar for Telemetri/Diyagram.
+  - **Drawer Retirement (`providers.tsx`, `workspace-ai-dock.tsx`):** Removed `TelemetryMonitorDrawer` and redundant dock buttons. The right detail panel is centrally controlled via `YulaDetailToggleButton` (`PanelRight` icon).
+  - **Verification:** 100% clean typecheck (`tsc --noEmit`), 0 oxlint warnings/errors, all 262 tests passing, all modified files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] Zero-Warning Oxlint Cleanup, Fast Refresh Conformance & Hook Immutability
 - **Rationale:**
   1. *Build Noise & Quality Standards:* Oxlint reported 14 warnings across `yula.client` including unused identifiers, non-component exports in fast-refresh modules, synchronous `setState` inside `useEffect`, and unsafe ref mutation during unmount cleanup.

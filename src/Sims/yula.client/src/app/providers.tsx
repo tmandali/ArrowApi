@@ -12,7 +12,6 @@ import { CompanySessionSync } from "@/components/app/company-session-sync";
 import { SessionDebug } from "@/components/app/session-debug";
 import { AccountStatusGuard } from "@/components/app/account-status-guard";
 import { SessionProvider } from "next-auth/react";
-import { TelemetryMonitorDrawer } from "@/components/layout/telemetry-monitor-drawer";
 
 export function Providers({
   children,
@@ -37,7 +36,6 @@ export function Providers({
                 <AccountStatusGuard />
                 <DocLangSync />
                 {children}
-                <TelemetryMonitorDrawer />
               </WorkspaceAiChatProvider>
             </YulaChatProvider>
           </AppProviders>

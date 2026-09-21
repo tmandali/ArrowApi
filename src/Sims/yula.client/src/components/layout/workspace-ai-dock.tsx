@@ -34,31 +34,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/utils/cn"
-import { Check, History, Activity } from "lucide-react"
+import { Check, History } from "lucide-react"
 import { MermaidCanvasSheet } from "@/components/layout/chat-markdown/mermaid-canvas-sheet"
-import { useTelemetryMonitorStore } from "@/lib/stores/telemetry-monitor"
 import {
   YulaNewChatButton,
   YulaExpandToggleButton,
   YulaCloseButton,
 } from "./fullscreen-overlay/yula-dock-controls"
-
-export function YulaTelemetryButton() {
-  const toggle = useTelemetryMonitorStore((s) => s.toggle);
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-      onClick={toggle}
-      title="Canlı Telemetri Monitörü (Radar)"
-      aria-label="Canlı Telemetri Monitörü"
-    >
-      <Activity className="size-3.5" />
-    </Button>
-  );
-}
 
 type WorkspaceAiDockProps = {
   children: React.ReactNode
@@ -303,7 +285,6 @@ export function WorkspaceAiDock({
         collapseLabel={YULA.collapseLabel}
         headerActions={
           <div className="flex min-w-0 items-center gap-0.5">
-            <YulaTelemetryButton />
             <YulaNewChatButton />
             <YulaExpandToggleButton />
             <YulaCloseButton />

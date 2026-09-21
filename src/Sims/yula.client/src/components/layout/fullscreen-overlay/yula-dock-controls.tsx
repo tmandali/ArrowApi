@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Maximize2, Minimize2, SquarePen, Trash2, X } from "lucide-react";
+import { Maximize2, Minimize2, PanelRight, SquarePen, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
+import { useTelemetryMonitorStore } from "@/lib/stores/telemetry-monitor";
+import { useActiveDiagramStore } from "@/lib/stores/active-diagram-store";
 import { cn } from "@/utils/cn";
 
 export function YulaDeleteChatButton({ className }: { className?: string }) {
@@ -137,6 +139,44 @@ export function YulaCloseButton({ className }: { className?: string }) {
       aria-label={t("close_panel")}
     >
       <X className="size-3.5" />
+    </Button>
+  );
+}
+
+export function YulaDetailToggleButton({ className }: { className?: string }) {
+  const { isOpen, open, close } = useTelemetryMonitorStore();
+  const activeDiagram = useActiveDiagramStore((s) => s.activeDiagram);
+  const closeDiagram = useActiveDiagramStore((s) => s.closeDiagram);
+
+  const isDetailOpen = isOpen || Boolean(activeDiagram);
+
+  const handleToggle = () => {
+    if (isDetailOpen) {
+      close();
+      if (activeDiagram) {
+        closeDiagram();
+      }
+    } else {
+      open("telemetry");
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      data-ide-action="true"
+      className={cn(
+        "size-7 shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors",
+        isDetailOpen && "bg-muted/60 text-foreground",
+        className,
+      )}
+      onClick={handleToggle}
+      title={isDetailOpen ? "Sağ Detay Panelini Kapat" : "Sağ Detay Panelini Aç"}
+      aria-label="Sağ Detay Paneli"
+    >
+      <PanelRight className="size-3.5" />
     </Button>
   );
 }
