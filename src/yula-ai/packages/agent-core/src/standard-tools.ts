@@ -13,6 +13,7 @@ import { sessionManager } from './session-branch';
 import { piEventStream } from './pi-event-stream';
 import { ComponentSchema, ActionContract, Tool, tool, TELEMETRY_TOPICS } from './types';
 import { i18nManager } from './i18n';
+import { classifyDiagnosticError, type DiagnosticVerdict } from './diagnostic-triage';
 
 export interface ExecuteActionParams {
   component_id: string;
@@ -34,6 +35,7 @@ export interface ExecuteActionResult {
   message?: string;
   error?: string;
   details?: Record<string, any>;
+  diagnostic?: DiagnosticVerdict;
   terminate?: boolean;
 }
 
@@ -142,9 +144,15 @@ export async function executeComponentAction({
   telemetryTracker.recordToolExecution(effectiveAction, isSuccess, Date.now() - startTime);
 
   if (!isSuccess) {
+    const rawErr = errorMsg || `"${effectiveComponentId}" failed to execute action "${effectiveAction}".`;
+    const diagnostic = classifyDiagnosticError(rawErr, {
+      source: effectiveComponentId,
+      payload: effectivePayload,
+    });
     return {
       success: false,
-      error: errorMsg || `"${effectiveComponentId}" failed to execute action "${effectiveAction}".`,
+      error: rawErr,
+      diagnostic,
       details: dispatchOutcome.result,
     };
   }
@@ -223,9 +231,12 @@ export const agentUiTools: Record<string, Tool> = {
         ),
       source: z.string().optional().describe('Filter telemetry events by source component identifier'),
       event_type: z.string().optional().describe('Filter telemetry events by event type (e.g. ROW_SELECTED, REPORT_COMPLETED)'),
+      correlation_id: z.string().optional().describe('Filter events by causality correlation ID (e.g. jobId)'),
+      min_severity: z.enum(['info', 'warn', 'critical']).optional().describe('Filter events by minimum severity level'),
       limit: z.number().optional().describe('Maximum number of events to return (default: 10)'),
     }),
-    execute: async ({ component_id, topic, source, event_type, limit }) => {
+    execute: async ({ component_id, topic, source, event_type, correlation_id, min_severity, limit }) => {
+      const filterOpts = { topic, source, type: event_type, correlationId: correlation_id, minSeverity: min_severity, limit };
       if (component_id) {
         const comp = uiRegistry.get(component_id);
         if (!comp) {
@@ -234,13 +245,13 @@ export const agentUiTools: Record<string, Tool> = {
         return {
           success: true,
           component: comp,
-          recent_events: uiEventBus.getRecentEvents({ source: component_id, topic, type: event_type, limit }),
+          recent_events: uiEventBus.getRecentEvents({ ...filterOpts, source: component_id }),
         };
       }
       return {
         success: true,
         active_components: uiRegistry.getActiveComponents(),
-        recent_events: uiEventBus.getRecentEvents({ topic, source, type: event_type, limit }),
+        recent_events: uiEventBus.getRecentEvents(filterOpts),
         available_topics: TELEMETRY_TOPICS,
       };
     },

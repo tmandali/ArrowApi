@@ -6,8 +6,6 @@ import {
   executeComponentAction,
   type ComponentSchema,
   piEventStream,
-  Agent,
-  AgentSession,
 } from "@my-agent/core";
 import { executeAgentToolCall } from "@my-agent/react";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";

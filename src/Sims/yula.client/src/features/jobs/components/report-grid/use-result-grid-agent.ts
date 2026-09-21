@@ -21,6 +21,7 @@ import {
 } from "@/lib/client-tools/result-grid-contracts";
 
 export interface UseResultGridAgentOptions {
+  jobId?: string;
   duckTableName: string;
   totalFiltered?: number;
   columns: string[];
@@ -35,6 +36,7 @@ export interface UseResultGridAgentOptions {
  * ve eylem çıktı sözleşmeleriyle 'result_grid:active' olarak kaydeder.
  */
 export function useResultGridAgent({
+  jobId,
   duckTableName,
   totalFiltered,
   columns,
@@ -114,14 +116,14 @@ export function useResultGridAgent({
               type: "FILTER_APPLIED",
               payload: { filters: filters as Record<string, unknown> },
             },
-            { coalesceKey: "result_grid:filters" }
+            { coalesceKey: "result_grid:filters", correlationId: jobId }
           );
         } catch {
           // Telemetry best-effort
         }
       }
     }
-  }, [filters, emit]);
+  }, [filters, emit, jobId]);
 
   const handleRowSelect = React.useCallback(
     (rowIndex: number, rowData: unknown) => {
@@ -136,14 +138,14 @@ export function useResultGridAgent({
               type: "ROW_SELECTED",
               payload: { id: rowIndex, rowData: raw as Record<string, unknown> },
             },
-            { coalesceKey: "result_grid:row_selected" }
+            { coalesceKey: "result_grid:row_selected", correlationId: jobId }
           );
         } catch {
           // Telemetry best-effort
         }
       }
     },
-    []
+    [jobId]
   );
 
   const handleSortChange = React.useCallback(
@@ -156,13 +158,13 @@ export function useResultGridAgent({
             type: "SORT_CHANGED",
             payload: { column, direction, sortConfigs },
           },
-          { coalesceKey: "result_grid:sort" }
+          { coalesceKey: "result_grid:sort", correlationId: jobId }
         );
       } catch {
         // Telemetry best-effort
       }
     },
-    []
+    [jobId]
   );
 
   const handleViewTransformed = React.useCallback(
@@ -175,13 +177,13 @@ export function useResultGridAgent({
             type: "VIEW_TRANSFORMED",
             payload: { viewId: viewId ?? undefined, title, query },
           },
-          { coalesceKey: "result_grid:view_transformed" }
+          { coalesceKey: "result_grid:view_transformed", correlationId: jobId }
         );
       } catch {
         // Telemetry best-effort
       }
     },
-    []
+    [jobId]
   );
 
   return {

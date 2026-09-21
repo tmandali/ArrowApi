@@ -7,7 +7,6 @@ import type {
   ArrowJobStatus,
   ArrowJobHubMessage,
 } from "./types"
-import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
 
 const ARROW_ACCEPT = "application/vnd.apache.arrow.stream"
 

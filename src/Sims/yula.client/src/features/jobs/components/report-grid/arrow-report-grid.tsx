@@ -298,6 +298,7 @@ export function ArrowReportGrid({
   // Headless React UI-Agent (@my-agent/react): Grid mount edildiğinde kendini
   // canlı React state'i, olay şemaları ve tip güvenli eylemleriyle kaydeder.
   const { handleRowSelect, handleSortChange, handleViewTransformed } = useResultGridAgent({
+    jobId: jobId ?? undefined,
     duckTableName,
     totalFiltered,
     columns: effectiveColumns.map((c) => c.name),
@@ -475,7 +476,7 @@ export function ArrowReportGrid({
         }}
         onSortSettingChange={(colName, desc) => {
           setSorting(colName, desc);
-          handleSortChange(colName, desc ? "desc" : "asc");
+          if (colName) handleSortChange(colName, desc ? "desc" : "asc");
         }}
         rowHeight={ROW_HEIGHT}
         isMaximized={isMaximized}

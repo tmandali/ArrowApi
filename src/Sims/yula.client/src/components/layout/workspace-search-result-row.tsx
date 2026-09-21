@@ -23,7 +23,7 @@ import { useChatsStore } from "@/lib/stores/chats";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 
-export function getCategoryIcon(category: string, isRag = false) {
+function getCategoryIcon(category: string, isRag = false) {
   if (isRag) {
     return <Sparkles className="size-3.5 shrink-0 text-amber-500/90 group-hover:text-amber-600 dark:text-amber-400" />;
   }

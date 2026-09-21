@@ -13,7 +13,6 @@ import {
   resolveValidationIssue,
   validateAgentAttachmentFile,
   validateUserAgent,
-  type UserAgent,
   type UserAgentAttachment,
 } from "@/lib/yula-user-agent";
 import { useUserSkillsStore } from "@/lib/stores/user-skills";

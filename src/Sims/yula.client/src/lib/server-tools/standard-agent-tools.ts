@@ -35,9 +35,15 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   inspect_ui_state: tool({
-    description: "Inspect the current UI state, mounted components, route, active filters, or criteria draft values on the active screen.",
+    description: "Inspect the current UI state, mounted components, route, active filters, or targeted UI telemetry events.",
     inputSchema: z.object({
       component_id: z.string().optional().describe("Optional target component ID to inspect specifically (e.g. 'criteria_form:retail-sales' or 'result_grid:active')"),
+      topic: z.enum(['jobs', 'data', 'form', 'navigation', 'system']).optional().describe("Filter telemetry events by topic/category"),
+      source: z.string().optional().describe("Filter telemetry events by source component identifier"),
+      event_type: z.string().optional().describe("Filter telemetry events by event type (e.g. ROW_SELECTED, REPORT_COMPLETED)"),
+      correlation_id: z.string().optional().describe("Filter events by causality correlation ID (e.g. jobId)"),
+      min_severity: z.enum(['info', 'warn', 'critical']).optional().describe("Filter events by minimum severity level"),
+      limit: z.number().optional().describe("Maximum number of events to return (default: 10)"),
     }),
     outputSchema: z.object({
       success: z.boolean().optional(),
@@ -50,12 +56,17 @@ export const STANDARD_AGENT_TOOLS = {
           z.object({
             source: z.string().describe("Source component of the event"),
             type: z.string().describe("Event type name"),
+            topic: z.string().optional().describe("Topic category"),
             payload: z.any().optional().describe("Event payload data"),
             timestamp: z.number().optional().describe("Event timestamp in milliseconds"),
+            age: z.string().optional().describe("Relative elapsed time (e.g. 2s ago)"),
+            correlationId: z.string().optional().describe("Correlation ID"),
+            severity: z.string().optional().describe("Event severity level"),
           }),
         )
         .optional()
         .describe("Ring-buffer telemetry events from active UI components"),
+      available_topics: z.any().optional().describe("Available telemetry topics and schemas"),
       message: z.string().optional(),
       error: z.string().optional(),
     }),

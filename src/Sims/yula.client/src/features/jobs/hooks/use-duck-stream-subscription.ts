@@ -18,7 +18,7 @@ export type UseDuckStreamSubscriptionOptions<T = Record<string, unknown>> = {
   sortByRef: React.RefObject<string | null>
   sortDescRef: React.RefObject<boolean>
   sortConfigsRef: React.RefObject<ColumnSortConfigs>
-  queryTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
+  clearQueryTimeout?: () => void
   executeQueryRef: React.RefObject<
     (
       activeFilters?: Record<string, string>,
@@ -56,7 +56,7 @@ export function useDuckStreamSubscription<T = Record<string, unknown>>({
   sortByRef,
   sortDescRef,
   sortConfigsRef,
-  queryTimeoutRef,
+  clearQueryTimeout,
   executeQueryRef,
   setStreamedRows,
   setIsStreaming,
@@ -153,7 +153,7 @@ export function useDuckStreamSubscription<T = Record<string, unknown>>({
 
     return () => {
       unsubscribe()
-      if (queryTimeoutRef.current) clearTimeout(queryTimeoutRef.current)
+      clearQueryTimeout?.()
     }
   }, [
     jobId,
@@ -163,10 +163,10 @@ export function useDuckStreamSubscription<T = Record<string, unknown>>({
     onError,
     markTableReady,
     baseTotalRowsRef,
+    clearQueryTimeout,
     executeQueryRef,
     filtersRef,
     prevCompleteRef,
-    queryTimeoutRef,
     setColumns,
     setCustomQueryTick,
     setHasMoreRows,

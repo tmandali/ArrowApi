@@ -14,10 +14,10 @@ import {
 } from './pdfx-graph.utils';
 import {
   Legend,
-  renderBarChart,
-  renderHorizontalBarChart,
-  renderLineAreaChart,
-  renderPieDonutChart,
+  BarChartRenderer,
+  HorizontalBarChartRenderer,
+  LineAreaChartRenderer,
+  PieDonutChartRenderer,
 } from './pdfx-chart-renderers';
 
 /**
@@ -100,30 +100,66 @@ export function PdfGraph({
 
   switch (variant) {
     case 'bar':
-      chartContent = renderBarChart(series, layout, palette, showGrid, showValues, theme);
+      chartContent = (
+        <BarChartRenderer
+          series={series}
+          layout={layout}
+          palette={palette}
+          showGrid={showGrid}
+          showValues={showValues}
+          theme={theme}
+        />
+      );
       break;
     case 'horizontal-bar':
-      chartContent = renderHorizontalBarChart(series, layout, palette, showValues, theme);
+      chartContent = (
+        <HorizontalBarChartRenderer
+          series={series}
+          layout={layout}
+          palette={palette}
+          showValues={showValues}
+          theme={theme}
+        />
+      );
       break;
     case 'line':
     case 'area':
-      chartContent = renderLineAreaChart(
-        series,
-        layout,
-        palette,
-        showGrid,
-        showValues,
-        showDots,
-        smooth,
-        variant === 'area',
-        theme
+      chartContent = (
+        <LineAreaChartRenderer
+          series={series}
+          layout={layout}
+          palette={palette}
+          showGrid={showGrid}
+          showValues={showValues}
+          showDots={showDots}
+          smooth={smooth}
+          isArea={variant === 'area'}
+          theme={theme}
+        />
       );
       break;
     case 'pie':
-      chartContent = renderPieDonutChart(series, layout, palette, undefined, false, theme);
+      chartContent = (
+        <PieDonutChartRenderer
+          series={series}
+          layout={layout}
+          palette={palette}
+          isDonut={false}
+          theme={theme}
+        />
+      );
       break;
     case 'donut':
-      chartContent = renderPieDonutChart(series, layout, palette, centerLabel, true, theme);
+      chartContent = (
+        <PieDonutChartRenderer
+          series={series}
+          layout={layout}
+          palette={palette}
+          centerLabel={centerLabel}
+          isDonut={true}
+          theme={theme}
+        />
+      );
       break;
   }
 
@@ -162,9 +198,13 @@ export function PdfGraph({
             </SvgText>
           )}
         </Svg>
-        {showLegend && legend === 'right' && Legend({ series, palette, styles, position: 'right' })}
+        {showLegend && legend === 'right' && (
+          <Legend series={series} palette={palette} styles={styles} position="right" />
+        )}
       </View>
-      {showLegend && legend === 'bottom' && Legend({ series, palette, styles, position: 'bottom' })}
+      {showLegend && legend === 'bottom' && (
+        <Legend series={series} palette={palette} styles={styles} position="bottom" />
+      )}
     </View>
   );
 

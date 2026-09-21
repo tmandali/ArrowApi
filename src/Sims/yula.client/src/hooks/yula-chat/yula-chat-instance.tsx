@@ -19,6 +19,8 @@ import {
   executeComponentAction,
   multiLaneScheduler,
   retryWithBackoff,
+  uiEventBus,
+  classifyDiagnosticError,
 } from "@my-agent/core";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
@@ -55,6 +57,26 @@ export function ChatInstance({
   // Headless UI-Agent Sistem Bileşenleri: app_router, job_history & criteria_form:*
   useHeadlessSystemComponents(router);
 
+  // Proaktif Kritik Telemetri Dinleyicisi
+  React.useEffect(() => {
+    const unsub = uiEventBus.onCritical((event) => {
+      const errPayload =
+        (event.payload as { error?: string; message?: string })?.error ||
+        (event.payload as { error?: string; message?: string })?.message ||
+        event.type;
+      const diagnostic = classifyDiagnosticError(errPayload, {
+        source: event.source,
+        payload: event.payload,
+        topic: event.topic,
+        correlationId: event.correlationId,
+      });
+      console.warn(
+        `🚨 [Yula Critical Telemetry]: ${event.type} (${diagnostic.category}) -> ${diagnostic.action}`,
+      );
+    });
+    return unsub;
+  }, []);
+
   const userStoppedRef = React.useRef(false);
   const [stopped, setStopped] = React.useState(false);
   const [streamErrorTexts, setStreamErrorTexts] = React.useState<Record<string, string>>({});
@@ -82,12 +104,14 @@ export function ChatInstance({
       userStoppedRef.current = true;
       setStopped(true);
       const raw = err instanceof Error ? err.message : String(err);
+      const verdict = classifyDiagnosticError(raw);
+      const userMsg = verdict.userFriendlyExplanation || raw;
       const lastAssistant = [...chat.messages]
         .reverse()
         .find((m) => m.role === "assistant");
-      if (lastAssistant && raw) {
+      if (lastAssistant && userMsg) {
         setStreamErrorTexts((prev) =>
-          prev[lastAssistant.id] === raw ? prev : { ...prev, [lastAssistant.id]: raw },
+          prev[lastAssistant.id] === userMsg ? prev : { ...prev, [lastAssistant.id]: userMsg },
         );
       }
     },

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { uiEventBus } from './event-bus';
+import { uiEventBus, formatRelativeAge } from './event-bus';
 import { TELEMETRY_TOPICS } from './types';
 import { agentUiTools } from './standard-tools';
 
@@ -211,6 +211,64 @@ describe('uiEventBus', () => {
     expect(res.available_topics).toBeDefined();
     expect(res.available_topics.data.key).toBe('data');
     expect(res.recent_events.every((e: any) => e.topic === 'data')).toBe(true);
+  });
+
+  it('formatRelativeAge göreli zaman etiketlerini doğru üretir ve getRecentEvents age ekler', () => {
+    const now = Date.now();
+    expect(formatRelativeAge(now - 2000, now)).toBe('just now');
+    expect(formatRelativeAge(now - 15000, now)).toBe('15s ago');
+    expect(formatRelativeAge(now - 180000, now)).toBe('3m ago');
+    expect(formatRelativeAge(now - 7200000, now)).toBe('2h ago');
+
+    uiEventBus.recordTelemetry({ source: 'result_grid', type: 'ROW_SELECTED', payload: { id: 1 } });
+    const events = uiEventBus.getRecentEvents();
+    expect(events[0].age).toBeDefined();
+    expect(events[0].ageMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('correlationId ile nedensellik zinciri filtrelenir', async () => {
+    uiEventBus.recordTelemetry(
+      { source: 'arrow_job', type: 'REPORT_STARTED', payload: { jobId: 'job-100' } },
+      { correlationId: 'job-100' }
+    );
+    uiEventBus.recordTelemetry(
+      { source: 'result_grid', type: 'ROW_SELECTED', payload: { id: 5 } },
+      { correlationId: 'job-100' }
+    );
+    uiEventBus.recordTelemetry(
+      { source: 'arrow_job', type: 'REPORT_STARTED', payload: { jobId: 'job-200' } },
+      { correlationId: 'job-200' }
+    );
+
+    const filtered = uiEventBus.getRecentEvents({ correlationId: 'job-100' });
+    expect(filtered).toHaveLength(2);
+    expect(filtered.every((e) => e.correlationId === 'job-100')).toBe(true);
+
+    const toolRes = (await agentUiTools.inspect_ui_state.execute({ correlation_id: 'job-100' } as any)) as any;
+    expect(toolRes.recent_events).toHaveLength(2);
+  });
+
+  it('severity otomatik türetilir, onCritical dinleyicisi tetiklenir ve minSeverity filtrelenir', () => {
+    let criticalTriggered = false;
+    let criticalEvent: any = null;
+    const unsub = uiEventBus.onCritical((ev) => {
+      criticalTriggered = true;
+      criticalEvent = ev;
+    });
+
+    uiEventBus.recordTelemetry({ source: 'arrow_job', type: 'REPORT_STARTED', payload: { jobId: 'j1' } });
+    uiEventBus.recordTelemetry({ source: 'arrow_job', type: 'REPORT_CANCELLED', payload: { jobId: 'j2' } });
+    uiEventBus.recordTelemetry({ source: 'arrow_job', type: 'REPORT_FAILED', payload: { jobId: 'j3', error: 'Fail' } });
+
+    expect(criticalTriggered).toBe(true);
+    expect(criticalEvent?.type).toBe('REPORT_FAILED');
+    expect(criticalEvent?.severity).toBe('critical');
+
+    const warnAndAbove = uiEventBus.getRecentEvents({ minSeverity: 'warn' });
+    expect(warnAndAbove).toHaveLength(2);
+    expect(warnAndAbove.map((e) => e.type)).toEqual(['REPORT_CANCELLED', 'REPORT_FAILED']);
+
+    unsub();
   });
 });
 

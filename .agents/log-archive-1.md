@@ -91,3 +91,62 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - Added 4th Golden Rule to root `AGENTS.md` enforcing English-only repository documentation and Evolutive Wiki Maintenance Protocol.
   - User-agent conversations remain in Turkish.
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Strict pnpm Package Manager Enforcement across JS/TS Workspaces
+- **Rationale:** The repository transitioned to `pnpm` (`packageManager: pnpm@10.15.1`, `pnpm-lock.yaml`), but lack of explicit prohibition in agent instructions led to occasional fallback invocations of `npm test` or `npx tsc`, triggering `.npmrc` configuration warnings and bypassing pnpm resolution.
+- **Decision:**
+  - Added Rule 5 to `src/Sims/yula.client/AGENTS.md` strictly requiring `pnpm` (`pnpm test`, `pnpm run typecheck`, `pnpm run lint`) and forbidding `npm` / `npx`.
+  - Added Section 3 ("Package Manager & Script Runner Standard") to `.agents/standards/dev-operations.md`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Type-Safe UI Telemetry & Upstream Event Stream Architecture
+- **Rationale:**
+  1. *Asymmetry between Downstream & Upstream:* While downstream actions (Agent -> UI via `dispatch_component_action`) enjoyed strict Zod preflight contracts, upstream interactions (UI -> Agent) relied on loose strings (`source: string`, `type: string`, `payload?: any`), leading to risk of typos, payload schema discrepancies, and token inflation.
+  2. *Single-Lifecycle Ambient Sensing:* Rapor job states and manual UI operations (filter changes, route changes, row selections) needed to stream cleanly into the LLM's ring-buffer memory without cancelable blocking queues or page-churn memory leaks.
+- **Decision:**
+  - **Core Typings (`@my-agent/core`):** Introduced `AppTelemetryEvent` discriminated union (`app_router`, `arrow_job`, `result_grid`, `criteria_form`), `InferEventPayload<T>`, and `ComponentEventEmitter<TEvents>`. Upgraded `IEventBus.recordTelemetry` to support strongly typed contracts with backward compatibility.
+  - **Component Inferred Emitter (`@my-agent/react`):** Enhanced `useAgentComponent` to return `{ emit }` typed against declared `events` Zod schemas.
+  - **Application Telemetry Stream (`yula.client`):**
+    - `arrow-job-hub-stream.ts`: Emits `arrow_job:REPORT_COMPLETED`, `REPORT_CANCELLED`, and `REPORT_FAILED` on terminal states.
+    - `use-headless-system-components.ts`: Emits `app_router:ROUTE_CHANGED` on client navigations.
+    - `use-result-grid-agent.ts`: Declares `row_selected`, `filter_change`, and emits filter events automatically when filters mutate.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] ReAct / Plan Mode Badge, Focus Screen Button, and Event Bus Dedup
+- **Rationale:** Triggering confirmation cards when the user is already on the target screen slowed down execution; fullscreen overlay also needed an instant way to focus on the underlying page.
+- **Decision:**
+  - Screen scope (`/stock/stock-balance`) defaults to **Direct ReAct** mode; global scope (`/`, `/dashboard`) defaults to **Plan-First** mode.
+  - Added live status badge (`YulaAgentModeChip`: `ReAct`, `Plan`, `Reasoning…`, `Acting…`) to the side dock and fullscreen header.
+  - Added `YulaFocusScreenButton` in fullscreen overlay to collapse the dock and focus on the underlying screen with `USER_FOCUS_SCREEN` telemetry.
+  - Added 150ms windowed deduplication and coalescing in `uiEventBus`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] ActionContract Canonicalization & StrictActionContract Elimination
+- **Rationale:** An extra intermediate type `StrictActionContract` was unnecessary since `@my-agent/core` already defines `ActionContract<TIn, TOut>` with required `whenToCall` and `whenNotToCall`.
+- **Decision:**
+  - Standardized all system contracts (`app_router`, `criteria_form`, `result_grid:active`, `job_history`, `job-detail-tool`) directly on `@my-agent/core`'s `ActionContract`.
+  - Enforced schemas and prompts compile-time safety using `satisfies ActionContract`.
+  - Deleted redundant `action-contract-types.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Generic Type-Safe ActionHandlersMap & Approach 2 Standardization
+- **Rationale:**
+  1. *Action Dispatch Boilerplate & Type Insecurity:* Previously, custom hooks and components handling actions had to implement a generic `onAction: async (action: string, payload: any)` callback containing `switch-case` blocks, defensive `typeof` checks, and manual payload casting. Typos in action names were undetected at compile time.
+  2. *Approach 2 (Isolated Custom Binding Hooks) Standard:* Inline `useAgentComponent` in complex UI views led to file bloat (e.g. `ItemFormShell.tsx` was 691 lines).
+- **Decision:**
+  - **Type Inference Primitives (`@my-agent/core`):** Introduced `InferActionInput<T>`, `InferActionOutput<T>`, and `ActionHandlersMap<TActions>` in `types.ts` to infer input and output types directly from Zod `ActionContract` schemas.
+  - **Type-Safe `handlers` in `useAgentComponent` (`@my-agent/react`):** Enhanced `useAgentComponent<TActions, TEvents>` with generic action typing and a strongly typed `handlers?: ActionHandlersMap<TActions>` property. Each action key maps to an async handler receiving automatically inferred payload types (`z.infer<TIn>`) and returning typed results. Backward-compatible fallback to `onAction` is preserved.
+  - **100% Approach 2 Adoption across `yula.client`:** Extracted dedicated binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`) and migrated their actions to the new `handlers` map.
+  - **File Size Compliance:** Modularized `ItemFormShell.tsx` from 691 lines down to 404 lines ($\le 500$).
+- **Author:** Antigravity / Team
+

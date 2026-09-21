@@ -2,6 +2,49 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-21] Zero-Warning Oxlint Cleanup, Fast Refresh Conformance & Hook Immutability
+- **Rationale:**
+  1. *Build Noise & Quality Standards:* Oxlint reported 14 warnings across `yula.client` including unused identifiers, non-component exports in fast-refresh modules, synchronous `setState` inside `useEffect`, and unsafe ref mutation during unmount cleanup.
+  2. *React Compiler & Fast Refresh Purity:* Exporting Zustand stores alongside UI components (`telemetry-monitor-drawer.tsx`) or lowercase rendering functions (`pdfx-chart-renderers.tsx`) broke React Fast Refresh hot-reloading boundaries. Mutating local accumulator variables inside JSX `.map` loops violated React Compiler immutability.
+- **Decision:**
+  - **Dead Code Pruning:** Removed unused imports `Agent`, `AgentSession`, `isTerminalJobStatus`, and type `UserAgent`.
+  - **Module & Store Isolation:** Extracted `useTelemetryMonitorStore` into dedicated `src/lib/stores/telemetry-monitor.ts`. Unexported internal helper `getCategoryIcon` in `workspace-search-result-row.tsx`.
+  - **PascalCase Component Architecture in React PDF:** Converted `renderBarChart`, `renderHorizontalBarChart`, `renderLineAreaChart`, and `renderPieDonutChart` into proper typed React components (`BarChartRenderer`, `HorizontalBarChartRenderer`, `LineAreaChartRenderer`, `PieDonutChartRenderer`) consuming standard props. Extracted pure slice geometry calculator `computePieSlices` to enforce immutability during render.
+  - **Hook Lifecycle Cleanups:** Replaced synchronous `setColumns(initialColumns)` inside `useEffect` with React's canonical render-time state adjustment pattern (`prevInitialColumns`) to eliminate cascading paints. Replaced raw mutable `queryTimeoutRef` with stable `clearQueryTimeout` callback in `useDuckStreamSubscription` to eliminate ref mutation warnings in cleanup.
+  - **Verification:** Oxlint reports 0 warnings and 0 errors across all 762 files. All 262 unit and simulation tests pass. All files comply with the 500-line ceiling.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] 3-Tier Diagnostic Triage & Sub-Agent Failure Analyst for Critical Telemetry
+- **Rationale:**
+  1. *Blind Halting vs Infinite Retries:* On `severity: 'critical'` telemetry or tool failure, models risk either halting on trivial syntax errors or spinning in infinite hallucination loops attempting to fix unrecoverable business constraints (closed periods, 401/403 permissions, 500 server crashes).
+  2. *Context Poisoning:* Dumping multi-megabyte stack traces into Level-0 chat history quickly exhausts token budgets and degrades reasoning.
+- **Decision:**
+  - **Tier 1 Fast Deterministic Classifier (`diagnostic-triage.ts` in `@my-agent/core`):** Synchronous 0ms rule engine separating recoverable syntax/schema errors (`ZodError`, malformed JSON, DuckDB parser typos) with `action: 'SELF_HEAL'` from unrecoverable errors with `action: 'ASK_USER_CHOICE'`.
+  - **Tier 2 Diagnostic Sub-Agent (`diagnostic-subagent.ts` in `yula.client`):** Isolated nested worker with a 2500ms timeout guard, sanitizing stack traces and generating tailored Turkish explanations with actionable `ask_user_choice` cards.
+  - **Tier 3 Bounded Retry Guard (`DiagnosticRetryGuard`):** Limits self-heal retries to 2 attempts, automatically escalating to interactive Human-In-The-Loop once exceeded.
+  - **Prompt Protocol & Wiring:** Added error triage directives in `yula-agent-prompt.ts` and subscribed to `uiEventBus.onCritical` in `yula-chat-instance.tsx`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Advanced Telemetry Engine (Relative Age, Causality Tracing, Severity Alerts & Dev Monitor)
+- **Rationale:**
+  1. *Token Waste and Chronological Ambiguity in LLM Prompts:* Raw ISO timestamps consume excess tokens and make it hard for language models to distinguish between events that happened 2 seconds ago versus 20 minutes ago.
+  2. *Lack of Causality Across Multi-Component Pipelines:* Submitting a form, queuing a report job, streaming progress, and populating a virtual spreadsheet happen across decoupled components. Tracing an outcome or error back to its causal request required a unified correlation ID.
+  3. *Purely Passive Telemetry:* Previously, errors like `REPORT_FAILED` remained in ring buffer memory until explicitly inspected. Critical system events require proactive notification capabilities (`onCritical`).
+  4. *Developer Observability:* Engineers lacked a visual live inspector to verify telemetry topic segregation, deduplication, and coalescing in real time.
+- **Decision:**
+  - **Relative Age Calculation (`event-bus.ts`, `compaction.ts`):** Implemented `formatRelativeAge`, dynamically attaching `age` (`just now`, `15s ago`, `3m ago`) and `ageMs` to recent events and prompt context.
+  - **Causality & Correlation (`types.ts`, `event-bus.ts`, `job-lifecycle-tools.ts`, `use-result-grid-agent.ts`):** Added `correlationId` to `UIEvent`, `RecordTelemetryOptions`, and `GetRecentEventsOptions`. Bound `jobId` across `REPORT_STARTED`, `REPORT_COMPLETED`, `REPORT_FAILED`, `ROW_SELECTED`, and `FILTER_APPLIED`. Added `correlation_id` filtering to `inspect_ui_state`.
+  - **Proactive Severity Alerts (`types.ts`, `event-bus.ts`, `arrow-job-hub-stream.ts`):** Added `TelemetrySeverity` (`info`, `warn`, `critical`), auto-inferred severity on job lifecycle events, and implemented `onCritical` listener hook.
+  - **Developer Radar Drawer (`telemetry-monitor-drawer.tsx`, `workspace-ai-dock.tsx`):** Created collapsible live inspector slide-over panel with topic filters, correlation search, live age updates, and JSON clipboard export, toggled via `YulaTelemetryButton` on the AI dock header.
+  - **Verification:** 113 unit tests in `@my-agent/core` pass, 258 simulation tests in `yula.client` pass, 0 oxlint errors, all 14 touched files <= 494 lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] Topic-Segmented UI Telemetry, Topic Schema Catalog & Live Grid Selection
 - **Rationale:**
   1. *Starvation Immunity & Decoupled Upstream Sensing:* A naive, unindexed chronological buffer allows high-frequency UI events to push out critical domain events (e.g. job completion or criteria submission). Telemetry streams require topic segmentation (`jobs`, `data`, `form`, `navigation`, `system`).
@@ -412,65 +455,8 @@ This document is the **append-only audit log** recording fundamental architectur
   - Surfaced active Wiki reading tier (`Workspace Wiki`, `User Wiki`, `System Baseline`) and playbook updates (`propose_playbook_update`) transparently in the Worked Steps UI.
 - **Author:** Antigravity / Team
 
-## [2026-09-20] ReAct / Plan Mode Badge, Focus Screen Button, and Event Bus Dedup
-- **Rationale:** Triggering confirmation cards when the user is already on the target screen slowed down execution; fullscreen overlay also needed an instant way to focus on the underlying page.
-- **Decision:**
-  - Screen scope (`/stock/stock-balance`) defaults to **Direct ReAct** mode; global scope (`/`, `/dashboard`) defaults to **Plan-First** mode.
-  - Added live status badge (`YulaAgentModeChip`: `ReAct`, `Plan`, `Reasoning…`, `Acting…`) to the side dock and fullscreen header.
-  - Added `YulaFocusScreenButton` in fullscreen overlay to collapse the dock and focus on the underlying screen with `USER_FOCUS_SCREEN` telemetry.
-  - Added 150ms windowed deduplication and coalescing in `uiEventBus`.
-- **Author:** Antigravity / Team
-
-## [2026-09-21] ActionContract Canonicalization & StrictActionContract Elimination
-- **Rationale:** An extra intermediate type `StrictActionContract` was unnecessary since `@my-agent/core` already defines `ActionContract<TIn, TOut>` with required `whenToCall` and `whenNotToCall`.
-- **Decision:**
-  - Standardized all system contracts (`app_router`, `criteria_form`, `result_grid:active`, `job_history`, `job-detail-tool`) directly on `@my-agent/core`'s `ActionContract`.
-  - Enforced schemas and prompts compile-time safety using `satisfies ActionContract`.
-  - Deleted redundant `action-contract-types.ts`.
-- **Author:** Antigravity / Team
-
-## [2026-09-21] Full Standardization on Approach 2 (Custom Agent Binding Hooks)
-- **Rationale:** Inline `useAgentComponent` bloated UI views and led to file size rule violations (`ItemFormShell.tsx` was 691 lines).
-- **Decision:**
-  - Extracted custom binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`).
-  - Modularized `ItemFormShell.tsx` down to 404 lines ($\le 500$).
-  - Achieved 100% Approach 2 adoption across `yula.client`.
-- **Author:** Antigravity / Team
-
-## [2026-09-21] Generic Type-Safe ActionHandlersMap & Approach 2 Standardization
-- **Rationale:**
-  1. *Action Dispatch Boilerplate & Type Insecurity:* Previously, custom hooks and components handling actions had to implement a generic `onAction: async (action: string, payload: any)` callback containing `switch-case` blocks, defensive `typeof` checks, and manual payload casting. Typos in action names were undetected at compile time.
-  2. *Approach 2 (Isolated Custom Binding Hooks) Standard:* Inline `useAgentComponent` in complex UI views led to file bloat (e.g. `ItemFormShell.tsx` was 691 lines).
-- **Decision:**
-  - **Type Inference Primitives (`@my-agent/core`):** Introduced `InferActionInput<T>`, `InferActionOutput<T>`, and `ActionHandlersMap<TActions>` in `types.ts` to infer input and output types directly from Zod `ActionContract` schemas.
-  - **Type-Safe `handlers` in `useAgentComponent` (`@my-agent/react`):** Enhanced `useAgentComponent<TActions, TEvents>` with generic action typing and a strongly typed `handlers?: ActionHandlersMap<TActions>` property. Each action key maps to an async handler receiving automatically inferred payload types (`z.infer<TIn>`) and returning typed results. Backward-compatible fallback to `onAction` is preserved.
-  - **100% Approach 2 Adoption across `yula.client`:** Extracted dedicated binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`) and migrated their actions to the new `handlers` map.
-  - **File Size Compliance:** Modularized `ItemFormShell.tsx` from 691 lines down to 404 lines ($\le 500$).
-- **Author:** Antigravity / Team
-
-## [2026-09-21] Strict pnpm Package Manager Enforcement across JS/TS Workspaces
-- **Rationale:** The repository transitioned to `pnpm` (`packageManager: pnpm@10.15.1`, `pnpm-lock.yaml`), but lack of explicit prohibition in agent instructions led to occasional fallback invocations of `npm test` or `npx tsc`, triggering `.npmrc` configuration warnings and bypassing pnpm resolution.
-- **Decision:**
-  - Added Rule 5 to `src/Sims/yula.client/AGENTS.md` strictly requiring `pnpm` (`pnpm test`, `pnpm run typecheck`, `pnpm run lint`) and forbidding `npm` / `npx`.
-  - Added Section 3 ("Package Manager & Script Runner Standard") to `.agents/standards/dev-operations.md`.
-- **Author:** Antigravity / Team
-
-## [2026-09-21] Type-Safe UI Telemetry & Upstream Event Stream Architecture
-- **Rationale:**
-  1. *Asymmetry between Downstream & Upstream:* While downstream actions (Agent $\rightarrow$ UI via `dispatch_component_action`) enjoyed strict Zod preflight contracts, upstream interactions (UI $\rightarrow$ Agent) relied on loose strings (`source: string`, `type: string`, `payload?: any`), leading to risk of typos, payload schema discrepancies, and token inflation.
-  2. *Single-Lifecycle Ambient Sensing:* Rapor job states and manual UI operations (filter changes, route changes, row selections) needed to stream cleanly into the LLM's ring-buffer memory without cancelable blocking queues or page-churn memory leaks.
-- **Decision:**
-  - **Core Typings (`@my-agent/core`):** Introduced `AppTelemetryEvent` discriminated union (`app_router`, `arrow_job`, `result_grid`, `criteria_form`), `InferEventPayload<T>`, and `ComponentEventEmitter<TEvents>`. Upgraded `IEventBus.recordTelemetry` to support strongly typed contracts with backward compatibility.
-  - **Component Inferred Emitter (`@my-agent/react`):** Enhanced `useAgentComponent` to return `{ emit }` typed against declared `events` Zod schemas.
-  - **Application Telemetry Stream (`yula.client`):**
-    - `arrow-job-hub-stream.ts`: Emits `arrow_job:REPORT_COMPLETED`, `REPORT_CANCELLED`, and `REPORT_FAILED` on terminal states.
-    - `use-headless-system-components.ts`: Emits `app_router:ROUTE_CHANGED` on client navigations.
-    - `use-result-grid-agent.ts`: Declares `row_selected`, `filter_change`, and emits filter events automatically when filters mutate.
-- **Author:** Antigravity / Team
-
----
-
 ## 📜 Prior Decisions Archive
-Older architectural decisions prior to September 20, 2026 have been archived to adhere to the 500-line limit:
+Older architectural decisions have been archived to adhere to the 500-line limit:
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
+
 

@@ -54,32 +54,41 @@ export async function executeJobSseStream(
       const jId = normId(session.snapshot.jobId || key);
       try {
         if (phase === "done") {
-          uiEventBus.recordTelemetry({
-            source: "arrow_job",
-            type: "REPORT_COMPLETED",
-            payload: {
-              jobId: jId,
-              totalRows: session.snapshot.totalRows ?? 0,
+          uiEventBus.recordTelemetry(
+            {
+              source: "arrow_job",
+              type: "REPORT_COMPLETED",
+              payload: {
+                jobId: jId,
+                totalRows: session.snapshot.totalRows ?? 0,
+              },
             },
-          });
+            { correlationId: jId, severity: "info" }
+          );
         } else if (phase === "cancelled") {
-          uiEventBus.recordTelemetry({
-            source: "arrow_job",
-            type: "REPORT_CANCELLED",
-            payload: {
-              jobId: jId,
-              reason: session.snapshot.error || "Kullanıcı tarafından iptal edildi",
+          uiEventBus.recordTelemetry(
+            {
+              source: "arrow_job",
+              type: "REPORT_CANCELLED",
+              payload: {
+                jobId: jId,
+                reason: session.snapshot.error || "Kullanıcı tarafından iptal edildi",
+              },
             },
-          });
+            { correlationId: jId, severity: "warn" }
+          );
         } else {
-          uiEventBus.recordTelemetry({
-            source: "arrow_job",
-            type: "REPORT_FAILED",
-            payload: {
-              jobId: jId,
-              error: session.snapshot.error || "Rapor oluşturulamadı",
+          uiEventBus.recordTelemetry(
+            {
+              source: "arrow_job",
+              type: "REPORT_FAILED",
+              payload: {
+                jobId: jId,
+                error: session.snapshot.error || "Rapor oluşturulamadı",
+              },
             },
-          });
+            { correlationId: jId, severity: "critical" }
+          );
         }
       } catch {
         // Telemetry best-effort

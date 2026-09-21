@@ -38,11 +38,13 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   const [sortConfigs, setSortConfigs] = React.useState<ColumnSortConfigs>({})
   const [page, setPage] = React.useState(0)
 
-  React.useEffect(() => {
+  const [prevInitialColumns, setPrevInitialColumns] = React.useState(initialColumns)
+  if (initialColumns !== prevInitialColumns) {
+    setPrevInitialColumns(initialColumns)
     if (!isCustomQueryActive() && initialColumns.length > 0) {
       setColumns(initialColumns)
     }
-  }, [initialColumns])
+  }
 
   const tableName = React.useMemo(() => {
     if (!jobId) return "current_report"
@@ -60,6 +62,12 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
   }, [columns])
 
   const queryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearQueryTimeout = React.useCallback(() => {
+    if (queryTimeoutRef.current) {
+      clearTimeout(queryTimeoutRef.current)
+      queryTimeoutRef.current = null
+    }
+  }, [])
   const tableReadyRef = React.useRef(false)
   const [isTableReady, setIsTableReady] = React.useState(false)
   const prevCompleteRef = React.useRef(false)
@@ -354,7 +362,7 @@ export function useDuckReport<T extends Record<string, unknown> = Record<string,
     sortByRef,
     sortDescRef,
     sortConfigsRef,
-    queryTimeoutRef,
+    clearQueryTimeout,
     executeQueryRef,
     setStreamedRows,
     setIsStreaming,

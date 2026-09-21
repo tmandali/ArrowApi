@@ -154,15 +154,18 @@ export async function runJobTool(
 
     // 📡 UI Telemetry: Rapor başlatma olayını telemetriye kaydet
     try {
-      uiEventBus.recordTelemetry({
-        source: "arrow_job",
-        type: "REPORT_STARTED",
-        payload: {
-          jobId: job.id,
-          scope,
-          title: meta.title,
+      uiEventBus.recordTelemetry(
+        {
+          source: "arrow_job",
+          type: "REPORT_STARTED",
+          payload: {
+            jobId: job.id,
+            scope,
+            title: meta.title,
+          },
         },
-      });
+        { correlationId: job.id }
+      );
     } catch {
       // Best-effort telemetry
     }

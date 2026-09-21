@@ -169,6 +169,10 @@ const BASE_PROMPT = [
   "• When calling 'ask_user_choice', write 1 short visible sentence in the user's language (what is ready + what is needed) — never leave the turn text empty or whitespace-only; the interactive choice card renders automatically below.",
   "• After starting a report job (action='SUBMIT' or 'RUN'), write one short started/queued line starting with 📊 followed by the exact report title in the user's language (shape: '📊 <Exact Report Title> <Started-word>'); the results card renders automatically.",
   "• When navigating (component_id='app_router', action='NAVIGATE'), write 1 short visible sentence in the user's language explaining that the target screen is opening (e.g. 'Stok bakiye ekranını açıyorum...'). Never leave the turn text empty.",
+  "",
+  "CRITICAL ERROR TRIAGE & SELF-HEALING PROTOCOL:",
+  "• If a tool result contains 'diagnostic.isRecoverable === true', read 'diagnostic.recoveryHint' and correct the parameters (e.g. fix argument types, dates, or query syntax) and retry the tool call (up to 2 times).",
+  "• If 'diagnostic.isRecoverable === false' or 'diagnostic.action === \"ASK_USER_CHOICE\"' (business logic constraint, 401/403 permissions, 500 infrastructure crash, or record not found), DO NOT repeat the failed action. Never hallucinate fake data. Instead, summarize the situation in 1 concise sentence using 'diagnostic.userFriendlyExplanation' and immediately invoke 'ask_user_choice' providing the suggested options (with label, description, and rationale).",
 ].join("\n");
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
 export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
@@ -339,7 +343,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       "",
       "RECENT UI TELEMETRY EVENTS (LATEST PER TOPIC / STATE):",
       JSON.stringify(recentEvents, null, 2),
-      "(Note: Use inspect_ui_state tool with { topic, event_type } to inspect deeper historical events if needed.)"
+      "(Note: Use inspect_ui_state tool with { topic, event_type, correlation_id, min_severity } to inspect deeper historical events if needed.)"
     );
   }
 

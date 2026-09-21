@@ -5,10 +5,41 @@ import {
   RecordTelemetryOptions,
   AppTelemetryEvent,
   TelemetryTopic,
+  TelemetrySeverity,
   GetRecentEventsOptions,
 } from './types';
 
-export { type RecordTelemetryOptions, type AppTelemetryEvent, type TelemetryTopic, type GetRecentEventsOptions };
+export {
+  type RecordTelemetryOptions,
+  type AppTelemetryEvent,
+  type TelemetryTopic,
+  type TelemetrySeverity,
+  type GetRecentEventsOptions,
+};
+
+export function formatRelativeAge(timestamp: number, now: number = Date.now()): string {
+  const diffMs = Math.max(0, now - timestamp);
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 5) return 'just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  return `${diffHour}h ago`;
+}
+
+export function inferTelemetrySeverity(type?: string, explicit?: TelemetrySeverity): TelemetrySeverity {
+  if (explicit) return explicit;
+  if (type === 'REPORT_FAILED') return 'critical';
+  if (type === 'REPORT_CANCELLED') return 'warn';
+  return 'info';
+}
+
+export const SEVERITY_RANK: Record<TelemetrySeverity, number> = {
+  info: 1,
+  warn: 2,
+  critical: 3,
+};
 
 export interface DispatchResult {
   success: boolean;
@@ -75,6 +106,7 @@ function arePayloadsEqual(a: any, b: any): boolean {
 export class UIEventBus implements IEventBus {
   private subscribers: Map<string, ActionHandler[]> = new Map();
   private telemetryListeners: Set<TelemetryListener> = new Set();
+  private criticalListeners: Set<TelemetryListener> = new Set();
   private ringBuffer: UIEvent[] = [];
   private readonly bufferLimit: number = 50;
   private dedupWindowMs: number = 250;
@@ -99,6 +131,16 @@ export class UIEventBus implements IEventBus {
     });
   }
 
+  private notifyCritical(event: UIEvent): void {
+    this.criticalListeners.forEach((listener) => {
+      try {
+        listener(event);
+      } catch (err) {
+        console.error('[UIEventBus] Critical telemetry listener hatası:', err);
+      }
+    });
+  }
+
   private flushPendingNotification(): void {
     if (this.pendingNotificationTimer) {
       clearTimeout(this.pendingNotificationTimer);
@@ -108,6 +150,9 @@ export class UIEventBus implements IEventBus {
       const ev = this.pendingNotificationEvent;
       this.pendingNotificationEvent = null;
       this.notifyListeners(ev);
+      if (ev.severity === 'critical') {
+        this.notifyCritical(ev);
+      }
     }
   }
 
@@ -128,24 +173,21 @@ export class UIEventBus implements IEventBus {
 
   /**
    * Hedef bileşene aksiyon gönderir ve bileşenin döndürdüğü sonucu (başarı/hata)
-   * Pi değerlendirme döngüsüne iletilmek üzere geri döner.
+   * standartlaştırılmış DispatchResult formatında geri iletir.
    */
   dispatch(actionPayload: UIAction): DispatchResult {
     const list = this.subscribers.get(actionPayload.component_id);
     if (!list || list.length === 0) {
-      const err = `[UIEventBus] Hedef bileşen bulunamadı: ${actionPayload.component_id}`;
-      console.warn(err);
-      return { success: false, error: err };
+      return {
+        success: false,
+        error: `Bileşen "${actionPayload.component_id}" bulunamadı veya dinleyicisi yok.`,
+      };
     }
 
-    const handler = list[list.length - 1];
-
     try {
-      const outcome = handler(actionPayload.action, actionPayload.payload);
-
-      // Bileşen açıkça false döndüyse
-      if (outcome === false) {
-        return { success: false, error: `Bileşen "${actionPayload.component_id}" eylemi reddetti.` };
+      let outcome: any;
+      for (const handler of list) {
+        outcome = handler(actionPayload.action, actionPayload.payload);
       }
 
       // Bileşen { success: false, error: "..." } nesnesi döndüyse (Validasyon hatası vb.)
@@ -171,6 +213,8 @@ export class UIEventBus implements IEventBus {
     const shouldCoalesce = options?.coalesce ?? true;
     const isForced = options?.force === true;
     const topic: TelemetryTopic = (event as any).topic ?? inferTelemetryTopic(event.source, event.type);
+    const severity: TelemetrySeverity = inferTelemetrySeverity(event.type, (event as any).severity ?? options?.severity);
+    const correlationId: string | undefined = (event as any).correlationId ?? options?.correlationId;
     const coalesceKey = options?.coalesceKey;
 
     // Özel tekilleştirme/birleştirme anahtarı varsa ringBuffer içinde eşleşeni doğrudan güncelle
@@ -180,7 +224,10 @@ export class UIEventBus implements IEventBus {
         match.payload = event.payload;
         match.timestamp = now;
         match.topic = topic;
+        if (correlationId) match.correlationId = correlationId;
+        if (severity) match.severity = severity;
         this.notifyListeners(match);
+        if (severity === 'critical') this.notifyCritical(match);
         return;
       }
     }
@@ -194,6 +241,8 @@ export class UIEventBus implements IEventBus {
         if (arePayloadsEqual(last.payload, event.payload)) {
           last.timestamp = now;
           last.topic = topic;
+          if (correlationId) last.correlationId = correlationId;
+          if (severity) last.severity = severity;
           return;
         }
 
@@ -202,6 +251,8 @@ export class UIEventBus implements IEventBus {
           last.payload = event.payload;
           last.timestamp = now;
           last.topic = topic;
+          if (correlationId) last.correlationId = correlationId;
+          if (severity) last.severity = severity;
 
           // Dinleyicileri sakinleştiren mikro trailing debounce (UI bildirim fırtınasını önler)
           this.pendingNotificationEvent = last;
@@ -214,6 +265,7 @@ export class UIEventBus implements IEventBus {
               const ev = this.pendingNotificationEvent;
               this.pendingNotificationEvent = null;
               this.notifyListeners(ev);
+              if (ev.severity === 'critical') this.notifyCritical(ev);
             }
           }, Math.min(50, windowMs));
           return;
@@ -225,7 +277,7 @@ export class UIEventBus implements IEventBus {
     this.flushPendingNotification();
 
     // Durum 3: Yeni / farklı olay veya tekilleştirme penceresi dışı
-    const fullEvent: UIEvent = { ...event, topic, timestamp: now };
+    const fullEvent: UIEvent = { ...event, topic, timestamp: now, severity, correlationId };
     if (coalesceKey) {
       Object.defineProperty(fullEvent, '_coalesceKey', {
         value: coalesceKey,
@@ -239,6 +291,7 @@ export class UIEventBus implements IEventBus {
       this.ringBuffer.shift();
     }
     this.notifyListeners(fullEvent);
+    if (severity === 'critical') this.notifyCritical(fullEvent);
   }
 
   onTelemetry(listener: TelemetryListener): () => void {
@@ -248,16 +301,31 @@ export class UIEventBus implements IEventBus {
     };
   }
 
+  onCritical(listener: TelemetryListener): () => void {
+    this.criticalListeners.add(listener);
+    return () => {
+      this.criticalListeners.delete(listener);
+    };
+  }
+
   getRecentEvents(options?: GetRecentEventsOptions): UIEvent[] {
     let result = [...this.ringBuffer];
     if (options?.topic) {
       result = result.filter((e) => e.topic === options.topic);
     }
     if (options?.source) {
-      result = result.filter((e) => e.source === options.source || e.source.startsWith(options.source));
+      const src = options.source;
+      result = result.filter((e) => e.source === src || e.source.startsWith(src));
     }
     if (options?.type) {
       result = result.filter((e) => e.type === options.type);
+    }
+    if (options?.correlationId) {
+      result = result.filter((e) => e.correlationId === options.correlationId);
+    }
+    if (options?.minSeverity) {
+      const minRank = SEVERITY_RANK[options.minSeverity] ?? 1;
+      result = result.filter((e) => (SEVERITY_RANK[e.severity ?? 'info'] ?? 1) >= minRank);
     }
 
     // Aynı topic içinde her farklı olay tipinin (type) yalnızca en sonuncusunu tut
@@ -295,7 +363,12 @@ export class UIEventBus implements IEventBus {
       result = result.slice(-10);
     }
 
-    return result;
+    const now = Date.now();
+    return result.map((e) => ({
+      ...e,
+      age: formatRelativeAge(e.timestamp, now),
+      ageMs: Math.max(0, now - e.timestamp),
+    }));
   }
 
   getTopicBalancedEvents(perTopicLimit: number = 2, distinctByType: boolean = true): UIEvent[] {
@@ -319,9 +392,9 @@ export class UIEventBus implements IEventBus {
   clear(): void {
     this.subscribers.clear();
     this.telemetryListeners.clear();
+    this.criticalListeners.clear();
     this.clearTelemetry();
   }
 }
 
 export const uiEventBus = new UIEventBus();
-

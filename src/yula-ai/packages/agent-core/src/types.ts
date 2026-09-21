@@ -113,10 +113,12 @@ export const TELEMETRY_TOPICS = {
 
 export type TelemetryTopic = keyof typeof TELEMETRY_TOPICS;
 
+export type TelemetrySeverity = 'info' | 'warn' | 'critical';
+
 /**
  * Canonical Application Telemetry Events Discriminated Union
  */
-export type AppTelemetryEvent =
+export type AppTelemetryEvent = (
   | {
       topic?: 'navigation';
       source: 'app_router';
@@ -200,7 +202,11 @@ export type AppTelemetryEvent =
       source: 'criteria_form';
       type: 'CRITERIA_RESET';
       payload: { report: string };
-    };
+    }
+) & {
+  correlationId?: string;
+  severity?: TelemetrySeverity;
+};
 
 export type InferEventPayload<T> = T extends { schema: infer TSchema }
   ? (TSchema extends ZodTypeAny ? z.infer<TSchema> : any)
@@ -232,6 +238,10 @@ export interface RecordTelemetryOptions {
   force?: boolean;
   /** İsteğe bağlı özel tekilleştirme / birleştirme anahtarı (örn. 'result_grid:row_selected') */
   coalesceKey?: string;
+  /** Nedensellik / iş akışı zincirini bağlayan korelasyon kimliği (örn. jobId) */
+  correlationId?: string;
+  /** Olay önem derecesi (varsayılan: 'info') */
+  severity?: TelemetrySeverity;
 }
 
 export interface GetRecentEventsOptions {
@@ -247,6 +257,10 @@ export interface GetRecentEventsOptions {
   balanced?: boolean;
   /** Aynı topic içinde her olay tipinden (type) yalnızca en sonuncusunu tutma (varsayılan: false) */
   distinctByType?: boolean;
+  /** Filtrelenecek nedensellik/korelasyon kimliği */
+  correlationId?: string;
+  /** Filtrelenecek asgari önem seviyesi */
+  minSeverity?: TelemetrySeverity;
 }
 
 export interface IEventBus {
@@ -255,6 +269,7 @@ export interface IEventBus {
   recordTelemetry(event: AppTelemetryEvent | Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
   getRecentEvents(options?: GetRecentEventsOptions): UIEvent[];
   getTopicBalancedEvents?(perTopicLimit?: number, distinctByType?: boolean): UIEvent[];
+  onCritical?(listener: (event: UIEvent) => void): () => void;
   clear(): void;
 }
 
@@ -275,6 +290,10 @@ export interface UIEvent {
   type: string;
   payload?: any;
   timestamp: number;
+  age?: string;
+  ageMs?: number;
+  correlationId?: string;
+  severity?: TelemetrySeverity;
 }
 
 export interface UIAction {

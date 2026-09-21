@@ -61,6 +61,7 @@ export * from './export-html';
 export type { AvailableModelInfo } from './models-config';
 export type * from './oauth/types';
 export { generatePKCE } from './oauth/pkce';
+export * from './diagnostic-triage';
 export * from './i18n';
 export { z } from 'zod';
 

@@ -15,7 +15,7 @@ import {
 /**
  * Shared Y-axis grid lines and tick labels for cartesian charts (bar, line, area).
  */
-export function renderGridAndYAxis(
+function renderGridAndYAxis(
   ticks: number[],
   toY: (v: number) => number,
   chartX: number,
@@ -57,14 +57,23 @@ export function renderGridAndYAxis(
   );
 }
 
-export function renderBarChart(
-  series: GraphSeries[],
-  layout: ChartLayout,
-  palette: string[],
-  showGrid: boolean,
-  showValues: boolean,
-  theme: PdfxTheme
-) {
+export interface BarChartRendererProps {
+  series: GraphSeries[];
+  layout: ChartLayout;
+  palette: string[];
+  showGrid: boolean;
+  showValues: boolean;
+  theme: PdfxTheme;
+}
+
+export function BarChartRenderer({
+  series,
+  layout,
+  palette,
+  showGrid,
+  showValues,
+  theme,
+}: BarChartRendererProps) {
   const { chartX, chartY, chartW, chartH, yMin, yMax, yTicks, xLabels } = layout;
   const nCategories = xLabels.length;
   const nSeries = series.length;
@@ -135,13 +144,21 @@ export function renderBarChart(
   );
 }
 
-export function renderHorizontalBarChart(
-  series: GraphSeries[],
-  layout: ChartLayout,
-  palette: string[],
-  showValues: boolean,
-  theme: PdfxTheme
-) {
+export interface HorizontalBarChartRendererProps {
+  series: GraphSeries[];
+  layout: ChartLayout;
+  palette: string[];
+  showValues: boolean;
+  theme: PdfxTheme;
+}
+
+export function HorizontalBarChartRenderer({
+  series,
+  layout,
+  palette,
+  showValues,
+  theme,
+}: HorizontalBarChartRendererProps) {
   const { chartX, chartY, chartW, chartH, xLabels } = layout;
   const nCategories = xLabels.length;
   const allValues = series.flatMap((s) => s.data.map((d) => d.value));
@@ -205,17 +222,29 @@ export function renderHorizontalBarChart(
   );
 }
 
-export function renderLineAreaChart(
-  series: GraphSeries[],
-  layout: ChartLayout,
-  palette: string[],
-  showGrid: boolean,
-  showValues: boolean,
-  showDots: boolean,
-  smooth: boolean,
-  isArea: boolean,
-  theme: PdfxTheme
-) {
+export interface LineAreaChartRendererProps {
+  series: GraphSeries[];
+  layout: ChartLayout;
+  palette: string[];
+  showGrid: boolean;
+  showValues: boolean;
+  showDots: boolean;
+  smooth: boolean;
+  isArea: boolean;
+  theme: PdfxTheme;
+}
+
+export function LineAreaChartRenderer({
+  series,
+  layout,
+  palette,
+  showGrid,
+  showValues,
+  showDots,
+  smooth,
+  isArea,
+  theme,
+}: LineAreaChartRendererProps) {
   const { chartX, chartY, chartW, chartH, yMin, yMax, yTicks, xLabels } = layout;
   const range = yMax - yMin || 1;
   const textColor = theme.colors.mutedForeground;
@@ -298,14 +327,50 @@ export function renderLineAreaChart(
   );
 }
 
-export function renderPieDonutChart(
-  series: GraphSeries[],
-  layout: ChartLayout,
+export interface PieDonutChartRendererProps {
+  series: GraphSeries[];
+  layout: ChartLayout;
+  palette: string[];
+  centerLabel?: string;
+  isDonut: boolean;
+  theme: PdfxTheme;
+}
+
+function computePieSlices(
+  data: GraphSeries['data'],
+  total: number,
   palette: string[],
-  centerLabel: string | undefined,
-  isDonut: boolean,
-  theme: PdfxTheme
+  cx: number,
+  cy: number,
+  r: number,
+  innerR: number
 ) {
+  let runningAngle = 0;
+  return data.map((d, i) => {
+    const color = d.color ?? palette[i % palette.length];
+    const sweep = (d.value / total) * 360;
+    const startAngle = runningAngle;
+    const endAngle = runningAngle + sweep;
+    const midAngle = startAngle + sweep / 2;
+    const path = arcPath(cx, cy, r, startAngle, endAngle, innerR);
+    runningAngle += sweep;
+
+    const labelR = r * 1.18;
+    const lp = polarToCartesian(cx, cy, labelR, midAngle);
+    const anchor: 'start' | 'end' = lp.x > cx ? 'start' : 'end';
+
+    return { d, i, color, sweep, path, lp, anchor };
+  });
+}
+
+export function PieDonutChartRenderer({
+  series,
+  layout,
+  palette,
+  centerLabel,
+  isDonut,
+  theme,
+}: PieDonutChartRendererProps) {
   const { svgW, svgH } = layout;
   const cx = svgW / 2;
   const cy = svgH / 2;
@@ -316,39 +381,27 @@ export function renderPieDonutChart(
   const data = series[0]?.data ?? [];
   const total = data.reduce((sum, d) => sum + d.value, 0) || 1;
 
-  let currentAngle = 0;
+  const slices = computePieSlices(data, total, palette, cx, cy, r, innerR);
 
   return (
     <>
-      {data.map((d, i) => {
-        const color = d.color ?? palette[i % palette.length];
-        const sweep = (d.value / total) * 360;
-        const midAngle = currentAngle + sweep / 2;
-        const path = arcPath(cx, cy, r, currentAngle, currentAngle + sweep, innerR);
-        currentAngle += sweep;
-
-        const labelR = r * 1.18;
-        const lp = polarToCartesian(cx, cy, labelR, midAngle);
-        const anchor = lp.x > cx ? 'start' : 'end';
-
-        return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static PDF chart data — index is the stable identity
-          <G key={`slice-${i}`}>
-            <Path d={path} fill={color} stroke="white" strokeWidth={1} />
-            {sweep > 15 && (
-              <SvgText
-                x={lp.x}
-                y={lp.y + 3}
-                fill={textColor}
-                textAnchor={anchor}
-                style={{ fontSize: 7 }}
-              >
-                {truncate(d.label, 10)}
-              </SvgText>
-            )}
-          </G>
-        );
-      })}
+      {slices.map(({ d, i, color, sweep, path, lp, anchor }) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static PDF chart data — index is the stable identity
+        <G key={`slice-${i}`}>
+          <Path d={path} fill={color} stroke="white" strokeWidth={1} />
+          {sweep > 15 && (
+            <SvgText
+              x={lp.x}
+              y={lp.y + 3}
+              fill={textColor}
+              textAnchor={anchor}
+              style={{ fontSize: 7 }}
+            >
+              {truncate(d.label, 10)}
+            </SvgText>
+          )}
+        </G>
+      ))}
 
       {isDonut && centerLabel && (
         <>

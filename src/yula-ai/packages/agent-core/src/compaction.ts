@@ -1,6 +1,7 @@
 import { UIEvent, UIContextSnapshot, ContextUsage, CompactionSettings, CompactionResult } from './types';
 import { modelCatalog } from './model-catalog';
 import { piEventStream } from './pi-event-stream';
+import { formatRelativeAge } from './event-bus';
 
 /**
  * Pi-Style Context Compaction & Pruning
@@ -327,23 +328,29 @@ export function compactUIEvents(events: UIEvent[], maxCount: number = 6): UIEven
   }
   const distinct = distinctReversed.reverse();
 
-  if (distinct.length <= maxCount) return distinct;
+  let finalEvents = distinct;
+  if (distinct.length > maxCount) {
+    const byTopic = new Map<string, UIEvent[]>();
+    for (const ev of distinct) {
+      const t = ev.topic ?? 'system';
+      if (!byTopic.has(t)) byTopic.set(t, []);
+      byTopic.get(t)!.push(ev);
+    }
 
-  // 2. Maksimum limit aşılıyorsa topic bazında dengeli seçerek sınırla
-  const byTopic = new Map<string, UIEvent[]>();
-  for (const ev of distinct) {
-    const t = ev.topic ?? 'system';
-    if (!byTopic.has(t)) byTopic.set(t, []);
-    byTopic.get(t)!.push(ev);
+    const perTopic = Math.max(1, Math.floor(maxCount / Math.max(1, byTopic.size)));
+    const balanced: UIEvent[] = [];
+    for (const [, topicEvents] of byTopic) {
+      balanced.push(...topicEvents.slice(-perTopic));
+    }
+    finalEvents = balanced.sort((a, b) => a.timestamp - b.timestamp).slice(-maxCount);
   }
 
-  const perTopic = Math.max(1, Math.floor(maxCount / Math.max(1, byTopic.size)));
-  const balanced: UIEvent[] = [];
-  for (const [, topicEvents] of byTopic) {
-    balanced.push(...topicEvents.slice(-perTopic));
-  }
-
-  return balanced.sort((a, b) => a.timestamp - b.timestamp).slice(-maxCount);
+  const now = Date.now();
+  return finalEvents.map((e) => ({
+    ...e,
+    age: e.age ?? formatRelativeAge(e.timestamp, now),
+    ageMs: e.ageMs ?? Math.max(0, now - e.timestamp),
+  }));
 }
 
 export function compactContextSnapshot(snapshot: UIContextSnapshot): UIContextSnapshot {
