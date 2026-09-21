@@ -412,16 +412,16 @@ export const agentUiTools: Record<string, Tool> = {
           z.union([
             z.string(),
             z.object({
-              label: z.string().describe('Option button label / title'),
+              label: z.string().describe('Option button label / title (concise single-line)'),
               value: z.string().optional().describe('Returned value when selected (defaults to label)'),
-              description: z.string().optional().describe('Clear explanation of what will happen if selected (Açıklama)'),
-              rationale: z.string().optional().describe('Why this option is proposed and its business impact (Gerekçe)'),
+              description: z.string().optional().describe('Brief 1-phrase explanation of what will happen if selected'),
+              rationale: z.string().optional().describe('Deprecated: Keep options concise without verbose rationales'),
               badge: z.string().optional().describe('Optional badge tag, e.g. Önerilen, Standart'),
             }),
           ]),
         )
         .min(1)
-        .describe('List of selectable options with descriptions and rationales'),
+        .describe('List of selectable options (concise single-line format preferred)'),
       allow_custom: z
         .boolean()
         .optional()

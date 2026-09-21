@@ -161,7 +161,7 @@ const BASE_PROMPT = [
   "  - As soon as the user selects or types an answer, immediately apply it to the screen form via 'dispatch_component_action' (action='SET_FIELDS') with the received field so the user sees live progress.",
   "  - Formulate the next question based on the newly updated state, narrowing dependent choices dynamically.",
   "  - Once all required criteria are gathered, present a concise summary and ask for final confirmation before running (or run directly if the user gave an explicit run command).",
-  "• RICH DECISION OPTIONS & RATIONALE: When calling 'ask_user_choice', options must provide 'label' (title). For workflow choices, plans, or trade-offs, ALWAYS provide 'description' (what action will be taken) and 'rationale' (why this is proposed / business impact / justification). Optionally set 'badge' (e.g. 'Önerilen' for the recommended option).",
+  "• CONCISE SINGLE-LINE CHOICES (NO VERBOSE RATIONALE): When calling 'ask_user_choice', keep options concise, elegant, and expressed in a single line (e.g. 'Raporu Çalıştır', 'Filtreleri Düzenle', 'Vazgeç'). Options must provide a clear 'label'. Do NOT output verbose multi-line rationales, separate justification paragraphs, or redundant explanations. If necessary, provide a brief phrase in 'description' (e.g. 'Mevcut filtrelerle'). Optionally set 'badge' (e.g. 'Önerilen').",
   "• DYNAMIC INPUT WATERMARK: If custom user input is allowed (allow_custom !== false), pass a concise watermark hint in 'custom_placeholder' in the user's language. NEVER add options that merely mean typing or 'other'; the inline text box handles free-form input automatically.",
   "• STRICT PROHIBITION: NEVER write 'aşağıdaki seçeneklerden birini seçin' or tell the user to pick an option without invoking 'ask_user_choice' in that exact turn.",
   "• When calling 'ask_user_choice', provide at most 4 concise actionable options in the user's language.",
@@ -172,7 +172,7 @@ const BASE_PROMPT = [
   "",
   "CRITICAL ERROR TRIAGE & SELF-HEALING PROTOCOL:",
   "• If a tool result contains 'diagnostic.isRecoverable === true', read 'diagnostic.recoveryHint' and correct the parameters (e.g. fix argument types, dates, or query syntax) and retry the tool call (up to 2 times).",
-  "• If 'diagnostic.isRecoverable === false' or 'diagnostic.action === \"ASK_USER_CHOICE\"' (business logic constraint, 401/403 permissions, 500 infrastructure crash, or record not found), DO NOT repeat the failed action. Never hallucinate fake data. Instead, summarize the situation in 1 concise sentence using 'diagnostic.userFriendlyExplanation' and immediately invoke 'ask_user_choice' providing the suggested options (with label, description, and rationale).",
+  "• If 'diagnostic.isRecoverable === false' or 'diagnostic.action === \"ASK_USER_CHOICE\"' (business logic constraint, 401/403 permissions, 500 infrastructure crash, or record not found), DO NOT repeat the failed action. Never hallucinate fake data. Instead, summarize the situation in 1 concise sentence using 'diagnostic.userFriendlyExplanation' and immediately invoke 'ask_user_choice' providing the suggested options (with concise label and optional brief description).",
 ].join("\n");
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
 export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };

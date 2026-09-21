@@ -21,15 +21,14 @@ This document establishes the interaction rules for user confirmations, multi-ch
 When the model requires user confirmation, clarification, or presents multiple workflow alternatives, it triggers `@my-agent/core`'s `ask_user_choice` tool:
 
 - The UI renders a clean, inline `YulaChoiceCard` inside the conversation thread immediately below the assistant's turn text or plan.
-- **Rich Choice Contract (`UserChoiceOption`):**
-  - `label`: Button and option title.
-  - `value`: Machine-readable action code or parameter.
-  - `description`: Detailed explanation of what action will be taken.
-  - `rationale`: Business rationale or justification explaining why the option is proposed and its operational impact.
+- **Choice Contract (`UserChoiceOption`):**
+  - `label`: Concise button and option title (mandatory).
+  - `value`: Optional machine-readable action code or parameter.
+  - `description`: Optional brief inline phrase explaining what action will be taken.
   - `badge`: Optional visual indicator (e.g. `Önerilen` / `Recommended`).
-- **Dual Presentation Modes:**
-  - **Detailed Decision Cards (`hasDetailedChoices`):** When options include `description` or `rationale`, options render as an informative vertical card list where users can compare trade-offs, descriptions, and rationales before clicking.
-  - **Compact Action Bar:** When options are brief and lack descriptions (e.g. binary "Yes / No"), options render as a compact horizontal chip bar.
+- **Sleek Single-Line Shadcn Presentation:**
+  - **Single-Line Action Rows (`hasDescriptions`):** When options include brief `description` texts, each option renders as a sleek, single-line shadcn button item (`h-8 w-full justify-between`) displaying the label, inline description (`— description`), and badge. No bulky multi-level cards or separate "Gerekçe / Etki" boxes are displayed.
+  - **Compact Action Bar:** When options are brief labels without descriptions (e.g. "Evet / Hayır", company codes, or quick presets), options render as a compact horizontal chip bar of shadcn buttons.
 - Clicking an option enqueues the selection into the action stream, allowing the agent to resume its ReAct loop.
 
 ```json
@@ -39,15 +38,13 @@ When the model requires user confirmation, clarification, or presents multiple w
     {
       "label": "Kriterleri Belirle",
       "value": "set_criteria",
-      "description": "Hedef mağaza ve tarih aralığı filtrelerini form alanlarına uygular.",
-      "rationale": "Sorguyu çalıştırmadan önce odaklanılacak veri kümesini daraltır ve performansı artırır.",
+      "description": "Hedef mağaza ve tarih aralığı filtrelerini ayarlar",
       "badge": "Önerilen"
     },
     {
       "label": "Doğrudan Raporu Çalıştır",
       "value": "run_directly",
-      "description": "Mevcut varsayılan kriterlerle işi başlatır.",
-      "rationale": "Zaman kazandırır ancak geniş veri kümesi getirebilir."
+      "description": "Mevcut kriterlerle işi başlatır"
     }
   ],
   "allow_custom": true,

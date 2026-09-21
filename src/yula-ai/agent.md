@@ -167,7 +167,7 @@ Every participant in the system is documented below with its role, registration 
 - **Outbound Edges:** Downstream: Reads live state and telemetry of UI component nodes.
 
 #### 🏷️ `ChoiceCardToolNode` (`ask_user_choice`)
-- **Role:** Human-in-the-Loop (HITL) Inline Decision Card generator. Renders interactive choice cards (`YulaChoiceCard`) directly inside the chat stream with full descriptions and rationales.
+- **Role:** Human-in-the-Loop (HITL) Inline Decision Card generator. Renders interactive choice cards (`YulaChoiceCard`) directly inside the chat stream with concise, single-line shadcn options.
 - **Contract:** `{ question: string, options: Array<{ label: string, value?: string, description?: string, rationale?: string, badge?: string } | string>, allow_custom?: boolean, custom_placeholder?: string }`.
 - **Inbound Edges:** Upstream: [`AgentLoopNode`](#agentloopnode).
 - **Outbound Edges:** Downstream: Presents selectable options and trade-offs to [`UserNode`](#user-node).

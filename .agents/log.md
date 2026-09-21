@@ -2,6 +2,21 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-21] Streamlined Single-Line Shadcn Choice Cards & Deprecation of Verbose "Gerekçe / Etki" Boxes
+- **Rationale:**
+  1. *Visual Clutter & Disproportionate Vertical Footprint:* Interactive choices (`ask_user_choice`) rendered oversized multi-level cards with separate "Seç" buttons, descriptive paragraphs, and dedicated gray boxes labeled "Gerekçe / Etki: ...", dominating the chat stream and pushing conversation context out of view.
+  2. *Unnecessary Rationale Prompting:* The system prompt previously commanded the agent to ALWAYS generate detailed rationales and justifications for every workflow choice, leading to redundant boilerplate text (e.g. "Rapor alma akışını başlatır; gerekli filtreler ekranda seçilir.").
+  3. *Inconsistent UI Standard:* Choice options needed to adhere strictly to the repository's sleek Shadcn UI design patterns as concise, single-line action buttons or chips.
+- **Decision:**
+  - **Single-Line Shadcn Action Rows (`yula-choice-card.tsx`):** Unified the choice card layout. When options have brief descriptions, each renders as a single-line, full-width Shadcn `Button` (`h-8 w-full justify-between`) displaying the label, inline description (`— description`), and optional badge (`Önerilen` / `Standart`). Clicking anywhere on the row selects it immediately with no redundant nested "Seç" button.
+  - **Compact Button Bar for Brief Chips:** For short, non-described choices (binary confirmations, store/company codes), options render as an elegant horizontal flex-wrap bar of Shadcn `Button` chips (`size="sm"` / `h-7`).
+  - **Elimination of "Gerekçe / Etki" Boxes:** Completely removed the dedicated "Gerekçe / Etki" block from the UI. Deprecated verbose multi-line rationales across tool schemas in `@my-agent/core` and `yula.client`.
+  - **Prompt Protocol Alignment (`yula-agent-prompt.ts`, `yula-ui-skills.ts`):** Updated agent instructions to mandate concise, single-line options and explicitly prohibit verbose multi-line rationales.
+  - **Verification:** Oxlint 0 warnings/errors, all 262 unit tests passing, `yula-choice-card.tsx` reduced to 418 lines ($\le 500$).
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] Telemetry Monitor Relocation to Yula Full-Mode Right Detail Panel & Shadcn UI Modernization
 - **Rationale:**
   1. *Detached Overlay vs Integrated Canvas:* The previous telemetry monitor opened as an invasive slide-over drawer anchored to the right browser viewport edge, overlaying the active workspace rather than residing within the Yula IDE layout.

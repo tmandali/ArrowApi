@@ -73,7 +73,7 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   ask_user_choice: tool({
-    description: "Prompt the user with interactive choice buttons or a decision card. Whenever asking the user to make a choice or decision, each option should include a label, a clear description of what the option executes, and a rationale/business impact so the user can evaluate properly.",
+    description: "Prompt the user with interactive choice buttons. Whenever asking the user to make a choice or decision, provide concise single-line options with a clear label, an optional brief description, and an optional badge.",
     inputSchema: z.object({
       question: z.string().describe("Question or decision prompt to present to the user"),
       options: z
@@ -81,16 +81,16 @@ export const STANDARD_AGENT_TOOLS = {
           z.union([
             z.string(),
             z.object({
-              label: z.string().describe("Option button label / title"),
+              label: z.string().describe("Option button label / title (concise single-line)"),
               value: z.string().optional().describe("Returned value when selected"),
-              description: z.string().optional().describe("Clear explanation of what will happen if selected (Açıklama)"),
-              rationale: z.string().optional().describe("Why this option is proposed and its business impact / justification (Gerekçe)"),
+              description: z.string().optional().describe("Brief 1-phrase explanation of what will happen if selected"),
+              rationale: z.string().optional().describe("Deprecated/Optional: Keep options concise without verbose multi-line rationales"),
               badge: z.string().optional().describe("Optional badge tag, e.g. 'Önerilen', 'Standart', 'Kurumsal Kural'"),
             }),
           ]),
         )
         .min(1)
-        .describe("List of selectable options. Provide clear descriptions and rationales for strategic or workflow choices."),
+        .describe("List of selectable options. Keep options concise and single-line."),
       allow_custom: z.boolean().optional().default(true).describe("Allow custom text input below options"),
       custom_placeholder: z
         .string()
