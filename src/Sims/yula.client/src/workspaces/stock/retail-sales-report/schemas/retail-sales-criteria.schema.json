@@ -177,17 +177,19 @@
       "description": "Perakende satışı raporlanacak şirketin kodu.",
       "enum": [
         "TJ01",
-        "TJ02"
+        "TJ02",
+        "TRLC"
       ],
       "x-enumTitles": {
         "TJ01": "TJ01 (Ana Mağazacılık)",
-        "TJ02": "TJ02 (İkinci Mağazacılık)"
+        "TJ02": "TJ02 (İkinci Mağazacılık)",
+        "TRLC": "TRLC"
       },
       "x-ai": {
         "intent": "company_code",
         "priority": 90,
         "columnHints": ["AXSirketKodu", "ŞirketKodu", "sirketKod"],
-        "directive": "Zorunlu alandır. Şirket seçenekleri: TJ01 (Ana Mağazacılık) ve TJ02 (İkinci Mağazacılık). Kullanıcı şirket kodu belirtmemişse bu seçenekleri sor (asla 1000, 2000 gibi uydurma kodlar önerme). Kodu küçük harfe dönüştürmeden olduğu gibi ilet."
+        "directive": "Zorunlu alandır. Şirket seçenekleri: TJ01 (Ana Mağazacılık), TJ02 (İkinci Mağazacılık) ve TRLC. Kullanıcı şirket kodu belirtmemişse bu seçenekleri sor (asla 1000, 2000 gibi uydurma kodlar önerme). Kodu küçük harfe dönüştürmeden olduğu gibi ilet."
       }
     }
   },

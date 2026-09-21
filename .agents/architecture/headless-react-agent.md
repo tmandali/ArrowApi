@@ -60,17 +60,29 @@ Interactive components are never manipulated through artificial external stores 
 
 ### 🏷️ `JobHistoryNode` (`job_history`)
 - **Type:** Registered Headless UI Component ([`<ArrowJobExecutionsPanel />`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/features/jobs/components/executions/arrow-job-executions-panel.tsx)).
-- **Actions:** `LIST`, `SELECT`, `REFRESH`, `CANCEL`.
+- **Actions & Contracts:** `LIST`, `GET_DETAIL`, `SELECT`, `REFRESH`, `CANCEL`, `OPEN_LAST`, `FIND` (see [`job-history-contracts.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/client-tools/job-history-contracts.ts)).
 - **Live Metadata:** Supplies `recentExecutions`, `itemsCount`, `total` to the model at 0 ms without extra queries.
 - **Inbound Edges:** Triggered by `[DispatchBridgeNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#dispatchbridgenode)`.
 - **Outbound Edges:** Dispatches to `[ArrowJobsEngineNode](file:///Users/tmr/Source/ArrowApi/.agents/architecture/arrow-jobs-engine.md)`.
 
 ### 🏷️ `ResultGridNode` (`result_grid:active`)
 - **Type:** Registered Headless UI Component ([`<ArrowReportGrid />`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/features/jobs/components/report-grid/arrow-report-grid.tsx)).
-- **Actions:** `RUN_SQL`, `FILTER`, `APPLY_FILTERS`, `SORT`, `COLUMNS`, `PIN`, `RESET_LAYOUT`, `EXPORT`, `VISUALIZE`, `ANALYZE`, `PROFILE`.
+- **Actions & Contracts:** `RUN_SQL`, `QUERY`, `FILTER`, `APPLY_FILTERS`, `SORT`, `COLUMNS`, `PIN`, `RESET_LAYOUT`, `EXPORT`, `VISUALIZE`, `ANALYZE`, `PROFILE` (see [`result-grid-contracts.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/client-tools/result-grid-contracts.ts)).
 - **Inbound Edges:** Triggered by `[DispatchBridgeNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#dispatchbridgenode)` and streams from `[ArrowJobsEngineNode](file:///Users/tmr/Source/ArrowApi/.agents/architecture/arrow-jobs-engine.md)`.
 - **Outbound Edges:** Queries `[DuckDbEngineNode](file:///Users/tmr/Source/ArrowApi/.agents/architecture/large-data-duckdb.md)`.
 - **Feedback Loop:** Emits row counts, applied filter states, and aggregation statistics back to `[AgentLoopNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#agentloopnode)` as observations.
+
+### 🏷️ `CriteriaFormNode` (`criteria_form:<scope>`)
+- **Type:** Registered Headless Criteria Form ([`useHeadlessSystemComponents.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/hooks/yula-chat/use-headless-system-components.ts)).
+- **Actions & Contracts:** `SET_FIELDS`, `APPLY`, `SUBMIT`, `RUN`, `SCHEMA`, `READ`, `VALIDATE` (see [`criteria-form-contracts.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/client-tools/criteria-form-contracts.ts)).
+- **Inbound Edges:** Triggered by `[DispatchBridgeNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#dispatchbridgenode)`.
+- **Outbound Edges:** Triggers report execution on `[ArrowJobsEngineNode](file:///Users/tmr/Source/ArrowApi/.agents/architecture/arrow-jobs-engine.md)`.
+
+### 🏷️ `AppRouterNode` (`app_router`)
+- **Type:** Universal Route Navigator ([`useHeadlessSystemComponents.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/hooks/yula-chat/use-headless-system-components.ts)).
+- **Actions & Contracts:** `NAVIGATE` (see [`app-router-contracts.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/client-tools/app-router-contracts.ts)).
+- **Inbound Edges:** Triggered by `[DispatchBridgeNode](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md#dispatchbridgenode)`.
+- **Outbound Edges:** Dispatches client navigation via Next.js App Router.
 
 ```tsx
 // Typical typed registration pattern

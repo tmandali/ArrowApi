@@ -12,6 +12,25 @@ import {
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { useYulaDockStore } from "@/lib/stores/dock";
+import {
+  JOB_OPEN_LAST_ACTION_CONTRACT,
+  JOB_DETAIL_ACTION_CONTRACT,
+  JOB_LIST_ACTION_CONTRACT,
+  JOB_FIND_ACTION_CONTRACT,
+  JOB_CANCEL_ACTION_CONTRACT,
+  JOB_SELECT_ACTION_CONTRACT,
+  JOB_REFRESH_ACTION_CONTRACT,
+} from "@/lib/client-tools/job-history-contracts";
+import { APP_ROUTER_NAVIGATE_CONTRACT } from "@/lib/client-tools/app-router-contracts";
+import {
+  CRITERIA_SET_FIELDS_CONTRACT,
+  CRITERIA_APPLY_CONTRACT,
+  CRITERIA_SUBMIT_CONTRACT,
+  CRITERIA_RUN_CONTRACT,
+  CRITERIA_SCHEMA_CONTRACT,
+  CRITERIA_READ_CONTRACT,
+  CRITERIA_VALIDATE_CONTRACT,
+} from "@/lib/client-tools/criteria-form-contracts";
 
 /**
  * Headless UI-Agent Sistem Bileşenleri Kayıt Kancası
@@ -23,11 +42,7 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
       id: "app_router",
       meta: { description: "Page and Route Navigator" },
       actions: {
-        NAVIGATE: {
-          description: "Navigates the user to a target page or report ({ path }).",
-          whenToCall: "When the user wants to navigate to another report, workspace, or page.",
-          whenNotToCall: "When the user is already on the target screen.",
-        },
+        NAVIGATE: APP_ROUTER_NAVIGATE_CONTRACT,
       },
     };
     uiRegistry.register(routerSchema);
@@ -59,26 +74,13 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
       id: "job_history",
       meta: { description: "Report Execution History and Job Tracker" },
       actions: {
-        OPEN_LAST: {
-          description: "Opens the most recently completed report result on the screen ({ report?: string }). Defaults to active report if omitted.",
-          whenToCall: "When the user asks to 'open last report', 'show latest result', etc.",
-          whenNotToCall: "When the user intends to execute a new report.",
-        },
-        LIST: {
-          description: "Lists past execution jobs ({ report?: string, limit?: number }). If report is omitted, defaults to the active screen's report, or lists recent runs across all reports if not on a report screen.",
-          whenToCall: "When the user asks 'how many reports ran' ('kaç rapor çalışmış'), 'which reports ran', 'show history', 'list past jobs', etc.",
-          whenNotToCall: "When the user wants to execute a new report run (use SUBMIT or RUN).",
-        },
-        FIND: {
-          description: "Searches past report executions or matching jobs ({ query, report?: string }). Defaults to active report if omitted.",
-          whenToCall: "When the user wants to find a specific job, execution, or report run.",
-          whenNotToCall: "When requesting the entire list or running a new report.",
-        },
-        CANCEL: {
-          description: "Cancels an active or running job ({ jobId }).",
-          whenToCall: "When the user explicitly asks to 'stop', 'abort', or 'cancel' an execution.",
-          whenNotToCall: "When the job is already finished or terminated.",
-        },
+        OPEN_LAST: JOB_OPEN_LAST_ACTION_CONTRACT,
+        GET_DETAIL: JOB_DETAIL_ACTION_CONTRACT,
+        LIST: JOB_LIST_ACTION_CONTRACT,
+        FIND: JOB_FIND_ACTION_CONTRACT,
+        CANCEL: JOB_CANCEL_ACTION_CONTRACT,
+        SELECT: JOB_SELECT_ACTION_CONTRACT,
+        REFRESH: JOB_REFRESH_ACTION_CONTRACT,
       },
     };
     uiRegistry.register(jobHistorySchema);
@@ -118,45 +120,13 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
           },
         },
         actions: {
-          SET_FIELDS: {
-            description: `Populates criteria form fields for ${report.title} without triggering execution ({ criteria }).`,
-            outputSchema: z.object({ success: z.boolean(), updatedFields: z.array(z.string()).optional() }),
-            whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
-            whenNotToCall: "When the user explicitly wants to run the report (call SUBMIT or RUN).",
-          },
-          APPLY: {
-            description: `Applies criteria field values for ${report.title} and navigates to the report screen.`,
-            outputSchema: z.object({ success: z.boolean(), navigatedTo: z.string().optional() }),
-            whenToCall: `When the user wants to fill or update criteria for ${report.title} and inspect the form.`,
-            whenNotToCall: "When the user wants to directly run the report or perform non-form operations.",
-          },
-          SUBMIT: {
-            description: `Executes the ${report.title} report and queues the job ({ criteria, report }).`,
-            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), queued: z.boolean().optional() }),
-            whenToCall: "When the user explicitly asks to 'run', 'start', 'fetch', or 'execute' the report.",
-            whenNotToCall: "When required parameters are missing or when user is only drafting criteria.",
-          },
-          RUN: {
-            description: `Executes the ${report.title} report and navigates to the result screen.`,
-            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), navigatedTo: z.string().optional() }),
-            whenToCall: `When the user wants to execute ${report.title} and inspect the result grid.`,
-            whenNotToCall: "When only drafting or setting criteria without execution.",
-          },
-          SCHEMA: {
-            description: `Inspects the criteria schema and parameters for ${report.title}.`,
-            whenToCall: `When the agent needs to discover available parameters, types, or constraints.`,
-            whenNotToCall: "When the criteria schema is already known.",
-          },
-          READ: {
-            description: `Reads current draft criteria values for ${report.title}.`,
-            whenToCall: `To inspect the current values filled in the criteria form.`,
-            whenNotToCall: "When assigning or overwriting new values.",
-          },
-          VALIDATE: {
-            description: `Validates criteria input parameters against schema rules for ${report.title}.`,
-            whenToCall: `To check parameter constraints and validation rules before submission.`,
-            whenNotToCall: "When no criteria have been supplied.",
-          },
+          SET_FIELDS: CRITERIA_SET_FIELDS_CONTRACT,
+          APPLY: CRITERIA_APPLY_CONTRACT,
+          SUBMIT: CRITERIA_SUBMIT_CONTRACT,
+          RUN: CRITERIA_RUN_CONTRACT,
+          SCHEMA: CRITERIA_SCHEMA_CONTRACT,
+          READ: CRITERIA_READ_CONTRACT,
+          VALIDATE: CRITERIA_VALIDATE_CONTRACT,
         },
       };
       uiRegistry.register(formSchema);

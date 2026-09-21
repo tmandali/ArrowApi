@@ -26,6 +26,13 @@ import { isTerminalJobStatus, useActiveJobsStore } from "@/store/slices/active-j
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { useAgentComponent } from "@my-agent/react";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
+import {
+  JOB_LIST_ACTION_CONTRACT,
+  JOB_SELECT_ACTION_CONTRACT,
+  JOB_REFRESH_ACTION_CONTRACT,
+  JOB_CANCEL_ACTION_CONTRACT,
+  JOB_DETAIL_ACTION_CONTRACT,
+} from "@/lib/client-tools/job-history-contracts";
 import { cn } from "@/utils/cn";
 import { formatCount } from "@/utils/format";
 import { ApiError } from "@/services";
@@ -195,28 +202,54 @@ export function ArrowJobExecutionsPanel({
       })),
     },
     actions: {
-      LIST: {
-        description: "Lists past execution runs from the active panel state ({ limit?: number }).",
-        whenToCall: "When the user asks about past runs, execution history, or how many reports ran ('kaç rapor çalışmış').",
-        whenNotToCall: "When executing a new report.",
-      },
-      SELECT: {
-        description: "Selects a past execution in the panel to inspect its details ({ jobId }).",
-        whenToCall: "When the user wants to view or select a specific run.",
-        whenNotToCall: "When the user is executing a new report or filtering.",
-      },
-      REFRESH: {
-        description: "Refreshes the execution list from the server.",
-        whenToCall: "When the user asks to reload or refresh past runs.",
-        whenNotToCall: "When the current list is already up to date.",
-      },
-      CANCEL: {
-        description: "Cancels an active running execution ({ jobId }).",
-        whenToCall: "When the user asks to cancel or stop an active run.",
-        whenNotToCall: "When the job is already completed, failed, or cancelled.",
-      },
+      LIST: JOB_LIST_ACTION_CONTRACT,
+      SELECT: JOB_SELECT_ACTION_CONTRACT,
+      REFRESH: JOB_REFRESH_ACTION_CONTRACT,
+      CANCEL: JOB_CANCEL_ACTION_CONTRACT,
+      GET_DETAIL: JOB_DETAIL_ACTION_CONTRACT,
     },
     onAction: async (action, payload) => {
+      if (action === "GET_DETAIL" || action === "DETAIL") {
+        const targetId = String(payload?.jobId || selectedId || activeJobId || "");
+        if (targetId && sameJobId(targetId, selectedId)) {
+          let parsedRequest: Record<string, unknown> = {};
+          try {
+            if (inputJson && inputJson.trim()) {
+              parsedRequest = JSON.parse(inputJson);
+            }
+          } catch {}
+          return {
+            status: "ok",
+            jobId: targetId,
+            summary: {
+              status: selectedJob?.status || selectedDisplayStatus || "Unknown",
+              owner: "Sistem",
+              createdAt: selectedJob?.createdAt || "",
+              completedAt: selectedJob?.completedAt || null,
+              durationMs:
+                selectedJob?.createdAt && selectedJob?.completedAt
+                  ? new Date(selectedJob.completedAt).getTime() - new Date(selectedJob.createdAt).getTime()
+                  : undefined,
+              totalRows: selectedJob?.totalRows ?? 0,
+              batchCount: selectedJob?.batchCount ?? 0,
+            },
+            progress: {
+              phase: progressPhase,
+              totalEvents: progressEvents.length,
+              events: progressEvents.map((e, idx) => ({
+                phase: e.title || e.eventName || `step-${idx + 1}`,
+                message: e.detail || "",
+                elapsedMs:
+                  e.at && selectedJob?.createdAt
+                    ? Math.max(0, new Date(e.at).getTime() - new Date(selectedJob.createdAt).getTime())
+                    : 0,
+              })),
+            },
+            requestInput: parsedRequest,
+            message: `Execution detail retrieved from active panel for job ${targetId}.`,
+          };
+        }
+      }
       if (action === "LIST") {
         const limit = typeof payload?.limit === "number" ? Math.min(10, Math.max(1, payload.limit)) : 10;
         const slice = items.slice(0, limit).map((j) => ({

@@ -3,6 +3,20 @@
 import { z } from "zod";
 import { useAgentComponent } from "@my-agent/react";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
+import {
+  GRID_RUN_SQL_CONTRACT,
+  GRID_QUERY_CONTRACT,
+  GRID_FILTER_CONTRACT,
+  GRID_APPLY_FILTERS_CONTRACT,
+  GRID_SORT_CONTRACT,
+  GRID_COLUMNS_CONTRACT,
+  GRID_PIN_CONTRACT,
+  GRID_RESET_LAYOUT_CONTRACT,
+  GRID_EXPORT_CONTRACT,
+  GRID_PROFILE_CONTRACT,
+  GRID_ANALYZE_CONTRACT,
+  GRID_VISUALIZE_CONTRACT,
+} from "@/lib/client-tools/result-grid-contracts";
 
 export interface UseResultGridAgentOptions {
   duckTableName: string;
@@ -48,83 +62,18 @@ export function useResultGridAgent({
       },
     },
     actions: {
-      RUN_SQL: {
-        description: "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
-        outputSchema: z.object({ success: z.boolean(), rowCount: z.number().optional() }),
-        whenToCall: "When custom SQL queries, aggregations, or calculations are requested.",
-        whenNotToCall: "When simple column filtering or sorting is sufficient.",
-        when: { phase: "results" },
-      },
-      FILTER: {
-        description: "Filters the grid by a column value ({ field, value, op }).",
-        outputSchema: z.object({ success: z.boolean(), rowCount: z.number().optional() }),
-        whenToCall: "To filter table data by a column value.",
-        whenNotToCall: "When filtering is not requested.",
-        when: { phase: "results" },
-      },
-      APPLY_FILTERS: {
-        description: "Applies multiple column filters simultaneously ({ filters, clearOthers }).",
-        outputSchema: z.object({ success: z.boolean(), rowCount: z.number().optional() }),
-        whenToCall: "When multiple columns need to be filtered concurrently.",
-        whenNotToCall: "When filtering only a single column.",
-        when: { phase: "results" },
-      },
-      SORT: {
-        description: "Sorts the grid by column ({ column, direction }).",
-        outputSchema: z.object({ success: z.boolean(), column: z.string().optional() }),
-        whenToCall: "When sorting is requested.",
-        whenNotToCall: "When sorting is not requested.",
-        when: { phase: "results" },
-      },
-      COLUMNS: {
-        description: "Shows, hides, or reorders columns ({ visibleColumns, hiddenColumns }).",
-        outputSchema: z.object({ success: z.boolean(), visibleCount: z.number().optional() }),
-        whenToCall: "To adjust column visibility or layout.",
-        whenNotToCall: "When column layout should remain untouched.",
-        when: { phase: "results" },
-      },
-      PIN: {
-        description: "Pins columns to the left or right ({ columns }).",
-        outputSchema: z.object({ success: z.boolean(), pinnedColumns: z.array(z.string()).optional() }),
-        whenToCall: "When column freezing or pinning is requested.",
-        whenNotToCall: "When pinning is not requested.",
-        when: { phase: "results" },
-      },
-      RESET_LAYOUT: {
-        description: "Resets the grid to default layout and visibility.",
-        outputSchema: z.object({ success: z.boolean() }),
-        whenToCall: "When the user wants to reset custom column arrangements.",
-        whenNotToCall: "When keeping the current layout.",
-        when: { phase: "results" },
-      },
-      EXPORT: {
-        description: "Exports data to Excel, CSV, or Parquet ({ format }).",
-        outputSchema: z.object({ success: z.boolean(), format: z.string().optional() }),
-        whenToCall: "When downloading or exporting grid data is requested.",
-        whenNotToCall: "When export is not requested.",
-        when: { phase: "results" },
-      },
-      VISUALIZE: {
-        description: "Generates a chart or visual plot ({ type, dimension, metric }).",
-        outputSchema: z.object({ success: z.boolean(), chartType: z.string().optional() }),
-        whenToCall: "When a chart or graph visualization is requested.",
-        whenNotToCall: "When no visual chart is requested.",
-        when: { phase: "results" },
-      },
-      ANALYZE: {
-        description: "Generates a statistical summary of the active data.",
-        outputSchema: z.object({ success: z.boolean(), summary: z.any().optional() }),
-        whenToCall: "When statistical summary or data distribution is requested.",
-        whenNotToCall: "When summary analysis is not requested.",
-        when: { phase: "results" },
-      },
-      PROFILE: {
-        description: "Profiles column data quality, null counts, and distinct values.",
-        outputSchema: z.object({ success: z.boolean(), profile: z.any().optional() }),
-        whenToCall: "When inspecting data quality or anomalies.",
-        whenNotToCall: "When profiling is not requested.",
-        when: { phase: "results" },
-      },
+      RUN_SQL: GRID_RUN_SQL_CONTRACT,
+      QUERY: GRID_QUERY_CONTRACT,
+      FILTER: GRID_FILTER_CONTRACT,
+      APPLY_FILTERS: GRID_APPLY_FILTERS_CONTRACT,
+      SORT: GRID_SORT_CONTRACT,
+      COLUMNS: GRID_COLUMNS_CONTRACT,
+      PIN: GRID_PIN_CONTRACT,
+      RESET_LAYOUT: GRID_RESET_LAYOUT_CONTRACT,
+      EXPORT: GRID_EXPORT_CONTRACT,
+      PROFILE: GRID_PROFILE_CONTRACT,
+      ANALYZE: GRID_ANALYZE_CONTRACT,
+      VISUALIZE: GRID_VISUALIZE_CONTRACT,
     },
     onAction: async (action, payload) => {
       return executeDispatchComponentAction({ component_id: "result_grid:active", action, payload });
