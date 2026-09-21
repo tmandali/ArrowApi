@@ -3,72 +3,29 @@
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
+import { MessageSquare, Search, Trash2, X } from "lucide-react";
+import { useChatsStore } from "@/lib/stores/chats";
 import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
 import { isConversationVisibleForAgent, formatPathnameLabel, extractAgentIdFromPath } from "@/lib/workspace-paths";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
-import {
-  MessageSquare,
-  Search,
-  Trash2,
-  Check,
-  X,
-  Pencil,
-  Sparkles,
-  History,
-} from "lucide-react";
+import { groupConversationsByDate } from "./yula-history-group-utils";
+import { YulaHistoryItem } from "./yula-history-item";
+
+export { YulaHistoryMainView } from "./yula-history-main-view";
 
 export interface YulaHistorySidebarProps {
   className?: string;
   onSelectConversation?: () => void;
 }
 
-function groupConversationsByDate(items: YulaConversation[], t: ReturnType<typeof import("next-intl").useTranslations>) {
-  const now = new Date();
-  const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).getTime();
-  const yesterdayStart = todayStart - 86400000;
-  const lastWeekStart = todayStart - 7 * 86400000;
-
-  const today: YulaConversation[] = [];
-  const yesterday: YulaConversation[] = [];
-  const lastWeek: YulaConversation[] = [];
-  const older: YulaConversation[] = [];
-
-  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
-
-  for (const item of sorted) {
-    if (item.createdAt >= todayStart) {
-      today.push(item);
-    } else if (item.createdAt >= yesterdayStart) {
-      yesterday.push(item);
-    } else if (item.createdAt >= lastWeekStart) {
-      lastWeek.push(item);
-    } else {
-      older.push(item);
-    }
-  }
-
-  return [
-    { label: t("group_today"), items: today },
-    { label: t("group_yesterday"), items: yesterday },
-    { label: t("group_last_week"), items: lastWeek },
-    { label: t("group_older"), items: older },
-  ].filter((group) => group.items.length > 0);
-}
-
 export function YulaHistorySidebar({
   className,
   onSelectConversation,
 }: YulaHistorySidebarProps) {
-  const t = useTranslations("HistorySidebar")
-  const tScreen = useTranslations("ScreenLabels")
+  const t = useTranslations("HistorySidebar");
+  const tScreen = useTranslations("ScreenLabels");
   const router = useRouter();
   const currentPathname = usePathname();
   const { setOpen } = useWorkspaceAiChat();
@@ -101,19 +58,9 @@ export function YulaHistorySidebar({
   }, [conversations, currentPathname, currentAgentId, searchQuery]);
 
   const grouped = React.useMemo(
-    () => groupConversationsByDate(filteredSessions, t),
+    () => groupConversationsByDate(filteredSessions, (k) => t(k)),
     [filteredSessions, t]
   );
-
-  const handleStartRename = (
-    e: React.MouseEvent,
-    id: string,
-    currentTitle: string
-  ) => {
-    e.stopPropagation();
-    setEditingId(id);
-    setEditingTitle(currentTitle);
-  };
 
   const handleSaveRename = (e: React.FormEvent | React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -122,16 +69,6 @@ export function YulaHistorySidebar({
       renameConversation(id, editingTitle);
     }
     setEditingId(null);
-  };
-
-  const handleCancelRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(null);
-  };
-
-  const handleDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    deleteConversation(id);
   };
 
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -191,115 +128,45 @@ export function YulaHistorySidebar({
                 {group.label}
               </div>
               <div className="space-y-0.5">
-                {group.items.map((session) => {
-                  const isActive = session.id === activeId;
-                  const isEditing = session.id === editingId;
-                  const pathLabel = formatPathnameLabel(session.pathname, (k) => tScreen(k));
-
-                  return (
-                    <div
-                      key={session.id}
-                      onClick={() => {
-                        if (!isEditing) {
-                          selectConversation(session.id);
-                          navigateToConversationScreen(
-                            session,
-                            (href) => {
-                              router.push(href);
-                            },
-                            useChatsStore.getState().messagesById[session.id],
-                          );
-                          setOpen(true);
-                          setHistoryOpen(false);
-                          onSelectConversation?.();
-                        }
-                      }}
-                      className={cn(
-                        "group relative flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer border-0",
-                        isActive
-                          ? "bg-primary/10 text-primary dark:bg-primary/15 font-medium"
-                          : "text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
-                      )}
-                    >
-                      {isEditing ? (
-                        <form
-                          onSubmit={(e) => handleSaveRename(e, session.id)}
-                          className="flex flex-1 items-center gap-1 min-w-0"
-                        >
-                          <input
-                            type="text"
-                            autoFocus
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") setEditingId(null);
-                            }}
-                            className="flex-1 rounded border border-primary/40 bg-background px-1.5 py-0.5 text-xs outline-none text-foreground"
-                          />
-                          <button
-                            type="submit"
-                            onClick={(e) => handleSaveRename(e, session.id)}
-                            className="p-1 rounded text-primary hover:bg-muted transition-colors"
-                            title={t("save")}
-                          >
-                            <Check className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCancelRename}
-                            className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                            title={t("cancel")}
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </form>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2 truncate min-w-0 flex-1">
-                            {isActive ? (
-                              <Sparkles className="size-3.5 shrink-0 text-primary/80" />
-                            ) : (
-                              <MessageSquare className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" />
-                            )}
-                            <span className="truncate text-[11.5px] leading-tight font-normal flex-1">
-                              {session.title}
-                            </span>
-                            {pathLabel ? (
-                              <span
-                                className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70"
-                                title={session.pathname}
-                              >
-                                {pathLabel}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div className="flex items-center gap-0.5 ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleStartRename(e, session.id, session.title)
-                              }
-                              className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
-                            title={t("rename")}
-                            >
-                              <Pencil className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => handleDelete(e, session.id)}
-                              className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
-                            title={t("delete_conv")}
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                {group.items.map((session) => (
+                  <YulaHistoryItem
+                    key={session.id}
+                    session={session}
+                    isActive={session.id === activeId}
+                    isEditing={session.id === editingId}
+                    editingTitle={editingTitle}
+                    pathLabel={formatPathnameLabel(session.pathname, (k) => tScreen(k))}
+                    paddingClassName="px-2.5 py-1.5"
+                    onSelect={() => {
+                      selectConversation(session.id);
+                      navigateToConversationScreen(
+                        session,
+                        (href) => {
+                          router.push(href);
+                        },
+                        useChatsStore.getState().messagesById[session.id],
+                      );
+                      setOpen(true);
+                      setHistoryOpen(false);
+                      onSelectConversation?.();
+                    }}
+                    onStartRename={(e) => {
+                      e.stopPropagation();
+                      setEditingId(session.id);
+                      setEditingTitle(session.title);
+                    }}
+                    onSaveRename={(e) => handleSaveRename(e, session.id)}
+                    onCancelRename={(e) => {
+                      e.stopPropagation();
+                      setEditingId(null);
+                    }}
+                    onEditingTitleChange={setEditingTitle}
+                    onDelete={(e) => {
+                      e.stopPropagation();
+                      deleteConversation(session.id);
+                    }}
+                  />
+                ))}
               </div>
             </div>
           ))
@@ -308,10 +175,10 @@ export function YulaHistorySidebar({
 
       {/* Footer Actions */}
       <div className="shrink-0 p-2.5 flex items-center justify-between text-[11px] text-muted-foreground/60 bg-transparent border-t border-border/30">
-              <span className="font-medium">{t("count_conversations", { count: filteredSessions.length })}</span>
+        <span className="font-medium">{t("count_conversations", { count: filteredSessions.length })}</span>
         {confirmClear ? (
           <div className="flex items-center gap-1">
-              <span className="text-[10px] text-destructive font-medium">{t("confirm_clear_ask")}</span>
+            <span className="text-[10px] text-destructive font-medium">{t("confirm_clear_ask")}</span>
             <button
               type="button"
               onClick={() => {
@@ -341,291 +208,6 @@ export function YulaHistorySidebar({
             <span>{t("clear_btn")}</span>
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-export function YulaHistoryMainView({ className }: { className?: string }) {
-  const t = useTranslations("HistorySidebar")
-  const tScreen = useTranslations("ScreenLabels")
-  const router = useRouter();
-  const currentPathname = usePathname();
-  const { setOpen } = useWorkspaceAiChat();
-  const conversations = useChatsStore((s) => s.conversations);
-  const activeId = useChatsStore((s) => s.activeId);
-  const searchQuery = useChatsStore((s) => s.searchQuery);
-  const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory);
-  const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen);
-  const selectConversation = useChatsStore((s) => s.selectConversation);
-  const deleteConversation = useChatsStore((s) => s.deleteConversation);
-  const renameConversation = useChatsStore((s) => s.renameConversation);
-  const clearAllConversations = useChatsStore((s) => s.clearAllConversations);
-
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = React.useState("");
-  const [confirmClear, setConfirmClear] = React.useState(false);
-
-  const screenLabel = formatPathnameLabel(currentPathname, (k) => tScreen(k)) || t("screen_placeholder");
-  const mainStoreActiveAgentId = useUserAgentsStore((s) => s.activeAgentId);
-  const mainCurrentAgentId =
-    extractAgentIdFromPath(currentPathname) ?? mainStoreActiveAgentId ?? null;
-
-  // Main modda da ajan ayrımı korunur: o oturumun sohbetleri listelenir.
-  const filteredSessions = React.useMemo(() => {
-    let list = conversations.filter(
-      (c) => (c.agentId ?? null) === (mainCurrentAgentId ?? null),
-    );
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter((s) => s.title.toLowerCase().includes(q));
-    }
-    return list;
-  }, [conversations, searchQuery, mainCurrentAgentId]);
-
-  const grouped = React.useMemo(
-    () => groupConversationsByDate(filteredSessions, t),
-    [filteredSessions, t]
-  );
-
-  const handleSelect = (id: string, target?: YulaConversation) => {
-    selectConversation(id);
-    const session =
-      target ?? useChatsStore.getState().conversations.find((c) => c.id === id);
-    if (session) {
-      console.info(
-        `🤖 [Yula History Select] sohbet=${session.id} · ${(useChatsStore.getState().messagesById[session.id] ?? []).length} mesaj · hedef=${session.pathname}`,
-      );
-      navigateToConversationScreen(
-        session,
-        (href) => {
-          router.push(href);
-        },
-        useChatsStore.getState().messagesById[id],
-      );
-    }
-    setOpen(true);
-    setSearchingHistory(false);
-    setHistoryOpen(false);
-  };
-
-  const handleStartRename = (
-    e: React.MouseEvent,
-    id: string,
-    currentTitle: string
-  ) => {
-    e.stopPropagation();
-    setEditingId(id);
-    setEditingTitle(currentTitle);
-  };
-
-  const handleSaveRename = (e: React.FormEvent | React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (editingTitle.trim()) {
-      renameConversation(id, editingTitle);
-    }
-    setEditingId(null);
-  };
-
-  const handleDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    deleteConversation(id);
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background/50 p-3 md:p-5 select-none animate-in fade-in-50 duration-150",
-        className
-      )}
-    >
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col">
-        {/* Header Bar — arama girişi header'daki YulaHeaderSearch'te (aynı searchQuery store'u) */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 pb-3 mb-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <History className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">{t("header_title")}</h2>
-            <span className="text-xs font-medium text-muted-foreground/60">({filteredSessions.length})</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearchingHistory(false);
-                setHistoryOpen(false);
-              }}
-              className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
-            >
-              <X className="size-3.5" />
-              <span>{t("back_to_chat")}</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* List Content */}
-        <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1 overscroll-contain">
-          {grouped.length === 0 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground/70 font-medium flex flex-col items-center justify-center gap-2">
-              <MessageSquare className="size-8 text-muted-foreground/30" />
-              <span>
-                {searchQuery
-                  ? `"${searchQuery}" ${t("search_no_results").toLowerCase()}`
-                  : `${screenLabel} ${t("search_no_conversations").toLowerCase()}`}
-              </span>
-            </div>
-          ) : (
-            grouped.map((group) => (
-              <div key={group.label} className="space-y-1">
-                <div className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                  {group.label}
-                </div>
-                <div className="space-y-0.5">
-                  {group.items.map((session) => {
-                    const isActive = session.id === activeId;
-                    const isEditing = session.id === editingId;
-                    const pathLabel = formatPathnameLabel(session.pathname, (k) => tScreen(k));
-
-                    return (
-                      <div
-                        key={session.id}
-                        onClick={() => {
-                          if (!isEditing) handleSelect(session.id, session);
-                        }}
-                        className={cn(
-                          "group relative flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-colors cursor-pointer border-0",
-                          isActive
-                            ? "bg-primary/10 text-primary dark:bg-primary/15 font-medium"
-                            : "text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground"
-                        )}
-                      >
-                        {isEditing ? (
-                          <form
-                            onSubmit={(e) => handleSaveRename(e, session.id)}
-                            className="flex flex-1 items-center gap-1 min-w-0"
-                          >
-                            <input
-                              type="text"
-                              autoFocus
-                              value={editingTitle}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") setEditingId(null);
-                              }}
-                              className="flex-1 rounded border border-primary/40 bg-background px-2 py-0.5 text-xs outline-none text-foreground"
-                            />
-                            <button
-                              type="submit"
-                              onClick={(e) => handleSaveRename(e, session.id)}
-                              className="p-1 rounded text-primary hover:bg-muted transition-colors"
-                              title={t("save")}
-                            >
-                              <Check className="size-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingId(null);
-                              }}
-                              className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-                              title={t("cancel")}
-                            >
-                              <X className="size-3.5" />
-                            </button>
-                          </form>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2.5 truncate min-w-0 flex-1">
-                              {isActive ? (
-                                <Sparkles className="size-3.5 shrink-0 text-primary/80" />
-                              ) : (
-                                <MessageSquare className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" />
-                              )}
-                              <span className="truncate text-xs font-normal flex-1">
-                                {session.title}
-                              </span>
-                              {pathLabel ? (
-                                <span
-                                  className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[9.5px] font-medium text-muted-foreground/70"
-                                  title={session.pathname}
-                                >
-                                  {pathLabel}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <div className="flex items-center gap-1 ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleStartRename(e, session.id, session.title)
-                                }
-                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground transition-colors"
-                              title={t("rename")}
-                              >
-                                <Pencil className="size-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDelete(e, session.id)}
-                                className="rounded p-1 text-muted-foreground/70 hover:bg-background/80 hover:text-destructive transition-colors"
-                              title={t("delete_conv")}
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer Actions */}
-        <div className="shrink-0 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] text-muted-foreground/60">
-            <span className="font-medium">{t("count_conversations", { count: filteredSessions.length })}</span>
-          {confirmClear ? (
-            <div className="flex items-center gap-1.5">
-               <span className="text-[10px] text-destructive font-medium">{t("confirm_delete_all")}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  clearAllConversations();
-                  setConfirmClear(false);
-                }}
-                className="px-2 py-0.5 rounded bg-destructive/80 hover:bg-destructive text-destructive-foreground font-medium text-[10px] transition-colors"
-              >
-                {t("yes")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmClear(false)}
-                className="px-2 py-0.5 rounded bg-muted hover:bg-accent text-[10px] font-medium transition-colors"
-              >
-                {t("no")}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmClear(true)}
-              className="hover:text-destructive transition-colors flex items-center gap-1 text-[10.5px] font-medium"
-              title={t("clear_btn")}
-            >
-              <Trash2 className="size-3" />
-              <span>{t("clear_btn")}</span>
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
