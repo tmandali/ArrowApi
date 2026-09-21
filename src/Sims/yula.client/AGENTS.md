@@ -22,6 +22,7 @@ This document is the **lightweight Client Router** for Yula Client frontend engi
 2. **500-Line Limit:** No file (`.tsx`, `.ts`, `.md`) may exceed 500 lines (`wc -l`).
 3. **Module Boundaries:** Preserve `src/workspaces/<workspace>/` boundaries. Cross-workspace direct imports are forbidden; external consumers must use `index.ts` (Public API) only.
 4. **Localization (i18n):** Never hardcode user-facing strings; resolve all labels from `messages/*.json` via `next-intl`.
+5. **Strict pnpm Enforcement:** All package management, testing, linting, and typechecking must use `pnpm` exclusively (`pnpm test`, `pnpm run typecheck`, `pnpm run lint`). Direct invocation of `npm` or `npx` is strictly forbidden.
 
 ---
 

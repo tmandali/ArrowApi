@@ -1,4 +1,4 @@
-import type { ZodTypeAny } from 'zod';
+import type { ZodTypeAny, z } from 'zod';
 
 export interface StorageAdapter {
   getItem: (key: string) => string | null;
@@ -40,6 +40,31 @@ export interface ActionContract<TInputSchema extends ZodTypeAny = ZodTypeAny, TO
   /** Deterministik motor doğrulama kuralları (Preflight & Router kuralı) */
   when?: ActionCondition;
 }
+
+/**
+ * Extracts TypeScript input payload type from an ActionContract or schema definition.
+ */
+export type InferActionInput<T> = T extends { inputSchema: infer TIn }
+  ? (TIn extends ZodTypeAny ? z.infer<TIn> : any)
+  : (T extends { schema: infer TSchema }
+      ? (TSchema extends ZodTypeAny ? z.infer<TSchema> : any)
+      : any);
+
+/**
+ * Extracts TypeScript output return type from an ActionContract definition.
+ */
+export type InferActionOutput<T> = T extends { outputSchema: infer TOut }
+  ? (TOut extends ZodTypeAny ? z.infer<TOut> : any)
+  : any;
+
+/**
+ * Code-safe Action Handlers Map keyed by actions declared in TActions.
+ */
+export type ActionHandlersMap<TActions extends Record<string, ActionContract>> = {
+  [K in keyof TActions]?: (
+    payload: InferActionInput<TActions[K]>
+  ) => Promise<InferActionOutput<TActions[K]> | any> | InferActionOutput<TActions[K]> | any;
+};
 
 export interface EventContract<TSchema extends ZodTypeAny = ZodTypeAny> {
   description: string;

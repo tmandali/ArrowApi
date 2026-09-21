@@ -8,7 +8,7 @@ import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Brain, Trash2, RefreshCw, HardDrive, Clock, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
-import { useAgentComponent } from "@my-agent/react";
+import { useMemoryAgentBinding } from "./use-memory-agent-binding";
 
 export function MemoryTabView() {
   const t = useTranslations("Studio");
@@ -36,63 +36,7 @@ export function MemoryTabView() {
     },
   });
 
-  useAgentComponent({
-    id: "entity_form:agent_memory",
-    meta: {
-      entity: "agent_memory",
-      screenTitle: "Kalıcı Bellek & Tercihler",
-      workspace: "my",
-      factsCount: entries.length,
-      facts: entries.map((e) => ({
-        key: e.key,
-        value: e.value,
-        scope: e.scope,
-        description: e.description || e.key,
-      })),
-    },
-    actions: {
-      READ: {
-        description: "Reads user preferences and facts stored in persistent memory.",
-        whenToCall: "When inspecting what Yula remembers about user habits or preferences.",
-        whenNotToCall: "When not on memory screen.",
-      },
-      FORGET: {
-        description: "Removes a specific memory fact by key ({ key: string }).",
-        whenToCall: "When the user asks to forget or remove a specific stored preference.",
-        whenNotToCall: "When inspecting memory.",
-      },
-      CLEAR_ALL: {
-        description: "Clears all remembered facts from persistent memory.",
-        whenToCall: "When the user explicitly asks to clear or reset all memory.",
-        whenNotToCall: "When deleting a single item.",
-      },
-    },
-    onAction: async (action, payload) => {
-      if (action === "READ") {
-        return {
-          success: true,
-          factsCount: entries.length,
-          facts: entries.map((e) => ({
-            key: e.key,
-            value: e.value,
-            scope: e.scope,
-            description: e.description || e.key,
-          })),
-        };
-      }
-      if (action === "FORGET" && typeof payload?.key === "string") {
-        agentMemory.forget(payload.key);
-        reload();
-        return { success: true, message: `Forgot '${payload.key}'` };
-      }
-      if (action === "CLEAR_ALL") {
-        agentMemory.clear("all");
-        reload();
-        return { success: true, message: "Cleared all persistent memory facts." };
-      }
-      return { success: false, error: `Unknown action: ${action}` };
-    },
-  });
+  useMemoryAgentBinding({ entries, reload });
 
   const handleForget = (key: string) => {
     agentMemory.forget(key);

@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
 import { Separator } from "@/components/ui/separator"
 import {
   Collapsible,
@@ -17,80 +15,30 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { PageHeaderTitle } from "@/components/layout/page-header-title"
 import { WorkspacePageHeader } from "@/components/layout/workspace-page-header"
-import {
-  ChevronRight,
-  ChevronDown,
-  Printer,
-  MoreHorizontal,
-  Plus,
-  UserPlus,
-  Paperclip,
-  Tag,
-  ShoppingBag,
-  RefreshCw,
-} from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { DocumentActivity } from "@/components/common/document-activity"
 import { DocumentComments } from "@/components/common/document-comments"
-import { AIChatAssistant } from "@/components/layout/ai-chat/ai-chat-assistant"
 import { panelCardClass } from "@/components/layout/panel-chrome";
 import { ModuleNavPane } from "@/components/layout/module-nav-pane"
 import { WorkspaceAiDock } from "@/components/layout/workspace-ai-dock"
 import { WorkspaceBanner } from "@/components/layout/workspace-banner"
-import { DetailAside } from "@/components/layout/detail-aside"
 import { useWorkspaceSearch } from "@/context/workspace-search-context"
-import { ItemImageUpload } from "./ItemImageUpload"
 import { ItemTaxTab } from "./ItemTaxTab"
-import { printStockItemReport } from "../services/print-stock-report"
+import { ItemDetailsAside } from "./item-details-aside"
 import { cn } from "@/utils/cn"
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
-import { useAgentComponent } from "@my-agent/react"
+import { useStockItemAgent, type ItemFormTab } from "./use-stock-item-agent"
 import { useTranslations } from "next-intl"
 
-export type ItemFormTab =
-  | "details"
-  | "dashboard"
-  | "inventory"
-  | "variants"
-  | "accounting"
-  | "purchasing"
-  | "sales"
-  | "tax"
-  | "report"
-  | "quality"
-  | "manufacturing"
+import {
+  TAB_ITEMS,
+  PLACEHOLDER_TABS,
+} from "./item-form-types";
+import { ItemFormHeaderActions } from "./item-form-header-actions";
 
-const TAB_ITEMS: { value: ItemFormTab; labelKey: string }[] = [
-  { value: "details", labelKey: "tab_details" },
-  { value: "dashboard", labelKey: "tab_dashboard" },
-  { value: "inventory", labelKey: "tab_inventory" },
-  { value: "variants", labelKey: "tab_variants" },
-  { value: "accounting", labelKey: "tab_accounting" },
-  { value: "purchasing", labelKey: "tab_purchasing" },
-  { value: "sales", labelKey: "tab_sales" },
-  { value: "tax", labelKey: "tab_tax" },
-  { value: "report", labelKey: "tab_report" },
-  { value: "quality", labelKey: "tab_quality" },
-  { value: "manufacturing", labelKey: "tab_manufacturing" },
-]
-
-const PLACEHOLDER_TABS: ItemFormTab[] = [
-  "dashboard",
-  "inventory",
-  "variants",
-  "accounting",
-  "purchasing",
-  "sales",
-  "quality",
-  "manufacturing",
-]
+export type { ItemFormTab };
 
 type ItemFormShellProps = {
   tabs?: ItemFormTab[]
@@ -137,70 +85,23 @@ export function ItemFormShell({
   const [isFixedAsset, setIsFixedAsset] = React.useState(false)
   const [showBanner, setShowBanner] = React.useState(variant === "item")
 
-  useAgentComponent({
-    id: "entity_form:stock_item",
-    meta: {
-      entity: "stock_item",
-      screenTitle: "Item Details",
-      workspace: "stock",
-      activeTab,
-      maintainStock,
-      disabled,
-      allowAlternative,
-      isZeroRated,
-      isExempt,
-      isFixedAsset,
-    },
-    actions: {
-      SET_FIELDS: {
-        description: "Updates item master data attributes ({ maintainStock, disabled, allowAlternative, isZeroRated, isExempt, isFixedAsset }).",
-        whenToCall: "When the user wants to enable/disable stock tracking, toggle exemption, or update item flags.",
-        whenNotToCall: "When switching tabs or inspecting values.",
-      },
-      SWITCH_TAB: {
-        description: "Switches the active tab in the item form ({ tab: 'details'|'dashboard'|'inventory'|'variants'|'accounting'|'purchasing'|'sales'|'tax'|'report'|'quality'|'manufacturing' }).",
-        whenToCall: "When the user asks to switch to a specific tab of the item details.",
-        whenNotToCall: "When the requested tab is already active.",
-      },
-      READ: {
-        description: "Reads the current fields, toggles, and active tab of the item form.",
-        whenToCall: "When inspecting the current state of the item details form.",
-        whenNotToCall: "When modifying values.",
-      },
-    },
-    onAction: async (action, payload) => {
-      if (action === "SWITCH_TAB" && typeof payload?.tab === "string") {
-        const targetTab = payload.tab as ItemFormTab;
-        if (visibleTabs.has(targetTab)) {
-          setActiveTab(targetTab);
-          return { success: true, activeTab: targetTab, message: `Switched to tab ${targetTab}` };
-        }
-        return { success: false, error: `Tab '${payload.tab}' is not available on this screen.` };
-      }
-      if (action === "SET_FIELDS" && payload) {
-        if (typeof payload.maintainStock === "boolean") setMaintainStock(payload.maintainStock);
-        if (typeof payload.disabled === "boolean") setDisabled(payload.disabled);
-        if (typeof payload.allowAlternative === "boolean") setAllowAlternative(payload.allowAlternative);
-        if (typeof payload.isZeroRated === "boolean") setIsZeroRated(payload.isZeroRated);
-        if (typeof payload.isExempt === "boolean") setIsExempt(payload.isExempt);
-        if (typeof payload.isFixedAsset === "boolean") setIsFixedAsset(payload.isFixedAsset);
-        return { success: true, updated: payload, message: "Item fields updated successfully." };
-      }
-      if (action === "READ") {
-        return {
-          success: true,
-          activeTab,
-          maintainStock,
-          disabled,
-          allowAlternative,
-          isZeroRated,
-          isExempt,
-          isFixedAsset,
-        };
-      }
-      return { success: false, error: `Unsupported action '${action}' for stock item form.` };
-    },
-  })
+  useStockItemAgent({
+    activeTab,
+    visibleTabs,
+    maintainStock,
+    disabled,
+    allowAlternative,
+    isZeroRated,
+    isExempt,
+    isFixedAsset,
+    setActiveTab,
+    setMaintainStock,
+    setDisabled,
+    setAllowAlternative,
+    setIsZeroRated,
+    setIsExempt,
+    setIsFixedAsset,
+  });
   const [attachments, setAttachments] = React.useState<
     { id: string; name: string }[]
   >([
@@ -223,100 +124,7 @@ export function ItemFormShell({
             </Badge>
           ) : null
         }
-        actions={
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
-          {isLedgerVariant ? (
-            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 shrink-0"
-                aria-label={t("aa_refresh")}
-              >
-                <RefreshCw className="size-3.5" />
-              </Button>
-              <AIChatAssistant />
-            </div>
-          ) : (
-            <div className="flex shrink-0 items-center gap-1.5 overflow-hidden sm:gap-2">
-              <ButtonGroup className="hidden md:inline-flex">
-                <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-                  {t("btn_view")}
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-1.5">
-                      <ChevronDown className="size-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem>{t("dd_print_format")}</DropdownMenuItem>
-                    <DropdownMenuItem>{t("dd_stock_ledger")}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </ButtonGroup>
-
-              <ButtonGroup className="hidden sm:inline-flex">
-                <Button variant="outline" size="sm" className="h-7 text-xs px-3">
-                  {t("btn_actions")}
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-1.5">
-                      <ChevronDown className="size-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem>{t("dd_make_stock_entry")}</DropdownMenuItem>
-                    <DropdownMenuItem>{t("dd_open_material_request")}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </ButtonGroup>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden h-7 text-xs px-2.5 lg:inline-flex"
-              >
-                {t("btn_duplicate")}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="hidden size-7 sm:inline-flex"
-                onClick={() => void printStockItemReport()}
-                title={t("aa_print_report")}
-                aria-label={t("aa_print_report")}
-              >
-                <Printer className="size-3.5" />
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="size-7">
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem className="md:hidden">{t("btn_view")}</DropdownMenuItem>
-                  <DropdownMenuItem className="sm:hidden">{t("btn_actions")}</DropdownMenuItem>
-                  <DropdownMenuItem className="lg:hidden">{t("btn_duplicate")}</DropdownMenuItem>
-                  <DropdownMenuItem className="sm:hidden" onClick={() => void printStockItemReport()}>{t("btn_print")}</DropdownMenuItem>
-                  <DropdownMenuItem>{t("btn_reload")}</DropdownMenuItem>
-                  <DropdownMenuItem>{t("btn_delete")}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button size="sm" className="h-7 text-xs px-3">
-                {t("btn_save")}
-              </Button>
-              <AIChatAssistant />
-            </div>
-          )}
-          </div>
-        }
+        actions={<ItemFormHeaderActions isLedgerVariant={isLedgerVariant} />}
       >
         <PageHeaderTitle>W6ED16Z8-HDN</PageHeaderTitle>
       </WorkspacePageHeader>
@@ -553,105 +361,11 @@ export function ItemFormShell({
               </div>
             </div>
 
-            <aside className="w-full space-y-4 border-t bg-muted/10 p-3 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0 sm:p-4">
-              <DetailAside
-                image={<ItemImageUpload />}
-                addControl={
-                  <div className="space-y-1">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <span className="flex items-center gap-2">
-                        <UserPlus className="size-3.5" />
-                        {t("f_assigned_to")}
-                      </span>
-                      <Plus className="size-3.5" />
-                    </Button>
-                    <div>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => attachmentInputRef.current?.click()}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Paperclip className="size-3.5" />
-                          {t("f_attachments")}
-                        </span>
-                        <Plus className="size-3.5" />
-                      </Button>
-                      <input
-                        ref={attachmentInputRef}
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        onChange={(event) => {
-                          const files = Array.from(event.target.files ?? [])
-                          if (files.length === 0) {
-                            return
-                          }
-                          setAttachments((prev) => [
-                            ...prev,
-                            ...files.map((file) => ({
-                              id: `${file.name}-${file.lastModified}-${file.size}`,
-                              name: file.name,
-                            })),
-                          ])
-                          event.target.value = ""
-                        }}
-                      />
-                    </div>
-                  </div>
-                }
-                files={attachments.map((file) => ({
-                  key: file.id,
-                  name: file.name,
-                  icon: <ShoppingBag className="size-3.5 shrink-0" />,
-                }))}
-                onRemoveFile={(key) =>
-                  setAttachments((prev) =>
-                    prev.filter((item) => item.id !== key)
-                  )
-                }
-              />
-
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="flex items-center gap-2">
-                    <Tag className="size-3.5" />
-                    {t("f_tags")}
-                  </span>
-                  <Plus className="size-3.5" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between h-8 text-xs font-normal px-2 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="flex items-center gap-2">
-                    <UserPlus className="size-3.5" />
-                    {t("f_share")}
-                  </span>
-                  <Plus className="size-3.5" />
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3 text-muted-foreground text-[11px]">
-                <div>
-                  <p className="font-medium text-foreground">{t("panel_administrator")}</p>
-                  <p>{t("panel_last_edited")}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">{t("panel_administrator")}</p>
-                  <p>{t("panel_created")}</p>
-                </div>
-              </div>
-            </aside>
+            <ItemDetailsAside
+              attachments={attachments}
+              setAttachments={setAttachments}
+              attachmentInputRef={attachmentInputRef}
+            />
 
             <div className="min-w-0 space-y-5 p-3 pt-0 sm:p-4 sm:pt-0">
               <Separator />

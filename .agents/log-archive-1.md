@@ -55,3 +55,39 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - Registered all skills into `built-in-skills.ts` and updated `built-in-skills.test.ts` (11 total built-in skills).
   - Validated test suite passing (212/212 pass) and clean lint/types.
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Graph-Native (Node & Edge) Documentation Standard with Traversable Neighbor Links
+- **Rationale:** Flat textual documentation failed to clearly capture the multi-agent control loops, event-driven reactive bridges, and Human-in-the-Loop (HITL) pause/resume flows in the Yula AI and Arrow ecosystem.
+- **Decision:**
+  - Established the mandatory **Graph-Native Documentation Standard** in `.agents/standards/graph-documentation-standard.md`.
+  - Added Rule 5 to root `AGENTS.md` requiring all architecture and agent workflow documents to define Mermaid topology, Nodes catalog, and Edges with feedback loops.
+  - Authored canonical master system graph document in `src/yula-ai/agent.md`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Deterministic Local Development Ports & Instant Shutdown Protocol
+- **Rationale:** Stopping local development services previously required exploratory port hunting via `lsof`. Deterministic ports allow immediate single-command termination upon user request ("proje kapat").
+- **Decision:**
+  - Standardized all default ports in `.agents/standards/dev-operations.md`.
+  - Defined the instant shutdown one-liner: `kill -9 $(lsof -ti:56402,3000,5168,7137) 2>/dev/null; pkill -f "dotnet run|next-server|yula.client.*next" 2>/dev/null || true`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Documented Core UI Components & Arrow Jobs .NET Engine
+- **Rationale:** The application's presentation layer (VirtualSpreadsheet, Criteria Form, Yula Client) and distributed job engine (`Arrow.Jobs.*`) required explicit centralized architecture guides.
+- **Decision:**
+  - Created `.agents/architecture/core-ui-components.md` and `.agents/architecture/arrow-jobs-engine.md`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Enforced English-Only Documentation & Evolutive Wiki Protocol
+- **Rationale:** LLM tokenizers and instruction-following attention mechanisms perform with higher accuracy in English. Documentation must evolve dynamically with user corrections.
+- **Decision:**
+  - Added 4th Golden Rule to root `AGENTS.md` enforcing English-only repository documentation and Evolutive Wiki Maintenance Protocol.
+  - User-agent conversations remain in Turkish.
+- **Author:** Antigravity / Team

@@ -386,68 +386,6 @@ This document is the **append-only audit log** recording fundamental architectur
   - Preserved simple card/list layout for single-screen rules (`screen_rule`) to prevent overengineering.
 - **Author:** Antigravity / Team
 
-## [2026-09-20] Graph-Native (Node & Edge) Documentation Standard with Traversable Neighbor Links
-- **Rationale:** Flat textual documentation failed to clearly capture the multi-agent control loops, event-driven reactive bridges, and Human-in-the-Loop (HITL) pause/resume flows in the Yula AI and Arrow ecosystem. Navigating dependencies, self-healing branches, and stagnation safeguards required a structured, traversable graph data model.
-- **Decision:**
-  - Established the mandatory **Graph-Native Documentation Standard** in `.agents/standards/graph-documentation-standard.md`.
-  - Added Rule 5 to root `AGENTS.md` requiring all architecture and agent workflow documents to define: 1) Mermaid directed graph topology, 2) Nodes catalog (roles, schemas, contracts), 3) Edges & flow dynamics (inbound/outbound triggers, feedback loops, error fallbacks, and traversable neighbor markdown links).
-  - Authored the canonical master system graph document in `src/yula-ai/agent.md`.
-  - Refactored `.agents/architecture/headless-react-agent.md` to conform to the Node & Edge graph specification with reciprocal neighbor links.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Deterministic Local Development Ports & Instant Shutdown Protocol
-- **Rationale:** Stopping local development services previously required exploratory port hunting via `lsof` and process tree queries across multiple turns. Local development runtimes (`yula.client` on 56402, `Sims.Server` on 5168/7137, `yula-ai` demo on 3000) have deterministic ports, allowing immediate, single-command process termination upon user request ("proje kapat").
-- **Decision:**
-  - Standardized all default ports and commands in `.agents/standards/dev-operations.md`.
-  - Defined the instant shutdown one-liner: `kill -9 $(lsof -ti:56402,3000,5168,7137) 2>/dev/null; pkill -f "dotnet run|next-server|yula.client.*next" 2>/dev/null || true`.
-  - Recorded user preference in global memories (`~/.gemini/GEMINI.md`) and linked in `.agents/index.md` and root `AGENTS.md`.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Documented Core UI Components (VirtualSpreadsheet, Criteria Form, Yula Client/AI)
-- **Rationale:** The application's core presentation layer relies on specialized, high-performance UI systems: an Airtable/Excel-style virtual grid, a schema-generated criteria engine, and the Yula Client/AI runtime. Developers and AI agents required a unified architecture guide detailing these components and their performance invariants.
-- **Decision:**
-  - Created `.agents/architecture/core-ui-components.md` detailing VirtualSpreadsheet (Canvas 2D zero-reflow sizing, bi-directional virtualization, Airtable aggregations, Excel selection), Schema-Generated Criteria Forms (JSON Schema contracts, D365/BC syntax, Zod preflight), and the Yula Client/AI platform ecosystem.
-  - Linked the document in `.agents/index.md` and root `AGENTS.md`.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Documented Arrow Jobs .NET Engine & Frontend Pipeline
-
-- **Rationale:** The asynchronous job execution pipeline spans both .NET backend (`Arrow.Jobs.*`) and Next.js frontend (`yula.client`). Its distributed queue, worker model, SSE event bus, and OPFS/DuckDB handoff required explicit, centralized architectural documentation.
-- **Decision:**
-  - Created `.agents/architecture/arrow-jobs-engine.md` documenting solution topology (`Abstractions`, `AspNetCore`, `InMemory`, `Postgres`, `Redis`), lifecycle states, Minimal API contracts, and frontend integration.
-  - Linked the document in `.agents/index.md` and root `AGENTS.md`.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Tauri Desktop and Python Sidecar Marked as TO-BE (Inactive)
-
-- **Rationale:** The immediate product focus is on the web-first Next.js ERP application, DuckDB WASM analytics, and single-page SSE reports. Desktop packaging and Python process execution are not in active scope.
-- **Decision:**
-  - Marked `.agents/knowledge/tauri-hybrid.md` and `.agents/knowledge/python-sidecar.md` with explicit `[TO-BE]` warnings instructing coding agents not to prioritize or implement them unless explicitly requested.
-  - Tagged both topics as `TO-BE (Future / Inactive)` in `.agents/index.md` and root `AGENTS.md`.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Enforced English-Only Documentation & Evolutive Wiki Protocol
-
-- **Rationale:** LLM tokenizers and instruction-following attention mechanisms perform with significantly higher accuracy and ~35% lower token consumption when operating on English technical guidelines. Furthermore, documentation must evolve dynamically with user corrections without manual prompts.
-- **Decision:**
-  - Added 4th Golden Rule to root `AGENTS.md` enforcing English-only repository documentation.
-  - Formalized the Evolutive Wiki Maintenance Protocol: AI agents must update the relevant `.agents/*.md` document in English and record an append-only entry in `.agents/log.md` whenever an architectural convention or rule is created or corrected.
-  - User-agent conversations remain in the user's preferred language (Turkish).
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Separation of Library (@my-agent) and Application (yula.client) AGENTS.md
-
-- **Rationale:** `@my-agent` is a domain-agnostic headless UI-Agent framework, whereas `yula.client` contains ERP/Sims business rules and reports. Storing their operational guidelines in a single place caused context pollution and compromised library portability.
-- **Decision:**
-  - Standardized `src/yula-ai/AGENTS.md` as the library operational guide with strict domain-agnostic rules.
-  - Updated root `AGENTS.md` and `.agents/index.md` with explicit Layer and Submodule Router maps.
-- **Author:** Antigravity / Team
-
-## [2026-09-20] Transition to Developer Agent Wiki (.agents/) Architecture
-- **Rationale:** Monolithic `AGENTS.md` files reached ~44,000 bytes (~10,000 tokens), causing high per-turn latency, token bloat, and context dilution.
-- **Decision:** Implemented Karpathy's "LLM Wiki" pattern under `.agents/` (`index.md`, `log.md`, `architecture/`, `standards/`, `knowledge/`). Slimmed down root `AGENTS.md` to a lightweight ~35-line Master Router.
-- **Author:** Antigravity / Team
-
 ## [2026-09-20] Procedural Memory & Playbook (Karpathy LLM Wiki Pattern)
 - **Rationale:** The AI agent had amnesia regarding screen-specific operational procedures and repeated exploratory trial-and-error queries from scratch on every turn.
 - **Decision:**
@@ -465,6 +403,7 @@ This document is the **append-only audit log** recording fundamental architectur
   - Added `YulaFocusScreenButton` in fullscreen overlay to collapse the dock and focus on the underlying screen with `USER_FOCUS_SCREEN` telemetry.
   - Added 150ms windowed deduplication and coalescing in `uiEventBus`.
 - **Author:** Antigravity / Team
+
 ## [2026-09-21] ActionContract Canonicalization & StrictActionContract Elimination
 - **Rationale:** An extra intermediate type `StrictActionContract` was unnecessary since `@my-agent/core` already defines `ActionContract<TIn, TOut>` with required `whenToCall` and `whenNotToCall`.
 - **Decision:**
@@ -472,6 +411,33 @@ This document is the **append-only audit log** recording fundamental architectur
   - Enforced schemas and prompts compile-time safety using `satisfies ActionContract`.
   - Deleted redundant `action-contract-types.ts`.
 - **Author:** Antigravity / Team
+
+## [2026-09-21] Full Standardization on Approach 2 (Custom Agent Binding Hooks)
+- **Rationale:** Inline `useAgentComponent` bloated UI views and led to file size rule violations (`ItemFormShell.tsx` was 691 lines).
+- **Decision:**
+  - Extracted custom binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`).
+  - Modularized `ItemFormShell.tsx` down to 404 lines ($\le 500$).
+  - Achieved 100% Approach 2 adoption across `yula.client`.
+- **Author:** Antigravity / Team
+
+## [2026-09-21] Generic Type-Safe ActionHandlersMap & Approach 2 Standardization
+- **Rationale:**
+  1. *Action Dispatch Boilerplate & Type Insecurity:* Previously, custom hooks and components handling actions had to implement a generic `onAction: async (action: string, payload: any)` callback containing `switch-case` blocks, defensive `typeof` checks, and manual payload casting. Typos in action names were undetected at compile time.
+  2. *Approach 2 (Isolated Custom Binding Hooks) Standard:* Inline `useAgentComponent` in complex UI views led to file bloat (e.g. `ItemFormShell.tsx` was 691 lines).
+- **Decision:**
+  - **Type Inference Primitives (`@my-agent/core`):** Introduced `InferActionInput<T>`, `InferActionOutput<T>`, and `ActionHandlersMap<TActions>` in `types.ts` to infer input and output types directly from Zod `ActionContract` schemas.
+  - **Type-Safe `handlers` in `useAgentComponent` (`@my-agent/react`):** Enhanced `useAgentComponent<TActions, TEvents>` with generic action typing and a strongly typed `handlers?: ActionHandlersMap<TActions>` property. Each action key maps to an async handler receiving automatically inferred payload types (`z.infer<TIn>`) and returning typed results. Backward-compatible fallback to `onAction` is preserved.
+  - **100% Approach 2 Adoption across `yula.client`:** Extracted dedicated binding hooks (`useJobExecutionsAgent`, `useStockItemAgent`, `useMySettingsAgent`, `usePluginsAgentBinding`, `useMemoryAgentBinding`) and migrated their actions to the new `handlers` map.
+  - **File Size Compliance:** Modularized `ItemFormShell.tsx` from 691 lines down to 404 lines ($\le 500$).
+- **Author:** Antigravity / Team
+
+## [2026-09-21] Strict pnpm Package Manager Enforcement across JS/TS Workspaces
+- **Rationale:** The repository transitioned to `pnpm` (`packageManager: pnpm@10.15.1`, `pnpm-lock.yaml`), but lack of explicit prohibition in agent instructions led to occasional fallback invocations of `npm test` or `npx tsc`, triggering `.npmrc` configuration warnings and bypassing pnpm resolution.
+- **Decision:**
+  - Added Rule 5 to `src/Sims/yula.client/AGENTS.md` strictly requiring `pnpm` (`pnpm test`, `pnpm run typecheck`, `pnpm run lint`) and forbidding `npm` / `npx`.
+  - Added Section 3 ("Package Manager & Script Runner Standard") to `.agents/standards/dev-operations.md`.
+- **Author:** Antigravity / Team
+
 ---
 
 ## 📜 Prior Decisions Archive

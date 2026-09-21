@@ -142,8 +142,27 @@ For administrative and configuration screens (Skills, Agents, Playbooks, User Se
    - `SELECT_<ENTITY>`: Programmatically selects an item from the list/master view.
    - `SWITCH_TAB`: Switches active sub-tabs (e.g. `overview`, `code`, `tests`, `system_prompt`).
    - `TEST_<ENTITY>` / `SAVE` / `SET_FIELDS`: Dispatches test flows or saves form changes.
-3. **Dedicated Binding Hook Pattern (`use-*-agent-binding.ts`):**
-   To strictly enforce Golden Rule 2 (500-line ceiling), agent bindings for management views must be isolated into separate `use-*-agent-binding.ts` hook files.
+3. **Dedicated Binding Hook Pattern (`use-*-agent-binding.ts`) & Type-Safe Handlers:**
+   To strictly enforce Golden Rule 2 (500-line ceiling), agent bindings for views must be isolated into dedicated `use-*-agent-binding.ts` or `use-*-agent.ts` hook files.
+   Furthermore, instead of boilerplate `onAction: async (action, payload)` switches, hooks leverage `@my-agent/react`'s generic `handlers?: ActionHandlersMap<TActions>` property:
+   ```ts
+   useAgentComponent({
+     id: "entity_form:custom_scope",
+     actions: {
+       READ: READ_CONTRACT,
+       SET_FIELDS: SET_FIELDS_CONTRACT,
+     },
+     handlers: {
+       READ: async () => ({ success: true, ... }),
+       SET_FIELDS: async (payload) => {
+         // payload is automatically typed and validated from SET_FIELDS_CONTRACT.inputSchema!
+         updateState(payload);
+         return { success: true };
+       },
+     },
+   });
+   ```
+   This eliminates `any` casting, guarantees autocompletion, catches action key typos at compile-time, and preserves backward compatibility.
 
 | Screen Route | Entity Form ID | Key Actions Registered |
 | :--- | :--- | :--- |

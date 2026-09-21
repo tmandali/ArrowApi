@@ -125,9 +125,9 @@ describe("use-chat-turns savunmacı yapı testleri", () => {
     assert.ok(asstMsg);
 
     // Sadece terminal (m3) mesajının metni 'text' parçası olarak kalmalıdır
-    const textParts = asstMsg.parts?.filter((p) => p.type === "text");
-    assert.equal(textParts?.length, 1);
-    assert.equal((textParts?.[0] as { text: string }).text, "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur.");
+    const textParts = asstMsg.parts?.filter((p) => p.type === "text") || [];
+    assert.equal(textParts.length, 1);
+    assert.equal((textParts[0] as { text: string }).text, "Nihai doğrulanmış iş akışı ve Mermaid grafiği budur.");
 
     // Ara adımın (m2) metni ise akordiyonda kalması için 'reasoning' (intermediate_plan) yapılmış olmalıdır
     const intermediateReasoning = asstMsg.parts?.find(

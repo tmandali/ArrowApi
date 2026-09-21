@@ -67,8 +67,20 @@ export function PlaybooksManagementView({
   }, [workspace]);
 
   React.useEffect(() => {
-    loadProposals();
-  }, [loadProposals]);
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/agent/playbook/proposals?workspace=${workspace}`);
+        if (res.ok && active) {
+          const data = await res.json();
+          setProposals(data.proposals || []);
+        }
+      } catch {}
+    })();
+    return () => {
+      active = false;
+    };
+  }, [workspace]);
 
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([loadData(), loadProposals()]);

@@ -123,7 +123,7 @@ export const STANDARD_AGENT_TOOLS = {
     execute: async ({ key, value, scope, description }) => {
       try {
         const { agentMemory } = await import("@my-agent/core");
-        agentMemory.remember(key, value, scope);
+        agentMemory.remember(key, value, scope, description);
         return { status: "saved", key, scope, message: `Preference "${key}" saved.` };
       } catch (err: any) {
         return { status: "error", message: err?.message || "Failed to save memory" };

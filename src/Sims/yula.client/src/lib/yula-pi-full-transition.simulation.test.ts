@@ -472,12 +472,12 @@ describe("⚡ Yula Client — Pi Tam Geçiş (14 Yetenek Doğrulama Testi)", () 
     ]);
 
     assert.equal(turns.length, 1);
-    const textParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "text");
-    assert.equal(textParts?.length, 1, "Balonda yalnızca terminal metin yer almalıdır");
-    assert.ok((textParts?.[0] as any).text.includes("Nihai onaylanmış akış şeması"));
+    const textParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "text") || [];
+    assert.equal(textParts.length, 1, "Balonda yalnızca terminal metin yer almalıdır");
+    assert.ok((textParts[0] as any).text.includes("Nihai onaylanmış akış şeması"));
 
-    const reasoningParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "reasoning");
-    assert.equal(reasoningParts?.length, 1, "Ara adım metni akordiyon için reasoning olmalıdır");
+    const reasoningParts = turns[0].assistantMessage?.parts?.filter((p) => p.type === "reasoning") || [];
+    assert.equal(reasoningParts.length, 1, "Ara adım metni akordiyon için reasoning olmalıdır");
   });
 });
 

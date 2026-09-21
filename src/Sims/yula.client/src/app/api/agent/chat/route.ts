@@ -4,7 +4,6 @@ import {
   extractReasoningMiddleware,
   hasToolCall,
   isStepCount,
-  pruneMessages,
   toUIMessageStream,
   type InferUITools,
   type LanguageModelUsage,

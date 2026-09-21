@@ -35,14 +35,15 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
 
   // 1. Canlı tur durumu (Reasoning vs Acting)
   const isTurnActive = Boolean(chat?.isTurnActive);
+  const messages = chat?.messages;
 
   const lastAssistantMsg = React.useMemo(() => {
-    if (!chat?.messages) return null;
-    for (let i = chat.messages.length - 1; i >= 0; i--) {
-      if (chat.messages[i].role === "assistant") return chat.messages[i];
+    if (!messages) return null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messages[i];
     }
     return null;
-  }, [chat?.messages]);
+  }, [messages]);
 
   const activeToolInfo = React.useMemo(() => {
     if (!isTurnActive || !lastAssistantMsg?.parts) return null;
@@ -62,9 +63,9 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
 
   // 2. /plan komutu oturumda çalıştırıldı mı kontrolü
   const isPlanCommandActive = React.useMemo(() => {
-    if (!chat?.messages) return false;
-    for (let i = chat.messages.length - 1; i >= 0; i--) {
-      const msg = chat.messages[i];
+    if (!messages) return false;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
       const text =
         msg.parts
           ?.filter((p) => p.type === "text")
@@ -86,7 +87,7 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
       }
     }
     return false;
-  }, [chat?.messages]);
+  }, [messages]);
 
   // 3. Mod kararı:
   // Canlı akışta: Acting vs Reasoning

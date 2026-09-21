@@ -43,3 +43,18 @@ Verify that listening ports are released cleanly:
 ```bash
 lsof -iTCP -sTCP:LISTEN -P -n | grep -E "56402|3000|5168|7137" || true
 ```
+
+---
+
+## 3. Package Manager & Script Runner Standard (`pnpm`)
+
+All JavaScript/TypeScript projects in this repository (`src/Sims/yula.client/` and `src/yula-ai/`) strictly use **`pnpm`** as the sole package manager and script runner.
+
+- **Lockfiles & Engine:** Controlled exclusively via `pnpm-lock.yaml` and `"packageManager": "pnpm@..."` in `package.json`.
+- **Prohibited Tooling:** Invoking `npm` or `npx` is **strictly forbidden**. Running `npm` triggers `.npmrc` configuration warnings and compromises lockfile integrity.
+- **Canonical Development & Verification Commands:**
+  - **Testing:** `pnpm test` (or `pnpm test:all`)
+  - **Type Checking:** `pnpm run typecheck` (or `pnpm exec tsc --noEmit`)
+  - **Linting:** `pnpm run lint` (or `pnpm exec oxlint`)
+  - **Development Server:** `pnpm run dev:next`
+

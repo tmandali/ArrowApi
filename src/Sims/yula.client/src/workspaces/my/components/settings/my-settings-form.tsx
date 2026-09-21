@@ -37,7 +37,7 @@ import { ProfileTab } from "./profile-tab";
 import { AiTab } from "./ai-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
-import { useAgentComponent } from "@my-agent/react";
+import { useMySettingsAgent } from "./use-my-settings-agent";
 
 export function MySettingsForm() {
   const t = useTranslations("MySettings");
@@ -121,78 +121,11 @@ export function MySettingsForm() {
     },
   });
 
-  useAgentComponent({
-    id: "entity_form:user_settings",
-    meta: {
-      entity: "user_settings",
-      screenTitle: t("title"),
-      workspace: "my",
-      activeTab,
-      profile: {
-        email: form.profileEmail,
-        fullName: form.profileFullName || `${form.profileFirstName} ${form.profileLastName}`.trim(),
-        language: form.profileLanguage,
-        timeZone: form.profileTimeZone,
-      },
-      aiSettings: {
-        provider: form.aiProvider,
-        model: form.aiModel,
-        endpoint: form.aiEndpoint,
-        thinkingLevel: form.aiThinkingLevel,
-      },
-    },
-    actions: {
-      READ: {
-        description: "Reads current user profile, preferences, and AI configuration.",
-        whenToCall: "When inspecting user settings, AI provider, or profile parameters.",
-        whenNotToCall: "When modifying values.",
-      },
-      SWITCH_TAB: {
-        description: "Switches the active settings tab ({ tab: 'user-details' | 'settings' | 'yula-ai' | 'connections' }).",
-        whenToCall: "When the user asks to open profile, preferences, or AI model settings.",
-        whenNotToCall: "When the tab is already active.",
-      },
-      SET_AI_CONFIG: {
-        description: "Updates AI provider, model, or thinking parameters ({ provider?: string, model?: string, thinkingLevel?: string }).",
-        whenToCall: "When the user asks to change the active LLM model or AI provider.",
-        whenNotToCall: "When updating profile info.",
-      },
-    },
-    onAction: async (action, payload) => {
-      if (action === "READ") {
-        return {
-          success: true,
-          activeTab,
-          profile: {
-            email: form.profileEmail,
-            fullName: form.profileFullName || `${form.profileFirstName} ${form.profileLastName}`.trim(),
-            language: form.profileLanguage,
-            timeZone: form.profileTimeZone,
-          },
-          aiSettings: {
-            provider: form.aiProvider,
-            model: form.aiModel,
-            endpoint: form.aiEndpoint,
-            thinkingLevel: form.aiThinkingLevel,
-          },
-        };
-      }
-      if (action === "SWITCH_TAB" && typeof payload?.tab === "string") {
-        const targetTab = payload.tab as SettingsTabId;
-        if (isSettingsTab(targetTab)) {
-          handleTabChange(targetTab);
-          return { success: true, activeTab: targetTab };
-        }
-        return { success: false, error: `Invalid tab: ${payload.tab}` };
-      }
-      if (action === "SET_AI_CONFIG" && payload) {
-        if (typeof payload.provider === "string") form.setAiProvider(payload.provider as any);
-        if (typeof payload.model === "string") form.setAiModel(payload.model);
-        if (typeof payload.thinkingLevel === "string") form.setAiThinkingLevel(payload.thinkingLevel as any);
-        return { success: true, message: "AI configuration updated on screen." };
-      }
-      return { success: false, error: `Unknown action: ${action}` };
-    },
+  useMySettingsAgent({
+    activeTab,
+    screenTitle: t("title"),
+    form,
+    handleTabChange,
   });
 
   /**

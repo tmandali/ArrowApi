@@ -107,9 +107,34 @@ export function SystemUsersView() {
   }, []);
 
   React.useEffect(() => {
-    void fetchUsers();
-    void fetchGuests();
-  }, [fetchUsers, fetchGuests]);
+    let active = true;
+    void (async () => {
+      try {
+        const [usersRes, guestsRes] = await Promise.all([
+          fetch("/api/system/users", { cache: "no-store" }),
+          fetch("/api/system/identities?unlinked=1", { cache: "no-store" }),
+        ]);
+        if (active && usersRes.ok) {
+          const data = (await usersRes.json()) as { users?: Record<string, unknown>[]; error?: string };
+          setUsers(Array.isArray(data.users) ? data.users.map(normalizeRow) : []);
+        }
+        if (active && guestsRes.ok) {
+          const data = (await guestsRes.json()) as { identities?: SystemIdentity[]; error?: string };
+          setGuests(Array.isArray(data.identities) ? data.identities : []);
+        }
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (active) {
+          setLoading(false);
+          setGuestLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredUsers = users.filter(
     (u) =>

@@ -174,10 +174,6 @@ export function renderPlainBullet(
   const boldParts = cleanBulletText.split(/(\*\*[^*]+\*\*)/g);
   const hasBold = boldParts.some((bp) => bp.startsWith("**") && bp.endsWith("**"));
 
-  // Asistanın kendi yapacağı/yaptığı 1. şahıs plan/anlatım cümleleri (örn: inceleyeceğim, özetleyeceğim) aksiyon butonu olamaz
-  const isNarrativePlan =
-    /(?:ceğim|cağım|cegim|cagim|eceğim|acağım|dim|dım|tim|tım|dum|düm|tum|tüm)\b/i.test(cleanBulletText);
-
   if (hasBold) {
     return (
       <div key={lIdx} className="flex items-start gap-2 py-0.5 pl-1 group">
