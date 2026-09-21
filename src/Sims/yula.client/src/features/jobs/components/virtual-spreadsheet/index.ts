@@ -8,4 +8,7 @@ export * from "./column-aggregations"
 export * from "./TableFooterSummaryRow"
 export * from "./AiViewDropdown"
 export * from "./hooks"
+export * from "./SpreadsheetHeaderBar"
+export * from "./SpreadsheetTableHeader"
+export * from "./SpreadsheetTableBody"
 

@@ -5,7 +5,7 @@ import {
   normalizeCriteria,
   normalizeCriteriaValue,
 } from "@/lib/criteria-match";
-import { deferredManager } from "@my-agent/core";
+import { uiEventBus } from "@my-agent/core";
 import { resolveCurrentReportScope } from "./job-scope-resolver";
 import {
   navigateToPageTool,
@@ -152,22 +152,19 @@ export async function runJobTool(
 
     const preset = typeof args.presetTitle === "string" ? args.presetTitle : undefined;
 
-    // ⏱️ Pi Deferred: Uzun süren rapor işini deferred yöneticisine kaydet
+    // 📡 UI Telemetry: Rapor başlatma olayını telemetriye kaydet
     try {
-      const { promise } = deferredManager.createDeferred(
-        job.id,
-        { scope, jobId: job.id, preset },
-        180000,
-        job.id,
-      );
-      // Zaman aşımı veya iptal durumunda unhandled rejection oluşmasını önle
-      promise.catch((err) => {
-        if (process.env.NODE_ENV === "development") {
-          console.warn(`[DeferredManager] Job ${job.id} deferred wait ended:`, err?.message || err);
-        }
+      uiEventBus.recordTelemetry({
+        source: "arrow_job",
+        type: "REPORT_STARTED",
+        payload: {
+          jobId: job.id,
+          scope,
+          title: meta.title,
+        },
       });
     } catch {
-      // Best-effort deferred registration
+      // Best-effort telemetry
     }
     return {
       status: "executed",
