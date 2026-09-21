@@ -13,6 +13,7 @@ export interface StepRouterContext {
   hasImageInMessages?: boolean;
   messages: unknown[];
   compactionBudget?: number;
+  hasNativeThinking?: boolean;
 }
 
 export interface StepRouterResult {
@@ -33,13 +34,21 @@ export function estimateStepTokens(messages: unknown): number {
 
 /**
  * Adım ve ekran fazına göre aktif araç listesini akıllıca belirler.
+ * AgentArch (arXiv:2509.10769) bulgusu:
+ * - Düşünme desteği olmayan modellerde synthesize_collected_information doğruluğu %22+ artırır.
+ * - Native thinking olan modellerde ise gereksiz gecikmeyi önlemek için bu araç filtrelenir.
  */
 export function resolveActiveToolsForStep(context: StepRouterContext): string[] {
-  const { hasImageInMessages, toolNames } = context;
+  const { hasImageInMessages, toolNames, hasNativeThinking } = context;
 
   // Görsel içeren mesajlarda modelin araç çağırması engellenir (Vision grounding kuralı).
   if (hasImageInMessages) {
     return [];
+  }
+
+  // Native thinking destekleyen modellerde yapay scratchpad aracını buda
+  if (hasNativeThinking) {
+    return toolNames.filter((name) => name !== "synthesize_collected_information");
   }
 
   // Temel araç seti hazır

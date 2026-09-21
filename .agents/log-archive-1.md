@@ -309,4 +309,58 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - **Interactive Simulation Harness (`apps/demo-app`):** Implemented `useAdvancedArchitecturalSimulations.ts` and updated `PiTestPanel.tsx` / `PiDiagnosticsView.tsx` with 4 interactive test scenarios (Tool Loadout Delta, Model Cascading, Provider Failover, Dynamic Step Routing).
 - **Author:** Antigravity / Team
 
+---
 
+## [2026-09-20] Modernization of Yula.Client Flows & Removal of Legacy Custom Workarounds
+- **Rationale:**
+  1. *Prompt Bloat & Redundant Defensive Warnings:* Previously, without dynamic tool pruning (`prepareStep`) and native loop termination (`stopWhen: [hasToolCall("ask_user_choice")]`), system prompts had to explicitly forbid calling criteria forms when unmounted, forbid asking multiple questions, and forbid duplicate tool calls.
+  2. *Untyped Client Tools:* While server tools had Zod `outputSchema`, client-executed tools (`dispatch_component_action`, `inspect_ui_state`, `ask_user_choice`, `time_travel`) lacked formal output schemas.
+  3. *Arbitrary Sliding Window in Transport Slimming:* `context-slim.ts` previously truncated conversations at 16 messages and cut rows at 800 chars regardless of actual token consumption.
+  4. *Component Mount/Unmount Desynchronization:* Active UI components mounted/unmounted without broadcasting explicit `tool_loadout_updated` events to the Pi event stream.
+- **Decision:**
+  - **Prompt Streamlining (`yula-agent-prompt.ts`):** Removed redundant duplicate tool call prohibitions and defensive prompt walls, relying on engine-level `prepareStepRouting` and `stopWhen`.
+  - **Client Tool Output Schemas (`standard-agent-tools.ts`):** Added explicit Zod `outputSchema` definitions to `dispatch_component_action`, `inspect_ui_state`, `ask_user_choice`, and `time_travel`.
+  - **Deprecation of Manual Deduplication (`yula-tool-info.ts`):** Deprecated `findDuplicateQuestionCallIds` as native `stopWhen` stops the loop after 1 choice prompt.
+  - **Transport Window Consolidation (`context-slim.ts`):** Relaxed arbitrary 16-message transport cutoff to safety-net levels, delegating fine-grained compaction to SDK-native `pruneMessages` inside `prepareStepRouting`.
+  - **Tool Loadout Delta Broadcast (`use-agent-component.ts` & `use-screen-agent-context.tsx`):** Connected `piEventStream.emit({ type: 'tool_loadout_updated', added, removed })` on component mount and unmount.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Multi-Step ReAct Isolation & Tool Loadout Synchronization (Pi DAG Message Model & Server-Client Tool Bridge)
+- **Rationale:**
+  1. *Duplicate Visual Artifacts & Preamble Pollution:* In multi-step turns (where the model executed tools before formulating its terminal response), intermediate assistant preambles and draft Mermaid diagrams were concatenated with the terminal response because `computeChatTurns` merged all assistant message parts using `flatMap`.
+  2. *Tool Loadout Desynchronization (`query_playbook` missing in client adapter):* `STANDARD_AGENT_TOOLS` on the server and `yula-agent-prompt.ts` included `query_playbook` and `propose_playbook_update`, but `createStandardAgentTools()` in `@my-agent/core/ui-tool-adapter.ts` omitted them, causing an immediate `Tool "query_playbook" not found.` error and triggering an unnecessary fallback recovery turn (resulting in 11-second turn latencies).
+  3. *Premature Tool Execution Bridge:* `chat-stream-fn.ts` intercepted server-streamed `tool-input-available` chunks and prematurely terminated the stream with `stopReason: 'tool_use'`, claiming client execution authority even when the server was already executing the tool.
+  4. *Unconstrained Pre-Tool Synthesis:* The system prompt previously lacked a strict negative constraint forbidding visual artifact and diagram generation in intermediate tool-invoking steps.
+- **Decision:**
+  - **Pi DAG Presentation Layer (`use-chat-turns.ts`):** Implemented `buildTurnAssistantMessage` following Pi's message DAG model. The visible chat bubble now strictly extracts text parts exclusively from the terminal assistant message. Any intermediate assistant text generated prior to tool invocations is demoted to `reasoning` (`meta: "intermediate_plan"`) so it is preserved inside the `WorkedSteps` accordion without polluting the user-facing response bubble.
+  - **Tool Adapter Synchronization (`ui-tool-adapter.ts`):** Registered `query_playbook` and `propose_playbook_update` in `createStandardAgentTools()` using `playbookManager`, ensuring 1:1 parity between prompt capabilities and local agent loop tools.
+  - **Hybrid Server/Client Tool Bridge (`chat-stream-fn.ts`):** Added handlers for server-completed tool chunks (`tool-output-available`, `tool-result`, and AI SDK `a:` protocol). Server-executed tools are removed from the client's pending execution list so the client agent loop does not attempt to re-execute them locally.
+  - **Prompting Directives (`yula-agent-prompt.ts`):** Added the `SINGLE FINAL SYNTHESIS & NO PRE-TOOL ARTIFACTS` directive forbidding Mermaid diagrams in pre-tool steps, and clarified that general conceptual ERP inquiries must be answered directly without triggering unnecessary playbook queries.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Typed Component & Action Contracts: Dual Schema Support (Input/Output), Emitted Events, and Deterministic Conditions
+- **Rationale:**
+  1. *Action Contract Schema Ambiguity:* `ActionContract.schema` was previously an input payload schema only, leaving return values untyped and unvalidated, and missing output introspection for tool-calling agents.
+  2. *Component Event Visibility:* UI components emitted events over `uiEventBus` (e.g. `field_change`, `filter_changed`, `job_queued`, `view_transformed`), but had no formal schema declaration for inspection or observability by agent tools like `inspect_ui_state`.
+  3. *Deterministic Guarding vs LLM Reasoning:* While natural language directives (`whenToCall` & `whenNotToCall`) are critical for LLM prompt reasoning, engine-level deterministic preflight conditions (`when?: ActionCondition`) were needed to prevent invalid action dispatches (e.g., executing grid actions when in criteria form phase).
+- **Decision:**
+  - **Core Types (`@my-agent/core`):**
+    - Added `ActionCondition` (`route?: string`, `phase?: string`, `custom?: (ctx) => boolean`).
+    - Added `EventContract` (`schema?: ZodTypeAny`, `description: string`, `whenEmitted?: string`).
+    - Enhanced `ActionContract` with `inputSchema` (aliasing `schema` for 100% backward compatibility), `outputSchema`, and `when?: ActionCondition`.
+    - Enhanced `ComponentSchema` with `events?: Record<string, EventContract>`.
+    - Added `postflightValidate` to `IComponentRegistry` for verifying action results against `outputSchema`.
+  - **Prompt & Registry Formatting (`component-registry.ts`):**
+    - Enforced deterministic `when` condition checking in `preflightValidate`.
+    - Enhanced `formatActiveComponentsPrompt` to cleanly format `Parameters:`, `Returns:`, and `Emitted Events:`.
+  - **React Hook Layer (`@my-agent/react`):**
+    - Enhanced `UseAgentComponentOptions` and `useAgentComponent` to accept and register typed `events`.
+  - **Application Migration (`Sims/yula.client`):**
+    - Added typed `outputSchema` and `events` across `criteria_form:*` (in `use-screen-agent-context.tsx`, `use-headless-system-components.ts`, and `yula-active-components.ts`) and `result_grid:active` (in `use-result-grid-agent.ts` and `yula-active-components.ts`).
+    - Enhanced `inspect_ui_state` tool's `outputSchema` with typed `recent_events` Zod schema.
+    - Extracted `useResultGridAgent` and `renderReportGridSubtitle` from `arrow-report-grid.tsx` to maintain clean separation and strictly adhere to the 500-line limit (486 lines).
+- **Author:** Antigravity / Team

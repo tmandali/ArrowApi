@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { synthesizeCollectedInformationTool } from "./thinking-tools";
 
 /**
  * Headless React UI-Agent (@my-agent/core) standart sunucu araç seti.
@@ -247,6 +248,8 @@ export const STANDARD_AGENT_TOOLS = {
       }
     },
   }),
+
+  synthesize_collected_information: synthesizeCollectedInformationTool,
 };
 
 export type StandardAgentTools = typeof STANDARD_AGENT_TOOLS;

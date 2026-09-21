@@ -401,6 +401,7 @@ export async function POST(req: Request) {
           hasImageInMessages,
           messages,
           compactionBudget: COMPACTION_TOKEN_BUDGET,
+          hasNativeThinking: isThinking,
         });
 
         if (result.compactedMessages) {

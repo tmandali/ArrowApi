@@ -1,6 +1,22 @@
 /**
  * Standard Component Family and Action contracts for Headless React UI-Agent dispatch.
+ * Actions are colocated with their respective component contracts and aggregated here.
  */
+
+import type { CriteriaFormAction } from "./criteria-form-contracts";
+import type { ResultGridAction } from "./result-grid-contracts";
+import type { AppRouterAction } from "./app-router-contracts";
+import type { JobHistoryAction, JobAction } from "./job-history-contracts";
+import type { WasmSqlAction } from "@/services/wasmsql/ai/wasm-sql-contracts";
+
+export type {
+  CriteriaFormAction,
+  ResultGridAction,
+  AppRouterAction,
+  JobHistoryAction,
+  JobAction,
+  WasmSqlAction,
+};
 
 /**
  * Arrow Job family identifiers.
@@ -69,53 +85,9 @@ export type ComponentId<F extends ComponentFamily = ComponentFamily> =
   | F
   | `${F}:${string}`;
 
-export type JobHistoryAction =
-  | "OPEN_LAST"
-  | "GET_DETAIL"
-  | "DETAIL"
-  | "LIST"
-  | "FIND"
-  | "CANCEL"
-  | "SELECT"
-  | "REFRESH";
-
-export type JobAction = JobHistoryAction;
-
-export type CriteriaFormAction =
-  | "SET_FIELDS"
-  | "APPLY"
-  | "SUBMIT"
-  | "RUN"
-  | "VALIDATE"
-  | "READ"
-  | "SCHEMA";
-
-export type ResultGridAction =
-  | "RUN_SQL"
-  | "SQL"
-  | "QUERY"
-  | "FILTER"
-  | "APPLY_FILTERS"
-  | "SORT"
-  | "COLUMNS"
-  | "PIN"
-  | "RESET_LAYOUT"
-  | "EXPORT"
-  | "VISUALIZE"
-  | "CHART"
-  | "ANALYZE"
-  | "PROFILE";
-
-export type AppRouterAction = "NAVIGATE";
-
-export type WasmSqlAction =
-  | "RUN_SQL"
-  | "SQL"
-  | "QUERY"
-  | "DESCRIBE_TABLE"
-  | "DESCRIBE"
-  | "LIST_TABLES";
-
+/**
+ * Aggregated union of all supported component actions.
+ */
 export type ComponentAction =
   | JobHistoryAction
   | CriteriaFormAction
@@ -124,6 +96,9 @@ export type ComponentAction =
   | AppRouterAction
   | (string & {});
 
+/**
+ * Family-to-Action mapping guaranteeing typesafe actions per component family.
+ */
 export type ComponentActionMap = {
   criteria_form: CriteriaFormAction;
   result_grid: ResultGridAction;

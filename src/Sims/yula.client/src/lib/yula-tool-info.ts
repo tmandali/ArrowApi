@@ -12,6 +12,7 @@ export const KNOWN_SERVER_TOOLS = [
   "recall_fact",
   "query_playbook",
   "propose_playbook_update",
+  "synthesize_collected_information",
 ] as const;
 
 /** Bilinen istemci araç isimleri */

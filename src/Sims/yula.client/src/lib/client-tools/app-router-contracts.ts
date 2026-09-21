@@ -22,4 +22,5 @@ export const APP_ROUTER_NAVIGATE_CONTRACT = {
 
 export type AppRouterNavigateInput = z.infer<typeof APP_ROUTER_NAVIGATE_CONTRACT.inputSchema>;
 export type AppRouterNavigateOutput = z.infer<typeof APP_ROUTER_NAVIGATE_CONTRACT.outputSchema>;
+export type AppRouterAction = "NAVIGATE";
 

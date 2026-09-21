@@ -382,6 +382,23 @@ export function mapToolInfoToWorkedSteps(
       });
       break;
     }
+    case "synthesize_collected_information": {
+      const synthesis =
+        typeof inputObj.synthesis === "string" ? inputObj.synthesis : "";
+      pushStep({
+        id: info.toolCallId,
+        kind: "thought",
+        label: "Akıl Yürütme & Sentez (Scratchpad)",
+        subLabel: isPending
+          ? "Hesaplama ve analiz yapılıyor..."
+          : "Tarih ve parametre doğrulaması tamamlandı",
+        detailText: synthesis,
+        isLive: isPending,
+        isError,
+        info,
+      });
+      break;
+    }
     default: {
       pushStep({
         id: info.toolCallId,

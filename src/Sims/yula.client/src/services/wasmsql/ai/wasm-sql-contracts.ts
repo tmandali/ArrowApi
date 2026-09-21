@@ -79,3 +79,12 @@ export type WasmSqlRunOutput = z.infer<typeof WASM_SQL_RUN_CONTRACT.outputSchema
 export type WasmSqlDescribeInput = z.infer<typeof WASM_SQL_DESCRIBE_CONTRACT.inputSchema>;
 export type WasmSqlDescribeOutput = z.infer<typeof WASM_SQL_DESCRIBE_CONTRACT.outputSchema>;
 export type WasmSqlListTablesOutput = z.infer<typeof WASM_SQL_LIST_TABLES_CONTRACT.outputSchema>;
+
+export type WasmSqlAction =
+  | "RUN_SQL"
+  | "SQL"
+  | "QUERY"
+  | "DESCRIBE_TABLE"
+  | "DESCRIBE"
+  | "LIST_TABLES";
+

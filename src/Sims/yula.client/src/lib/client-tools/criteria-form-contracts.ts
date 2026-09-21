@@ -190,3 +190,12 @@ export const CRITERIA_SCHEMA_CONTRACT = {
   whenNotToCall:
     "When the criteria schema is already known.",
 } satisfies ActionContract;
+
+export type CriteriaFormAction =
+  | "SET_FIELDS"
+  | "APPLY"
+  | "SUBMIT"
+  | "RUN"
+  | "VALIDATE"
+  | "READ"
+  | "SCHEMA";

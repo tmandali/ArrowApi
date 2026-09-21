@@ -164,3 +164,15 @@ export const JOB_REFRESH_ACTION_CONTRACT = {
   whenNotToCall:
     "When the current list is already up to date.",
 } satisfies ActionContract;
+
+export type JobHistoryAction =
+  | "OPEN_LAST"
+  | "GET_DETAIL"
+  | "DETAIL"
+  | "LIST"
+  | "FIND"
+  | "CANCEL"
+  | "SELECT"
+  | "REFRESH";
+
+export type JobAction = JobHistoryAction;

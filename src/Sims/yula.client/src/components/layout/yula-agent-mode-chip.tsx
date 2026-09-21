@@ -89,7 +89,9 @@ export function YulaAgentModeChip({ className }: YulaAgentModeChipProps) {
   // 3. Mod kararı:
   // Canlı akışta: Acting vs Reasoning
   // Boşta (Idle): ReAct (ekran içi) vs Plan (ekran dışı veya /plan aktif)
-  const isActing = isTurnActive && Boolean(activeToolInfo);
+  // synthesize_collected_information bir UI mutasyonu değil, ara akıl yürütme (scratchpad) adımıdır.
+  const isThinkingTool = activeToolInfo?.toolName === "synthesize_collected_information";
+  const isActing = isTurnActive && Boolean(activeToolInfo) && !isThinkingTool;
   const isReasoning = isTurnActive && !isActing;
   const isPlanMode = isHome || !screenTitle || isPlanCommandActive;
 

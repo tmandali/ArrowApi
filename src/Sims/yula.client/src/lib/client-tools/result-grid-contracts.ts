@@ -373,3 +373,19 @@ export const GRID_VISUALIZE_CONTRACT = {
   whenToCall: "When the user requests a chart, plot, or graph visualization.",
   whenNotToCall: "When there are no numeric metrics in the table.",
 } satisfies ActionContract;
+
+export type ResultGridAction =
+  | "RUN_SQL"
+  | "SQL"
+  | "QUERY"
+  | "FILTER"
+  | "APPLY_FILTERS"
+  | "SORT"
+  | "COLUMNS"
+  | "PIN"
+  | "RESET_LAYOUT"
+  | "EXPORT"
+  | "VISUALIZE"
+  | "CHART"
+  | "ANALYZE"
+  | "PROFILE";

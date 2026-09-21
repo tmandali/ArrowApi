@@ -121,14 +121,22 @@ useAgentComponent({
 
 ---
 
-## 3. Prompt Pruning & Single Active Form Rule
+## 3. Prompt Pruning, Single Active Form & Typesafe Component Families
 
 Inactive report forms MUST NOT be injected into the system prompt (`filterRelevantComponents`). Only:
 1. The active route/screen form (`criteria_form:<activeScope>`)
-2. Universal components (`job_history`, `app_router`)
+2. Universal components (`arrow_job`, `arrow_job_manager` / `job_history`, `app_router`, `wasm_sql_engine`)
 3. The active result grid (`result_grid:active`)
 
 are transferred. This saves ~4000 tokens per turn. Entity/master-data screens register as `entity_form:<name>`.
+
+### 🛡️ Component Families & Typesafe Dispatch
+
+All UI components and dispatch operations adhere to canonical types declared in [`dispatch-types.ts`](file:///Users/tmr/Source/ArrowApi/src/Sims/yula.client/src/lib/client-tools/dispatch-types.ts):
+- **Job Families (`JobComponentFamily`):** `"arrow_job" | "arrow_job_manager" | "job_history"` unified through runtime type-guard `isJobFamily(family)`.
+- **Component Families (`ComponentFamily`):** `"criteria_form" | "result_grid" | "app_router" | JobComponentFamily | "wasm_sql_engine" | "entity_form" | "plugin"` guarded by `isComponentFamily(family)`.
+- **Scoped Component IDs (`ComponentId`):** Structured as `${ComponentFamily}:${string}` and safely unpacked via `parseComponentId(componentId)`.
+
 
 ### 🏷️ Management & Master Data Screens Registration Standard (`entity_form:*`)
 
@@ -233,6 +241,8 @@ The underlying runtime guarantees reliability via core execution primitives:
     - *Tier 1 (Deterministic Classifier)*: 0 ms latency, 0 token rule matcher identifying recoverable syntax/schema errors (`ZodError`, JSON parse errors, DuckDB parser typos) with `action: 'SELF_HEAL'` vs. unrecoverable business constraints (closed accounting periods, record not found), permissions (401/403), and infrastructure crashes (500/504/WASM OOM) with `action: 'ASK_USER_CHOICE'`.
     - *Tier 2 (Diagnostic Sub-Agent - Nested Worker)*: Isolated fast LLM worker (`runDiagnosticSubagent`) evaluating ambiguous errors with a 2500ms timeout guard, sanitizing stack traces and generating tailored Turkish explanations with actionable `ask_user_choice` chips.
     - *Tier 3 (Bounded Retry Guard)*: Enforces `maxSelfHealAttempts: 2` per correlation ID or error signature, automatically escalating to interactive Human-In-The-Loop (`ask_user_choice`) once the retry ceiling is reached.
+23. **Non-Reasoning Scratchpad & Thinking Tool Integration (`synthesize_collected_information`)**: Following the ServiceNow AgentArch enterprise benchmark (arXiv:2509.10769), non-reasoning LLMs receive a zero-side-effect scratchpad tool for multi-step date arithmetic, fiscal quarter calculations, and inventory reconciliation before executing mutations. `prepareStepRouting` conditionally prunes this tool when native thinking tokens are enabled (`hasNativeThinking: true`) to avoid redundant token latency.
+24. **Enterprise Evaluation & Reliability Benchmarking (`AcceptableScore`, `Strict/Lenient`, `Pass^k`)**: Embeds ServiceNow AgentArch and Vertex AI trajectory evaluation metrics into `evals.ts` (`EvalRunner`): calculates $C(r) \cdot A(r) \cdot O(r)$ Acceptable Score, separates strict tool order from lenient read-only allowances, and measures $k$-trial repeatability ($Pass@1$ and $Pass\text{^}k$) to safeguard against stochastic enterprise failure modes.
 
 ---
 

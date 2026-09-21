@@ -38,6 +38,33 @@ describe("yula-step-router", () => {
     assert.deepEqual(tools, allTools);
   });
 
+  it("native thinking aktifken synthesize_collected_information aracını budar", () => {
+    const toolsWithThinking = [...allTools, "synthesize_collected_information"];
+    const tools = resolveActiveToolsForStep({
+      phase: "workspace",
+      stepNumber: 1,
+      toolNames: toolsWithThinking,
+      hasImageInMessages: false,
+      hasNativeThinking: true,
+      messages: [{ role: "user", content: "Hesapla" }],
+    });
+    assert.ok(!tools.includes("synthesize_collected_information"));
+    assert.equal(tools.length, allTools.length);
+  });
+
+  it("native thinking kapalıyken synthesize_collected_information aracını korur", () => {
+    const toolsWithThinking = [...allTools, "synthesize_collected_information"];
+    const tools = resolveActiveToolsForStep({
+      phase: "workspace",
+      stepNumber: 1,
+      toolNames: toolsWithThinking,
+      hasImageInMessages: false,
+      hasNativeThinking: false,
+      messages: [{ role: "user", content: "Hesapla" }],
+    });
+    assert.ok(tools.includes("synthesize_collected_information"));
+  });
+
   it("bütçe altındayken mesajları budamaz", () => {
     const res = prepareStepRouting({
       phase: "workspace",
