@@ -6,7 +6,7 @@
     "dev": "pnpm --filter demo-app dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "simulate": "pnpm --filter @my-agent/core exec vitest run src/agent-simulation.test.ts",
+    "simulate": "pnpm --filter @my-agent/core exec vitest run src/agent-simulation",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
