@@ -1,6 +1,6 @@
-import { UIEvent, UIAction, IEventBus, RecordTelemetryOptions } from './types';
+import { UIEvent, UIAction, IEventBus, RecordTelemetryOptions, AppTelemetryEvent } from './types';
 
-export { type RecordTelemetryOptions };
+export { type RecordTelemetryOptions, type AppTelemetryEvent };
 
 export interface DispatchResult {
   success: boolean;
@@ -119,7 +119,7 @@ export class UIEventBus implements IEventBus {
     }
   }
 
-  recordTelemetry(event: Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void {
+  recordTelemetry(event: AppTelemetryEvent | Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void {
     const now = Date.now();
     const windowMs = options?.dedupWindowMs ?? this.dedupWindowMs;
     const shouldCoalesce = options?.coalesce ?? true;

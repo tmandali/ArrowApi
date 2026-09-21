@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import {
   uiEventBus,
   ActionHandler,
@@ -10,6 +10,8 @@ import {
   EventContract,
   ActionHandlersMap,
   piEventStream,
+  ComponentEventEmitter,
+  RecordTelemetryOptions,
 } from '@my-agent/core';
 
 export interface UseAgentComponentOptions<
@@ -34,6 +36,12 @@ export interface UseAgentComponentOptions<
   onAction?: ActionHandler;
 }
 
+export interface UseAgentComponentResult<
+  TEvents extends Record<string, EventContract> = Record<string, EventContract>,
+> {
+  emit: ComponentEventEmitter<TEvents>;
+}
+
 export function useAgentComponent<
   TActions extends Record<string, ActionContract> = Record<string, ActionContract>,
   TEvents extends Record<string, EventContract> = Record<string, EventContract>,
@@ -46,7 +54,7 @@ export function useAgentComponent<
   events,
   handlers,
   onAction,
-}: UseAgentComponentOptions<TActions, TEvents>) {
+}: UseAgentComponentOptions<TActions, TEvents>): UseAgentComponentResult<TEvents> {
   const handlersRef = useRef(handlers);
   useEffect(() => {
     handlersRef.current = handlers;
@@ -118,4 +126,20 @@ export function useAgentComponent<
     ),
     JSON.stringify(events ? Object.keys(events) : []),
   ]);
+
+  const emit = useCallback<ComponentEventEmitter<TEvents>>(
+    (eventName, payload, telemetryOptions?: RecordTelemetryOptions) => {
+      uiEventBus.recordTelemetry(
+        {
+          source: id,
+          type: eventName,
+          payload,
+        },
+        telemetryOptions
+      );
+    },
+    [id]
+  );
+
+  return { emit };
 }

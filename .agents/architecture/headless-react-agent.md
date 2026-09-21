@@ -217,7 +217,9 @@ The underlying runtime guarantees reliability via core execution primitives:
 17. **Dynamic Step Routing (`prepareStepRouting`)**: Prunes unneeded tools per execution phase (`workspace` vs `results`) to conserve tokens and block hallucinations.
 18. **Provider Failover (`createFailoverLanguageModel`)**: Transparently falls back to secondary LLM endpoints on HTTP 429 quota exhaustion or 5xx server outages.
 19. **Strict Output Schemas (`outputSchema`)**: Validates tool return structures via Zod schemas and executes `postflightValidate` in `IComponentRegistry` for end-to-end type safety.
-20. **Component Event Contracts (`events`)**: Declares telemetry and state events emitted by components over `uiEventBus` for observability and reflection tools (`inspect_ui_state`).
+20. **Component Event Contracts (`events`) & Type-Safe Upstream Telemetry (`AppTelemetryEvent`)**: Declares telemetry and state events emitted by components over `uiEventBus` for observability, reflection tools (`inspect_ui_state`), and bounded ring-buffer memory. Type safety is enforced across two layers:
+    - *Global Discriminated Union (`AppTelemetryEvent`)*: Standardizes application-wide telemetry (`app_router:ROUTE_CHANGED`, `arrow_job:REPORT_COMPLETED`, `result_grid:ROW_SELECTED`, etc.) to prevent context poisoning and token inflation.
+    - *Component-Level Inferred Emitter (`ComponentEventEmitter`)*: Automatically extracts payload typings from Zod `EventContract` definitions via `z.infer`, returned as `{ emit }` from `useAgentComponent`.
 21. **Deterministic Guard Conditions (`when`)**: Complements natural-language directives (`whenToCall` / `whenNotToCall`) with deterministic preflight checks matching current screen route and execution phase.
 
 ---

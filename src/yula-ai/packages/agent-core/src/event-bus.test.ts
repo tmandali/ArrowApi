@@ -37,4 +37,26 @@ describe('uiEventBus', () => {
     uiEventBus.recordTelemetry({ source: 's', type: 'B' });
     expect(count).toBe(1);
   });
+
+  it('standart AppTelemetryEvent nesnelerini doğru formatta kaydeder', () => {
+    uiEventBus.recordTelemetry({
+      source: 'arrow_job',
+      type: 'REPORT_COMPLETED',
+      payload: { jobId: 'job-123', totalRows: 42, durationMs: 1500 },
+    });
+
+    uiEventBus.recordTelemetry({
+      source: 'result_grid',
+      type: 'ROW_SELECTED',
+      payload: { id: 99, rowData: { code: 'PRD-1' } },
+    });
+
+    const recent = uiEventBus.getRecentEvents();
+    expect(recent).toHaveLength(2);
+    expect(recent[0].source).toBe('arrow_job');
+    expect(recent[0].type).toBe('REPORT_COMPLETED');
+    expect(recent[0].payload).toEqual({ jobId: 'job-123', totalRows: 42, durationMs: 1500 });
+    expect(recent[1].source).toBe('result_grid');
+    expect(recent[1].type).toBe('ROW_SELECTED');
+  });
 });

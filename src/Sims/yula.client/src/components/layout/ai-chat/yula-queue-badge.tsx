@@ -1,36 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Zap, ListOrdered, X, Clock } from "lucide-react";
+import { Zap, ListOrdered, X } from "lucide-react";
 import { useYulaChat } from "@/hooks/use-yula-chat";
-import { deferredManager, piEventStream, type DeferredHandle } from "@my-agent/core";
 
 export function YulaQueueBadge() {
   const yula = useYulaChat();
   const steeringQueue = yula.steeringQueue ?? [];
   const followUpQueue = yula.followUpQueue ?? [];
-  const [deferredTasks, setDeferredTasks] = React.useState<DeferredHandle[]>([]);
 
-  React.useEffect(() => {
-    const sync = () => {
-      setDeferredTasks(deferredManager.getSuspendedHandles());
-    };
-    sync();
-
-    const unsub = piEventStream.subscribe((event) => {
-      if (
-        event.type === "task_suspended" ||
-        event.type === "task_resumed" ||
-        event.type === "task_timed_out" ||
-        event.type === "task_cancelled"
-      ) {
-        sync();
-      }
-    });
-    return unsub;
-  }, []);
-
-  if (steeringQueue.length === 0 && followUpQueue.length === 0 && deferredTasks.length === 0) {
+  if (steeringQueue.length === 0 && followUpQueue.length === 0) {
     return null;
   }
 
@@ -75,34 +54,6 @@ export function YulaQueueBadge() {
             onClick={() => yula.clearFollowUp()}
             className="ml-0.5 rounded-full p-0.5 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 transition-colors cursor-pointer"
             title="Takip görevini iptal et"
-          >
-            <X className="size-3" />
-            <span className="sr-only">Kaldır</span>
-          </button>
-        </div>
-      ) : null}
-
-      {deferredTasks.length > 0 ? (
-        <div
-          className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 font-medium text-amber-600 dark:text-amber-400 shadow-2xs"
-          title={deferredTasks.map((t) => `${t.name} (${t.handleId})`).join("\n")}
-        >
-          <Clock className="size-3 text-amber-500 animate-pulse" />
-          <span>
-            {deferredTasks.length === 1
-              ? `⏱️ Rapor hazırlanıyor (${deferredTasks[0].name.slice(0, 8)}…)`
-              : `⏱️ ${deferredTasks.length} arka plan görevi`}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              deferredTasks.forEach((t) =>
-                deferredManager.cancel(t.handleId, "Kullanıcı arayüzden iptal etti")
-              );
-              setDeferredTasks(deferredManager.getSuspendedHandles());
-            }}
-            className="ml-0.5 rounded-full p-0.5 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-colors cursor-pointer"
-            title="Arka plan beklemesini iptal et"
           >
             <X className="size-3" />
             <span className="sr-only">Kaldır</span>

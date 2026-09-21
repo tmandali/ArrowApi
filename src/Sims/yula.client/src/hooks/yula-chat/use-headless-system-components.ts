@@ -65,6 +65,14 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
         useYulaDockStore.getState().setExpanded(false);
         useYulaDockStore.getState().setOpen(true);
         router.push(targetPath);
+        uiEventBus.recordTelemetry({
+          source: "app_router",
+          type: "ROUTE_CHANGED",
+          payload: {
+            path: targetPath,
+            title: matched?.title,
+          },
+        });
         return { success: true, navigatedTo: targetPath };
       }
       return { success: false, error: "Unknown router action" };

@@ -71,6 +71,73 @@ export interface EventContract<TSchema extends ZodTypeAny = ZodTypeAny> {
   schema: TSchema;
 }
 
+/**
+ * Canonical Application Telemetry Events Discriminated Union
+ */
+export type AppTelemetryEvent =
+  | {
+      source: 'app_router';
+      type: 'ROUTE_CHANGED';
+      payload: { path: string; from?: string; title?: string };
+    }
+  | {
+      source: 'arrow_job';
+      type: 'REPORT_STARTED';
+      payload: { jobId: string; scope?: string; title?: string };
+    }
+  | {
+      source: 'arrow_job';
+      type: 'REPORT_COMPLETED';
+      payload: { jobId: string; totalRows?: number; durationMs?: number };
+    }
+  | {
+      source: 'arrow_job';
+      type: 'REPORT_FAILED';
+      payload: { jobId: string; error: string };
+    }
+  | {
+      source: 'arrow_job';
+      type: 'REPORT_CANCELLED';
+      payload: { jobId: string; reason?: string };
+    }
+  | {
+      source: 'result_grid';
+      type: 'ROW_SELECTED';
+      payload: { id: string | number; rowData?: Record<string, unknown> };
+    }
+  | {
+      source: 'result_grid';
+      type: 'FILTER_APPLIED';
+      payload: { field: string; value: unknown; op?: string };
+    }
+  | {
+      source: 'result_grid';
+      type: 'VIEW_TRANSFORMED';
+      payload: { query?: string; rowCount?: number };
+    }
+  | {
+      source: 'criteria_form';
+      type: 'FIELD_CHANGED';
+      payload: { field: string; value: unknown };
+    }
+  | {
+      source: 'criteria_form';
+      type: 'CRITERIA_SUBMITTED';
+      payload: { report: string; criteria?: Record<string, unknown> };
+    };
+
+export type InferEventPayload<T> = T extends { schema: infer TSchema }
+  ? (TSchema extends ZodTypeAny ? z.infer<TSchema> : any)
+  : any;
+
+export type ComponentEventEmitter<TEvents extends Record<string, EventContract>> = <
+  K extends keyof TEvents & string
+>(
+  eventName: K,
+  payload: InferEventPayload<TEvents[K]>,
+  options?: RecordTelemetryOptions
+) => void;
+
 export interface ComponentSchema {
   id: string;
   capabilities?: string[];
@@ -92,7 +159,7 @@ export interface RecordTelemetryOptions {
 export interface IEventBus {
   subscribe(componentId: string, handler: (action: string, payload: any) => any): () => void;
   dispatch(actionPayload: UIAction): { success: boolean; result?: any; error?: string };
-  recordTelemetry(event: Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
+  recordTelemetry(event: AppTelemetryEvent | Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
   getRecentEvents(): UIEvent[];
   clear(): void;
 }

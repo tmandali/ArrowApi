@@ -438,6 +438,19 @@ This document is the **append-only audit log** recording fundamental architectur
   - Added Section 3 ("Package Manager & Script Runner Standard") to `.agents/standards/dev-operations.md`.
 - **Author:** Antigravity / Team
 
+## [2026-09-21] Type-Safe UI Telemetry & Upstream Event Stream Architecture
+- **Rationale:**
+  1. *Asymmetry between Downstream & Upstream:* While downstream actions (Agent $\rightarrow$ UI via `dispatch_component_action`) enjoyed strict Zod preflight contracts, upstream interactions (UI $\rightarrow$ Agent) relied on loose strings (`source: string`, `type: string`, `payload?: any`), leading to risk of typos, payload schema discrepancies, and token inflation.
+  2. *Single-Lifecycle Ambient Sensing:* Rapor job states and manual UI operations (filter changes, route changes, row selections) needed to stream cleanly into the LLM's ring-buffer memory without cancelable blocking queues or page-churn memory leaks.
+- **Decision:**
+  - **Core Typings (`@my-agent/core`):** Introduced `AppTelemetryEvent` discriminated union (`app_router`, `arrow_job`, `result_grid`, `criteria_form`), `InferEventPayload<T>`, and `ComponentEventEmitter<TEvents>`. Upgraded `IEventBus.recordTelemetry` to support strongly typed contracts with backward compatibility.
+  - **Component Inferred Emitter (`@my-agent/react`):** Enhanced `useAgentComponent` to return `{ emit }` typed against declared `events` Zod schemas.
+  - **Application Telemetry Stream (`yula.client`):**
+    - `arrow-job-hub-stream.ts`: Emits `arrow_job:REPORT_COMPLETED`, `REPORT_CANCELLED`, and `REPORT_FAILED` on terminal states.
+    - `use-headless-system-components.ts`: Emits `app_router:ROUTE_CHANGED` on client navigations.
+    - `use-result-grid-agent.ts`: Declares `row_selected`, `filter_change`, and emits filter events automatically when filters mutate.
+- **Author:** Antigravity / Team
+
 ---
 
 ## 📜 Prior Decisions Archive

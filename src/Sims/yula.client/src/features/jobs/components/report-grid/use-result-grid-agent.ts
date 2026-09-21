@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { z } from "zod";
 import { useAgentComponent } from "@my-agent/react";
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
@@ -40,7 +41,7 @@ export function useResultGridAgent({
   customQuerySql,
   isTableReady,
 }: UseResultGridAgentOptions) {
-  useAgentComponent({
+  const { emit } = useAgentComponent({
     id: "result_grid:active",
     meta: {
       description: `Active Result Grid (${duckTableName}) - ${totalFiltered ?? "?"} rows`,
@@ -55,6 +56,13 @@ export function useResultGridAgent({
       filter_change: {
         description: "Triggered when user or agent filters the grid columns",
         schema: z.object({ filters: z.record(z.string(), z.any()) }),
+      },
+      row_selected: {
+        description: "Triggered when user selects a row in the result grid",
+        schema: z.object({
+          id: z.union([z.string(), z.number()]),
+          rowData: z.record(z.string(), z.unknown()).optional(),
+        }),
       },
       view_transformed: {
         description: "Triggered when SQL, sorting, or projection transforms active view",
@@ -79,4 +87,16 @@ export function useResultGridAgent({
       return executeDispatchComponentAction({ component_id: "result_grid:active", action, payload });
     },
   });
+
+  const prevFiltersRef = React.useRef(filters);
+  React.useEffect(() => {
+    if (filters && filters !== prevFiltersRef.current) {
+      prevFiltersRef.current = filters;
+      if (typeof filters === "object" && Object.keys(filters).length > 0) {
+        emit("filter_change", { filters: filters as Record<string, any> });
+      }
+    }
+  }, [filters, emit]);
+
+  return { emit };
 }

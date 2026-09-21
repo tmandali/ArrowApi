@@ -2,7 +2,7 @@ import type { ArrowJobEvent } from "../types"
 import { appendOrUpdateRunEvent } from "../run-events"
 import { readJobSseEvents } from "../arrow-job-client"
 import { isTerminalJobStatus } from "@/store/slices/active-jobs-store"
-import { deferredManager } from "@my-agent/core"
+import { uiEventBus } from "@my-agent/core"
 import { type JobHubSession, type JobPhase, normId } from "./arrow-job-hub-types"
 
 export async function executeJobSseStream(
@@ -49,12 +49,40 @@ export async function executeJobSseStream(
       isStreaming: phase === "running",
     }
 
-    // ⏱️ Pi Deferred: Terminal durumda (Completed, Failed, Cancelled) askıya alınmış ajanı uyandır
+    // 📡 UI Telemetry: Terminal durumda (Completed, Failed, Cancelled)
     if (phase === "done" || phase === "cancelled" || payload.status === "Failed" || eventName === "failed") {
+      const jId = normId(session.snapshot.jobId || key);
       try {
-        deferredManager.resume(normId(session.snapshot.jobId || key), session.snapshot)
+        if (phase === "done") {
+          uiEventBus.recordTelemetry({
+            source: "arrow_job",
+            type: "REPORT_COMPLETED",
+            payload: {
+              jobId: jId,
+              totalRows: session.snapshot.totalRows ?? 0,
+            },
+          });
+        } else if (phase === "cancelled") {
+          uiEventBus.recordTelemetry({
+            source: "arrow_job",
+            type: "REPORT_CANCELLED",
+            payload: {
+              jobId: jId,
+              reason: session.snapshot.error || "Kullanıcı tarafından iptal edildi",
+            },
+          });
+        } else {
+          uiEventBus.recordTelemetry({
+            source: "arrow_job",
+            type: "REPORT_FAILED",
+            payload: {
+              jobId: jId,
+              error: session.snapshot.error || "Rapor oluşturulamadı",
+            },
+          });
+        }
       } catch {
-        // Deferred resume best-effort
+        // Telemetry best-effort
       }
     }
 
