@@ -1,88 +1,40 @@
 import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation";import { useJobSync } from "@/context/job-sync-context"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useJobSync } from "@/context/job-sync-context"
 import {
   fetchJobRequest,
   fetchJobStatus,
 } from "@/features/jobs/arrow-job-client"
 import { arrowJobEventHub } from "@/features/jobs/services/arrow-job-event-hub"
 import type { RunEventItem } from "@/features/jobs/run-events"
-import { ApiError } from "@/services"
 import {
-  isTerminalJobStatus,
   useActiveJobsStore,
-  type TrackedJob,
 } from "@/store/slices/active-jobs-store"
 import type {
   ArrowJobStatus,
 } from "@/features/jobs/types"
-import type { WorkspaceKey } from "@/lib/workspace"
 import {
-  subscribeExecutionFocus,
-  takePendingExecutionFocus,
-} from "@/lib/report-run-bus"
+  type ArrowJobRunnerOptions,
+  type PendingJobItem,
+  type JobLiveSnapshot,
+  isInFlightStatus,
+  prettyJson,
+  formatErrorMessage,
+  sameJobId,
+  normId,
+} from "./arrow-job-runner-types"
+import { useEntryJobResume } from "./use-entry-job-resume"
+import { useJobFocusBus } from "./use-job-focus-bus"
 
-export type ArrowJobRunnerOptions = {
-  jobName: string
-  title: string
-  basePath: string
-  jobsEndpoint: string
-  workspace?: WorkspaceKey
-  selectPendingJob?: (jobs: Record<string, TrackedJob>) => TrackedJob | null
-}
-
-export type PendingJobItem = {
-  id: string
-  status: string
-  createdAt: string
-  name?: string
-  totalRows?: number | null
-  batchCount?: number | null
-}
-
-export type JobLiveSnapshot = {
-  status?: string
-  requestJson?: string
-  events: RunEventItem[]
-  phase: "idle" | "running" | "done" | "cancelled"
-}
-
-function isInFlightStatus(status: string | undefined): boolean {
-  if (!status) return false
-  const s = status.trim().toLowerCase()
-  return s === "running" || s === "queued"
-}
-
-function prettyJson(value: unknown): string {
-  try {
-    return JSON.stringify(value ?? {}, null, 2)
-  } catch {
-    return "{\n  \n}"
-  }
-}
-
-export function formatErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    if (
-      typeof error.body === "object" &&
-      error.body &&
-      "error" in error.body
-    ) {
-      const bodyError = (error.body as { error?: unknown }).error
-      if (typeof bodyError === "string" && bodyError.trim()) return bodyError
-    }
-    return error.message || fallback
-  }
-  if (error instanceof Error && error.message) return error.message
-  return fallback
-}
-
-export function sameJobId(a: string | null | undefined, b: string | null | undefined) {
-  if (!a || !b) return false
-  return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0
-}
-
-function normId(id: string | null | undefined): string {
-  return id ? id.trim().toLowerCase() : ""
+export {
+  type ArrowJobRunnerOptions,
+  type PendingJobItem,
+  type JobLiveSnapshot,
+  isInFlightStatus,
+  prettyJson,
+  formatErrorMessage,
+  sameJobId,
+  normId,
 }
 
 export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
@@ -95,18 +47,18 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     selectPendingJob,
   } = options
 
-  const router = useRouter();
+  const router = useRouter()
   const searchParams = useSearchParams()
   // Reaktif query: aynı sayfada router.push ile ?jobId= değişirse remount
   // olmadan focus güncellenir (önceki davranış yalnız mount'ta okurdu).
   const queryJobIdParam = searchParams.get("jobId") || searchParams.get("job")
   const navigate = React.useCallback(
     (to: string | number) => {
-      if (typeof to === "number") router.back();
-      else void router.push(to);
+      if (typeof to === "number") router.back()
+      else void router.push(to)
     },
     [router]
-  );
+  )
   const location = { pathname: typeof window !== "undefined" ? window.location.pathname : "/", state: null as unknown }
   const { trackJob } = useJobSync()
 
@@ -132,7 +84,6 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
 
   const focusJobIdRef = React.useRef<string | null>(null)
   const controllersRef = React.useRef(new Map<string, AbortController>())
-  const entryResumeGenRef = React.useRef(0)
   const allowEntryResumeRef = React.useRef(true)
 
   const jobHref = React.useCallback(
@@ -315,6 +266,7 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     },
     [followJob, setComposing]
   )
+
   const handleSelectJob = React.useCallback(
     (jobOrId: ArrowJobStatus | string | null) => {
       if (!jobOrId) {
@@ -405,65 +357,12 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     [handleSelectJob, handleSubmitted, setComposing],
   )
 
-  const applyExecutionFocusRef = React.useRef(applyExecutionFocus)
-  React.useEffect(() => {
-    applyExecutionFocusRef.current = applyExecutionFocus
+  useJobFocusBus({
+    jobName,
+    queryJobIdParam,
+    focusJobIdRef,
+    applyExecutionFocus,
   })
-
-  const focusJobIdFromQuery = React.useCallback((queryJobId: string) => {
-    const tracked = useActiveJobsStore.getState().jobs[queryJobId]
-    if (tracked?.status) {
-      applyExecutionFocusRef.current(
-        {
-          id: queryJobId,
-          status: tracked.status,
-          eventsUrl: tracked.eventsUrl ?? "",
-          jobUrl: tracked.jobUrl ?? "",
-          createdAt: tracked.createdAt,
-          name: tracked.name,
-        },
-        tracked.payload,
-      )
-    } else {
-      // Sayfa ilk defa URL query param ile açıldığında işin durumu henüz bilinmiyor.
-      // "Completed" varsaymak yerine önce boş geçilir; fetchJobStatus ile gerçek durum öğrenilir.
-      applyExecutionFocusRef.current({
-        id: queryJobId,
-        status: "",
-        jobUrl: "",
-        eventsUrl: "",
-      })
-      void fetchJobStatus(queryJobId).then((st) => {
-        if (st) {
-          applyExecutionFocusRef.current({
-            id: queryJobId,
-            status: st.status,
-            jobUrl: st.jobUrl,
-            eventsUrl: st.eventsUrl,
-            createdAt: st.createdAt,
-            name: st.name,
-            totalRows: st.totalRows ?? undefined,
-            batchCount: st.batchCount ?? undefined,
-          })
-        }
-      })
-    }
-  }, [])
-
-  React.useEffect(() => {
-    const pending = takePendingExecutionFocus(jobName)
-    if (pending) {
-      applyExecutionFocusRef.current(pending.job, pending.request)
-    } else if (queryJobIdParam) {
-      // Aynı job zaten odaktaysa tekrar dokunma (gereksiz fetch/odak sıfırlama yok).
-      if (!sameJobId(focusJobIdRef.current, queryJobIdParam)) {
-        focusJobIdFromQuery(queryJobIdParam)
-      }
-    }
-    return subscribeExecutionFocus(jobName, (focus) => {
-      applyExecutionFocusRef.current(focus.job, focus.request)
-    })
-  }, [jobName, queryJobIdParam, focusJobIdFromQuery])
 
   const handleJobCancelled = React.useCallback(
     (jobId: string) => {
@@ -515,55 +414,13 @@ export function useArrowJobRunner(options: ArrowJobRunnerOptions) {
     connectFocus()
   }, [locationState?.focusJobId, handleSelectJob])
 
-  // Sayfaya ilk girişte varsa in-flight job'ı otomatik bağla
-  const pendingTrackedJob = useActiveJobsStore((s) =>
-    selectPendingJob ? selectPendingJob(s.jobs) : null
-  )
-  const trackedId = pendingTrackedJob?.id
-
-  React.useEffect(() => {
-    if (!trackedId) return
-    if (!allowEntryResumeRef.current) return
-    if (controllersRef.current.has(normId(trackedId))) return
-
-    const abort = new AbortController()
-    const gen = ++entryResumeGenRef.current
-
-    const resumeEntryInFlight = async () => {
-      try {
-        const status = await fetchJobStatus(trackedId, abort.signal)
-        if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
-
-        if (!status || isTerminalJobStatus(status.status)) {
-          // Sunucuda job zaten tamamlanmış, başarısız veya silinmiş.
-          // Store'u güncelle/temizle ve kriter formunda kal (canlı ilerleme ekranına geçme).
-          if (status?.status) {
-            useActiveJobsStore.getState().updateJob(trackedId, { status: status.status })
-          } else {
-            useActiveJobsStore.getState().removeJob(trackedId)
-          }
-          return
-        }
-
-        if (!isInFlightStatus(status.status)) return
-
-        setComposing(false)
-
-        const req = (await fetchJobRequest(status.id, abort.signal)) ?? {}
-        if (abort.signal.aborted || gen !== entryResumeGenRef.current) return
-
-        void followJob(status, req)
-      } catch {
-        // yoksay
-      }
-    }
-
-    void resumeEntryInFlight()
-
-    return () => {
-      abort.abort()
-    }
-  }, [trackedId, followJob, setComposing])
+  useEntryJobResume({
+    selectPendingJob,
+    allowEntryResumeRef,
+    controllersRef,
+    followJob,
+    setComposing,
+  })
 
   return {
     composing,
