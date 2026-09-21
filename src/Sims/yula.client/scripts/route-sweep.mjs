@@ -1,6 +1,6 @@
 // Tüm route'ları ziyaret edip 404/5xx + tekrar eden konsol uyarılarını toplar.
 // Kullanım: PORT=56402 node scripts/route-sweep.mjs   (veya PORT=56403)
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
 
 const BASE = `http://localhost:${process.env.PORT || 56402}`;
 const ROUTES = [

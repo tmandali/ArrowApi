@@ -1,7 +1,7 @@
 // Geçici teşhis scripti: headless Chromium ile konsol preload uyarıları,
 // 404/5xx yanıtları ve failed request'leri toplar. Kullanım:
 //   node scripts/preload-watch.mjs
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
 
 const BASE = `http://localhost:${process.env.PORT || 56402}`;
 const PAGES = ["/", "/sign-in", "/login", "/dashboard", "/stock"];
