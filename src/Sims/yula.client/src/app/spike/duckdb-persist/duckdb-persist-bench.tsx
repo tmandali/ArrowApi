@@ -5,121 +5,34 @@ import * as duckdb from "@duckdb/duckdb-wasm"
 import {
   RecordBatchReader,
   Table,
-  tableFromArrays,
   tableToIPC,
   type RecordBatch,
 } from "apache-arrow"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { getCompanyHeaders } from "@/lib/company-headers"
 import { formatCount } from "@/utils/format"
-
-const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: {
-    mainModule: "/duckdb/duckdb-mvp.wasm",
-    mainWorker: "/duckdb/duckdb-browser-mvp.worker.js",
-  },
-  eh: {
-    mainModule: "/duckdb/duckdb-eh.wasm",
-    mainWorker: "/duckdb/duckdb-browser-eh.worker.js",
-  },
-}
-
-const DB_FILE = "bench_reports.duckdb"
-const TABLE = "bench_table"
-const CHUNK_ROWS = 50_000
-
-type Mode = "memory" | "opfs-auto" | "opfs-manual"
-type SourceKind = "synthetic" | "url"
-
-type Probe = {
-  batch: number
-  rows: number
-  elapsedMs: number
-  duckdbBytes: number | null
-  tempBytes: number | null
-  heapBytes: number | null
-  checkpointMs: number | null
-}
-
-type LogLine = { kind: "info" | "warn" | "error"; msg: string }
-
-type BenchState = {
-  running: boolean
-  batches: number
-  rows: number
-  elapsedMs: number
-  duckdbBytes: number | null
-  tempBytes: number | null
-  peakHeap: number | null
-  status: "idle" | "running" | "done" | "partial" | "error"
-  statusMsg: string
-}
-
-const INITIAL_STATE: BenchState = {
-  running: false,
-  batches: 0,
-  rows: 0,
-  elapsedMs: 0,
-  duckdbBytes: null,
-  tempBytes: null,
-  peakHeap: null,
-  status: "idle",
-  statusMsg: "",
-}
-
-function isOomMessage(msg: string): boolean {
-  return (
-    msg.includes("Out of Memory") ||
-    msg.includes("could not allocate block") ||
-    msg.includes("Allocation failure")
-  )
-}
-
-function syntheticTable(rows: number, seed: number, strWidth: number): Table {
-  const ids = new Int32Array(rows)
-  const vals = new Float64Array(rows)
-  const names: string[] = new Array(rows)
-  const cats: string[] = new Array(rows)
-  const pad = "x".repeat(Math.max(0, strWidth - 14))
-  for (let i = 0; i < rows; i++) {
-    ids[i] = (seed * 1_000_003 + i) | 0
-    vals[i] = Math.sin(i + seed) * 1000
-    names[i] = `name_${seed}_${i}_${pad}`
-    cats[i] = `cat_${(i + seed) % 7}`
-  }
-  return tableFromArrays({ id: ids, val: vals, name: names, cat: cats })
-}
-
-async function opfsFileEntries(): Promise<{ name: string; size: number }[]> {
-  if (typeof navigator === "undefined" || !navigator.storage?.getDirectory) return []
-  const root = await navigator.storage.getDirectory()
-  const out: { name: string; size: number }[] = []
-  for await (const [name, handle] of root.entries()) {
-    if (handle.kind === "file") {
-      const file = await handle.getFile()
-      out.push({ name, size: file.size })
-    } else {
-      for await (const [childName, child] of handle.entries()) {
-        if (child.kind === "file") {
-          const file = await child.getFile()
-          out.push({ name: `${name}/${childName}`, size: file.size })
-        }
-      }
-    }
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name))
-}
-
-async function opfsDbFileSize(): Promise<number | null> {
-  try {
-    const root = await navigator.storage.getDirectory()
-    const fh = await root.getFileHandle(DB_FILE, { create: false })
-    return (await fh.getFile()).size
-  } catch {
-    return null
-  }
-}
+import {
+  MANUAL_BUNDLES,
+  DB_FILE,
+  TABLE,
+  CHUNK_ROWS,
+  type Mode,
+  type SourceKind,
+  type Probe,
+  type LogLine,
+  type BenchState,
+  INITIAL_STATE,
+  isOomMessage,
+  syntheticTable,
+  opfsFileEntries,
+  opfsDbFileSize,
+} from "./duckdb-persist-types"
+import {
+  BenchFormControls,
+  BenchActionButtons,
+  BenchStatsCards,
+  BenchOpfsFileList,
+  BenchLogsAndProbes,
+} from "./duckdb-persist-views"
 
 export function DuckDbPersistBench() {
   const [mode, setMode] = React.useState<Mode>("opfs-manual")
@@ -189,9 +102,6 @@ export function DuckDbPersistBench() {
 
       const path = `opfs://${DB_FILE}`
       if (selected === "opfs-manual") {
-        // Boş dosya guard'ını aş: FileSystemFileHandle'ı biz register ederiz;
-        // handle iç worker'da createSyncAccessHandle'e dönüştürülür (main thread
-        // sync access handle oluşturamaz).
         const root = await navigator.storage.getDirectory()
         const fh = await root.getFileHandle(DB_FILE, { create: true })
         await db.registerFileHandle(
@@ -469,7 +379,6 @@ export function DuckDbPersistBench() {
 
   const resetOpfs = React.useCallback(async () => {
     await teardown()
-    // bench db'si + eski üretim denemesinin bıraktığı 0-byte kalıntılar
     const legacy = [
       DB_FILE,
       "sims_reports.duckdb",
@@ -526,219 +435,35 @@ export function DuckDbPersistBench() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded-md border p-3 md:grid-cols-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Mod</span>
-          <select
-            className="h-8 rounded-md border bg-background px-2"
-            value={mode}
-            onChange={(e) => setMode(e.target.value as Mode)}
-          >
-            <option value="memory">memory (in-memory db)</option>
-            <option value="opfs-auto">opfs-auto (dispatcher path)</option>
-            <option value="opfs-manual">opfs-manual (handle pre-register)</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Kaynak</span>
-          <select
-            className="h-8 rounded-md border bg-background px-2"
-            value={source}
-            onChange={(e) => setSource(e.target.value as SourceKind)}
-          >
-            <option value="synthetic">Sentetik üretim</option>
-            <option value="url">Gerçek job URL (Arrow stream)</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">memory_limit</span>
-          <Input
-            className="h-8"
-            value={memoryLimit}
-            onChange={(e) => setMemoryLimit(e.target.value)}
-          />
-        </label>
-        {source === "synthetic" ? (
-          <>
-            <label className="flex flex-col gap-1">
-              <span className="text-muted-foreground">Satır</span>
-              <Input
-                className="h-8"
-                type="number"
-                value={rows}
-                onChange={(e) => setRows(Number(e.target.value) || 0)}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-muted-foreground">String genişliği (byte)</span>
-              <Input
-                className="h-8"
-                type="number"
-                value={strWidth}
-                onChange={(e) => setStrWidth(Number(e.target.value) || 0)}
-              />
-            </label>
-          </>
-        ) : (
-          <label className="col-span-2 flex flex-col gap-1">
-            <span className="text-muted-foreground">Arrow stream URL</span>
-            <Input
-              className="h-8"
-              value={url}
-              placeholder="/api/arrow/jobs/&lt;name&gt;/&lt;jobId&gt;/result"
-              onChange={(e) => setUrl(e.target.value)}
-            />
-          </label>
-        )}
-        <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">CHECKPOINT (batch aralığı, 0=kapalı)</span>
-          <Input
-            className="h-8"
-            type="number"
-            value={checkpointEvery}
-            onChange={(e) => setCheckpointEvery(Number(e.target.value) || 0)}
-          />
-        </label>
-      </div>
+      <BenchFormControls
+        mode={mode}
+        setMode={setMode}
+        source={source}
+        setSource={setSource}
+        memoryLimit={memoryLimit}
+        setMemoryLimit={setMemoryLimit}
+        rows={rows}
+        setRows={setRows}
+        strWidth={strWidth}
+        setStrWidth={setStrWidth}
+        url={url}
+        setUrl={setUrl}
+        checkpointEvery={checkpointEvery}
+        setCheckpointEvery={setCheckpointEvery}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={state.running || (source === "url" && !url.trim())}
-          onClick={() => void runBench()}
-        >
-          {state.running ? "Çalışıyor…" : "Benchmark çalıştır"}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={state.running}
-          onClick={() => void runPersistCheck()}
-        >
-          Kalıcılık kontrolü (opfs-auto)
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={state.running}
-          onClick={() => void cleanCacheExt(".arrow")}
-        >
-          Arrow cache temizle
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={state.running}
-          onClick={() => void cleanCacheExt(".parquet")}
-        >
-          Parquet cache temizle
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={state.running}
-          onClick={() => void resetOpfs()}
-        >
-          OPFS bench db + kalıntıları sil
-        </Button>
-      </div>
+      <BenchActionButtons
+        running={state.running}
+        canRun={!(source === "url" && !url.trim())}
+        onRunBench={() => void runBench()}
+        onRunPersistCheck={() => void runPersistCheck()}
+        onCleanCacheExt={(ext) => void cleanCacheExt(ext)}
+        onResetOpfs={() => void resetOpfs()}
+      />
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Durum</div>
-          <div className="font-semibold">{state.status}</div>
-          <div className="truncate text-[11px] text-muted-foreground" title={state.statusMsg}>
-            {state.statusMsg || "—"}
-          </div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Satır / batch</div>
-          <div className="font-semibold tabular-nums">
-            {formatCount(state.rows)} / {state.batches}
-          </div>
-          <div className="text-[11px] text-muted-foreground tabular-nums">
-            {(state.elapsedMs / 1000).toFixed(1)} s
-          </div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">duckdb_memory</div>
-          <div className="font-semibold tabular-nums">
-            {state.duckdbBytes != null ? `${(state.duckdbBytes / 1048576).toFixed(0)} MB` : "—"}
-          </div>
-          <div className="text-[11px] text-muted-foreground tabular-nums">
-            temp: {state.tempBytes != null ? `${(state.tempBytes / 1048576).toFixed(0)} MB` : "—"}
-          </div>
-        </div>
-        <div className="rounded-md border p-2">
-          <div className="text-muted-foreground">Heap peak / OPFS delta</div>
-          <div className="font-semibold tabular-nums">
-            {state.peakHeap != null ? `${(state.peakHeap / 1048576).toFixed(0)} MB` : "—"}
-          </div>
-          <div className="text-[11px] text-muted-foreground tabular-nums">
-            {storageDelta != null ? `${(storageDelta / 1048576).toFixed(0)} MB disk` : "disk ölçümü yok"}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-md border p-2">
-        <div className="mb-1 text-muted-foreground">OPFS dosyaları</div>
-        {opfsFiles.length === 0 ? (
-          <div className="text-[11px] text-muted-foreground">—</div>
-        ) : (
-          <div className="flex flex-col gap-0.5 tabular-nums">
-            {opfsFiles.map((f) => (
-              <div key={f.name} className="flex justify-between gap-2">
-                <span className="truncate">{f.name}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  {(f.size / 1048576).toFixed(1)} MB
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {persistCheck ? (
-        <div className="rounded-md border p-2 font-medium">{persistCheck}</div>
-      ) : null}
-
-      <div className="rounded-md border p-2">
-        <div className="mb-1 text-muted-foreground">Log</div>
-        <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-4">
-          {logs.length === 0
-            ? "—"
-            : logs
-                .map((l) => `[${l.kind}] ${l.msg}`)
-                .join("\n")}
-        </pre>
-      </div>
-
-      <div className="rounded-md border p-2">
-        <div className="mb-1 text-muted-foreground">
-          duckdb_memory / heap örnekleri (batch bazlı)
-        </div>
-        <pre className="max-h-64 overflow-auto text-[11px] leading-4 tabular-nums">
-          {probes.length === 0
-            ? "—"
-            : probes
-                .map(
-                  (p) =>
-                    `b=${String(p.batch).padStart(4)} rows=${String(p.rows).padStart(9)} mem=${
-                      p.duckdbBytes != null ? (p.duckdbBytes / 1048576).toFixed(0) + "MB" : "  -"
-                    } tmp=${
-                      p.tempBytes != null ? (p.tempBytes / 1048576).toFixed(0) + "MB" : "  -"
-                    } heap=${
-                      p.heapBytes != null ? (p.heapBytes / 1048576).toFixed(0) + "MB" : "  -"
-                    } cp=${p.checkpointMs != null ? p.checkpointMs + "ms" : "-"}`
-                )
-                .join("\n")}
-        </pre>
-      </div>
+      <BenchStatsCards state={state} storageDelta={storageDelta} />
+      <BenchOpfsFileList opfsFiles={opfsFiles} />
+      <BenchLogsAndProbes persistCheck={persistCheck} logs={logs} probes={probes} />
     </div>
   )
 }
