@@ -20,6 +20,7 @@ import {
 
 // Session type extension (refreshToken bilinçli olarak dışarı verilmez)
 export interface Session extends NextAuthSession {
+  error?: "RefreshTokenError" | string;
   user: {
     id: string;
     name?: string | null;
@@ -141,6 +142,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (token.accessToken && token.expiresAt && Date.now() >= (token.expiresAt as number)) {
           delete token.accessToken;
         }
+        if (token.provider !== "sms" && !token.accessToken) {
+          token.error = "RefreshTokenError";
+        }
         return token;
       }
 
@@ -189,6 +193,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             delete token.accessToken;
             delete token.refreshToken;
             delete token.expiresAt;
+            token.error = "RefreshTokenError";
             return token;
           }
           console.error(
@@ -201,12 +206,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.expiresAt = (data.expires_in ?? 3600) * 1000 + Date.now();
         if (data.refresh_token) token.refreshToken = data.refresh_token;
         if (provider === "keycloak") token.roles = realmRolesFromAccessToken(data.access_token);
+        delete token.error;
       } catch (error) {
         console.error(`[auth] refresh isteği istisna (${provider}):`, error);
       }
       return token;
     },
     async session({ session, token }) {
+      if (token.error) {
+        (session as Session).error = token.error as string;
+      }
       if (session.user) {
         session.user.id = token.sub ?? "unknown";
         const user = session.user as typeof session.user & {

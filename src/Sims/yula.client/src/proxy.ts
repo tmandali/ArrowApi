@@ -6,17 +6,23 @@
  * otomatik olarak korur; oturumu olmayan istekleri /sign-in?next=<pathname>
  * adresine yönlendirir.
  */
-import { auth } from "@/lib/auth";
+import { auth, type Session } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  const session = await auth();
-  const isAuth = !!session?.user;
+  const session = (await auth()) as Session | null;
+  const isExpired =
+    session?.error === "RefreshTokenError" ||
+    (!!session?.user && session.user.provider !== "sms" && !session.user.accessToken);
+  const isAuth = !!session?.user && !isExpired;
 
   if (!isAuth) {
     const signInUrl = new URL("/sign-in", request.url);
     signInUrl.searchParams.set("next", request.nextUrl.pathname);
+    if (isExpired) {
+      signInUrl.searchParams.set("reason", "session_expired");
+    }
     return NextResponse.redirect(signInUrl);
   }
 

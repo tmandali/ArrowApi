@@ -20,9 +20,23 @@ const POLL_INTERVAL_MS = 60_000;
  * Tek kullanıcı / provider'sız modda guard ateşlemez (route `active:true`).
  */
 export function AccountStatusGuard() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
+    const user = session?.user as
+      | (typeof session.user & { accessToken?: string; provider?: string })
+      | undefined;
+    const isExpired =
+      (session as { error?: string } | null)?.error === "RefreshTokenError" ||
+      (status === "authenticated" && !!user && user.provider !== "sms" && !user.accessToken);
+
+    if (isExpired) {
+      void signOut({
+        callbackUrl: "/sign-in?reason=session_expired",
+      }).catch(() => undefined);
+      return;
+    }
+
     if (status !== "authenticated") return;
 
     let disposed = false;
@@ -74,7 +88,7 @@ export function AccountStatusGuard() {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [status]);
+  }, [status, session]);
 
   return null;
 }

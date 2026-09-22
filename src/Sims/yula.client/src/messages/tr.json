@@ -59,7 +59,6 @@
     "title": "Profil & Ayarlar",
     "tab_user_details": "Kullanıcı Detayları",
     "tab_settings": "Ayarlar",
-    "tab_yula_ai": "Yula AI & LLM",
     "tab_connections": "Bağlantılar",
     "prompt_save_settings": "Kullanıcı tercihlerini kaydet",
     "prompt_change_store": "Varsayılan şubeyi değiştir",
@@ -832,6 +831,10 @@
     "continue_main": "Ana ekranda devam et",
     "expand_overlay": "Tam ekrana genişlet",
     "collapse_overlay": "Dock'a geri dön",
+    "collapse_disabled_home": "Ana ekranda küçültülemez",
+    "edit_title": "Başlığı düzenle",
+    "return_to_screen": "Ekrana Dön",
+    "return_to_screen_tooltip": "Ekrana dön ve dock moduna geç",
     "focus_screen": "Ekrana Odaklan",
     "focus_screen_tooltip": "{screen} ekranına odaklan ve AI panelini küçült",
     "mode_plan": "Plan",
@@ -865,7 +868,15 @@
     "context_auto_on": "Otomatik",
     "context_auto_off": "Kapalı",
     "context_tooltip": "Bağlam: {used} / {total} token",
-    "context_dump_session": "Oturumu İndir (JSON Dump)"
+    "context_dump_session": "Oturumu İndir (JSON Dump)",
+    "context_model_label": "Aktif Model",
+    "context_thinking_label": "Düşünme (Thinking)",
+    "context_effort_label": "Düşünme Eforu",
+    "context_effort_off": "Kapalı",
+    "context_effort_low": "Düşük",
+    "context_effort_medium": "Orta",
+    "context_effort_high": "Yüksek",
+    "context_effort_unsupported": "Bu model efor seviyesini desteklemiyor"
   },
   "PinnedItems": {
     "unpin": "İğneyi Kaldır"
@@ -932,6 +943,7 @@
     "default_question": "Lütfen bir seçenek belirleyin:",
     "rationale_label": "Gerekçe / Etki",
     "recommended": "Önerilen",
+    "waiting_approval": "Onay Bekleniyor",
     "select": "Seç"
   },
   "QuestionnaireCard": {
@@ -1101,6 +1113,12 @@
   },
   "WorkedAccordion": {
     "worked_for": "{timeLabel} saniye çalıştı",
+    "status_running": "Çalışıyor...",
+    "status_suspended": "Onay Bekliyor",
+    "status_completed": "Tamamlandı",
+    "status_warning": "Adım Uyarısı",
+    "status_error": "Hata Oluştu",
+    "status_stopped": "Durduruldu",
     "step": "adım",
     "steps": "adım",
     "telemetry_tokens": "Token",
@@ -1214,6 +1232,7 @@
     "system_tab": "Sistem"
   },
   "ChatAssistant": {
+    "commands_header": "Komutlar",
     "greeting": "Hoş geldiniz",
     "app_load_failed": "Uygulama yüklenemedi",
     "input_placeholder_secondary": "Ek mesaj veya parametre yazın...",
@@ -1244,6 +1263,9 @@
     "inference_on": "açık",
     "inference_off": "kapalı",
     "command_empty": "Komut bulunamadı",
+    "provider_active": "Aktif",
+    "provider_logged_in": "Giriş yapıldı",
+    "provider_not_configured": "Giriş gerekli",
     "agent_create": "Ajan oluştur",
     "agent_manage_open": "Yönetim sayfasını aç",
     "history_suggestions": "Geçmişten öneriler",
@@ -1253,6 +1275,8 @@
     "pi_follow_up_label": "Kuyruğa Ekle",
     "pi_follow_up_title": "Agent mevcut işini bitirdikten sonra sıradaki işi otomatik devralsın",
     "input_placeholder_running": "Ajan çalışıyor… Araya girmek veya sıraya eklemek için yazın…",
+    "choice_pending_placeholder": "Seçiminizi yapın veya talimat yazın…",
+    "confirm_send": "Onayla ve Gönder",
     "remove_attachment": "{name} ekini kaldır",
     "paste_lines": "Paste ({count} satır)",
     "paste_chars": "Paste ({count} karakter)",
@@ -1464,8 +1488,8 @@
     "sql_note_detail": "Serbest dilli sorgu tablo şemasına, kolon isimlerine ve ISO tarihine otomatik uyarlandı.",
     "confirm_waiting": "Onay bekleniyor (forma doldur / uygula)",
     "filter_filled_values": "{field} (dolu olanlar)",
-    "tour_copy": "Tur İzini Kopyala (adımlar + cevap)",
-    "tour_copy_done": "Tur İzi Kopyalandı"
+    "tour_copy": "JSON Dump Kopyala (tur telemetrisi ve adımlar)",
+    "tour_copy_done": "JSON Dump Kopyalandı"
   },
   "ChatMarkdown": {
     "open_report_screen": "\"{title}\" rapor ekranını açmak için tıklayın",
@@ -1568,6 +1592,16 @@
       "label": "Model Seç & Listele",
       "description": "Kullanılabilir modelleri listeler veya belirtilen modeli seçer",
       "prompt": "/model"
+    },
+    "provider": {
+      "label": "AI Sağlayıcısı Seç",
+      "description": "Aktif AI model sağlayıcısını seç (Ollama, Azure, OpenAI...)",
+      "prompt": "/provider"
+    },
+    "login": {
+      "label": "Giriş / Sağlayıcı Bağla",
+      "description": "AI sağlayıcısı veya hesap kimlik doğrulaması",
+      "prompt": "/login"
     },
     "help": {
       "label": "Yardım & Komutlar",
@@ -1773,6 +1807,7 @@
     "sign_in_keycloak": "Keycloak ile Giriş",
     "sign_in_google": "Google ile Giriş",
     "deactivated_notice": "Hesabınız bir yönetici tarafından devre dışı bırakıldı. Lütfen sistem yöneticinize başvurun.",
+    "session_expired_notice": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "provider_unreachable": "{provider} sunucusuna ulaşılamıyor. Lütfen servisin çalıştığından ve ortam değişkenlerinin doğru yapılandırıldığından emin olun, ardından tekrar deneyin.",
     "forgot_password": "Şifremi Unuttum",

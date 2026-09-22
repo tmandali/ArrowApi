@@ -59,7 +59,6 @@
     "title": "Profile & Settings",
     "tab_user_details": "User Details",
     "tab_settings": "Settings",
-    "tab_yula_ai": "Yula AI & LLM",
     "tab_connections": "Connections",
     "prompt_save_settings": "Save user preferences",
     "prompt_change_store": "Change default branch",
@@ -832,6 +831,10 @@
     "continue_main": "Continue in main screen",
     "expand_overlay": "Expand to fullscreen",
     "collapse_overlay": "Back to dock",
+    "collapse_disabled_home": "Cannot collapse on home screen",
+    "edit_title": "Edit title",
+    "return_to_screen": "Return to Screen",
+    "return_to_screen_tooltip": "Return to screen and switch to dock mode",
     "focus_screen": "Focus on Screen",
     "focus_screen_tooltip": "Focus on {screen} and collapse AI panel",
     "mode_plan": "Plan",
@@ -865,7 +868,15 @@
     "context_auto_on": "Auto",
     "context_auto_off": "Off",
     "context_tooltip": "Context: {used} / {total} tokens",
-    "context_dump_session": "Export Session (JSON Dump)"
+    "context_dump_session": "Export Session (JSON Dump)",
+    "context_model_label": "Active Model",
+    "context_thinking_label": "Thinking (Reasoning)",
+    "context_effort_label": "Reasoning Effort",
+    "context_effort_off": "Off",
+    "context_effort_low": "Low",
+    "context_effort_medium": "Medium",
+    "context_effort_high": "High",
+    "context_effort_unsupported": "This model does not support reasoning effort"
   },
   "PinnedItems": {
     "unpin": "Unpin"
@@ -932,6 +943,7 @@
     "default_question": "Please select an option:",
     "rationale_label": "Rationale / Impact",
     "recommended": "Recommended",
+    "waiting_approval": "Waiting for Approval",
     "select": "Select"
   },
   "QuestionnaireCard": {
@@ -1101,6 +1113,12 @@
   },
   "WorkedAccordion": {
     "worked_for": "Worked for {timeLabel}s",
+    "status_running": "Running...",
+    "status_suspended": "Waiting for confirmation",
+    "status_completed": "Completed",
+    "status_warning": "Step Warning",
+    "status_error": "Error occurred",
+    "status_stopped": "Stopped",
     "step": "step",
     "steps": "steps",
     "telemetry_tokens": "Tokens",
@@ -1214,6 +1232,7 @@
     "system_tab": "System"
   },
   "ChatAssistant": {
+    "commands_header": "Commands",
     "greeting": "Welcome",
     "app_load_failed": "App failed to load",
     "input_placeholder_secondary": "Add a message or parameters...",
@@ -1244,6 +1263,9 @@
     "inference_on": "on",
     "inference_off": "off",
     "command_empty": "No command found",
+    "provider_active": "Active",
+    "provider_logged_in": "Logged in",
+    "provider_not_configured": "Login required",
     "agent_create": "Create agent",
     "agent_manage_open": "Open the management page",
     "history_suggestions": "Suggestions from history",
@@ -1253,6 +1275,8 @@
     "pi_follow_up_label": "Queue Follow-up",
     "pi_follow_up_title": "Queue a follow-up task to run automatically after current turn completes",
     "input_placeholder_running": "Agent is working… Type to steer or queue a follow-up…",
+    "choice_pending_placeholder": "Make a choice or enter instructions…",
+    "confirm_send": "Confirm and Send",
     "remove_attachment": "Remove the {name} attachment",
     "paste_lines": "Pasted {count} lines",
     "paste_chars": "Pasted {count} characters",
@@ -1464,8 +1488,8 @@
     "sql_note_detail": "The free-text query was automatically adapted to the table schema, column names and ISO dates.",
     "confirm_waiting": "Waiting for confirmation (fill in the form / apply)",
     "filter_filled_values": "{field} (non-empty values)",
-    "tour_copy": "Copy tour trace (steps + answer)",
-    "tour_copy_done": "Tour trace copied"
+    "tour_copy": "Copy Turn JSON Dump",
+    "tour_copy_done": "Turn JSON Dump Copied"
   },
   "ChatMarkdown": {
     "open_report_screen": "Click to open the \"{title}\" report screen",
@@ -1568,6 +1592,16 @@
       "label": "Model Selection",
       "description": "List available models or switch the active model",
       "prompt": "/model"
+    },
+    "provider": {
+      "label": "AI Provider Selection",
+      "description": "Select active AI model provider (Ollama, Azure, OpenAI...)",
+      "prompt": "/provider"
+    },
+    "login": {
+      "label": "Login / Connect Provider",
+      "description": "AI provider or account authentication",
+      "prompt": "/login"
     },
     "help": {
       "label": "Help & Commands",
@@ -1773,6 +1807,7 @@
     "sign_in_keycloak": "Sign in with Keycloak",
     "sign_in_google": "Sign in with Google",
     "deactivated_notice": "Your account has been deactivated by an administrator. Please contact your system administrator.",
+    "session_expired_notice": "Your session has expired. Please sign in again.",
     "no_providers": "No account providers configured.",
     "provider_unreachable": "Could not reach the {provider} server. Please make sure the service is running and the environment variables are configured correctly, then try again.",
     "error_account_not_linked": "This account is already linked to a different identity provider. Please sign in with the provider you used when creating your account.",

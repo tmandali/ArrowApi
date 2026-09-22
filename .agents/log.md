@@ -2,6 +2,105 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-22] Canonical NextAuth Refresh Token Rotation Error Propagation & Immediate Sign-In Redirect
+- **Rationale:**
+  1. *Hanging Authenticated State on Fatal Refresh Failure:* When Keycloak or Google refresh tokens expired or were revoked (`invalid_grant: Token is not active`), `auth.ts` deleted `token.accessToken`, `token.refreshToken`, and `token.expiresAt`. However, the JWT cookie and `session.user` (`id`, `name`, `email`) remained intact, causing NextAuth and route guards (`proxy.ts`) to treat the session as still `authenticated`.
+  2. *401 Cascades & Broken UI:* Users were stranded on internal screens without valid Bearer tokens, resulting in silent API failures (401 Unauthorized), unpopulated datasets, and no redirect to login.
+- **Decision:**
+  - **Standard NextAuth Token Error Tagging (`lib/auth.ts`):** On fatal refresh failures (`res.status === 400 && invalid_grant | invalid_client | unauthorized_client`), set `token.error = "RefreshTokenError"`. Added `error?: "RefreshTokenError" | string` to `Session` interface and mapped `session.error = token.error`.
+  - **Server-Side Route Guard Enforcement (`src/proxy.ts`):** Updated route proxy to evaluate `isExpired = session?.error === "RefreshTokenError"` and require `!isExpired` for `isAuth`. Automatically appends `?reason=session_expired` when redirecting to `/sign-in`.
+  - **Client-Side Reactive Sign-Out (`AccountStatusGuard`):** Added detection for `session?.error === "RefreshTokenError"` to trigger `signOut({ callbackUrl: "/sign-in?reason=session_expired" })`, instantly clearing the browser session cookie.
+  - **Sign-In Notice & i18n (`page.tsx`, `tr.json`, `en.json`):** Added `isSessionExpired` check and localized `session_expired_notice` ("Oturum süreniz doldu. Lütfen tekrar giriş yapın." / "Your session has expired. Please sign in again.").
+- **Verification:**
+  - 355/355 unit tests passed (`pnpm test`).
+  - `pnpm lint` (oxlint) passed with 0 errors/warnings on 797 files.
+  - `pnpm check:i18n` passed with code 0.
+  - All modified files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Deterministic Event Hashing (FNV-1a) & Repeat Count Aggregation
+- **Rationale:**
+  1. *Telemetry Noise & Buffer Saturation:* Rapid consecutive UI events (search typing, row clicks, criteria applying) rapidly exhausted the 50-item ring buffer with duplicate entries, washing out previous historical events.
+  2. *Token Overhead in Prompt Context:* Sending identical unaggregated events to the LLM context consumed unnecessary tokens and obscured frequency patterns.
+  3. *Zero Call-Site Requirement:* Introducing event fingerprinting must not require retrofitting hundreds of calling components across workspaces.
+- **Decision:**
+  - **Canonical Serialization (`canonicalStringify`):** Recursively orders dictionary keys alphabetically so that `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce identical hashes.
+  - **Non-Cryptographic FNV-1a Hashing (`fnv1a32` & `computeEventHash`):** High-speed 32-bit hash returning an 8-character hex string, executing in sub-microsecond time in browser threads.
+  - **Centralized Auto-Enrichment (`UIEventBus.recordTelemetry`):** Automatically computes `eventHash`, sets `repeatCount: 1`, and `firstTimestamp: now`. For identical repeats within the dedup window, increments `repeatCount++` and updates `timestamp` while preserving `firstTimestamp`.
+  - **UIEvent Interface Extension (`types.ts`):** Added optional `eventHash?: string; repeatCount?: number; firstTimestamp?: number;` ensuring 100% backward compatibility.
+- **Verification:**
+  - Added 3 unit tests to `event-bus-dedup.test.ts` verifying hash determinism, key invariance, and count incrementing.
+  - 137/137 `@my-agent/core` tests pass.
+  - 355/355 `yula.client` tests pass.
+  - All modified files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Elimination of Duplicate Job Triggers, RPC Event Bus Semantics & Criteria Form De-duplication
+- **Rationale:**
+  1. *Duplicate Job Execution on Single User Request:* In single-agent turns executing reports (e.g. `NAVIGATE` -> `SET_FIELDS` -> `SUBMIT`), two distinct background jobs were being triggered on the backend with different GUIDs (e.g. `b87622a7...` and `1d782188...`).
+  2. *Dual Registration & Listener Stacking:* `useHeadlessSystemComponents` registered and subscribed to `criteria_form:<scope>` for all `REGISTERED_REPORTS` globally. When navigating to the report screen, `useScreenAgentContext` redundantly re-registered `criteria_form:<scope>` and attached a second handler to `uiEventBus`.
+  3. *Broadcast Looping in Action Dispatch:* `uiEventBus.dispatch` iterated through all subscribers (`for (const handler of list) outcome = handler(...)`), which violated RPC command semantics and caused every registered handler to fire duplicate remote job creations.
+  4. *Unregister Leaks on Navigation:* When unmounting, `useScreenAgentContext` unregistered the component from `uiRegistry`, destroying the global headless registration.
+- **Decision:**
+  - **Single Active Handler RPC Dispatch (`@my-agent/core/event-bus.ts`):** Enforced single active handler semantics in `uiEventBus.dispatch` (`const handler = list[list.length - 1]`). UI action dispatches to a specific component ID now execute strictly once instead of looping through all historical listeners.
+  - **Single Source of Truth for Criteria Forms (`use-screen-agent-context.tsx`):** Removed redundant `criteria_form:<reportScope>` registration and unregistration from `useScreenAgentContext`. The canonical, typed registration in `useHeadlessSystemComponents` remains the authoritative provider with full action contracts.
+  - **In-Flight Job Idempotency Guard (`job-lifecycle-tools.ts`):** Updated `runJobTool` to check `findActiveJobByPayload(scope, result.instance)` before sending `createArrowJob`. If an identical job is already `Queued` or `Running`, it refocuses and reuses the active job instead of spawning duplicates.
+- **Verification:**
+  - 134/134 `@my-agent/core` unit tests pass (including new `dispatch` duplicate handler test in `event-bus.test.ts`).
+  - 355/355 `yula.client` tests pass across 89 suites.
+  - All modified files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Interactive Choice Bullets & Enriched Event Bus HITL Protocol
+- **Rationale:**
+  1. *Passive Text Roadblocks:* When the LLM asked a clarifying or disambiguating question with bullet options (e.g. *"Hangi şirket koduyla devam edelim? ● TJ01 ● TJ02 ● TRLC ● Kriterleri değiştir"*), bullet points were rendered as static text. Users had to manually type their answer, leading to redundant chat turns and typos.
+  2. *Loss of ReAct Steering Context:* Sending a text prompt created a new chat message, risking the model treating the user selection as a brand-new task rather than resolving the active suspended/waiting turn.
+  3. *Unconnected UI Form State:* Selecting an option did not update the registered screen criteria form immediately, requiring a round-trip LLM dispatch to sync form state.
+- **Decision:**
+  - **Context-Aware Choice Chip Transformation (`chat-markdown.tsx`, `markdown-chips.tsx`, `yula-choice-inference.ts`):** Detected question context (`/\?\s*$/` or question keywords) in preceding blocks or heading lines. Transformed short bullet items ($\le 50$ chars) under questions into interactive clickable `<InteractiveChoiceChip />` buttons with subtle orange/primary styling.
+  - **HITL Enriched Telemetry & Criteria Dispatch (`ai-chat-message.tsx`):**
+    1. On click, broadcasts `CHOICE_SELECTED` telemetry on `uiEventBus` enriched with `questionContext`, `inferredField` (e.g. `CompanyCode`, `WarehouseCode`), and `targetComponent: "criteria_form"`.
+    2. Immediately updates registered `criteria_form` components via `uiEventBus.dispatch({ component_id, action: "SET_FIELDS", payload: { [inferredField]: value } })`.
+    3. Seamlessly resumes the waiting agent via native steering (`respondToChoice(val)` if suspended, `steer(val)` if turn is active, or `sendPrompt(val)` otherwise) without losing the ReAct execution state.
+  - **Verification:** Added `yula-choice-bullet.test.ts` (4/4 pass), all 353 client tests pass across 89 suites (`npm test`), 0 oxlint warnings/errors on 797 files, all modified files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Provider Authentication Badges, Connection Dialog Pre-fill & Disconnect (Logout)
+- **Rationale:**
+  1. *Provider Status Ambiguity:* Users running `/provider` or `/login` could not visually distinguish which LLM providers had active sessions or valid API keys versus unconfigured services.
+  2. *Empty Connection Dialog & Missing Logout:* Opening the connection dialog previously failed to pre-fill default provider URLs for unauthenticated services, failed to display current credentials for logged-in services, and lacked an explicit Disconnect (Logout) mechanism.
+  3. *Active Provider Model Prioritization:* In the `/model` selector, models were not sorted or decorated by the active provider, making it difficult to find relevant models.
+- **Decision:**
+  - **Provider Command Decoration (`yula-commands.ts`):** Extended `YulaCommand` with `badge`, `badgeVariant` (`active` | `success` | `muted`), and `isLoggedIn`. Updated `matchProviderSubcommands` to decorate and sort providers by status: active first (`● Aktif`), configured second (`● Giriş yapıldı`), unconfigured last (`Giriş gerekli`).
+  - **Connection Dialog Pre-fill & Logout (`yula-provider-dialog.tsx`):** Pre-populated unauthenticated providers with official default URLs (`azure`, `ollama`, `openai`, `agnes`, `nvidia`, `openrouter`, `opencode`, `google`). Added status badge and explicit "Çıkış Yap" (Logout) button for authenticated providers with session/credential purging.
+  - **Active Provider Models Prioritization (`matchModelSubcommands` & `use-chat-composer.ts`):** Added multi-provider defaults to `DEFAULT_AUTHORIZED_MODELS`, prioritized active provider models to the top of `/model` with `● Aktif` badge, and re-fetched models on provider switch.
+  - **Verification:** 346/346 client unit tests pass across 88 suites, 0 tsc errors, all files $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Model Identifier Uniqueness & Deduplication Defense in Depth
+- **Rationale:**
+  1. *Duplicate React Key Console Error:* When multiple providers (e.g. OpenRouter and OpenCode) or proxy endpoints expose identical model IDs (e.g. `google/gemma-3-12b-it`), `<SelectItem key={m.id} value={m.id}>` in `YulaContextUsageBadge` rendered duplicate keys, triggering React warnings and invalid Radix UI Select state.
+  2. *Cross-Provider Collisions & Stale Storage:* `allModels` aggregation in `/api/agent/models` appended all models from all available providers without deduplication, and browser localStorage cached these duplicates.
+- **Decision:**
+  - **Context Window UI Protection (`yula-context-usage-badge.tsx`):** Added `uniqueModelsList` memo ensuring case-insensitive model ID uniqueness when populating the Radix UI `<Select>` items and lookups.
+  - **Server-Side Route Deduplication (`/api/agent/models/route.ts`):** Prioritized the active provider and deduplicated `allModels` array by model ID.
+  - **Provider Fetcher Guard (`yula-provider-models-fetcher.ts`):** Deduplicated live provider response arrays before caching and returning.
+  - **Storage Sanitization (`yula-ai-client-config.ts`):** Sanitized and deduplicated `allModels` on retrieval from `loadModelsFromStorage` and `fetchCachedYulaModels`.
+  - **Verification:** Unit test added in `yula-provider-models-fetcher.test.ts`, all 346 unit tests pass across 88 suites, 0 errors.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-21] AgentArch Enterprise Benchmark Integration: Non-Reasoning Scratchpad (`synthesize_collected_information`) & Pass^k Evaluation Suite
 - **Rationale:**
   1. *Enterprise Reliability Gap ($Pass\text{^}8 \le 6.34\%$):* The ServiceNow AgentArch benchmark (arXiv:2509.10769) demonstrated that state-of-the-art LLMs struggle with multi-step deterministic business constraints, failing to repeat workflows across consecutive trials unless safeguarded.
@@ -368,84 +467,25 @@ This document is the **append-only audit log** recording fundamental architectur
   - **Verification:** Added `playbook-subagent.test.ts` and updated `yula-workflow-grounding.simulation.test.ts`. 231/231 tests pass, 33/33 simulations pass, 99/99 `@my-agent/core` pass, and Next.js Turbopack build succeeds (48/48 routes).
 - **Author:** Antigravity / Team
 
----
 
-## [2026-09-21] Conversation Deletion & Workspace Grouping in IDE Overlay
+
+## [2026-09-22] Autonomous LLM Steering, Turn Suspension, and Seamless Resumption (Eliminating Redundant Chat Runs)
 - **Rationale:**
-  1. *Missing Conversation Deletion in Fullscreen IDE Overlay:* While `/my/history` supported deletion, users working in the fullscreen IDE overlay (`YulaFullscreenOverlay` & `YulaIdeSidebar`) lacked an inline delete trigger for old or transient sessions.
-  2. *Workspace Grouping Transparency:* The sidebar organizes chat sessions under folder trees labeled "Projeler" (Projects), derived from `conv.pathname` via `workspaceLabelFromPath`. Clarifying and preserving this taxonomy ensures seamless navigation and data hygiene.
+  1. *Rigid UI Choice Lock-in:* The agent previously forced rigid `ask_user_choice` tool calls and `YulaChoiceCard` interactive button grids whenever clarification or approval was sought. In natural conversation, LLMs can autonomously decide in text whether human intervention or steering is required.
+  2. *Redundant LLM Run Anti-Pattern:* Responding to choices invoked `sendMessageText()`, appending a new `role: 'user'` message and triggering a brand-new POST `/api/agent/chat` run. This discarded active tool executions, duplicated context overhead, and disrupted multi-step ReAct loops.
+  3. *Native Turn Suspension & Steering:* `@my-agent/core` provides `steer()` and `PendingMessageQueue`. By introducing native suspension (`turn_suspended`, `turn_resumed`, `waitForSteering`), an ongoing turn can sleep awaiting user guidance and resume seamlessly in the exact same execution cycle.
 - **Decision:**
-  - **Inline Session & Folder Deletion (`YulaIdeSidebar`):** Updated conversation list items from static `<button>` elements to accessible, interactive rows with hover/focus-revealed `Trash2` buttons. Added bulk folder deletion allowing users to clear all sessions under a workspace folder, protected by an inline confirmation dialog (`Silinsin mi? Evet / İptal`) to prevent accidental wipeouts.
-  - **Batch Deletion in Store (`chats.ts` & `yula-chat-provider.tsx`):** Implemented `deleteConversations(ids)` for atomic multi-session and vector layer purging.
-  - **Active Session Deletion (`YulaDeleteChatButton` & `yula-dock-controls.tsx`):** Added a dedicated `Trash2` action button in the overlay top bar header alongside `YulaNewChatButton`, active when the current session is saved in store history.
-  - **Streaming Cleanup Hardening (`yula-chat-provider.tsx`):** Extended `deleteConversation` and `deleteConversations` in the provider to abort any running `liveHelpers?.stop()` and reset custom grid views if any deleted conversation is the active session.
-  - **Terminology Correction & i18n:** Renamed sidebar section from "Projeler" (Projects) to "Çalışma Alanları" (Workspaces). Added `delete_folder`, `confirm_clear_ask`, `confirm_yes`, `confirm_no` in `IdeOverlay` across `tr.json` and `en.json`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Option B Governance & Approval Lifecycle for Procedural Playbook (Draft Isolation & Admin Review Screen)
-- **Rationale:**
-  1. *Unrestricted Production Mutations:* Standard users or agent proposals previously committed workflow recipes and screen rules directly to production company wikis via `recordEntry`. Allowing non-administrative roles to alter canonical corporate workflows poses severe governance and compliance risks.
-  2. *Need for Draft Isolation (Zero Leakage):* Newly proposed rules and recipes must be quarantined in `proposals/` (`status: "draft"`) so that active Level 0 prompt injection and `findRecipe` queries ignore them until officially sanctioned by an administrator.
-  3. *Admin Visual DAG Inspection:* Administrators require a dedicated review interface (`/system/playbooks`) featuring interactive flowchart rendering (`WorkflowGraphCanvas`), step inspection, and one-click `[Approve & Publish]` or `[Reject]` actions.
-- **Decision:**
-  - **Core Governance Models (`@my-agent/core`):** Extended `PlaybookEntry` with `status: 'draft' | 'approved' | 'rejected'`, `proposedBy`, `reviewedBy`, and `changeSummary`. Added `readProposals`, `writeProposal`, `approveProposal`, and `rejectProposal` to `IPlaybookStorageAdapter` and `PlaybookService`.
-  - **Tool Adapter Quarantining (`ui-tool-adapter.ts`):** Modified `propose_playbook_update` to invoke `proposeEntry` instead of `recordEntry`, ensuring non-admin proposals enter the draft pool awaiting admin authorization.
-  - **Server File Storage (`playbook-server.ts`):** Added isolated storage in `storage/wiki/workspaces/<workspace>/proposals/` and promotion logic moving approved recipes to `workflows/` or `screens/` while updating `index.md` and logging `proposal_approved`.
-  - **Dedicated API (`/api/agent/playbook/proposals`):** Created endpoints for proposal retrieval, draft creation, approvals, and rejections.
-  - **Visual Admin UI (`PlaybookProposalsTab` & `/system/playbooks`):** Created modular proposal review tab with DAG flowchart preview, diff view, and decision buttons, integrated into `PlaybooksManagementView` and guarded by `RequireAdmin`.
-  - **Navigation Integration:** Added `Kural & Akış Onayları` to `systemNav`, `global-nav-drawer.tsx`, `module-nav-menu.tsx`, and `workspace-landing-data.ts`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-20] Grounded ERP Workflow Protocol & Procedural Memory (Eliminating Theoretical LLM Fallback)
-- **Rationale:**
-  1. *Theoretical Parametric Fallback:* When a user asked about multi-step enterprise workflows (such as purchasing order creation, approvals, goods receipt, and invoicing), the LLM lacked verified procedural recipes in the workspace wiki. Governed by a generic rule ("Answer general conceptual questions directly"), the model fell into parametric training memory and generated generic textbook theories ("Talep açılır -> Tedarikçi seçilir -> Fatura ödenir") completely detached from actual Sims ERP screens, routes, and business rules.
-  2. *Missing Level 0 Recipe Discovery:* `chat/route.ts` pre-injected `playbookRules` (screen guidelines), but omitted `playbookRecipes` from Level 0 system prompt context, forcing extra search turns.
-  3. *Lack of Proactive Playbook Learning:* When no company-specific recipe was found, the model failed to offer interactive Human-In-The-Loop learning chips (`ask_user_choice`) to record the company's real DAG workflow via `propose_playbook_update`.
-- **Decision:**
-  - **Prompt Grounding & Directives (`yula-agent-prompt.ts`):** Replaced the generic conceptual exception with the **Grounded Workflow Protocol**:
-    - For ERP workflow and operational procedure queries, ungrounded textbook essays and theoretical diagrams detached from Sims ERP are strictly forbidden.
-    - If a verified recipe exists, present its concrete DAG steps and screen routes.
-    - If no verified recipe exists (Anti-Confabulation / Grounded Fallback): transparently state that no verified company recipe exists, ground the response in actual Sims ERP modules and screen routes (`stock`, `selling`, `accounting`, `manufacturing`, `subcontracting`), and proactively offer interactive `ask_user_choice` chips (`['Playbook Reçetesi Oluştur', 'İlgili Ekrana Git', 'Vazgeç']`).
-    - Added the Sims Available Enterprise Modules catalog to Level 0 context.
-  - **Zero-Latency Recipe Discovery (`chat/route.ts`):** Added pre-injection of `playbookRecipes` using `serverPlaybookStorage.readEntries(wsId)` so existing workflow recipes are visible to the agent in Level 0 with 0 ms latency.
-  - **Frontmatter Parsing Hardening (`playbook-server.ts`):** Stripped surrounding quotation marks from `category` and `targetPath` frontmatter attributes to ensure strict enum matching (`workflow_recipe`).
-  - **Core Tool Binding (`ui-tool-adapter.ts`):** Fixed missing `playbookManager` import in `@my-agent/core` ui tool adapter.
-  - **Baseline Recipe & Catalog:** Added `recipe-purchasing-flow.md` and initialized `index.md` in `storage/wiki/workspaces/stock/`.
-  - **Simulation & Verification:** Added `yula-workflow-grounding.simulation.test.ts` (4/4 pass) and expanded `yula-agent-prompt.test.ts` (18/18 pass). All simulation suites pass (31/31).
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Robust Chart Visualization Dispatch, Parameter Aliases & Base Table Fallback
-- **Rationale:** When users requested chart visualizations (e.g. "top 5 stores"), the agent defaulted to issuing raw SQL queries on `active_view` instead of triggering visualization, failed Zod validation on `orderMode: "desc"`, and encountered DuckDB Binder Errors when previous custom views masked underlying columns or filtered out requested entities (like `T999`).
-- **Decision:**
-  - **Tool & ReAct Prompt Grounding:** Added `VISUALIZE` example to `dispatch_component_action` in `standard-agent-tools.ts` and registered an autonomous execution step in `yula-agent-prompt.ts`.
-  - **Schema & Order Mode Normalization:** Allowed `"desc"` and `"asc"` in `GRID_VISUALIZE_CONTRACT` and mapped them to `"value_desc"` and `"value_asc"` in `inferChartOrderMode`.
-  - **Custom View & Base Table Fallbacks:** Derived columns from the probe row in `resolveActiveDataset` (`dataset.ts`) and added automatic fallback to `baseColumns` / base table in `visualizeGrid` when custom views lack requested columns or yield empty rows.
-  - **UI Chart Rendering:** Guaranteed unwrap of nested `details` in `parseChartOutput` and normalized AI SDK tool call parts in `yula-tool-info.ts`.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Comprehensive WasmSql Architecture Migration & Legacy DuckDB Cleanup
-- **Rationale:**
-  1. *Architectural Disambiguation:* The browser-side WebAssembly SQL engine was historically named after a specific vendor implementation (`duckdb`). Renaming to `wasmsql` cleanly distinguishes client-side WASM execution from Next.js server-side SQL, while opening up engine-agnostic AI tooling.
-  2. *Full System Cleansing:* Beyond hook aliases, a complete cleanup was needed across localization dictionaries (`tr.json`, `en.json`), KPI landing specs, core service folders (`src/services/wasmsql`), vector memory stores (`wasmsql-vector`), Pyodide skill bridges, and internal hook state variables (`tableName`, `applyFilters`, `columnWasmTypes`, `gridAggregations`).
-- **Decision:**
-  - **Core Service Migration (`src/services/wasmsql/`):** Established `src/services/wasmsql/` as the single source of truth (`wasm-sql-client.ts`, `wasm-sql.worker.ts`, `filter-parser.ts`, `wasmsql-vector-*`, `ai/`). Completely removed legacy `src/services/duckdb` directory and deleted obsolete proxy files.
-  - **Localization & KPI Keys:** Migrated `duckdb-status` to `wasmsql-status` across Turkish and English translation files and `workspace-landing-data.ts`.
-  - **Grid Props & State Variable Cleanup:** Replaced `duckTableName` with `tableName`, `duckApplyFilters` with `applyFilters`, `columnDuckTypes` with `columnWasmTypes`, and `duckDbAggregations` with `gridAggregations` across all report-grid hooks and `arrow-report-grid.tsx`.
-  - **Headless AI Wasm SQL Engine:** Bound `wasm_sql_engine` component (`use-wasm-sql-agent.ts`) with `RUN_SQL`, `DESCRIBE_TABLE`, and `LIST_TABLES` action contracts and strict read-only SQL guard routing in `dispatch-bridge.ts`.
-  - **Skills & Tools Integration:** Renamed Pyodide bridge to `wasmsql-pyodide-bridge.ts` and updated dataset resolver, profiler, visualizer, and RAG vector indexing to import directly from `@/services/wasmsql` and `@/services/wasmsql-vector`.
-  - **Verification:** All 316 unit tests passed, all 8/8 grid test suites passed (`npm run test:grid`), 0 oxlint warnings/errors, 0 tsc errors, all files strictly $\le 500$ lines.
+  - **Loop Suspension Protocol (`@my-agent/core`):** Added `turn_suspended` and `turn_resumed` events to `AgentEvent`. Updated `agentLoop` to support `waitForSteering(signal)`. When `toolResult.suspend` or `shouldSuspendTurn` is true, the loop emits `turn_suspended`, awaits incoming steering input via `PendingMessageQueue.waitForMessage`, drains steered messages, emits `turn_resumed`, and continues the multi-step ReAct loop without terminating.
+  - **Client-Side Steering Integration (`@my-agent/react` & `yula.client`):** Updated `useAgentChat` and `yula-chat-instance.tsx` so that `respondToChoice` and choice cards invoke `chat.steer(val)` instead of `sendMessageText(val)`.
+  - **Stream API Alignment (`route.ts`):** Removed `hasToolCall("ask_user_choice")` from `stopWhen` so the LLM decides autonomously when to pause or complete.
+  - **Prompt Protocol Modernization (`yula-agent-prompt.ts` & `yula-ui-skills.ts`):** Replaced rigid plain-text question prohibitions with `HUMAN-IN-THE-LOOP, SUSPENSION & STEERING PROTOCOL`. Eliminated redundant confirmation roadblocks ("Planı onaylıyor musunuz?") once criteria are gathered in favor of direct execution.
+  - **Verification:** All 345 `yula.client` unit tests passed (88 suites), all 133 `@my-agent/core` tests passed (17 suites), and `pnpm --filter yula.client typecheck` passed with 0 errors. All modified files strictly comply with the 500-line ceiling.
 - **Author:** Antigravity / Team
 
 ---
 
 ## 📜 Prior Decisions Archive
 Older architectural decisions have been archived to adhere to the 500-line limit:
+- [Decision Log Archive 2 (.agents/log-archive-2.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-2.md)
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
+

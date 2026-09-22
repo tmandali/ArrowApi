@@ -27,6 +27,8 @@ export default function SignInPage() {
   // Yönetici tarafından devre dışı bırakılan hesap (AccountStatusGuard
   // sign-out'u buraya düşer) — kullanıcıya sebep gösterilir.
   const isDeactivated = searchParams.get("reason") === "deactivated";
+  // Token refresh hatası / oturum süresi dolması
+  const isSessionExpired = searchParams.get("reason") === "session_expired";
   // OAuth callback hatası (auth.ts'de pages.error = "/sign-in") —
   // tarayıcıda çıplak `?error=` yerine kartta anlamlı mesaj.
   const oauthError = searchParams.get("error");
@@ -73,6 +75,17 @@ export default function SignInPage() {
             )}
           >
             {t("deactivated_notice")}
+          </p>
+        )}
+        {isSessionExpired && (
+          <p
+            role="alert"
+            className={cn(
+              "rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs",
+              forceDarkCard ? "text-amber-200" : "text-amber-600 dark:text-amber-300",
+            )}
+          >
+            {t("session_expired_notice")}
           </p>
         )}
         {oauthError ? (
