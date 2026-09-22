@@ -28,10 +28,12 @@ graph TD
     end
 
     subgraph HarnessLayer ["🛡️ Modular Harness Subsystems (@my-agent/core)"]
-        SessionSubsystem[💾 SessionHarness<br/>Memory, Branches, CBOR & Replay]:::runtime
-        RuntimeSubsystem[🚦 RuntimeScheduler<br/>MultiLaneScheduler & Effect Gate]:::runtime
+        SessionSubsystem[💾 SessionSubsystem<br/>Memory, Session Tree, Branches, CBOR & Replay]:::runtime
+        RuntimeSubsystem[🚦 RuntimeSubsystem<br/>MultiLaneScheduler & Durable Task Recovery]:::runtime
         CompactionSubsystem[🗜️ CompactionEngine<br/>Dual-Bound Truncate & Summaries]:::runtime
         TelemetrySubsystem[📡 TelemetryEngine<br/>Metrics Tracker & Event Stream]:::runtime
+        ServerStorageSubsystem[🔐 ServerStorageSubsystem<br/>Node 22 native SQLite Driver]:::backend
+        EvalSubsystem[🧪 EvaluationSubsystem<br/>AgentArch & Enterprise ERP Benchmark]:::runtime
     end
 
     subgraph StandardToolsLayer ["🧰 Standard Executable Tools (Nodes)"]
@@ -65,7 +67,7 @@ graph TD
     AgentLoop -->|Pi Interceptor| PiGuard
     PiGuard -->|Validated Step| AgentLoop
     AgentLoop -.->|Lifecycle & Health Triage| HarnessFacade
-    HarnessFacade --> SessionSubsystem & RuntimeSubsystem & CompactionSubsystem & TelemetrySubsystem
+    HarnessFacade --> SessionSubsystem & RuntimeSubsystem & CompactionSubsystem & TelemetrySubsystem & ServerStorageSubsystem & EvalSubsystem
 
     %% Tool Dispatches
     AgentLoop -->|Execute Tool| DispatchBridge
@@ -160,13 +162,15 @@ Every participant in the system is documented below with its role, registration 
 - **Inbound Edges:**
   - Upstream: Interfaced by [`AgentSession`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/agent-session.ts) during session lifecycle, turns, and checkpoints.
 - **Outbound Subsystem Nodes:**
-  - `session`: [`SessionHarness`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/session/session-harness.ts) (dumps, memory recall/remember, checkpoints).
-  - `runtime`: [`MultiLaneScheduler`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/runtime/lanes.ts), `ExecutionQueue`, `EffectGate`.
+  - `session`: [`SessionHarness`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/session/session-harness.ts), [`SessionBranchManager`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/session/session-branch.ts) (dumps, tree hierarchy, what-if branches, diffing & merging).
+  - `runtime`: [`MultiLaneScheduler`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/runtime/lanes.ts), [`DurableLaneManager`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/runtime/durable-lane.ts) (crash recovery, idempotency, memoization), `ExecutionQueue`, `EffectGate`.
   - `compaction`: `compactConversation`, `compactUIEvents`, `truncateContent`.
   - `ui`: `UIEventBus`, `UIComponentRegistry`, `VisionBridge`.
   - `telemetry`: `PiTelemetryTracker`, `PiEventStream`, `DiagnosticRetryGuard`.
+  - `server`: [`SqliteSessionDriver`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/server/sqlite-session.ts) (Node 22 native ACID SQLite persistence).
+  - `extensions`: Hook pipeline, plugin registry, and [`erpEnterpriseEvalSuite`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/extensions/erp-eval-cases.ts).
 - **Health Triage & Auditing:** Exposes `getHealthReport()` and `exportAuditReport()` for zero-overhead diagnostics.
-- **Neighbor References:** [`agent-harness.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/agent-harness.ts).
+- **Neighbor References:** [`agent-harness.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/agent-harness.ts), [`durable-lane.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/runtime/durable-lane.ts), [`sqlite-session.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/server/sqlite-session.ts).
 
 ---
 
