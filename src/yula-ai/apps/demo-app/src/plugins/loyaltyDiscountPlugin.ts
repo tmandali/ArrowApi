@@ -1,5 +1,5 @@
-import { definePlugin } from '../../../../packages/agent-core/src/plugins';
-import { piEventStream } from '../../../../packages/agent-core/src/pi-event-stream';
+import { definePlugin } from '../../../../packages/agent-core/src/harness/extensions/plugins';
+import { piEventStream } from '../../../../packages/agent-core/src/harness/telemetry/pi-event-stream';
 import { z } from 'zod';
 import { tool } from 'ai';
 

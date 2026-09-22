@@ -1,5 +1,5 @@
-export * from './server/models-config';
-export * from './server/oauth';
+export * from './models-config';
+export * from './oauth';
 export {
   type ApiKeyCredential,
   type Credential,
@@ -12,4 +12,4 @@ export {
   loadAuthFile,
   saveAuthFile,
   resolveApiKey,
-} from './server/auth';
+} from './auth';

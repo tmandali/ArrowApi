@@ -16,7 +16,7 @@ import {
   agentUiTools,
   piEventStream,
 } from './index';
-import { oauthManager } from './oauth/oauth-manager';
+import { oauthManager } from './server/oauth/oauth-manager';
 
 describe('🤖 Pi Headless UI-Agent Runtime & Protocol Simülasyonu', () => {
   // Simülasyon Ortamını Hazırla

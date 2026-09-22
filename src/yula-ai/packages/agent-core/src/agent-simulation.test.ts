@@ -22,7 +22,7 @@ import {
   resolveProviderAndModel,
   parseModelsFile,
   getAvailableModels,
-} from './models-config';
+} from './server/models-config';
 
 describe('🤖 Pi Headless UI-Agent Uçtan Uca Simülasyonu', () => {
   // Simülasyon Ortamını Hazırla

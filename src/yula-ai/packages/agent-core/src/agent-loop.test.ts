@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Agent } from './agent';
-import { createStandardAgentTools } from './ui-tool-adapter';
-import { uiRegistry } from './component-registry';
-import { uiEventBus } from './event-bus';
+import { createStandardAgentTools } from './harness/tools/ui-tool-adapter';
+import { uiRegistry } from './harness/ui-bridge/component-registry';
+import { uiEventBus } from './harness/ui-bridge/event-bus';
 import type { StreamFn } from './agent-loop-types';
 import { z } from 'zod';
 

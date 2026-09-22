@@ -14,10 +14,10 @@
 import { Agent } from './agent';
 import type { QueueMode } from './agent-loop-types';
 import type { AgentEvent, CompactionResult, CompactionSettings } from './types';
-import { compactConversation } from './compaction';
-import { sessionHarness, type SessionDump } from './session-harness';
-import { delegatedToolRegistry } from './ui-delegation';
-import { exportSessionToHtml } from './export-html';
+import { compactConversation } from './harness/compaction/compaction';
+import { sessionHarness, type SessionDump } from './harness/session/session-harness';
+import { delegatedToolRegistry } from './harness/tools/ui-delegation';
+import { exportSessionToHtml } from './harness/telemetry/export-html';
 
 export type AgentMessage = any;
 

@@ -6,22 +6,22 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { streamText, generateText, tool, isStepCount, convertToModelMessages } from 'ai';
 import { z } from 'zod';
 import { existsSync } from 'node:fs';
-import { loadAuthFile, resolveApiKey } from '../../packages/agent-core/src/auth';
+import { loadAuthFile, resolveApiKey } from '../../packages/agent-core/src/server/auth';
 import {
   loadModelsFile,
   resolveDefaultProvider,
   getAvailableModels,
   resolveProviderAndModel,
-} from '../../packages/agent-core/src/models-config';
-import { skillsManager } from '../../packages/agent-core/src/skills';
-import { agentMemory } from '../../packages/agent-core/src/memory';
-import { createAgentToolsForServer } from '../../packages/agent-core/src/standard-tools';
-import { formatActiveComponentsPrompt } from '../../packages/agent-core/src/component-registry';
-import { telemetryTracker } from '../../packages/agent-core/src/telemetry-metrics';
-import { oauthManager } from '../../packages/agent-core/src/oauth';
-import { pluginRegistry } from '../../packages/agent-core/src/plugins';
+} from '../../packages/agent-core/src/server/models-config';
+import { skillsManager } from '../../packages/agent-core/src/harness/knowledge/skills';
+import { agentMemory } from '../../packages/agent-core/src/harness/session/memory';
+import { createAgentToolsForServer } from '../../packages/agent-core/src/harness/tools/server-tools';
+import { formatActiveComponentsPrompt } from '../../packages/agent-core/src/harness/ui-bridge/component-registry';
+import { telemetryTracker } from '../../packages/agent-core/src/harness/telemetry/telemetry-metrics';
+import { oauthManager } from '../../packages/agent-core/src/server/oauth';
+import { pluginRegistry } from '../../packages/agent-core/src/harness/extensions/plugins';
 import { loyaltyDiscountPlugin } from './src/plugins/loyaltyDiscountPlugin';
-import { SUMMARIZATION_SYSTEM_PROMPT, generateLocalSummary } from '../../packages/agent-core/src/compaction';
+import { SUMMARIZATION_SYSTEM_PROMPT, generateLocalSummary } from '../../packages/agent-core/src/harness/compaction/compaction';
 
 // Custom plugin'leri sunucu ajanına bir kez tak (kart promptları gerçekten çalışsın)
 await pluginRegistry.register(loyaltyDiscountPlugin as any);

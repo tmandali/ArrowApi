@@ -3,7 +3,7 @@
  * Direct Reference: reference-pi/packages/agent/src/agent-loop.ts
  */
 
-import { EventStream } from './event-stream';
+import { EventStream } from './harness/telemetry/event-stream';
 import type { AgentEvent } from './types';
 import type {
   AgentContext,

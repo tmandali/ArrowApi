@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Agent } from './agent';
 import { AgentSession } from './agent-session';
-import { delegatedToolRegistry } from './ui-delegation';
-import { createStandardAgentTools } from './ui-tool-adapter';
-import { uiRegistry } from './component-registry';
+import { delegatedToolRegistry } from './harness/tools/ui-delegation';
+import { createStandardAgentTools } from './harness/tools/ui-tool-adapter';
+import { uiRegistry } from './harness/ui-bridge/component-registry';
 
 describe('AgentSession Pure Pi Architecture', () => {
   it('should initialize AgentSession and run multi-turn prompt successfully', async () => {

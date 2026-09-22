@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { promptTemplateManager } from './prompt-templates';
+import { promptTemplateManager } from './harness/knowledge/prompt-templates';
 
 describe('Built-in Commands & Slash System (Pi Reference)', () => {
   it('/new, /model, /login, /compact, /help sistem komutları olarak kayıtlı olmalıdır', () => {

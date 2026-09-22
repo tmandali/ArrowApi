@@ -4,6 +4,33 @@ Archived decisions from September 2026 to ensure active documentation files stri
 
 ---
 
+## [2026-09-21] Typed Action Contract for Report Execution Inspection (`job_history:GET_DETAIL`)
+- **Rationale:**
+  1. *Missing Execution Telemetry in Agent Context:* Previously, the `job_history` component only provided high-level summary rows via `LIST` (`jobId`, `status`, `rowCount`). The agent could not inspect detailed runtime metrics, live SSE event history, error messages, or exact request parameters submitted for a specific report run.
+  2. *Schema-First Action Contract Compliance:* In line with the `@my-agent/core` architecture, tools and actions must declare structured Zod/JSON Schema contracts (`inputSchema`, `outputSchema`, `whenToCall`, `whenNotToCall`).
+- **Decision:**
+  - **Modular Tool & Action Contract (`job-detail-tool.ts`):** Created dedicated modular file adhering to the 500-line limit, defining `JOB_DETAIL_ACTION_CONTRACT` with typed `summary`, `progress`, and `requestInput` schemas. Implemented `getJobDetailTool` calling backend endpoints (`getArrowJob`, `fetchJobRequest`, `fetchJobEventLog`).
+  - **Dispatch Bridge Integration (`dispatch-bridge.ts`):** Routed `GET_DETAIL` and `DETAIL` on `family === "job_history"` to `getJobDetailTool`.
+  - **Active Component Registration (`yula-active-components.ts`):** Exposed `GET_DETAIL` capability and action contract to `job_history`.
+  - **Zero-Latency Panel Hydration (`arrow-job-executions-panel.tsx`):** Handled `GET_DETAIL` directly inside `useAgentComponent.onAction` using active React state (`selectedJob`, `progressEvents`, `inputJson`) when matching `selectedId`, with seamless fallback to server dispatch.
+  - **Verification:** Unit tests in `job-detail-tool.test.ts` pass, all 242 client tests pass, and zero linter errors.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Protocol-Compliant Tool Result Reconciliation & Prevention of MissingToolResultsError
+- **Rationale:**
+  1. *Unanswered Interactive Tool Calls:* When the assistant invokes `ask_user_choice` and pauses the stream, user selection dispatches a user message without generating a corresponding `tool-result`.
+  2. *LLM Protocol Rejection:* OpenAI, Gemini, and Vercel AI SDK enforce that every assistant `tool-call` must have an immediately following `tool-result`. Unmatched calls triggered `MissingToolResultsError: Tool result is missing for tool call ...` within 1s, rendering silent turn fallbacks.
+- **Decision:**
+  - **Automatic Interactive Result Reconciliation (`context-slim.ts`):** In `normalizeUIMessagesForTransport`, assistant tool calls (`ask_user_choice`, `ask_user_question`) preceding a user message are matched and resolved to `state: "output-available"` with `{ selected, value }`.
+  - **Defensive Transport Slimming (`context-slim.ts`):** Updated `slimMessagesForTransport` to transition any non-output tool states (`call`, `input-available`, undefined) to safe fallback outputs (`output-available` / `output-error`).
+  - **SDK Engine Safeguard (`route.ts`):** Passed `{ ignoreIncompleteToolCalls: true }` to `convertToModelMessages`.
+  - **Client-Side State Tracking (`yula-choice-card.tsx` & `use-agent-chat.ts`):** Implemented `addToolOutput` in `useAgentChat` and wired it into `YulaChoiceCard` for immediate local part state synchronization.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-22] Autonomous LLM Steering, Turn Suspension, and Seamless Resumption (Eliminating Redundant Chat Runs)
 - **Rationale:**
   1. *Rigid UI Choice Lock-in:* The agent previously forced rigid `ask_user_choice` tool calls and `YulaChoiceCard` interactive button grids whenever clarification or approval was sought. In natural conversation, LLMs can autonomously decide in text whether human intervention or steering is required.
@@ -333,4 +360,68 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - Oxlint passed with 0 warnings and 0 errors on 798 files.
   - All modified files strictly obey the 500-line ceiling rule.
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Yula Full-Mode In-Place Conversation Selection (Zero Unwanted Screen Navigation)
+- **Rationale:**
+  1. *Unwanted Navigation to Report Screen:* When users are working inside Yula's fullscreen IDE overlay or on the home screen (`/`), clicking a past conversation from history or the left sidebar triggered `navigateToConversationScreen -> router.push(href)`. This forcibly routed the browser to `/stock/retail-sales-report/<jobId>` and collapsed full mode (`expanded: false`), throwing the user into the report screen against their intent.
+  2. *In-Place IDE Navigation Contract:* Inside an IDE interface, selecting a conversation should only switch the active conversation and render its chat messages and telemetry in-place. Background route navigation belongs to the explicit exit action (`X` button / Escape) or dedicated link buttons, not casual conversation selection.
+- **Decision:**
+  - **Full-Mode Navigation Guard (`yula-history-navigation.ts`):** In `navigateToConversationScreen`, added a guard: if `isExpanded || (typeof window !== "undefined" && isWorkspaceHomePath(here))`, `restoreConversationExecution` still restores execution state in memory, but route navigation (`push(href)`) is bypassed.
+  - **Internal Action Tagging (`yula-history-item.tsx` & `yula-ide-sidebar.tsx`):** Added `data-ide-action="true"` and `data-slot="ide-conversation-item"` to ensure global capture click listeners never treat conversation item clicks as external screen navigations.
+  - **In-Place History View (`yula-ide-sidebar.tsx`):** Bound "Konuşma Geçmişi" button to `setHistoryOpen(true)` instead of routing to `/my/history`.
+- **Verification:**
+  - All 372 unit and simulation tests passed in `yula.client` across 94 suites.
+  - Oxlint passed with 0 warnings and 0 errors.
+  - All modified files remain strictly $\le 500$ lines (`wc -l`).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Playbook Governance & Index Integrity Fix (Draft Approval + id-based Paths)
+- **Rationale:**
+  1. *Governance Bypass:* `propose_playbook_update` called `recordEntry()` (immediate approved) despite advertising user confirmation, so agent-saved rules landed in `screens/` while operators watched the empty `proposals` tab on `/system/playbooks`.
+  2. *Index/File-Name Mismatch:* `PlaybookService` computed `relativePath` from `targetPath` (`screens/<target>.md`) while `ServerFsPlaybookStorage.writeEntry` persisted `<id>.md`, breaking index links and colliding duplicate targets.
+- **Decision:**
+  - Core (`src/yula-ai/packages/agent-core/src/playbook.ts`): added `playbookRelativePath()` single source of truth (`<sub>/<id>.md`); `recordEntry` and `approveProposal` use it; added `reindexWorkspace()` to repair legacy indexes.
+  - Agent (`src/Sims/yula.client/src/lib/server-tools/standard-agent-tools.ts`): `propose_playbook_update` now calls `proposeEntry()` (draft, status `proposed`) and returns approval guidance pointing to `/system/playbooks` proposals tab.
+  - Data repair: rebuilt `storage/wiki/workspaces/stock/index.md` with id-based paths (2 screen rules + 2 workflow recipes).
+  - Tests (`playbook.test.ts`): added id-based path and legacy reindex repair assertions.
+- **Verification:**
+  - `@my-agent/core` typecheck passed; all 139 unit tests passed (17 files).
+  - `yula.client` typecheck shows 8 pre-existing errors in unrelated files (account-status-guard, ai-chat-message, dispatch-bridge, diagnostic-subagent); none in touched files.
+  - All modified files remain strictly <= 500 lines.
+- **Author:** OpenCode / Team
+
+---
+
+## [2026-09-22] Playbook Admin View Data Source Fix (REST Instead of Empty Memory Context)
+- **Rationale:**
+  1. *Empty Admin Lists:* `PlaybooksManagementView` read entries/log via `useAgentPlaybook`, which resolves to the library `playbookManager` (MemoryPlaybookStorage) because `yula.client` never mounts `AgentProvider`. Approved disk records therefore never appeared in Screens/Workflows/Log tabs; only the directly-fetched Proposals tab worked. Deletes were memory-only and never reached disk.
+- **Decision:**
+  - App (`src/Sims/yula.client/src/workspaces/my/components/playbooks/playbooks-management-view.tsx`): replaced context-memory hook with REST state — `GET /api/agent/playbook?workspace=` for entries+log, `DELETE /api/agent/playbook?id=&workspace=` for removal, refresh after delete; proposals flow unchanged.
+- **Verification:**
+  - File is 492 lines (<= 500). `pnpm run lint` passed with 0 warnings/errors on 798 files. `pnpm run typecheck` reports no errors in the touched file (8 pre-existing errors elsewhere remain).
+- **Author:** OpenCode / Team
+
+---
+
+## [2026-09-22] Yula Fullscreen Overlay Header Controls Streamlining & Universal Exit X Button
+- **Rationale:**
+  1. *Trapped in Fullscreen on Home (`SystemHomeView`):* When opening conversations from history while on the home route (`/`), Yula mounts `SystemHomeView` in fullscreen mode. Previously, `hideWindowControls={true}` and `isOverlay={false}` suppressed the `X` button and `Escape` key listener, trapping users in fullscreen and preventing them from returning to the underlying report screen.
+  2. *Single Intuitive Exit Action:* Users expect an `X` button and `Escape` hotkey under all fullscreen conditions to exit full mode and return to their active screen with the side-dock open.
+- **Decision:**
+  - **Universal Exit (`YulaExitOverlayButton` & `use-exit-overlay.ts`):** Extracted `useExitOverlay` hook into a dedicated module to adhere to React Fast Refresh. Bound both `YulaExitOverlayButton` and the global `Escape` key listener to `useExitOverlay`.
+  - **Screen Execution Resolution (`yula-screen-resolver.ts` & `yula-history-navigation.ts`):** Enhanced `resolveTargetScreen` with `hrefForConversation` and `restoreConversationExecution`. When exiting fullscreen on home or switching conversations in `YulaIdeSidebar`, the application resolves the specific `/scope/<jobId>` route and restores the report execution.
+  - **Unconditional Rendering in Fullscreen Overlay:** Updated `yula-fullscreen-overlay.tsx` to render `{!hideWindowControls && <YulaExitOverlayButton />}`, and removed `hideWindowControls={true}` from `SystemHomeView.tsx`.
+  - **Guarded `hrefForConversation`:** Ensured home roots (`/`) do not generate malformed `//<jobId>` paths when conversation pathname is root.
+- **Verification:**
+  - All 6 unit tests in `src/lib/yula-screen-resolver.test.ts` passed.
+  - All 15 tests in `yula-navigation-overlay.test.ts` and `yula-navigation-simulation.test.ts` passed.
+  - Zero Oxlint errors/warnings across all 7 modified files.
+  - All modified files remain strictly $\le 500$ lines (`wc -l`).
+- **Author:** Antigravity / Team
+
+
 
