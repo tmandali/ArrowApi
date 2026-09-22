@@ -2,6 +2,23 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Comparative A/B Lift Evaluation Engine: Reference-Pi Adaptation (@my-agent/core & demo-app)
+- **Rationale:**
+  1. *Reference-Pi Evals Adaptation Analysis:* Analyzed `reference-pi/packages/evals`. Concluded that adopting its heavy Docker/CLI container machinery was unsuitable for our browser-based web architecture.
+  2. *Extraction of Core Value (A/B Lift Analysis):* Pi's most valuable evaluation concept is paired A/B lift comparison (`treatment - control`), measuring the net improvement delivered by guidance, documentation, or rules.
+  3. *Measuring Playbook & Guardrail Effectiveness:* Needed a standardized metric to prove and quantify how much kurumsal guardrails and procedural playbooks increase agent accuracy compared to unguided naive models.
+- **Decision:**
+  - **Core Lift Engine (`harness/extensions/eval-lift.ts`):** Implemented `computeEvalLift()` comparing Control vs Treatment runs. Computes `liftRate`, `acceptableLiftRate`, `durationDeltaMs`, performance flags (`positive-lift`, `treatment-saturated`, `negative-delta`), and classifies each case as `improved`, `regressed`, `stable-passed`, or `stable-failed`.
+  - **Full Test Coverage (`eval-lift.test.ts`):** Added 3 unit tests verifying positive lift, regression detection, and saturation handling.
+  - **Interactive Demo-App Integration (`EvalsRunnerView.tsx`):** Added an "📈 A/B Kural & Lift Analizi" tab in `demo-app` executing Control (unguided, failing negative guardrails) vs Treatment (grounded ERP with guardrails), displaying live lift metrics (+%67 net lift), comparative cards, and case-by-case improvements.
+- **Verification:**
+  - 24/24 `@my-agent/core` test files passed (191 tests).
+  - Demo-app build succeeded cleanly (`pnpm --filter demo-app build`).
+  - All touched source and test files strictly respect `wc -l <= 500`.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Demo App Showcase for Pi Harness Capabilities: ERP Benchmark Runner & Interactive Session Tree
 - **Rationale:**
   1. *Visualizing Advanced Harness Features:* After implementing Session Tree (branching, forking, diffing) and the 12 Enterprise ERP Benchmark Suite in `@my-agent/core`, the `demo-app` lacked UI controls to interactively test, showcase, and verify these features live.

@@ -1,6 +1,7 @@
 export * from './hooks';
 export * from './plugins';
 export * from './evals';
+export * from './eval-lift';
 export * from './erp-eval-cases';
 export * from './rpc-protocol';
 export * from './adaptive-publisher';
