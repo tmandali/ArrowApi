@@ -128,3 +128,4 @@
 ## [2026-09-22] entry_deleted | Entry pb_screen_rule_mud2y0nn deleted - Yula
 ## [2026-09-22] entry_deleted | Entry prop_screen_rule_mud5esys deleted - Yula
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
