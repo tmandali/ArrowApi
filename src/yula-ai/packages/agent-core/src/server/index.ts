@@ -1,5 +1,6 @@
 export * from './models-config';
 export * from './oauth';
+export * from './sqlite-session';
 export {
   type ApiKeyCredential,
   type Credential,
