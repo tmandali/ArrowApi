@@ -69,9 +69,11 @@ export function ErpEvalsBench() {
     try {
       const suiteRes = await evalRunner.runSuite(
         erpEnterpriseEvalSuite,
-        async (testCase) => {
+        async (prompt) => {
           await new Promise((r) => setTimeout(r, 40));
-          return simulateErpExecution(testCase);
+          const matchingCase =
+            erpEnterpriseEvalSuite.find((c) => c.prompt === prompt) ?? erpEnterpriseEvalSuite[0];
+          return simulateErpExecution(matchingCase);
         },
       );
       setResults(suiteRes);
@@ -168,7 +170,7 @@ export function ErpEvalsBench() {
               <TrendingUp className="h-4 w-4 text-amber-500" />
             </div>
             <div className="text-2xl font-bold mt-2 text-amber-600">
-              +{lift?.acceptableRateLift.toFixed(1)}%
+              +{lift?.acceptableLiftRate.toFixed(1)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">Temel baseline&apos;a kıyasla artış</div>
           </div>
