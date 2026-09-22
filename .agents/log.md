@@ -2,6 +2,41 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] yula.client Full Alignment & Integration with @my-agent/core Library
+- **Rationale:**
+  1. *Complete Library Modernization:* `yula.client` needed full end-to-end integration with the modern capabilities provided by `@my-agent/core` (Session Tree branching, Prompt Cache tracking, and Canonical 5-section Compaction).
+  2. *What-If Scenario Isolation:* Enterprise users analyzing complex ERP reports required branch forking (`forkBranch`, `switchBranch`) to test different criteria without polluting the primary conversation.
+  3. *Prompt Cache Telemetry:* Production models require tracking cache hit rates and estimated financial savings across turns.
+- **Decision:**
+  - **Session Tree Branching (`stores/chats.ts` & `yula-branch-selector.tsx`):** Added `forkBranch`, `switchBranch`, and `getBranchMessages` to `useChatsStore` with an interactive `YulaBranchSelector` in the chat panel header. Added unit tests in `chats-branching.test.ts`.
+  - **Prompt Cache Tracking (`chat/route.ts`):** Wired `promptCacheTracker.recordTurn()` on finish with hit ratio, cached tokens, and financial savings logging.
+  - **Canonical Compaction Endpoint (`api/compact/route.ts`):** Upgraded to use `SUMMARIZATION_PROMPT` and incremental `UPDATE_SUMMARIZATION_PROMPT` with `<previous-summary>`.
+- **Verification:**
+  - 95 `yula.client` test suites passed (374 tests, 100% green).
+  - 28 `@my-agent/core` test files passed (206 tests, 100% green).
+  - All modified files strictly respect `wc -l <= 500`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-23] Pi-Style Modular Prompt Architecture & JIT Context Compaction Integration
+- **Rationale:**
+  1. *Monolithic Prompt Bloat:* `BASE_PROMPT` in `yula.client` was an 80-line static string (~2,500 tokens) loaded on every turn, redundantly describing 6 tools already defined in API tool schemas and duplicating table grid instructions.
+  2. *Prefix Caching Alignment:* Anthropic, OpenAI, and Azure prompt caching require rigid, stable section prefixes. Volatile or screen-specific instructions in the middle of static text broke cache hit rates.
+  3. *Structured Compaction Contract:* Unstructured compaction summaries allowed context drift over long multi-turn sessions. Standardizing on Pi's 5-section Markdown schema ensures consistent state continuity across both LLM and local offline compactions.
+- **Decision:**
+  - **Prompt Sections Engine (`harness/prompt/prompt-sections.ts`):** Implemented `buildSystemPromptSections`, `renderPromptSections`, and `diffSystemPromptSections` computing section deltas (`preamble`, `<rules>`, `<tools>`, `<skills>`, `<playbook_rules>`, `<active_context>`).
+  - **Structured Context Compaction (`harness/compaction/compaction.ts`):** Exported canonical templates `SUMMARIZATION_SYSTEM_PROMPT`, `SUMMARIZATION_PROMPT`, and `UPDATE_SUMMARIZATION_PROMPT` enforcing `## Goal`, `## Constraints & Preferences`, `## Progress [Done / In Progress / Blocked]`, `## Key Decisions`, `## Critical Context`.
+  - **Client Prompt Modularization (`yula-agent-prompt.ts`):** Refactored `BASE_PROMPT` into modular XML sections (`SYSTEM_PREAMBLE`, `<rules>`, `<playbook>`), eliminated redundant 6-tool enumeration, and kept 100% backward compatibility with all 24 prompt assertion groups.
+- **Verification:**
+  - 28/28 `@my-agent/core` test files passed (206 tests).
+  - 94 `yula.client` test suites passed (372 tests).
+  - `demo-app` build succeeded cleanly in 1.17s (`tsc && vite build`).
+  - Every modified file strictly respects `wc -l <= 500`.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Final Reference-Pi Capabilities Integration: Branch Summarization, Prompt Cache Stats & Effect Gate Async
 - **Rationale:**
   1. *Exploratory Branch Loss:* When users created "What-If" simulation branches (e.g. discount, inventory transfer) and switched back to `main`, context and insights gained in the exploratory branch were isolated and lost.

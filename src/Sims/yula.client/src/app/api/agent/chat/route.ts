@@ -13,6 +13,7 @@ import {
 } from "ai";
 import { type StandardAgentTools, STANDARD_AGENT_TOOLS } from "@/lib/yula-server-tools";
 import { buildSystemPrompt, type YulaScreenContext } from "@/lib/yula-agent-prompt";
+import { promptCacheTracker } from "@my-agent/core";
 import { isResultGridComponent } from "@/lib/yula-tool-info";
 import { serverPlaybookService } from "@/lib/playbook-server";
 import { yulaCachingMiddleware } from "@/lib/yula-caching-middleware";
@@ -418,13 +419,23 @@ export async function POST(req: Request) {
           completionTokens?: number;
           outputTokens?: number;
           totalTokens?: number;
+          cachedTokens?: number;
+          cacheReadTokens?: number;
         };
         const pTokens = u.promptTokens ?? u.inputTokens ?? 0;
         const cTokens = u.completionTokens ?? u.outputTokens ?? 0;
         const tTokens = u.totalTokens ?? pTokens + cTokens;
+        const cachedTokens = u.cachedTokens ?? u.cacheReadTokens ?? 0;
+        promptCacheTracker.recordTurn({
+          turnIndex: modelMessages.length,
+          promptTokens: pTokens,
+          cacheReadTokens: cachedTokens,
+          model: runningModel,
+        });
+        const cacheMetrics = promptCacheTracker.getMetrics();
         void runRecorder.onFinish({ finishReason, totalTokens: tTokens });
         console.info(
-          `🤖 [Yula AI Telemetry]: Prompt Tokens: ${pTokens} · Completion Tokens: ${cTokens} · Total: ${tTokens} (Reason: ${finishReason})`
+          `🤖 [Yula AI Telemetry]: Prompt: ${pTokens} (Cached: ${cachedTokens}, %${cacheMetrics.cacheHitRatio}) · Completion: ${cTokens} · Total: ${tTokens} · Savings: $${cacheMetrics.estimatedSavingsUsd.toFixed(4)} (Reason: ${finishReason})`
         );
       },
       stopWhen: [

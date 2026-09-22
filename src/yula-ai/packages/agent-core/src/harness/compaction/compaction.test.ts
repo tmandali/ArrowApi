@@ -123,5 +123,27 @@ describe('Context Compaction & Token Accounting (Pi Reference)', () => {
     expect(compactedMessages[0].role).toBe('system');
     expect(compactedMessages[0].content).toContain('[Önceki Konuşma Özeti (Compaction)]:');
     expect(result.summary).toBeTruthy();
+    expect(result.summary).toContain('## Goal');
+    expect(result.summary).toContain('## Progress');
+    expect(result.summary).toContain('## Key Decisions');
+  });
+
+  it('exports structured summarization prompt templates conforming to 5-section schema', async () => {
+    const { SUMMARIZATION_PROMPT, UPDATE_SUMMARIZATION_PROMPT, SUMMARIZATION_SYSTEM_PROMPT } =
+      await import('./compaction');
+
+    expect(SUMMARIZATION_SYSTEM_PROMPT).toContain('ONLY output the structured summary');
+    expect(SUMMARIZATION_PROMPT).toContain('## Goal');
+    expect(SUMMARIZATION_PROMPT).toContain('## Constraints & Preferences');
+    expect(SUMMARIZATION_PROMPT).toContain('## Progress');
+    expect(SUMMARIZATION_PROMPT).toContain('### Done');
+    expect(SUMMARIZATION_PROMPT).toContain('### In Progress');
+    expect(SUMMARIZATION_PROMPT).toContain('### Blocked');
+    expect(SUMMARIZATION_PROMPT).toContain('## Key Decisions');
+    expect(SUMMARIZATION_PROMPT).toContain('## Critical Context');
+
+    expect(UPDATE_SUMMARIZATION_PROMPT).toContain('<previous-summary>');
+    expect(UPDATE_SUMMARIZATION_PROMPT).toContain('## Goal');
+    expect(UPDATE_SUMMARIZATION_PROMPT).toContain('## Progress');
   });
 });

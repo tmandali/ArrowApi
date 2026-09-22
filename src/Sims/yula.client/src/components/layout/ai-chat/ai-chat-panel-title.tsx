@@ -9,6 +9,8 @@ import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { useChatsStore } from "@/lib/stores/chats";
 import { formatPathnameLabel, isWorkspaceHomePath } from "@/lib/workspace-paths";
 
+import { YulaBranchSelector } from "@/components/layout/yula-branch-selector";
+
 export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = {}) {
   const t = useTranslations("ChatAssistant");
   const tScreen = useTranslations("ScreenLabels");
@@ -49,6 +51,8 @@ export function AIChatPanelTitle({ hideIcon = false }: { hideIcon?: boolean } = 
     <div className="flex min-w-0 items-center gap-1.5 truncate">
       {hideIcon ? null : <YulaMarkIcon className="size-5 shrink-0" />}
       <span className="truncate text-xs font-semibold">{titleText}</span>
+      {!isHistoryOpen && !isSearchingHistory && <YulaBranchSelector />}
     </div>
   );
 }
+

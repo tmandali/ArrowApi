@@ -4,6 +4,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { extractJobIdFromHref, resolveConversationPathname } from "@/lib/workspace-paths";
 
+export interface YulaBranchInfo {
+  name: string;
+  parentBranch?: string;
+  createdAt: number;
+}
+
 export interface YulaConversation {
   id: string;
   title: string;
@@ -13,6 +19,10 @@ export interface YulaConversation {
   jobId?: string;
   /** Ayrı ajan oturumu ise ajan id'si; null/undefined = varsayılan Yula. */
   agentId?: string | null;
+  /** Aktif dal adı (varsayılan: "main") */
+  activeBranch?: string;
+  /** Konuşmanın dallanma kataloğu */
+  branches?: Record<string, YulaBranchInfo>;
 }
 
 interface ChatsState {
@@ -40,12 +50,16 @@ interface ChatsState {
   renameFromFirstMessage: (id: string, text: string, agentId?: string | null) => void;
   clearAllConversations: () => void;
   saveMessages: (id: string, messages: YulaMessage[], pathname?: string, agentId?: string | null) => void;
+  forkBranch: (conversationId: string, branchName: string) => void;
+  switchBranch: (conversationId: string, branchName: string) => void;
+  getBranchMessages: (conversationId: string, branchName?: string) => YulaMessage[];
   beginConversationFollow: (id: string) => void;
   followArrivedConversation: (id: string, href?: string, agentId?: string | null) => void;
   isThinkingEnabled: boolean;
   setThinkingEnabled: (enabled: boolean) => void;
   setModel: (model: string) => void;
 }
+
 
 function makeId() {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -297,6 +311,52 @@ export const useChatsStore = create<ChatsState>()(
 
           return { messagesById, conversations };
         }),
+
+      forkBranch: (conversationId, branchName) =>
+        set((s) => {
+          const conv = s.conversations.find((c) => c.id === conversationId);
+          if (!conv) return s;
+          const currentBranch = conv.activeBranch || "main";
+          const currentKey = currentBranch === "main" ? conversationId : `${conversationId}:${currentBranch}`;
+          const currentMessages = s.messagesById[currentKey] || [];
+          const newBranchKey = `${conversationId}:${branchName}`;
+
+          const updatedBranches = {
+            ...(conv.branches || { main: { name: "main", createdAt: conv.createdAt } }),
+            [branchName]: {
+              name: branchName,
+              parentBranch: currentBranch,
+              createdAt: Date.now(),
+            },
+          };
+
+          return {
+            conversations: s.conversations.map((c) =>
+              c.id === conversationId
+                ? { ...c, activeBranch: branchName, branches: updatedBranches }
+                : c,
+            ),
+            messagesById: {
+              ...s.messagesById,
+              [newBranchKey]: [...currentMessages],
+            },
+          };
+        }),
+
+      switchBranch: (conversationId, branchName) =>
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id === conversationId ? { ...c, activeBranch: branchName } : c,
+          ),
+        })),
+
+      getBranchMessages: (conversationId, branchName) => {
+        const state = get();
+        const conv = state.conversations.find((c) => c.id === conversationId);
+        const b = branchName || conv?.activeBranch || "main";
+        const key = b === "main" ? conversationId : `${conversationId}:${b}`;
+        return state.messagesById[key] || [];
+      },
 
       beginConversationFollow: (id) =>
         set({ followNav: { id, at: Date.now() } }),
