@@ -444,6 +444,9 @@ export interface SessionBranch {
   createdAt: number;
   checkpoints: SessionCheckpoint[];
   currentIndex: number;
+  parentBranchId?: string;
+  forkPointId?: string;
+  metadata?: Record<string, any>;
 }
 
 /** 7. Telemetry & Metrics Types (Pi) */
