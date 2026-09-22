@@ -79,14 +79,21 @@ export function AgentWidget({
 
   useEffect(() => {
     setPiEvents(piEventStream.getHistory());
+    setCheckpoints(sessionManager.getActiveBranch().checkpoints);
+
     const unsubPi = piEventStream.subscribe(() => {
       setPiEvents(piEventStream.getHistory());
       setSummary(telemetryTracker.getMetricsSummary());
       setCheckpoints(sessionManager.getActiveBranch().checkpoints);
     });
 
+    const unsubSession = sessionManager.subscribe(() => {
+      setCheckpoints(sessionManager.getActiveBranch().checkpoints);
+    });
+
     return () => {
       unsubPi();
+      unsubSession();
     };
   }, []);
 

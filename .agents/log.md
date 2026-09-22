@@ -2,6 +2,24 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Demo App Showcase for Pi Harness Capabilities: ERP Benchmark Runner & Interactive Session Tree
+- **Rationale:**
+  1. *Visualizing Advanced Harness Features:* After implementing Session Tree (branching, forking, diffing) and the 12 Enterprise ERP Benchmark Suite in `@my-agent/core`, the `demo-app` lacked UI controls to interactively test, showcase, and verify these features live.
+  2. *Evaluation Suite Selection:* `EvalsRunnerView` was previously hardcoded to only run 10 basic UI agent tests, ignoring kurumsal ERP safety guardrails and negative constraints.
+  3. *Branch Tree Interaction:* `SessionsTab` only presented flat checkpoints and linear Undo/Redo without exposing branch creation (`fork`), branch switching, or genealogical ancestry.
+- **Decision:**
+  - **Enhanced `EvalsRunnerView.tsx`:** Added suite switcher tabs (`🏢 Kurumsal ERP Benchmark (12 Test)` vs `🖥️ Temel UI Ajanı (10 Test)`). Integrated `erpEnterpriseEvalSuite` running procurement, inventory, DuckDB SQL guard, Arrow Jobs, and financial guardrail scenarios with categorized badge cards (`🛡️ Güvenlik Bariyeri` vs `⚡ Pozitif Aksiyon`).
+  - **Enhanced `SessionsTab.tsx`:** Added interactive Session Tree controls: branch switcher pills with checkpoint counts, "➕ Yeni Dal Aç (Fork)" input form, genealogical ancestry breadcrumb (`Soy Kütüğü: main ➔ senaryo-1`), and active branch checkpoint tracking with live restoration.
+  - **Subscribed `AgentWidget.tsx`:** Synchronized `sessionManager.subscribe` directly into the widget to react to fork/switch events seamlessly.
+- **Verification:**
+  - 23/23 `@my-agent/core` test files passed (188 tests).
+  - 94 `yula.client` test suites passed (372 tests).
+  - Demo-app build succeeded in 1.16s (`tsc && vite build`).
+  - All files strictly adhere to `wc -l <= 500` (`EvalsRunnerView`: 254 lines, `SessionsTab`: 294 lines, `AgentWidget`: 265 lines).
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Advanced Pi Capabilities Integration: Hierarchical Session Tree, Durable Task Recovery, Node 22 SQLite & ERP Evals (@my-agent/core)
 - **Rationale:**
   1. *Session Branching & What-If Lineage:* Previously, session checkpointing supported flat undo/redo without genealogical tree parentage (`parentBranchId`), fork points (`forkPointId`), tree visualization, or branch diff/merge capabilities.
