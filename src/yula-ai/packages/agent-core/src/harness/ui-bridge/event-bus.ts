@@ -191,7 +191,14 @@ export class UIEventBus implements IEventBus {
    * Hedef bileşene aksiyon gönderir ve bileşenin döndürdüğü sonucu (başarı/hata)
    * standartlaştırılmış DispatchResult formatında geri iletir.
    */
-  dispatch(actionPayload: UIAction): DispatchResult {
+  dispatch(actionPayload: UIAction): DispatchResult;
+  dispatch(componentId: string, action: string, payload?: any): DispatchResult;
+  dispatch(first: UIAction | string, second?: string, third?: any): DispatchResult {
+    const actionPayload: UIAction =
+      typeof first === 'string'
+        ? { component_id: first, action: second!, payload: third }
+        : first;
+
     const list = this.subscribers.get(actionPayload.component_id);
     if (!list || list.length === 0) {
       return {

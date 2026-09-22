@@ -24,7 +24,7 @@ export function AccountStatusGuard() {
 
   useEffect(() => {
     const user = session?.user as
-      | (typeof session.user & { accessToken?: string; provider?: string })
+      | (NonNullable<typeof session>["user"] & { accessToken?: string; provider?: string })
       | undefined;
     const isExpired =
       (session as { error?: string } | null)?.error === "RefreshTokenError" ||

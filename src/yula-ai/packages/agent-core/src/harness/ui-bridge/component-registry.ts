@@ -55,6 +55,13 @@ export class UIComponentRegistry implements IComponentRegistry {
   }
 
   /**
+   * Backward-compatible alias for getActiveComponents.
+   */
+  getAll(): ComponentSchema[] {
+    return this.getActiveComponents();
+  }
+
+  /**
    * Pi-Style Preflight Validation
    * Doğrudan DOM etkileşimi öncesi bileşenin varlığı, aksiyon kabiliyeti
    * ve varsa Zod action contract şeması ile tip/format doğruluğunu denetler.

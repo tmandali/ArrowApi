@@ -17,7 +17,7 @@ export type DiagnosticAction = 'SELF_HEAL' | 'ASK_USER_CHOICE' | 'HALT';
 
 export interface DiagnosticChoice {
   label: string;
-  description: string;
+  description?: string;
   rationale?: string;
   badge?: string;
 }
@@ -30,7 +30,7 @@ export interface DiagnosticVerdict {
   reason: string;
   recoveryHint?: string;
   userFriendlyExplanation?: string;
-  suggestedChoices?: DiagnosticChoice[];
+  suggestedChoices?: Array<DiagnosticChoice | string>;
 }
 
 export interface DiagnosticContext {

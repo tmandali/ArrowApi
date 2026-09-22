@@ -11,6 +11,7 @@
 import * as React from 'react';
 import {
   AgentSession,
+  agentHarness,
   delegatedToolRegistry,
   executeComponentAction,
   uiRegistry,
@@ -322,6 +323,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}) {
 
   return {
     session,
+    harness: session?.harness ?? agentHarness,
     messages,
     status,
     isStreaming,

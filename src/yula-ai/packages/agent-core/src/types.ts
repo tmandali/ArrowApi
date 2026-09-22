@@ -267,6 +267,7 @@ export interface GetRecentEventsOptions {
 export interface IEventBus {
   subscribe(componentId: string, handler: (action: string, payload: any) => any): () => void;
   dispatch(actionPayload: UIAction): { success: boolean; result?: any; error?: string };
+  dispatch(componentId: string, action: string, payload?: any): { success: boolean; result?: any; error?: string };
   recordTelemetry(event: AppTelemetryEvent | Omit<UIEvent, 'timestamp'>, options?: RecordTelemetryOptions): void;
   getRecentEvents(options?: GetRecentEventsOptions): UIEvent[];
   getTopicBalancedEvents?(perTopicLimit?: number, distinctByType?: boolean): UIEvent[];
@@ -279,6 +280,7 @@ export interface IComponentRegistry {
   unregister(componentId: string, schema?: ComponentSchema): void;
   get(componentId: string): ComponentSchema | undefined;
   getActiveComponents(): ComponentSchema[];
+  getAll?(): ComponentSchema[];
   preflightValidate(componentId: string, action: string, payload?: any, context?: any): PreflightValidationResult;
   postflightValidate(componentId: string, action: string, output?: any): { valid: boolean; error?: string };
   formatActiveComponentsPrompt(components?: ComponentSchema[]): string;
@@ -290,6 +292,8 @@ export interface UIEvent {
   source: string;
   type: string;
   payload?: any;
+  /** Backward-compatible alias for payload */
+  details?: any;
   timestamp: number;
   age?: string;
   ageMs?: number;
