@@ -24,6 +24,14 @@ graph TD
         AgentLoop[⚡ AgentLoopNode<br/>streamText / Autonomous ReAct Loop]:::runtime
         PiGuard[🛡️ PiReliabilityNode<br/>Stagnation, Truncation & FIFO Queue]:::runtime
         PlaybookMem[(📚 ProceduralMemoryNode<br/>Playbook Rules System/Workspace/User)]:::runtime
+        HarnessFacade[🎛️ AgentHarnessNode<br/>Unified Subsystems Facade]:::runtime
+    end
+
+    subgraph HarnessLayer ["🛡️ Modular Harness Subsystems (@my-agent/core)"]
+        SessionSubsystem[💾 SessionHarness<br/>Memory, Branches, CBOR & Replay]:::runtime
+        RuntimeSubsystem[🚦 RuntimeScheduler<br/>MultiLaneScheduler & Effect Gate]:::runtime
+        CompactionSubsystem[🗜️ CompactionEngine<br/>Dual-Bound Truncate & Summaries]:::runtime
+        TelemetrySubsystem[📡 TelemetryEngine<br/>Metrics Tracker & Event Stream]:::runtime
     end
 
     subgraph StandardToolsLayer ["🧰 Standard Executable Tools (Nodes)"]
@@ -56,6 +64,8 @@ graph TD
 
     AgentLoop -->|Pi Interceptor| PiGuard
     PiGuard -->|Validated Step| AgentLoop
+    AgentLoop -.->|Lifecycle & Health Triage| HarnessFacade
+    HarnessFacade --> SessionSubsystem & RuntimeSubsystem & CompactionSubsystem & TelemetrySubsystem
 
     %% Tool Dispatches
     AgentLoop -->|Execute Tool| DispatchBridge
@@ -144,6 +154,19 @@ Every participant in the system is documented below with its role, registration 
 - **Outbound Edges:**
   - Downstream: Directly injects rules into [`AgentLoopNode`](#agentloopnode) prompt context.
 - **Neighbor References:** [Playbook Procedural Memory](file:///Users/tmr/Source/ArrowApi/.agents/knowledge/playbook-procedural-memory.md).
+
+#### 🏷️ `AgentHarnessNode`
+- **Role:** Unified Coordinator and Diagnostic Facade for UI-Agent Subsystems (`@my-agent/core`). Coordinates session persistence, execution scheduling, context compaction, UI bridge, telemetry, knowledge, and extensible hook/plugin pipelines.
+- **Inbound Edges:**
+  - Upstream: Interfaced by [`AgentSession`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/agent-session.ts) during session lifecycle, turns, and checkpoints.
+- **Outbound Subsystem Nodes:**
+  - `session`: [`SessionHarness`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/session/session-harness.ts) (dumps, memory recall/remember, checkpoints).
+  - `runtime`: [`MultiLaneScheduler`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/runtime/lanes.ts), `ExecutionQueue`, `EffectGate`.
+  - `compaction`: `compactConversation`, `compactUIEvents`, `truncateContent`.
+  - `ui`: `UIEventBus`, `UIComponentRegistry`, `VisionBridge`.
+  - `telemetry`: `PiTelemetryTracker`, `PiEventStream`, `DiagnosticRetryGuard`.
+- **Health Triage & Auditing:** Exposes `getHealthReport()` and `exportAuditReport()` for zero-overhead diagnostics.
+- **Neighbor References:** [`agent-harness.ts`](file:///Users/tmr/Source/ArrowApi/src/yula-ai/packages/agent-core/src/harness/agent-harness.ts).
 
 ---
 

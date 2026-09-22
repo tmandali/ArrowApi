@@ -2,6 +2,24 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Unified AgentHarness Facade & Lifecycle Coordination (@my-agent/core)
+- **Rationale:**
+  1. *Subsystem Coordination Overhead:* Following Phase 1 harness modularization, consumers and tests were forced to coordinate 8 separate singletons independently (`sessionHarness`, `multiLaneScheduler`, `compactConversation`, `uiEventBus`, `uiRegistry`, `telemetryTracker`, `skillsManager`, `playbookManager`).
+  2. *Alignment with Reference-Pi AgentHarness Pattern:* Reference-Pi (`reference-pi/packages/agent/src/harness/agent-harness.ts`) utilizes a unified `AgentHarness` controller providing typed access to all subsystems, session snapshots, and automated diagnostic health checks.
+- **Decision:**
+  - **Unified `AgentHarness` Facade (`harness/agent-harness.ts`):** Implemented `AgentHarness` class and `agentHarness` singleton aggregating `session`, `runtime`, `compaction`, `ui`, `tools`, `knowledge`, `telemetry`, and `extensions`.
+  - **Coordinated Operations:** Added `dump()`, `restore()`, `reset()`, `getHealthReport()`, and `exportAuditReport()`.
+  - **AgentSession Integration (`agent-session.ts`):** Exposed `session.harness` and accepted optional `harness` parameter in `AgentSessionConfig`.
+  - **Graph Topology Standard Compliance:** Updated `src/yula-ai/agent.md` Mermaid system graph and Node Catalog with `AgentHarnessNode` and modular subsystem layers.
+- **Verification:**
+  - 19/19 test suites passed (157 tests in `@my-agent/core`).
+  - Full monorepo typecheck passed cleanly (`pnpm -r typecheck`).
+  - Demo app production build succeeded (`pnpm --filter demo-app build`).
+  - All source and documentation files strictly adhere to `wc -l <= 500`.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Harness Architecture Refactor & Sub-System Layering (@my-agent/core)
 - **Rationale:**
   1. *Flat File Congestion:* Previously, `packages/agent-core/src/` contained ~50 files directly in a flat directory, obscuring subsystem boundaries, complicating navigation, and threatening the 500-line limit.
@@ -457,35 +475,7 @@ This document is the **append-only audit log** recording fundamental architectur
 
 ---
 
-## [2026-09-21] System UI Component Action Contract Standardization (app_router, criteria_form, result_grid:active)
-- **Rationale:**
-  1. *Prompt Engine Parameter Omission:* In `@my-agent/core` (`component-registry.ts`), the LLM system prompt outputs action parameters (`- Parameters: { ... }`) and return types (`- Returns: { ... }`) only when `inputSchema` and `outputSchema` are declared on the action contract. Components lacking explicit `inputSchema` caused the agent to guess parameter names.
-  2. *Unified Schema Contracts Across Component Families:* All system-level components (`job_history`, `app_router`, `criteria_form`, `result_grid:active`) must adhere to identical structured contracts with Zod `safeParse` validation in `dispatch-bridge.ts`.
-- **Decision:**
-  - **Modular Contracts:** Created `app-router-contracts.ts` (`NAVIGATE`), `criteria-form-contracts.ts` (`SET_FIELDS`, `APPLY`, `SUBMIT`, `RUN`, `SCHEMA`, `READ`, `VALIDATE`), and `result-grid-contracts.ts` (`RUN_SQL`, `QUERY`, `FILTER`, `APPLY_FILTERS`, `SORT`, `COLUMNS`, `PIN`, `RESET_LAYOUT`, `EXPORT`, `PROFILE`, `ANALYZE`, `VISUALIZE`).
-  - **Component Wiring:** Replaced ad-hoc action definitions across `yula-active-components.ts`, `use-result-grid-agent.ts`, and `use-headless-system-components.ts` with standardized imported contracts.
-  - **Runtime Validation:** Integrated `safeParse` in `dispatch-bridge.ts` for all system action families.
-  - **Verification:** Created comprehensive test suite in `system-contracts.test.ts` (all 258 tests pass, 0 oxlint warnings/errors, all files <= 345 lines).
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Typed Action Contract for Report Execution Inspection (`job_history:GET_DETAIL`)
-- **Rationale:**
-  1. *Missing Execution Telemetry in Agent Context:* Previously, the `job_history` component only provided high-level summary rows via `LIST` (`jobId`, `status`, `rowCount`). The agent could not inspect detailed runtime metrics, live SSE event history, error messages, or exact request parameters submitted for a specific report run.
-  2. *Schema-First Action Contract Compliance:* In line with the `@my-agent/core` architecture, tools and actions must declare structured Zod/JSON Schema contracts (`inputSchema`, `outputSchema`, `whenToCall`, `whenNotToCall`).
-- **Decision:**
-  - **Modular Tool & Action Contract (`job-detail-tool.ts`):** Created dedicated modular file adhering to the 500-line limit, defining `JOB_DETAIL_ACTION_CONTRACT` with typed `summary`, `progress`, and `requestInput` schemas. Implemented `getJobDetailTool` calling backend endpoints (`getArrowJob`, `fetchJobRequest`, `fetchJobEventLog`).
-  - **Dispatch Bridge Integration (`dispatch-bridge.ts`):** Routed `GET_DETAIL` and `DETAIL` on `family === "job_history"` to `getJobDetailTool`.
-  - **Active Component Registration (`yula-active-components.ts`):** Exposed `GET_DETAIL` capability and action contract to `job_history`.
-  - **Zero-Latency Panel Hydration (`arrow-job-executions-panel.tsx`):** Handled `GET_DETAIL` directly inside `useAgentComponent.onAction` using active React state (`selectedJob`, `progressEvents`, `inputJson`) when matching `selectedId`, with seamless fallback to server dispatch.
-  - **Verification:** Unit tests in `job-detail-tool.test.ts` pass, all 242 client tests pass, and zero linter errors.
-- **Author:** Antigravity / Team
-
----
-
 ## 📜 Prior Decisions Archive
 Older architectural decisions have been archived to adhere to the 500-line limit:
 - [Decision Log Archive 2 (.agents/log-archive-2.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-2.md)
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
-

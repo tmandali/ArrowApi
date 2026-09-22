@@ -15,7 +15,8 @@ import { Agent } from './agent';
 import type { QueueMode } from './agent-loop-types';
 import type { AgentEvent, CompactionResult, CompactionSettings } from './types';
 import { compactConversation } from './harness/compaction/compaction';
-import { sessionHarness, type SessionDump } from './harness/session/session-harness';
+import { type SessionDump } from './harness/session/session-harness';
+import { AgentHarness, agentHarness } from './harness/agent-harness';
 import { delegatedToolRegistry } from './harness/tools/ui-delegation';
 import { exportSessionToHtml } from './harness/telemetry/export-html';
 
@@ -50,6 +51,7 @@ export interface AgentSessionConfig {
   autoRetry?: boolean;
   maxRetries?: number;
   onSaveMessages?: (messages: AgentMessage[]) => void;
+  harness?: AgentHarness;
 }
 
 function isRetryableError(err: any): boolean {
@@ -69,6 +71,7 @@ function isRetryableError(err: any): boolean {
 export class AgentSession {
   readonly agent: Agent;
   readonly sessionId: string;
+  readonly harness: AgentHarness;
   private listeners = new Set<(event: AgentSessionEvent) => void>();
   private autoCompactionEnabled: boolean;
   private compactionSettings: CompactionSettings;
@@ -80,6 +83,7 @@ export class AgentSession {
   constructor(config: AgentSessionConfig) {
     this.agent = config.agent;
     this.sessionId = config.sessionId || `session_${Date.now()}`;
+    this.harness = config.harness ?? agentHarness;
     this.autoCompactionEnabled = config.autoCompaction ?? true;
     this.compactionSettings = {
       enabled: true,
@@ -385,7 +389,7 @@ export class AgentSession {
   }
 
   dump(uiState?: Record<string, any>): SessionDump {
-    const d = sessionHarness.dumpSession(this.agent.messages, uiState);
+    const d = this.harness.dump(this.agent.messages, uiState);
     d.sessionId = this.sessionId;
     return d;
   }

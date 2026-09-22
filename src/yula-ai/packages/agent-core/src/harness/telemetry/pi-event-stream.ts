@@ -2,7 +2,7 @@ import { AgentEvent } from '../../types';
 
 export type AgentEventListener = (event: AgentEvent) => void;
 
-class PiEventStream {
+export class PiEventStream {
   private listeners: Set<AgentEventListener> = new Set();
   private history: AgentEvent[] = [];
   private readonly maxHistory: number = 50;

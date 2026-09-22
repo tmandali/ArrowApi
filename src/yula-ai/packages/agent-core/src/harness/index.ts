@@ -6,3 +6,4 @@ export * from './tools';
 export * from './knowledge';
 export * from './telemetry';
 export * from './extensions';
+export * from './agent-harness';

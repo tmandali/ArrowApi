@@ -147,6 +147,13 @@ export class SessionHarness {
     // UI'daki chat state ve dinleyicileri sıfırla
     this.onResetListeners.forEach((l) => l());
   }
+
+  /**
+   * Alias for newConversation to reset session state.
+   */
+  reset(): void {
+    this.newConversation();
+  }
 }
 
 export const sessionHarness = new SessionHarness();
