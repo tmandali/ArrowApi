@@ -24,6 +24,8 @@ interface WidgetHeaderProps {
   availableModels?: any[];
   onSelectModel?: (modelId: string, provider?: string) => void;
   onOpenLogin?: () => void;
+  onExportHtmlReport?: () => void;
+  harnessHealth?: { status: 'healthy' | 'degraded'; activeBranch: string };
 }
 
 export function WidgetHeader({
@@ -46,6 +48,8 @@ export function WidgetHeader({
   availableModels = [],
   onSelectModel,
   onOpenLogin,
+  onExportHtmlReport,
+  harnessHealth,
 }: WidgetHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,6 +104,22 @@ export function WidgetHeader({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>🤖</span>
           <span style={{ fontWeight: 700, fontSize: 14 }}>Headless UI Agent</span>
+          {harnessHealth && (
+            <span
+              title={`Harness Durumu: ${harnessHealth.status}, Aktif Dal: ${harnessHealth.activeBranch}`}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                borderRadius: 10,
+                fontWeight: 600,
+                backgroundColor: harnessHealth.status === 'healthy' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                color: harnessHealth.status === 'healthy' ? '#4ade80' : '#f87171',
+                border: `1px solid ${harnessHealth.status === 'healthy' ? '#22c55e' : '#ef4444'}`,
+              }}
+            >
+              {harnessHealth.status === 'healthy' ? '🟢 Sağlıklı' : '🔴 Sorunlu'}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input
@@ -133,6 +153,15 @@ export function WidgetHeader({
           >
             💾 Dump
           </button>
+          {onExportHtmlReport && (
+            <button
+              onClick={onExportHtmlReport}
+              title="HTML Denetim Raporu İndir"
+              style={actionBtnStyle}
+            >
+              📊 Rapor
+            </button>
+          )}
           <button
             onClick={() => fileInputRef.current?.click()}
             title="JSON Dump Dosyası Geri Yükle"

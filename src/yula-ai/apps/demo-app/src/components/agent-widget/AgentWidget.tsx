@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAgentChat, useAgentProgress } from '@my-agent/react';
+import { useAgentChat, useAgentProgress, useAgentHarness } from '@my-agent/react';
 import {
   piEventStream,
   AgentEvent,
@@ -36,6 +36,7 @@ export function AgentWidget({
   const [summary, setSummary] = useState(telemetryTracker.getMetricsSummary());
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const { activeProgress } = useAgentProgress();
+  const { health: harnessHealth, exportAuditReport } = useAgentHarness();
 
   const resolvedRoute = currentRoute || (typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -110,14 +111,24 @@ export function AgentWidget({
     marginBottom: 12,
   };
 
-  const handleRestore = (jsonText: string) => {
-    const res = restoreSession(jsonText);
-    if (res.success) {
-      alert('✅ Oturum dump dosyası başarıyla yüklendi!');
-      setMemories(getMemories());
-    } else {
-      alert(`❌ Hata: ${res.error}`);
+  const handleRestore = (jsonStr: string) => {
+    try {
+      const dump = JSON.parse(jsonStr);
+      restoreSession(dump);
+    } catch (err: any) {
+      alert(`Geri yükleme hatası: ${err.message}`);
     }
+  };
+
+  const handleExportHtmlReport = () => {
+    const html = exportAuditReport(messages);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent-audit-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -131,6 +142,8 @@ export function AgentWidget({
             onNewConversation={newConversation}
             onDumpSession={() => dumpSession()}
             onRestoreSession={handleRestore}
+            onExportHtmlReport={handleExportHtmlReport}
+            harnessHealth={harnessHealth}
             piEventsCount={piEvents.length}
             skillsCount={activeSkills.length}
             memoryCount={memories.length}

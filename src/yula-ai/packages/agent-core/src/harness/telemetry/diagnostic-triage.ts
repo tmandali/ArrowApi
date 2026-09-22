@@ -30,7 +30,7 @@ export interface DiagnosticVerdict {
   reason: string;
   recoveryHint?: string;
   userFriendlyExplanation?: string;
-  suggestedChoices?: Array<DiagnosticChoice | string>;
+  suggestedChoices?: DiagnosticChoice[];
 }
 
 export interface DiagnosticContext {

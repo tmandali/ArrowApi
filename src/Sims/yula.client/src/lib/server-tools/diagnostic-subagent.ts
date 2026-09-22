@@ -192,7 +192,9 @@ ${sanitizedError}`;
         reason: data.reason || sanitizedError,
         userFriendlyExplanation: data.userFriendlyExplanation || deterministic.userFriendlyExplanation,
         recoveryHint: data.recoveryHint,
-        suggestedChoices: data.suggestedChoices || deterministic.suggestedChoices,
+        suggestedChoices: data.suggestedChoices
+          ? data.suggestedChoices.map((choice) => ({ label: choice, description: choice }))
+          : deterministic.suggestedChoices,
       };
     }
   } catch (subErr) {
