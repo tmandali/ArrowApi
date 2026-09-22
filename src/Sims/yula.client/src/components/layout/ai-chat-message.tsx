@@ -12,7 +12,8 @@ import { FileOpenChip } from "./chat-markdown/markdown-chips";
 import { criteriaStaticTitles } from "@/lib/yula-actions";
 import { yulaToolPartInfo } from "@/lib/yula-tool-info";
 import { extractSourceTable } from "@/lib/yula-source-table";
-import { isTextPart } from "@my-agent/core";
+import { useYulaDockStore } from "@/lib/stores/dock";
+import { isTextPart, uiEventBus, uiRegistry } from "@my-agent/core";
 
 type AiChatMessageProps = {
   message: YulaMessage;
@@ -43,11 +44,19 @@ function FormattedAssistantText({
       if (to < 0) router.back();
       else router.forward();
     } else {
+      useYulaDockStore.getState().setExpanded(false);
+      useYulaDockStore.getState().setOpen(true);
       void router.push(to);
     }
   };
 
-  const { sendMessageText: sendPrompt } = useYulaChat()
+  const {
+    sendMessageText: sendPrompt,
+    steer,
+    respondToChoice,
+    isSuspended,
+    isTurnActive,
+  } = useYulaChat();
   const pathname = usePathname()
   // Aktif raporun kriter başlıkları: yankı maddeleri statik render edilir.
   const staticTitles = React.useMemo(
@@ -168,7 +177,49 @@ function FormattedAssistantText({
     return false
   }
 
-  const columns = useYulaGridStore.getState().spec?.columns ?? []
+  const columns = useYulaGridStore.getState().spec?.columns ?? [];
+
+  const handleChoiceSelect = React.useCallback(
+    (value: string, context?: { question?: string; field?: string }) => {
+      // 1. Telemetri olayını uiEventBus üzerine zenginleştirilmiş veriyle fırlat
+      uiEventBus.recordTelemetry({
+        source: "human_in_the_loop",
+        type: "CHOICE_SELECTED",
+        details: {
+          value,
+          label: value,
+          questionContext: context?.question,
+          inferredField: context?.field,
+          targetComponent: "criteria_form",
+          timestamp: Date.now(),
+        },
+      });
+
+      // 2. Kriter alanı çıkarıldıysa (örn: CompanyCode), kayıtlı criteria_form bileşenini anında güncelle
+      if (context?.field) {
+        const formComps = uiRegistry
+          .getAll()
+          .filter((c) => c.id.startsWith("criteria_form"));
+        for (const comp of formComps) {
+          uiEventBus.dispatch({
+            component_id: comp.id,
+            action: "SET_FIELDS",
+            payload: { [context.field]: value },
+          });
+        }
+      }
+
+      // 3. Ajan akışını kesintisiz sürdür (askıda ise tool cevabı olarak, turn aktifse steer, değilse prompt)
+      if (isSuspended && typeof respondToChoice === "function") {
+        respondToChoice(value);
+      } else if (isTurnActive && typeof steer === "function") {
+        steer(value);
+      } else {
+        sendPrompt(value);
+      }
+    },
+    [isSuspended, respondToChoice, isTurnActive, steer, sendPrompt],
+  );
 
   return (
     <div className="max-w-[96%] text-[12px] text-foreground/90">
@@ -178,12 +229,13 @@ function FormattedAssistantText({
         columns={columns}
         sourceTable={sourceTable}
         onPrompt={sendPrompt}
+        onChoiceSelect={handleChoiceSelect}
         onNavigateReport={navigateToReportOrJob}
         onRunReport={onRunReport}
         staticTitles={staticTitles}
       />
     </div>
-  )
+  );
 }
 
 function TextPart({

@@ -6,6 +6,8 @@ import { useTranslations, useLocale } from "next-intl";
 import {
   getAllYulaCommands,
   localizeYulaCommands,
+  matchModelSubcommands,
+  matchProviderSubcommands,
   matchYulaCommands,
   userSkillsToCommands,
   type YulaCommand,
@@ -17,6 +19,14 @@ import { ensureExampleAgent } from "@/lib/stores/user-agents";
 import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
 import type { useYulaChat } from "@/hooks/use-yula-chat";
 import { useHistorySuggestions } from "./use-history-suggestions";
+import { useProviderDialogStore } from "@/lib/stores/provider-dialog-store";
+import {
+  fetchCachedYulaModels,
+  getCachedAllModels,
+  getCachedAvailableProviders,
+  useYulaAiConfig,
+  writeYulaClientAiConfig,
+} from "@/lib/yula-ai-client-config";
 
 export type AttachedFile = {
   id: string;
@@ -47,9 +57,20 @@ export function useChatComposer(args: {
   const { yula, effectiveAgent, workspaceId, isViewingResults, pathname } = args;
   const router = useRouter();
   const tc = useTranslations("Commands");
+  const tChat = useTranslations("ChatAssistant");
   const locale = useLocale();
 
   const [input, setInput] = React.useState("");
+  const aiConfig = useYulaAiConfig();
+  const storeModel = useChatsStore((s) => s.model);
+  const activeModel = (aiConfig.model || yula.model || storeModel || "").trim();
+  const activeProvider = aiConfig.provider;
+  const modelTag = activeModel
+    ? activeProvider
+      ? `${activeProvider}:${activeModel}`
+      : activeModel
+    : null;
+
   const [attachments, setAttachments] = React.useState<AttachedFile[]>([]);
   const [selectedCommand, setSelectedCommand] = React.useState<YulaCommand | null>(null);
   const [pastedChip, setPastedChip] = React.useState<{
@@ -95,11 +116,85 @@ export function useChatComposer(args: {
     // `tc` render başına yenidir; liste küçüktür → her render yeniden çözümle
     [isViewingResults, pathname, userSkillCommands, tc],
   );
-  const commandMatches = matchYulaCommands(input, allCommands);
-  const showCommands = input.startsWith("/") && commandMatches !== null && commandMatches.length > 0;
+
+  const [allModelsList, setAllModelsList] = React.useState(() => getCachedAllModels());
+  const [availableProvidersList, setAvailableProvidersList] = React.useState(() =>
+    getCachedAvailableProviders(),
+  );
+  const [isRefreshingModels, setIsRefreshingModels] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    void fetchCachedYulaModels(aiConfig).then((data) => {
+      if (!active) return;
+      if (data?.allModels && data.allModels.length > 0) setAllModelsList(data.allModels);
+      if (data?.availableProviders && data.availableProviders.length > 0) {
+        setAvailableProvidersList(data.availableProviders);
+      }
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- provider ve endpoint değiştikçe modeller yenilenir
+  }, [aiConfig.provider, aiConfig.endpoint]);
+
+  const isProviderSubmenu =
+    selectedCommand?.id === "provider" ||
+    selectedCommand?.id === "login" ||
+    input.startsWith("/provider ") ||
+    input === "/provider" ||
+    input.startsWith("/login ") ||
+    input === "/login";
+
+  const isModelSubmenu =
+    selectedCommand?.id === "model" ||
+    input.startsWith("/model ") ||
+    input === "/model";
+
+  const providerMatchOpts = React.useMemo(
+    () => ({
+      availableProviderIds: availableProvidersList.map((p) => p.id),
+      activeProvider: aiConfig.provider,
+      activeLabel: tChat("provider_active"),
+      loggedInLabel: tChat("provider_logged_in"),
+      notConfiguredLabel: tChat("provider_not_configured"),
+    }),
+    [availableProvidersList, aiConfig.provider, tChat],
+  );
+
+  const commandMatches = React.useMemo(() => {
+    if (selectedCommand?.id === "provider" || selectedCommand?.id === "login") {
+      return matchProviderSubcommands(input, providerMatchOpts);
+    }
+    if (
+      input.startsWith("/provider ") ||
+      input === "/provider" ||
+      input.startsWith("/login ") ||
+      input === "/login"
+    ) {
+      const sub = input.replace(/^\/(provider|login)\s*/, "");
+      return matchProviderSubcommands(sub, providerMatchOpts);
+    }
+    if (selectedCommand?.id === "model") {
+      return matchModelSubcommands(input, allModelsList, isRefreshingModels, aiConfig.provider);
+    }
+    if (input.startsWith("/model ") || input === "/model") {
+      const sub = input.replace(/^\/model\s*/, "");
+      return matchModelSubcommands(sub, allModelsList, isRefreshingModels, aiConfig.provider);
+    }
+    return matchYulaCommands(input, allCommands);
+  }, [selectedCommand, input, allCommands, allModelsList, isRefreshingModels, providerMatchOpts, aiConfig.provider]);
+
+  const showCommands =
+    (selectedCommand?.id === "provider" ||
+      selectedCommand?.id === "login" ||
+      selectedCommand?.id === "model" ||
+      input.startsWith("/")) &&
+    commandMatches !== null &&
+    commandMatches.length > 0;
   // "Ajan oluştur" alt öğesi yalnız ana Yula ekranında (/) gösterilir ve
   // ok tuşu gezintisine dahildir (son sıra).
-  const showNewAgentItem = showCommands && pathname === "/";
+  const showNewAgentItem = showCommands && pathname === "/" && !isProviderSubmenu && !isModelSubmenu;
   const paletteItemCount = (commandMatches?.length ?? 0) + (showNewAgentItem ? 1 : 0);
   const isNewAgentSelected =
     showNewAgentItem && selectedIndex === (commandMatches?.length ?? 0);
@@ -137,6 +232,14 @@ export function useChatComposer(args: {
     [router],
   );
 
+  const clearComposer = (closeHistory = true) => {
+    setInput("");
+    setSelectedCommand(null);
+    setPastedChip(null);
+    setAttachments([]);
+    if (closeHistory) setHistoryClosed(true);
+  };
+
   const newConversation = yula.newConversation;
 
   const doSend = (text: string) => {
@@ -146,51 +249,78 @@ export function useChatComposer(args: {
 
     if (!trimmed && !promptPrefix && !pastedChip && attachments.length === 0) return;
 
-    if (
-      selectedCommand?.id === "new" ||
-      trimmed.toLowerCase() === "/new" ||
-      trimmed.toLowerCase() === "/yeni" ||
-      trimmed.toLowerCase() === "/clear"
-    ) {
+    const lower = trimmed.toLowerCase();
+    if (selectedCommand?.id === "new" || lower === "/new" || lower === "/yeni" || lower === "/clear") {
       newConversation();
-      setInput("");
-      setSelectedCommand(null);
-      setPastedChip(null);
-      setAttachments([]);
-      setHistoryClosed(true);
+      clearComposer();
       return;
     }
 
-    if (selectedCommand?.id === "dump" || trimmed.toLowerCase() === "/dump") {
+    if (selectedCommand?.id === "dump" || lower === "/dump") {
       yula.dumpSession?.();
-      setInput("");
-      setSelectedCommand(null);
-      setPastedChip(null);
-      setAttachments([]);
-      setHistoryClosed(true);
+      clearComposer();
       return;
     }
 
-    let finalPrompt = "";
-    if (selectedCommand?.source === "user") {
-      finalPrompt = buildUserSkillPrompt(selectedCommand, trimmed);
-    } else if (promptPrefix) {
-      finalPrompt = trimmed ? `${promptPrefix} ${trimmed}` : promptPrefix;
-    } else {
-      finalPrompt = trimmed;
+    if (
+      selectedCommand?.id === "provider" ||
+      selectedCommand?.id === "login" ||
+      lower.startsWith("/provider") ||
+      lower.startsWith("/login")
+    ) {
+      const sub = trimmed.replace(/^\/(provider|login)\s*/i, "").trim();
+      clearComposer();
+      useProviderDialogStore.getState().openDialog((sub || "ollama").toLowerCase());
+      return;
     }
 
-    if (pastedBlock) {
-      finalPrompt = `${finalPrompt}${pastedBlock}`.trim();
+    if (selectedCommand?.id === "model" || lower.startsWith("/model")) {
+      const sub = trimmed.replace(/^\/model\s*/i, "").trim();
+      clearComposer();
+
+      if (["refresh", "yenile", "guncelle"].includes(sub.toLowerCase())) {
+        setIsRefreshingModels(true);
+        const modelCmd = allCommands.find((c) => c.id === "model");
+        if (modelCmd) setSelectedCommand(modelCmd);
+        setInput("");
+        setHistoryClosed(false);
+        void fetchCachedYulaModels(undefined, true)
+          .then((res) => {
+            if (res?.allModels) setAllModelsList(res.allModels);
+          })
+          .finally(() => setIsRefreshingModels(false));
+        return;
+      }
+
+      if (sub) {
+        const found = allModelsList.find(
+          (m) => m.id.toLowerCase() === sub.toLowerCase() || m.name.toLowerCase() === sub.toLowerCase(),
+        );
+        const targetModel = found?.id || sub;
+        writeYulaClientAiConfig({
+          model: targetModel,
+          ...(found?.provider ? { provider: found.provider as any } : {}),
+        });
+        useChatsStore.getState().setModel(targetModel);
+      } else {
+        const cmd = allCommands.find((c) => c.id === "model");
+        if (cmd) setSelectedCommand(cmd);
+      }
+      return;
     }
+
+    const finalPromptRaw = selectedCommand?.source === "user"
+      ? buildUserSkillPrompt(selectedCommand, trimmed)
+      : promptPrefix ? (trimmed ? `${promptPrefix} ${trimmed}` : promptPrefix) : trimmed;
+    const finalPrompt = pastedBlock ? `${finalPromptRaw}${pastedBlock}`.trim() : finalPromptRaw;
 
     const currentAttachments = [...attachments];
-    yula.sendMessageText(`${finalPrompt}`.trim(), currentAttachments);
-    setInput("");
-    setSelectedCommand(null);
-    setPastedChip(null);
-    setAttachments([]);
-    setHistoryClosed(true);
+    if (yula.isSuspended && yula.respondToChoice) {
+      yula.respondToChoice(`${finalPrompt}`.trim());
+    } else {
+      yula.sendMessageText(`${finalPrompt}`.trim(), currentAttachments);
+    }
+    clearComposer();
   };
 
   const handleSend = () => {
@@ -201,37 +331,54 @@ export function useChatComposer(args: {
     const content = (text ?? input).trim();
     if (!content) return;
     yula.steer?.(content);
-    setInput("");
-    setSelectedCommand(null);
-    setPastedChip(null);
-    setAttachments([]);
+    clearComposer(false);
   };
 
   const handleFollowUp = (text?: string) => {
     const content = (text ?? input).trim();
     if (!content) return;
     yula.followUp?.(content);
-    setInput("");
-    setSelectedCommand(null);
-    setPastedChip(null);
-    setAttachments([]);
+    clearComposer(false);
   };
 
   const applyCommand = (command: YulaCommand) => {
     if (command.id === "new") {
       newConversation();
-      setInput("");
-      setSelectedCommand(null);
-      setPastedChip(null);
-      setHistoryClosed(true);
+      clearComposer();
       return;
     }
     if (command.id === "dump") {
       yula.dumpSession?.();
-      setInput("");
-      setSelectedCommand(null);
-      setPastedChip(null);
-      setHistoryClosed(true);
+      clearComposer();
+      return;
+    }
+    if (command.id.startsWith("provider-") || (isProviderSubmenu && command.slash)) {
+      clearComposer();
+      useProviderDialogStore.getState().openDialog(command.slash);
+      return;
+    }
+    if (command.id.startsWith("model-") || (isModelSubmenu && command.slash)) {
+      if (isModelSubmenu && (command.id === "model:refresh" || command.slash === "refresh")) {
+        setIsRefreshingModels(true);
+        const modelCmd = allCommands.find((c) => c.id === "model");
+        if (modelCmd) setSelectedCommand(modelCmd);
+        setInput("");
+        setHistoryClosed(false);
+        void fetchCachedYulaModels(undefined, true)
+          .then((res) => {
+            if (res?.allModels) setAllModelsList(res.allModels);
+          })
+          .finally(() => setIsRefreshingModels(false));
+        return;
+      }
+      const targetModel = command.slash;
+      const targetProvider = command.pagePath;
+      clearComposer();
+      writeYulaClientAiConfig({
+        model: targetModel,
+        ...(targetProvider ? { provider: targetProvider as any } : {}),
+      });
+      useChatsStore.getState().setModel(targetModel);
       return;
     }
     setSelectedCommand(command);
@@ -241,27 +388,17 @@ export function useChatComposer(args: {
 
   const onFilesSelected = (files: FileList | null) => {
     if (!files?.length) return;
-    const fileArray = Array.from(files);
-
-    fileArray.forEach((file) => {
+    Array.from(files).forEach((file) => {
       const id = `${file.name}-${file.size}-${file.lastModified}`;
-      const isImage = file.type.startsWith("image/");
-
-      if (isImage) {
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (e) => {
           const dataUrl = e.target?.result as string;
-          setAttachments((current) => {
-            if (current.some((f) => f.id === id)) return current;
-            return [...current, { id, name: file.name, size: file.size, type: file.type, dataUrl }].slice(0, 5);
-          });
+          setAttachments((curr) => curr.some((f) => f.id === id) ? curr : [...curr, { id, name: file.name, size: file.size, type: file.type, dataUrl }].slice(0, 5));
         };
         reader.readAsDataURL(file);
       } else {
-        setAttachments((current) => {
-          if (current.some((f) => f.id === id)) return current;
-          return [...current, { id, name: file.name, size: file.size, type: file.type }].slice(0, 5);
-        });
+        setAttachments((curr) => curr.some((f) => f.id === id) ? curr : [...curr, { id, name: file.name, size: file.size, type: file.type }].slice(0, 5));
       }
     });
   };
@@ -271,6 +408,12 @@ export function useChatComposer(args: {
     Boolean(selectedCommand) ||
     Boolean(pastedChip) ||
     attachments.length > 0;
+
+  const closeCommands = React.useCallback(() => {
+    setInput("");
+    setSelectedCommand(null);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
 
   return {
     input,
@@ -293,6 +436,7 @@ export function useChatComposer(args: {
     fileInputRef,
     textareaRef,
     commandMatches,
+    isRefreshingModels,
     showCommands,
     showNewAgentItem,
     paletteItemCount,
@@ -306,6 +450,12 @@ export function useChatComposer(args: {
     applyCommand,
     onFilesSelected,
     canSubmit,
+    modelTag,
+    closeCommands,
+    isModelSubmenu,
+    isProviderSubmenu,
+    isSuspended: yula.isSuspended,
+    pendingChoice: yula.pendingChoice,
   };
 }
 

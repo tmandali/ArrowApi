@@ -31,6 +31,22 @@ commands:
     icon: "Cpu"
     phase: "system"
 
+  - id: "provider"
+    slash: "provider"
+    label: "AI Sağlayıcısı Seç"
+    description: "Aktif AI model sağlayıcısını seç (Ollama, Azure, OpenAI...)"
+    prompt: "/provider"
+    icon: "Layers"
+    phase: "system"
+
+  - id: "login"
+    slash: "login"
+    label: "Giriş / Sağlayıcı Bağla"
+    description: "AI sağlayıcısı veya hesap kimlik doğrulaması"
+    prompt: "/login"
+    icon: "LogIn"
+    phase: "system"
+
   - id: "help"
     slash: "yardim"
     label: "Yardım & Komutlar"

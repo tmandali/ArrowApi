@@ -10,7 +10,6 @@ export function isSettingsTab(v: string | null): v is SettingsTabId {
   return (
     v === "user-details" ||
     v === "settings" ||
-    v === "yula-ai" ||
     v === "connections"
   );
 }
@@ -37,16 +36,16 @@ export const SETTINGS_READ_CONTRACT = {
 
 export const SETTINGS_SWITCH_TAB_CONTRACT = {
   description:
-    "Switches the active settings tab ({ tab: 'user-details' | 'settings' | 'yula-ai' | 'connections' }).",
+    "Switches the active settings tab ({ tab: 'user-details' | 'settings' | 'connections' }).",
   inputSchema: z.object({
-    tab: z.enum(["user-details", "settings", "yula-ai", "connections"]),
+    tab: z.enum(["user-details", "settings", "connections"]),
   }),
   outputSchema: z.object({
     success: z.boolean(),
     activeTab: z.string().optional(),
     error: z.string().optional(),
   }),
-  whenToCall: "When the user asks to open profile, preferences, or AI model settings.",
+  whenToCall: "When the user asks to open profile or preferences settings.",
   whenNotToCall: "When the tab is already active.",
 } satisfies ActionContract;
 

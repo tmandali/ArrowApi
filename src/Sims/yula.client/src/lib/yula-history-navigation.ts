@@ -1,5 +1,6 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route"
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats"
+import { useYulaDockStore } from "@/lib/stores/dock"
 import { useActiveJobsStore } from "@/store/slices/active-jobs-store"
 import { focusReportExecution } from "@/lib/report-run-bus"
 import {
@@ -63,7 +64,7 @@ export function hrefForConversation(
   if (jobId && extractJobIdFromHref(conversation.pathname)) {
     return conversation.pathname
   }
-  if (jobId && exec) return `${exec}/${jobId}`
+  if (jobId && exec && !isWorkspaceHomePath(exec)) return `${exec}/${jobId}`
   return conversation.pathname
 }
 
@@ -95,12 +96,19 @@ export function navigateToConversationScreen(
   messages?: YulaMessage[],
 ): void {
   restoreConversationExecution(conversation, messages)
-  const href = hrefForConversation(conversation, messages)
-  if (!href) return
+
+  // In full-mode IDE (expanded) or on workspace home (/), selecting a conversation
+  // must stay in full-mode in-place and NEVER navigate away to a report screen.
+  // The user exits to the resolved report screen when they click the X button or Escape.
+  const isExpanded = useYulaDockStore.getState().expanded
   const here =
     typeof window !== "undefined"
       ? `${window.location.pathname}${window.location.search}`.replace(/\/+$/, "") || "/"
       : "/"
+  if (isExpanded || (typeof window !== "undefined" && isWorkspaceHomePath(here))) return
+
+  const href = hrefForConversation(conversation, messages)
+  if (!href) return
   const dest = href.replace(/\/+$/, "") || "/"
   if (here !== dest) push(href)
 }
@@ -108,7 +116,7 @@ export function navigateToConversationScreen(
 const NAV_TOOL_NAMES = new Set(["navigate_to_page", "run_job"])
 
 /** Mesajlardaki SON navigasyon aracının hedef sayfası (yoksa null). */
-function lastNavigateTargetFromMessages(messages?: YulaMessage[]): string | null {
+export function lastNavigateTargetFromMessages(messages?: YulaMessage[]): string | null {
   if (!messages?.length) return null
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i]

@@ -34,7 +34,12 @@ import {
   SilentTurnFallback,
   hasVisibleTurnContent,
   INTERACTIVE_CARD_TOOLS,
+  extractNavigationAction,
+  hasJobStartedCard,
+  isChartActionContract,
+  extractJobStartedAction,
 } from "./yula-chat-turn-helpers";
+import { YulaAssistantActions } from "./yula-assistant-actions";
 import { modelCatalog, getMessageText, isTextPart, isReasoningPart } from "@my-agent/core";
 
 export interface YulaChatTurnProps {
@@ -245,6 +250,14 @@ export function YulaChatTurn({
     });
   }, [assistantMessage, toolParts, assistantText, pathname, turnLang]);
 
+  const navAction = React.useMemo(() => {
+    return extractNavigationAction(toolParts);
+  }, [toolParts]);
+
+  const hasJobCard = React.useMemo(() => {
+    return hasJobStartedCard(toolParts);
+  }, [toolParts]);
+
   const handleRunReportClick = React.useCallback((): boolean => {
     if (!runAction) return false;
     return triggerReportRun(runAction.scope);
@@ -362,42 +375,40 @@ export function YulaChatTurn({
           .map((info) => {
             const isError = isFailedToolInfo(info);
             if (isError && recoveredToolCallIds.has(info.toolCallId)) return null;
-            const isChart =
-              (info.toolName === "visualize_grid_data" ||
-                (info.toolName === "dispatch_component_action" &&
-                  ((info.input as { action?: string } | undefined)?.action === "VISUALIZE" ||
-                   (info.input as { action?: string } | undefined)?.action === "CHART"))) &&
+            if (
+              isChartActionContract(info.toolName, info.input) &&
               !isError &&
-              info.state === "output-available";
-            if (isChart) {
+              info.state === "output-available"
+            ) {
               return <YulaChartCard key={info.toolCallId} output={info.output} />;
             }
-            const isJob =
-              (info.toolName === "run_job" ||
-                (info.input as { action?: string } | undefined)?.action === "RUN" ||
-                (info.output as { status?: string } | undefined)?.status === "executed") &&
-              !isError &&
-              info.state === "output-available" &&
-              typeof (info.output as { navigateTo?: unknown })?.navigateTo === "string";
-            if (isJob) {
-              const out = info.output as { jobId?: string; navigateTo: string };
-              return <YulaJobStartedCard key={info.toolCallId} jobId={out.jobId} navigateTo={out.navigateTo} />;
+            const jobAction = extractJobStartedAction(info);
+            if (jobAction) {
+              return (
+                <YulaJobStartedCard
+                  key={info.toolCallId}
+                  jobId={jobAction.jobId}
+                  navigateTo={jobAction.navigateTo}
+                />
+              );
             }
             return null;
           })}
 
-        {/* 2. Nihai Akan Markdown Cevap / Plan Metni — Kullanıcı önce planı okur */}
-        {assistantText.trim() && displayAssistantMessage ? (
-          <AiChatMessage
-            message={displayAssistantMessage}
-            isLive={isLive}
-            onRunReport={runAction ? handleRunReportClick : undefined}
-          />
-        ) : fallbackMessage ? (
-          <AiChatMessage
-            message={fallbackMessage}
-            onRunReport={runAction ? handleRunReportClick : undefined}
-          />
+        {/* 2. Nihai Akan Markdown Cevap / Plan Metni — Hover aksiyonları ile sarılı */}
+        {(assistantText.trim() && displayAssistantMessage) || fallbackMessage ? (
+          <div className="group/assistant relative rounded-lg">
+            <AiChatMessage
+              message={(displayAssistantMessage || fallbackMessage)!}
+              isLive={isLive}
+              onRunReport={runAction ? handleRunReportClick : undefined}
+            />
+            {!isLive ? (
+              <YulaAssistantActions
+                navAction={hasJobCard ? null : navAction}
+              />
+            ) : null}
+          </div>
         ) : null}
 
         {/* 3. Etkileşimli Karar ve Takip Kartları (Seçenekler, Anketler, Öneriler) — Planın hemen altında */}

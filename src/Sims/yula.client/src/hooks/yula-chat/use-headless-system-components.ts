@@ -101,7 +101,26 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
           finalPayload = { ...finalPayload, report: activeScope };
         }
       }
-      return executeDispatchComponentAction({ component_id: "job_history", action, payload: finalPayload }) as any;
+      const res = (await executeDispatchComponentAction({
+        component_id: "job_history",
+        action,
+        payload: finalPayload,
+      })) as Record<string, unknown> | null;
+
+      if (res && typeof res === "object" && typeof res.navigateTo === "string" && res.navigateTo) {
+        useYulaDockStore.getState().setExpanded(false);
+        useYulaDockStore.getState().setOpen(true);
+        if (uiRegistry.get("app_router")) {
+          uiEventBus.dispatch({
+            component_id: "app_router",
+            action: "NAVIGATE",
+            payload: { path: res.navigateTo },
+          });
+        } else {
+          router.push(res.navigateTo);
+        }
+      }
+      return res as any;
     });
 
     // Headless Platform Rapor Kriter Formları (REGISTERED_REPORTS):
@@ -170,10 +189,14 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
                   payload: { path: navTarget },
                 });
               } else {
+                useYulaDockStore.getState().setExpanded(false);
+                useYulaDockStore.getState().setOpen(true);
                 router.push(navTarget);
                 navOutcome = { success: true, result: { navigatedTo: navTarget } };
               }
             } catch (err) {
+              useYulaDockStore.getState().setExpanded(false);
+              useYulaDockStore.getState().setOpen(true);
               router.push(navTarget);
               navOutcome = { success: false, error: String(err) };
             }

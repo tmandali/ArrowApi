@@ -21,6 +21,24 @@ describe('uiEventBus', () => {
     expect(res.error).toBe('bozuk');
   });
 
+  it('dispatch birden fazla handler kayıtlıysa son aktif handlerı çalıştırır ve tek sefer işletir', () => {
+    let callCount1 = 0;
+    let callCount2 = 0;
+    uiEventBus.subscribe('comp-dup', () => {
+      callCount1++;
+      return { success: true, from: 1 };
+    });
+    uiEventBus.subscribe('comp-dup', () => {
+      callCount2++;
+      return { success: true, from: 2 };
+    });
+    const res = uiEventBus.dispatch({ component_id: 'comp-dup', action: 'TEST' });
+    expect(res.success).toBe(true);
+    expect(callCount1).toBe(0);
+    expect(callCount2).toBe(1);
+    expect(res.result).toEqual({ success: true, from: 2 });
+  });
+
   it('ring-buffer son 10 olayı tutar', () => {
     for (let i = 0; i < 12; i++) {
       uiEventBus.recordTelemetry({ source: 's', type: `E${i}` });

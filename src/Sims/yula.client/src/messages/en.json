@@ -831,6 +831,7 @@
     "continue_main": "Continue in main screen",
     "expand_overlay": "Expand to fullscreen",
     "collapse_overlay": "Back to dock",
+    "exit_overlay": "Exit overlay mode",
     "collapse_disabled_home": "Cannot collapse on home screen",
     "edit_title": "Edit title",
     "return_to_screen": "Return to Screen",
@@ -910,6 +911,9 @@
   "ChatTurn": {
     "copy_question": "Copy question",
     "copy": "Copy",
+    "copy_reply": "Copy reply",
+    "copied": "Copied",
+    "open_target": "Open",
     "undo_edit": "Undo and edit message",
     "undo_edit_short": "Undo and edit",
     "no_visible_reply": "No visible reply was produced in this turn.",

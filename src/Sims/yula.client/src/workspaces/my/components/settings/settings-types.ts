@@ -42,7 +42,7 @@ export type SettingsApiRow = {
 export type ProfileLanguage = "english" | "turkish";
 export type ProfileTimeZone = "asia-kolkata" | "europe-istanbul";
 
-export type SettingsTabId = "user-details" | "settings" | "yula-ai" | "connections";
+export type SettingsTabId = "user-details" | "settings" | "connections";
 
 export type SettingsMeta = {
   identityCreatedAt: string | null;

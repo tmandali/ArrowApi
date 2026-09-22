@@ -1,24 +1,46 @@
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import type { WorkedStepItem } from "./yula-worked-steps";
-import { formatTokenCount } from "./yula-chat-turn-helpers";
-import { isTextPart, isReasoningPart } from "@my-agent/core";
+import { isTextPart, isReasoningPart, getMessageText } from "@my-agent/core";
 
-/** Adım detay bloğu — ekrandaki CodeBlock ile aynı alanlar (sql/display çıkarılmış) */
-export function stepPayload(step: WorkedStepItem): string | null {
-  if (!step.info) return null;
-  const out = (() => {
-    if (!step.info?.output || typeof step.info.output !== "object") return step.info?.output ?? null;
-    const cleaned = { ...(step.info.output as Record<string, unknown>) };
-    if (step.info.input && typeof step.info.input === "object" && "sql" in step.info.input) {
-      delete cleaned.sql;
-      delete cleaned.display;
-    }
-    return cleaned;
-  })();
-  const body: Record<string, unknown> = { tool: step.info.toolName, input: step.info.input };
-  // Sınır işaretlerinde output hiç üretilmez: null alanı basmak yerine atla
-  if (out !== null && out !== undefined) body.output = out;
-  return JSON.stringify(body, null, 2);
+export interface TurnJsonDump {
+  timestamp: string;
+  durationSec: number | string;
+  telemetry: {
+    totalTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    cost: string | null;
+    contextUsage?: {
+      percent: number;
+      tokens: number;
+      contextWindow: number;
+    };
+  };
+  userMessage?: {
+    id?: string;
+    text: string;
+  };
+  assistantMessage?: {
+    id?: string;
+    text: string;
+    reasoning?: string;
+    model?: string;
+    provider?: string;
+  };
+  steps: Array<{
+    id: string;
+    kind: string;
+    label: string;
+    subLabel?: string;
+    isError?: boolean;
+    durationSec?: number;
+    stepIndex?: number;
+    tool?: string;
+    input?: unknown;
+    output?: unknown;
+    detailText?: string;
+  }>;
+  rawMessage?: YulaMessage;
 }
 
 export interface BuildFullCopyTextParams {
@@ -29,16 +51,20 @@ export interface BuildFullCopyTextParams {
   costFormatted: string | null;
   contextUsage?: { percent: number; tokens: number; contextWindow: number };
   steps: WorkedStepItem[];
+  userMessage?: YulaMessage;
   message?: YulaMessage;
-  workedForText: string;
-  telemetryTokensLabel: string;
-  telemetryInputLabel: string;
-  telemetryOutputLabel: string;
-  telemetryCostLabel: string;
-  telemetryContextLabel: string;
+  workedForText?: string;
+  telemetryTokensLabel?: string;
+  telemetryInputLabel?: string;
+  telemetryOutputLabel?: string;
+  telemetryCostLabel?: string;
+  telemetryContextLabel?: string;
 }
 
-/** "Worked for" başlığı + tüm adım detayları + nihai cevap metni */
+/**
+ * Turun eksiksiz durumunu (telemetri, kullanıcı sorusu, asistan yanıtı,
+ * ReAct adımları, araç girdileri ve ham mesaj) formatlanmış JSON dump olarak üretir.
+ */
 export function buildFullCopyText({
   timeLabel,
   totalTokens,
@@ -47,52 +73,67 @@ export function buildFullCopyText({
   costFormatted,
   contextUsage,
   steps,
+  userMessage,
   message,
-  workedForText,
-  telemetryTokensLabel,
-  telemetryInputLabel,
-  telemetryOutputLabel,
-  telemetryCostLabel,
-  telemetryContextLabel,
 }: BuildFullCopyTextParams): string {
-  const sections: string[] = [];
-  const headerTitle =
-    totalTokens > 0
-      ? `${workedForText} · ${formatTokenCount(totalTokens)} tok`
-      : workedForText;
-  sections.push(headerTitle);
+  const userText = userMessage ? getMessageText(userMessage) : "";
 
-  if (totalTokens > 0) {
-    const contextStr =
-      contextUsage?.percent !== undefined
-        ? ` · ${telemetryContextLabel}: %${contextUsage.percent.toFixed(1)} / ${Math.round(contextUsage.contextWindow / 1000)}k`
-        : "";
-    sections.push(
-      `📊 ${telemetryTokensLabel}: ${totalTokens.toLocaleString()} (${telemetryInputLabel}: ${inTokens.toLocaleString()}, ${telemetryOutputLabel}: ${outTokens.toLocaleString()}) · ${telemetryCostLabel}: ${costFormatted || "$0.000000"}${contextStr} · ${timeLabel}s`
-    );
-  }
-
-  steps.forEach((step, index) => {
-    const lines = [`${index + 1}. ${step.label}${step.subLabel ? ` (${step.subLabel})` : ""}`];
-    if (step.detailText) lines.push(`   ${step.detailText}`);
-    const payload = stepPayload(step);
-    if (payload) lines.push(payload);
-    sections.push(lines.join("\n"));
-  });
-
+  let assistantText = "";
+  let reasoningText = "";
   if (message) {
-    const fullText = message.parts
-      .map((p) => {
-        if (isTextPart(p)) return p.text;
-        if (isReasoningPart(p) && p.text) {
-          return `[Thinking / Reasoning]\n${p.text}`;
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join("\n\n");
-    if (fullText.trim()) sections.push(`———\n${fullText}`);
+    message.parts.forEach((p) => {
+      if (isTextPart(p)) {
+        assistantText += (assistantText ? "\n\n" : "") + p.text;
+      } else if (isReasoningPart(p) && p.text) {
+        reasoningText += (reasoningText ? "\n\n" : "") + p.text;
+      }
+    });
   }
 
-  return sections.join("\n\n");
+  const dump: TurnJsonDump = {
+    timestamp: new Date().toISOString(),
+    durationSec: timeLabel,
+    telemetry: {
+      totalTokens,
+      inputTokens: inTokens,
+      outputTokens: outTokens,
+      cost: costFormatted,
+      ...(contextUsage ? { contextUsage } : {}),
+    },
+    ...(userMessage
+      ? {
+          userMessage: {
+            id: userMessage.id,
+            text: userText,
+          },
+        }
+      : {}),
+    ...(message
+      ? {
+          assistantMessage: {
+            id: message.id,
+            text: assistantText,
+            ...(reasoningText ? { reasoning: reasoningText } : {}),
+            ...(message.metadata?.model ? { model: message.metadata.model } : {}),
+            ...(message.metadata?.provider ? { provider: message.metadata.provider } : {}),
+          },
+        }
+      : {}),
+    steps: steps.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      label: s.label,
+      ...(s.subLabel ? { subLabel: s.subLabel } : {}),
+      ...(s.isError !== undefined ? { isError: s.isError } : {}),
+      ...(s.durationSec !== undefined ? { durationSec: s.durationSec } : {}),
+      ...(s.stepIndex !== undefined ? { stepIndex: s.stepIndex } : {}),
+      ...(s.info?.toolName ? { tool: s.info.toolName } : {}),
+      ...(s.info?.input !== undefined ? { input: s.info.input } : {}),
+      ...(s.info?.output !== undefined ? { output: s.info.output } : {}),
+      ...(s.detailText ? { detailText: s.detailText } : {}),
+    })),
+    rawMessage: message,
+  };
+
+  return JSON.stringify(dump, null, 2);
 }

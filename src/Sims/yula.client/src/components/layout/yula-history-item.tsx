@@ -39,6 +39,8 @@ export function YulaHistoryItem({
 
   return (
     <div
+      data-ide-action="true"
+      data-slot="ide-conversation-item"
       onClick={() => {
         if (!isEditing) onSelect();
       }}

@@ -18,6 +18,7 @@ export const JOB_OPEN_LAST_ACTION_CONTRACT = {
     status: z.string().describe("Navigation status ('navigated', 'not_found', 'error')"),
     jobId: z.string().optional().describe("GUID of the opened job"),
     navigateTo: z.string().optional().describe("URL path to navigate to"),
+    title: z.string().optional().describe("Human-readable title of the opened report"),
     message: z.string().optional().describe("Result explanation message"),
     error: z.string().optional().describe("Error message if failed"),
   }),

@@ -2,6 +2,27 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+
+## [2026-09-22] Assistant Message Hover Action Toolbar & Programmatic Navigation Actions (Zero-Hallucination ReAct Links)
+- **Rationale:**
+  1. *Probabilistic Navigation Formatting:* Expecting the LLM to format internal route links (`navigateTo`) into Markdown links within free-form text introduced hallucination risks (truncated GUIDs, broken parameters, or missing links when the LLM summarized tersely, e.g., "Raporunuz hazır").
+  2. *Clean Separation of Concerns:* The LLM should remain focused on natural conversational summaries without being burdened by link generation syntax or Zod output schema constraints in multi-step ReAct loops.
+  3. *Consistent Action Affordance:* Modern AI interfaces provide hover action bars on assistant turns (Copy, Open target, etc.) to give deterministic, type-safe shortcuts.
+- **Decision:**
+  - **Assistant Message Container (`group/assistant` in `yula-chat-turn.tsx`):** Wrapped assistant text rendering in an interactive group with `YulaAssistantActions`.
+  - **Programmatic Navigation Action Extraction (`yula-chat-turn-helpers.tsx`):** Added `extractNavigationAction(toolParts)` to deterministically extract `navigateTo`, `title`, and `jobId` from successful tool outputs (such as `OPEN_LAST`, `findMatchingReport`, and `NAVIGATE`).
+  - **Hover Action Toolbar (`yula-assistant-actions.tsx`):** Renders a responsive action bar (hover on desktop, subtle on mobile) featuring a dedicated `[ExternalLink: <Title>]` button when `navigateTo` is present (and no active `YulaJobStartedCard` is mounted), alongside a response copy button.
+  - **Action Contract Alignment (`job-history-contracts.ts` & `report-execution-tools.ts`):** Added `title` to `JOB_OPEN_LAST_ACTION_CONTRACT` outputSchema and `openLastReportTool` return payload.
+  - **Localization (`tr.json`, `en.json`):** Added `copy_reply`, `copied`, and `open_target` keys to `ChatTurn`.
+- **Verification:**
+  - All 357 `yula.client` unit tests passed (90 suites, 0 failures).
+  - Oxlint passed with 0 warnings and 0 errors on 798 files.
+  - `check:i18n` passed.
+  - All modified files remain strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-22] Canonical NextAuth Refresh Token Rotation Error Propagation & Immediate Sign-In Redirect
 - **Rationale:**
   1. *Hanging Authenticated State on Fatal Refresh Failure:* When Keycloak or Google refresh tokens expired or were revoked (`invalid_grant: Token is not active`), `auth.ts` deleted `token.accessToken`, `token.refreshToken`, and `token.expiresAt`. However, the JWT cookie and `session.user` (`id`, `name`, `email`) remained intact, causing NextAuth and route guards (`proxy.ts`) to treat the session as still `authenticated`.
@@ -424,62 +445,37 @@ This document is the **append-only audit log** recording fundamental architectur
   - **Client-Side State Tracking (`yula-choice-card.tsx` & `use-agent-chat.ts`):** Implemented `addToolOutput` in `useAgentChat` and wired it into `YulaChoiceCard` for immediate local part state synchronization.
 - **Author:** Antigravity / Team
 
----
-
-## [2026-09-21] Complete Elimination of Regex-Based Intent Routing & Alignment with Reference-Pi Semantic Reasoning
-- **Rationale:**
-  1. *Brittle Keyword Regex Steering:* Attempting to classify user prompts using hardcoded regular expressions (`GREETING_REGEX`, `PLAN_EXECUTION_REGEX`, `WORKFLOW_CONSULTATION_REGEX`, `DIRECT_EXECUTION_REGEX`, `DATA_ANALYSIS_REGEX`, `POLICY_LEARNING_REGEX`) created a fragile keyword-maintenance loop ("her fiil için regex/prompt mu güncelleyeceğiz?").
-  2. *Constraint Conflicts & Deadlocks:* Injected prompt directives (e.g. `=== DETECTED INTENT: WORKFLOW_CONSULTATION === MANDATORY: You MUST invoke ask_user_choice`) clashed with natural multi-turn context (e.g. approving an already proposed plan), inducing silent turn failures.
-  3. *Reference-Pi & Vercel AI SDK Standard:* The canonical reference architecture does not filter user prompts through regex matchers. Instead, the LLM determines intent naturally through semantic conversation history, screen context, and declarative prompt rules.
-- **Decision:**
-  - **Deleted Regex Router (`yula-intent-router.ts` & test):** Removed all regex intent pattern matchers and early classification passes.
-  - **Clean Prompt Construction (`route.ts` & `yula-agent-prompt.ts`):** Removed artificial `=== DETECTED INTENT ===` system prompt injections and `intent` context properties.
-  - **Declarative System Prompt Directives:** Preserved clear behavioral contracts in `yula-agent-prompt.ts` (direct execution on active report screens, plan-first on `/`, structured choices with rationale via `ask_user_choice`, and plan execution transitions).
-  - **Verification:** All 236 `yula.client` tests pass, 101 `@my-agent/core` tests pass, and zero regex router references remain in the repository.
-- **Author:** Antigravity / Team
 
 ---
 
-## [2026-09-21] Intent-Driven Routing, Rich Choice Cards (Rationale & Badge), and Elimination of Regex Buttonization
+## [2026-09-22] Yula Fullscreen Overlay Header Controls Streamlining & Universal Exit X Button
 - **Rationale:**
-  1. *Brittle Frontend Text Heuristics:* `markdown-blocks.tsx` previously used regular expressions (`isPromptSentenceLike`, `isActionLike`) matching keywords like `"sorgula"`, `"filtrele"`, `"aç"`, `"sonuçları"` to turn bullet points into clickable buttons. This caused arbitrary plan steps to look like buttons while others remained static text, creating severe UX inconsistency.
-  2. *Lack of Rationale in User Choices:* Plan and decision options lacked explanation and justification (`rationale`), leaving users unable to evaluate the business impact and trade-offs of proposed paths.
-  3. *Parametric Intent Guessing vs. First-Class Intent Routing:* Relying on the LLM to remember to output interactive chips without classifying user intent caused turns where the model announced choices in prose without emitting the `ask_user_choice` tool call.
+  1. *Trapped in Fullscreen on Home (`SystemHomeView`):* When opening conversations from history while on the home route (`/`), Yula mounts `SystemHomeView` in fullscreen mode. Previously, `hideWindowControls={true}` and `isOverlay={false}` suppressed the `X` button and `Escape` key listener, trapping users in fullscreen and preventing them from returning to the underlying report screen.
+  2. *Single Intuitive Exit Action:* Users expect an `X` button and `Escape` hotkey under all fullscreen conditions to exit full mode and return to their active screen with the side-dock open.
 - **Decision:**
-  - **Eliminated Frontend Regex Buttonization (`markdown-blocks.tsx` & `markdown-entities.ts` & `yula-actions.ts`):** Removed `isPromptSentenceLike`, `isActionLike`, and regex-based buttonization of bullet points and quoted phrases. Removed `isRunTitle` bullet hijacking. Markdown lists, quotes, and plans are rendered strictly as clean, static text.
-  - **Modernized Prepare Chain Skills (`yula-ui-skills.ts`):** Removed the legacy prompt instruction telling the model to output fake clickable bullets (`• **Run the report**`) and verb lists (`${formatLocalizedRunVerbs()}`). Replaced with structured `ask_user_choice` decision invocation.
-  - **Rich Choice Contract (`ask_user_choice` & `YulaChoiceCard`):** Extended `ask_user_choice` schema in `@my-agent/core` and `standard-agent-tools.ts` with `description`, `rationale`, and `badge`. Updated `YulaChoiceCard` to render vertical decision cards displaying action, badge, description, and rationale when detailed choices are present, preserving compact chips for simple binary choices.
-  - **Intent Router & Classifier (`yula-intent-router.ts`):** Created early intent classification (`WORKFLOW_CONSULTATION`, `DIRECT_EXECUTION`, `DATA_ANALYSIS`, `POLICY_LEARNING`, `GENERAL_CONVERSATION`) dynamically injecting tailored prompt directives into Level 0 system prompt. In `WORKFLOW_CONSULTATION`, the model is strictly required to emit `ask_user_choice` with `description` and `rationale`.
-  - **Verification:** Unit tests in `yula-choice-card.test.ts` and `yula-intent-router.test.ts` pass (15/15), all 243 client tests pass, 101 `@my-agent/core` tests pass, 33/33 simulations pass, and all files remain strictly under 500 lines.
+  - **Universal Exit (`YulaExitOverlayButton` & `use-exit-overlay.ts`):** Extracted `useExitOverlay` hook into a dedicated module to adhere to React Fast Refresh. Bound both `YulaExitOverlayButton` and the global `Escape` key listener to `useExitOverlay`.
+  - **Screen Execution Resolution (`yula-screen-resolver.ts` & `yula-history-navigation.ts`):** Enhanced `resolveTargetScreen` with `hrefForConversation` and `restoreConversationExecution`. When exiting fullscreen on home or switching conversations in `YulaIdeSidebar`, the application resolves the specific `/scope/<jobId>` route and restores the report execution.
+  - **Unconditional Rendering in Fullscreen Overlay:** Updated `yula-fullscreen-overlay.tsx` to render `{!hideWindowControls && <YulaExitOverlayButton />}`, and removed `hideWindowControls={true}` from `SystemHomeView.tsx`.
+  - **Guarded `hrefForConversation`:** Ensured home roots (`/`) do not generate malformed `//<jobId>` paths when conversation pathname is root.
+- **Verification:**
+  - All 6 unit tests in `src/lib/yula-screen-resolver.test.ts` passed.
+  - All 15 tests in `yula-navigation-overlay.test.ts` and `yula-navigation-simulation.test.ts` passed.
+  - Zero Oxlint errors/warnings across all 7 modified files.
+  - All modified files remain strictly $\le 500$ lines (`wc -l`).
 - **Author:** Antigravity / Team
 
----
-
-## [2026-09-21] Playbook Knowledge Sub-Agent & Level-0 Context Decoupling (Vercel AI SDK Tool-as-a-Subagent Pattern)
+## [2026-09-22] Yula Full-Mode In-Place Conversation Selection (Zero Unwanted Screen Navigation)
 - **Rationale:**
-  1. *Context Window Bloat & Scaling Limits:* Bulk pre-injection of all workspace recipes into Level 0 system prompt context (`playbookRecipes`) degraded TTFT latency and consumed tens of thousands of tokens on every user turn, creating severe attention dilution and cost inefficiencies as the corporate catalog expanded.
-  2. *Intent-to-Recipe Gap (Brittle String Overlap):* Users express complex business goals in natural language (e.g., *"ay sonu depo sayımını eşitle ve farkları raporla"*), which failed against rigid string/word overlap checks (`overlap >= 2`) when recipes were titled differently (e.g., *"Fiziksel Envanter Eşitleme Prosedürü"*).
-  3. *Vercel AI SDK & Pi Alignment:* Delegating knowledge retrieval to a dedicated, isolated sub-agent invoked from within the `query_playbook` tool call allows model tiering (fast/cost-effective worker model), completely eliminates intermediate token pollution from main chat history, and provides resilient deterministic fallbacks.
+  1. *Unwanted Navigation to Report Screen:* When users are working inside Yula's fullscreen IDE overlay or on the home screen (`/`), clicking a past conversation from history or the left sidebar triggered `navigateToConversationScreen -> router.push(href)`. This forcibly routed the browser to `/stock/retail-sales-report/<jobId>` and collapsed full mode (`expanded: false`), throwing the user into the report screen against their intent.
+  2. *In-Place IDE Navigation Contract:* Inside an IDE interface, selecting a conversation should only switch the active conversation and render its chat messages and telemetry in-place. Background route navigation belongs to the explicit exit action (`X` button / Escape) or dedicated link buttons, not casual conversation selection.
 - **Decision:**
-  - **Isolated Sub-Agent Engine (`playbook-subagent.ts`):** Created `runPlaybookSubagent` utilizing Vercel AI SDK `generateText` with isolated system prompt, lightweight sub-tools (`search_catalog`, `inspect_recipe`, `submit_verdict`), and a 3500ms timeout sandbox with automatic fallback to deterministic index search.
-  - **Tool Upgrade (`standard-agent-tools.ts`):** Upgraded `query_playbook` to delegate directly to `runPlaybookSubagent`, returning enriched resolution schemas (`recipe`, `dag`, `matched`, `confidence`, `explanation`, `screenRules`).
-  - **Level-0 Prompt Decoupling (`route.ts` & `yula-agent-prompt.ts`):** Removed bulk recipe reading from `chat/route.ts` while preserving active screen rules (1-3 lines) for zero-latency local screen compliance. Updated agent instructions to invoke `query_playbook` for procedural workflows.
-  - **Verification:** Added `playbook-subagent.test.ts` and updated `yula-workflow-grounding.simulation.test.ts`. 231/231 tests pass, 33/33 simulations pass, 99/99 `@my-agent/core` pass, and Next.js Turbopack build succeeds (48/48 routes).
-- **Author:** Antigravity / Team
-
-
-
-## [2026-09-22] Autonomous LLM Steering, Turn Suspension, and Seamless Resumption (Eliminating Redundant Chat Runs)
-- **Rationale:**
-  1. *Rigid UI Choice Lock-in:* The agent previously forced rigid `ask_user_choice` tool calls and `YulaChoiceCard` interactive button grids whenever clarification or approval was sought. In natural conversation, LLMs can autonomously decide in text whether human intervention or steering is required.
-  2. *Redundant LLM Run Anti-Pattern:* Responding to choices invoked `sendMessageText()`, appending a new `role: 'user'` message and triggering a brand-new POST `/api/agent/chat` run. This discarded active tool executions, duplicated context overhead, and disrupted multi-step ReAct loops.
-  3. *Native Turn Suspension & Steering:* `@my-agent/core` provides `steer()` and `PendingMessageQueue`. By introducing native suspension (`turn_suspended`, `turn_resumed`, `waitForSteering`), an ongoing turn can sleep awaiting user guidance and resume seamlessly in the exact same execution cycle.
-- **Decision:**
-  - **Loop Suspension Protocol (`@my-agent/core`):** Added `turn_suspended` and `turn_resumed` events to `AgentEvent`. Updated `agentLoop` to support `waitForSteering(signal)`. When `toolResult.suspend` or `shouldSuspendTurn` is true, the loop emits `turn_suspended`, awaits incoming steering input via `PendingMessageQueue.waitForMessage`, drains steered messages, emits `turn_resumed`, and continues the multi-step ReAct loop without terminating.
-  - **Client-Side Steering Integration (`@my-agent/react` & `yula.client`):** Updated `useAgentChat` and `yula-chat-instance.tsx` so that `respondToChoice` and choice cards invoke `chat.steer(val)` instead of `sendMessageText(val)`.
-  - **Stream API Alignment (`route.ts`):** Removed `hasToolCall("ask_user_choice")` from `stopWhen` so the LLM decides autonomously when to pause or complete.
-  - **Prompt Protocol Modernization (`yula-agent-prompt.ts` & `yula-ui-skills.ts`):** Replaced rigid plain-text question prohibitions with `HUMAN-IN-THE-LOOP, SUSPENSION & STEERING PROTOCOL`. Eliminated redundant confirmation roadblocks ("Planı onaylıyor musunuz?") once criteria are gathered in favor of direct execution.
-  - **Verification:** All 345 `yula.client` unit tests passed (88 suites), all 133 `@my-agent/core` tests passed (17 suites), and `pnpm --filter yula.client typecheck` passed with 0 errors. All modified files strictly comply with the 500-line ceiling.
+  - **Full-Mode Navigation Guard (`yula-history-navigation.ts`):** In `navigateToConversationScreen`, added a guard: if `isExpanded || (typeof window !== "undefined" && isWorkspaceHomePath(here))`, `restoreConversationExecution` still restores execution state in memory, but route navigation (`push(href)`) is bypassed.
+  - **Internal Action Tagging (`yula-history-item.tsx` & `yula-ide-sidebar.tsx`):** Added `data-ide-action="true"` and `data-slot="ide-conversation-item"` to ensure global capture click listeners never treat conversation item clicks as external screen navigations.
+  - **In-Place History View (`yula-ide-sidebar.tsx`):** Bound "Konuşma Geçmişi" button to `setHistoryOpen(true)` instead of routing to `/my/history`.
+- **Verification:**
+  - All 372 unit and simulation tests passed in `yula.client` across 94 suites.
+  - Oxlint passed with 0 warnings and 0 errors.
+  - All modified files remain strictly $\le 500$ lines (`wc -l`).
 - **Author:** Antigravity / Team
 
 ---
@@ -488,4 +484,5 @@ This document is the **append-only audit log** recording fundamental architectur
 Older architectural decisions have been archived to adhere to the 500-line limit:
 - [Decision Log Archive 2 (.agents/log-archive-2.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-2.md)
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
+
 

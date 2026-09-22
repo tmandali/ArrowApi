@@ -295,6 +295,9 @@ export interface UIEvent {
   ageMs?: number;
   correlationId?: string;
   severity?: TelemetrySeverity;
+  eventHash?: string;
+  repeatCount?: number;
+  firstTimestamp?: number;
 }
 
 export interface UIAction {
@@ -372,6 +375,8 @@ export type AgentEvent =
   // Pi Causal Step Frame & Turn State Machine events
   | { type: 'step_frame_start'; stepIndex: number; stepId: string; parentStepId?: string; timestamp?: number }
   | { type: 'step_frame_end'; frame: AgentStepFrame; timestamp?: number }
+  | { type: 'turn_suspended'; stepIndex?: number; reason?: string; prompt?: string; timestamp?: number }
+  | { type: 'turn_resumed'; stepIndex?: number; message?: string; timestamp?: number }
   | { type: 'state_transition'; from: AgentTurnStateStatus; to: AgentTurnStateStatus; reason?: string; stepIndex?: number; timestamp?: number };
 
 /** 1. beforeToolCall & afterToolCall Hook Types (Pi) */

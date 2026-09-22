@@ -60,6 +60,7 @@ import {
 } from "./result-grid-contracts";
 import { pluginRegistry } from "@/lib/plugins/yula-plugins";
 import { guardReadOnlySelect } from "@/lib/sql-guard";
+import { uiEventBus } from "@my-agent/core";
 
 export * from "./dispatch-types";
 import {
@@ -219,6 +220,11 @@ export async function executeDispatchComponentAction({
         status: "error",
         error: parsed.error.issues.map((i) => i.message).join(", "),
       };
+    }
+    try {
+      uiEventBus.dispatch("app_router", "NAVIGATE", parsed.data);
+    } catch {
+      // ignore
     }
     return navigateToPageTool(parsed.data);
   }

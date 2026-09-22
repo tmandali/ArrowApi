@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Check, FileSpreadsheet, Sparkles } from "lucide-react";
+import { ArrowRight, Check, FileSpreadsheet, Sparkles } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { inferCriteriaFieldFromQuestion } from "@/lib/yula-choice-inference";
 
 /** Yatay bar kartındaki "En Yüksek 5" tablosu gibi dış kullanımlar için file çipi */
 export function FileOpenChip({ path, label }: { path: string; label: string }) {
@@ -83,6 +84,62 @@ export function CriteriaApplyChip({
       <span className="font-semibold">{children}</span>
       <span className="text-[10px] opacity-85 underline ml-0.5 font-normal">
         {applied ? t("criteria_applied") : t("criteria_apply")}
+      </span>
+    </button>
+  );
+}
+
+export function InteractiveChoiceChip({
+  value,
+  questionContext,
+  onSelect,
+  className,
+}: {
+  value: string;
+  questionContext?: string;
+  onSelect?: (value: string, context?: { question?: string; field?: string }) => void;
+  className?: string;
+}) {
+  const [selected, setSelected] = React.useState(false);
+  const field = inferCriteriaFieldFromQuestion(questionContext);
+
+  const handleClick = () => {
+    if (selected) return;
+    setSelected(true);
+    onSelect?.(value, { question: questionContext, field });
+  };
+
+  const isCode = /^[A-Z0-9_-]{2,15}$/.test(value.trim());
+
+  return (
+    <button
+      type="button"
+      data-ide-action="true"
+      onClick={handleClick}
+      disabled={selected}
+      title={questionContext ? `${value} (${questionContext})` : value}
+      className={cn(
+        "group inline-flex items-center gap-1.5 my-0.5 mr-1.5 px-2.5 py-1 rounded-md text-[12px] transition-all cursor-pointer select-none",
+        selected
+          ? "border border-primary/60 bg-primary/15 text-primary font-semibold shadow-xs"
+          : "border border-border/80 bg-muted/40 hover:bg-primary/10 hover:border-primary/50 text-foreground hover:text-primary shadow-2xs hover:shadow-xs active:scale-95",
+        className,
+      )}
+    >
+      <ArrowRight
+        className={cn(
+          "size-3 shrink-0 transition-transform group-hover:translate-x-0.5",
+          selected ? "text-primary" : "text-orange-500/80 group-hover:text-primary",
+        )}
+      />
+      <span
+        className={cn(
+          isCode
+            ? "font-mono font-semibold tracking-tight text-[11.5px]"
+            : "font-medium text-[12px]",
+        )}
+      >
+        {value}
       </span>
     </button>
   );

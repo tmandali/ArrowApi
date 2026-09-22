@@ -266,8 +266,11 @@ export function useAgentSession(options: UseAgentSessionOptions = {}) {
         success: true,
         result: { value, selected: true },
       });
+    } else if (session) {
+      session.steer(value);
+      setSessionState(session.getState());
     }
-  }, []);
+  }, [session]);
 
   const clearQueue = React.useCallback(() => {
     if (!session) return { steering: [], followUp: [] };

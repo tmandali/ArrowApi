@@ -831,6 +831,7 @@
     "continue_main": "Ana ekranda devam et",
     "expand_overlay": "Tam ekrana genişlet",
     "collapse_overlay": "Dock'a geri dön",
+    "exit_overlay": "Overlay modundan çık",
     "collapse_disabled_home": "Ana ekranda küçültülemez",
     "edit_title": "Başlığı düzenle",
     "return_to_screen": "Ekrana Dön",
@@ -910,6 +911,9 @@
   "ChatTurn": {
     "copy_question": "Soruyu Kopyala",
     "copy": "Kopyala",
+    "copy_reply": "Yanıtı Kopyala",
+    "copied": "Kopyalandı",
+    "open_target": "Aç",
     "undo_edit": "Mesajı Geri Al ve Düzenle",
     "undo_edit_short": "Geri Al ve Düzenle",
     "no_visible_reply": "Bu turda görünür bir yanıt üretilemedi.",

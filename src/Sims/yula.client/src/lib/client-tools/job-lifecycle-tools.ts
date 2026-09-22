@@ -122,14 +122,37 @@ export async function runJobTool(
     if (!result.jobEndpoint) {
       return { status: "error", error: "Missing x-job-endpoint in schema." };
     }
+    const { useActiveJobsStore, findActiveJobByPayload } = await import(
+      "@/store/slices/active-jobs-store"
+    );
+
+    // Aynı kriterlerle zaten in-flight (Queued/Running) bir job varsa tekrar tetikleme
+    const activeExisting = findActiveJobByPayload(scope, result.instance);
+    if (activeExisting) {
+      focusReportExecution({
+        scope,
+        job: {
+          id: activeExisting.id,
+          status: (activeExisting.status as any) || "Queued",
+          eventsUrl: activeExisting.eventsUrl || "",
+          jobUrl: activeExisting.jobUrl || "",
+        },
+        request: result.instance,
+      });
+      return {
+        status: "executed",
+        jobId: activeExisting.id,
+        jobStatus: activeExisting.status,
+        navigateTo: reportExecutionHref(meta.pagePath, activeExisting.id),
+        message: `Existing active job reused (${activeExisting.id}). Tracking on execution screen.`,
+      };
+    }
+
     const { createArrowJob } = await import(
       "@/features/jobs/arrow-job-client"
     );
     const job = await createArrowJob(result.jobEndpoint, result.instance);
 
-    const { useActiveJobsStore } = await import(
-      "@/store/slices/active-jobs-store"
-    );
     useActiveJobsStore.getState().addJob({
       id: job.id,
       name: scope,

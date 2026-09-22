@@ -65,9 +65,7 @@ public static class ArrowJobsRedisExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.RemoveAll<IArrowJobStore<TRequest>>();
-        services.RemoveAll<IArrowJobStore>();
         services.RemoveAll<IArrowJobQueue<TRequest>>();
-        services.RemoveAll<IArrowJobEventHub>();
         services.TryAddSingleton<IConnectionMultiplexer>(_ =>
         {
             var options = ConfigurationOptions.Parse(connectionString);

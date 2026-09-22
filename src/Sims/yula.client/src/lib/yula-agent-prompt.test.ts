@@ -155,15 +155,19 @@ describe("buildSystemPrompt agent katmanı", () => {
     );
   });
 
-  it("karar ve onay sorularının düz metin yerine zorunlu olarak ask_user_choice çağırmasını zorunlu kılar", () => {
+  it("karar ve onay durumlarında otonom steering kararı ve askıya alma (suspension) protokolünü içerir", () => {
     const prompt = buildSystemPrompt({ pathname: "/" });
     assert.ok(
-      prompt.includes("MANDATORY INTERACTIVE BUTTONS (NO PLAIN-TEXT DECISION QUESTIONS)"),
-      "Zorunlu interaktif buton kuralı bulunmalı",
+      prompt.includes("HUMAN-IN-THE-LOOP, SUSPENSION & STEERING PROTOCOL"),
+      "HITL ve steering protokolü bulunmalı",
     );
     assert.ok(
-      prompt.includes("NEVER write questions ending with 'ister misiniz?'"),
-      "Düz metin soru yasağı kuralı bulunmalı",
+      prompt.includes("AUTONOMOUS STEERING DECISION"),
+      "Otonom steering kararı kuralı bulunmalı",
+    );
+    assert.ok(
+      prompt.includes("SEAMLESS RESUMPTION VIA STEERING"),
+      "Steering ile kesintisiz devam kuralı bulunmalı",
     );
   });
 

@@ -27,6 +27,7 @@ export function YulaJobStartedCard({
 
   const handleOpen = React.useCallback(() => {
     useChatsStore.getState().beginConversationFollow(yula.activeId);
+    useYulaDockStore.getState().setExpanded(false);
     useYulaDockStore.getState().setOpen(true);
     void router.push(navigateTo);
   }, [navigateTo, router, yula.activeId]);

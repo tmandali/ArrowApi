@@ -189,6 +189,13 @@ export class PromptTemplateManager {
     });
 
     this.register({
+      command: '/provider',
+      description: 'Selects or configures active AI model provider (e.g. /provider ollama)',
+      argumentHint: '[provider (optional)]',
+      category: 'system',
+    });
+
+    this.register({
       command: '/compact',
       description: 'Compacts conversation history and summarizes token context',
       argumentHint: '[instructions (optional)]',

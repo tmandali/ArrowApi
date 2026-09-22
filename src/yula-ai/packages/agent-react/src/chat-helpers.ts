@@ -80,3 +80,43 @@ export async function executeAgentToolCall(
 
   return { result, isError };
 }
+
+export interface CachedModelsResult {
+  models: any[];
+  defaultModel?: string;
+  defaultProvider?: string;
+}
+
+const modelsEndpointCache = new Map<string, CachedModelsResult>();
+const inFlightModelsFetches = new Map<string, Promise<CachedModelsResult | null>>();
+
+export function fetchModelsCached(endpoint: string): Promise<CachedModelsResult | null> {
+  if (!endpoint) return Promise.resolve(null);
+  const cached = modelsEndpointCache.get(endpoint);
+  if (cached) return Promise.resolve(cached);
+
+  const inFlight = inFlightModelsFetches.get(endpoint);
+  if (inFlight) return inFlight;
+
+  const promise = fetch(endpoint)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data?.models && Array.isArray(data.models)) {
+        const entry: CachedModelsResult = {
+          models: data.models,
+          defaultModel: data.defaultModel,
+          defaultProvider: data.defaultProvider,
+        };
+        modelsEndpointCache.set(endpoint, entry);
+        return entry;
+      }
+      return null;
+    })
+    .catch(() => null)
+    .finally(() => {
+      inFlightModelsFetches.delete(endpoint);
+    });
+
+  inFlightModelsFetches.set(endpoint, promise);
+  return promise;
+}

@@ -99,22 +99,28 @@ describe('Autonomous Agent Loop (Pi Reference Implementation)', () => {
     expect(events).toContain('agent_end');
   });
 
-  it('should suspend loop when ask_user_choice is invoked (Inline HITL)', async () => {
+  it('should suspend loop and seamlessly resume via steering without starting a new run', async () => {
     let turnCount = 0;
-    const mockStreamFn: StreamFn = vi.fn(async () => {
+    const mockStreamFn: StreamFn = vi.fn(async (ctx) => {
       turnCount++;
-      return {
-        message: { role: 'assistant', content: 'Lütfen seçim yapın.' },
-        toolCalls: [
-          {
-            id: 'choice_1',
-            name: 'ask_user_choice',
-            arguments: {
-              question: 'Hangi tarihi seçmek istersiniz?',
-              options: ['Bugün', 'Dün', 'Son 7 Gün'],
+      if (turnCount === 1) {
+        return {
+          message: { role: 'assistant', content: 'Lütfen seçim yapın.' },
+          toolCalls: [
+            {
+              id: 'choice_1',
+              name: 'ask_user_choice',
+              arguments: {
+                question: 'Hangi tarihi seçmek istersiniz?',
+                options: ['Bugün', 'Dün', 'Son 7 Gün'],
+              },
             },
-          },
-        ],
+          ],
+        };
+      }
+      return {
+        message: { role: 'assistant', content: `Seçilen tarihle devam ediliyor: ${ctx.messages[ctx.messages.length - 1]?.content}` },
+        toolCalls: [],
       };
     });
 
@@ -124,11 +130,22 @@ describe('Autonomous Agent Loop (Pi Reference Implementation)', () => {
       maxIterations: 5,
     });
 
-    await agent.run([{ role: 'user', content: 'Tarih seçimi yap' }]);
+    const runPromise = agent.run([{ role: 'user', content: 'Tarih seçimi yap' }]);
 
-    // ask_user_choice terminate: true olduğu için 1. turdan sonra döngü durur
+    // 1. Tur sonrası askıya alınmalı
+    await new Promise((r) => setTimeout(r, 20));
+    expect(agent.isSuspended).toBe(true);
     expect(turnCount).toBe(1);
+
+    // Kullanıcı steering ile araya girer (yeni bir agent.run başlatmaz!)
+    agent.steer('Bugün');
+    await runPromise;
+
+    // Ajan aynı döngü içinde 2. tura devam edip tamamlamış olmalı
+    expect(turnCount).toBe(2);
+    expect(agent.isSuspended).toBe(false);
     expect(agent.isStreaming).toBe(false);
+    expect(agent.messages.some((m) => m.content?.includes('Bugün'))).toBe(true);
   });
 
   it('declareToolChanges should detect added and removed tools properly', async () => {

@@ -26,6 +26,12 @@ import {
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { exportDetailedYulaSessionDump } from "@/lib/yula-session-dump";
 import { useHeadlessSystemComponents } from "./use-headless-system-components";
+import {
+  readYulaClientAiConfig,
+  writeYulaClientAiConfig,
+  yulaModelsApiUrl,
+} from "@/lib/yula-ai-client-config";
+import { useProviderDialogStore } from "@/lib/stores/provider-dialog-store";
 
 /**
  * Yula Chat Instance — Saf @my-agent/react motoru ve Headless UI-Agent bileşen kaydı.
@@ -34,6 +40,42 @@ import { useHeadlessSystemComponents } from "./use-headless-system-components";
  * veya süre kapıları (sendGate) içermez; araçlar ve olaylar doğrudan EventBus
  * ve @my-agent/core üzerinden yürütülür.
  */
+let errorIdCounter = 0;
+function nextErrorAssistantId(): string {
+  errorIdCounter += 1;
+  return `asst_err_${errorIdCounter}`;
+}
+
+function extractPendingChoice(messages?: any[]) {
+  if (!messages || messages.length === 0) return null;
+  const lastMsg = messages[messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "assistant") return null;
+
+  const parts = (lastMsg as any).parts;
+  if (!Array.isArray(parts)) return null;
+
+  for (const p of parts) {
+    if (
+      p &&
+      typeof p === "object" &&
+      (p.type === "tool-ask_user_choice" || p.toolName === "ask_user_choice")
+    ) {
+      if (p.state === "output-available" && p.output != null) continue;
+
+      const args = (p.input || p.args || {}) as Record<string, any>;
+      return {
+        toolCallId: p.toolCallId || "",
+        messageId: lastMsg.id,
+        question: String(args.question || ""),
+        options: Array.isArray(args.options) ? args.options : [],
+        allowCustom: args.allow_custom !== false,
+        customPlaceholder: typeof args.custom_placeholder === "string" ? args.custom_placeholder : undefined,
+      };
+    }
+  }
+  return null;
+}
+
 export function ChatInstance({
   conversationId,
   onContextReady,
@@ -87,11 +129,37 @@ export function ChatInstance({
       ? `${window.location.pathname}${window.location.search}`
       : "/";
 
+  const storeModel = useChatsStore((s) => s.model);
+
   // Saf @my-agent/react sohbet motoru
   const chat = useAgentChat(currentPath, {
+    model: storeModel || undefined,
+    getAiConfig: () => {
+      const cfg = readYulaClientAiConfig();
+      const chatsStore = useChatsStore.getState();
+      return {
+        provider: cfg.provider,
+        endpoint: cfg.endpoint,
+        thinking: cfg.thinking !== undefined ? cfg.thinking : chatsStore.isThinkingEnabled,
+        effort: cfg.effort,
+      };
+    },
+    onSelectModel: (modelId, provider) => {
+      useChatsStore.getState().setModel(modelId);
+      writeYulaClientAiConfig({
+        model: modelId,
+        ...(provider ? { provider: provider as any } : {}),
+      });
+    },
+    onSelectProvider: (targetProvider) => {
+      useProviderDialogStore.getState().openDialog(targetProvider);
+    },
+    onOpenLogin: (targetProvider) => {
+      useProviderDialogStore.getState().openDialog(targetProvider);
+    },
     initialMessages: initialMessages as any,
     compactEndpoint: "/api/compact",
-    modelsEndpoint: "/api/agent/models",
+    modelsEndpoint: yulaModelsApiUrl(),
     compactionSettings: {
       enabled: true,
       reserveTokens: 16384,
@@ -107,12 +175,22 @@ export function ChatInstance({
       const raw = err instanceof Error ? err.message : String(err);
       const verdict = classifyDiagnosticError(raw);
       const userMsg = verdict.userFriendlyExplanation || raw;
-      const lastAssistant = [...chat.messages]
+      let lastAssistant = [...chat.messages]
         .reverse()
         .find((m) => m.role === "assistant");
+      if (!lastAssistant) {
+        const errId = nextErrorAssistantId();
+        lastAssistant = {
+          id: errId,
+          role: "assistant",
+          content: "",
+          parts: [],
+        } as any;
+        chat.setMessages([...chat.messages, lastAssistant] as any);
+      }
       if (lastAssistant && userMsg) {
         setStreamErrorTexts((prev) =>
-          prev[lastAssistant.id] === userMsg ? prev : { ...prev, [lastAssistant.id]: userMsg },
+          prev[lastAssistant!.id] === userMsg ? prev : { ...prev, [lastAssistant!.id]: userMsg },
         );
       }
     },
@@ -326,6 +404,24 @@ export function ChatInstance({
     [],
   );
 
+  const pendingChoice = extractPendingChoice(chat.messages);
+  const isSuspended = Boolean(pendingChoice || chat.isSuspended);
+
+  const chatAddToolOutput = chat.addToolOutput;
+  const chatSteer = chat.steer;
+  const respondToChoice = React.useCallback(
+    (val: string) => {
+      if (pendingChoice?.toolCallId && chatAddToolOutput) {
+        chatAddToolOutput({
+          toolCallId: pendingChoice.toolCallId,
+          output: { selected: val, value: val },
+        });
+      }
+      chatSteer(val);
+    },
+    [pendingChoice, chatAddToolOutput, chatSteer],
+  );
+
   const value = React.useMemo(
     () => ({
       messages: chat.messages as YulaMessage[],
@@ -355,6 +451,9 @@ export function ChatInstance({
       followUpQueue,
       clearSteering,
       clearFollowUp,
+      isSuspended,
+      pendingChoice,
+      respondToChoice,
     }),
     [
       chat.messages,
@@ -383,6 +482,9 @@ export function ChatInstance({
       followUpQueue,
       clearSteering,
       clearFollowUp,
+      isSuspended,
+      pendingChoice,
+      respondToChoice,
     ],
   );
 

@@ -27,7 +27,7 @@ import {
   AgentMessage,
   UseAgentChatOptions,
 } from './chat-types';
-import { promptTextOf } from './chat-helpers';
+import { promptTextOf, fetchModelsCached } from './chat-helpers';
 import { handleBuiltInCommand } from './chat-commands';
 import { createYulaStreamFn } from './chat-stream-fn';
 
@@ -47,6 +47,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'ready' | 'submitted' | 'streaming' | 'error'>('ready');
+  const [isSuspended, setIsSuspended] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   // Context Doluluk & Compaction Durumu (Pi Reference)
@@ -76,16 +77,17 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
   }, []);
 
   useEffect(() => {
-    fetch(modelsEndpoint)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.models && Array.isArray(data.models)) {
-          setAvailableModels(data.models);
-          if (!selectedModel && data.defaultModel) setSelectedModel(data.defaultModel);
-          if (!selectedProvider && data.defaultProvider) setSelectedProvider(data.defaultProvider);
-        }
-      })
-      .catch(() => {});
+    if (!modelsEndpoint) return;
+    let active = true;
+    fetchModelsCached(modelsEndpoint).then((data) => {
+      if (!active || !data) return;
+      setAvailableModels(data.models);
+      setSelectedModel((curr) => (!curr && data.defaultModel ? data.defaultModel : curr));
+      setSelectedProvider((curr) => (!curr && data.defaultProvider ? data.defaultProvider : curr));
+    });
+    return () => {
+      active = false;
+    };
   }, [modelsEndpoint]);
 
   const selectModel = useCallback(
@@ -93,7 +95,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       setSelectedModel(modelId);
       let resolvedProvider = provider;
       if (!resolvedProvider) {
-        const found = availableModels.find((m) => m.id === modelId || m.modelId === modelId);
+        const found = availableModels.find((m) => (m.id || m.modelId || m.model || m.name) === modelId);
         if (found?.provider) resolvedProvider = found.provider;
       }
       if (resolvedProvider) setSelectedProvider(resolvedProvider);
@@ -101,6 +103,18 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     },
     [availableModels, options]
   );
+
+  useEffect(() => {
+    if (options?.model && options.model !== selectedModel) {
+      setSelectedModel(options.model);
+    }
+  }, [options?.model, selectedModel]);
+
+  useEffect(() => {
+    if (options?.provider && options.provider !== selectedProvider) {
+      setSelectedProvider(options.provider);
+    }
+  }, [options?.provider, selectedProvider]);
 
   useEffect(() => {
     setContextUsage(calculateContextUsage(messages, selectedModel));
@@ -182,6 +196,9 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     return createYulaStreamFn({
       endpoint: apiEndpoint,
       getContextSnapshot,
+      getProvider: () => selectedProvider ?? options?.provider ?? options?.getAiConfig?.()?.provider,
+      getEndpoint: () => options?.getAiConfig?.()?.endpoint,
+      getAiConfig: options?.getAiConfig,
       onAssistantUpdate: (partial) => {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -191,8 +208,13 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
           return [...prev, partial];
         });
       },
+      onModelFallback: (serverModel, serverProvider) => {
+        if (serverModel && serverModel !== selectedModel) {
+          selectModel(serverModel, serverProvider);
+        }
+      },
     });
-  }, [apiEndpoint, getContextSnapshot]);
+  }, [apiEndpoint, getContextSnapshot, selectedProvider, options?.provider, options?.getAiConfig, selectedModel, selectModel]);
 
   if (!agentRef.current) {
     agentRef.current = new Agent({
@@ -222,8 +244,14 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       if (event.type === 'turn_start' || event.type === 'session_start') {
         setStatus('streaming');
         telemetryTracker.startTurn();
+      } else if (event.type === 'turn_suspended') {
+        setIsSuspended(true);
+      } else if (event.type === 'turn_resumed') {
+        setIsSuspended(false);
       } else if (event.type === 'turn_end') {
         telemetryTracker.endTurn(0, 0);
+      } else if (event.type === 'agent_end') {
+        setIsSuspended(false);
       } else if (event.type === 'compaction_start') {
         setIsCompacting(true);
       } else if (event.type === 'compaction_end') {
@@ -276,6 +304,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
           newConversation,
           compact,
           onOpenLogin: options?.onOpenLogin,
+          onSelectProvider: options?.onSelectProvider,
           appendSystemMessage,
         });
         if (handled) return;
@@ -413,6 +442,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         newConversation,
         compact,
         onOpenLogin: options?.onOpenLogin,
+        onSelectProvider: options?.onSelectProvider,
         appendSystemMessage,
       }),
     handleInputChange: (e: any) => setInput(e?.target?.value ?? String(e ?? '')),
@@ -429,6 +459,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         newConversation,
         compact,
         onOpenLogin: options?.onOpenLogin,
+        onSelectProvider: options?.onSelectProvider,
         appendSystemMessage,
       }),
     undo: () => sessionManager.undo(),
@@ -441,7 +472,8 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     remember: (k: string, v: any, s?: any) => agentMemory.remember(k, v, s),
     forget: (k: string) => agentMemory.forget(k),
     getMemories: () => agentMemory.getAll(),
-    chooseOption: (choice: string) => sendMessage(choice),
+    isSuspended,
+    chooseOption: (choice: string) => (isSuspended ? steer(choice) : sendMessage(choice)),
     addToolOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => {
       setMessages((prev) =>
         prev.map((msg) => {
@@ -462,5 +494,4 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       );
     },
   };
-
 }

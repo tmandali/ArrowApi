@@ -21,7 +21,7 @@ import { cn } from "@/utils/cn";
 import { useChatsStore, type YulaConversation } from "@/lib/stores/chats";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { workspaceLabelFromPath } from "@/lib/workspace-paths";
-import { restoreConversationExecution } from "@/lib/yula-history-navigation";
+import { navigateToConversationScreen } from "@/lib/yula-history-navigation";
 import { formatTimeAgo } from "./time-ago";
 import { YULA } from "@/components/layout/yula-brand-data";
 import { YulaMarkIcon } from "@/components/layout/yula-brand";
@@ -50,6 +50,8 @@ export function YulaIdeSidebar({
   const selectConversation = useChatsStore((s) => s.selectConversation);
   const deleteConversation = useChatsStore((s) => s.deleteConversation);
   const deleteConversations = useChatsStore((s) => s.deleteConversations);
+  const setHistoryOpen = useChatsStore((s) => s.setHistoryOpen);
+  const setSearchingHistory = useChatsStore((s) => s.setSearchingHistory);
   const {
     newConversation,
     deleteConversation: chatDeleteConversation,
@@ -108,20 +110,32 @@ export function YulaIdeSidebar({
   }, []);
 
   const handleNewConversation = React.useCallback(() => {
+    setSearchingHistory(false);
+    setHistoryOpen(false);
     newConversation?.();
     onNewChat?.();
-  }, [newConversation, onNewChat]);
+  }, [newConversation, onNewChat, setSearchingHistory, setHistoryOpen]);
+
+  const handleOpenHistory = React.useCallback(() => {
+    setSearchingHistory(false);
+    setHistoryOpen(true);
+  }, [setSearchingHistory, setHistoryOpen]);
 
   const handleSelect = React.useCallback(
     (session: YulaConversation) => {
+      setSearchingHistory(false);
+      setHistoryOpen(false);
       selectConversation(session.id);
-      restoreConversationExecution(
+      navigateToConversationScreen(
         session,
+        (href) => {
+          router.push(href);
+        },
         useChatsStore.getState().messagesById[session.id],
       );
       onSelectConversation?.(session.id);
     },
-    [selectConversation, onSelectConversation],
+    [selectConversation, router, onSelectConversation, setSearchingHistory, setHistoryOpen],
   );
 
   const handleDelete = React.useCallback(
@@ -159,8 +173,8 @@ export function YulaIdeSidebar({
     >
       {/* Sidebar Header Bar (aligned with Column 2 & 3 headers) */}
       <div className={cn(panelHeaderClass, "bg-card")}>
-        <div className="flex items-center gap-2">
-          <YulaMarkIcon className="size-4" />
+        <div className="flex items-center gap-2 min-w-0">
+          <YulaMarkIcon className="size-4 shrink-0" />
           <span className={panelHeaderTitleClass}>{YULA.name}</span>
         </div>
       </div>
@@ -182,8 +196,8 @@ export function YulaIdeSidebar({
       <div className="space-y-0.5 px-3 py-1 text-muted-foreground">
         <button
           type="button"
-          data-nav="screen"
-          onClick={() => router.push("/my/history")}
+          data-ide-action="true"
+          onClick={handleOpenHistory}
           className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted/40 hover:text-foreground transition-colors cursor-pointer"
         >
           <History className="size-3.5" />
@@ -307,6 +321,7 @@ export function YulaIdeSidebar({
                           role="button"
                           tabIndex={0}
                           data-slot="ide-conversation-item"
+                          data-ide-action="true"
                           onClick={() => handleSelect(conv)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {

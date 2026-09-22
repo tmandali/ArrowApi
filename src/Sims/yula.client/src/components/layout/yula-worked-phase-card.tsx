@@ -5,15 +5,14 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  PauseCircle,
   Sparkles,
   TriangleAlert,
-  Send,
-  Square,
 } from "lucide-react";
 import { CodeBlock } from "@/components/ui/code-block";
 import { cn } from "@/utils/cn";
-import type { WorkedStepPhase } from "./yula-worked-steps";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
+import type { WorkedStepPhase } from "./yula-worked-steps";
 
 export interface YulaWorkedPhaseCardProps {
   phase: WorkedStepPhase;
@@ -32,20 +31,9 @@ export function YulaWorkedPhaseCard({
   onToggle,
   lastStepRef,
 }: YulaWorkedPhaseCardProps) {
-  const chat = useOptionalYulaChat();
-  const canSteer = Boolean(chat && typeof chat.steer === "function");
-  const canStop = Boolean(chat && typeof chat.stop === "function");
   const [expandedStepId, setExpandedStepId] = React.useState<string | null>(null);
-  const [steerInputOpen, setSteerInputOpen] = React.useState(false);
-  const [steerText, setSteerText] = React.useState("");
-
-  const handleSteerSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!steerText.trim() || !chat?.steer) return;
-    chat.steer(steerText.trim());
-    setSteerText("");
-    setSteerInputOpen(false);
-  };
+  const yula = useOptionalYulaChat();
+  const isSuspended = Boolean(phase.isSuspended || (phase.isLive && yula?.isSuspended));
 
   return (
     <div className="flex flex-col gap-1 rounded-md border border-border/25 bg-muted/10 p-1.5 transition-colors">
@@ -55,10 +43,12 @@ export function YulaWorkedPhaseCard({
         className="group/phase flex cursor-pointer items-center justify-between py-0.5 select-none"
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          {phase.isLive ? (
+          {isSuspended ? (
+            <PauseCircle className="size-3.5 text-amber-500 animate-pulse shrink-0" />
+          ) : phase.isLive ? (
             <Loader2 className="size-3.5 animate-spin text-orange-500 shrink-0" />
           ) : phase.hasError ? (
-            <TriangleAlert className="size-3.5 text-red-500 shrink-0" />
+            <TriangleAlert className="size-3.5 text-amber-500 shrink-0" />
           ) : phase.isRecovery ? (
             <Sparkles className="size-3.5 text-amber-500 shrink-0" />
           ) : (
@@ -75,6 +65,11 @@ export function YulaWorkedPhaseCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {isSuspended && (
+            <span className="rounded bg-amber-500/10 px-1.5 py-0.2 font-mono text-[9.5px] font-medium text-amber-600 dark:text-amber-400">
+              ASKIDA
+            </span>
+          )}
           {phase.hasError && (
             <span className="rounded bg-red-500/10 px-1.5 py-0.2 font-mono text-[9.5px] font-medium text-red-600 dark:text-red-400">
               HATA
@@ -145,7 +140,7 @@ export function YulaWorkedPhaseCard({
                     className={cn(
                       "font-sans text-[12px]",
                       step.isError
-                        ? "text-red-600 dark:text-red-400 font-medium"
+                        ? "text-amber-600 dark:text-amber-400 font-medium"
                         : isThought
                           ? "text-muted-foreground/90 italic"
                           : "text-foreground/85"
@@ -162,7 +157,11 @@ export function YulaWorkedPhaseCard({
 
                   {step.isLive ? (
                     <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-orange-500 animate-pulse">
-                      <Loader2 className="size-3 animate-spin" />
+                      {isSuspended || step.isSuspended ? (
+                        <PauseCircle className="size-3 text-amber-500 animate-pulse" />
+                      ) : (
+                        <Loader2 className="size-3 animate-spin" />
+                      )}
                     </span>
                   ) : hasDetails ? (
                     <ChevronRight
@@ -208,59 +207,6 @@ export function YulaWorkedPhaseCard({
               </div>
             );
           })}
-
-          {/* Canlı Müdahale (Live Intervention / Steer / Abort) Barı */}
-          {(phase.hasError || phase.isRecovery || phase.isLive) && canSteer ? (
-            <div className="mt-1 flex flex-col gap-1 border-t border-border/20 pt-1">
-              {!steerInputOpen ? (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSteerInputOpen(true)}
-                    className="flex items-center gap-1 rounded px-2 py-0.5 text-[10.5px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="size-3" />
-                    <span>Yönlendir (Steer)</span>
-                  </button>
-                  {canStop && phase.isLive ? (
-                    <button
-                      type="button"
-                      onClick={() => chat?.stop()}
-                      className="flex items-center gap-1 rounded px-2 py-0.5 text-[10.5px] font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
-                    >
-                      <Square className="size-2.5 fill-current" />
-                      <span>Durdur</span>
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                <form onSubmit={handleSteerSubmit} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={steerText}
-                    onChange={(e) => setSteerText(e.target.value)}
-                    placeholder="Ajanı yönlendirecek talimat yazın..."
-                    className="flex-1 rounded border border-border/40 bg-background px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    className="flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-[10.5px] font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer"
-                  >
-                    <Send className="size-2.5" />
-                    <span>Gönder</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSteerInputOpen(false)}
-                    className="rounded px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    Vazgeç
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

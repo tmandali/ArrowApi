@@ -1,10 +1,13 @@
-export type AIProviderType = "azure" | "ollama" | "openai" | "agnes";
+export type AIProviderType = "azure" | "ollama" | "openai" | "agnes" | "nvidia" | "openrouter" | (string & {});
 
-export const PROVIDER_LABELS: Record<AIProviderType, string> = {
+export const PROVIDER_LABELS: Record<string, string> = {
   azure: "Microsoft Foundry",
   ollama: "Ollama",
   openai: "OpenAI",
-  agnes: "Agnes",
+  agnes: "Agnes AI",
+  nvidia: "NVIDIA NIM",
+  openrouter: "OpenRouter",
+  opencode: "OpenCode",
 };
 
 /** Agnes AI gateway (OpenAI-uyumlu). Kaynak: agnes-ai docs cid1/cid7. */
@@ -19,11 +22,9 @@ export const DEFAULT_AGNES_MODELS: readonly string[] = [
 /** İstekte / ayarda gelen ad (foundry ≡ azure). */
 export function normalizeProvider(requested?: string | null): AIProviderType | undefined {
   const r = (requested ?? "").toLowerCase().trim();
-  if (r === "azure" || r === "foundry") return "azure";
-  if (r === "ollama") return "ollama";
-  if (r === "openai") return "openai";
-  if (r === "agnes") return "agnes";
-  return undefined;
+  if (!r) return undefined;
+  if (r === "foundry") return "azure";
+  return r as AIProviderType;
 }
 
 /** İstekte gelen sağlayıcı; yoksa env. */
@@ -97,23 +98,70 @@ export function getDefaultModel(provider: AIProviderType = getActiveProvider()):
   );
 }
 
+/** Varsayılan Ollama modelleri (yerel Ollama kapalıyken veya yapılandırma katalogu için). */
+export const DEFAULT_OLLAMA_MODELS: readonly string[] = [
+  "gemma4:12b-mlx",
+  "gemma4:27b-mlx",
+  "llama3.3:70b",
+  "qwen2.5:32b",
+  "deepseek-r1:14b",
+  "llama3.2:3b",
+] as const;
+
+/** Varsayılan OpenAI modelleri. */
+export const DEFAULT_OPENAI_MODELS: readonly string[] = [
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o3-mini",
+] as const;
+
 /** Azure/Foundry'de kullanılabilir deployment adları (sıra korunur).
  *  AZURE_OPENAI_DEPLOYMENTS="gpt-5.4,gpt-4o" gibi virgüllü liste;
- *  boşsa yalnızca varsayılan model döner. Deployment adı ≠ model adı:
- *  Azure kaynağında tanımlı deployment adları yazılmalıdır. */
+ *  boşsa varsayılan liste döner. */
 export function getAzureDeployments(): string[] {
   const primary = getDefaultModel("azure");
-  const extras = (process.env.AZURE_OPENAI_DEPLOYMENTS ?? "")
+  const envList = (process.env.AZURE_OPENAI_DEPLOYMENTS ?? "")
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && s !== primary);
-  return [primary, ...extras];
+    .filter(Boolean);
+  const defaults = ["gpt-5.4", "gpt-4o", "gpt-4o-mini", "o3-mini"];
+  const pool = envList.length > 0 ? envList : defaults;
+  const out = [primary];
+  for (const name of pool) {
+    if (!out.includes(name)) out.push(name);
+  }
+  return out;
 }
 
-/** Agnes'te kullanılabilir model adları (sıra korunur).
- *  Birincil model sağlayıcı varsayılanıdır (`AGNES_MODEL`, yoksa
- *  `agnes-2.5-flash`); ardından bilinen modeller, en sonda `AGNES_MODELS`
- *  env'inden ekstralar (`"agnes-2.5-pro,..."` gibi virgüllü liste) gelir. */
+/** Ollama'da yapılandırılmış modeller (sıra korunur). */
+export function getOllamaModels(): string[] {
+  const primary = getDefaultModel("ollama");
+  const envModels = (process.env.OLLAMA_MODELS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const out = [primary];
+  for (const name of [...DEFAULT_OLLAMA_MODELS, ...envModels]) {
+    if (!out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+/** OpenAI'da yapılandırılmış modeller (sıra korunur). */
+export function getOpenAiModels(): string[] {
+  const primary = getDefaultModel("openai");
+  const envModels = (process.env.OPENAI_MODELS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const out = [primary];
+  for (const name of [...DEFAULT_OPENAI_MODELS, ...envModels]) {
+    if (!out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+/** Agnes'te kullanılabilir model adları (sıra korunur). */
 export function getAgnesModels(): string[] {
   const primary = getDefaultModel("agnes");
   const extras = (process.env.AGNES_MODELS ?? "")
@@ -125,6 +173,22 @@ export function getAgnesModels(): string[] {
     if (name !== primary && !out.includes(name)) out.push(name);
   }
   return out;
+}
+
+/** Sağlayıcıya göre yula-config'de tanımlı modellerin tamamını döndürür. */
+export function getConfiguredModels(provider: AIProviderType = getActiveProvider()): string[] {
+  switch (provider) {
+    case "azure":
+      return getAzureDeployments();
+    case "ollama":
+      return getOllamaModels();
+    case "openai":
+      return getOpenAiModels();
+    case "agnes":
+      return getAgnesModels();
+    default:
+      return [getDefaultModel(provider)];
+  }
 }
 
 /** Varsayılan embedding modeli. */
@@ -170,3 +234,34 @@ export function resolveThinkingEnabled(bodyValue?: boolean): boolean {
   }
   return bodyValue !== false;
 }
+
+/**
+ * Verilen uç noktanın sağlayıcı ile uyumlu olup olmadığını doğrular.
+ * Örneğin Azure uç noktası Agnes veya Ollama isteklerine taşınamaz.
+ */
+export function isEndpointCompatible(
+  endpoint: string | undefined | null,
+  provider: AIProviderType,
+): boolean {
+  if (!endpoint) return true;
+  const ep = endpoint.toLowerCase();
+  const prov = (provider || "").toLowerCase();
+
+  const isAzureEp = ep.includes("azure.com") || ep.includes("azure-api.net");
+  if (isAzureEp) return prov === "azure";
+
+  const isOllamaEp = ep.includes("11434") || ep.includes("ollama");
+  if (isOllamaEp) return prov === "ollama";
+
+  const isAgnesEp = ep.includes("agnes-ai.com") || ep.includes("agnes.ai");
+  if (isAgnesEp) return prov === "agnes";
+
+  const isOpenAiEp = ep.includes("api.openai.com");
+  if (isOpenAiEp) return prov === "openai";
+
+  const isGoogleEp = ep.includes("googleapis.com");
+  if (isGoogleEp) return prov === "google";
+
+  return true;
+}
+

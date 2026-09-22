@@ -30,6 +30,7 @@ interface FinalizedToolOutcome {
 interface ExecutedToolBatch {
   messages: any[];
   terminate: boolean;
+  suspend?: boolean;
 }
 
 /**
@@ -178,6 +179,8 @@ async function runLoop(
       const toolResultMessages: any[] = [];
       hasMoreToolCalls = false;
 
+      let batch: ExecutedToolBatch | undefined;
+
       if (toolCalls.length > 0) {
         // Pi Stagnation (kısırdöngü) sezici: aynı araç ve parametrelerle 3 ardışık tur
         const fp = toolCalls
@@ -201,7 +204,7 @@ async function runLoop(
         }
 
         // Output token sınırında yarım kalan çağrıları güvenle ele al
-        const batch: ExecutedToolBatch =
+        batch =
           turnResult.stopReason === 'length'
             ? await failTruncatedCalls(toolCalls, emit)
             : await executeToolCalls(currentContext, toolCalls, config, signal, emit);
@@ -228,6 +231,54 @@ async function runLoop(
       if (await config.shouldStopAfterTurn?.(stopContext)) {
         await emit({ type: 'agent_end', messages: newMessages });
         return;
+      }
+
+      // Pi Suspension & Steering: Araç veya model araya girme / yönlendirme bekliyorsa askıya al
+      const isSuspended = Boolean(batch?.suspend || (await config.shouldSuspendTurn?.(stopContext)));
+      if (isSuspended) {
+        await emit({
+          type: 'state_transition',
+          from: 'tool_executing',
+          to: 'suspended',
+          reason: 'steering',
+          stepIndex: turnIndex,
+          timestamp: Date.now(),
+        });
+        await emit({
+          type: 'turn_suspended',
+          stepIndex: turnIndex,
+          reason: 'steering',
+          prompt: assistantMessage?.content,
+          timestamp: Date.now(),
+        });
+
+        if (config.waitForSteering) {
+          try {
+            await config.waitForSteering(signal);
+            pendingMessages = (await config.getSteeringMessages?.()) || [];
+            await emit({
+              type: 'state_transition',
+              from: 'suspended',
+              to: 'thinking',
+              reason: 'steering_received',
+              stepIndex: turnIndex,
+              timestamp: Date.now(),
+            });
+            await emit({
+              type: 'turn_resumed',
+              stepIndex: turnIndex,
+              message: pendingMessages[0]?.content,
+              timestamp: Date.now(),
+            });
+            hasMoreToolCalls = true;
+            continue;
+          } catch {
+            if (signal?.aborted) {
+              await emit({ type: 'agent_end', messages: newMessages });
+              return;
+            }
+          }
+        }
       }
 
       // Pi prepareNextTurn: Tur sonrası dinamik model/thinking terfisi veya bağlam hazırlığı
@@ -382,7 +433,8 @@ async function executeToolCalls(
   }
 
   const terminate = outcomes.length > 0 && outcomes.some((o) => o.result.terminate === true);
-  return { messages, terminate };
+  const suspend = outcomes.length > 0 && outcomes.some((o) => o.result.suspend === true);
+  return { messages, terminate, suspend };
 }
 
 async function failTruncatedCalls(toolCalls: AgentToolCall[], emit: AgentEventSink): Promise<ExecutedToolBatch> {
@@ -425,5 +477,5 @@ async function failTruncatedCalls(toolCalls: AgentToolCall[], emit: AgentEventSi
     await emit({ type: 'message_end', message: msg });
     messages.push(msg);
   }
-  return { messages, terminate: false };
+  return { messages, terminate: false, suspend: false };
 }

@@ -19,20 +19,28 @@ export interface FailoverOptions {
  */
 export function isRetryableProviderError(error: unknown): boolean {
   if (!error) return false;
-  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  const causeMsg =
+    error instanceof Error && (error as any).cause
+      ? String((error as any).cause).toLowerCase()
+      : "";
+  const combined = `${msg} ${causeMsg}`;
 
-  // 429 Rate limit, 500, 502, 503, 504 veya ağ zaman aşımı
+  // 429 Rate limit, 500, 502, 503, 504 veya ağ zaman aşımı / bağlantı hatası
   return (
-    msg.includes("429") ||
-    msg.includes("rate limit") ||
-    msg.includes("quota") ||
-    msg.includes("500") ||
-    msg.includes("502") ||
-    msg.includes("503") ||
-    msg.includes("504") ||
-    msg.includes("timeout") ||
-    msg.includes("econnrefused") ||
-    msg.includes("service unavailable")
+    combined.includes("429") ||
+    combined.includes("rate limit") ||
+    combined.includes("quota") ||
+    combined.includes("500") ||
+    combined.includes("502") ||
+    combined.includes("503") ||
+    combined.includes("504") ||
+    combined.includes("timeout") ||
+    combined.includes("econnrefused") ||
+    combined.includes("cannot connect") ||
+    combined.includes("fetch failed") ||
+    combined.includes("network") ||
+    combined.includes("service unavailable")
   );
 }
 
@@ -48,7 +56,7 @@ export function createFailoverLanguageModel(options: FailoverOptions): LanguageM
 
   const middleware: LanguageModelMiddleware = {
     specificationVersion: "v4",
-    wrapStream: async ({ doStream }) => {
+    wrapStream: async ({ doStream, params }) => {
       try {
         return await doStream();
       } catch (err) {
@@ -56,13 +64,13 @@ export function createFailoverLanguageModel(options: FailoverOptions): LanguageM
           onFailover?.(err, "stream");
           const fb = fallback as any;
           if (typeof fb?.doStream === "function") {
-            return await fb.doStream();
+            return await fb.doStream(params);
           }
         }
         throw err;
       }
     },
-    wrapGenerate: async ({ doGenerate }) => {
+    wrapGenerate: async ({ doGenerate, params }) => {
       try {
         return await doGenerate();
       } catch (err) {
@@ -70,7 +78,7 @@ export function createFailoverLanguageModel(options: FailoverOptions): LanguageM
           onFailover?.(err, "generate");
           const fb = fallback as any;
           if (typeof fb?.doGenerate === "function") {
-            return await fb.doGenerate();
+            return await fb.doGenerate(params);
           }
         }
         throw err;

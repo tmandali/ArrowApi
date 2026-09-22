@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -37,6 +37,7 @@ export function ChatComposer({
   onStop: () => void;
 }) {
   const t = useTranslations("ChatAssistant");
+  const locale = useLocale();
   const router = useRouter();
   const {
     input,
@@ -54,6 +55,7 @@ export function ChatComposer({
     fileInputRef,
     textareaRef,
     commandMatches,
+    isRefreshingModels,
     showCommands,
     showNewAgentItem,
     paletteItemCount,
@@ -67,6 +69,10 @@ export function ChatComposer({
     applyCommand,
     onFilesSelected,
     canSubmit,
+    modelTag,
+    closeCommands,
+    isModelSubmenu,
+    isProviderSubmenu,
   } = composer;
 
   const commandPaletteRef = React.useRef<HTMLDivElement>(null);
@@ -88,6 +94,34 @@ export function ChatComposer({
     historyPaletteRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
   }, [historyIndex, showHistory]);
 
+  React.useEffect(() => {
+    if (!showCommands) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeCommands();
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (commandPaletteRef.current && !commandPaletteRef.current.contains(target) && textareaRef.current && !textareaRef.current.contains(target)) {
+        closeCommands();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showCommands, closeCommands, textareaRef]);
+
+  const paletteTitle = isModelSubmenu
+    ? (locale === "tr" ? "Modeller" : "Models")
+    : isProviderSubmenu
+      ? (locale === "tr" ? "Sağlayıcılar" : "Providers")
+      : (locale === "tr" ? "Komutlar" : "Commands");
+
   return (
     <div className="relative mx-auto w-full max-w-3xl shrink-0 space-y-1.5 px-3 pb-2 pt-1.5">
       {showCommands ? (
@@ -95,6 +129,18 @@ export function ChatComposer({
           ref={commandPaletteRef}
           className="absolute inset-x-3 bottom-full z-20 mb-1.5 overflow-hidden rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-lg"
         >
+          <div className="flex items-center justify-between border-b border-border/40 px-2.5 py-1 text-[11px] text-muted-foreground bg-muted/20 select-none">
+            <span className="font-medium text-[10.5px]">{paletteTitle}</span>
+            <button
+              type="button"
+              onClick={closeCommands}
+              className="size-5 flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+              aria-label="Kapat"
+              title="Kapat (Esc)"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
           <Command
             shouldFilter={false}
             disablePointerSelection
@@ -114,29 +160,27 @@ export function ChatComposer({
                       key={command.id}
                       value={command.slash}
                       onSelect={() => applyCommand(command)}
-                      onMouseMove={(e) => {
-                        if (e.movementX === 0 && e.movementY === 0) return;
-                        if (!isSelected) setSelectedIndex(idx);
-                      }}
+                      onMouseMove={(e) => { if (e.movementX !== 0 || e.movementY !== 0) if (!isSelected) setSelectedIndex(idx); }}
                       data-active={isSelected ? "true" : undefined}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
-                        isSelected
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "hover:bg-accent/80"
-                      )}
+                      className={cn("flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors", isSelected ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/80")}
                     >
-                      <Icon className="size-3.5 text-primary shrink-0" />
-                      <span className="font-semibold text-foreground shrink-0">
-                        /{command.slash}
-                      </span>
-                      <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
-                        {command.description || command.label}
-                      </span>
-                      {command.source === "user" ? (
-                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1 py-px text-[9.5px] font-medium text-primary">
-                          skill
+                      <Icon className={cn("size-3.5 shrink-0", command.badgeVariant === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-primary", command.id === "model:refresh" && isRefreshingModels && "animate-spin")} />
+                      <span className="font-semibold text-foreground shrink-0">/{command.slash}</span>
+                      <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">{command.description || command.label}</span>
+                      {command.badge ? (
+                        <span className={cn(
+                          "shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-medium transition-colors",
+                          command.badgeVariant === "active" && "border border-primary/30 bg-primary/10 text-primary font-semibold",
+                          command.badgeVariant === "success" && "border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                          command.badgeVariant !== "active" && command.badgeVariant !== "success" && "border border-border/60 bg-muted/40 text-muted-foreground"
+                        )}>
+                          {(command.badgeVariant === "active" || command.badgeVariant === "success") && (
+                            <span className={cn("size-1.5 rounded-full shrink-0", command.badgeVariant === "active" ? "bg-primary" : "bg-emerald-500")} />
+                          )}
+                          {command.badge}
                         </span>
+                      ) : command.source === "user" ? (
+                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1 py-px text-[9.5px] font-medium text-primary">skill</span>
                       ) : null}
                     </CommandItem>
                   );
@@ -145,26 +189,13 @@ export function ChatComposer({
                   <CommandItem
                     value="__new-agent__"
                     onSelect={() => router.push("/my/agents")}
-                    onMouseMove={(e) => {
-                      if (e.movementX === 0 && e.movementY === 0) return;
-                      if (!isNewAgentSelected)
-                        setSelectedIndex(commandMatches?.length ?? 0);
-                    }}
+                    onMouseMove={(e) => { if (e.movementX !== 0 || e.movementY !== 0) if (!isNewAgentSelected) setSelectedIndex(commandMatches?.length ?? 0); }}
                     data-active={isNewAgentSelected ? "true" : undefined}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
-                      isNewAgentSelected
-                        ? "bg-accent text-accent-foreground font-medium"
-                        : "hover:bg-accent/80"
-                    )}
+                    className={cn("flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors", isNewAgentSelected ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/80")}
                   >
                     <Plus className="size-3.5 text-primary shrink-0" />
-                    <span className="font-semibold text-foreground shrink-0">
-                      {t("agent_create")}
-                    </span>
-                    <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">
-                      {t("agent_manage_open")}
-                    </span>
+                    <span className="font-semibold text-foreground shrink-0">{t("agent_create")}</span>
+                    <span className="text-[10.5px] text-muted-foreground truncate flex-1 min-w-0">{t("agent_manage_open")}</span>
                   </CommandItem>
                 ) : null}
               </CommandGroup>
@@ -185,37 +216,25 @@ export function ChatComposer({
             value={selectedHistoryValue}
             className="p-1 pt-0.5"
           >
-            <CommandList className="max-h-56 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
+            <CommandList className="max-h-56 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30">
               <CommandGroup className="p-0">
-                {historySuggestions.map((s, idx) => {
-                  const isSelected = idx === historyIndex;
-                  return (
-                    <CommandItem
-                      key={`${s.convId}-${s.text.slice(0, 48)}-${idx}`}
-                      value={s.text}
-                      onSelect={() => openHistoryConversation(s.convId)}
-                      onMouseMove={(e) => {
-                        if (e.movementX === 0 && e.movementY === 0) return;
-                        if (!isSelected) setHistoryIndex(idx);
-                      }}
-                      data-active={isSelected ? "true" : undefined}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
-                        isSelected
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "hover:bg-accent/80"
-                      )}
-                    >
-                      <History className="size-3.5 text-primary shrink-0" />
-                      <span className="truncate flex-1 min-w-0 text-foreground">
-                        {s.text.length > 120 ? `${s.text.slice(0, 120)}…` : s.text}
-                      </span>
-                      <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70">
-                        {formatHistoryAgo(s.createdAt, t)}
-                      </span>
-                    </CommandItem>
-                  );
-                })}
+                {historySuggestions.map((s, idx) => (
+                  <CommandItem
+                    key={`${s.convId}-${s.text.slice(0, 48)}-${idx}`}
+                    value={s.text}
+                    onSelect={() => openHistoryConversation(s.convId)}
+                    onMouseMove={(e) => { if (e.movementX !== 0 || e.movementY !== 0) setHistoryIndex(idx); }}
+                    data-active={idx === historyIndex ? "true" : undefined}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] cursor-pointer min-h-0 transition-colors",
+                      idx === historyIndex ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/80"
+                    )}
+                  >
+                    <History className="size-3.5 text-primary shrink-0" />
+                    <span className="truncate flex-1 min-w-0 text-foreground">{s.text.length > 120 ? `${s.text.slice(0, 120)}…` : s.text}</span>
+                    <span className="shrink-0 text-[10px] font-medium text-muted-foreground/70">{formatHistoryAgo(s.createdAt, t)}</span>
+                  </CommandItem>
+                ))}
               </CommandGroup>
             </CommandList>
           </Command>
@@ -230,12 +249,15 @@ export function ChatComposer({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (showCommands) return;
-          if (isLoading) {
-            handleSteer();
-          } else {
-            handleSend();
+          if (showCommands && commandMatches?.length) {
+            const target = commandMatches[selectedIndex] ?? commandMatches[0];
+            if (target) {
+              applyCommand(target);
+              return;
+            }
           }
+          if (isLoading) handleSteer();
+          else handleSend();
         }}
         className="rounded-xl border border-primary/15 bg-card p-1.5 shadow-sm focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/15 dark:border-primary/20"
       >
@@ -255,20 +277,13 @@ export function ChatComposer({
           ) : null}
 
           {attachments.map((file) => (
-            <span
-              key={file.id}
-              className="inline-flex shrink-0 max-w-full items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground"
-            >
+            <span key={file.id} className="inline-flex shrink-0 max-w-full items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
               <FileText className="size-3 shrink-0" />
               <span className="truncate">{file.name}</span>
               <button
                 type="button"
-                className="rounded-full p-0.5 hover:bg-muted hover:text-foreground"
-                onClick={() =>
-                  setAttachments((current) =>
-                    current.filter((item) => item.id !== file.id)
-                  )
-                }
+                className="rounded-full p-0.5 hover:bg-muted hover:text-foreground cursor-pointer"
+                onClick={() => setAttachments((current) => current.filter((item) => item.id !== file.id))}
                 aria-label={t("remove_attachment", { name: file.name })}
               >
                 <X className="size-3" />
@@ -282,6 +297,19 @@ export function ChatComposer({
             rows={1}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                if (showCommands) {
+                  event.preventDefault();
+                  closeCommands();
+                  return;
+                }
+                if (showHistory) {
+                  event.preventDefault();
+                  setHistoryClosed(true);
+                  return;
+                }
+              }
+
               if (showCommands && paletteItemCount > 0) {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();
@@ -300,73 +328,40 @@ export function ChatComposer({
                     return;
                   }
                   const targetCmd = commandMatches?.[selectedIndex] ?? commandMatches?.[0];
-                  if (targetCmd) {
-                    applyCommand(targetCmd);
-                  }
-                  return;
-                }
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setInput("");
+                  if (targetCmd) applyCommand(targetCmd);
                   return;
                 }
               }
 
               if (showHistory) {
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  setHistoryIndex((prev) => (prev + 1) % historySuggestions.length);
-                  return;
-                }
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  setHistoryIndex(
-                    (prev) =>
-                      (prev - 1 + historySuggestions.length) % historySuggestions.length,
-                  );
-                  return;
-                }
+                if (event.key === "ArrowDown") { event.preventDefault(); setHistoryIndex((prev) => (prev + 1) % historySuggestions.length); return; }
+                if (event.key === "ArrowUp") { event.preventDefault(); setHistoryIndex((prev) => (prev - 1 + historySuggestions.length) % historySuggestions.length); return; }
                 if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
                   event.preventDefault();
                   const target = historySuggestions[historyIndex] ?? historySuggestions[0];
-                  if (target) {
-                    openHistoryConversation(target.convId);
-                  }
+                  if (target) openHistoryConversation(target.convId);
                   return;
                 }
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setHistoryClosed(true);
-                  return;
-                }
+                if (event.key === "Escape") { event.preventDefault(); setHistoryClosed(true); return; }
               }
 
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                if (isLoading) {
-                  handleSteer();
-                } else {
-                  handleSend();
-                }
+                if (isLoading) handleSteer();
+                else handleSend();
               }
               if (event.key === "Backspace" && !input) {
-                if (pastedChip) {
-                  setPastedChip(null);
-                } else if (selectedCommand) {
-                  composer.setSelectedCommand(null);
-                }
+                if (pastedChip) setPastedChip(null);
+                else if (selectedCommand) composer.setSelectedCommand(null);
               }
             }}
             onPaste={(event) => {
               const items = event.clipboardData?.items;
               if (items) {
-                const imageFiles: File[] = [];
-                for (let i = 0; i < items.length; i++) {
-                  if (items[i].type.startsWith("image/")) {
-                    const file = items[i].getAsFile();
-                    if (file) imageFiles.push(file);
-                  }
-                }
+                const imageFiles = Array.from(items)
+                  .filter((it) => it.type.startsWith("image/"))
+                  .map((it) => it.getAsFile())
+                  .filter((f): f is File => Boolean(f));
                 if (imageFiles.length > 0) {
                   const dt = new DataTransfer();
                   imageFiles.forEach((f) => dt.items.add(f));
@@ -378,35 +373,27 @@ export function ChatComposer({
               if (!pastedText) return;
 
               const lines = pastedText.split(/\r?\n/);
-              const isMultiLine = lines.length > 5 && pastedText.trim().length > 300;
-              const isLong = pastedText.trim().length > 500;
-
-              if (isMultiLine || isLong) {
+              if ((lines.length > 5 && pastedText.trim().length > 300) || pastedText.trim().length > 500) {
                 event.preventDefault();
-                const preview = lines.length > 5
-                  ? t("paste_lines", { count: lines.length })
-                  : t("paste_chars", { count: pastedText.trim().length });
-
-                setPastedChip({
-                  id: `paste-${Date.now()}`,
-                  content: pastedText,
-                  preview,
-                });
+                const preview = lines.length > 5 ? t("paste_lines", { count: lines.length }) : t("paste_chars", { count: pastedText.trim().length });
+                setPastedChip({ id: `paste-${Date.now()}`, content: pastedText, preview });
               }
             }}
             placeholder={
               isLoading
                 ? t("input_placeholder_running")
-                : selectedCommand || pastedChip
-                  ? t("input_placeholder_secondary")
-                  : t("yula_placeholder")
+                : composer.isSuspended
+                  ? (composer.pendingChoice?.customPlaceholder || t("choice_pending_placeholder"))
+                  : selectedCommand || pastedChip
+                    ? t("input_placeholder_secondary")
+                    : t("yula_placeholder")
             }
             className="flex-1 min-w-[120px] min-h-[28px] max-h-32 resize-none border-0 bg-transparent px-1 py-1 text-[12px] leading-relaxed outline-none placeholder:text-muted-foreground"
           />
         </div>
 
         <div className="flex items-center justify-between gap-2 px-0.5 pt-0.5">
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1 min-w-0">
             <input
               ref={fileInputRef}
               type="file"
@@ -422,7 +409,7 @@ export function ChatComposer({
               size="icon"
               variant="ghost"
               className={cn(
-                "size-7 rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "size-7 shrink-0 rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer",
                 input.startsWith("/") && "bg-primary/10 text-primary font-medium"
               )}
               onClick={() => {
@@ -434,6 +421,18 @@ export function ChatComposer({
             >
               <Plus className="size-3.5" />
             </Button>
+            {modelTag ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("yula:open-context-window"));
+                }}
+                className="text-[10.5px] text-muted-foreground/60 hover:text-muted-foreground/90 transition-colors select-none truncate max-w-[200px] cursor-pointer hover:underline"
+                title={`Model: ${modelTag} (Bağlam Penceresi & Ayarlar)`}
+              >
+                {modelTag}
+              </button>
+            ) : null}
           </div>
 
           {isLoading ? (
@@ -451,24 +450,11 @@ export function ChatComposer({
 
               {canSubmit ? (
                 <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleFollowUp()}
-                    className="h-7 px-2.5 rounded-full text-[11px] font-medium border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-500/30 transition-all gap-1 cursor-pointer"
-                    title={t("pi_follow_up_title")}
-                  >
+                  <Button type="button" size="sm" onClick={() => handleFollowUp()} className="h-7 px-2.5 rounded-full text-[11px] font-medium border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-500/30 transition-all gap-1 cursor-pointer" title={t("pi_follow_up_title")}>
                     <ListOrdered className="size-3 text-violet-500 shrink-0" />
                     <span>{t("pi_follow_up_label")}</span>
                   </Button>
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleSteer()}
-                    className="h-7 px-2.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs transition-all gap-1 cursor-pointer"
-                    title={t("pi_steer_title")}
-                  >
+                  <Button type="button" size="sm" onClick={() => handleSteer()} className="h-7 px-2.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs transition-all gap-1 cursor-pointer" title={t("pi_steer_title")}>
                     <Zap className="size-3 fill-current shrink-0" />
                     <span>{t("pi_steer_label")}</span>
                   </Button>
@@ -480,8 +466,14 @@ export function ChatComposer({
               type="submit"
               size="icon"
               disabled={!canSubmit}
-              className="size-7 rounded-full bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90 transition-all cursor-pointer"
-              aria-label={t("send_aria")}
+              className={cn(
+                "size-7 rounded-full transition-all cursor-pointer",
+                composer.isSuspended
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-xs"
+                  : "bg-gradient-to-br from-primary to-orange-500 text-primary-foreground hover:from-primary/90 hover:to-orange-500/90"
+              )}
+              aria-label={composer.isSuspended ? (t("confirm_send") || "Onayla") : t("send_aria")}
+              title={composer.isSuspended ? (t("confirm_send") || "Onayla ve Gönder") : undefined}
             >
               <ArrowUp className="size-3.5" />
             </Button>

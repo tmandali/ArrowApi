@@ -364,3 +364,58 @@ Archived decisions from September 2026 to ensure active documentation files stri
     - Enhanced `inspect_ui_state` tool's `outputSchema` with typed `recent_events` Zod schema.
     - Extracted `useResultGridAgent` and `renderReportGridSubtitle` from `arrow-report-grid.tsx` to maintain clean separation and strictly adhere to the 500-line limit (486 lines).
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-20] Grounded ERP Workflow Protocol & Procedural Memory (Eliminating Theoretical LLM Fallback)
+- **Rationale:**
+  1. *Theoretical Parametric Fallback:* When a user asked about multi-step enterprise workflows, the LLM lacked verified procedural recipes in the workspace wiki. Governed by a generic rule, the model generated generic textbook theories detached from actual Sims ERP screens.
+  2. *Missing Level 0 Recipe Discovery:* `chat/route.ts` pre-injected `playbookRules`, but omitted `playbookRecipes` from Level 0 system prompt context.
+- **Decision:**
+  - **Prompt Grounding & Directives (`yula-agent-prompt.ts`):** Established the **Grounded Workflow Protocol**: ungrounded textbook essays and theoretical diagrams detached from Sims ERP are strictly forbidden. Present concrete DAG steps and screen routes. Proactively offer interactive `ask_user_choice` chips.
+  - **Zero-Latency Recipe Discovery (`chat/route.ts`):** Pre-injected `playbookRecipes` using `serverPlaybookStorage.readEntries(wsId)`.
+  - **Verification:** All simulation suites pass (31/31), 18/18 prompt tests pass.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Robust Chart Visualization Dispatch, Parameter Aliases & Base Table Fallback
+- **Rationale:** When users requested chart visualizations (e.g. "top 5 stores"), the agent defaulted to issuing raw SQL queries on `active_view` instead of triggering visualization, failed Zod validation on `orderMode: "desc"`, and encountered DuckDB Binder Errors when previous custom views masked underlying columns or filtered out requested entities (like `T999`).
+- **Decision:**
+  - **Tool & ReAct Prompt Grounding:** Added `VISUALIZE` example to `dispatch_component_action` in `standard-agent-tools.ts` and registered an autonomous execution step in `yula-agent-prompt.ts`.
+  - **Schema & Order Mode Normalization:** Allowed `"desc"` and `"asc"` in `GRID_VISUALIZE_CONTRACT` and mapped them to `"value_desc"` and `"value_asc"` in `inferChartOrderMode`.
+  - **Custom View & Base Table Fallbacks:** Derived columns from the probe row in `resolveActiveDataset` (`dataset.ts`) and added automatic fallback to `baseColumns` / base table in `visualizeGrid` when custom views lack requested columns or yield empty rows.
+  - **UI Chart Rendering:** Guaranteed unwrap of nested `details` in `parseChartOutput` and normalized AI SDK tool call parts in `yula-tool-info.ts`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Comprehensive WasmSql Architecture Migration & Legacy DuckDB Cleanup
+- **Rationale:**
+  1. *Architectural Disambiguation:* The browser-side WebAssembly SQL engine was historically named after a specific vendor implementation (`duckdb`). Renaming to `wasmsql` cleanly distinguishes client-side WASM execution from Next.js server-side SQL, while opening up engine-agnostic AI tooling.
+  2. *Full System Cleansing:* Beyond hook aliases, a complete cleanup was needed across localization dictionaries (`tr.json`, `en.json`), KPI landing specs, core service folders (`src/services/wasmsql`), vector memory stores (`wasmsql-vector`), Pyodide skill bridges, and internal hook state variables (`tableName`, `applyFilters`, `columnWasmTypes`, `gridAggregations`).
+- **Decision:**
+  - **Core Service Migration (`src/services/wasmsql/`):** Established `src/services/wasmsql/` as the single source of truth (`wasm-sql-client.ts`, `wasm-sql.worker.ts`, `filter-parser.ts`, `wasmsql-vector-*`, `ai/`). Completely removed legacy `src/services/duckdb` directory and deleted obsolete proxy files.
+  - **Localization & KPI Keys:** Migrated `duckdb-status` to `wasmsql-status` across Turkish and English translation files and `workspace-landing-data.ts`.
+  - **Grid Props & State Variable Cleanup:** Replaced `duckTableName` with `tableName`, `duckApplyFilters` with `applyFilters`, `columnDuckTypes` with `columnWasmTypes`, and `duckDbAggregations` with `gridAggregations` across all report-grid hooks and `arrow-report-grid.tsx`.
+  - **Headless AI Wasm SQL Engine:** Bound `wasm_sql_engine` component (`use-wasm-sql-agent.ts`) with `RUN_SQL`, `DESCRIBE_TABLE`, and `LIST_TABLES` action contracts and strict read-only SQL guard routing in `dispatch-bridge.ts`.
+  - **Skills & Tools Integration:** Renamed Pyodide bridge to `wasmsql-pyodide-bridge.ts` and updated dataset resolver, profiler, visualizer, and RAG vector indexing to import directly from `@/services/wasmsql` and `@/services/wasmsql-vector`.
+  - **Verification:** All 316 unit tests passed, all 8/8 grid test suites passed (`npm run test:grid`), 0 oxlint warnings/errors, 0 tsc errors, all files strictly $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Option B Governance & Approval Lifecycle for Procedural Playbook (Draft Isolation & Admin Review Screen)
+- **Rationale:**
+  1. *Unrestricted Production Mutations:* Standard users or agent proposals previously committed workflow recipes and screen rules directly to production company wikis via `recordEntry`. Allowing non-administrative roles to alter canonical corporate workflows poses severe governance and compliance risks.
+  2. *Need for Draft Isolation (Zero Leakage):* Newly proposed rules and recipes must be quarantined in `proposals/` (`status: "draft"`) so that active Level 0 prompt injection and `findRecipe` queries ignore them until officially sanctioned by an administrator.
+  3. *Admin Visual DAG Inspection:* Administrators require a dedicated review interface (`/system/playbooks`) featuring interactive flowchart rendering (`WorkflowGraphCanvas`), step inspection, and one-click `[Approve & Publish]` or `[Reject]` actions.
+- **Decision:**
+  - **Core Governance Models (`@my-agent/core`):** Extended `PlaybookEntry` with `status: 'draft' | 'approved' | 'rejected'`, `proposedBy`, `reviewedBy`, and `changeSummary`. Added `readProposals`, `writeProposal`, `approveProposal`, and `rejectProposal` to `IPlaybookStorageAdapter` and `PlaybookService`.
+  - **Tool Adapter Quarantining (`ui-tool-adapter.ts`):** Modified `propose_playbook_update` to invoke `proposeEntry` instead of `recordEntry`, ensuring non-admin proposals enter the draft pool awaiting admin authorization.
+  - **Server File Storage (`playbook-server.ts`):** Added isolated storage in `storage/wiki/workspaces/<workspace>/proposals/` and promotion logic moving approved recipes to `workflows/` or `screens/` while updating `index.md` and logging `proposal_approved`.
+  - **Dedicated API (`/api/agent/playbook/proposals`):** Created endpoints for proposal retrieval, draft creation, approvals, and rejections.
+  - **Visual Admin UI (`PlaybookProposalsTab` & `/system/playbooks`):** Created modular proposal review tab with DAG flowchart preview, diff view, and decision buttons, integrated into `PlaybooksManagementView` and guarded by `RequireAdmin`.
+  - **Navigation Integration:** Added `Kural & Akış Onayları` to `systemNav`, `global-nav-drawer.tsx`, `module-nav-menu.tsx`, and `workspace-landing-data.ts`.
+- **Author:** Antigravity / Team
+

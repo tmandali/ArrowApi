@@ -10,7 +10,7 @@ import {
 import { useChatsStore } from "@/lib/stores/chats";
 import { useUserAgentsStore } from "@/lib/stores/user-agents";
 import { navigateToConversationScreen, healConversationRecords } from "@/lib/yula-history-navigation";
-import { yulaModelsApiUrl } from "@/lib/yula-ai-client-config";
+import { fetchCachedYulaModels } from "@/lib/yula-ai-client-config";
 import { ChatInstance } from "./yula-chat/yula-chat-instance";
 import {
   firstUserMessageText,
@@ -79,7 +79,7 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // Soğuk başlangıç ısıtması: dock açılır açılmaz Ollama modeli belleğe
   // yüklenir (models route'u boş-prompt warmup tetikler) → ilk mesaj hızlı.
   React.useEffect(() => {
-    void fetch(yulaModelsApiUrl()).catch(() => {
+    void fetchCachedYulaModels().catch(() => {
       // Isıtma best-effort
     });
   }, []);
@@ -240,6 +240,9 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
         followUpQueue: [],
         clearSteering: () => {},
         clearFollowUp: () => {},
+        isSuspended: false,
+        pendingChoice: null,
+        respondToChoice: () => {},
       };
     }
     return {

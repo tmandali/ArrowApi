@@ -27,7 +27,7 @@ export function ItemDetailsAside({
   setAttachments,
   attachmentInputRef,
 }: ItemDetailsAsideProps) {
-  const t = useTranslations("ItemForm");
+  const t = useTranslations("Stock");
 
   return (
     <aside className="w-full space-y-4 border-t bg-muted/10 p-3 text-xs @[56rem]/item-details:row-span-2 @[56rem]/item-details:border-l @[56rem]/item-details:border-t-0 sm:p-4">

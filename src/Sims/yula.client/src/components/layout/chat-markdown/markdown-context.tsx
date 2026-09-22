@@ -26,6 +26,8 @@ export interface ChatMarkdownCallbacks {
    * değildir, statik render edilir (tıklama yok).
    */
   staticTitles?: string[];
+  /** Soru altındaki interaktif bullet seçeneği tıklandığında tetiklenir */
+  onChoiceSelect?: (value: string, context?: { question?: string; field?: string }) => void;
 }
 
 export const ChatMarkdownCallbacksContext =

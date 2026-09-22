@@ -34,7 +34,6 @@ import { useSettingsFormState } from "./use-settings-form-state";
 import { useSettingsBoot } from "./use-settings-boot";
 import { useSystemFacts } from "./use-system-facts";
 import { ProfileTab } from "./profile-tab";
-import { AiTab } from "./ai-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
 import { useMySettingsAgent } from "./use-my-settings-agent";
@@ -55,16 +54,21 @@ export function MySettingsForm() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const isSettingsTab = (v: string | null): v is SettingsTabId =>
-    v === "user-details" || v === "settings" || v === "yula-ai" || v === "connections";
+    v === "user-details" || v === "settings" || v === "connections";
   const [activeTab, setActiveTab] = React.useState<SettingsTabId>(
     isSettingsTab(tabParam) ? tabParam : "user-details",
   );
   React.useEffect(() => {
     // URL search-params (tab=...) ile state senkronu — legit external-sync.
     // eslint-disable-next-line set-state-in-effect
-    if (isSettingsTab(tabParam)) setActiveTab(tabParam);
+    if (isSettingsTab(tabParam)) {
+      setActiveTab(tabParam);
+    } else if (tabParam === "yula-ai") {
+      setActiveTab("user-details");
+      router.replace(`${pathname}?tab=user-details`, { scroll: false });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabParam]);
+  }, [tabParam, pathname, router]);
   const handleTabChange = (v: string) => {
     if (!isSettingsTab(v)) return;
     setActiveTab(v);
@@ -245,17 +249,12 @@ export function MySettingsForm() {
             <TabsList variant="line">
               <TabsTrigger value="user-details">{t("tab_user_details")}</TabsTrigger>
               <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
-              <TabsTrigger value="yula-ai">{t("tab_yula_ai")}</TabsTrigger>
               <TabsTrigger value="connections">{t("tab_connections")}</TabsTrigger>
             </TabsList>
           </div>
 
           <TabsContent value="user-details" className="m-0 flex-1 flex flex-col overflow-hidden">
             <ProfileTab form={form} />
-          </TabsContent>
-
-          <TabsContent value="yula-ai" className="m-0 flex-1 flex flex-col overflow-hidden">
-            <AiTab form={form} />
           </TabsContent>
 
           <TabsContent value="settings" className="m-0 flex-1 flex flex-col overflow-hidden">

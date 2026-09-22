@@ -1,3 +1,4 @@
+import * as React from "react";
 import Link from "next/link";
 import { FileSpreadsheet } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -8,6 +9,7 @@ import {
 import { parseColonTitleLine, extractFindingFilterPrompt } from "@/lib/finding-actions";
 import { buildFindingDrillPrompt } from "@/lib/yula-finding-drill";
 import { reportPageForAction } from "./markdown-entities";
+import { InteractiveChoiceChip } from "./markdown-chips";
 import type { ChatMarkdownCallbacks, ChatMarkdownT } from "./markdown-context";
 
 /** 3a — onay/çalıştırma satırı: "✓ Stok Bakiye Raporu: ..." */
@@ -163,13 +165,33 @@ export function renderPlainBullet(
   lIdx: string,
   cb?: ChatMarkdownCallbacks,
   t?: ChatMarkdownT,
+  questionContext?: string,
 ): React.ReactNode {
   if (cb && t) {
     const titled = renderBulletedItem(line, lIdx, cb, t);
     if (titled) return titled;
   }
-  const cleanBulletText = line.trim().replace(/^([-*•●]|\d+\.)\s+/, "").trim();
+  const cleanBulletText = line
+    .trim()
+    .replace(/^(?:->|[•●\-*→]|\d+\.)\s*/, "")
+    .trim();
   if (!cleanBulletText) return null;
+
+  // Soru bağlamı altındaki kısa seçenek maddeleri: interaktif tıklanabilir çip
+  if (
+    questionContext &&
+    cleanBulletText.length <= 50 &&
+    !/(?:adım|step|hazırlık)\b/i.test(cleanBulletText)
+  ) {
+    return (
+      <InteractiveChoiceChip
+        key={lIdx}
+        value={cleanBulletText}
+        questionContext={questionContext}
+        onSelect={cb?.onChoiceSelect || ((val) => cb?.onPrompt(val))}
+      />
+    );
+  }
 
   const boldParts = cleanBulletText.split(/(\*\*[^*]+\*\*)/g);
   const hasBold = boldParts.some((bp) => bp.startsWith("**") && bp.endsWith("**"));

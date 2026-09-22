@@ -11,15 +11,17 @@ import { AuthHeaderSync } from "@/components/app/auth-header-sync";
 import { CompanySessionSync } from "@/components/app/company-session-sync";
 import { SessionDebug } from "@/components/app/session-debug";
 import { AccountStatusGuard } from "@/components/app/account-status-guard";
-import { SessionProvider } from "next-auth/react";
+import { SessionProvider, type SessionProviderProps } from "next-auth/react";
 
 export function Providers({
+  session,
   children,
 }: {
+  session?: SessionProviderProps["session"];
   children: ReactNode;
 }) {
   return (
-    <SessionProvider>
+    <SessionProvider session={session} refetchOnWindowFocus={false}>
       <ThemeProvider
         attribute="class"
         defaultTheme="system"

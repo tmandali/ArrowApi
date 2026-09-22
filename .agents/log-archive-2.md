@@ -4,6 +4,21 @@ Archived decisions from September 2026 to ensure active documentation files stri
 
 ---
 
+## [2026-09-22] Autonomous LLM Steering, Turn Suspension, and Seamless Resumption (Eliminating Redundant Chat Runs)
+- **Rationale:**
+  1. *Rigid UI Choice Lock-in:* The agent previously forced rigid `ask_user_choice` tool calls and `YulaChoiceCard` interactive button grids whenever clarification or approval was sought. In natural conversation, LLMs can autonomously decide in text whether human intervention or steering is required.
+  2. *Redundant LLM Run Anti-Pattern:* Responding to choices invoked `sendMessageText()`, appending a new `role: 'user'` message and triggering a brand-new POST `/api/agent/chat` run. This discarded active tool executions, duplicated context overhead, and disrupted multi-step ReAct loops.
+  3. *Native Turn Suspension & Steering:* `@my-agent/core` provides `steer()` and `PendingMessageQueue`. By introducing native suspension (`turn_suspended`, `turn_resumed`, `waitForSteering`), an ongoing turn can sleep awaiting user guidance and resume seamlessly in the exact same execution cycle.
+- **Decision:**
+  - **Loop Suspension Protocol (`@my-agent/core`):** Added `turn_suspended` and `turn_resumed` events to `AgentEvent`. Updated `agentLoop` to support `waitForSteering(signal)`. When `toolResult.suspend` or `shouldSuspendTurn` is true, the loop emits `turn_suspended`, awaits incoming steering input via `PendingMessageQueue.waitForMessage`, drains steered messages, emits `turn_resumed`, and continues the multi-step ReAct loop without terminating.
+  - **Client-Side Steering Integration (`@my-agent/react` & `yula.client`):** Updated `useAgentChat` and `yula-chat-instance.tsx` so that `respondToChoice` and choice cards invoke `chat.steer(val)` instead of `sendMessageText(val)`.
+  - **Stream API Alignment (`route.ts`):** Removed `hasToolCall("ask_user_choice")` from `stopWhen` so the LLM decides autonomously when to pause or complete.
+  - **Prompt Protocol Modernization (`yula-agent-prompt.ts` & `yula-ui-skills.ts`):** Replaced rigid plain-text question prohibitions with `HUMAN-IN-THE-LOOP, SUSPENSION & STEERING PROTOCOL`. Eliminated redundant confirmation roadblocks ("Planı onaylıyor musunuz?") once criteria are gathered in favor of direct execution.
+  - **Verification:** All 345 `yula.client` unit tests passed (88 suites), all 133 `@my-agent/core` tests passed (17 suites), and `pnpm --filter yula.client typecheck` passed with 0 errors. All modified files strictly comply with the 500-line ceiling.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-20] Grounded ERP Workflow Protocol & Procedural Memory (Eliminating Theoretical LLM Fallback)
 - **Rationale:**
   1. *Theoretical Parametric Fallback:* When a user asked about multi-step enterprise workflows, the LLM lacked verified procedural recipes in the workspace wiki. Governed by a generic rule, the model fell into parametric training memory and generated generic textbook theories detached from actual Sims ERP screens, routes, and business rules.
@@ -261,3 +276,61 @@ Archived decisions from September 2026 to ensure active documentation files stri
   - **Streaming Cleanup Hardening (`yula-chat-provider.tsx`):** Extended `deleteConversation` and `deleteConversations` in the provider to abort any running `liveHelpers?.stop()` and reset custom grid views if any deleted conversation is the active session.
   - **Terminology Correction & i18n:** Renamed sidebar section from "Projeler" (Projects) to "Çalışma Alanları" (Workspaces). Added `delete_folder`, `confirm_clear_ask`, `confirm_yes`, `confirm_no` in `IdeOverlay` across `tr.json` and `en.json`.
 - **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Intent-Driven Routing, Rich Choice Cards (Rationale & Badge), and Elimination of Regex Buttonization
+- **Rationale:**
+  1. *Brittle Frontend Text Heuristics:* `markdown-blocks.tsx` previously used regular expressions matching keywords like `"sorgula"`, `"filtrele"`, `"aç"` to turn bullet points into clickable buttons, creating severe UX inconsistency.
+  2. *Lack of Rationale in User Choices:* Plan and decision options lacked explanation and justification (`rationale`).
+  3. *Parametric Intent Guessing vs. First-Class Intent Routing:* Relying on the LLM to remember to output interactive chips caused turns where the model announced choices without emitting `ask_user_choice`.
+- **Decision:**
+  - **Eliminated Frontend Regex Buttonization:** Removed regex-based buttonization of bullet points and quoted phrases. Markdown lists, quotes, and plans are rendered strictly as clean, static text.
+  - **Rich Choice Contract (`ask_user_choice` & `YulaChoiceCard`):** Extended `ask_user_choice` schema in `@my-agent/core` with `description`, `rationale`, and `badge`. Updated `YulaChoiceCard` to render vertical decision cards.
+  - **Intent Router & Classifier (`yula-intent-router.ts`):** Created early intent classification dynamically injecting tailored prompt directives into Level 0 system prompt.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Playbook Knowledge Sub-Agent & Level-0 Context Decoupling (Vercel AI SDK Tool-as-a-Subagent Pattern)
+- **Rationale:**
+  1. *Context Window Bloat & Scaling Limits:* Bulk pre-injection of all workspace recipes into Level 0 system prompt context degraded TTFT latency and consumed tens of thousands of tokens.
+  2. *Intent-to-Recipe Gap:* Rigid string/word overlap checks failed when recipes were titled differently.
+  3. *Vercel AI SDK & Pi Alignment:* Delegating knowledge retrieval to a dedicated, isolated sub-agent invoked from within `query_playbook` tool call allows model tiering and eliminates intermediate token pollution.
+- **Decision:**
+  - **Isolated Sub-Agent Engine (`playbook-subagent.ts`):** Created `runPlaybookSubagent` utilizing Vercel AI SDK `generateText` with isolated system prompt, lightweight sub-tools, and a 3500ms timeout sandbox with fallback to deterministic search.
+  - **Tool Upgrade (`standard-agent-tools.ts`):** Upgraded `query_playbook` to delegate directly to `runPlaybookSubagent`.
+  - **Level-0 Prompt Decoupling (`route.ts` & `yula-agent-prompt.ts`):** Removed bulk recipe reading from `chat/route.ts` while preserving active screen rules.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-21] Complete Elimination of Regex-Based Intent Routing & Alignment with Reference-Pi Semantic Reasoning
+- **Rationale:**
+  1. *Brittle Keyword Regex Steering:* Attempting to classify user prompts using hardcoded regular expressions (`GREETING_REGEX`, `PLAN_EXECUTION_REGEX`, `WORKFLOW_CONSULTATION_REGEX`, `DIRECT_EXECUTION_REGEX`, `DATA_ANALYSIS_REGEX`, `POLICY_LEARNING_REGEX`) created a fragile keyword-maintenance loop ("her fiil için regex/prompt mu güncelleyeceğiz?").
+  2. *Constraint Conflicts & Deadlocks:* Injected prompt directives (e.g. `=== DETECTED INTENT: WORKFLOW_CONSULTATION === MANDATORY: You MUST invoke ask_user_choice`) clashed with natural multi-turn context (e.g. approving an already proposed plan), inducing silent turn failures.
+  3. *Reference-Pi & Vercel AI SDK Standard:* The canonical reference architecture does not filter user prompts through regex matchers. Instead, the LLM determines intent naturally through semantic conversation history, screen context, and declarative prompt rules.
+- **Decision:**
+  - **Deleted Regex Router (`yula-intent-router.ts` & test):** Removed all regex intent pattern matchers and early classification passes.
+  - **Clean Prompt Construction (`route.ts` & `yula-agent-prompt.ts`):** Removed artificial `=== DETECTED INTENT ===` system prompt injections and `intent` context properties.
+  - **Declarative System Prompt Directives:** Preserved clear behavioral contracts in `yula-agent-prompt.ts` (direct execution on active report screens, plan-first on `/`, structured choices with rationale via `ask_user_choice`, and plan execution transitions).
+  - **Verification:** All 236 `yula.client` tests pass, 101 `@my-agent/core` tests pass, and zero regex router references remain in the repository.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-22] Action Contracts Standardization & Elimination of Heuristic JSON String Guessing
+- **Rationale:**
+  1. *Fragile JSON Guessing Across Output Payloads:* UI components were performing unstructured string JSON parses (`JSON.parse(content[0].text)`, `JSON.parse(trimmed)`) and regex extractions (`/Options:\s*(\[.*?\])/`) instead of relying on typed Action Contracts (`ActionContract`).
+  2. *Deterministic UI Affordance:* Visual charts, interactive user choices (`ask_user_choice`), report execution status (`SUBMIT`/`RUN`), and diagnostic subagent verdicts must be strictly guarded by registered action schemas.
+- **Decision:**
+  - **Visualization Contract (`GRID_VISUALIZE_CONTRACT` & `parseChartOutput`):** Expanded `outputSchema` in `result-grid-contracts.ts` to declare `chart`, `rows`, and `sql`. Refactored `parseChartOutput` in `yula-chart-utils.ts` to read directly from `(output.details ?? output)` without string parsing or `content[0].text` JSON parsing. Added `isChartActionContract(toolName, input)` in `yula-chat-turn-helpers.tsx`.
+  - **User Choice Contract (`ask_user_choice` & `parseChoiceData`):** Removed `/Options:\s*(\[.*?\])/` regex and `JSON.parse` from `yula-choice-card.tsx`, reading directly from structured `input` and `output.details`.
+  - **Job Execution Contract (`isJobActionContract` & `extractJobStartedAction`):** Replaced ad-hoc status/string checks in `yula-chat-turn.tsx` and `yula-chat-turn-helpers.tsx` with contract-driven checking and structured `{ jobId, navigateTo }` extraction.
+  - **Diagnostic Triage Subagent Contract (`DIAGNOSTIC_VERDICT_SCHEMA`):** Enforced Zod contract validation with `safeParse` in `diagnostic-subagent.ts`.
+- **Verification:**
+  - 364/364 unit and simulation tests passed in `yula.client` (93 suites, 0 failures).
+  - Oxlint passed with 0 warnings and 0 errors on 798 files.
+  - All modified files strictly obey the 500-line ceiling rule.
+- **Author:** Antigravity / Team
+

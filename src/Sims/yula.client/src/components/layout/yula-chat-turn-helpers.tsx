@@ -208,6 +208,103 @@ export const INTERACTIVE_CARD_TOOLS = new Set([
  * (seçenekler, anket, öneri çipleri, grafik veya yönlendirme kartı)
  * olup olmadığını belirler.
  */
+/**
+ * Belirli bir tool çağrısının sistem sözleşmelerine göre bir "Grafik / Görselleştirme Eylemi"
+ * (visualize_grid_data, result_grid:active VISUALIZE/CHART) olup olmadığını doğrular.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function isChartActionContract(
+  toolName: string,
+  input: unknown,
+): boolean {
+  if (toolName === "visualize_grid_data") {
+    return true;
+  }
+  if (toolName === "dispatch_component_action" && input && typeof input === "object") {
+    const inp = input as { component_id?: unknown; action?: unknown };
+    const compId = typeof inp.component_id === "string" ? inp.component_id : "";
+    const action = typeof inp.action === "string" ? inp.action : "";
+    if (
+      (compId === "result_grid:active" || compId.startsWith("result_grid:")) &&
+      (action === "VISUALIZE" || action === "CHART")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Belirli bir tool çağrısının sistem sözleşmelerine göre bir "İş Başlatma Eylemi"
+ * (run_job, criteria_form SUBMIT/RUN, arrow_job RUN/START) olup olmadığını doğrular.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function isJobActionContract(
+  toolName: string,
+  input: unknown,
+): boolean {
+  if (toolName === "run_job") {
+    return true;
+  }
+  if (toolName === "dispatch_component_action" && input && typeof input === "object") {
+    const inp = input as { component_id?: unknown; action?: unknown };
+    const compId = typeof inp.component_id === "string" ? inp.component_id : "";
+    const action = typeof inp.action === "string" ? inp.action : "";
+    if (
+      compId.startsWith("criteria_form:") &&
+      (action === "SUBMIT" || action === "RUN")
+    ) {
+      return true;
+    }
+    if (
+      (compId === "arrow_job" || compId.startsWith("arrow_job:")) &&
+      (action === "RUN" || action === "START")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export interface JobStartedAction {
+  jobId?: string;
+  navigateTo: string;
+}
+
+/**
+ * İş başlatma sözleşmelerinden (ActionContract) başarılı jobId ve navigateTo hedefini çeker.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function extractJobStartedAction(
+  part: YulaToolPartInfo,
+): JobStartedAction | null {
+  if (
+    part.state !== "output-available" ||
+    isFailedToolInfo(part) ||
+    (part as { isError?: boolean }).isError ||
+    !isJobActionContract(part.toolName, part.input)
+  ) {
+    return null;
+  }
+  const out = part.output as Record<string, unknown> | undefined;
+  const target =
+    out && typeof out === "object"
+      ? ((out.details && typeof out.details === "object" ? out.details : out) as Record<string, unknown>)
+      : undefined;
+
+  if (target?.status === "executed" && typeof target?.navigateTo === "string" && target.navigateTo.startsWith("/")) {
+    return {
+      navigateTo: target.navigateTo,
+      jobId: typeof target?.jobId === "string" ? target.jobId : undefined,
+    };
+  }
+  return null;
+}
+
+/**
+ * Tur içinde görsel bir kart (seçenek, soru, öneri, grafik veya başlatılan iş)
+ * gösterilip gösterilmeyeceğini belirler.
+ */
 // eslint-disable-next-line react/only-export-components -- yardımcı + bileşen aynı dosyada; saf fonksiyon
 export function hasVisibleTurnCard(toolParts: YulaToolPartInfo[]): boolean {
   return toolParts.some((info) => {
@@ -218,32 +315,112 @@ export function hasVisibleTurnCard(toolParts: YulaToolPartInfo[]): boolean {
     ) {
       return true;
     }
-    const isChart =
-      info.toolName === "visualize_grid_data" ||
-      (info.toolName === "dispatch_component_action" &&
-        ((info.input as { action?: string } | undefined)?.action === "VISUALIZE" ||
-         (info.input as { action?: string } | undefined)?.action === "CHART"));
-    if (isChart && info.state === "output-available") {
+    if (isChartActionContract(info.toolName, info.input) && info.state === "output-available") {
       return true;
     }
-    if (
-      (info.toolName === "run_job" ||
-        (info.toolName === "dispatch_component_action" &&
-          (info.input as { action?: string } | undefined)?.action === "RUN") ||
-        (info.toolName === "dispatch_component_action" &&
-          typeof info.output === "object" &&
-          info.output !== null &&
-          (info.output as { status?: unknown }).status === "executed")) &&
-      info.state === "output-available" &&
-      typeof info.output === "object" &&
-      info.output !== null &&
-      (info.output as { status?: unknown }).status === "executed" &&
-      typeof (info.output as { navigateTo?: unknown }).navigateTo === "string"
-    ) {
+    if (extractJobStartedAction(info) !== null) {
       return true;
     }
     return false;
   });
+}
+
+/**
+ * Belirli bir tool çağrısının sistem sözleşmelerine göre bir "Navigasyon Eylemi"
+ * (OPEN_LAST, FIND, NAVIGATE) olup olmadığını doğrular.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function isNavigationActionContract(
+  toolName: string,
+  input: unknown,
+): boolean {
+  if (toolName === "open_last_report" || toolName === "navigate_to_page") {
+    return true;
+  }
+  if (toolName === "dispatch_component_action" && input && typeof input === "object") {
+    const inp = input as { component_id?: unknown; action?: unknown };
+    const compId = typeof inp.component_id === "string" ? inp.component_id : "";
+    const action = typeof inp.action === "string" ? inp.action : "";
+
+    // 1. job_history / arrow_job_manager: OPEN_LAST veya FIND
+    if (
+      (compId === "job_history" ||
+        compId.startsWith("job_history:") ||
+        compId === "arrow_job_manager" ||
+        compId.startsWith("arrow_job_manager:")) &&
+      (action === "OPEN_LAST" || action === "FIND")
+    ) {
+      return true;
+    }
+
+    // 2. app_router: NAVIGATE
+    if (compId === "app_router" && action === "NAVIGATE") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Tur içinde YulaJobStartedCard render edilecek başarılı bir iş çalıştırma
+ * olup olmadığını belirler.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function hasJobStartedCard(toolParts: YulaToolPartInfo[]): boolean {
+  return toolParts.some((info) => extractJobStartedAction(info) !== null);
+}
+
+export interface NavigationAction {
+  navigateTo: string;
+  title?: string;
+  jobId?: string;
+}
+
+/**
+ * Yalnızca tanımlı navigasyon sözleşmelerine (ActionContract) uyan çağrılardan
+ * hedef yönlendirmeyi ve başlığı deterministik olarak çeker.
+ */
+// eslint-disable-next-line react/only-export-components -- saf fonksiyon
+export function extractNavigationAction(
+  toolParts: YulaToolPartInfo[],
+): NavigationAction | null {
+  for (const part of toolParts) {
+    if (
+      part.state === "output-available" &&
+      !isFailedToolInfo(part) &&
+      !(part as { isError?: boolean }).isError &&
+      isNavigationActionContract(part.toolName, part.input)
+    ) {
+      const out = part.output as Record<string, unknown> | undefined;
+      const target =
+        out && typeof out === "object"
+          ? ((out.details && typeof out.details === "object" ? out.details : out) as Record<string, unknown>)
+          : undefined;
+
+      const navigateTo =
+        typeof target?.navigateTo === "string" && target.navigateTo.startsWith("/")
+          ? target.navigateTo
+          : typeof target?.navigatedTo === "string" && target.navigatedTo.startsWith("/")
+          ? target.navigatedTo
+          : undefined;
+
+      if (navigateTo) {
+        const title =
+          typeof target?.title === "string" && target.title.trim()
+            ? target.title.trim()
+            : typeof target?.reportTitle === "string" && target.reportTitle.trim()
+            ? target.reportTitle.trim()
+            : undefined;
+
+        return {
+          navigateTo,
+          title,
+          jobId: typeof target?.jobId === "string" ? target.jobId : undefined,
+        };
+      }
+    }
+  }
+  return null;
 }
 
 /**

@@ -117,8 +117,23 @@ describe("YulaChoiceCard dynamic custom_placeholder and choice parsing", () => {
     assert.equal(data.options[0].label, "Central");
   });
 
-  it("falls back to parsing content text regex when details object is missing", () => {
-    const output = {
+  it("reads structured options from contract details and ignores unstructured text blobs", () => {
+    const outputWithDetails = {
+      details: {
+        question: "Choose an action",
+        options: ["Option A", "Option B"],
+      },
+    };
+
+    const data = parseChoiceData(undefined, outputWithDetails);
+    assert.ok(data);
+    assert.equal(data.question, "Choose an action");
+    assert.equal(data.options.length, 2);
+    assert.equal(data.options[0].label, "Option A");
+    assert.equal(data.options[1].label, "Option B");
+
+    // Düz metin blob'ları artık regex ile parse edilmez, null döner
+    const unstructuredOutput = {
       content: [
         {
           type: "text",
@@ -126,13 +141,7 @@ describe("YulaChoiceCard dynamic custom_placeholder and choice parsing", () => {
         },
       ],
     };
-
-    const data = parseChoiceData(undefined, output);
-    assert.ok(data);
-    assert.equal(data.question, "Choose an action");
-    assert.equal(data.options.length, 2);
-    assert.equal(data.options[0].label, "Option A");
-    assert.equal(data.options[1].label, "Option B");
+    assert.equal(parseChoiceData(undefined, unstructuredOutput), null);
   });
 
   it("parses description, rationale, and badge in detailed choice options", () => {

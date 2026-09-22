@@ -67,3 +67,33 @@ When the model requires user confirmation, clarification, or presents multiple w
 > **No Fake Buttons from Assistant Prose:**
 > Assistant markdown text is strictly a read-only presentation medium. The frontend MUST NEVER parse assistant text or bullet points looking for action verbs (`"sorgula"`, `"filtrele"`, `"aç"`, `"çalıştır"`, quotes, etc.) to fabricate clickable prompt buttons.
 > All interactive decisions and user choices MUST be emitted natively by the LLM as structured `ask_user_choice` tool calls.
+
+---
+
+## 5. Active Suspension & Interruption Lifecycle (Steering & `respondToChoice`)
+
+- **Suspended Execution State:** When `ask_user_choice` is triggered, the interaction does NOT finish into an idle "done" state. Instead, the turn transitions into `isSuspended: true` with a `pendingChoice` object.
+- **Pulsing Status Indicator:** The uncompleted choice card displays an active pulsing badge (`⏸️ Onay Bekleniyor` / `Waiting for Approval`), making it immediately obvious that the agent has paused its multi-step execution to await user confirmation.
+- **Composer & Textarea Synchronization:**
+  - **Running & Typing (`isLoading`):** While the agent is actively executing, typing in the textarea switches the primary action button to `⚡ Araya Gir (Steer)` (with Enter invoking `agent.steer()`). The user can interrupt and redirect ongoing execution mid-flight.
+- **Seamless Resumption via Steering (No Redundant LLM Runs):** Clicking a choice button, suggestion chip, or submitting custom text invokes `respondToChoice(value)` or `steer(value)`.
+  - **No New LLM Run:** The action does NOT invoke `sendMessageText` or start a new independent LLM conversation run (`POST /api/agent/chat`).
+  - **Ongoing ReAct Continuity:** The user's input is delivered directly into the active agent loop's steering queue (`chat.steer(value)`). The suspended loop wakes up, ingests the steering input into its context, and immediately executes the subsequent ReAct steps in the exact same turn/accordion.
+
+---
+
+## 6. Run & Turn Status Indicator Standard
+
+The top-level run execution header (`{timeLabel} saniye çalıştı` / `Worked for {timeLabel}s`) in [`YulaWorkedAccordion`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/components/layout/yula-worked-accordion.tsx) visually reflects the macro Run State on its immediate left:
+
+| Run State | Visual Indicator | Status Meaning |
+| :--- | :--- | :--- |
+| **Running** | `<Loader2 className="animate-spin text-primary" />` | LLM generation, thinking, or tool execution actively in progress. |
+| **Suspended (HITL)** | `<PauseCircle className="text-amber-500 animate-pulse" />` + Badge | Execution paused awaiting human confirmation or choice (`isSuspended`). |
+| **Completed** | `<CheckCircle2 className="text-emerald-500" />` | All ReAct steps and response generation finished cleanly without warnings or errors. |
+| **Warning (Step)** | `<TriangleAlert className="text-amber-500" />` | A tool step failed or triggered self-correction, but the overall run completed and produced text. Accordion auto-collapses normally. |
+| **Error (Run)** | `<AlertCircle className="text-rose-500" />` | Fatal run failure (network/stream error, provider 401/quota, or crash without text). Accordion stays open for inspection. |
+| **Stopped** | `<CircleSlash className="text-amber-500" />` | User explicitly aborted or stopped the turn mid-execution. |
+
+
+

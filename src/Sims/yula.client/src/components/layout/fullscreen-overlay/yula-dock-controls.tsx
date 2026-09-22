@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Maximize2, Minimize2, PanelRight, SquarePen, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import { useChatsStore } from "@/lib/stores/chats";
 import { useTelemetryMonitorStore } from "@/lib/stores/telemetry-monitor";
 import { useActiveDiagramStore } from "@/lib/stores/active-diagram-store";
+import { isWorkspaceHomePath } from "@/lib/workspace-paths";
+import { resolveTargetScreen } from "@/lib/yula-screen-resolver";
 import { cn } from "@/utils/cn";
 
 export function YulaDeleteChatButton({ className }: { className?: string }) {
@@ -84,18 +87,70 @@ export function YulaNewChatButton({ className }: { className?: string }) {
   );
 }
 
-export function YulaExpandToggleButton({ className }: { className?: string }) {
+import { useExitOverlay } from "./use-exit-overlay";
+
+export function YulaExitOverlayButton({
+  className,
+}: {
+  className?: string;
+}) {
   const t = useTranslations("AiDock");
-  const { open, setOpen, expanded, setExpanded } = useWorkspaceAiChat();
+  const handleExit = useExitOverlay();
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      data-ide-action="true"
+      onClick={handleExit}
+      className={cn(
+        "size-7 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer transition-colors",
+        className,
+      )}
+      title={t("exit_overlay")}
+      aria-label={t("exit_overlay")}
+    >
+      <X className="size-3.5" />
+    </Button>
+  );
+}
+
+export function YulaExpandToggleButton({
+  className,
+  forceCollapse,
+}: {
+  className?: string;
+  forceCollapse?: boolean;
+}) {
+  const t = useTranslations("AiDock");
+  const { setOpen, expanded, setExpanded } = useWorkspaceAiChat();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const isFullscreen = Boolean(forceCollapse || expanded);
 
   const handleToggle = () => {
-    if (!expanded) {
-      if (!open) setOpen(true);
-      setExpanded(true);
-    } else {
+    if (isFullscreen) {
+      const isHome = isWorkspaceHomePath(pathname);
+      if (isHome) {
+        const activeId = useChatsStore.getState().activeId;
+        const activeConv = useChatsStore.getState().conversations.find((c) => c.id === activeId);
+        const messages = activeId ? useChatsStore.getState().messagesById[activeId] : undefined;
+        const target = resolveTargetScreen(pathname, activeConv, messages);
+        if (target && !isWorkspaceHomePath(target)) {
+          router.push(target);
+        }
+      }
       setExpanded(false);
+      setOpen(true);
+    } else {
+      setOpen(true);
+      setExpanded(true);
     }
   };
+
+  const title = t(isFullscreen ? "collapse_overlay" : "expand_overlay");
 
   return (
     <Button
@@ -104,14 +159,14 @@ export function YulaExpandToggleButton({ className }: { className?: string }) {
       variant="ghost"
       data-ide-action="true"
       className={cn(
-        "size-7 shrink-0 text-muted-foreground hover:text-foreground",
+        "size-7 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer transition-colors",
         className,
       )}
       onClick={handleToggle}
-      title={t(expanded ? "collapse_overlay" : "expand_overlay")}
-      aria-label={t(expanded ? "collapse_overlay" : "expand_overlay")}
+      title={title}
+      aria-label={title}
     >
-      {expanded ? (
+      {isFullscreen ? (
         <Minimize2 className="size-3.5" />
       ) : (
         <Maximize2 className="size-3.5" />
@@ -168,8 +223,7 @@ export function YulaDetailToggleButton({ className }: { className?: string }) {
       variant="ghost"
       data-ide-action="true"
       className={cn(
-        "size-7 shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors",
-        isDetailOpen && "bg-muted/60 text-foreground",
+        "size-7 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer",
         className,
       )}
       onClick={handleToggle}

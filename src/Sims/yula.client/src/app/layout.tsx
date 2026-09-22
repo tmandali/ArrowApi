@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+import { auth } from "@/lib/auth";
 import { Providers } from "./providers";
 import { GoogleOneTapPrompt } from "@/features/auth/components/google-one-tap-prompt";
 import "./globals.css";
@@ -25,8 +26,11 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await getLocale();
-  const messages = await getMessages();
+  const [locale, messages, session] = await Promise.all([
+    getLocale(),
+    getMessages(),
+    auth(),
+  ]);
   return (
     <html
       lang={locale}
@@ -35,7 +39,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <NextIntlClientProvider messages={messages}>
-          <Providers>
+          <Providers session={session}>
             {/* GIS One Tap otomatik kartı: GOOGLE_ONE_TAP=1 iken ve oturum
                 yokken her tam sayfa yüklenmesinde sağ üstte bir kez beliren
                 kartı tetkler (Providers altındadır — useSession context'i

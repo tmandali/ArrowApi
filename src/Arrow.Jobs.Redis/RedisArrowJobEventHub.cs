@@ -210,14 +210,7 @@ public sealed class RedisArrowJobEventHub : IArrowJobEventHub
             _dispose = dispose;
         }
 
-        public IAsyncEnumerable<ArrowJobHubMessage> Messages => ReadAllAsync();
-
-        private async IAsyncEnumerable<ArrowJobHubMessage> ReadAllAsync(
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await foreach (ArrowJobHubMessage message in _reader.ReadAllAsync(cancellationToken))
-                yield return message;
-        }
+        public IAsyncEnumerable<ArrowJobHubMessage> Messages => _reader.ReadAllAsync();
 
         public ValueTask DisposeAsync()
         {

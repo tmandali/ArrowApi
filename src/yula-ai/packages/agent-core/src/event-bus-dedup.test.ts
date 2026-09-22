@@ -106,4 +106,50 @@ describe('uiEventBus Telemetri Tekilleştirme ve Coalescing (Dedup)', () => {
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({ payload: 'abc' }));
   });
+
+  it('deterministik eventHash üretir ve nesne anahtar sırasından bağımsız çalışır', () => {
+    uiEventBus.recordTelemetry({ source: 'form', type: 'APPLY', payload: { a: 1, b: 2 } });
+    const ev1 = uiEventBus.getRecentEvents()[0];
+    expect(ev1.eventHash).toBeDefined();
+    expect(typeof ev1.eventHash).toBe('string');
+    expect(ev1.eventHash).toHaveLength(8);
+
+    // Temizle ve anahtar sırası ters olarak kaydet
+    uiEventBus.clear();
+    uiEventBus.recordTelemetry({ source: 'form', type: 'APPLY', payload: { b: 2, a: 1 } });
+    const ev2 = uiEventBus.getRecentEvents()[0];
+
+    // İki hash birebir aynı olmalıdır
+    expect(ev1.eventHash).toBe(ev2.eventHash);
+  });
+
+  it('tekrar eden olaylarda repeatCount değerini artırır ve firstTimestampi korur', () => {
+    uiEventBus.recordTelemetry({ source: 'button', type: 'CLICK', payload: { id: 1 } });
+    const firstTime = uiEventBus.getRecentEvents()[0].timestamp;
+    expect(uiEventBus.getRecentEvents()[0].repeatCount).toBe(1);
+    expect(uiEventBus.getRecentEvents()[0].firstTimestamp).toBe(firstTime);
+
+    // Aynı olayı tekrar tetikle
+    uiEventBus.recordTelemetry({ source: 'button', type: 'CLICK', payload: { id: 1 } });
+    const recent = uiEventBus.getRecentEvents();
+    expect(recent).toHaveLength(1);
+    expect(recent[0].repeatCount).toBe(2);
+    expect(recent[0].firstTimestamp).toBe(firstTime);
+
+    // Üçüncü tekrar
+    uiEventBus.recordTelemetry({ source: 'button', type: 'CLICK', payload: { id: 1 } });
+    expect(uiEventBus.getRecentEvents()[0].repeatCount).toBe(3);
+  });
+
+  it('farklı payload veya type değerleri farklı eventHash üretir', () => {
+    uiEventBus.recordTelemetry({ source: 'btn', type: 'CLICK', payload: { x: 1 } });
+    uiEventBus.recordTelemetry({ source: 'btn', type: 'CLICK', payload: { x: 2 } }, { force: true });
+    uiEventBus.recordTelemetry({ source: 'btn', type: 'HOVER', payload: { x: 1 } });
+
+    const events = uiEventBus.getRecentEvents();
+    expect(events).toHaveLength(3);
+    expect(events[0].eventHash).not.toBe(events[1].eventHash);
+    expect(events[0].eventHash).not.toBe(events[2].eventHash);
+    expect(events[1].eventHash).not.toBe(events[2].eventHash);
+  });
 });

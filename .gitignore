@@ -497,3 +497,4 @@ arrow-jobs/
 # Vitest cache / attachments
 .vitest/
 
+/src/Sims/yula.client/auth.json

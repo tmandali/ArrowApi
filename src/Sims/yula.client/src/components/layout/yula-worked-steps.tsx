@@ -34,6 +34,7 @@ export interface WorkedStepItem {
   diffBadge?: { added: number; removed: number };
   durationSec?: number;
   isLive?: boolean;
+  isSuspended?: boolean;
   isError?: boolean;
   detailText?: string;
   info?: YulaToolPartInfo;
@@ -47,6 +48,7 @@ export interface WorkedStepPhase {
   steps: WorkedStepItem[];
   hasError: boolean;
   isLive: boolean;
+  isSuspended?: boolean;
   isRecovery?: boolean;
   thought?: string;
   errorMessage?: string;
@@ -108,6 +110,7 @@ export function groupStepsByPhase(steps: WorkedStepItem[]): WorkedStepPhase[] {
       steps: phaseSteps,
       hasError,
       isLive: phaseSteps.some((s) => s.isLive),
+      isSuspended: phaseSteps.some((s) => s.isSuspended),
       isRecovery,
       thought: thoughtStep?.detailText,
       errorMessage,

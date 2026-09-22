@@ -8,7 +8,7 @@ import { useYulaChat } from "@/hooks/use-yula-chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { isTextPart, getMessageText } from "@my-agent/core";
+import { getMessageText } from "@my-agent/core";
 
 export interface UserChoiceOption {
   label: string;
@@ -45,18 +45,7 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
     question = outObj.question.trim();
   }
 
-  // Eğer hâlâ soru bulunamadıysa content text parsing ([User Decision Required]: ...)
-  if (!question && Array.isArray(outObj.content)) {
-    const textPart = outObj.content.find(isTextPart);
-    if (textPart?.text) {
-      const match = textPart.text.match(/\[User Decision Required\]:\s*(.*?)(?:\nOptions:|$)/s);
-      if (match && match[1]) {
-        question = match[1].trim();
-      }
-    }
-  }
-
-  // 2. Seçenekleri çöz: input.options -> output.details.options -> output.options -> text options JSON parsing
+  // 2. Seçenekleri çöz: input.options -> output.details.options -> output.options
   let rawOptions: unknown[] = [];
   if (Array.isArray(inObj.options) && inObj.options.length > 0) {
     rawOptions = inObj.options;
@@ -64,17 +53,6 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
     rawOptions = outDetails.options;
   } else if (Array.isArray(outObj.options) && outObj.options.length > 0) {
     rawOptions = outObj.options;
-  } else if (Array.isArray(outObj.content)) {
-    const textPart = outObj.content.find(isTextPart);
-    if (textPart?.text) {
-      const optMatch = textPart.text.match(/Options:\s*(\[.*?\])/s);
-      if (optMatch && optMatch[1]) {
-        try {
-          const parsed = JSON.parse(optMatch[1]);
-          if (Array.isArray(parsed)) rawOptions = parsed;
-        } catch {}
-      }
-    }
   }
 
   // 3. allow_custom bayrağı
@@ -113,7 +91,7 @@ export function parseChoiceData(input?: unknown, output?: unknown): UserChoiceDa
     })
     .filter((o) => o.label.length > 0);
 
-  if (!question && options.length === 0 && !allowCustom) return null;
+  if (!question && options.length === 0) return null;
 
   return {
     question: question || "",
@@ -179,20 +157,31 @@ export function YulaChoiceCard({
       if (yula.busy || isAnswered) return;
       setSelectedLabel(opt.label);
 
-      if (toolCallId && yula.addToolOutput) {
-        yula.addToolOutput({
-          toolCallId,
-          output: { selected: opt.label, value: opt.value || opt.label },
-        });
-      }
-
       // Gönderilecek metin: Değer etiketten farklı ve anlamlıysa parantezde belirt
       const textToSend =
         opt.value && opt.value !== opt.label
           ? `${opt.label} (${opt.value})`
           : opt.label;
 
-      yula.sendMessageText(textToSend);
+      if (yula.respondToChoice) {
+        yula.respondToChoice(textToSend);
+      } else if (yula.steer) {
+        if (toolCallId && yula.addToolOutput) {
+          yula.addToolOutput({
+            toolCallId,
+            output: { selected: opt.label, value: opt.value || opt.label },
+          });
+        }
+        yula.steer(textToSend);
+      } else {
+        if (toolCallId && yula.addToolOutput) {
+          yula.addToolOutput({
+            toolCallId,
+            output: { selected: opt.label, value: opt.value || opt.label },
+          });
+        }
+        yula.sendMessageText(textToSend);
+      }
     },
     [yula, isAnswered, toolCallId],
   );
@@ -204,14 +193,25 @@ export function YulaChoiceCard({
       if (!trimmed || yula.busy || isAnswered) return;
       setSelectedLabel(trimmed);
 
-      if (toolCallId && yula.addToolOutput) {
-        yula.addToolOutput({
-          toolCallId,
-          output: { selected: trimmed, value: trimmed },
-        });
+      if (yula.respondToChoice) {
+        yula.respondToChoice(trimmed);
+      } else if (yula.steer) {
+        if (toolCallId && yula.addToolOutput) {
+          yula.addToolOutput({
+            toolCallId,
+            output: { selected: trimmed, value: trimmed },
+          });
+        }
+        yula.steer(trimmed);
+      } else {
+        if (toolCallId && yula.addToolOutput) {
+          yula.addToolOutput({
+            toolCallId,
+            output: { selected: trimmed, value: trimmed },
+          });
+        }
+        yula.sendMessageText(trimmed);
       }
-
-      yula.sendMessageText(trimmed);
     },
     [customInput, yula, isAnswered, toolCallId],
   );
@@ -236,11 +236,19 @@ export function YulaChoiceCard({
 
   // Canlı seçim kartı görünümü — Ekran standartlarına uygun, sade ve zarif shadcn kartı
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-card/60 dark:bg-card/40 p-2.5 shadow-2xs transition-all my-1.5">
-      {/* Soru Başlığı */}
-      <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/90 leading-tight">
-        <HelpCircle className="size-3.5 text-primary shrink-0" />
-        <span>{choiceData.question || t("default_question")}</span>
+    <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.03] dark:bg-amber-500/[0.06] p-2.5 shadow-2xs transition-all my-1.5">
+      {/* Soru ve Askıya Alma Durum Başlığı */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/90 leading-tight">
+          <HelpCircle className="size-3.5 text-primary shrink-0" />
+          <span>{choiceData.question || t("default_question")}</span>
+        </div>
+        <Badge
+          variant="outline"
+          className="animate-pulse bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] h-4.5 px-1.5 shrink-0 font-medium"
+        >
+          {t("waiting_approval")}
+        </Badge>
       </div>
 
       {/* Seçenekler: Açıklama varsa tek satırlı şık liste, yoksa kompakt buton çipleri */}

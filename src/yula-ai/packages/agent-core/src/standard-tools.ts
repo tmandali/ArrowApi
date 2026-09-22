@@ -446,6 +446,7 @@ export const agentUiTools: Record<string, Tool> = {
 
       return {
         success: true,
+        suspend: true,
         status: 'waiting_user_selection',
         message: i18nManager.getDictionary().status.waitingUserSelection(question, normalizedOptions.length),
         question,

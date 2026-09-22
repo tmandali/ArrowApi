@@ -109,7 +109,8 @@ export function createStandardAgentTools(): AgentTool[] {
             },
           ],
           details: { question, options, allow_custom, custom_placeholder },
-          terminate: true, // Inline HITL: Döngüyü askıya alır, kullanıcı seçimi beklenir
+          suspend: true, // Pi HITL: Döngüyü askıya alır, steering ile kullanıcı yanıtı beklenir
+          terminate: false,
         };
       },
     },

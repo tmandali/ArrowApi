@@ -14,6 +14,7 @@ export interface CommandContext {
   newConversation: () => void;
   compact: (instructions?: string, reason?: 'threshold' | 'overflow' | 'manual') => Promise<boolean>;
   onOpenLogin?: (provider?: string) => void;
+  onSelectProvider?: (provider: string) => void;
   appendSystemMessage: (content: string) => void;
 }
 
@@ -40,7 +41,7 @@ export async function handleBuiltInCommand(
       const modelList = ctx.availableModels
         .map(
           (m) =>
-            `- \`${m.id || m.modelId}\` (${m.provider || 'default'}${
+            `- \`${m.id || m.modelId || m.model || m.name}\` (${m.provider || 'default'}${
               m.contextWindow ? ` - ${Math.round(m.contextWindow / 1000)}k` : ''
             })`
         )
@@ -56,8 +57,30 @@ export async function handleBuiltInCommand(
     return true;
   }
 
+  if (key === 'provider') {
+    if (args.length === 0) {
+      ctx.onOpenLogin?.();
+      ctx.appendSystemMessage(resp.loginOpened);
+      return true;
+    }
+    const targetProvider = args[0].toLowerCase();
+    ctx.onSelectProvider?.(targetProvider);
+    ctx.appendSystemMessage(
+      resp.providerChanged?.(targetProvider) || `🔌 Aktif AI sağlayıcısı: **${targetProvider}**`
+    );
+    return true;
+  }
+
   if (key === 'login') {
-    ctx.onOpenLogin?.(args[0]);
+    if (args.length > 0) {
+      const targetProvider = args[0].toLowerCase();
+      ctx.onSelectProvider?.(targetProvider);
+      ctx.appendSystemMessage(
+        resp.providerChanged?.(targetProvider) || `🔌 Aktif AI sağlayıcısı: **${targetProvider}**`
+      );
+      return true;
+    }
+    ctx.onOpenLogin?.(args[0]?.toLowerCase());
     ctx.appendSystemMessage(resp.loginOpened);
     return true;
   }

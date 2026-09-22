@@ -38,6 +38,7 @@ export const textPart = (text: string) => [{ type: 'text' as const, text }];
 export interface UseAgentChatOptions {
   model?: string;
   provider?: string;
+  getAiConfig?: () => { provider?: string; endpoint?: string };
   locale?: import('@my-agent/core').AgentLocale;
   messages?: Partial<import('@my-agent/core').AgentDictionary>;
   apiEndpoint?: string;
@@ -51,4 +52,5 @@ export interface UseAgentChatOptions {
   onCompaction?: (result: CompactionResult) => void;
   onOpenLogin?: (provider?: string) => void;
   onSelectModel?: (modelId: string, provider?: string) => void;
+  onSelectProvider?: (provider: string) => void;
 }

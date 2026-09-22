@@ -92,15 +92,39 @@ export function inferTelemetryTopic(source: string, type?: string): TelemetryTop
   return 'system';
 }
 
+export function canonicalStringify(val: unknown): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val !== 'object') return String(val);
+  if (Array.isArray(val)) {
+    return '[' + val.map(canonicalStringify).join(',') + ']';
+  }
+  try {
+    const keys = Object.keys(val as Record<string, unknown>).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalStringify((val as Record<string, unknown>)[k])).join(',') + '}';
+  } catch {
+    return String(val);
+  }
+}
+
+export function fnv1a32(str: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+export function computeEventHash(source: string, type: string, payload?: unknown): string {
+  const serialized = canonicalStringify(payload);
+  return fnv1a32(`${source}:${type}:${serialized}`);
+}
+
 function arePayloadsEqual(a: any, b: any): boolean {
   if (a === b) return true;
   if (a == null || b == null) return a === b;
   if (typeof a !== 'object' || typeof b !== 'object') return false;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
-  }
+  return canonicalStringify(a) === canonicalStringify(b);
 }
 
 export class UIEventBus implements IEventBus {
@@ -185,10 +209,9 @@ export class UIEventBus implements IEventBus {
     }
 
     try {
-      let outcome: any;
-      for (const handler of list) {
-        outcome = handler(actionPayload.action, actionPayload.payload);
-      }
+      // Bileşen eylemleri RPC semantiğine sahiptir; birden fazla dinleyici varsa son aktif dinleyici işletilir
+      const handler = list[list.length - 1];
+      const outcome = handler(actionPayload.action, actionPayload.payload);
 
       // Bileşen { success: false, error: "..." } nesnesi döndüyse (Validasyon hatası vb.)
       if (outcome && typeof outcome === 'object' && outcome.success === false) {
@@ -216,6 +239,7 @@ export class UIEventBus implements IEventBus {
     const severity: TelemetrySeverity = inferTelemetrySeverity(event.type, (event as any).severity ?? options?.severity);
     const correlationId: string | undefined = (event as any).correlationId ?? options?.correlationId;
     const coalesceKey = options?.coalesceKey;
+    const eventHash = (event as any).eventHash ?? computeEventHash(event.source, event.type, event.payload);
 
     // Özel tekilleştirme/birleştirme anahtarı varsa ringBuffer içinde eşleşeni doğrudan güncelle
     if (!isForced && coalesceKey) {
@@ -224,6 +248,8 @@ export class UIEventBus implements IEventBus {
         match.payload = event.payload;
         match.timestamp = now;
         match.topic = topic;
+        match.eventHash = eventHash;
+        match.repeatCount = (match.repeatCount || 1) + 1;
         if (correlationId) match.correlationId = correlationId;
         if (severity) match.severity = severity;
         this.notifyListeners(match);
@@ -241,6 +267,8 @@ export class UIEventBus implements IEventBus {
         if (arePayloadsEqual(last.payload, event.payload)) {
           last.timestamp = now;
           last.topic = topic;
+          last.eventHash = eventHash;
+          last.repeatCount = (last.repeatCount || 1) + 1;
           if (correlationId) last.correlationId = correlationId;
           if (severity) last.severity = severity;
           return;
@@ -251,6 +279,8 @@ export class UIEventBus implements IEventBus {
           last.payload = event.payload;
           last.timestamp = now;
           last.topic = topic;
+          last.eventHash = eventHash;
+          last.repeatCount = (last.repeatCount || 1) + 1;
           if (correlationId) last.correlationId = correlationId;
           if (severity) last.severity = severity;
 
@@ -277,7 +307,16 @@ export class UIEventBus implements IEventBus {
     this.flushPendingNotification();
 
     // Durum 3: Yeni / farklı olay veya tekilleştirme penceresi dışı
-    const fullEvent: UIEvent = { ...event, topic, timestamp: now, severity, correlationId };
+    const fullEvent: UIEvent = {
+      ...event,
+      topic,
+      timestamp: now,
+      severity,
+      correlationId,
+      eventHash,
+      repeatCount: 1,
+      firstTimestamp: now,
+    };
     if (coalesceKey) {
       Object.defineProperty(fullEvent, '_coalesceKey', {
         value: coalesceKey,

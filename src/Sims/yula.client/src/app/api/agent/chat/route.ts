@@ -2,7 +2,6 @@ import {
   convertToModelMessages,
   createUIMessageStreamResponse,
   extractReasoningMiddleware,
-  hasToolCall,
   isStepCount,
   toUIMessageStream,
   type InferUITools,
@@ -26,7 +25,7 @@ import {
   getYulaProviderInfo,
   getAvailableProviderModels,
 } from "@/lib/yula-provider";
-import { getDefaultModel, resolveProvider, resolveThinkingEnabled } from "@/lib/yula-config";
+import { getDefaultModel, resolveProvider, resolveThinkingEnabled, isEndpointCompatible } from "@/lib/yula-config";
 import {
   effortToOllamaThink,
   effortToReasoning,
@@ -47,21 +46,10 @@ export type YulaTools = InferUITools<StandardAgentTools>;
 /** Per-message metadata: token usage attached at step finish and wiki procedural memory scope. */
 export type YulaMessageMetadata = {
   usage?: LanguageModelUsage;
-  wiki?: {
-    level: "system" | "workspace" | "user";
-    workspaceId: string;
-    targetPath?: string;
-    rulesCount: number;
-    rules: string[];
-    recipesCount?: number;
-  };
-  inspection?: {
-    route: string;
-    phase: string;
-    activeReportScope?: string;
-    hasMountedForm: boolean;
-    today: string;
-  };
+  model?: string;
+  provider?: string;
+  wiki?: { level: "system" | "workspace" | "user"; workspaceId: string; targetPath?: string; rulesCount: number; rules: string[]; recipesCount?: number };
+  inspection?: { route: string; phase: string; activeReportScope?: string; hasMountedForm: boolean; today: string };
 };
 export type YulaMessage = UIMessage<YulaMessageMetadata, UIDataTypes, YulaTools>;
 
@@ -190,17 +178,15 @@ async function prepareModelMessages(
           }
         }
       } else if (p.type === "image") {
-        if (typeof p.image === "string") {
-          const raw = p.image;
-          if (raw.startsWith("http://") || raw.startsWith("https://")) {
-            imageUrl = new URL(raw);
+        const raw = typeof p.image === "string" ? p.image : null;
+        if (raw?.startsWith("http://") || raw?.startsWith("https://")) {
+          imageUrl = new URL(raw);
+          mimeType = p.mimeType || "image/jpeg";
+        } else if (raw) {
+          const b64 = raw.includes(",") ? raw.split(",")[1] : raw;
+          if (b64) {
+            imageBuffer = Buffer.from(b64, "base64");
             mimeType = p.mimeType || "image/jpeg";
-          } else {
-            const base64Data = raw.includes(",") ? raw.split(",")[1] : raw;
-            if (base64Data) {
-              imageBuffer = Buffer.from(base64Data, "base64");
-              mimeType = p.mimeType || "image/jpeg";
-            }
           }
         } else if (Buffer.isBuffer(p.image)) {
           imageBuffer = p.image as Buffer;
@@ -250,20 +236,16 @@ export async function POST(req: Request) {
         provider?: string;
         endpoint?: string;
       };
-    const provider = resolveProvider(
-      context?.agent?.provider || requestedProvider,
-    );
-    const baseUrl =
-      typeof endpoint === "string" && endpoint.length > 0 ? endpoint : undefined;
+    const provider = resolveProvider(context?.agent?.provider || requestedProvider);
+    const rawBaseUrl = typeof endpoint === "string" && endpoint.length > 0 ? endpoint : undefined;
+    const baseUrl = isEndpointCompatible(rawBaseUrl, provider) ? rawBaseUrl : undefined;
 
     if (!Array.isArray(messages)) {
       return Response.json({ error: "messages required" }, { status: 400 });
     }
 
     const effectivePathname = context?.pathname || uiContext?.route || "/";
-    const effectivePhase =
-      context?.phase ??
-      (uiContext?.active_components?.some(isResultGridComponent) ? "results" : "workspace");
+    const effectivePhase = context?.phase ?? (uiContext?.active_components?.some(isResultGridComponent) ? "results" : "workspace");
     const phase = effectivePhase;
 
     // Standart Headless React UI-Agent (@my-agent/core) araç seti
@@ -271,19 +253,9 @@ export async function POST(req: Request) {
     const toolNames = Object.keys(tools);
 
     const isThinking = resolveThinkingEnabled(thinkingEnabled);
-    // Efor önceliği: ajan pini > istek > eski boolean bayrak. Cookbook deseni:
-    // taşınabilir top-level `reasoning` kullanılır, providerOptions ile aynı
-    // anda reasoning yazılmaz (precedence çakışması olur).
-    const agentEffort = normalizeEffort(
-      (context?.agent as { effort?: unknown } | null | undefined)?.effort ?? "",
-    );
-    const bodyEffort =
-      normalizeEffort(requestedEffort ?? "") ?? thinkingToEffort(thinkingEnabled);
-    const effort = resolveEffort({
-      agentEffort,
-      requestEffort: bodyEffort,
-      defaultEffort: isThinking ? "low" : "off",
-    });
+    const agentEffort = normalizeEffort((context?.agent as { effort?: unknown } | null | undefined)?.effort ?? "");
+    const bodyEffort = normalizeEffort(requestedEffort ?? "") ?? thinkingToEffort(thinkingEnabled);
+    const effort = resolveEffort({ agentEffort, requestEffort: bodyEffort, defaultEffort: isThinking ? "low" : "off" });
     // Aktif rota ve çalışma alanına ait doğrulanmış ekran kurallarını getir (0 ms screen grounding)
     let playbookRules = context?.playbookRules;
     const wsId = context?.workspaceId || (effectivePathname.split("/")[1] || "stock");
@@ -318,16 +290,30 @@ export async function POST(req: Request) {
       provider,
       baseUrl,
     });
-    const fallbackProvider = provider === "azure" ? "openai" : provider === "openai" ? "agnes" : undefined;
-    const fallbackLanguageModel = fallbackProvider && process.env.OPENAI_API_KEY
-      ? getYulaLanguageModel(undefined, { provider: fallbackProvider })
+    let runningProvider: string = provider;
+    let runningModel: string = activeModel;
+    const fallbackProvider =
+      provider === "ollama"
+        ? "azure"
+        : provider === "azure"
+          ? (process.env.OPENAI_API_KEY ? "openai" : "agnes")
+          : provider === "openai"
+            ? "agnes"
+            : undefined;
+    const fallbackDefaultModel = fallbackProvider ? getDefaultModel(fallbackProvider) : undefined;
+    const fallbackLanguageModel = fallbackProvider
+      ? getYulaLanguageModel(fallbackDefaultModel, { provider: fallbackProvider })
       : undefined;
 
     const languageModel = createFailoverLanguageModel({
       primary: primaryLanguageModel,
       fallback: fallbackLanguageModel,
       onFailover: (err, step) => {
-        console.warn(`⚠️ [Yula Failover]: Primary provider failed during ${step}, falling back to ${fallbackProvider}. Error:`, err);
+        console.warn(`⚠️ [Yula Failover]: Primary failed (${step}), fallback to ${fallbackProvider}:`, err);
+        if (fallbackProvider && fallbackDefaultModel) {
+          runningProvider = fallbackProvider;
+          runningModel = fallbackDefaultModel;
+        }
       },
     });
 
@@ -443,7 +429,6 @@ export async function POST(req: Request) {
       },
       stopWhen: [
         isStepCount(6),
-        hasToolCall("ask_user_choice"),
       ],
     });
 
@@ -475,12 +460,17 @@ export async function POST(req: Request) {
             usage: part.usage,
             wiki: wikiInfo,
             inspection: inspectionInfo,
+            model: runningModel,
+            provider: runningProvider,
           };
         }
       },
     });
 
-    return createUIMessageStreamResponse({ stream: uiStream });
+    const streamResponse = createUIMessageStreamResponse({ stream: uiStream });
+    streamResponse.headers.set("x-yula-model", runningModel);
+    streamResponse.headers.set("x-yula-provider", runningProvider);
+    return streamResponse;
   } catch (error) {
     console.error("🤖 [Yula API Route Unhandled Error]:", error);
     return Response.json(

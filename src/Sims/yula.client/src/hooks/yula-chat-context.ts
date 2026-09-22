@@ -66,6 +66,19 @@ export interface YulaChatContextValue {
   followUpQueue: import("@my-agent/core").QueueItem[];
   clearSteering: () => void;
   clearFollowUp: () => void;
+  /** Ajan kullanıcı onayı / seçimi bekliyor mu (ask_user_choice askıda mı)? */
+  isSuspended: boolean;
+  /** Askıda olan seçim bilgisi */
+  pendingChoice: {
+    toolCallId: string;
+    messageId?: string;
+    question: string;
+    options: Array<any>;
+    allowCustom?: boolean;
+    customPlaceholder?: string;
+  } | null;
+  /** Askıdaki seçimi yanıtlayıp ajanın akışa devam etmesini sağlar */
+  respondToChoice: (value: string) => void;
 }
 
 export const YulaChatContext = React.createContext<YulaChatContextValue>({} as YulaChatContextValue);

@@ -7,6 +7,12 @@ import {
   ChevronRight,
   Copy,
   Check,
+  CheckCircle2,
+  AlertCircle,
+  TriangleAlert,
+  PauseCircle,
+  CircleSlash,
+  Loader2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -21,7 +27,7 @@ import {
   extractWorkedSteps,
   groupStepsByPhase,
 } from "./yula-worked-steps";
-import { modelCatalog, getMessageText } from "@my-agent/core";
+import { modelCatalog, getMessageText, estimateTokens } from "@my-agent/core";
 import { formatTokenCount } from "./yula-chat-turn-helpers";
 import { buildFullCopyText } from "./yula-worked-copy";
 import { YulaExecutionTerminal } from "./yula-execution-terminal";
@@ -46,9 +52,10 @@ export function YulaWorkedAccordion({
   conversationId,
   className,
 }: YulaWorkedAccordionProps) {
-  const t = useTranslations("WorkedAccordion")
-  const ws = useTranslations("WorkedSteps")
-  const { contextUsage } = useOptionalYulaChat() ?? {}
+  const t = useTranslations("WorkedAccordion");
+  const ws = useTranslations("WorkedSteps");
+  const yula = useOptionalYulaChat();
+  const contextUsage = yula?.contextUsage;
   const [open, setOpen] = React.useState(isLive);
   const [userToggled, setUserToggled] = React.useState(false);
   const [liveTimer, setLiveTimer] = React.useState(0);
@@ -71,23 +78,32 @@ export function YulaWorkedAccordion({
   const outTokens = usage ? (usage.outputTokens ?? usage.completionTokens ?? 0) : 0;
   const totalTokens = usage ? (usage.totalTokens ?? inTokens + outTokens) : 0;
 
+  const userTok = React.useMemo(() => (userMessage ? estimateTokens(userMessage) : 0), [userMessage]);
+  const assistantTok = React.useMemo(() => (message ? estimateTokens(message) : 0), [message]);
+
+  const effectiveInTokens = inTokens > 0 ? inTokens : userTok;
+  const effectiveOutTokens = outTokens > 0 ? outTokens : assistantTok;
+  const effectiveTotalTokens =
+    totalTokens > 0 ? totalTokens : effectiveInTokens + effectiveOutTokens;
+
   const costFormatted = React.useMemo(() => {
-    if (totalTokens <= 0) return null;
-    const cost = modelCatalog.calculateCost("gpt-4o-mini", inTokens, outTokens);
+    if (effectiveTotalTokens <= 0) return null;
+    const cost = modelCatalog.calculateCost("gpt-4o-mini", effectiveInTokens, effectiveOutTokens);
     return cost.formatted;
-  }, [totalTokens, inTokens, outTokens]);
+  }, [effectiveTotalTokens, effectiveInTokens, effectiveOutTokens]);
 
   const handleCopyAnswer = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!message && steps.length === 0) return;
     const fullText = buildFullCopyText({
       timeLabel,
-      totalTokens,
-      inTokens,
-      outTokens,
+      totalTokens: effectiveTotalTokens,
+      inTokens: effectiveInTokens,
+      outTokens: effectiveOutTokens,
       costFormatted,
       contextUsage,
       steps,
+      userMessage,
       message,
       workedForText: t("worked_for", { timeLabel }),
       telemetryTokensLabel: t("telemetry_tokens"),
@@ -104,29 +120,48 @@ export function YulaWorkedAccordion({
     }
   };
 
-  // Canlı akış zamanlayıcısı (Live streaming ticker) — Tur boyunca (tüm araçlar/turlar bitene kadar) kesintisiz sayar
+  // Canlı akış zamanlayıcısı (Live streaming ticker) — Askıya alındığında (suspend) duraklar, saniye işlemez
   const startTimeRef = React.useRef<number | null>(null);
+  const pausedAtRef = React.useRef<number | null>(null);
+  const totalPausedMsRef = React.useRef(0);
+
+  const isSuspended = Boolean(yula?.isSuspended);
 
   React.useEffect(() => {
-    const resetLiveTimer = () => {
-      startTimeRef.current = null;
-      setLiveTimer(0);
-    };
     if (!isLive) {
-      resetLiveTimer();
+      startTimeRef.current = null;
+      pausedAtRef.current = null;
+      totalPausedMsRef.current = 0;
+      // eslint-disable-next-line react/set-state-in-effect -- live durum bittiğinde sayacı sıfırla
+      setLiveTimer(0);
       return;
     }
+
     if (startTimeRef.current === null) {
       startTimeRef.current = Date.now();
     }
+
+    if (isSuspended) {
+      if (pausedAtRef.current === null) {
+        pausedAtRef.current = Date.now();
+      }
+      return;
+    }
+
+    if (pausedAtRef.current !== null) {
+      totalPausedMsRef.current += Date.now() - pausedAtRef.current;
+      pausedAtRef.current = null;
+    }
+
     const start = startTimeRef.current;
     const updateTimer = () => {
-      setLiveTimer(Math.max(1, Math.floor((Date.now() - start) / 1000)));
+      const activeElapsed = Date.now() - start - totalPausedMsRef.current;
+      setLiveTimer(Math.max(1, Math.floor(activeElapsed / 1000)));
     };
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [isLive]);
+  }, [isLive, isSuspended]);
 
   // Nihai cevap metni tamamlandığında (akış bittiğinde) akordeon otomatik katlanır
   const hasTextContent = React.useMemo(() => {
@@ -160,16 +195,16 @@ export function YulaWorkedAccordion({
   React.useEffect(() => {
     const syncOpen = () => {
       if (userToggled) return;
-      // Yanıt bitince (canlı akış yok, cevap metni var, gerçek araç hatası yok)
-      // akordeon kendini kapatır; isLive tüm tur (araç yürütmeleri dahil) süresince açık tutar.
-      // Sanitizer gürültüsü (kind: "thought" gizli metinler) açık tutmaz — yalnızca
-      // gerçek araç hataları (ran/edited/explored/confirmation) açık tutar.
-      const keepOpen =
-        isLive || !hasTextContent || steps.some((s) => s.isError && s.kind !== "thought");
+      // Canlı akışta veya henüz cevap metni yokken açık tutulur.
+      // Sadece gerçek RUN hatasında (akış koptu / streamErrorText) açık kalır.
+      // Steplerde hata (warning) olsa bile yanıt metni üretildiyse run akordiyonu açık tutulmaz.
+      const streamErrorText = message?.id ? yula?.streamErrorTexts?.[message.id] : undefined;
+      const hasRunFatalError = Boolean(streamErrorText);
+      const keepOpen = isLive || !hasTextContent || hasRunFatalError;
       setOpen(keepOpen);
     };
     syncOpen();
-  }, [isLive, hasTextContent, userToggled, steps]);
+  }, [isLive, hasTextContent, userToggled, message?.id, yula?.streamErrorTexts]);
 
   // Akış bittikten sonra gösterilecek son timer değeri — state aynası
   // (render'da ref okunmaz).
@@ -192,6 +227,73 @@ export function YulaWorkedAccordion({
 
   const timeLabel = typeof totalTime === "number" ? Math.max(1, Math.round(totalTime)) : totalTime;
 
+
+  const hasStepError = steps.some((s) => s.isError && s.kind !== "thought");
+
+  // Run (Tur / Koşu) Genel Statüsü Belirleme
+  const runStatus = React.useMemo(() => {
+    if (isLive) {
+      if (yula?.isSuspended) {
+        return {
+          type: "suspended" as const,
+          icon: <PauseCircle className="size-3.5 text-amber-500 animate-pulse shrink-0" />,
+          label: t("status_suspended"),
+        };
+      }
+      return {
+        type: "running" as const,
+        icon: <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />,
+        label: t("status_running"),
+      };
+    }
+
+    const streamErrorText = message?.id ? yula?.streamErrorTexts?.[message.id] : undefined;
+
+    // 1. Run Hatası (Stream kopması, API hatası veya cevapsız çökme): Kırmızı Ünlem (AlertCircle)
+    if (streamErrorText || (!hasTextContent && hasStepError)) {
+      return {
+        type: "error" as const,
+        icon: <AlertCircle className="size-3.5 text-rose-500 shrink-0" />,
+        label: t("status_error"),
+      };
+    }
+
+    // 2. Step Hatası / Uyarısı (Adım hata aldı ama yanıt metni tamamlandı): Sarı Üçgen Uyarı (TriangleAlert)
+    if (hasStepError) {
+      return {
+        type: "warning" as const,
+        icon: <TriangleAlert className="size-3.5 text-amber-500 shrink-0" />,
+        label: t("status_warning"),
+      };
+    }
+
+    const isLastAssistantMessage = yula?.messages?.length
+      ? yula.messages.slice().reverse().find((m) => m.role === "assistant")?.id === message?.id
+      : false;
+    if (yula?.stopped && isLastAssistantMessage) {
+      return {
+        type: "stopped" as const,
+        icon: <CircleSlash className="size-3.5 text-amber-500 shrink-0" />,
+        label: t("status_stopped"),
+      };
+    }
+
+    return {
+      type: "completed" as const,
+      icon: <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />,
+      label: t("status_completed"),
+    };
+  }, [
+    isLive,
+    hasTextContent,
+    hasStepError,
+    yula?.isSuspended,
+    yula?.streamErrorTexts,
+    yula?.stopped,
+    yula?.messages,
+    message?.id,
+    t,
+  ]);
 
   // Worker her zaman: asistan, canlı akış, süre veya görünür adım varsa
   if (!message && !isLive && !durationSec && steps.length === 0) return null;
@@ -216,11 +318,21 @@ export function YulaWorkedAccordion({
             hasExpandableContent ? "hover:text-foreground cursor-pointer" : "cursor-default"
           )}
         >
+          {/* Run Durumu İkonu (Çalışıyor: Spinner, Onay Bekliyor: Pause, Hata: Ünlem, Durduruldu: CircleSlash, Tamamlandı: Tik) */}
+          <span className="inline-flex items-center shrink-0" title={runStatus.label}>
+            {runStatus.icon}
+          </span>
+
           <span className="font-sans text-foreground/90 font-medium flex items-center gap-1.5">
             <span>{t("worked_for", { timeLabel })}</span>
-            {totalTokens > 0 ? (
+            {runStatus.type === "suspended" ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
+                {runStatus.label}
+              </span>
+            ) : null}
+            {effectiveTotalTokens > 0 ? (
               <span className="font-mono text-[11px] text-muted-foreground/60 font-normal">
-                · {formatTokenCount(totalTokens)} tok
+                · {formatTokenCount(effectiveTotalTokens)} tok
               </span>
             ) : null}
           </span>
@@ -276,14 +388,14 @@ export function YulaWorkedAccordion({
             })}
           </div>
 
-          {/* Canlı Telemetri & Token Kullanımı Özeti — Katlanabilir Terminal Görünümü */}
-          {!isLive && totalTokens > 0 ? (
+          {/* Canlı Telemetri & Token Kullanımı Özeti */}
+          {!isLive ? (
             <YulaExecutionTerminal
               userMessage={userMessage}
               steps={steps}
-              totalTokens={totalTokens}
-              inTokens={inTokens}
-              outTokens={outTokens}
+              totalTokens={effectiveTotalTokens}
+              inTokens={effectiveInTokens}
+              outTokens={effectiveOutTokens}
               costFormatted={costFormatted}
               contextUsage={contextUsage}
               timeLabel={timeLabel}

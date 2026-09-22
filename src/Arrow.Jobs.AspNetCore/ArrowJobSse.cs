@@ -81,35 +81,42 @@ internal static class ArrowJobSse
             subscription.Messages.GetAsyncEnumerator(cancellationToken);
 
         Task<bool>? pendingMove = null;
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            pendingMove ??= enumerator.MoveNextAsync().AsTask();
-            Task delayTask = Task.Delay(heartbeatInterval, cancellationToken);
-            Task completed = await Task.WhenAny(pendingMove, delayTask);
-
-            if (completed == delayTask)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await WriteHeartbeatAsync(response, cancellationToken);
-                continue;
+                pendingMove ??= enumerator.MoveNextAsync().AsTask();
+                Task delayTask = Task.Delay(heartbeatInterval, cancellationToken);
+                Task completed = await Task.WhenAny(pendingMove, delayTask);
+
+                if (completed == delayTask)
+                {
+                    await WriteHeartbeatAsync(response, cancellationToken);
+                    continue;
+                }
+
+                bool hasNext = await pendingMove;
+                pendingMove = null;
+                if (!hasNext)
+                    break;
+
+                ArrowJobHubMessage message = enumerator.Current;
+                ArrowJobEvent payload = EnrichUrls(message.Payload, jobsPath);
+                await WriteEventAsync(
+                    response,
+                    message.EventName,
+                    JsonSerializer.Serialize(payload, JsonOptions),
+                    cancellationToken);
+
+                if (message.EventName is ArrowJobEventNames.Completed
+                    or ArrowJobEventNames.Failed
+                    or ArrowJobEventNames.Cancelled)
+                    break;
             }
-
-            bool hasNext = await pendingMove;
-            pendingMove = null;
-            if (!hasNext)
-                break;
-
-            ArrowJobHubMessage message = enumerator.Current;
-            ArrowJobEvent payload = EnrichUrls(message.Payload, jobsPath);
-            await WriteEventAsync(
-                response,
-                message.EventName,
-                JsonSerializer.Serialize(payload, JsonOptions),
-                cancellationToken);
-
-            if (message.EventName is ArrowJobEventNames.Completed
-                or ArrowJobEventNames.Failed
-                or ArrowJobEventNames.Cancelled)
-                break;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // İstemci SSE bağlantısını sonlandırdı (normal disconnect).
         }
     }
 

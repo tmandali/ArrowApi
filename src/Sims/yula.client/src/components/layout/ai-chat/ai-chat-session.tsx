@@ -24,6 +24,7 @@ import { useChatComposer } from "./use-chat-composer";
 import { ChatComposer } from "./chat-composer";
 import { ChatIntro } from "./chat-intro";
 import { YulaQueueBadge } from "./yula-queue-badge";
+import { YulaProviderDialog } from "@/components/layout/yula-provider-dialog";
 import {
   useDedupedMessages,
   useChatTurns,
@@ -320,15 +321,18 @@ function AIChatPanelSession({
     return isMainMode ? <YulaHistoryMainView /> : <YulaHistorySidebar />;
   }
 
-  if (isMainMode) {
-    return (
-      <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-        {chatPanelBody}
-      </div>
-    );
-  }
-
-  return chatPanelBody;
+  return (
+    <>
+      {isMainMode ? (
+        <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          {chatPanelBody}
+        </div>
+      ) : (
+        chatPanelBody
+      )}
+      <YulaProviderDialog />
+    </>
+  );
 }
 
 // Not: default export yok — dışarıdan yalnız `ai-chat-panel.tsx` tüketir.

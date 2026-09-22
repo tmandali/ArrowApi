@@ -10,6 +10,7 @@ describe('Built-in Commands & Slash System (Pi Reference)', () => {
     expect(cmdNames).toContain('/yeni');
     expect(cmdNames).toContain('/model');
     expect(cmdNames).toContain('/login');
+    expect(cmdNames).toContain('/provider');
     expect(cmdNames).toContain('/compact');
     expect(cmdNames).toContain('/plan');
     expect(cmdNames).toContain('/help');
@@ -22,6 +23,9 @@ describe('Built-in Commands & Slash System (Pi Reference)', () => {
     expect(promptTemplateManager.isSystemCommand('/yeni')).toBe(true);
     expect(promptTemplateManager.isSystemCommand('/model gpt-4o')).toBe(true);
     expect(promptTemplateManager.isSystemCommand('/login google')).toBe(true);
+    expect(promptTemplateManager.isSystemCommand('/provider')).toBe(true);
+    expect(promptTemplateManager.isSystemCommand('/provider azure')).toBe(true);
+    expect(promptTemplateManager.isSystemCommand('/provider ollama')).toBe(true);
     expect(promptTemplateManager.isSystemCommand('/compact')).toBe(true);
     expect(promptTemplateManager.isSystemCommand('/plan')).toBe(true);
     expect(promptTemplateManager.isSystemCommand('/help')).toBe(true);
@@ -42,6 +46,12 @@ describe('Built-in Commands & Slash System (Pi Reference)', () => {
     expect(resolvedModel.isSystem).toBe(true);
     expect(resolvedModel.command).toBe('/model');
     expect(resolvedModel.args).toEqual(['claude-3-5-sonnet']);
+
+    const resolvedProvider = promptTemplateManager.resolveInput('/provider azure');
+    expect(resolvedProvider.isCommand).toBe(true);
+    expect(resolvedProvider.isSystem).toBe(true);
+    expect(resolvedProvider.command).toBe('/provider');
+    expect(resolvedProvider.args).toEqual(['azure']);
 
     // Dinamik şablon kaydı testi
     promptTemplateManager.register({

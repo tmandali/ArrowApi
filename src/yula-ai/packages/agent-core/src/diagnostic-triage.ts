@@ -148,21 +148,31 @@ export function classifyDiagnosticError(
     lowerMsg.includes('failed to fetch') ||
     lowerMsg.includes('econnrefused') ||
     lowerMsg.includes('networkerror') ||
+    lowerMsg.includes('cannot connect') ||
+    lowerMsg.includes('stream error') ||
     lowerMsg.includes('timeout') ||
     lowerMsg.includes('timed out');
 
   if (isInfrastructure) {
+    const isOllamaDown =
+      lowerMsg.includes('ollama') ||
+      lowerMsg.includes('11434') ||
+      lowerMsg.includes('cannot connect to api');
     return {
       category: 'INFRASTRUCTURE',
       isRecoverable: false,
       action: 'ASK_USER_CHOICE',
-      confidence: 0.9,
+      confidence: 0.95,
       reason: message,
-      userFriendlyExplanation: 'Sunucu bağlantısında veya altyapı hizmetinde geçici bir kesinti yaşandı.',
+      userFriendlyExplanation: isOllamaDown
+        ? 'Yerel Ollama servisine (127.0.0.1:11434) bağlanılamadı. Lütfen Ollama uygulamasının çalıştığından emin olun veya sağ üstten Azure bulut modeline geçin.'
+        : 'Sunucu bağlantısında veya LLM akışında geçici bir kesinti yaşandı.',
       suggestedChoices: [
         {
           label: 'Tekrar Dene',
-          description: 'Sunucu bağlantısını yenileyerek işlemi yeniden başlatır.',
+          description: isOllamaDown
+            ? 'Ollama servisini başlattıktan sonra sorguyu yeniden gönderin.'
+            : 'Sunucu bağlantısını yenileyerek işlemi yeniden başlatır.',
           badge: 'Önerilen',
         },
         {

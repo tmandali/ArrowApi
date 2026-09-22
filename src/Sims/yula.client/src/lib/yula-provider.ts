@@ -7,11 +7,13 @@ import {
   getDefaultEmbeddingModel,
   getAzureDeployments,
   getAgnesModels,
+  getConfiguredModels,
   getVectorDimension,
   DEFAULT_AGNES_BASE_URL,
   DEFAULT_OLLAMA_URL,
   type AIProviderType,
 } from "./yula-config";
+import { getAuthKeyForProvider, resolveModelsConfig } from "./yula-models-auth";
 
 export interface ProviderModelCapability {
   name: string;
@@ -30,6 +32,7 @@ export interface ProviderModelCapability {
     isCloud?: boolean;
   };
   hasThinking?: boolean;
+  isConfigured?: boolean;
 }
 
 export type YulaModelRequestOptions = {
@@ -94,12 +97,14 @@ function getOllamaProvider(baseUrl?: string) {
  * kullanılır — tel protokolü aynı (chat completions + tools + vision).
  */
 function getAgnesProvider(baseUrl?: string): ReturnType<typeof createOpenAI> {
+  const modelsCfg = resolveModelsConfig();
   const resolved = (
     baseUrl ||
     process.env.AGNES_BASE_URL ||
+    modelsCfg?.providers?.agnes?.baseUrl ||
     DEFAULT_AGNES_BASE_URL
   ).replace(/\/+$/, "");
-  const apiKey = process.env.AGNES_API_KEY ?? "";
+  const apiKey = process.env.AGNES_API_KEY ?? getAuthKeyForProvider("agnes") ?? "";
   const key = `${resolved}:${apiKey.length > 0 ? "set" : "empty"}`;
   if (!agnesInstance || agnesBoundKey !== key) {
     agnesBoundKey = key;
@@ -116,18 +121,33 @@ function getCloudProvider(
   if (!cloudInstance || cloudBoundKey !== key) {
     cloudBoundKey = key;
     if (provider === "azure") {
+      const modelsCfg = resolveModelsConfig();
       const endpoint = (
         baseUrl ||
         process.env.AZURE_OPENAI_ENDPOINT ||
+        modelsCfg?.providers?.azure?.baseUrl ||
         "https://tmandali-resource.openai.azure.com/openai/v1"
       ).replace(/\/+$/, "");
+      const apiKey =
+        process.env.AZURE_OPENAI_API_KEY ??
+        process.env.AZURE_API_KEY ??
+        getAuthKeyForProvider("azure") ??
+        "";
       cloudInstance = createAzure({
         baseURL: endpoint,
-        apiKey: process.env.AZURE_OPENAI_API_KEY ?? process.env.AZURE_API_KEY ?? "",
+        apiKey,
       });
     } else {
-      const apiKey = process.env.OPENAI_API_KEY ?? "";
-      const resolved = (baseUrl || process.env.OPENAI_BASE_URL || "").replace(/\/+$/, "");
+      const modelsCfg = resolveModelsConfig();
+      const apiKey =
+        process.env.OPENAI_API_KEY ??
+        getAuthKeyForProvider(provider) ??
+        "";
+      const fallbackUrl =
+        modelsCfg?.providers?.[provider]?.baseUrl ||
+        (provider === "openai" ? process.env.OPENAI_BASE_URL : "") ||
+        "";
+      const resolved = (baseUrl || fallbackUrl).replace(/\/+$/, "");
       cloudInstance = createOpenAI({
         apiKey,
         ...(resolved ? { baseURL: resolved } : {}),
@@ -160,8 +180,9 @@ export function getYulaLanguageModel(
     case "ollama":
       return getOllamaProvider(options?.baseUrl)(activeModel);
     default: {
-      const _never: never = provider;
-      return _never;
+      return (
+        getCloudProvider(provider, options?.baseUrl) as ReturnType<typeof createOpenAI>
+      )(activeModel);
     }
   }
 }
@@ -185,8 +206,9 @@ export function getYulaEmbeddingModel(
     case "ollama":
       return getOllamaProvider(options?.baseUrl).embedding(activeModel);
     default: {
-      const _never: never = provider;
-      return _never;
+      return (
+        getCloudProvider(provider, options?.baseUrl) as ReturnType<typeof createOpenAI>
+      ).textEmbeddingModel(activeModel);
     }
   }
 }
@@ -260,74 +282,31 @@ export async function getAvailableProviderModels(options?: {
   }
 
   if (provider === "openai") {
-    const primaryModel = process.env.OPENAI_MODEL ?? "gpt-4o";
-    const models: ProviderModelCapability[] = [
-      {
-        name: primaryModel,
-        model: primaryModel,
-        description: `OpenAI (${primaryModel})`,
+    const configured = getConfiguredModels("openai");
+    const isReasoningModel = (name: string) => /o[13](-mini|-preview)?$/i.test(name);
+    const models: ProviderModelCapability[] = configured.map((name, index) => {
+      const hasThinking = isReasoningModel(name);
+      return {
+        name,
+        model: name,
+        description: `OpenAI (${name})`,
         provider: "openai",
-        tag: "OpenAI",
+        tag: hasThinking ? "Thinking" : index === 0 ? "Pro" : "Fast",
         capabilities: {
-          hasThinking: primaryModel.includes("o1") || primaryModel.includes("o3"),
-          hasVision: true,
+          hasThinking,
+          hasVision: !isReasoningModel(name),
           hasTools: true,
           isCloud: true,
         },
-        hasThinking: primaryModel.includes("o1") || primaryModel.includes("o3"),
-      },
-      {
-        name: "gpt-4o",
-        model: "gpt-4o",
-        description: "OpenAI GPT-4o Amiral Gemisi",
-        provider: "openai",
-        tag: "Pro",
-        capabilities: {
-          hasThinking: false,
-          hasVision: true,
-          hasTools: true,
-          isCloud: true,
-        },
-        hasThinking: false,
-      },
-      {
-        name: "gpt-4o-mini",
-        model: "gpt-4o-mini",
-        description: "OpenAI GPT-4o Mini",
-        provider: "openai",
-        tag: "Fast",
-        capabilities: {
-          hasThinking: false,
-          hasVision: true,
-          hasTools: true,
-          isCloud: true,
-        },
-        hasThinking: false,
-      },
-      {
-        name: "o3-mini",
-        model: "o3-mini",
-        description: "OpenAI o3-mini Reasoning",
-        provider: "openai",
-        tag: "Thinking",
-        capabilities: {
-          hasThinking: true,
-          hasVision: false,
-          hasTools: true,
-          isCloud: true,
-        },
-        hasThinking: true,
-      },
-    ];
+        hasThinking,
+      };
+    });
     const uniqueMap = new Map<string, ProviderModelCapability>();
     models.forEach((m) => uniqueMap.set(m.name, m));
     return Array.from(uniqueMap.values());
   }
 
   if (provider === "agnes") {
-    // Agnes modelleri: tool-calling + vision + streaming destekler (cid7).
-    // Liste sağlayıcı varsayılanı + bilinen modeller + AGNES_MODELS
-    // ekstralarından beslenir (getAgnesModels).
     const models: ProviderModelCapability[] = getAgnesModels().map((name, index) => ({
       name,
       model: name,
@@ -347,10 +326,40 @@ export async function getAvailableProviderModels(options?: {
     return Array.from(uniqueMap.values());
   }
 
-  // Ollama
-  const names = await fetchOllamaModels(options?.baseUrl);
-  const defaultMod = getDefaultModel(provider);
-  const effectiveNames = names.length > 0 ? names : [defaultMod];
+  // models.json içinde tanımlanmış diğer sağlayıcılar (nvidia, openrouter vb.)
+  if (provider !== "ollama") {
+    const mConfig = resolveModelsConfig();
+    const pConfig = mConfig?.providers?.[provider];
+    if (pConfig && pConfig.models && pConfig.models.length > 0) {
+      return pConfig.models.map((m) => {
+        const hasThinking = Boolean(m.reasoning);
+        const hasVision = Array.isArray(m.input) && m.input.includes("image");
+        return {
+          name: m.id,
+          model: m.id,
+          description: m.name ? `${pConfig.name || provider} (${m.name})` : m.id,
+          provider,
+          tag: hasThinking ? "Thinking" : "Standard",
+          capabilities: {
+            hasThinking,
+            hasVision,
+            hasTools: true,
+            isCloud: true,
+          },
+          hasThinking,
+        };
+      });
+    }
+  }
+
+  // Ollama: canlı modeller + yula-config'de yapılandırılmış modeller birleştirilir
+  const liveNames = await fetchOllamaModels(options?.baseUrl);
+  const configuredOllama = getConfiguredModels("ollama");
+  const combined = [...liveNames];
+  for (const m of configuredOllama) {
+    if (!combined.includes(m)) combined.push(m);
+  }
+  const effectiveNames = combined.length > 0 ? combined : [getDefaultModel(provider)];
 
   return effectiveNames.map((name) => {
     const lowerName = name.toLowerCase();

@@ -18,6 +18,7 @@ export interface AgentToolResult<T = any> {
   details?: T;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
   terminate?: boolean;
+  suspend?: boolean;
 }
 
 export interface AgentTool<TArgs = any, TDetails = any> {
@@ -111,9 +112,11 @@ export interface AgentLoopConfig {
   beforeToolCall?: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult | undefined>;
   afterToolCall?: (context: AfterToolCallContext, signal?: AbortSignal) => Promise<AfterToolCallResult | undefined>;
   shouldStopAfterTurn?: (context: ShouldStopAfterTurnContext) => boolean | Promise<boolean>;
+  shouldSuspendTurn?: (context: ShouldStopAfterTurnContext) => boolean | Promise<boolean>;
   prepareNextTurn?: (context: PrepareNextTurnContext) => AgentLoopTurnUpdate | undefined | Promise<AgentLoopTurnUpdate | undefined>;
   getSteeringMessages?: () => Promise<any[]>;
   getFollowUpMessages?: () => Promise<any[]>;
+  waitForSteering?: (signal?: AbortSignal) => Promise<void | any[]>;
 }
 
 export interface AgentState {
@@ -122,6 +125,7 @@ export interface AgentState {
   tools: AgentTool<any>[];
   messages: any[];
   readonly isStreaming: boolean;
+  readonly isSuspended?: boolean;
   readonly pendingToolCalls: ReadonlySet<string>;
   readonly errorMessage?: string;
 }

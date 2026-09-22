@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ChevronRight, PanelLeft } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -14,9 +13,6 @@ import { cn } from "@/utils/cn";
 import { YULA } from "@/components/layout/yula-brand-data";
 import { useActiveDiagramStore } from "@/lib/stores/active-diagram-store";
 import { useTelemetryMonitorStore } from "@/lib/stores/telemetry-monitor";
-import { useChatsStore } from "@/lib/stores/chats";
-import { useWorkspaceAiChat } from "@/context/workspace-ai-chat-context";
-import { workspaceLabelFromPath } from "@/lib/workspace-paths";
 import { AIChatPanel } from "@/components/layout/ai-chat/ai-chat-panel";
 import { MermaidBlock } from "@/components/layout/chat-markdown/mermaid-block";
 import { YulaContextUsageBadge } from "@/components/layout/yula-context-usage-badge";
@@ -24,18 +20,18 @@ import {
   pageInsetGutterClass,
   panelCardClass,
   panelHeaderClass,
-  panelHeaderTitleClass,
   panelResizeHandleClass,
 } from "@/components/layout/panel-chrome";
 import { YulaIdeSidebar } from "./fullscreen-overlay/yula-ide-sidebar";
 import { YulaIdeDetailHeader } from "./fullscreen-overlay/yula-ide-detail-header";
 import { TelemetryDetailView } from "./fullscreen-overlay/telemetry-detail-view";
+import { YulaConversationTitleEditable } from "./fullscreen-overlay/yula-conversation-title-editable";
+import { useExitOverlay } from "./fullscreen-overlay/use-exit-overlay";
 import {
-  YulaCloseButton,
   YulaDeleteChatButton,
-  YulaExpandToggleButton,
-  YulaNewChatButton,
   YulaDetailToggleButton,
+  YulaExitOverlayButton,
+  YulaNewChatButton,
 } from "./fullscreen-overlay/yula-dock-controls";
 
 export interface YulaFullscreenOverlayProps {
@@ -60,11 +56,10 @@ export function YulaFullscreenOverlay({
   isOverlay = true,
 }: YulaFullscreenOverlayProps) {
   const t = useTranslations("ChatMarkdown");
-  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = React.useState(defaultSidebarOpen);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const { setExpanded } = useWorkspaceAiChat();
+  const handleExit = useExitOverlay();
   const {
     isOpen: isTelemetryOpen,
     activeView: telemetryActiveView,
@@ -94,27 +89,16 @@ export function YulaFullscreenOverlay({
     }
   }, [closeTelemetry, activeDiagram, closeDiagram]);
 
-  const conversations = useChatsStore((s) => s.conversations);
-  const activeId = useChatsStore((s) => s.activeId);
-  const activeConv = React.useMemo(
-    () => conversations.find((c) => c.id === activeId),
-    [conversations, activeId],
-  );
-
-  // Escape key collapses overlay back to side dock (only in overlay mode)
+  // Escape key collapses overlay back to side dock
   React.useEffect(() => {
-    if (!isOverlay) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setExpanded(false);
+        handleExit();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setExpanded, isOverlay]);
-
-  const workspaceLabel = workspaceLabelFromPath(pathname) || "Yula";
-  const conversationTitle = activeConv?.title || "New Conversation";
+  }, [handleExit]);
 
   return (
     <div
@@ -193,44 +177,26 @@ export function YulaFullscreenOverlay({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      data-ide-action="true"
                       onClick={() => setSidebarOpen((prev) => !prev)}
                       title={t("toggle_sidebar")}
                       aria-label={t("toggle_sidebar")}
-                      className={cn(
-                        "size-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors",
-                        sidebarOpen && "bg-muted/60 text-foreground",
-                      )}
+                      className="size-7 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
                     >
-                      <PanelLeft className="size-4" />
+                      <PanelLeft className="size-3.5" />
                     </Button>
 
-                    <div className="flex items-center gap-1.5 min-w-0 text-xs select-none">
-                      <span className="font-medium text-muted-foreground">
-                        {workspaceLabel}
-                      </span>
-                      <ChevronRight className="size-3 text-muted-foreground/40 shrink-0" />
-                      <span className={cn(panelHeaderTitleClass, "max-w-[200px] sm:max-w-md")}>
-                        {conversationTitle}
-                      </span>
-                    </div>
+                    <YulaConversationTitleEditable />
                     {headerExtra}
                   </div>
 
                   <div className="flex min-w-0 items-center gap-0.5">
-                    {headerActions ?? (
-                      <>
-                        <YulaContextUsageBadge />
-                        <YulaDetailToggleButton />
-                        <YulaNewChatButton />
-                        <YulaDeleteChatButton />
-                        {!hideWindowControls && (
-                          <>
-                            <YulaExpandToggleButton />
-                            <YulaCloseButton />
-                          </>
-                        )}
-                      </>
-                    )}
+                    {headerActions}
+                    <YulaContextUsageBadge />
+                    <YulaDetailToggleButton />
+                    <YulaNewChatButton />
+                    <YulaDeleteChatButton />
+                    {!hideWindowControls && <YulaExitOverlayButton />}
                   </div>
                 </div>
 

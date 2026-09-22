@@ -7,6 +7,7 @@
  */
 
 import { generateText } from "ai";
+import { z } from "zod";
 import {
   classifyDiagnosticError,
   type DiagnosticVerdict,
@@ -15,6 +16,27 @@ import {
 } from "@my-agent/core";
 import { getYulaLanguageModel } from "../yula-provider";
 import { resolveProvider } from "../yula-config";
+
+export const DIAGNOSTIC_VERDICT_SCHEMA = z.object({
+  category: z.enum([
+    "DATA_TYPE_MISMATCH",
+    "COLUMN_NOT_FOUND",
+    "SQL_SYNTAX_ERROR",
+    "BUSINESS_RULE_VIOLATION",
+    "TIMEOUT_EXCEEDED",
+    "SYSTEM_ABORT",
+    "PERMISSION_DENIED",
+    "RESOURCE_UNAVAILABLE",
+    "UNSPECIFIED",
+  ]),
+  isRecoverable: z.boolean(),
+  action: z.enum(["SELF_HEAL", "ASK_USER_CHOICE", "HALT"]).optional(),
+  confidence: z.number().optional().default(0.8),
+  reason: z.string().optional(),
+  userFriendlyExplanation: z.string().optional(),
+  recoveryHint: z.string().optional(),
+  suggestedChoices: z.array(z.string()).optional(),
+});
 
 export interface DiagnosticSubagentParams {
   error: unknown;
@@ -152,18 +174,25 @@ ${sanitizedError}`;
     const { text } = await Promise.race([generatePromise, timeoutPromise]);
 
     const cleanedText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleanedText);
+    let rawObj: unknown = null;
+    try {
+      rawObj = JSON.parse(cleanedText);
+    } catch {
+      // ignore JSON syntax errors, will fallback to safeParse failure
+    }
+    const parsed = DIAGNOSTIC_VERDICT_SCHEMA.safeParse(rawObj);
 
-    if (parsed && typeof parsed === "object" && parsed.category) {
+    if (parsed.success) {
+      const data = parsed.data;
       return {
-        category: parsed.category as DiagnosticCategory,
-        isRecoverable: Boolean(parsed.isRecoverable),
-        action: (parsed.action as DiagnosticAction) || (parsed.isRecoverable ? "SELF_HEAL" : "ASK_USER_CHOICE"),
-        confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.8,
-        reason: String(parsed.reason || sanitizedError),
-        userFriendlyExplanation: parsed.userFriendlyExplanation || deterministic.userFriendlyExplanation,
-        recoveryHint: parsed.recoveryHint,
-        suggestedChoices: Array.isArray(parsed.suggestedChoices) ? parsed.suggestedChoices : deterministic.suggestedChoices,
+        category: data.category as DiagnosticCategory,
+        isRecoverable: data.isRecoverable,
+        action: (data.action as DiagnosticAction) || (data.isRecoverable ? "SELF_HEAL" : "ASK_USER_CHOICE"),
+        confidence: data.confidence ?? 0.8,
+        reason: data.reason || sanitizedError,
+        userFriendlyExplanation: data.userFriendlyExplanation || deterministic.userFriendlyExplanation,
+        recoveryHint: data.recoveryHint,
+        suggestedChoices: data.suggestedChoices || deterministic.suggestedChoices,
       };
     }
   } catch (subErr) {

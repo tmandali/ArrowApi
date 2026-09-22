@@ -5,6 +5,7 @@ export interface AgentDictionary {
     help: string;
     model: string;
     login: string;
+    provider?: string;
     compact: string;
     new: string;
     history: string;
@@ -17,6 +18,7 @@ export interface AgentDictionary {
     availableModelsIntro: string;
     modelHint: string;
     modelChanged: (modelId: string) => string;
+    providerChanged?: (provider: string) => string;
     loginOpened: string;
     planningModeActive: (hint?: string) => string;
     helpTitle: string;
@@ -61,6 +63,7 @@ export const trDictionary: AgentDictionary = {
     help: 'Kullanılabilir sistem ve beceri komutlarını listeler.',
     model: 'Aktif LLM modelini veya sağlayıcısını değiştirir (örn: /model openai:gpt-4o).',
     login: 'Sağlayıcı kimlik doğrulaması (OAuth) oturumunu açar (örn: /login github).',
+    provider: 'Aktif AI model sağlayıcısını seçer veya yapılandırır (örn: /provider ollama).',
     compact: 'Konuşma geçmişini ve token bağlamını özetleyerek sıkıştırır.',
     new: 'Yeni ve temiz bir konuşma oturumu başlatır.',
     history: 'Oturum geçmişi ve dallanma kontrol noktalarını listeler.',
@@ -76,6 +79,7 @@ export const trDictionary: AgentDictionary = {
     availableModelsIntro: '**Kullanılabilir Modeller:**',
     modelHint: '*Model değiştirmek için `/model <model-id>` yazabilir veya başlıktaki seçiciyi kullanabilirsiniz.*',
     modelChanged: (modelId) => `⚡ Aktif model başarıyla değiştirildi: **${modelId}**`,
+    providerChanged: (provider) => `🔌 Aktif AI sağlayıcısı başarıyla değiştirildi: **${provider}**`,
     loginOpened: '🔑 Sağlayıcı kimlik doğrulama penceresi (OAuth / API Key) açıldı.',
     planningModeActive: (hint) =>
       `📋 **Planlama Modu Aktif:** Ajan eylemleri doğrudan çalıştırmayacak; önce adımları ve parametreleri içeren bir yol haritası (Plan) sunup onay isteyecektir.${hint ? `\n${hint}` : ''}`,
@@ -126,6 +130,7 @@ export const enDictionary: AgentDictionary = {
     help: 'Lists available system and skill slash commands.',
     model: 'Switches the active LLM model or provider (e.g. /model openai:gpt-4o).',
     login: 'Initiates provider authentication (OAuth) login (e.g. /login github).',
+    provider: 'Selects or configures active AI model provider (e.g. /provider ollama).',
     compact: 'Compacts conversation history and summarizes token context.',
     new: 'Starts a brand new, clean conversation session.',
     history: 'Lists session history and checkpoint branches.',
@@ -141,6 +146,7 @@ export const enDictionary: AgentDictionary = {
     availableModelsIntro: '**Available Models:**',
     modelHint: '*To switch the model, write `/model <model-id>` or use the model selector in the header.*',
     modelChanged: (modelId) => `⚡ Active model successfully switched to: **${modelId}**`,
+    providerChanged: (provider) => `🔌 Active AI provider successfully switched to: **${provider}**`,
     loginOpened: '🔑 Provider authentication window (OAuth / API Key) opened.',
     planningModeActive: (hint) =>
       `📋 **Plan-First Mode Active:** The agent will not execute actions directly; it will formulate a step-by-step roadmap for approval first.${hint ? `\n${hint}` : ''}`,

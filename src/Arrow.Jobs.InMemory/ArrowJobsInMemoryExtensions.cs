@@ -13,8 +13,6 @@ public static class ArrowJobsInMemoryExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.RemoveBackend();
-        builder.Services.RemoveAll<IArrowJobStore>();
-        builder.Services.RemoveAll<IArrowJobEventHub>();
         builder.Services.TryAddSingleton<IArrowJobStore<TRequest>, InMemoryArrowJobStore<TRequest>>();
         builder.Services.AddSingleton<IArrowJobStore>(sp => (IArrowJobStore)sp.GetRequiredService<IArrowJobStore<TRequest>>());
         builder.Services.TryAddSingleton<IArrowJobQueue<TRequest>, InMemoryArrowJobQueue<TRequest>>();

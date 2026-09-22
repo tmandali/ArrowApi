@@ -97,12 +97,18 @@ export function WorkspaceAiChatProvider({
       // Rota değiştiğinde tam ekran overlay modunu kapat
       setExpandedStore(false);
 
-      // Ana sayfaya dönüldüyse dock'u da kapat (ana sayfa kendi görünümünü kullanır)
       if (isWorkspaceHomePath(pathname)) {
+        // Ana sayfaya dönüldüyse dock'u da kapat (ana sayfa kendi görünümünü kullanır)
         setOpenStore(false);
+      } else {
+        // Bir ekrana geçildiyse ve chat açıktıysa (veya expanded idi),
+        // yan panel (dock) modunda açık kalmasını garanti et (ekran ve sohbet birlikte takip edilir)
+        if (open || expanded) {
+          setOpenStore(true);
+        }
       }
     }
-  }, [pathname, setExpandedStore, setOpenStore]);
+  }, [pathname, setExpandedStore, setOpenStore, open, expanded]);
 
   // Universal click capture listener: collapses fullscreen overlay when user clicks any screen navigation element
   React.useEffect(() => {
@@ -117,6 +123,8 @@ export function WorkspaceAiChatProvider({
         setExpandedStore(false);
         if (isHome) {
           setOpenStore(false);
+        } else {
+          setOpenStore(true);
         }
       }
     };
@@ -129,24 +137,31 @@ export function WorkspaceAiChatProvider({
 
   const setOpen = React.useCallback(
     (next: boolean) => {
-      setOpenStore(next)
+      setOpenStore(next);
       if (!next) {
-        setExpandedStore(false)
+        setExpandedStore(false);
       }
     },
-    [setOpenStore, setExpandedStore]
-  )
+    [setOpenStore, setExpandedStore],
+  );
 
   const setExpanded = React.useCallback(
     (next: boolean) => {
-      setExpandedStore(next)
+      setExpandedStore(next);
+      if (next) {
+        setOpenStore(true);
+      }
     },
-    [setExpandedStore]
-  )
+    [setExpandedStore, setOpenStore],
+  );
 
   const toggleExpanded = React.useCallback(() => {
-    setExpandedStore(!expanded)
-  }, [expanded, setExpandedStore])
+    const next = !expanded;
+    setExpandedStore(next);
+    if (next) {
+      setOpenStore(true);
+    }
+  }, [expanded, setExpandedStore, setOpenStore]);
 
   const value = React.useMemo<WorkspaceAiChatContextValue>(
     () => ({

@@ -8,18 +8,32 @@ import type { StreamFn, AssistantTurnResult, AgentToolCall } from '@my-agent/cor
 export interface StreamFnOptions {
   endpoint: string;
   getContextSnapshot: () => any;
+  getProvider?: () => string | undefined;
+  getEndpoint?: () => string | undefined;
+  getAiConfig?: () => { provider?: string; endpoint?: string; thinking?: boolean; effort?: string };
   onThoughtDelta?: (delta: string) => void;
   onAssistantUpdate?: (partialMessage: any) => void;
+  onModelFallback?: (modelId: string, provider?: string) => void;
 }
 
 export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
   return async (context, config, signal): Promise<AssistantTurnResult> => {
+    const aiConfig = options.getAiConfig?.();
+    const resolvedProvider = options.getProvider?.() ?? aiConfig?.provider;
+    const resolvedEndpoint = options.getEndpoint?.() ?? aiConfig?.endpoint;
+    const resolvedThinking = aiConfig?.thinking;
+    const resolvedEffort = aiConfig?.effort;
+
     const response = await fetch(options.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: context.messages,
         model: config.model,
+        ...(resolvedProvider ? { provider: resolvedProvider } : {}),
+        ...(resolvedEndpoint ? { endpoint: resolvedEndpoint } : {}),
+        ...(resolvedThinking !== undefined ? { thinkingEnabled: resolvedThinking } : {}),
+        ...(resolvedEffort ? { effort: resolvedEffort } : {}),
         uiContext: options.getContextSnapshot(),
       }),
       signal,
@@ -28,6 +42,12 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
     if (!response.ok) {
       const errText = await response.text().catch(() => response.statusText);
       throw new Error(`LLM Gateway Error (${response.status}): ${errText}`);
+    }
+
+    const serverModel = response.headers.get('x-yula-model');
+    const serverProvider = response.headers.get('x-yula-provider');
+    if (serverModel && options.onModelFallback) {
+      options.onModelFallback(serverModel, serverProvider || undefined);
     }
 
     const reader = response.body?.getReader();
@@ -63,6 +83,13 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
             } catch {
               accumulatedText += trimmed.slice(2);
             }
+          } else if (trimmed.startsWith('3:')) {
+            let errMsg = trimmed.slice(2);
+            try {
+              const parsed = JSON.parse(errMsg);
+              errMsg = typeof parsed === 'string' ? parsed : (parsed?.errorText || parsed?.error || parsed?.message || errMsg);
+            } catch {}
+            throw new Error(errMsg || 'LLM Gateway Stream Error');
           } else if (trimmed.startsWith('9:') || trimmed.startsWith('b:')) {
             // Tool çağrısı paketi
             try {
@@ -142,8 +169,21 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
                 const idx = toolCalls.findIndex((c) => c.id === toolCallId);
                 if (idx !== -1) toolCalls.splice(idx, 1);
                 if (toolCalls.length === 0) stopReason = 'end_turn';
+              } else if (parsed?.type === 'message-metadata') {
+                const meta = parsed.messageMetadata;
+                if (meta?.model && options.onModelFallback) {
+                  options.onModelFallback(meta.model, meta.provider);
+                }
+              } else if (parsed?.type === 'error') {
+                const errMsg =
+                  parsed.errorText ||
+                  (typeof parsed.error === 'string' ? parsed.error : parsed.error?.message) ||
+                  parsed.message ||
+                  'LLM Stream Error';
+                throw new Error(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
               }
-            } catch {
+            } catch (err: any) {
+              if (err instanceof Error) throw err;
               accumulatedText += ssePayload;
             }
           }
@@ -167,6 +207,10 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
           options.onAssistantUpdate?.(partialMsg);
         }
       }
+    }
+
+    if (!accumulatedText && toolCalls.length === 0) {
+      throw new Error("Boş yanıt alındı: LLM modeline veya yerel servise ulaşılamadı.");
     }
 
     const finalAssistantMessage = {

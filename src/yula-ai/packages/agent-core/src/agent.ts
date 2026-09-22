@@ -17,11 +17,31 @@ import type {
 
 export class PendingMessageQueue {
   private messages: any[] = [];
+  private waitResolvers: Array<() => void> = [];
 
   constructor(public mode: QueueMode = 'one-at-a-time') {}
 
   enqueue(message: any): void {
     this.messages.push(message);
+    const resolver = this.waitResolvers.shift();
+    if (resolver) resolver();
+  }
+
+  waitForMessage(signal?: AbortSignal): Promise<void> {
+    if (this.messages.length > 0) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        const idx = this.waitResolvers.indexOf(resolve);
+        if (idx !== -1) this.waitResolvers.splice(idx, 1);
+        reject(new Error('Aborted while waiting for steering'));
+      };
+      if (signal?.aborted) return onAbort();
+      signal?.addEventListener('abort', onAbort, { once: true });
+      this.waitResolvers.push(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      });
+    });
   }
 
   hasItems(): boolean {
@@ -67,6 +87,7 @@ export interface AgentOptions {
   beforeToolCall?: AgentLoopConfig['beforeToolCall'];
   afterToolCall?: AgentLoopConfig['afterToolCall'];
   shouldStopAfterTurn?: AgentLoopConfig['shouldStopAfterTurn'];
+  shouldSuspendTurn?: AgentLoopConfig['shouldSuspendTurn'];
   prepareNextTurn?: AgentLoopConfig['prepareNextTurn'];
 }
 
@@ -74,6 +95,7 @@ export class Agent implements AgentState {
   private _messages: any[] = [];
   private _tools: AgentTool<any>[] = [];
   private _isStreaming = false;
+  private _isSuspended = false;
   private _pendingToolCalls = new Set<string>();
   private _errorMessage?: string;
   private currentAbortController?: AbortController;
@@ -111,6 +133,10 @@ export class Agent implements AgentState {
     return this._isStreaming;
   }
 
+  get isSuspended(): boolean {
+    return this._isSuspended;
+  }
+
   get pendingToolCalls(): ReadonlySet<string> {
     return this._pendingToolCalls;
   }
@@ -124,6 +150,7 @@ export class Agent implements AgentState {
       messages: this.messages,
       tools: this.tools,
       isStreaming: this.isStreaming,
+      isSuspended: this.isSuspended,
       pendingToolCalls: this.pendingToolCalls,
       errorMessage: this.errorMessage,
       thinkingLevel: this.thinkingLevel,
@@ -196,9 +223,11 @@ export class Agent implements AgentState {
       beforeToolCall: this.options.beforeToolCall,
       afterToolCall: this.options.afterToolCall,
       shouldStopAfterTurn: this.options.shouldStopAfterTurn,
+      shouldSuspendTurn: this.options.shouldSuspendTurn,
       prepareNextTurn: this.options.prepareNextTurn,
       getSteeringMessages: async () => this.steeringQueue.drain(),
       getFollowUpMessages: async () => this.followUpQueue.drain(),
+      waitForSteering: async (sig) => this.steeringQueue.waitForMessage(sig),
     };
 
     const stream = agentLoop(prompts, context, config, ac.signal, this.options.streamFn);
@@ -209,6 +238,10 @@ export class Agent implements AgentState {
           this._pendingToolCalls.add(event.toolCallId);
         } else if (event.type === 'tool_execution_end') {
           this._pendingToolCalls.delete(event.toolCallId);
+        } else if (event.type === 'turn_suspended') {
+          this._isSuspended = true;
+        } else if (event.type === 'turn_resumed' || event.type === 'agent_end') {
+          this._isSuspended = false;
         }
         this.emit(event);
       }
@@ -220,6 +253,7 @@ export class Agent implements AgentState {
       throw err;
     } finally {
       this._isStreaming = false;
+      this._isSuspended = false;
       this.currentAbortController = undefined;
     }
   }

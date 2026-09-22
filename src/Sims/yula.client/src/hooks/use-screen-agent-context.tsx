@@ -1,9 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { z } from "zod";
-import { uiRegistry, uiEventBus, piEventStream, type ComponentSchema } from "@my-agent/core";
-import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { useYulaGridStore } from "@/lib/stores/grid";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 
@@ -103,99 +100,7 @@ export function useScreenAgentContext(input: {
       ...(stateExtra ? { stateExtra } : {}),
     });
 
-    const registeredCompIds: string[] = [];
-    const unsubscribes: Array<() => void> = [];
-
-    // Headless UI-Agent (@my-agent/core) Bileşen Kaydı
-    // Note: 'result_grid:active' is natively registered by ArrowReportGrid via useAgentComponent.
-    // Note: Only register criteria_form if this is truly a registered report.
-    if (!isViewingResults && registeredReport && reportScope) {
-      const formCompId = `criteria_form:${reportScope}`;
-      const formSchema: ComponentSchema = {
-        id: formCompId,
-        meta: {
-          reportScope,
-          screenTitle,
-          workspaceId,
-        },
-        events: {
-          field_change: {
-            description: `Triggered when criteria fields for ${screenTitle || reportScope} are updated`,
-            schema: z.object({ field: z.string(), value: z.any() }),
-          },
-          job_queued: {
-            description: `Triggered when ${screenTitle || reportScope} report execution starts`,
-            schema: z.object({ jobId: z.string(), report: z.string() }),
-          },
-        },
-        actions: {
-          SET_FIELDS: {
-            description: "Populates criteria form fields without executing the report ({ criteria }).",
-            outputSchema: z.object({ success: z.boolean(), updatedFields: z.array(z.string()).optional() }),
-            whenToCall: "When the user specifies store, date, or filter parameters to fill in the form.",
-            whenNotToCall: "When the user explicitly wants to run or execute the report (call SUBMIT or RUN).",
-          },
-          APPLY: {
-            description: "Populates criteria form fields and updates the form ({ criteria }).",
-            outputSchema: z.object({ success: z.boolean(), navigatedTo: z.string().optional() }),
-            whenToCall: "When the user prepares or updates criteria parameters.",
-            whenNotToCall: "When the user commands to run the report directly.",
-          },
-          SUBMIT: {
-            description: "Executes the report and starts the job ({ criteria }).",
-            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), queued: z.boolean().optional() }),
-            whenToCall: "When the user explicitly asks to run, execute, fetch, or generate the report.",
-            whenNotToCall: "When only filling form fields without running.",
-          },
-          RUN: {
-            description: "Executes the report and starts the job ({ criteria }).",
-            outputSchema: z.object({ success: z.boolean(), jobId: z.string().optional(), navigatedTo: z.string().optional() }),
-            whenToCall: "When the user explicitly asks to run, execute, fetch, or generate the report.",
-            whenNotToCall: "When only filling form fields without running.",
-          },
-          SCHEMA: {
-            description: "Inspects the report criteria schema and parameter definitions.",
-            whenToCall: "To discover parameter names, data types, and constraints.",
-            whenNotToCall: "When the criteria schema is already known.",
-          },
-          READ: {
-            description: "Reads current draft criteria values from the active form.",
-            outputSchema: z.object({ criteria: z.record(z.string(), z.any()) }),
-            whenToCall: "To inspect the current values filled in the criteria form.",
-            whenNotToCall: "When assigning or overwriting new values.",
-          },
-          VALIDATE: {
-            description: "Validates criteria input parameters against schema rules.",
-            outputSchema: z.object({ valid: z.boolean(), errors: z.array(z.string()).optional() }),
-            whenToCall: "To check parameter constraints before execution.",
-            whenNotToCall: "When validation is not needed.",
-          },
-        },
-      };
-      uiRegistry.register(formSchema);
-      registeredCompIds.push(formCompId);
-      piEventStream.emit({
-        type: "tool_loadout_updated",
-        added: [formCompId],
-        removed: [],
-      });
-      unsubscribes.push(
-        uiEventBus.subscribe(formCompId, (action, payload) =>
-          executeDispatchComponentAction({ component_id: formCompId, action, payload }) as any
-        )
-      );
-    }
-
     return () => {
-      unsubscribes.forEach((unsub) => unsub());
-      if (registeredCompIds.length > 0) {
-        piEventStream.emit({
-          type: "tool_loadout_updated",
-          added: [],
-          removed: [...registeredCompIds],
-        });
-      }
-      registeredCompIds.forEach((id) => uiRegistry.unregister(id));
       useYulaGridStore.getState().unregisterScreen();
       useYulaGridStore.getState().unregister();
     };

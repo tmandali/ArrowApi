@@ -124,6 +124,7 @@ public sealed class RedisConnectionFixture : IAsyncLifetime
         Redis = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions
         {
             EndPoints = new EndPointCollection { "localhost:6379" },
+            Password = Environment.GetEnvironmentVariable("REDIS_PASSWORD") ?? "dev-redis-password-change-me",
             ConnectTimeout = 1_500,
             SyncTimeout = 3_000
         });

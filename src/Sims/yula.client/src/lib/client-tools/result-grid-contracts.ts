@@ -367,6 +367,21 @@ export const GRID_VISUALIZE_CONTRACT = {
     success: z.boolean().optional(),
     status: z.string().optional(),
     chartType: z.string().optional(),
+    sql: z.string().optional(),
+    chart: z
+      .object({
+        chartType: z.enum(["bar", "line", "pie", "area"]),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        takeaway: z.string().optional(),
+        dimensionX: z.string(),
+        dimensionY: z.array(z.string()),
+        aggregation: z.string().optional(),
+        orderMode: z.string().optional(),
+      })
+      .optional(),
+    rowCount: z.number().optional(),
+    rows: z.array(z.record(z.string(), z.unknown())).optional(),
     error: z.string().optional(),
   }),
   when: { phase: "results" },

@@ -22,6 +22,11 @@ import {
   renderPlainBullet,
 } from "./markdown-blocks";
 import { markdownComponents } from "./markdown-component-map";
+import {
+  isQuestionText,
+  isBulletBlock,
+  normalizeChoiceBullets,
+} from "@/lib/yula-choice-inference";
 
 /**
  * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
@@ -53,6 +58,7 @@ function renderBlock(
   key: number,
   cb: ChatMarkdownCallbacks,
   t: ChatMarkdownT,
+  questionContext?: string,
 ): React.ReactNode {
   const trimmed = block.raw.trim();
   if (!trimmed) return null;
@@ -67,16 +73,20 @@ function renderBlock(
   }
 
   // Paragraf veya liste satırlarında bullet kontrolü:
-  if (block.type === "list" || /^([-*•●]|\d+\.)\s+/.test(trimmed)) {
+  if (block.type === "list" || isBulletBlock(trimmed)) {
     const lines = block.raw.split("\n").filter((l) => l.trim());
+    let currentQuestionContext = questionContext;
     return (
       <React.Fragment key={`list-${key}`}>
         {lines.map((line, li) => {
           const trimmedLine = line.trim();
-          if (/^([-*•●]|\d+\.)\s+/.test(trimmedLine)) {
+          if (isQuestionText(trimmedLine)) {
+            currentQuestionContext = trimmedLine;
+          }
+          if (isBulletBlock(trimmedLine)) {
             const bullet = renderBulletedItem(trimmedLine, `${key}-${li}`, cb, t);
             if (bullet) return bullet;
-            const plain = renderPlainBullet(trimmedLine, `${key}-${li}`, cb, t);
+            const plain = renderPlainBullet(trimmedLine, `${key}-${li}`, cb, t, currentQuestionContext);
             if (plain) return plain;
           }
           return (
@@ -99,6 +109,7 @@ export function ChatMarkdown({
   onNavigateReport,
   onRunReport,
   staticTitles,
+  onChoiceSelect,
   className,
 }: {
   text: string;
@@ -109,21 +120,85 @@ export function ChatMarkdown({
   onNavigateReport: (reportTitle: string) => boolean;
   onRunReport?: () => boolean;
   staticTitles?: string[];
+  onChoiceSelect?: (value: string, context?: { question?: string; field?: string }) => void;
   className?: string;
 }) {
-  const blocks = React.useMemo(() => parseMarkdownBlocks(text), [text]);
+  const normalizedText = React.useMemo(() => normalizeChoiceBullets(text), [text]);
+  const blocks = React.useMemo(() => parseMarkdownBlocks(normalizedText), [normalizedText]);
   const t = useTranslations("ChatMarkdown");
   const callbacks = React.useMemo<ChatMarkdownCallbacks>(
-    () => ({ onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles }),
-    [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles],
+    () => ({
+      onPrompt,
+      onNavigateReport,
+      isExecutionConfirmation,
+      columns,
+      sourceTable,
+      onRunReport,
+      staticTitles,
+      onChoiceSelect,
+    }),
+    [onPrompt, onNavigateReport, isExecutionConfirmation, columns, sourceTable, onRunReport, staticTitles, onChoiceSelect],
   );
+
+  let activeQuestion: string | undefined;
+
+  // Soru bağlamı altındaki ardışık seçim çipleri yatay flex kutusunda toplanır:
+  const renderedElements: React.ReactNode[] = [];
+  let choiceGroup: React.ReactNode[] = [];
+
+  const flushChoiceGroup = (groupKey: string) => {
+    if (choiceGroup.length > 0) {
+      renderedElements.push(
+        <div key={`choice-group-${groupKey}`} className="flex flex-wrap items-center gap-1.5 py-1">
+          {choiceGroup}
+        </div>,
+      );
+      choiceGroup = [];
+    }
+  };
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const trimmed = block.raw.trim();
+
+    if (isQuestionText(trimmed)) {
+      flushChoiceGroup(String(i));
+      activeQuestion = trimmed;
+      renderedElements.push(
+        <React.Fragment key={i}>
+          {renderBlock(block, i, callbacks, t, activeQuestion)}
+        </React.Fragment>,
+      );
+      continue;
+    }
+
+    if (isBulletBlock(trimmed)) {
+      const rendered = renderBlock(block, i, callbacks, t, activeQuestion);
+      if (activeQuestion) {
+        choiceGroup.push(<React.Fragment key={i}>{rendered}</React.Fragment>);
+        continue;
+      }
+      flushChoiceGroup(String(i));
+      renderedElements.push(<React.Fragment key={i}>{rendered}</React.Fragment>);
+      continue;
+    }
+
+    // Normal metin veya başlık
+    flushChoiceGroup(String(i));
+    activeQuestion = undefined;
+    renderedElements.push(
+      <React.Fragment key={i}>
+        {renderBlock(block, i, callbacks, t, undefined)}
+      </React.Fragment>,
+    );
+  }
+
+  flushChoiceGroup("end");
 
   return (
     <ChatMarkdownCallbacksContext.Provider value={callbacks}>
       <div className={cn("space-y-1 text-[12px] text-foreground/90", className)}>
-        {blocks.map((block, i) => (
-          <React.Fragment key={i}>{renderBlock(block, i, callbacks, t)}</React.Fragment>
-        ))}
+        {renderedElements}
       </div>
     </ChatMarkdownCallbacksContext.Provider>
   );

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Compass, FileSpreadsheet, LineChart, Sparkles } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useYulaChat } from "@/hooks/use-yula-chat";
+import { useYulaDockStore } from "@/lib/stores/dock";
 import { findReport } from "@/features/reports/report-registry";
 import {
   asSuggestions,
@@ -58,12 +59,16 @@ export function YulaSuggestionChips({
           : null;
         if (pagePath) {
           setUsed((prev) => new Set(prev).add(index));
+          useYulaDockStore.getState().setExpanded(false);
+          useYulaDockStore.getState().setOpen(true);
           router.push(pagePath);
           return;
         }
       }
       if (suggestion.kind === "navigation" && suggestion.path) {
         setUsed((prev) => new Set(prev).add(index));
+        useYulaDockStore.getState().setExpanded(false);
+        useYulaDockStore.getState().setOpen(true);
         router.push(suggestion.path);
         return;
       }

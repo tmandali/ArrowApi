@@ -13,6 +13,13 @@ export async function navigateToPageTool(
   const currentPath =
     typeof window !== "undefined" ? window.location.pathname : "";
   if (currentPath === targetPath) {
+    try {
+      const { useYulaDockStore } = await import("@/lib/stores/dock");
+      useYulaDockStore.getState().setExpanded(false);
+      useYulaDockStore.getState().setOpen(true);
+    } catch {
+      // ignore
+    }
     return {
       status: "already_on_page",
       navigateTo: targetPath,
@@ -110,6 +117,7 @@ export async function openLastReportTool(
       status: "navigated",
       jobId: lastJob.jobId,
       navigateTo: lastJob.href,
+      title: lastJob.title,
       message: `Opened last report: ${lastJob.title} (job ${lastJob.jobId.slice(0, 8)}, ${lastJob.status}).`,
     };
   } catch (err) {
