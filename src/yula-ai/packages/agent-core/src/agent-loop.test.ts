@@ -212,4 +212,81 @@ describe('Autonomous Agent Loop (Pi Reference Implementation)', () => {
     expect(receivedModel).toBe('claude-3-7-sonnet');
     expect(receivedThinking).toBe('high');
   });
+
+  it('beforeToolCall should rewrite arguments passed to tool.execute', async () => {
+    let executedArgs: any;
+    const customTool = {
+      name: 'test_mutation',
+      description: 'Test mutation tool',
+      parameters: z.object({ value: z.string(), sanitized: z.boolean().optional() }),
+      execute: vi.fn(async (_id, args) => {
+        executedArgs = args;
+        return { content: [{ type: 'text', text: 'Success' }] };
+      }),
+    };
+
+    const mockStreamFn: StreamFn = vi.fn(async (context) => {
+      if (context.messages.length === 1) {
+        return {
+          message: { role: 'assistant', content: 'Mutating...' },
+          toolCalls: [{ id: 'mut_1', name: 'test_mutation', arguments: { value: 'raw_input' } }],
+        };
+      }
+      return { message: { role: 'assistant', content: 'Done' }, toolCalls: [], stopReason: 'end_turn' as const };
+    });
+
+    const agent = new Agent({
+      tools: [customTool],
+      streamFn: mockStreamFn,
+      maxIterations: 3,
+      beforeToolCall: async ({ args }) => {
+        return {
+          args: { ...args, value: args.value.toUpperCase(), sanitized: true },
+        };
+      },
+    });
+
+    await agent.run([{ role: 'user', content: 'Execute' }]);
+    expect(executedArgs).toEqual({ value: 'RAW_INPUT', sanitized: true });
+  });
+
+  it('beforeToolCall should fail closed when hook throws an exception', async () => {
+    let toolExecuted = false;
+    const customTool = {
+      name: 'risky_action',
+      description: 'Risky tool',
+      parameters: z.object({}),
+      execute: vi.fn(async () => {
+        toolExecuted = true;
+        return { content: [{ type: 'text', text: 'Should not run' }] };
+      }),
+    };
+
+    const mockStreamFn: StreamFn = vi.fn(async (context) => {
+      if (context.messages.length === 1) {
+        return {
+          message: { role: 'assistant', content: 'Running risky...' },
+          toolCalls: [{ id: 'risk_1', name: 'risky_action', arguments: {} }],
+        };
+      }
+      return { message: { role: 'assistant', content: 'Handled block' }, toolCalls: [], stopReason: 'end_turn' as const };
+    });
+
+    const agent = new Agent({
+      tools: [customTool],
+      streamFn: mockStreamFn,
+      maxIterations: 3,
+      beforeToolCall: async () => {
+        throw new Error('Unauthorized policy violation in before_tool');
+      },
+    });
+
+    const result = await agent.run([{ role: 'user', content: 'Execute risky' }]);
+    // Tool must NOT execute (fail-closed)
+    expect(toolExecuted).toBe(false);
+    // Synthetic error message delivered to conversation
+    const toolMsg = result.find((m: any) => m.role === 'toolResult');
+    expect(toolMsg).toBeDefined();
+    expect(JSON.stringify(toolMsg.content)).toContain('before_tool failed: Unauthorized policy violation');
+  });
 });

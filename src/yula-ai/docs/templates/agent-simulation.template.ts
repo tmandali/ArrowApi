@@ -166,4 +166,13 @@ describe('🤖 Headless UI-Agent Uçtan Uca Simülasyonu', () => {
     expect(res).toBe('OK');
     expect(attempts).toBe(2);
   });
+
+  it('Aşama 14: Modüler Beceriler ve Progressive Disclosure (skillsManager)', () => {
+    const summary = skillsManager.formatSkillsSummaryPrompt('/', ['filter_form']);
+    expect(summary).toContain('<available_ui_skills>');
+    expect(summary).toContain('read_skill_guide');
+
+    const content = skillsManager.formatSkillContent('form-submission-guide');
+    expect(content).toContain('<skill name="form-submission-guide">');
+  });
 });

@@ -2,6 +2,27 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Skill-Metadata (Progressive Disclosure) & Fail-Closed before_tool Hook Pattern (@my-agent/core)
+- **Rationale:**
+  1. *Prompt Bloat & Token Inefficiency:* Previously, `SkillRegistry.formatSkillsPrompt` injected complete instructions of all active skills into the LLM system prompt, overflowing context windows and degrading attention as screens multiplied.
+  2. *Missing Declarative Governance:* Skills lacked metadata for policy enforcement (`riskLevel`, `requiresApproval`, `requiredFields`).
+  3. *Domain-Agnostic Purity Violation:* Default skills in `agent-core/src/skills.ts` contained ERP-specific terms (`storeId`, `Kadıköy`, `sales-report-workflow`).
+  4. *Hook Arg Loss & Fail-Closed Gap:* `beforeToolCall` in `agent-loop.ts` did not forward rewritten/sanitized arguments to `tool.execute`, and throwing hooks were not guaranteed to fail-closed.
+- **Decision:**
+  - **SkillMetadata Contract (`skills.ts`):** Added specification-compliant metadata (`name`, `description`, `applicableRoutes`, `applicableComponents`, `requiresApproval`, `riskLevel`, `requiredFields`, `disableModelInvocation`, `metadata`). Added strict name/description validators per Pi reference.
+  - **Progressive Disclosure:** Implemented `formatSkillsSummaryPrompt` (emits lightweight XML metadata tags only) and `formatSkillContent` for on-demand lazy loading.
+  - **Standard Tool `read_skill_guide` (`standard-tools.ts`):** Added standard tool enabling the model to retrieve full skill instructions dynamically when executing a matched task.
+  - **Declarative Policy Hook (`installSkillPolicyHook`):** Automatically intercepts `dispatch_component_action` calls via `hookPipeline.beforeToolCall` to enforce `requiredFields` and trigger HITL hold on `requiresApproval` or `riskLevel: 'high'` actions unless approved.
+  - **Fail-Closed Execution & Arg Rewriting (`agent-loop.ts`, `agent-loop-types.ts`):** `agent-loop` catches throwing `beforeToolCall` hooks as terminal tool blocks (fail-closed) and cascades rewritten `effectiveArgs` downstream to `tool.execute`.
+  - **Domain-Agnostic Purification:** Replaced ERP defaults in `skills.ts` with pure UI skill guides (`form-submission-guide`, `validation-recovery-guide`, `table-interaction-guide`), relocating demo ERP skills to `apps/demo-app/src/skills/salesReportSkill.ts`.
+- **Verification:**
+  - 18/18 test suites passed (151 tests in `@my-agent/core`, including 10 new tests in `skills.test.ts` and 2 in `agent-loop.test.ts`).
+  - Full monorepo typecheck passed (`pnpm -r typecheck`).
+  - Demo app built successfully (`pnpm --filter demo-app build`).
+  - All files strictly adhere to the 500-line ceiling rule (`skills.ts`: 307, `agent-loop.ts`: 488, `standard-tools.ts`: 487).
+- **Author:** Antigravity / Team
+
+---
 
 ## [2026-09-22] Assistant Message Hover Action Toolbar & Programmatic Navigation Actions (Zero-Hallucination ReAct Links)
 - **Rationale:**
@@ -486,3 +507,27 @@ Older architectural decisions have been archived to adhere to the 500-line limit
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
 
 
+
+## [2026-09-22] Playbook Governance & Index Integrity Fix (Draft Approval + id-based Paths)
+- **Rationale:**
+  1. *Governance Bypass:* `propose_playbook_update` called `recordEntry()` (immediate approved) despite advertising user confirmation, so agent-saved rules landed in `screens/` while operators watched the empty `proposals` tab on `/system/playbooks`.
+  2. *Index/File-Name Mismatch:* `PlaybookService` computed `relativePath` from `targetPath` (`screens/<target>.md`) while `ServerFsPlaybookStorage.writeEntry` persisted `<id>.md`, breaking index links and colliding duplicate targets.
+- **Decision:**
+  - Core (`src/yula-ai/packages/agent-core/src/playbook.ts`): added `playbookRelativePath()` single source of truth (`<sub>/<id>.md`); `recordEntry` and `approveProposal` use it; added `reindexWorkspace()` to repair legacy indexes.
+  - Agent (`src/Sims/yula.client/src/lib/server-tools/standard-agent-tools.ts`): `propose_playbook_update` now calls `proposeEntry()` (draft, status `proposed`) and returns approval guidance pointing to `/system/playbooks` proposals tab.
+  - Data repair: rebuilt `storage/wiki/workspaces/stock/index.md` with id-based paths (2 screen rules + 2 workflow recipes).
+  - Tests (`playbook.test.ts`): added id-based path and legacy reindex repair assertions.
+- **Verification:**
+  - `@my-agent/core` typecheck passed; all 139 unit tests passed (17 files).
+  - `yula.client` typecheck shows 8 pre-existing errors in unrelated files (account-status-guard, ai-chat-message, dispatch-bridge, diagnostic-subagent); none in touched files.
+  - All modified files remain strictly <= 500 lines.
+- **Author:** OpenCode / Team
+
+## [2026-09-22] Playbook Admin View Data Source Fix (REST Instead of Empty Memory Context)
+- **Rationale:**
+  1. *Empty Admin Lists:* `PlaybooksManagementView` read entries/log via `useAgentPlaybook`, which resolves to the library `playbookManager` (MemoryPlaybookStorage) because `yula.client` never mounts `AgentProvider`. Approved disk records therefore never appeared in Screens/Workflows/Log tabs; only the directly-fetched Proposals tab worked. Deletes were memory-only and never reached disk.
+- **Decision:**
+  - App (`src/Sims/yula.client/src/workspaces/my/components/playbooks/playbooks-management-view.tsx`): replaced context-memory hook with REST state — `GET /api/agent/playbook?workspace=` for entries+log, `DELETE /api/agent/playbook?id=&workspace=` for removal, refresh after delete; proposals flow unchanged.
+- **Verification:**
+  - File is 492 lines (<= 500). `pnpm run lint` passed with 0 warnings/errors on 798 files. `pnpm run typecheck` reports no errors in the touched file (8 pre-existing errors elsewhere remain).
+- **Author:** OpenCode / Team

@@ -15,7 +15,11 @@ export function useAgentSkill(skill: Skill) {
     skill.name,
     skill.description,
     skill.instructions,
+    skill.requiresApproval,
+    skill.riskLevel,
+    JSON.stringify(skill.requiredFields),
     JSON.stringify(skill.applicableRoutes),
     JSON.stringify(skill.applicableComponents),
+    JSON.stringify(skill.metadata),
   ]);
 }

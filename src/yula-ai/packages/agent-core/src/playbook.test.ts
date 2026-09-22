@@ -205,8 +205,7 @@ describe('PlaybookService & LLM Wiki Çekirdek Motoru', () => {
     });
   });
 
-  describe('Two-Tier Intent Resolution & Subagent Resolver', () => {
-    it('alt ajan çözümleyicisi kayıtlıysa öncelikle onu çalıştırmalı ve sonucu dönmelidir', async () => {
+  describe('Two-Tier Intent Resolution & Subagent Resolver', () => {    it('alt ajan çözümleyicisi kayıtlıysa öncelikle onu çalıştırmalı ve sonucu dönmelidir', async () => {
       await service.recordEntry({
         scope: 'workspace',
         workspaceId: 'stock',
@@ -253,6 +252,44 @@ describe('PlaybookService & LLM Wiki Çekirdek Motoru', () => {
       expect(res.matched).toBe(true);
       expect(res.status).toBe('fallback');
       expect(res.recipe?.title).toBe('Fason Sevk Süreci');
+    });
+  });
+
+  describe('Index bütünlüğü (id-tabanlı dosya eşleşmesi)', () => {
+    it('recordEntry index satırını <sub>/<id>.md olarak yazar', async () => {
+      const entry = await service.recordEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'screen_rule',
+        title: 'Index Eşleşme Kuralı',
+        targetPath: '/stock/retail-sales-report',
+        contentMarkdown: '- test kuralı',
+      });
+      const index = await service.getIndex('stock');
+      expect(index).toHaveLength(1);
+      expect(index[0].id).toBe(entry.id);
+      expect(index[0].relativePath).toBe(`screens/${entry.id}.md`);
+    });
+
+    it('reindexWorkspace legacy target-tabanlı satırları onarır', async () => {
+      const entry = await service.recordEntry({
+        scope: 'workspace',
+        workspaceId: 'stock',
+        category: 'screen_rule',
+        title: 'Legacy Kural',
+        targetPath: '/stock/retail-sales-report',
+        contentMarkdown: '- legacy',
+      });
+      await storage.writeIndex('stock', [{
+        id: entry.id,
+        title: entry.title,
+        category: entry.category,
+        targetPath: entry.targetPath,
+        summary: 'legacy',
+        relativePath: 'screens/stock-retail-sales-report.md',
+      }]);
+      const fixed = await service.reindexWorkspace('stock');
+      expect(fixed[0].relativePath).toBe(`screens/${entry.id}.md`);
     });
   });
 });

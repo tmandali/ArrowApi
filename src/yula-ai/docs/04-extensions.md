@@ -8,9 +8,11 @@ Source Modules: `packages/agent-core/src/{dynamic-tools,skills,plugins,lanes,ste
 
 - **Dynamic Tool Generation:** Automatically synthesizes custom tool signatures from live component schemas on the fly.
 - **Skills Architecture (`skillsManager`):**
-  - Modular skill definitions scoped by active route or mounted components (e.g., `reports-filtering-skill`, `dashboard-overview-skill`).
-  - Registers slash commands (such as `/report`, `/summary`, `/clear`).
-  - Dynamically injects available skill guidelines into LLM system prompts via `formatSkillsPrompt()`.
+  - Modular skill definitions scoped by active route or mounted components (`report-catalog-navigation`, `active-table-grid-operations`).
+  - **Skill Metadata Contract (`SkillMetadata`):** Supports `requiresApproval`, `riskLevel` (`'low' | 'medium' | 'high'`), `requiredFields`, `disableModelInvocation`, and custom `metadata`.
+  - **Progressive Disclosure:** Injects lightweight skill metadata summaries into LLM system prompts via `formatSkillsSummaryPrompt()` (avoiding prompt context bloat).
+  - **On-Demand Retrieval:** The model dynamically retrieves full skill instructions via the standard tool `read_skill_guide` (`formatSkillContent()`).
+  - **Declarative Policy Hook (`installSkillPolicyHook`):** Automatically protects component actions via `before_tool` hook, verifying `requiredFields` and holding high-risk mutations until user approval (HITL).
 
 ---
 

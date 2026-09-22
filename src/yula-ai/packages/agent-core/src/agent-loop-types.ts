@@ -36,9 +36,10 @@ export interface AgentTool<TArgs = any, TDetails = any> {
 }
 
 export interface BeforeToolCallResult {
-  block?: boolean;
+  block?: { reason: string; terminate?: boolean } | boolean;
   reason?: string;
   terminate?: boolean;
+  args?: Record<string, any>;
 }
 
 export interface BeforeToolCallContext {

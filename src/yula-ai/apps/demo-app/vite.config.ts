@@ -284,7 +284,7 @@ export default defineConfig({
               }
 
               const activeComponentIds = activeComps.map((c) => c.id);
-              const skillsPrompt = skillsManager.formatSkillsPrompt(uiContext?.route || '/', activeComponentIds);
+              const skillsPrompt = skillsManager.formatSkillsSummaryPrompt(uiContext?.route || '/', activeComponentIds);
               const memoryPrompt = agentMemory.formatMemoryPrompt();
               const activeComponentsPrompt = formatActiveComponentsPrompt(activeComps);
 
@@ -298,6 +298,7 @@ Kullanıcının Türkçe taleplerini anla ve aşağıdaki standart araçları ku
 6. 'time_travel': Kullanıcı "geri al", "önceki adıma dön", "undo" veya "redo" dediğinde sayfa durumunu zamanda geri/ileri almak için.
 7. 'apply_vip_discount': Kullanıcı VIP indirimi, sadakat kuponu veya iskonto istediğinde (örn: Kadıköy-VIP-101'e %20) kupon tanımlamak için. %40 üzeri oranları reddet.
 8. 'ask_user_choice': Kullanıcıya netleştirmek, onay almak veya seçenek sunmak istediğinde (örn: mağaza, tarih aralığı, onay) etkileşimli buton çipleri sunmak için.
+9. 'read_skill_guide': Ekrandaki bir UI becerisinin ('available_ui_skills') ayrıntılı yönergelerini ve güvenlik kılavuzunu dinamik olarak okumak için.
 
 ${activeComponentsPrompt}
 

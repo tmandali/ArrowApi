@@ -354,12 +354,17 @@ describe('🤖 Pi Headless UI-Agent Uçtan Uca Simülasyonu', () => {
     // /reports rotasında filter_form bileşeni için geçerli yetenekleri çek
     const activeSkills = skillsManager.getActiveSkills('/reports', ['filter_form']);
     expect(activeSkills.length).toBeGreaterThanOrEqual(1);
-    expect(activeSkills.some((s) => s.name === 'sales-report-workflow')).toBe(true);
+    expect(activeSkills.some((s) => s.name === 'form-submission-guide')).toBe(true);
 
     // LLM sistem promptu için formatlanmış XML çıktısını al
     const promptXml = skillsManager.formatSkillsPrompt('/reports', ['filter_form']);
     expect(promptXml).toContain('<available_ui_skills>');
-    expect(promptXml).toContain('sales-report-workflow');
-    expect(promptXml).toContain('storeId');
+    expect(promptXml).toContain('form-submission-guide');
+
+    // Progressive disclosure summary çıktısını test et
+    const summaryXml = skillsManager.formatSkillsSummaryPrompt('/reports', ['filter_form']);
+    expect(summaryXml).toContain('<available_ui_skills>');
+    expect(summaryXml).toContain('form-submission-guide');
+    expect(summaryXml).toContain('read_skill_guide');
   });
 });

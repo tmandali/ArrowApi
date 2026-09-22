@@ -12,6 +12,7 @@ import { playbookManager } from './playbook';
 import { sessionManager } from './session-branch';
 import { piEventStream } from './pi-event-stream';
 import { ComponentSchema, ActionContract, Tool, tool, TELEMETRY_TOPICS } from './types';
+import { skillsManager } from './skills';
 import { i18nManager } from './i18n';
 import { classifyDiagnosticError, type DiagnosticVerdict } from './diagnostic-triage';
 
@@ -452,6 +453,31 @@ export const agentUiTools: Record<string, Tool> = {
         question,
         options: normalizedOptions,
         allow_custom,
+      };
+    },
+  }),
+
+  read_skill_guide: tool({
+    description: 'Read detailed workflow instructions and safety playbook for an available UI skill.',
+    inputSchema: z.object({
+      skill_name: z.string().describe('Name of the skill to read (from available_ui_skills)'),
+      additional_instructions: z.string().optional().describe('Optional context or specific focus area'),
+    }),
+    execute: async ({ skill_name, additional_instructions }) => {
+      const skill = skillsManager.getSkill(skill_name);
+      if (!skill) {
+        return {
+          success: false,
+          error: `Skill "${skill_name}" not found. Available: ${skillsManager.getAllSkills().map((s) => s.name).join(', ')}`,
+        };
+      }
+      return {
+        success: true,
+        skill_name: skill.name,
+        description: skill.description,
+        risk_level: skill.riskLevel || 'low',
+        requires_approval: skill.requiresApproval || false,
+        content: skillsManager.formatSkillContent(skill_name, additional_instructions),
       };
     },
   }),

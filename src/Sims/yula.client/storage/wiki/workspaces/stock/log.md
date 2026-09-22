@@ -121,3 +121,10 @@
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-22] rule_learned | Perakende satış raporunda varsayılan tarih (/stock/retail-sales-report) - Yula AI (Learned)
+## [2026-09-22] rule_learned | Perakende satış raporunda varsayılan tarih ve şirket (/stock/retail-sales-report) - Yula AI (Learned)
+## [2026-09-22] proposal_created | Perakende Satış Raporu açılış tarihi (/stock/retail-sales-report) - Yula AI (Learned)
+## [2026-09-22] proposal_approved | Perakende Satış Raporu açılış tarihi (/stock/retail-sales-report) - Admin
+## [2026-09-22] entry_deleted | Entry pb_screen_rule_mud2y0nn deleted - Yula
+## [2026-09-22] entry_deleted | Entry prop_screen_rule_mud5esys deleted - Yula
+## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi

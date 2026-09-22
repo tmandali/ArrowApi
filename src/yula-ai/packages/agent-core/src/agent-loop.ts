@@ -350,29 +350,36 @@ async function executeToolCalls(
         isError: true,
       };
     } else {
-      // Before tool call kancası (HITL, gate)
+      // Before tool call kancası (HITL, gate, argüman dönüştürme ve fail-closed)
       let blockedResult: BeforeToolCallResult | undefined;
+      let effectiveArgs = call.arguments;
       if (config.beforeToolCall) {
-        blockedResult = await config.beforeToolCall({ toolCall: call, args: call.arguments, context }, signal);
+        try {
+          blockedResult = await config.beforeToolCall({ toolCall: call, args: effectiveArgs, context }, signal);
+          if (blockedResult?.args) effectiveArgs = blockedResult.args;
+        } catch (err: any) {
+          blockedResult = { block: { reason: `before_tool failed: ${err?.message || String(err)}` } };
+        }
       }
 
       if (blockedResult?.block) {
+        const bObj = typeof blockedResult.block === 'object' ? blockedResult.block : null;
         finalized = {
           toolCall: call,
           result: {
-            content: [{ type: 'text', text: blockedResult.reason || 'Tool execution was blocked' }],
-            terminate: blockedResult.terminate,
+            content: [{ type: 'text', text: bObj?.reason || blockedResult.reason || 'Tool execution was blocked' }],
+            terminate: bObj?.terminate ?? blockedResult.terminate,
           },
           isError: true,
         };
       } else {
         try {
-          const rawResult = await tool.execute(call.id, call.arguments, signal, (partial) => {
+          const rawResult = await tool.execute(call.id, effectiveArgs, signal, (partial) => {
             void emit({
               type: 'tool_execution_update',
               toolCallId: call.id,
               toolName: call.name,
-              args: call.arguments,
+              args: effectiveArgs,
               partialResult: partial,
             });
           });
@@ -382,7 +389,7 @@ async function executeToolCalls(
 
           if (config.afterToolCall) {
             const afterRes = await config.afterToolCall(
-              { toolCall: call, args: call.arguments, result: rawResult, isError, context },
+              { toolCall: call, args: effectiveArgs, result: rawResult, isError, context },
               signal
             );
             if (afterRes) {

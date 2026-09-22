@@ -40,6 +40,20 @@ export interface PlaybookIndexItem {
   relativePath: string;
 }
 
+/**
+ * Single source of truth for wiki file layout.
+ * Must match ServerFsPlaybookStorage.writeEntry (<sub>/<id>.md).
+ */
+export function playbookRelativePath(entry: Pick<PlaybookEntry, 'id' | 'category'>): string {
+  const sub =
+    entry.category === 'screen_rule'
+      ? 'screens'
+      : entry.category === 'workflow_recipe'
+        ? 'workflows'
+        : 'policies';
+  return `${sub}/${entry.id}.md`;
+}
+
 export interface PlaybookLogItem {
   timestamp: string;
   action:
@@ -215,9 +229,7 @@ export class PlaybookService {
     await this.adapter.writeEntry(entry);
     const currentIndex = await this.adapter.readIndex(entry.workspaceId);
     const summary = entry.contentMarkdown.replace(/[#*`_]/g, '').split('\n')[0]?.slice(0, 100).trim() || entry.title;
-    const relativePath = entry.category === 'screen_rule'
-      ? `screens/${entry.targetPath?.replace(/^\//, '').replace(/\//g, '-') || 'general'}.md`
-      : `workflows/${entry.id}.md`;
+    const relativePath = playbookRelativePath(entry);
     const nextIndex = currentIndex.filter((i) => i.id !== entry.id);
     nextIndex.push({ id: entry.id, title: entry.title, category: entry.category, targetPath: entry.targetPath, summary, relativePath });
     await this.adapter.writeIndex(entry.workspaceId, nextIndex);
@@ -252,9 +264,7 @@ export class PlaybookService {
       if (approved) {
         const currentIndex = await this.adapter.readIndex(workspaceId);
         const summary = approved.contentMarkdown.replace(/[#*`_]/g, '').split('\n')[0]?.slice(0, 100).trim() || approved.title;
-        const relativePath = approved.category === 'screen_rule'
-          ? `screens/${approved.targetPath?.replace(/^\//, '').replace(/\//g, '-') || 'general'}.md`
-          : `workflows/${approved.id}.md`;
+        const relativePath = playbookRelativePath(approved);
         const nextIndex = currentIndex.filter((i) => i.id !== approved.id);
         nextIndex.push({ id: approved.id, title: approved.title, category: approved.category, targetPath: approved.targetPath, summary, relativePath });
         await this.adapter.writeIndex(workspaceId, nextIndex);
@@ -281,6 +291,23 @@ export class PlaybookService {
 
   async getIndex(workspaceId: string): Promise<PlaybookIndexItem[]> { return this.adapter.readIndex(workspaceId); }
   async getLog(workspaceId: string): Promise<PlaybookLogItem[]> { return this.adapter.readLog(workspaceId); }
+
+  /** Rebuilds index from approved entries on disk (repairs legacy target-based paths). */
+  async reindexWorkspace(workspaceId: string): Promise<PlaybookIndexItem[]> {
+    const entries = await this.adapter.readEntries(workspaceId);
+    const items: PlaybookIndexItem[] = entries
+      .filter((e) => e.status !== 'draft')
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        category: e.category,
+        targetPath: e.targetPath,
+        summary: e.contentMarkdown.replace(/[#*`_]/g, '').split('\n')[0]?.slice(0, 100).trim() || e.title,
+        relativePath: playbookRelativePath(e),
+      }));
+    await this.adapter.writeIndex(workspaceId, items);
+    return items;
+  }
 
   async lint(workspaceId: string): Promise<{ staleRules: string[]; warnings: string[] }> {
     const entries = await this.adapter.readEntries(workspaceId);

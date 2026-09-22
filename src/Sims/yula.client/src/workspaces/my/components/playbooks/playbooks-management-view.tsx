@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useAgentPlaybook } from "@my-agent/react";
-import type { PlaybookEntry } from "@my-agent/core";
+import type { PlaybookEntry, PlaybookLogItem } from "@my-agent/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -43,16 +42,25 @@ export function PlaybooksManagementView({
   const [workflowViewMode, setWorkflowViewMode] = React.useState<"graph" | "cards">("graph");
   const [selectedWorkflowId, setSelectedWorkflowId] = React.useState<string | null>(null);
   const [proposals, setProposals] = React.useState<PlaybookEntry[]>([]);
+  const [entries, setEntries] = React.useState<PlaybookEntry[]>([]);
+  const [logs, setLogs] = React.useState<PlaybookLogItem[]>([]);
+  const [loading, setLoading] = React.useState(false);
 
-  // Kütüphane seviyesindeki @my-agent/react useAgentPlaybook kancası ile veri yönetimi
-  const {
-    entries,
-    index: _indexItems,
-    log: logs,
-    loading,
-    refresh: loadData,
-    removeRule,
-  } = useAgentPlaybook({ workspaceId: workspace });
+  // Server is the source of truth (ServerFsPlaybookStorage). The library
+  // useAgentPlaybook hook reads from in-memory context here (no AgentProvider
+  // mounted), so entries/log must come from the REST API instead.
+  const loadEntries = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agent/playbook?workspace=${workspace}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(Array.isArray(data.entries) ? data.entries : []);
+        setLogs(Array.isArray(data.log) ? data.log : []);
+      }
+    } catch {
+      // Liste getirme hatasında mevcut state korunur
+    }
+  }, [workspace]);
 
   const loadProposals = React.useCallback(async () => {
     try {
@@ -69,22 +77,55 @@ export function PlaybooksManagementView({
   React.useEffect(() => {
     let active = true;
     void (async () => {
+      setLoading(true);
       try {
-        const res = await fetch(`/api/agent/playbook/proposals?workspace=${workspace}`);
-        if (res.ok && active) {
-          const data = await res.json();
+        const [entriesRes, proposalsRes] = await Promise.all([
+          fetch(`/api/agent/playbook?workspace=${workspace}`),
+          fetch(`/api/agent/playbook/proposals?workspace=${workspace}`),
+        ]);
+        if (!active) return;
+        if (entriesRes.ok) {
+          const data = await entriesRes.json();
+          setEntries(Array.isArray(data.entries) ? data.entries : []);
+          setLogs(Array.isArray(data.log) ? data.log : []);
+        }
+        if (proposalsRes.ok) {
+          const data = await proposalsRes.json();
           setProposals(data.proposals || []);
         }
       } catch {}
+      if (active) setLoading(false);
     })();
     return () => {
       active = false;
     };
   }, [workspace]);
 
+  const removeRule = React.useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(
+          `/api/agent/playbook?id=${encodeURIComponent(id)}&workspace=${workspace}`,
+          { method: "DELETE" },
+        );
+        if (!res.ok) return false;
+        const data = await res.json();
+        return Boolean(data.removed ?? data.success);
+      } catch {
+        return false;
+      }
+    },
+    [workspace],
+  );
+
   const handleRefresh = React.useCallback(async () => {
-    await Promise.all([loadData(), loadProposals()]);
-  }, [loadData, loadProposals]);
+    setLoading(true);
+    try {
+      await Promise.all([loadEntries(), loadProposals()]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadEntries, loadProposals]);
 
   const screenRules = entries.filter((e) => e.category === "screen_rule");
   const workflowRecipes = entries.filter((e) => e.category === "workflow_recipe");
@@ -108,6 +149,7 @@ export function PlaybooksManagementView({
     const success = await removeRule(id);
     if (success) {
       setDeleteConfirmId(null);
+      await handleRefresh();
     }
   };
 

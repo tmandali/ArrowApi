@@ -33,10 +33,10 @@ Source Modules: `packages/agent-core/src/{execution-queue,retry,effect-gate,reco
 
 - **Pipeline:** `hookPipeline`
 - **Interceptors:**
-  - `beforeToolCall`: Intercepts actions before they reach the component handler.
-  - `afterToolCall`: Audits action outcomes and triggers secondary workflows.
-- **Human-in-the-Loop (HITL):**
-  When an action requires user consent (such as `filter_form.SUBMIT`), `beforeToolCall` pauses execution, opens [`HitlModal.tsx`](../apps/demo-app/src/components/HitlModal.tsx), and blocks the agent loop (`{ block: { reason, terminate } }`) until explicit approval is granted.
+  - `beforeToolCall`: Intercepts actions before execution. Guarantees **fail-closed** safety (exceptions block the tool instead of crashing the loop) and supports **argument rewriting** (`{ args }`) to sanitize parameters before dispatch.
+  - `afterToolCall`: Audits action outcomes, patches details/results, and triggers secondary workflows.
+- **Human-in-the-Loop (HITL) & Policy-as-Metadata:**
+  When an action requires user consent (such as `filter_form.SUBMIT`), `beforeToolCall` pauses execution, opens [`HitlModal.tsx`](../apps/demo-app/src/components/HitlModal.tsx), and blocks the agent loop (`{ block: { reason, terminate } }`) until explicit approval is granted. The built-in `installSkillPolicyHook` automatically enforces `requiredFields` and approval gates declared in active `SkillMetadata`.
 
 ---
 

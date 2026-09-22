@@ -202,7 +202,7 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   propose_playbook_update: tool({
-    description: "Propose a learned operational rule or multi-step workflow recipe to be saved into the organizational Playbook wiki with user confirmation.",
+    description: "Propose a learned operational rule or multi-step workflow recipe for the organizational Playbook wiki. Creates a draft proposal requiring user approval in /system/playbooks (proposals tab).",
     inputSchema: z.object({
       category: z.enum(["screen_rule", "workflow_recipe"]).describe("Type of playbook entry: screen_rule or workflow_recipe"),
       title: z.string().describe("Short descriptive title for this rule or recipe"),
@@ -224,7 +224,7 @@ export const STANDARD_AGENT_TOOLS = {
       try {
         const { serverPlaybookService } = await import("@/lib/playbook-server");
         const wsId = workspace || "stock";
-        const entry = await serverPlaybookService.recordEntry({
+        const entry = await serverPlaybookService.proposeEntry({
           category,
           title,
           contentMarkdown: content,
@@ -232,16 +232,17 @@ export const STANDARD_AGENT_TOOLS = {
           workspaceId: wsId,
           scope: "workspace",
           author: "Yula AI (Learned)",
+          proposedBy: "Yula AI (Learned)",
         });
         return {
-          status: "saved",
+          status: "proposed",
           level: "workspace",
           workspaceId: wsId,
           category,
           title,
           targetPath: target_path,
           entry,
-          message: `Rule "${title}" successfully recorded to Workspace Wiki (${wsId}).`,
+          message: `Proposal "${title}" saved as draft (${entry.id}). Ask the user to approve it in /system/playbooks → Proposals tab for workspace "${wsId}".`,
         };
       } catch (err: any) {
         return { status: "error", message: err?.message || "Failed to update playbook" };

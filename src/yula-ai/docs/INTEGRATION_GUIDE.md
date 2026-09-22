@@ -396,7 +396,7 @@ describe('🤖 Headless UI-Agent Uçtan Uca Simülasyonu', () => {
 });
 ```
 
-Tam 13 aşamalı uçtan uca simülasyon testi için: [agent-simulation.template.ts](./templates/agent-simulation.template.ts)
+Tam 14 aşamalı uçtan uca simülasyon testi için: [agent-simulation.template.ts](./templates/agent-simulation.template.ts)
 
 
 ### CI/CD Entegrasyonu

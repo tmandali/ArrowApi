@@ -4,5 +4,6 @@
 
 | Tür | Başlık | Hedef Ekran | Dosya | Özet |
 | :--- | :--- | :--- | :--- | :--- |
-| `workflow_recipe` | **Haftalık Stok Mutabakat ve Fire Analizi** | `/stock/stock-balance` | [recipe-stock-reconcile.md](workflows/recipe-stock-reconcile.md) | Stok Bakiye Raporunu Aç -> Depo ve Tarih Kriterlerini Belirle -> Bakiye ve Hareket Sorgusunu Çalıştır |
-| `workflow_recipe` | **Satınalma Siparişi ve Mal Kabul İş Akışı** | `/stock/stock-balance` | [recipe-purchasing-flow.md](workflows/recipe-purchasing-flow.md) | Satınalma Siparişi ve Talep Girişi -> Yönetici Onayı -> Depo Mal Kabul -> Fatura Eşleme |
+| `screen_rule` | **Perakende satış raporunda varsayılan tarih ve şirket** | `/stock/retail-sales-report` | [pb_screen_rule_mud3biw8.md](screens/pb_screen_rule_mud3biw8.md) | Perakende Satış Raporu ekranı açıldığında Hareket Tarihi alanı, ekran açılış gününe göre dinamik ola |
+| `workflow_recipe` | **Satınalma Siparişi ve Mal Kabul İş Akışı** | `/stock/stock-balance` | [recipe-purchasing-flow.md](workflows/recipe-purchasing-flow.md) | 1. [openorder] (action) Satınalma Siparişi ve Talep Girişi -> navigate:/stock/stock-balance |
+| `workflow_recipe` | **Haftalık Stok Mutabakat ve Fire Analizi** | `/stock/stock-balance` | [recipe-stock-reconcile.md](workflows/recipe-stock-reconcile.md) | 1. [openbalance] (action) Stok Bakiye Raporunu Aç -> navigate:/stock/stock-balance |
