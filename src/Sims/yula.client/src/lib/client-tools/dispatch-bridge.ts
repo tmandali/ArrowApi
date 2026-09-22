@@ -77,9 +77,15 @@ export async function executeDispatchComponentAction({
   component_id,
   action,
   payload = {},
+  gate,
+  signal,
 }: DispatchActionParams): Promise<unknown> {
-  const { family, subId } = parseComponentId(component_id);
-  const args = { ...payload };
+  const executeCore = async (): Promise<unknown> => {
+    if (signal?.aborted || gate?.isAborted?.()) {
+      return { status: "aborted", component_id, action, error: "Abort requested" };
+    }
+    const { family, subId } = parseComponentId(component_id);
+    const args = { ...payload };
 
   // 1. Kriter Formu Eylemleri
   if (family === "criteria_form") {
@@ -389,4 +395,18 @@ export async function executeDispatchComponentAction({
   }
 
   return { status: "unknown-component", component_id, action };
+  };
+
+  if (gate) {
+    try {
+      return await gate.admitAsync(executeCore);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortRequested") {
+        return { status: "aborted", component_id, action, error: "Abort requested" };
+      }
+      throw err;
+    }
+  }
+
+  return await executeCore();
 }

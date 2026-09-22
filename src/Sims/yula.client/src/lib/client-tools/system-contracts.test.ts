@@ -25,6 +25,7 @@ import {
   GRID_VISUALIZE_CONTRACT,
 } from "./result-grid-contracts";
 import { executeDispatchComponentAction } from "./dispatch-bridge";
+import { createGate } from "@my-agent/core";
 
 describe("system-contracts", () => {
   describe("app-router contracts", () => {
@@ -55,6 +56,35 @@ describe("system-contracts", () => {
 
       assert.equal(res.status, "error");
       assert.ok(res.error.length > 0);
+    });
+
+    it("dispatch bridge cooperatively aborts when Effect Gate is aborted", async () => {
+      const { gate, control } = createGate();
+      control.beginAbort(Promise.resolve());
+      control.signalAbort();
+
+      const res = (await executeDispatchComponentAction({
+        component_id: "app_router",
+        action: "NAVIGATE",
+        payload: { path: "/stock/retail-sales-report" },
+        gate,
+      })) as { status: string; error?: string };
+
+      assert.equal(res.status, "aborted");
+    });
+
+    it("dispatch bridge cooperatively aborts when AbortSignal is already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const res = (await executeDispatchComponentAction({
+        component_id: "app_router",
+        action: "NAVIGATE",
+        payload: { path: "/stock/retail-sales-report" },
+        signal: controller.signal,
+      })) as { status: string };
+
+      assert.equal(res.status, "aborted");
     });
   });
 

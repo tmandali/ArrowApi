@@ -8,6 +8,7 @@ import type { ResultGridAction } from "./result-grid-contracts";
 import type { AppRouterAction } from "./app-router-contracts";
 import type { JobHistoryAction, JobAction } from "./job-history-contracts";
 import type { WasmSqlAction } from "@/services/wasmsql/ai/wasm-sql-contracts";
+import type { Gate } from "@my-agent/core";
 
 export type {
   CriteriaFormAction,
@@ -115,4 +116,8 @@ export interface DispatchActionParams {
   component_id: ComponentId | (string & {});
   action: ComponentAction;
   payload?: Record<string, unknown>;
+  /** Optional cooperative Effect Gate from @my-agent/core for async cancellation */
+  gate?: Gate;
+  /** Optional standard AbortSignal */
+  signal?: AbortSignal;
 }
