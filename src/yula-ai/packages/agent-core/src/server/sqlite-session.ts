@@ -1,9 +1,23 @@
-import { createRequire } from 'node:module';
 import type { SessionDump } from '../harness/session/session-harness';
 import type { SessionCheckpoint } from '../types';
 
-const nodeRequire = createRequire(import.meta.url);
-const { DatabaseSync } = nodeRequire('node:sqlite');
+function getDatabaseSync(): any {
+  try {
+    if (typeof process !== 'undefined') {
+      if (typeof (process as any).getBuiltinModule === 'function') {
+        const mod = (process as any).getBuiltinModule('node:sqlite');
+        if (mod?.DatabaseSync) return mod.DatabaseSync;
+      }
+      if (typeof require === 'function') {
+        const mod = require('node:sqlite');
+        return mod?.DatabaseSync ?? null;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export interface SqliteSessionRecord {
   id: string;
@@ -32,6 +46,10 @@ export class SqliteSessionDriver {
 
   constructor(options: SqliteSessionDriverOptions = {}) {
     this.dbPath = options.dbPath ?? ':memory:';
+    const DatabaseSync = getDatabaseSync();
+    if (!DatabaseSync) {
+      throw new Error('Native SQLite is not supported in this runtime environment (node:sqlite required).');
+    }
     this.db = new DatabaseSync(this.dbPath);
 
     if (this.dbPath !== ':memory:' && options.enableWal !== false) {

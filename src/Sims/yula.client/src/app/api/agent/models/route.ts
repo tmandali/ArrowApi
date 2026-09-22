@@ -24,7 +24,7 @@ function warmupLocalModel(base: string, defaultModel: string) {
 /** Model seçici: Sağlayıcılardan canlı çekim + 2-kademeli önbellek. */
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url);
+    const url = req?.url ? new URL(req.url) : new URL("http://localhost/api/agent/models");
     const mConfig = resolveModelsConfig();
     const authProviderIds = getAvailableProviderIdsFromAuth();
     const forceRefresh = url.searchParams.get("refresh") === "true";
@@ -137,7 +137,7 @@ export async function GET(req: Request) {
   } catch (error) {
     return Response.json(
       { models: [], error: error instanceof Error ? error.message : String(error) },
-      { status: 502 },
+      { status: 200 },
     );
   }
 }

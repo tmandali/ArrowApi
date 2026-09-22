@@ -40,8 +40,13 @@ export function createYulaStreamFn(options: StreamFnOptions): StreamFn {
     });
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => response.statusText);
-      throw new Error(`LLM Gateway Error (${response.status}): ${errText}`);
+      let errText = await response.text().catch(() => response.statusText);
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed?.error) errText = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+      } catch {}
+      const finalMsg = errText?.trim() || response.statusText || 'Internal Server Error';
+      throw new Error(`LLM Gateway Error (${response.status}): ${finalMsg}`);
     }
 
     const serverModel = response.headers.get('x-yula-model');
