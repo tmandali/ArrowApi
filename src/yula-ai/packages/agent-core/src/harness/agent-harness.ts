@@ -13,6 +13,7 @@ import { sessionHarness, SessionHarness, type SessionDump } from './session/sess
 import { sessionManager, SessionBranchManager } from './session/session-branch';
 import { agentMemory, AgentMemory } from './session/memory';
 import { multiLaneScheduler, MultiLaneScheduler } from './runtime/lanes';
+import { durableLane, DurableLaneManager } from './runtime/durable-lane';
 import { executionCoordinator, ActionExecutionCoordinator } from './runtime/execution-queue';
 import { createGate } from './runtime/effect-gate';
 import { compactConversation, compactUIEvents } from './compaction/compaction';
@@ -41,6 +42,7 @@ export interface AgentHarnessConfig {
   sessionManager?: SessionBranchManager;
   memory?: AgentMemory;
   laneScheduler?: MultiLaneScheduler;
+  durableLane?: DurableLaneManager;
   executionCoordinator?: ActionExecutionCoordinator;
   uiEventBus?: UIEventBus;
   uiRegistry?: UIComponentRegistry;
@@ -64,6 +66,7 @@ export class AgentHarness {
 
   readonly runtime: {
     readonly lanes: MultiLaneScheduler;
+    readonly durable: DurableLaneManager;
     readonly coordinator: ActionExecutionCoordinator;
     readonly createGate: typeof createGate;
   };
@@ -113,6 +116,7 @@ export class AgentHarness {
 
     this.runtime = {
       lanes: config.laneScheduler ?? multiLaneScheduler,
+      durable: config.durableLane ?? durableLane,
       coordinator: config.executionCoordinator ?? executionCoordinator,
       createGate,
     };

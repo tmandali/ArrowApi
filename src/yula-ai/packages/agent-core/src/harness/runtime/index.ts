@@ -5,5 +5,6 @@ export * from './reconcile';
 export * from './deferred';
 export * from './mutation-line';
 export * from './lanes';
+export * from './durable-lane';
 export * from './isolated-runner';
 export * from './progress';

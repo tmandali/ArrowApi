@@ -12,6 +12,7 @@ describe('AgentHarness Facade', () => {
   it('exposes all 8 subsystems with typed submodules', () => {
     expect(harness.session).toBeDefined();
     expect(harness.runtime).toBeDefined();
+    expect(harness.runtime.durable).toBeDefined();
     expect(harness.compaction).toBeDefined();
     expect(harness.ui).toBeDefined();
     expect(harness.tools).toBeDefined();
