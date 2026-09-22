@@ -9,9 +9,16 @@ import {
   type ComponentSchema,
   type UIContextSnapshot,
   type SystemPromptSections,
+  buildSystemPromptSections,
+  renderPromptSections,
   diffSystemPromptSections,
 } from "@my-agent/core";
-export { type SystemPromptSections, diffSystemPromptSections };
+export {
+  type SystemPromptSections,
+  buildSystemPromptSections,
+  renderPromptSections,
+  diffSystemPromptSections,
+};
 import {
   REGISTERED_REPORTS,
   findReport,
@@ -118,7 +125,6 @@ const SYSTEM_PREAMBLE = [
   "VISUAL DIAGRAMS & WORKFLOW SCHEMAS (Mermaid):",
   "• When explaining multi-step business workflows, approval lifecycles, decision trees, state transitions, or entity relationships, illustrate them visually using Mermaid diagrams inside fenced code blocks (` ```mermaid ... ``` `).",
   "• Supported Mermaid diagram types: 'graph TD' / 'graph LR', 'flowchart TD', 'sequenceDiagram', 'stateDiagram-v2', 'erDiagram'.",
-  "• The UI automatically renders these as interactive vector diagrams with zoom controls and a raw code switcher.",
   "• Keep diagrams concise, readable, and directly relevant to the user's business context.",
   "• SINGLE FINAL SYNTHESIS & NO PRE-TOOL ARTIFACTS: NEVER draw Mermaid diagrams in intermediate steps before or alongside tool calls. If tools are needed, execute them first. Render visual diagrams and workflows ONLY in your final synthesized response after all tool calls are completed.",
 ].join("\n");
@@ -171,9 +177,7 @@ const PLAYBOOK_PROTOCOL = [
   "     b. Ground the explanation in actual Sims ERP modules and screen routes (e.g. Stock, Selling, Accounting, registered reports). If the module is not yet configured, state it honestly.",
   "     c. Keep any high-level operational outline concise (at most 3-4 bullets).",
   "     d. Proactively invoke 'ask_user_choice' to offer recording the organization's verified approval gates and steps into the Playbook (e.g. ['Playbook Reçetesi Oluştur', 'İlgili Ekrana Git', 'Vazgeç']).",
-  "• Specific company/screen rules or custom workflow how-tos: Call 'query_playbook' to search verified procedural recipes.",
-  "• When the user explicitly corrects a workflow, teaches a rule (e.g. 'bu ekranda filtreleri her zaman şöyle seç', 'bu raporda mağaza kodu boş bırakılamaz'): Call 'propose_playbook_update' with category='workflow_recipe' or 'screen_rule'.",
-  "• For corrections or modifications: Call 'propose_playbook_update'.",
+  "• WORKFLOW CORRECTIONS & LESSONS LEARNED: When the user explicitly corrects a workflow or teaches a screen rule (e.g. 'bu ekranda filtreleri her zaman şöyle seç', 'bu raporda mağaza kodu boş bırakılamaz'): Call 'propose_playbook_update' with category='workflow_recipe' or 'screen_rule'.",
 ].join("\n");
 
 import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
@@ -185,18 +189,20 @@ import {
 } from "./yula-active-components";
 export { resolveActiveComponents, filterRelevantComponents };
 
-export function buildSystemPrompt(context?: YulaScreenContext): string {
+/**
+ * Assembles structured, prefix-cache friendly prompt sections according to Pi specifications.
+ */
+export function buildYulaSystemPromptSections(context?: YulaScreenContext): SystemPromptSections {
   registerYulaSkills();
-  const lines: string[] = [SYSTEM_PREAMBLE];
 
-  // LEVEL 0: seçili kullanıcı ajanı (persona)
+  // Preamble & Level 0 persona
+  let preamble = SYSTEM_PREAMBLE;
   if (context?.agent) {
-    lines.push(
-      "",
+    const personaLines: string[] = [
       `=== LEVEL 0: ACTIVE AGENT PERSONA (${context.agent.name}) ===`,
       context.agent.instructions,
       "Precedence is limited to tone and task priorities: keep the persona's tone and priorities in EVERY reply — including greetings and small talk (greet as the persona, briefly state who you are and how you can help in your domain). Never fall back to a generic assistant voice. The safety rules below are NOT overridden by this persona: phase walls (RESULTS vs WORKSPACE separation, no unapproved execution [action='RUN']) and tool allowlists still bind every reply.",
-    );
+    ];
     const docs = (context.agent.attachments ?? []).filter(
       (d) => d.name.trim() && d.content.trim(),
     );
@@ -212,19 +218,14 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
           body + (doc.content.trim().length > body.length ? "\n[…truncated]" : ""),
         );
       }
-      lines.push(
+      personaLines.push(
         "",
         "Agent reference documents (read-only context, follow when relevant):",
         ...parts,
       );
     }
+    preamble = `${SYSTEM_PREAMBLE}\n\n${personaLines.join("\n")}`;
   }
-
-  // <rules>: Çekirdek işletim kuralları (invariants)
-  lines.push("", "<rules>", CORE_RULES, "</rules>");
-
-  // <playbook>: Prosedürel bilgi ve ERP iş akışı protokolü
-  lines.push("", "<playbook>", PLAYBOOK_PROTOCOL, "</playbook>");
 
   const href = context?.pathname || context?.uiContext?.route || "/";
   const pathname = href.split("?")[0] || "/";
@@ -247,8 +248,7 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
     (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
 
-  lines.push(
-    "",
+  const activeContextLines: string[] = [
     `• Current Date: ${todayStr} (Use for expanding relative date terms like today, yesterday, this month into ISO format)`,
     `• Current Route: ${pathname}`,
     "• Available Enterprise Modules: stock (/stock/*), selling (/selling/*), accounting (/accounting/*), manufacturing (/manufacturing/*), subcontracting (/subcontracting/*), financial-reports (/financial-reports/*)",
@@ -256,12 +256,12 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
       ? `• Active Report Screen: "${activeReport.title}" (scope: "${activeReport.scope}", workspace: "${activeReport.workspace}")`
       : "",
     jobGrounding ?? (jobId ? `• Active Job Id: ${jobId}` : ""),
-  );
+  ].filter(Boolean);
 
   if (activeReport) {
-    lines.push("", formatCriteriaPromptGrounding(activeReport));
+    activeContextLines.push("", formatCriteriaPromptGrounding(activeReport));
   } else {
-    lines.push(
+    activeContextLines.push(
       "",
       `GLOBAL ORCHESTRATION & PLAN-FIRST MODE:`,
       `• The user is at the global / workspace landing level (route: "${pathname}"). NO report criteria form or result grid is currently mounted on the DOM.`,
@@ -278,62 +278,55 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
     );
   }
 
-  // 0. DOĞRULANMIŞ PLAYBOOK KURALLARI & PROSEDÜREL BİLGİLER (LLM Wiki / Playbook)
+  // Playbook rules & recipes
+  const pbRules: string[] = [];
   if (context?.playbookRules && context.playbookRules.length > 0) {
-    lines.push(
-      "",
+    pbRules.push(
       "=== VERIFIED PLAYBOOK RULES (Company / Screen Guidelines) ===",
       "Follow these established organizational rules strictly for this screen and workspace:",
       ...context.playbookRules.map((rule) => `• ${rule}`),
     );
   }
-
   if (context?.playbookRecipes && context.playbookRecipes.length > 0) {
-    lines.push(
+    pbRules.push(
       "",
       "=== PLAYBOOK RECIPES (Available Procedural Workflows) ===",
       ...context.playbookRecipes.map((r) => `• ${r.title}: ${r.summary}`),
     );
   }
 
-  // 1. DİNAMİK BİLEŞEN SÖZLEŞMELERİ (@my-agent/core formatActiveComponentsPrompt)
+  const customSections: Record<string, string> = {
+    playbook: PLAYBOOK_PROTOCOL,
+  };
+
   const activeCompsPrompt = formatActiveComponentsPrompt(activeComps);
   if (activeCompsPrompt) {
-    lines.push("", activeCompsPrompt);
+    customSections.active_components = activeCompsPrompt;
   }
 
-  // 2. DİNAMİK BECERİLER (@my-agent/core skillsManager)
   const skillsPrompt = skillsManager.formatSkillsPrompt(pathname, activeCompIds);
-  if (skillsPrompt) {
-    lines.push("", skillsPrompt);
+  const prepareChain = context?.agent && phase === "workspace" ? AGENT_PREPARE_CHAIN_RULES : "";
+  if (skillsPrompt || prepareChain) {
+    customSections.skills = [skillsPrompt, prepareChain].filter(Boolean).join("\n\n");
   }
 
-  // Ajan oturumu + WORKSPACE fazında prepare chain kuralı
-  if (context?.agent && phase === "workspace") {
-    lines.push("", AGENT_PREPARE_CHAIN_RULES);
-  }
-
-  // 3. Tablo açıkken canlı veri ve DuckDB şema grounding'i (Virtual Grid AI)
   const effectiveGrid = resolveEffectiveGrid(context, activeComps);
-
   if ((phase === "results" || effectiveGrid) && effectiveGrid) {
-    lines.push("", formatGridPromptGrounding(effectiveGrid));
+    customSections.grid_grounding = formatGridPromptGrounding(effectiveGrid);
   }
 
-  // 4. Ring Buffer UI Olayları Telemetrisi
+  const telemetryParts: string[] = [];
   const recentEvents = context?.uiContext?.recent_events;
   if (Array.isArray(recentEvents) && recentEvents.length > 0) {
-    lines.push(
-      "",
+    telemetryParts.push(
       "RECENT UI TELEMETRY EVENTS (LATEST PER TOPIC / STATE):",
       JSON.stringify(recentEvents, null, 2),
-      "(Note: Use inspect_ui_state tool with { topic, event_type, correlation_id, min_severity } to inspect deeper historical events if needed.)"
+      "(Note: Use inspect_ui_state tool with { topic, event_type, correlation_id, min_severity } to inspect deeper historical events if needed.)",
     );
   }
 
-  // 5. RAG ve Kullanıcı Becerileri
   if (context?.ragContext && context.ragContext.length > 0) {
-    lines.push(
+    telemetryParts.push(
       "\nRELEVANT VECTOR RAG CONTEXT:",
       ...context.ragContext.map(
         (item) => ` • ${item.content}${item.distance != null ? ` (distance: ${item.distance.toFixed(3)})` : ""}`,
@@ -342,16 +335,26 @@ export function buildSystemPrompt(context?: YulaScreenContext): string {
   }
 
   if (context?.userSkills && context.userSkills.length > 0) {
-    lines.push(
+    telemetryParts.push(
       "\nUSER SKILLS (on-device slash commands defined by this user):",
       ...context.userSkills.map((s) => ` • /${s.slash}: ${s.description || s.label}`),
       "When the user types /<name> explicitly or selects a skill, its instructions arrive as their message. Follow those skill instructions using your active component actions.",
     );
   }
+  if (telemetryParts.length > 0) {
+    customSections.telemetry_context = telemetryParts.join("\n");
+  }
 
-  lines.push(
-    "\nFINAL REMINDER: Write your final response text to the user in the user's active language.",
-  );
+  return buildSystemPromptSections({
+    preamble,
+    rules: [CORE_RULES],
+    playbookRules: pbRules.length > 0 ? pbRules : undefined,
+    activeContext: activeContextLines.join("\n"),
+    customSections,
+  });
+}
 
-  return lines.join("\n");
+export function buildSystemPrompt(context?: YulaScreenContext): string {
+  const sections = buildYulaSystemPromptSections(context);
+  return renderPromptSections(sections);
 }

@@ -6,7 +6,13 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSystemPrompt, isResultGridMeta, resolveEffectiveGrid } from "./yula-agent-prompt.ts";
+import {
+  buildSystemPrompt,
+  buildYulaSystemPromptSections,
+  diffSystemPromptSections,
+  isResultGridMeta,
+  resolveEffectiveGrid,
+} from "./yula-agent-prompt.ts";
 
 const testAgent = {
   name: "Satış Danışmanı",
@@ -312,6 +318,14 @@ describe("buildSystemPrompt agent katmanı", () => {
       prompt.includes("Available Enterprise Modules"),
       "Sistem modül envanteri yer almalı",
     );
+  });
+
+  it("buildYulaSystemPromptSections structured bölümler üretir ve diff algılar", () => {
+    const s1 = buildYulaSystemPromptSections({ pathname: "/" });
+    assert.ok(s1.preamble && s1.rules, "preamble ve rules bölümleri bulunmalı");
+    const s2 = buildYulaSystemPromptSections({ pathname: "/stock/stock-balance" });
+    const diff = diffSystemPromptSections(s1, s2);
+    assert.ok(diff && "active_context" in diff, "rota değişiminde active_context farkı yakalanmalı");
   });
 
   it("context.grid olmadan uiContext.active_components meta bilgisinden grid şema grounding türetilir", () => {
