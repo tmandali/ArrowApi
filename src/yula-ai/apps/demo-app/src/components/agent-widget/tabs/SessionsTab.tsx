@@ -3,6 +3,8 @@ import {
   sessionManager,
   SessionCheckpoint,
   SessionBranch,
+  generateBranchSummary,
+  BranchSummary,
 } from '@my-agent/core';
 
 export interface SessionsTabProps {
@@ -24,6 +26,7 @@ export function SessionsTab({
   const [allBranches, setAllBranches] = useState<SessionBranch[]>(sessionManager.getAllBranches());
   const [isForking, setIsForking] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [activeSummary, setActiveSummary] = useState<BranchSummary | null>(null);
   const [canUndoState, setCanUndoState] = useState(sessionManager.canUndo());
   const [canRedoState, setCanRedoState] = useState(sessionManager.canRedo());
 
@@ -96,22 +99,71 @@ export function SessionsTab({
             <span style={{ fontSize: 14 }}>🌿</span>
             <span style={{ fontWeight: 700, color: '#0f172a' }}>Dallar (Session Tree)</span>
           </div>
-          <button
-            onClick={() => setIsForking((prev) => !prev)}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => {
+                if (activeSummary) {
+                  setActiveSummary(null);
+                } else {
+                  const sum = generateBranchSummary(sessionManager, activeBranch.name, 'main');
+                  setActiveSummary(sum);
+                }
+              }}
+              style={{
+                padding: '3px 8px',
+                backgroundColor: activeSummary ? '#dcfce7' : '#f8fafc',
+                color: activeSummary ? '#166534' : '#475569',
+                border: '1px solid #cbd5e1',
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {activeSummary ? '✕ Özeti Kapat' : '📝 Dalı Özetle'}
+            </button>
+            <button
+              onClick={() => setIsForking((prev) => !prev)}
+              style={{
+                padding: '3px 8px',
+                backgroundColor: isForking ? '#e2e8f0' : '#eff6ff',
+                color: isForking ? '#475569' : '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {isForking ? '✕ İptal' : '➕ Yeni Dal Aç (Fork)'}
+            </button>
+          </div>
+        </div>
+
+        {/* Branch Summary Card */}
+        {activeSummary && (
+          <div
             style={{
-              padding: '3px 8px',
-              backgroundColor: isForking ? '#e2e8f0' : '#eff6ff',
-              color: isForking ? '#475569' : '#2563eb',
-              border: '1px solid #bfdbfe',
+              marginTop: 6,
+              marginBottom: 8,
+              padding: 8,
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #86efac',
               borderRadius: 6,
               fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
             }}
           >
-            {isForking ? '✕ İptal' : '➕ Yeni Dal Aç (Fork)'}
-          </button>
-        </div>
+            <div style={{ fontWeight: 700, color: '#166534', marginBottom: 2 }}>
+              📋 '{activeSummary.sourceBranchName}' Dal Özeti ({activeSummary.checkpointCount} Adım)
+            </div>
+            <div style={{ color: '#15803d', marginBottom: 4 }}>{activeSummary.summaryText}</div>
+            {activeSummary.changedKeys.length > 0 && (
+              <div style={{ color: '#166534', fontSize: 10 }}>
+                Etkilenen Alanlar: <strong>{activeSummary.changedKeys.join(', ')}</strong>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Fork Input Form */}
         {isForking && (

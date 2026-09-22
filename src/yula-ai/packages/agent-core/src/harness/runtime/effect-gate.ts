@@ -32,7 +32,17 @@ export function createGate(): { gate: Gate; control: GateControl } {
         check();
         return invoke();
       },
+      async admitAsync<T>(invoke: () => Promise<T>): Promise<T> {
+        check();
+        const promise = invoke();
+        if (controller.signal.aborted) {
+          throw new AbortRequested(Promise.resolve());
+        }
+        return await promise;
+      },
       signal: controller.signal,
+      isOpen: () => state.status === 'open',
+      isAborted: () => state.status === 'aborting' || controller.signal.aborted,
     },
     control: {
       beginAbort(cancellation) {
@@ -48,6 +58,7 @@ export function createGate(): { gate: Gate; control: GateControl } {
         state = { status: 'closed', error };
         if (!controller.signal.aborted) controller.abort(error);
       },
+      isClosed: () => state.status === 'closed',
     },
   };
 }

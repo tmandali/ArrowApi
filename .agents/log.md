@@ -2,6 +2,25 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Final Reference-Pi Capabilities Integration: Branch Summarization, Prompt Cache Stats & Effect Gate Async
+- **Rationale:**
+  1. *Exploratory Branch Loss:* When users created "What-If" simulation branches (e.g. discount, inventory transfer) and switched back to `main`, context and insights gained in the exploratory branch were isolated and lost.
+  2. *Prompt Cache Opacity:* Production models (Claude, OpenAI, Azure) enforce 5-minute Prompt Cache TTLs. Without tracking cache hits and TTL expirations, token costs and caching efficiency were invisible.
+  3. *Synchronous Cancellation Flaws:* Tools in the web/ERP environment (DuckDB WASM, Arrow Jobs) are asynchronous. `Gate.admit()` was purely synchronous, lacking `admitAsync()` and robust abort-signal admission coordination.
+- **Decision:**
+  - **Branch Summarization (`harness/session/branch-summarization.ts`):** Implemented `generateBranchSummary()` and `formatBranchSummaryAsContext()` generating structured branch summaries with affected state keys, checkpoint counts, and step sequences.
+  - **Prompt Cache Stats & Savings Tracker (`harness/telemetry/cache-stats.ts`):** Implemented `PromptCacheTracker` with 5-minute TTL expiration detection (`PROMPT_CACHE_TTL_MS`), cache hit ratio, token totals, and estimated dollar savings calculations.
+  - **Effect Gate Async & State Inspection (`harness/runtime/effect-gate.ts`):** Enhanced `Gate` with `admitAsync<T>()`, `isOpen()`, `isAborted()`, and `GateControl.isClosed()`.
+  - **Demo App Showcase:** Updated `SessionsTab.tsx` with "📝 Dalı Özetle" button & summary card, and `MetricsTab.tsx` with live Prompt Cache telemetry & TTL indicator.
+- **Verification:**
+  - 27/27 `@my-agent/core` test files passed (201 tests).
+  - 94 `yula.client` test suites passed (372 tests).
+  - `demo-app` build succeeded cleanly in 1.16s (`tsc && vite build`).
+  - All touched source and test files strictly respect `wc -l <= 500`.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Comparative A/B Lift Evaluation Engine: Reference-Pi Adaptation (@my-agent/core & demo-app)
 - **Rationale:**
   1. *Reference-Pi Evals Adaptation Analysis:* Analyzed `reference-pi/packages/evals`. Concluded that adopting its heavy Docker/CLI container machinery was unsuitable for our browser-based web architecture.

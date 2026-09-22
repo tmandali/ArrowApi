@@ -323,12 +323,16 @@ export interface UIContextSnapshot {
 export interface Gate {
   readonly signal: AbortSignal;
   admit<T>(invoke: () => T): T;
+  admitAsync<T>(invoke: () => Promise<T>): Promise<T>;
+  isOpen(): boolean;
+  isAborted(): boolean;
 }
 
 export interface GateControl {
   beginAbort(cancellation: Promise<void>): void;
   signalAbort(): void;
   close(error: Error): void;
+  isClosed(): boolean;
 }
 
 export interface PreflightValidationResult {
