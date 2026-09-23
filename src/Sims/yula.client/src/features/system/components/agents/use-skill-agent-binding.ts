@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
-import { useAgentComponent } from "@my-agent/react";
+import { useScreenContract } from "@/hooks/use-screen-contract";
 import type { UserSkill } from "@/lib/yula-user-skill";
 import type { SkillEditorHandle, SkillEditorMode } from "./skill-editor";
+import { SkillEditorContract } from "./skill-editor.contract";
 
 type Selection = { id: string | null; readOnly?: boolean } | null;
 
@@ -42,16 +42,7 @@ export function useSkillAgentBinding({
 }) {
   const t = useTranslations("SkillManagement");
 
-  useScreenAgentContext({
-    screenId: "my-skills",
-    screenTitle: selectedSkill
-      ? `${t("title")} - /${selectedSkill.slash}`
-      : screenTitle,
-    workspaceId: "my",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
+  useScreenContract(SkillEditorContract, {
     quickPrompts: selectedSkill
       ? [
           t("prompt_test_skill", { slash: selectedSkill.slash }),
@@ -70,11 +61,7 @@ export function useSkillAgentBinding({
       userSkillsCount: userSkills.length,
       systemSkillsCount: systemSkills.length,
     },
-  });
-
-  useAgentComponent({
-    id: "entity_form:skill_editor",
-    meta: {
+    runtimeMeta: {
       entity: "user_skill",
       screenTitle: selectedSkill
         ? `Skill Ayarları - /${selectedSkill.slash}`
@@ -98,43 +85,8 @@ export function useSkillAgentBinding({
         readOnly: "readOnly" in s && s.readOnly === true,
       })),
     },
-    actions: {
-      READ: {
-        description:
-          "Reads the currently selected skill details, metadata, and SKILL.md prompt content.",
-        whenToCall:
-          "When inspecting or asking about the active skill, its purpose, prompt, or configuration.",
-        whenNotToCall: "When changing values or switching skills.",
-      },
-      SELECT_SKILL: {
-        description:
-          "Selects a skill from the list to view or edit on screen ({ slash?: string, id?: string }).",
-        whenToCall:
-          "When the user commands to open, view, inspect, or switch to a specific skill (e.g. 'open xlsx skill', 'skill-creator'a geç').",
-        whenNotToCall: "When the requested skill is already selected.",
-      },
-      SWITCH_TAB: {
-        description:
-          "Switches the active detail tab in the skill editor ({ tab: 'genel' | 'skillmd' | string }).",
-        whenToCall:
-          "When the user asks to inspect the SKILL.md markdown or return to general settings.",
-        whenNotToCall: "When the requested tab is already active.",
-      },
-      TEST_SKILL: {
-        description:
-          "Provides testing instructions or executes test flow for the active skill ({ sampleInput?: string }).",
-        whenToCall:
-          "When the user asks 'how do I test this skill', 'test this skill', 'bu skili nasıl test ederim', etc.",
-        whenNotToCall: "When editing or saving fields.",
-      },
-      SAVE: {
-        description: "Saves changes made to the currently active user skill.",
-        whenToCall: "When the user asks to save the skill edits.",
-        whenNotToCall: "When viewing a read-only system skill or when no edits were made.",
-      },
-    },
-    onAction: async (action, payload) => {
-      if (action === "READ") {
+    handlers: {
+      READ: async () => {
         return {
           success: true,
           activeSkill: selectedSkill
@@ -152,11 +104,11 @@ export function useSkillAgentBinding({
           activeTab: activeDetailTab,
           tab,
         };
-      }
-      if (action === "SELECT_SKILL" && payload) {
+      },
+      SELECT_SKILL: async (payload) => {
         const query = (
-          (payload.slash as string) ||
-          (payload.id as string) ||
+          (payload?.slash as string) ||
+          (payload?.id as string) ||
           ""
         ).toLowerCase().replace(/^\//, "");
         const all = [
@@ -180,13 +132,13 @@ export function useSkillAgentBinding({
           };
         }
         return { success: false, error: `Skill '${query}' not found.` };
-      }
-      if (action === "SWITCH_TAB" && typeof payload?.tab === "string") {
-        const targetTab = payload.tab;
+      },
+      SWITCH_TAB: async (payload) => {
+        const targetTab = payload?.tab ?? "genel";
         setActiveDetailTab(targetTab);
         return { success: true, activeTab: targetTab, message: `Switched to tab ${targetTab}` };
-      }
-      if (action === "TEST_SKILL") {
+      },
+      TEST_SKILL: async (payload) => {
         if (!selectedSkill) {
           return { success: false, error: "No skill currently selected." };
         }
@@ -202,15 +154,14 @@ export function useSkillAgentBinding({
           guidance: `Bu beceriyi (${selectedSkill.label}) test etmek için Yula chat girişine '/${selectedSkill.slash} <istek>' yazabilirsiniz. Örneğin: '/${selectedSkill.slash} ${samplePrompt}'.`,
           skillDescription: selectedSkill.description || selectedSkill.label,
         };
-      }
-      if (action === "SAVE") {
+      },
+      SAVE: async () => {
         if (isReadOnly) {
           return { success: false, error: "Cannot save read-only system skill." };
         }
         editorRef.current?.save();
         return { success: true, message: "Skill saved successfully." };
-      }
-      return { success: false, error: `Unknown action: ${action}` };
+      },
     },
   });
 }

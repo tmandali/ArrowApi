@@ -129,3 +129,10 @@
 ## [2026-09-22] entry_deleted | Entry prop_screen_rule_mud5esys deleted - Yula
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
 ## [2026-09-22] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-23] proposal_created | Perakende satış raporunda standart mağaza analizi (/stock/retail-sales-report) - Yula AI (Learned)
+## [2026-09-23] proposal_approved | Perakende satış raporunda standart mağaza analizi (/stock/retail-sales-report) - Admin
+## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi

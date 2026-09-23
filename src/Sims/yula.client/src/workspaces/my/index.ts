@@ -9,10 +9,14 @@ export { myNav, myDashboardPath } from "./routes";
  * sayfası ince zarf olarak tüketir.
  */
 export { MySettingsForm } from "./components/settings/my-settings-form";
+export { UserSettingsContract } from "./components/settings/user-settings.contract";
 export { YulaStudioView } from "./components/studio/yula-studio-view";
 export { PluginsPageView } from "./components/plugins/plugins-page-view";
+export { PluginsRegistryContract } from "./components/studio/plugins-registry.contract";
 export { MemoryPageView } from "./components/memory/memory-page-view";
+export { MemoryManagementContract } from "./components/studio/memory-management.contract";
 export { PlaybooksPageView } from "./components/playbooks/playbooks-page-view";
+export { PlaybooksManagementContract } from "./components/playbooks/playbook-management.contract";
 
 /**
  * `my` workspace oturum kapısı — `my/*` sayfaları bu bileşenle sarılır.

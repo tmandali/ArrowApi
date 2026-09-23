@@ -249,4 +249,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signOut: "/sign-in",
     error: "/sign-in",
   },
+  debug: process.env.NODE_ENV === "development",
+  logger: {
+    error(error: Error) {
+      console.error("[auth][error]:", error.message);
+      if ("cause" in error && error.cause) {
+        console.error("  ↳ [auth][root cause]:", error.cause);
+      }
+    },
+    warn(code: string) {
+      console.warn("[auth][warn]:", code);
+    },
+    debug(message: string, metadata?: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[auth][debug]:", message, metadata ?? "");
+      }
+    },
+  },
 });

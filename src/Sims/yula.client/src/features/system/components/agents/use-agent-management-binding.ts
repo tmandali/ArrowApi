@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
-import { useAgentComponent } from "@my-agent/react";
+import { useScreenContract } from "@/hooks/use-screen-contract";
 import type { UserAgent } from "@/lib/yula-user-agent";
 import type { AgentEditorHandle, AgentEditorMode } from "./agent-editor";
+import { AgentEditorContract } from "./agent-editor.contract";
 
 type Selection = { id: string | null } | null;
 
@@ -38,16 +38,7 @@ export function useAgentManagementBinding({
 }) {
   const t = useTranslations("AgentManagement");
 
-  useScreenAgentContext({
-    screenId: "my-agents",
-    screenTitle: selectedAgent
-      ? `${t("title")} - ${selectedAgent.name}`
-      : screenTitle,
-    workspaceId: "my",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
+  useScreenContract(AgentEditorContract, {
     quickPrompts: selectedAgent
       ? [
           t("prompt_test_agent", { name: selectedAgent.name }),
@@ -64,16 +55,11 @@ export function useAgentManagementBinding({
       isActivePersona: selectedAgent ? selectedAgent.id === activeAgentId : false,
       agentsCount: agents.length,
     },
-  });
-
-  useAgentComponent({
-    id: "entity_form:agent_editor",
-    meta: {
+    runtimeMeta: {
       entity: "user_agent",
       screenTitle: selectedAgent
         ? `Ajan Ayarları - ${selectedAgent.name}`
         : screenTitle,
-      workspace: "my",
       activeAgentName: selectedAgent?.name ?? null,
       agentId: selectedAgent?.id ?? null,
       description: selectedAgent?.description ?? "",
@@ -93,48 +79,6 @@ export function useAgentManagementBinding({
         scope: a.scope,
         isActive: a.id === activeAgentId,
       })),
-    },
-    actions: {
-      READ: {
-        description:
-          "Reads the currently selected agent details, persona configuration, and AGENT.md instructions.",
-        whenToCall:
-          "When inspecting or asking about the active agent, its instructions, tools, or model settings.",
-        whenNotToCall: "When modifying values or switching agents.",
-      },
-      SELECT_AGENT: {
-        description:
-          "Selects an agent from the list to view or edit on screen ({ name?: string, id?: string }).",
-        whenToCall:
-          "When the user commands to open, view, or switch to a specific agent.",
-        whenNotToCall: "When the requested agent is already selected.",
-      },
-      SWITCH_TAB: {
-        description:
-          "Switches the active detail tab in the agent editor ({ tab: 'genel' | 'agentmd' }).",
-        whenToCall:
-          "When the user asks to inspect the AGENT.md markdown or return to general settings.",
-        whenNotToCall: "When the requested tab is already active.",
-      },
-      SET_ACTIVE: {
-        description:
-          "Sets the selected agent as the active persona for the user ({ agentId?: string }).",
-        whenToCall:
-          "When the user asks to activate or start using this agent as their active assistant persona.",
-        whenNotToCall: "When only viewing or editing configuration.",
-      },
-      TEST_AGENT: {
-        description:
-          "Opens or navigates to a live chat session with the selected agent persona.",
-        whenToCall:
-          "When the user asks to test, chat with, or try out this agent.",
-        whenNotToCall: "When editing settings.",
-      },
-      SAVE: {
-        description: "Saves changes made to the currently active agent.",
-        whenToCall: "When the user commands to save the agent edits.",
-        whenNotToCall: "When viewing without changes.",
-      },
     },
     onAction: async (action, payload) => {
       if (action === "READ") {

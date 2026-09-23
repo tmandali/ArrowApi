@@ -89,19 +89,31 @@ export default function SignInPage() {
           </p>
         )}
         {oauthError ? (
-          <p
-            role="alert"
-            className={cn(
-              "rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs",
-              forceDarkCard ? "text-red-200" : "text-red-600 dark:text-red-300",
+          <div className="flex flex-col gap-1.5">
+            <p
+              role="alert"
+              className={cn(
+                "rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs",
+                forceDarkCard ? "text-red-200" : "text-red-600 dark:text-red-300",
+              )}
+            >
+              {oauthError === "OAuthAccountNotLinked" ? (
+                t("error_account_not_linked")
+              ) : (
+                t("error_oauth_generic")
+              )}
+            </p>
+            {process.env.NODE_ENV === "development" && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+                <div className="font-mono font-semibold">[DEV] Auth Hata Kodu: {oauthError}</div>
+                <div className="mt-1 text-[11px] opacity-90">
+                  {oauthError === "Configuration"
+                    ? "Sağlayıcı (Google/Keycloak vb.) OIDC uç noktasına bağlanamadı (DNS/Firewall/SSL). Ayrıntı için sunucu terminalindeki [auth][root cause] loguna bakın."
+                    : "Ayrıntılı hata ve yığın izi için sunucu konsolundaki [auth] loglarını inceleyin."}
+                </div>
+              </div>
             )}
-          >
-            {oauthError === "OAuthAccountNotLinked" ? (
-              t("error_account_not_linked")
-            ) : (
-              t("error_oauth_generic")
-            )}
-          </p>
+          </div>
         ) : null}
         {/* Tek giriş noktası: ilk girişte hesap otomatik oluşur, ayrı
             sign-up akışı yok (/sign-up buraya redirect eder). */}

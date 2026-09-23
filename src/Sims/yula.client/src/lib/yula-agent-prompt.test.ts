@@ -465,6 +465,14 @@ describe("isResultGridMeta & resolveEffectiveGrid type guards", () => {
     ]);
     assert.equal(res, undefined);
   });
+
+  it("non-report ekranlarında (/my/agents) ekran kimliği eklenir ve rapor kuralı sızmaz", () => {
+    const prompt = buildSystemPrompt({ pathname: "/my/agents" });
+    assert.ok(prompt.includes('Active Screen: "Ajanlar" (route: "/my/agents")'));
+    assert.ok(prompt.includes("LIVE UI STATE VS CONVERSATION HISTORY"));
+    assert.ok(!prompt.includes("ACTIVE REPORT CONTEXT RULE"));
+    assert.ok(!prompt.includes("• Active Report Screen:"));
+  });
 });
 
 

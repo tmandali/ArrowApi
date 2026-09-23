@@ -1,20 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAgentChat, useAgentSteering } from "@my-agent/react";
 import type { YulaMessage } from "@/app/api/agent/chat/route";
 import { useChatsStore } from "@/lib/stores/chats";
 import { clearTurnTrace } from "@/lib/yula-turn-trace";
 import { extractWorkedSteps } from "@/components/layout/yula-worked-steps";
 import {
-  getRequestStartMs,
-  clearRequestStart,
-  markRequestStart,
-  setActiveConversationId,
-  resolveCurrentAgentId,
-  type LiveHelpers,
+  getRequestStartMs, clearRequestStart, markRequestStart,
+  setActiveConversationId, resolveCurrentAgentId, type LiveHelpers,
 } from "./chat-shared";
+import { isAiAllowedOnRoute } from "@/lib/contracts/screen-contract";
 import {
   executeComponentAction,
   multiLaneScheduler,
@@ -124,10 +121,9 @@ export function ChatInstance({
   const [stopped, setStopped] = React.useState(false);
   const [streamErrorTexts, setStreamErrorTexts] = React.useState<Record<string, string>>({});
 
-  const currentPath =
-    typeof window !== "undefined"
-      ? `${window.location.pathname}${window.location.search}`
-      : "/";
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPath = `${pathname || "/"}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
 
   const storeModel = useChatsStore((s) => s.model);
 
@@ -198,26 +194,9 @@ export function ChatInstance({
 
   const status = chat.status;
 
-  const {
-    steeringQueue,
-    followUpQueue,
-    clearSteering,
-    clearFollowUp,
-  } = useAgentSteering();
-
-  const steer = React.useCallback(
-    (text: string) => {
-      chat.steer(text);
-    },
-    [chat],
-  );
-
-  const followUp = React.useCallback(
-    (text: string) => {
-      chat.followUp(text);
-    },
-    [chat],
-  );
+  const { steeringQueue, followUpQueue, clearSteering, clearFollowUp } = useAgentSteering();
+  const steer = React.useCallback((text: string) => { chat.steer(text); }, [chat]);
+  const followUp = React.useCallback((text: string) => { chat.followUp(text); }, [chat]);
 
   // Background indexing with Multi-Lane Scheduler (lane: background)
   React.useEffect(() => {
@@ -353,6 +332,19 @@ export function ChatInstance({
       userStoppedRef.current = false;
       setStopped(false);
       clearTurnTrace(conversationId);
+
+      if (!isAiAllowedOnRoute(pathname || "/")) {
+        const ts = Date.now();
+        const userMsg = { id: `usr_${ts}`, role: "user" as const, content: text, parts: [{ type: "text", text }] };
+        const asstMsg = {
+          id: `asst_${ts + 1}`,
+          role: "assistant" as const,
+          content: "🛑 Bu ekranda güvenlik politikaları gereğince AI asistanı devre dışıdır.",
+          parts: [{ type: "text", text: "🛑 Bu ekranda güvenlik politikaları gereğince AI asistanı devre dışıdır." }],
+        };
+        chat.setMessages([...chat.messages, userMsg as any, asstMsg as any]);
+        return;
+      }
 
       const imageFiles = (attachmentsList ?? []).filter(
         (f) => f.dataUrl && f.type.startsWith("image/"),

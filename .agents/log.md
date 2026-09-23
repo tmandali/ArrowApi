@@ -2,6 +2,19 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Single Eval Click-to-Run, Live SSE Trace, Diff Inspector & Model Selector
+- **Rationale:** On `/spike/agent-debug`, developers needed to execute individual eval cases, hot-swap models, inspect expected vs actual diff assertions, and observe real-time SSE streaming reasoning, tool calls, and token telemetry.
+- **Decision:**
+  - **Live LLM SSE Route (`api/agent/eval/route.ts`):** Upgraded `POST /api/agent/eval` to stream Server-Sent Events with token usage telemetry (`inputTokens`, `outputTokens`, `totalTokens`).
+  - **Visual Diff Inspector (`eval-diff-inspector.tsx`):** Built component asserting target contracts vs actual dispatched actions and negative guardrail violations.
+  - **Live Model Switcher (`eval-model-select.tsx`):** Built dropdown hot-switching providers/models from `/api/agent/models`.
+  - **Trace Panel (`eval-trace-panel.tsx`):** Added Diff tab, Token Telemetry footer, and JSON Trace export (`.json`).
+  - **Bench Integration (`evals-bench.tsx`):** Integrated Model Selector, Diff Inspector, and 500-line compliance.
+- **Verification:** 92 test suites passed (377 tests, 100% green), 0 Oxlint warnings/errors, clean typecheck (`tsc --noEmit`), all files $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] yula.client Full Alignment & Integration with @my-agent/core Library
 - **Rationale:**
   1. *Complete Library Modernization:* `yula.client` needed full end-to-end integration with the modern capabilities provided by `@my-agent/core` (Session Tree branching, Prompt Cache tracking, and Canonical 5-section Compaction).

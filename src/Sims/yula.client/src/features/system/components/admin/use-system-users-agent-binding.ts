@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
-import { useAgentComponent } from "@my-agent/react";
+import { useScreenContract } from "@/hooks/use-screen-contract";
+import { SystemUsersContract } from "./system-users.contract";
 
 export function useSystemUsersAgentBinding({
   usersCount,
@@ -23,14 +23,7 @@ export function useSystemUsersAgentBinding({
 }) {
   const t = useTranslations("SystemUsers");
 
-  useScreenAgentContext({
-    screenId: "system-users",
-    screenTitle,
-    workspaceId: "system",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
+  useScreenContract(SystemUsersContract, {
     quickPrompts: [
       t("prompt_search_users"),
       t("prompt_active_count"),
@@ -42,11 +35,7 @@ export function useSystemUsersAgentBinding({
       tab,
       searchTerm,
     },
-  });
-
-  useAgentComponent({
-    id: "entity_form:system_users",
-    meta: {
+    runtimeMeta: {
       entity: "system_users",
       screenTitle,
       workspace: "system",
@@ -55,25 +44,8 @@ export function useSystemUsersAgentBinding({
       tab,
       searchTerm,
     },
-    actions: {
-      READ: {
-        description: "Reads user catalog and guest identities summary.",
-        whenToCall: "When inspecting users count, guest count, or active tab.",
-        whenNotToCall: "When filtering users.",
-      },
-      SEARCH: {
-        description: "Filters users or guests by search term ({ query: string }).",
-        whenToCall: "When searching for a user by name or email.",
-        whenNotToCall: "When clearing filter (pass query='' to reset).",
-      },
-      SWITCH_TAB: {
-        description: "Switches between 'catalog' (registered users) and 'guests' (pending authorization).",
-        whenToCall: "When user asks to see guest logins or registered users.",
-        whenNotToCall: "When requested tab is already active.",
-      },
-    },
-    onAction: async (action, payload) => {
-      if (action === "READ") {
+    handlers: {
+      READ: async () => {
         return {
           success: true,
           usersCount,
@@ -81,16 +53,20 @@ export function useSystemUsersAgentBinding({
           tab,
           searchTerm,
         };
-      }
-      if (action === "SEARCH" && typeof payload?.query === "string") {
-        setSearchTerm(payload.query);
-        return { success: true, searchTerm: payload.query };
-      }
-      if (action === "SWITCH_TAB" && (payload?.tab === "catalog" || payload?.tab === "guests")) {
-        setTab(payload.tab);
-        return { success: true, tab: payload.tab };
-      }
-      return { success: false, error: `Unknown action: ${action}` };
+      },
+      SEARCH: async (payload) => {
+        const query = payload?.query ?? "";
+        setSearchTerm(query);
+        return { success: true, searchTerm: query };
+      },
+      SWITCH_TAB: async (payload) => {
+        const targetTab = payload?.tab as "catalog" | "guests";
+        if (targetTab === "catalog" || targetTab === "guests") {
+          setTab(targetTab);
+          return { success: true, tab: targetTab };
+        }
+        return { success: false, error: "Invalid tab" };
+      },
     },
   });
 }

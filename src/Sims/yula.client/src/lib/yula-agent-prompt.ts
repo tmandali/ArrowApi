@@ -26,6 +26,7 @@ import {
 import { USER_AGENT_ATTACHMENTS_PROMPT_MAX_CHARS } from "@/lib/yula-user-agent";
 import {
   extractJobIdFromHref,
+  formatPathnameLabel,
 } from "@/lib/workspace-paths";
 import { formatLocalizedRelativeDateTerms } from "./yula-prompt-directives";
 import {
@@ -65,6 +66,16 @@ export {
   normalizeJobState,
   isTerminalJobState,
 };
+
+export function resolveScreenTitle(
+  pathname: string,
+  contextScreen?: { screenTitle?: string } | null,
+): string {
+  if (contextScreen?.screenTitle && contextScreen.screenTitle !== "screen") {
+    return contextScreen.screenTitle;
+  }
+  return formatPathnameLabel(pathname) || pathname;
+}
 
 export type YulaScreenPhase =
   /** İşin SONUÇ tablosu görüntüleniyor (grid hazır) */
@@ -141,6 +152,9 @@ const CORE_RULES = [
   "• When a tool produces output, summarize key insights and actionable findings for the user. Do not repeat raw data tables longer than 5 rows in chat text.",
   "",
   "GROUNDING, MISSING ASSETS & OUT-OF-SCOPE PROTOCOL:",
+  "• LIVE UI STATE VS CONVERSATION HISTORY:",
+  "  - The active route (`Current Route`) and mounted components (`active_components`) represent the user's LIVE present state.",
+  "  - Conversation history reflects past dialogue. When answering questions about the active screen, ground your response strictly in the current route and live mounted components rather than past reports or screens from previous messages.",
   "• MISSING ASSETS (Anti-Confabulation): If the user asks about or references an image, screenshot, attachment, file, or document (e.g. 'bu ne resmi', 'resimdeki sorun ne', 'bu PDF'i özetle') but NO image or file is present in their turn/context:",
   "  - Immediately state in the user's language that no image or file was received/attached.",
   "  - NEVER guess, invent, or substitute a description of the current screen/reports when an image or file was asked about.",
@@ -248,13 +262,17 @@ export function buildYulaSystemPromptSections(context?: YulaScreenContext): Syst
     REGISTERED_REPORTS.find((r) => pathname.startsWith(r.pagePath)) ||
     (context?.screen?.reportScope ? findReport(context.screen.reportScope) : undefined);
 
+  const screenTitle =
+    activeReport?.title ||
+    resolveScreenTitle(pathname, context?.screen);
+
   const activeContextLines: string[] = [
     `• Current Date: ${todayStr} (Use for expanding relative date terms like today, yesterday, this month into ISO format)`,
     `• Current Route: ${pathname}`,
     "• Available Enterprise Modules: stock (/stock/*), selling (/selling/*), accounting (/accounting/*), manufacturing (/manufacturing/*), subcontracting (/subcontracting/*), financial-reports (/financial-reports/*)",
     activeReport
       ? `• Active Report Screen: "${activeReport.title}" (scope: "${activeReport.scope}", workspace: "${activeReport.workspace}")`
-      : "",
+      : `• Active Screen: "${screenTitle}" (route: "${pathname}")`,
     jobGrounding ?? (jobId ? `• Active Job Id: ${jobId}` : ""),
   ].filter(Boolean);
 
@@ -264,7 +282,7 @@ export function buildYulaSystemPromptSections(context?: YulaScreenContext): Syst
     activeContextLines.push(
       "",
       `GLOBAL ORCHESTRATION & PLAN-FIRST MODE:`,
-      `• The user is at the global / workspace landing level (route: "${pathname}"). NO report criteria form or result grid is currently mounted on the DOM.`,
+      `• The user is currently on "${screenTitle}" (route: "${pathname}"). NO report criteria form or result grid is currently mounted on the DOM.`,
       `• NAVIGATION FAST-PATH: If the user simply asks to open or navigate to a page or report (e.g. 'beni stok bakiye raporuna götür', 'go to sales report', 'stok ekranını aç'):`,
       `  - Call dispatch_component_action with component_id="app_router" and action="NAVIGATE" directly in ONE step.`,
       `  - Do NOT ask for plan approval or propose multi-step confirmation for simple direct navigation.`,

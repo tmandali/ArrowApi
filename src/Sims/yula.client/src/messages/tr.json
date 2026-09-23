@@ -1814,6 +1814,8 @@
     "session_expired_notice": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
     "no_providers": "Giriş yapılabilecek hesap sağlayıcısı bulunmuyor.",
     "provider_unreachable": "{provider} sunucusuna ulaşılamıyor. Lütfen servisin çalıştığından ve ortam değişkenlerinin doğru yapılandırıldığından emin olun, ardından tekrar deneyin.",
+    "error_account_not_linked": "Bu hesap zaten farklı bir kimlik sağlayıcıya bağlı. Lütfen hesabınızı oluştururken kullandığınız sağlayıcı ile giriş yapın.",
+    "error_oauth_generic": "Giriş işlemi tamamlanamadı. Lütfen tekrar deneyin.",
     "forgot_password": "Şifremi Unuttum",
     "invalid_credentials": "E-posta veya şifre hatalı.",
     "sms_title": "SMS ile Giriş",
