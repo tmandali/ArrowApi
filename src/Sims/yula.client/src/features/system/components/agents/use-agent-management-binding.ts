@@ -48,6 +48,19 @@ export function useAgentManagementBinding({
           t("prompt_create_agent"),
           t("prompt_list_agents"),
         ],
+    state: {
+      activeAgentName: selectedAgent?.name ?? null,
+      selectedId: selection?.id ?? null,
+      mode,
+      isActivePersona: selectedAgent ? selectedAgent.id === activeAgentId : false,
+      agentsCount: agents.length,
+      activeTab: activeDetailTab,
+    },
+    getExitSnapshot: () => ({
+      activeAgentName: selectedAgent?.name ?? null,
+      activeTab: activeDetailTab,
+      mode,
+    }),
     stateExtra: {
       activeAgentName: selectedAgent?.name ?? null,
       selectedId: selection?.id ?? null,

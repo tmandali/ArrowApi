@@ -55,6 +55,20 @@ export function useStockItemAgent({
   setIsFixedAsset,
 }: UseStockItemAgentOptions) {
   useScreenContract(StockItemContract, {
+    state: {
+      activeTab,
+      maintainStock,
+      disabled,
+      allowAlternative,
+      isZeroRated,
+      isExempt,
+      isFixedAsset,
+    },
+    getExitSnapshot: () => ({
+      activeTab,
+      maintainStock,
+      disabled,
+    }),
     runtimeMeta: {
       entity: "stock_item",
       screenTitle: "Stok Kartı Detayı",

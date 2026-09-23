@@ -304,12 +304,25 @@ export async function executeDispatchComponentAction({
     return { status: "unknown-plugin-tool", component_id, action };
   }
 
-  // 6. Master Data / Varlık Formları (Entity Forms)
+  // 6. Master Data / Varlık Formları (Entity Forms & Mounted UI Components)
   if (family === "entity_form") {
+    const outcome = uiEventBus.dispatch(component_id, action, args);
+    if (outcome.success) {
+      const resolved = outcome.result instanceof Promise ? await outcome.result : outcome.result;
+      return { status: "ok", ...(typeof resolved === "object" && resolved !== null ? resolved : { result: resolved }) };
+    }
+    if (subId) {
+      const fallbackOutcome = uiEventBus.dispatch(subId, action, args);
+      if (fallbackOutcome.success) {
+        const resolved = fallbackOutcome.result instanceof Promise ? await fallbackOutcome.result : fallbackOutcome.result;
+        return { status: "ok", ...(typeof resolved === "object" && resolved !== null ? resolved : { result: resolved }) };
+      }
+    }
     return {
       status: "unhandled-entity-form",
       component_id,
       action,
+      error: outcome.error,
       message: `Entity form action ${action} for ${subId} must be handled by the mounted UI component.`,
     };
   }
@@ -392,6 +405,13 @@ export async function executeDispatchComponentAction({
       default:
         return { status: "unknown-action", component_id, action };
     }
+  }
+
+  // 8. Genel Doğrudan Bileşen RPC (Mounted Component Direct RPC Dispatch)
+  const directDispatch = uiEventBus.dispatch(component_id, action, args);
+  if (directDispatch.success) {
+    const resolved = directDispatch.result instanceof Promise ? await directDispatch.result : directDispatch.result;
+    return { status: "ok", ...(typeof resolved === "object" && resolved !== null ? resolved : { result: resolved }) };
   }
 
   return { status: "unknown-component", component_id, action };

@@ -12,6 +12,7 @@ import {
 import { executeDispatchComponentAction } from "@/lib/client-tools/dispatch-bridge";
 import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import { useYulaDockStore } from "@/lib/stores/dock";
+import { useScreenJourneyStore } from "@/lib/stores/screen-journey-store";
 import {
   JOB_OPEN_LAST_ACTION_CONTRACT,
   JOB_DETAIL_ACTION_CONTRACT,
@@ -34,10 +35,23 @@ import {
 
 /**
  * Headless UI-Agent Sistem Bileşenleri Kayıt Kancası
- * app_router, job_history ve REGISTERED_REPORTS formlarını headless olarak kaydeder.
+ * app_router, job_history, session_journey ve REGISTERED_REPORTS formlarını headless olarak kaydeder.
  */
 export function useHeadlessSystemComponents(router: AppRouterInstance) {
   React.useEffect(() => {
+    // 0. Headless Session Screen Journey Tracker
+    const syncJourney = () => {
+      const trail = useScreenJourneyStore.getState().getRecentTrail();
+      uiRegistry.register({
+        id: "session_journey",
+        meta: {
+          description: "Chronological Multi-Screen Navigation Trail & Snapshots",
+          trail,
+        },
+      });
+    };
+    syncJourney();
+    const unsubJourney = useScreenJourneyStore.subscribe(syncJourney);
     const routerSchema: ComponentSchema = {
       id: "app_router",
       meta: { description: "Page and Route Navigator" },
@@ -217,9 +231,11 @@ export function useHeadlessSystemComponents(router: AppRouterInstance) {
     });
 
     return () => {
+      unsubJourney();
       unsubRouter();
       unsubJob();
       unsubReports.forEach((unsub) => unsub());
+      uiRegistry.unregister("session_journey");
       uiRegistry.unregister("app_router");
       uiRegistry.unregister("job_history");
       REGISTERED_REPORTS.forEach((report) => {

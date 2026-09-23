@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ActionContract, ComponentSchema } from "@my-agent/core";
+import type { ActionContract, EventContract } from "@my-agent/core";
 
 /**
  * Deterministic Screen AI Capability Tiers.
@@ -23,6 +23,7 @@ export const ScreenCategorySchema = z.enum([
 
 export interface ScreenContract<
   TActions extends Record<string, ActionContract> = Record<string, ActionContract>,
+  TEvents extends Record<string, EventContract> = Record<string, EventContract>,
 > {
   screenId: string;
   screenTitle: string;
@@ -30,6 +31,25 @@ export interface ScreenContract<
   category: ScreenCategory;
   aiEnabled: boolean;
   actions: TActions;
+  events?: TEvents;
+  /**
+   * next-intl translation namespace (e.g. "SkillManagement", "AgentManagement").
+   * When provided, useScreenBinding automatically resolves quick prompts and action descriptions.
+   */
+  i18nNamespace?: string;
+  /**
+   * Translation keys for quick action prompts displayed in chat dock.
+   */
+  quickPromptKeys?: string[];
+  /**
+   * Encapsulated domain rules/guidelines dynamically injected into LLM system prompt
+   * ONLY when this screen is active on the DOM.
+   */
+  promptGuidelines?: string[];
+  /**
+   * Zod schema validating the live state mirrored upstream to LLM.
+   */
+  stateSchema?: z.ZodTypeAny;
   meta?: Record<string, unknown>;
 }
 
@@ -38,7 +58,8 @@ export interface ScreenContract<
  */
 export function defineScreenContract<
   TActions extends Record<string, ActionContract> = Record<string, ActionContract>,
->(contract: ScreenContract<TActions>): ScreenContract<TActions> {
+  TEvents extends Record<string, EventContract> = Record<string, EventContract>,
+>(contract: ScreenContract<TActions, TEvents>): ScreenContract<TActions, TEvents> {
   return contract;
 }
 

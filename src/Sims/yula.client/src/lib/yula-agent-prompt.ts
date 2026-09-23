@@ -126,6 +126,8 @@ export interface YulaScreenContext {
   playbookRules?: string[];
   /** Mevcut Playbook tarif / iş akışları katalog özeti */
   playbookRecipes?: Array<{ title: string; summary: string }>;
+  /** Kullanıcının oturum boyunca gezindiği ekranların kronolojik izi ve çıkış anlık görüntüleri */
+  screenJourney?: import("@/lib/stores/screen-journey-store").ScreenJourneyEntry[];
 }
 
 const SYSTEM_PREAMBLE = [
@@ -317,7 +319,58 @@ export function buildYulaSystemPromptSections(context?: YulaScreenContext): Syst
     playbook: PLAYBOOK_PROTOCOL,
   };
 
-  const activeCompsPrompt = formatActiveComponentsPrompt(activeComps);
+  // 1. Ekran Kuralları (Active Screen Domain Guidelines)
+  const screenGuidelines: string[] = [];
+  for (const comp of activeComps) {
+    const gl = comp.meta?.promptGuidelines;
+    if (Array.isArray(gl) && gl.length > 0) {
+      screenGuidelines.push(...gl);
+    }
+  }
+  if (screenGuidelines.length > 0) {
+    customSections.screen_guidelines = [
+      "=== ACTIVE SCREEN DOMAIN GUIDELINES ===",
+      "Strict domain rules for the currently active screen component:",
+      ...screenGuidelines.map((g) => `• ${g}`),
+    ].join("\n");
+  }
+
+  // 2. Çift Yönlü Canlı DOM Durum Aynalaması (Live Screen State Mirror)
+  const liveStates: string[] = [];
+  for (const comp of activeComps) {
+    if (comp.meta?.state && typeof comp.meta.state === "object") {
+      liveStates.push(
+        `• [${comp.id} (${(comp.meta.screenTitle as string) || "Screen"})]: ${JSON.stringify(comp.meta.state)}`
+      );
+    }
+  }
+  if (liveStates.length > 0) {
+    customSections.live_screen_state = [
+      "=== LIVE SCREEN STATE (Real-time DOM State Mirror) ===",
+      "The following state represents the exact, real-time values and selection currently mounted in the user's browser DOM:",
+      ...liveStates,
+    ].join("\n");
+  }
+
+  // 3. Çoklu Ekran Oturum Geçmişi (Session Screen Journey Breadcrumbs)
+  const journeyComp = activeComps.find((c) => c.id === "session_journey");
+  const journey = context?.screenJourney || (journeyComp?.meta?.trail as any);
+  if (Array.isArray(journey) && journey.length > 0) {
+    const trail = journey.map((visit: any) => {
+      const duration = visit.exitedAt ? `${Math.round((visit.exitedAt - visit.enteredAt) / 1000)}s` : "active";
+      const snapshot = visit.exitSnapshot ? ` - Exit Snapshot: ${JSON.stringify(visit.exitSnapshot)}` : "";
+      return ` • [${visit.screenTitle || visit.route}] (visited for ${duration})${snapshot}`;
+    });
+    customSections.session_screen_journey = [
+      "=== SESSION SCREEN JOURNEY (Previously Visited Screens & Historical Artifacts) ===",
+      "The user previously visited these screens during this session. Note: previous DOM components are UNMOUNTED; only the Current Live Screen components can receive actions.",
+      ...trail,
+    ].join("\n");
+  }
+
+  // session_journey'yi araç bloklarından gizle; sadece semantik bağlam olarak kalsın
+  const promptComps = activeComps.filter((c) => c.id !== "session_journey");
+  const activeCompsPrompt = formatActiveComponentsPrompt(promptComps);
   if (activeCompsPrompt) {
     customSections.active_components = activeCompsPrompt;
   }

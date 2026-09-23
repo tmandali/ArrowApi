@@ -53,6 +53,20 @@ export function useSkillAgentBinding({
           t("prompt_create_skill"),
           t("prompt_list_skills"),
         ],
+    state: {
+      activeSkill: selectedSkill?.slash ?? null,
+      selectedId: selection?.id ?? null,
+      mode,
+      isReadOnly,
+      userSkillsCount: userSkills.length,
+      systemSkillsCount: systemSkills.length,
+      activeTab: activeDetailTab,
+    },
+    getExitSnapshot: () => ({
+      activeSkill: selectedSkill?.slash ?? null,
+      activeTab: activeDetailTab,
+      mode,
+    }),
     stateExtra: {
       activeSkill: selectedSkill?.slash ?? null,
       selectedId: selection?.id ?? null,

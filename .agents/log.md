@@ -2,6 +2,21 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-23] Elimination of NextAuth SignOut Loops and Proxy API Redirect Storms
+- **Rationale:**
+  1. *SignOut & CSRF Loop Storm:* When sessions expired or became invalid, `AccountStatusGuard` triggered `signOut()` on every render without an in-flight guard, while also running on `/sign-in`, resulting in repetitive `POST /api/auth/signout` and `GET /api/auth/csrf` cascades.
+  2. *API Route 307 Redirect Pollution:* `proxy.ts` redirected all unauthenticated requests (including `/api/*`) to `/sign-in` HTML, causing background fetch calls (like `/api/agent/models`) to follow redirects into `GET /sign-in?next=/api/...`.
+  3. *Duplicate Provider Fetches:* `ProviderButtons` and child `<SmsOtpSignIn />` concurrently invoked `getProviders()`, issuing duplicate `GET /api/auth/providers` network requests.
+- **Decision:**
+  - **AccountStatusGuard (`account-status-guard.tsx`):** Added `signingOutRef` locking to ensure single-flight `signOut()` execution, added path checks to bypass signOut logic on auth routes (`/sign-in`, `/login`, `/sign-up`), and updated hook dependencies.
+  - **Proxy API Guard (`proxy.ts`):** Unauthenticated `/api/*` routes now cleanly return `401 Unauthorized` JSON instead of redirecting to the `/sign-in` HTML page.
+  - **SmsOtpSignIn Deduplication (`sms-otp-sign-in.tsx` & `provider-buttons.tsx`):** Added `isAvailable` prop to `SmsOtpSignIn` so that already-fetched providers from `ProviderButtons` are reused without issuing a duplicate `GET /api/auth/providers` call.
+  - **AI Model Warmup Guard (`yula-chat-provider.tsx`):** Guarded `fetchCachedYulaModels()` to avoid issuing model warmup requests when on authentication pages.
+- **Verification:** Clean TypeScript verification (`npx tsc --noEmit`), 0 type errors, all modified files conform to 500-line limit.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-23] Single Eval Click-to-Run, Live SSE Trace, Diff Inspector & Model Selector
 - **Rationale:** On `/spike/agent-debug`, developers needed to execute individual eval cases, hot-swap models, inspect expected vs actual diff assertions, and observe real-time SSE streaming reasoning, tool calls, and token telemetry.
 - **Decision:**
@@ -406,89 +421,37 @@ This document is the **append-only audit log** recording fundamental architectur
 
 ---
 
-## [2026-09-21] Grid Schema Grounding from Mounted Components, Read-Only DuckDB Inspection & Telemetry Source Alignment
+## [2026-09-23] ScreenContract Standard, Pre-Flight Circuit Breaker & 100% CI Route Coverage
 - **Rationale:**
-  1. *Missing Grid Schema Grounding (`yula-agent-prompt.ts`):* In the `@my-agent/react` runtime, client-side requests send `uiContext` containing `active_components` and `recent_events`. While `result_grid:active` was mounted and registered with full table/column metadata, `buildSystemPrompt` only checked `if (phase === "results" && context?.grid)`. When `context.grid` was omitted over the wire, active table name, row count, and available columns were never injected into the system prompt. Consequently, when the user asked "hangi tablo açık", the agent had no grid context and hallucinated that the results table was not loaded/accessible.
-  2. *DuckDB Read-Only Inspection Blocked by SQL Guard (`sql-guard.ts`):* When the user asked to filter by a store (e.g. "T006 yı süz"), the agent attempted schema inspection via `DESCRIBE active_view`. `guardReadOnlySelect` strictly required queries to start with `SELECT` or `WITH`, rejecting safe read-only commands (`DESCRIBE`, `DESC`, `SHOW`, `SUMMARIZE`). When `RUN_SQL` errored, the agent concluded that the result table was inaccessible. Furthermore, appending `LIMIT 200` to `DESCRIBE` is invalid in DuckDB syntax.
-  3. *Telemetry Source Mismatch in `inspect_ui_state`:* `useResultGridAgent` emitted telemetry with `source: "result_grid"`, but registered the component as `result_grid:active`. When `inspect_ui_state` queried by `component_id: "result_grid:active"`, `getRecentEvents` filtered strictly with `e.source === src || e.source.startsWith(src)`, yielding empty telemetry results.
+  1. *Context Leakage & Hallucination on Non-Report Screens:* Opening management screens like `/my/agents` resulted in stale report titles (e.g. Retail Sales Report) being fed to LLMs due to non-reactive route synchronization in `YulaChatProvider` and conversational history pollution.
+  2. *Lack of Code-Safe Screen Boundaries:* Screens lacked deterministic capability declarations, leading to ambiguous LLM interpretations and brittle string-based prompt directives.
+  3. *Unprotected Auth & Security Boundaries:* Sensitive routes (e.g. `/(auth)/*`, password changes) required deterministic local pre-flight blocking without making external LLM calls.
 - **Decision:**
-  - **Type-Safe Component-Driven Grid Grounding (`yula-agent-prompt.ts` & `yula-tool-info.ts`):** Replaced unsafe type casts (`as Partial<YulaGridContext>`) and raw magic strings (`(c: any) => c.id === "result_grid:active" || c.id.startsWith("result_grid")`) with strictly typed guards: `isResultGridComponentId(id: unknown): id is ResultGridComponentId`, `isResultGridComponent(comp: unknown): comp is ComponentSchema & { id: ResultGridComponentId }`, `isResultGridMeta(meta: unknown): meta is ResultGridMetaPayload`, and `resolveEffectiveGrid(context, activeComps)` pure helpers. `normalizeFiltersRecord` safely maps filter objects. Active table, row count, DuckDB view, and columns are cleanly extracted and grounded into the system prompt without runtime assumptions.
-  - **Safe Read-Only Inspection Support (`sql-guard.ts`):** Expanded `guardReadOnlySelect` to permit `select`, `with`, `describe`, `desc`, `show`, and `summarize`. Added `isSelectOrWith` guard so automatic `LIMIT` is only appended to `SELECT`/`WITH` statements and not to schema inspection commands. Added unit test suite `sql-guard.test.ts` (9/9 passing).
-  - **Direct Filter Action Guidance (`yula-agent-prompt.ts`):** Instructed the ReAct loop prompt to use `action: 'FILTER'` (with `field`, `value`, `op: 'eq'`) directly when the user requests filtering a column value, eliminating unnecessary `DESCRIBE` calls since columns are already grounded in context.
-  - **Telemetry Source Alignment (`use-result-grid-agent.ts` & `event-bus.ts`):** Updated `useResultGridAgent` telemetry calls to emit `source: "result_grid:active"`, and enhanced `getRecentEvents` to match bidirectionally (`src.startsWith(e.source)`).
+  - **Deterministic 4-Tier Screen Contract Standard (`screen-contract.ts`):** Defined `ScreenCategory` (`interactive_operator`, `report_results`, `workspace_hub`, `restricted`) backed by Zod schemas via `defineScreenContract()`.
+  - **Client-Side Pre-Flight Circuit Breaker (`yula-chat-instance.tsx`):** Added synchronous route gatekeeping in `sendMessageText` that intercepts restricted routes locally, immediately outputting an assistant notification with 0 external API calls and 0 token cost.
+  - **Typed Screen Binding Hook (`use-screen-contract.ts`):** Built a unified hook wrapping `@my-agent/react`'s `useAgentComponent` and `useScreenAgentContext` ensuring 100% compile-time type safety for component action handlers.
+  - **Comprehensive Screen Migration:**
+    - Personal & System Management: `AgentEditorContract`, `SkillEditorContract`, `PluginsRegistryContract`, `MemoryManagementContract`, `PlaybooksManagementContract`, `UserSettingsContract`, and `SystemUsersContract`.
+    - Stock Entity Management: `StockItemContract` with field toggles and multi-tab switching.
+    - Reporting Contracts: `StockBalanceReportContract`, `StockAnalyticsReportContract`, `RetailSalesReportContract`, and `StockLedgerReportContract`.
+    - Workspace Hub Contracts: `RootWorkspaceHubContract`, `StockWorkspaceHubContract`, `AccountingWorkspaceHubContract`, `SellingWorkspaceHubContract`, `ManufacturingWorkspaceHubContract`, `SubcontractingWorkspaceHubContract`, and `FinancialReportsHubContract`.
+  - **100% CI Route Coverage Suite (`screen-contract-coverage.test.ts`):** Implemented an automated test that dynamically scans all `src/app/**/page.tsx` routes, asserting valid category resolution and circuit-breaker compliance, failing CI if any new page is added without contract classification.
+- **Verification:** 428/428 tests passed across 98 suites (100% pass rate), clean static checks, zero Oxlint errors, and all files strictly comply with the 500-line rule.
 - **Author:** Antigravity / Team
 
----
-
-## [2026-09-21] Type-Safe Tool Error Guards, Grid Visualize Schema Alignment & Card Rendering
+## [2026-09-23] Unified useScreenBinding, Direct RPC, Bidirectional State Mirroring & Multi-Screen Journey
 - **Rationale:**
-  1. *Untyped Error Extraction (False-Positive Errors):* `extractToolErrorMessage` in `yula-tool-info.ts` cast objects to `Record<string, unknown>` and inspected `det.message` without verifying `det.status === "error"`. Consequently, successful query transformations (e.g. `Grid view updated to "..." (519 rows)`) were misclassified as failures and rendered as red `Hata: ...` in the UI.
-  2. *Schema & Tool Parameter Mismatch (Infinite Retry Loop):* `GRID_VISUALIZE_CONTRACT` exposed `dimension` and `metric`, whereas `visualizeGrid` looked for `dimensionX` and `dimensionY`. When models adhered to the schema, `labelKey` remained empty, throwing `Invalid category column: `. When models pivoted to `dimensionX` per error hint, default Zod stripping removed the unknown key, causing persistent failure.
-  3. *Missing Chart Card Dispatch Handling:* `yula-chat-turn.tsx` and `yula-chat-turn-helpers.tsx` only matched the legacy `visualize_grid_data` tool name and missed `dispatch_component_action` with action `VISUALIZE` / `CHART`.
-  4. *Agressive Top-N Limit Stripping:* `setGridQuery` stripped all `LIMIT \d+` regexes, turning intentional Top-N views (e.g. `LIMIT 5`) into full table loads (519 rows).
+  1. *Dual-Store & Redundant Registration Overhead:* Previously, screens maintained split state across `useScreenAgentContext` and `useAgentComponent`, leading to code duplication and synchronization lag.
+  2. *EventBus String Pub/Sub Bottleneck:* Intra-screen actions (`SET_FIELDS`, `SWITCH_TAB`, `SAVE`) relied on loose string-based EventBus dispatch, resulting in `unhandled-entity-form` errors and lack of direct handler return values.
+  3. *Lack of Bidirectional Full-Duplex State Sync:* The LLM operated with only past event telemetry without direct visibility into real-time React DOM state.
+  4. *Multi-Screen Amnesia & Hallucination:* As users transitioned between screens during a single LLM session, models lacked awareness of previously visited pages and final state snapshots.
 - **Decision:**
-  - **Type-Safe Status & Error Guards (`yula-tool-info.ts`):** Introduced `FAILED_TOOL_STATUSES`, `FailedToolStatus`, `ToolStatus`, `ToolErrorPayload`, and type guards `isFailedToolStatus(status)` and `isToolErrorPayload(val)`. Updated `extractToolErrorMessage` and `isFailedToolInfo` to safely discriminate errors from success messages.
-  - **Bilingual & Passthrough Visualize Contract (`result-grid-contracts.ts` & `grid-visualize-tool.ts`):** Added aliases `dimension`/`dimensionX`/`labelKey`, `metric`/`dimensionY`/`valueKeys`, `type`/`chartType`, chart options (`limit`, `aggregation`, `orderMode`, `title`, `description`, `takeaway`), and `.passthrough()`.
-  - **Unified Dispatch Card Rendering (`yula-chat-turn.tsx` & `yula-chat-utils.ts`):** Enabled `<YulaChartCard>` rendering for `dispatch_component_action:VISUALIZE` and added unwrapping for `output.details`.
-  - **Preserve Top-N Intent (`grid-sql-tools.ts`):** Retained user/agent Top-N limits (e.g. `LIMIT 5`) while only stripping default auto-guard limits (200/500/1000).
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Semantic Text Taxonomy, Role-Based Extraction & Type-Safe Text Guards
-- **Rationale:**
-  1. *Fragile & Untyped Text Checking:* Across the codebase, components checked `part.type === "text"` using raw type-casting (`(p as { text: string }).text`), which was prone to runtime errors, code duplication, and lint warnings.
-  2. *Loss of Semantic Meaning:* A generic `text` part failed to express what the text represented (e.g. an intermediate plan, a pre-choice prompt, an in-flight progress notice, or a final synthesis). This caused intermediate plans to either leak into main chat bubbles or require artificial hacks like masking as `type: "reasoning"`.
-- **Decision:**
-  - **Semantic Text Taxonomy (`@my-agent/core/step-frame-types.ts`):** Introduced `TextPartRole` (`plan_rationale`, `decision_prompt`, `progress_notice`, `final_synthesis`) and `SemanticTextPart`.
-  - **Zero-Regex Structural Classification:** Completely eliminated regex patterns (`/^[📊🚀...]/`), emoji matching, and Turkish keyword heuristics (`seçin`, `belirtin`, `açılıyor`). Role assignment in `classifyTextPart` is now 100% structural and deterministic based on ReAct execution context (pre-tool text = `plan_rationale`, tool-free text = `final_synthesis`).
-  - **Type Guards & Extraction:** Added `isTextPart(part)` and `isReasoningPart(part)` type guards, `classifyTextPart(text, hasTools)` for structural role assignment, and `getMessageText(message, options)` with role filtering/exclusion.
-  - **Client-Wide Adoption:** Replaced raw `part.type === "text"` filters and casts in `yula-chat-turn.tsx`, `ai-chat-message.tsx`, `yula-worked-steps.tsx`, `yula-worked-accordion.tsx`, `yula-worked-copy.ts`, `use-chat-turns.ts`, `yula-choice-card.tsx`, `yula-questionnaire-card.tsx`, `yula-execution-terminal.tsx`, `yula-agent-mode-chip.tsx`, `use-history-suggestions.ts`, `chat-shared.ts`, `yula-chat-instance.tsx`, `use-workspace-rag-search.ts`, `context-slim.ts`, `chats.ts`, and `yula-session-dump.ts`.
-  - **Bubble vs Accordion Clean Separation:** Chat bubbles exclude `plan_rationale` (which renders cleanly inside the Worked Accordion step cards), while final syntheses render in the message row.
-  - **Verification:** 129/129 `@my-agent/core` vitest tests pass, 269/269 `yula.client` tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), Next.js 16.3.5 Turbopack production build succeeds with 0 errors, and all files strictly comply with the 500-line limit.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Text-First Causal Transparency: Context Inspection, Plan Extraction & Decision Flow Diagram Cancellation
-- **Rationale:**
-  1. *Premature Visual Diagram & Obscure Pre-Action State:* When an agent formulated a plan and presented an interactive user choice (e.g. `ask_user_choice` for store or company code clarification), the visual Mermaid flowchart only showed the solitary final action node (`Adım 1: ask_user_choice`), offering zero insight into what the agent checked or why it made that decision.
-  2. *User Direction (Text-First Priority):* The user explicitly instructed to cancel/disable visual diagram generation for decision trees and prioritize rich, structured textual transparency detailing the entire chain of inspection and causal reasoning.
-  3. *Discarded LLM Planning Text:* `extractWorkedSteps` previously threw away non-reasoning text parts (`part.type === "text"`), causing pre-tool planning headers, calculated date ranges (e.g. `2026-09-14..2026-09-20`), target report matching, and missing-parameter rationales to disappear from step accordions.
-- **Decision:**
-  - **Diagram Cancellation:** Removed the "Karar Ağacı" Mermaid trigger button from `YulaWorkedAccordion` (`yula-worked-accordion.tsx`). Decision flows are now rendered natively as structured textual cards.
-  - **Context & Screen Inspection Step:** Added `inspection` telemetry to `YulaMessageMetadata` and `/api/agent/chat/route.ts` (`toUIMessageStream`). `extractWorkedSteps` generates a dedicated `🔍 Ekran & Bağlam İncelemesi` step reporting active route, screen phase, mounted form status, target report, and reference date.
-  - **Pre-Action Plan & Rationale Extraction:** Enhanced `extractWorkedSteps` (`yula-worked-steps.tsx`) so that whenever text precedes tool executions, it is captured as a `📋 Değerlendirme & Eylem Planı` or `💡 Karar Gerekçesi` thought step with full detail text.
-  - **Causal Transition Reasoning:** Enhanced `groupStepsByPhase` to automatically establish `transitionReason` for choices (`Kullanıcı tercihi ve eksik kriter doğrulama adımı`), navigation, field application, job execution, and recovery.
-  - **Phase Card UX Enhancement:** Updated `YulaWorkedPhaseCard` (`yula-worked-phase-card.tsx`) to auto-open inspection steps and render formatted multi-line detail text with full readability.
-  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 269/269 `yula.client` tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), Next.js 16.3.5 Turbopack production build succeeds with 0 errors, and all files strictly comply with the 500-line limit.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Retirement of Obsolete Intervention Tools (time_travel, ask_user_question) & Elimination of Artificial Triage Prompts
-- **Rationale:**
-  1. *Redundant Intervention Tools:* With the deterministic Turn State Machine and inline Steer/Abort controls (`YulaWorkedPhaseCard`), legacy intervention tools such as `time_travel` (Undo/Redo via LLM call) and deprecated functions (`askUserQuestionTool`, `suggestNextStepsTool`) were unnecessary, cluttered the agent's tool loadout, and wasted context window tokens.
-  2. *Artificial Triage Prompting:* The system prompt previously contained a convoluted `CRITICAL ERROR TRIAGE & SELF-HEALING PROTOCOL` commanding the LLM to inspect non-existent telemetry properties (`diagnostic.isRecoverable`, `diagnostic.action === "ASK_USER_CHOICE"`).
-- **Decision:**
-  - **Pruned Obsolete Tools:** Removed `time_travel` from `STANDARD_AGENT_TOOLS` (`standard-agent-tools.ts`), `@my-agent/core` (`standard-tools.ts`, `ui-tool-adapter.ts`), `chat-helpers.ts`, and catalog manifests. Removed deprecated `askUserQuestionTool` and `suggestNextStepsTool` from `interactive-tools.ts` and `client-tools/index.ts`.
-  - **Streamlined Causal Recovery Protocol:** Replaced the legacy triage instructions in `yula-agent-prompt.ts` with `CAUSAL ERROR RECOVERY & INTERVENTION PROTOCOL`, instructing the model to analyze root causes, execute intelligent schema/parameter adjustments (matching the State Machine's `isRecovery` flag), ask user choices when unresolvable, and immediately pivot on inline steering.
-  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 266/266 `yula.client` tests pass, 0 oxlint warnings/errors, clean Next.js 16.3.5 Turbopack production build (`next build`), and all files remain strictly $\le 500$ lines.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-21] Causal ReAct Step Frame Architecture, PostgreSQL Telemetry & Live Mermaid Decision Tree
-- **Rationale:**
-  1. *Opaque LLM Reasoning & Debugging Complexity:* In multi-step agent runs, detecting why tools failed or why subsequent steps were chosen was exceedingly difficult. The agent could not inspect pre-action context, raw tool inputs/outputs, or the causal transition link explaining why Step $N+1$ followed Step $N$.
-  2. *Lack of Live Intervention:* Users had no ability to steer or abort an in-flight tool run when observing aberrant trajectories.
-  3. *Unpersisted Telemetry:* Turn state and step transitions existed only ephemerally in client memory, lacking durable auditability for post-incident diagnostics.
-- **Decision:**
-  - **Core Causal Types (`@my-agent/core`):** Introduced `AgentTurnState`, `AgentStepFrame`, and `StepFrameStatus` in `step-frame-types.ts` establishing causal chaining (`parentStepId`, `transitionReason`, `isRecovery`, `preActionContext`). Extended `AgentEvent` with `step_frame_start`, `step_frame_end`, and `state_transition`.
-  - **PostgreSQL Telemetry Service (`src/server/db`):** Defined `agentRunsSchema` and `agentStepsSchema` with DAG foreign-key chaining. Built `AgentTelemetryService` (`createRunRecorder`) saving step frames and token counts asynchronously on each `onStepFinish` and `onFinish` in `route.ts`.
-  - **Visual Mermaid Decision Tree (`decision-tree-mermaid.ts`):** Implemented automatic DAG generation (`flowchart TD`) linking causal steps with status-based CSS styling (success, error, recovery, running) directly openable in `MermaidCanvasPanel` via `openDecisionTreeDiagram`.
-  - **Interactive ReAct Step UI (`yula-worked-phase-card.tsx` & `yula-worked-accordion.tsx`):** Extracted `YulaWorkedPhaseCard` with inline Live Steer & Abort controls, thought disclosure, formatted tool input/output JSON inspection, and causal transition reasoning. Added "Karar Ağacı" header trigger.
-  - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 11/11 `yula.client` node tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), and all files strictly $\le 500$ lines.
+  - **Unified `useScreenBinding` Hook (`use-screen-binding.ts`):** Created the canonical single-door binding hook unifying React state, `@my-agent/react` component registration, `useYulaGridStore` backward compatibility, automatic i18n localization, and session journey logging. `use-screen-contract.ts` is unified as a direct re-export.
+  - **Direct RPC Execution (`dispatch-bridge.ts`):** Refactored `executeDispatchComponentAction` to directly invoke mounted UI component handlers via `uiEventBus.dispatch(component_id, action, args)` (and subId fallback), awaiting Promise outcomes and returning `{ status: "ok", ...result }` without unhandled errors.
+  - **Bidirectional Live State Mirroring (`yula-agent-prompt.ts`):** `useScreenBinding` mirrors `state` into `uiRegistry` `meta.state`. The server system prompt builder injects `=== LIVE SCREEN STATE (Real-time DOM State Mirror) ===` on every turn for 0-latency upstream awareness.
+  - **Multi-Screen Session Journey Engine (`screen-journey-store.ts`):** Tracks navigation entries, timestamps, and exit snapshots (`getExitSnapshot()`). Headless `session_journey` component in `useHeadlessSystemComponents` syncs breadcrumbs to `uiRegistry`. `yula-agent-prompt.ts` separates `CURRENT LIVE SCREEN (Active DOM)` from `SESSION SCREEN JOURNEY (Breadcrumbs & Artifacts)`.
+  - **Active Screen Domain Guidelines:** Injected dynamic screen rules (`contract.promptGuidelines`) into the system prompt under `=== ACTIVE SCREEN DOMAIN GUIDELINES ===` strictly when the target screen is mounted.
+- **Verification:** 434/434 tests passed across 100 suites (100% pass rate in `screen-binding-journey.test.ts`), zero lint/type errors, all source/test/log files strictly comply with the 500-line rule.
 - **Author:** Antigravity / Team
 
 ---

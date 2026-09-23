@@ -372,7 +372,7 @@ export function ChatInstance({
         void chat.sendMessage({ text: finalText });
       }
     },
-    [chat, conversationId],
+    [chat, conversationId, pathname],
   );
 
   const runPendingTool = React.useCallback(

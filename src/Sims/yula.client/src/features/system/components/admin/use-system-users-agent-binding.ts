@@ -29,6 +29,17 @@ export function useSystemUsersAgentBinding({
       t("prompt_active_count"),
       t("prompt_guest_ids"),
     ],
+    state: {
+      usersCount,
+      guestsCount,
+      tab,
+      searchTerm,
+    },
+    getExitSnapshot: () => ({
+      tab,
+      searchTerm,
+      usersCount,
+    }),
     stateExtra: {
       usersCount,
       guestsCount,
