@@ -29,7 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, ShieldCheck, MoreVertical, CheckCircle2, XCircle, Check } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Search, ShieldCheck, MoreVertical, CheckCircle2, XCircle, Check, LogOut } from "lucide-react";
+import { useJobSession } from "@/features/auth/hooks/use-job-session";
 import { useSystemUsersAgentBinding } from "./use-system-users-agent-binding";
 import { SystemUser, SystemIdentity, ROLE_OPTIONS } from "./system-users-types";
 import { SystemUsersGuestsTab } from "./SystemUsersGuestsTab";
@@ -53,11 +55,20 @@ function normalizeRow(row: Record<string, unknown>): SystemUser {
 export function SystemUsersView() {
   const t = useTranslations("SystemUsers");
   const tc = useTranslations("Common");
+  const tNav = useTranslations("NavUser");
+  const { clearJobSession } = useJobSession();
+  const [signingOut, setSigningOut] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [users, setUsers] = React.useState<SystemUser[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [rowBusyId, setRowBusyId] = React.useState<string | null>(null);
+
+  const handleLogout = async () => {
+    setSigningOut(true);
+    clearJobSession();
+    await signOut({ redirectTo: "/sign-in" });
+  };
 
   // ── Sekmeler + guest (yetkilendirilmemiş kimlik) picker ──
   const [tab, setTab] = React.useState<"catalog" | "guests">("catalog");
@@ -199,7 +210,22 @@ export function SystemUsersView() {
     <WorkspacePageShell
       title={<PageHeaderTitle>{t("title")}</PageHeaderTitle>}
       showSearch={false}
-      actions={<AIChatAssistant />}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={signingOut}
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+            onClick={handleLogout}
+            title={tNav("sign_out")}
+          >
+            <LogOut className="size-3.5" />
+            <span className="hidden sm:inline">{tNav("sign_out")}</span>
+          </Button>
+          <AIChatAssistant />
+        </div>
+      }
     >
       <div className={cn(panelCardClass, "min-h-0 flex-1 flex flex-col p-4 md:p-6 space-y-4 overflow-hidden")}>
         <div className="flex items-center justify-between gap-4">
