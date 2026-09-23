@@ -71,6 +71,19 @@ public sealed record ArrowQueryRequest(
     int? BatchSize = null) : Arrow.Http.AspNetCore.Dispatcher.IRequest<System.Collections.Generic.IAsyncEnumerable<Apache.Arrow.RecordBatch>>;
 
 /// <summary>Job durum yanıt modeli (DTO).</summary>
+/// <param name="Id">Job benzersiz kimliği.</param>
+/// <param name="Status">Mevcut job durumu.</param>
+/// <param name="JobUrl">Job durum URL'i.</param>
+/// <param name="EventsUrl">SSE olay endpoint URL'i.</param>
+/// <param name="CreatedAt">Oluşturulma zamanı.</param>
+/// <param name="CompletedAt">Tamamlanma zamanı.</param>
+/// <param name="Error">Başarısızlık durumunda hata detayı.</param>
+/// <param name="BatchCount">Üretilen toplam batch sayısı.</param>
+/// <param name="TotalRows">Üretilen toplam satır sayısı.</param>
+/// <param name="RetriedFrom">Yeniden denenen orijinal job kimliği.</param>
+/// <param name="Name">Job kayıt adı.</param>
+/// <param name="RootJobId">Kök (zincirin ilk) job kimliği.</param>
+/// <param name="ParentJobId">Üst (doğrudan tetikleyen) job kimliği.</param>
 /// <param name="OwnerId">Job'a ait OIDC sub owner kimliği; sistem job'larında null.</param>
 public sealed record ArrowJobStatus(
     Guid Id,
