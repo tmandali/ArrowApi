@@ -35,7 +35,6 @@ import { useSettingsBoot } from "./use-settings-boot";
 import { useSystemFacts } from "./use-system-facts";
 import { ProfileTab } from "./profile-tab";
 import { PreferencesTab } from "./preferences-tab";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
 import { useMySettingsAgent } from "./use-my-settings-agent";
 
 export function MySettingsForm() {
@@ -104,26 +103,6 @@ export function MySettingsForm() {
   const facts = useSystemFacts(getSnapshot);
 
   useSettingsBoot(form, facts.setSystemFacts);
-
-  useScreenAgentContext({
-    screenId: "my-settings",
-    screenTitle: t("title"),
-    workspaceId: "my",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
-    quickPrompts: [
-      t("prompt_save_settings"),
-      t("prompt_change_store"),
-    ],
-    stateExtra: {
-      activeTab,
-      aiProvider: form.aiProvider,
-      aiModel: form.aiModel,
-      language: form.profileLanguage,
-    },
-  });
 
   useMySettingsAgent({
     activeTab,

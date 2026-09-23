@@ -2,33 +2,6 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
-## [2026-09-23] Transition of AccountStatusGuard from Periodic Polling to Single-Mount Check
-- **Rationale:**
-  1. *Repetitive Polling & Focus Storms:* `AccountStatusGuard` was running a 60-second `setInterval` alongside a `window.addEventListener("focus")` handler. This triggered repeated calls to `GET /api/auth/account-status` whenever the developer switched windows, generating verbose NextAuth `CHUNKING_SESSION_COOKIE` debug messages and unnecessary network load.
-  2. *Architectural Alignment:* Live session invalidation and role gates are natively enforced server-side upon on-demand RPC/Server Action/API invocations (`assertSessionAdmin`). Polling continuously in the background is unnecessary for security.
-- **Decision:**
-  - Removed `POLL_INTERVAL_MS`, `window.setInterval`, and `window.addEventListener("focus")` from `AccountStatusGuard`.
-  - Retained single-mount `check()` invocation upon authentication to populate `useAuthRoleStore` and verify active status.
-- **Verification:** 0 oxlint errors, all modified files remain within 500 lines.
-- **Author:** Antigravity / Team
-
----
-
-## [2026-09-23] Elimination of NextAuth SignOut Loops and Proxy API Redirect Storms
-- **Rationale:**
-  1. *SignOut & CSRF Loop Storm:* When sessions expired or became invalid, `AccountStatusGuard` triggered `signOut()` on every render without an in-flight guard, while also running on `/sign-in`, resulting in repetitive `POST /api/auth/signout` and `GET /api/auth/csrf` cascades.
-  2. *API Route 307 Redirect Pollution:* `proxy.ts` redirected all unauthenticated requests (including `/api/*`) to `/sign-in` HTML, causing background fetch calls (like `/api/agent/models`) to follow redirects into `GET /sign-in?next=/api/...`.
-  3. *Duplicate Provider Fetches:* `ProviderButtons` and child `<SmsOtpSignIn />` concurrently invoked `getProviders()`, issuing duplicate `GET /api/auth/providers` network requests.
-- **Decision:**
-  - **AccountStatusGuard (`account-status-guard.tsx`):** Added `signingOutRef` locking to ensure single-flight `signOut()` execution, added path checks to bypass signOut logic on auth routes (`/sign-in`, `/login`, `/sign-up`), and updated hook dependencies.
-  - **Proxy API Guard (`proxy.ts`):** Unauthenticated `/api/*` routes now cleanly return `401 Unauthorized` JSON instead of redirecting to the `/sign-in` HTML page.
-  - **SmsOtpSignIn Deduplication (`sms-otp-sign-in.tsx` & `provider-buttons.tsx`):** Added `isAvailable` prop to `SmsOtpSignIn` so that already-fetched providers from `ProviderButtons` are reused without issuing a duplicate `GET /api/auth/providers` call.
-  - **AI Model Warmup Guard (`yula-chat-provider.tsx`):** Guarded `fetchCachedYulaModels()` to avoid issuing model warmup requests when on authentication pages.
-- **Verification:** Clean TypeScript verification (`npx tsc --noEmit`), 0 type errors, all modified files conform to 500-line limit.
-- **Author:** Antigravity / Team
-
----
-
 ## [2026-09-23] Single Eval Click-to-Run, Live SSE Trace, Diff Inspector & Model Selector
 - **Rationale:** On `/spike/agent-debug`, developers needed to execute individual eval cases, hot-swap models, inspect expected vs actual diff assertions, and observe real-time SSE streaming reasoning, tool calls, and token telemetry.
 - **Decision:**
@@ -464,6 +437,27 @@ This document is the **append-only audit log** recording fundamental architectur
   - **Multi-Screen Session Journey Engine (`screen-journey-store.ts`):** Tracks navigation entries, timestamps, and exit snapshots (`getExitSnapshot()`). Headless `session_journey` component in `useHeadlessSystemComponents` syncs breadcrumbs to `uiRegistry`. `yula-agent-prompt.ts` separates `CURRENT LIVE SCREEN (Active DOM)` from `SESSION SCREEN JOURNEY (Breadcrumbs & Artifacts)`.
   - **Active Screen Domain Guidelines:** Injected dynamic screen rules (`contract.promptGuidelines`) into the system prompt under `=== ACTIVE SCREEN DOMAIN GUIDELINES ===` strictly when the target screen is mounted.
 - **Verification:** 434/434 tests passed across 100 suites (100% pass rate in `screen-binding-journey.test.ts`), zero lint/type errors, all source/test/log files strictly comply with the 500-line rule.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-23] Reactive ActiveScreenStore, Undo/Rollback Buffer, and Studio Screens State Enrichment
+- **Rationale:**
+  1. *Decoupling Screen Lifecycle from Grid Store:* Previously, non-grid management and studio screens (`/my/agents`, `/my/settings`, `/system/users`) were registering their screen metadata inside `useYulaGridStore`, creating unnecessary coupling between DuckDB table views and DOM forms.
+  2. *Reactivity for Chat Dock & Quick Prompts:* `uiRegistry` is an in-memory JS map that does not trigger React re-renders. When the user changed selections or active tabs, the Chat Dock could not reactively adapt its quick action prompt chips.
+  3. *Action Undo / Mutation Safety:* When the AI agent dispatched form modifications via direct RPC (`SET_FIELDS`, `SWITCH_TAB`), previous state was not buffered, preventing 1-click user rollback.
+  4. *Studio Screens Migration Completion:* Several studio management hooks (`plugins`, `memory`, `settings`, `playbooks`) lacked explicit `state` and `getExitSnapshot` implementations.
+- **Decision:**
+  - **Dedicated Reactive Store (`active-screen-store.ts`):** Created `useActiveScreenStore` managing active screen info, live state, reactive `quickPrompts`, `stateHistory` buffer (depth 20), `canUndo`, and `restoreDraft()`.
+  - **Single-Door Integration (`use-screen-binding.ts`):** `useScreenBinding` registers with `useActiveScreenStore` on mount, syncs state/prompts changes, and wraps action handlers to push pre-mutation state to the history buffer automatically before executing direct RPC actions.
+  - **Studio Screens State Enrichment:**
+    - `use-plugins-agent-binding.ts`: Added `state` (`pluginsCount`, `pluginIds`, `pluginNames`) and `getExitSnapshot()`.
+    - `use-memory-agent-binding.ts`: Added `state` (`factsCount`, `keys`) and `getExitSnapshot()`.
+    - `use-my-settings-agent.ts`: Added `state` (`activeTab`, `email`, `language`, `aiProvider`, `aiModel`, `aiThinkingLevel`) and `getExitSnapshot()`.
+    - `use-playbook-agent-binding.ts`: Added `state` (`workspace`, `searchQuery`, `rulesCount`, `workflowsCount`, `selectedWorkflowId`, `viewMode`) and `getExitSnapshot()`.
+  - **Unit Testing Suite (`active-screen-store.test.ts`):** Added 5 unit tests verifying active screen setting, selective state updates, undo/rollback mechanics, draft restore from `screenJourneyStore`, and cleanup.
+  - **Dual-Registration Legacy Cleanup:** Purged redundant duplicate direct calls to `useScreenAgentContext` in `plugins-tab-view.tsx`, `memory-tab-view.tsx`, `my-settings-form.tsx`, and `ItemFormShell.tsx`; unified all screen binding exclusively through contract hooks.
+- **Verification:** 439/439 tests passed across 101 suites (100% green), 0 TypeScript errors (`tsc --noEmit`), 0 Oxlint warnings/errors, all files strictly $\le 500$ lines.
 - **Author:** Antigravity / Team
 
 ---

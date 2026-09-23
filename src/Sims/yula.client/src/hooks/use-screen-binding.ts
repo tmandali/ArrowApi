@@ -14,6 +14,7 @@ import type {
 import { useScreenAgentContext } from "./use-screen-agent-context";
 import type { ScreenContract } from "@/lib/contracts/screen-contract";
 import { useScreenJourneyStore } from "@/lib/stores/screen-journey-store";
+import { useActiveScreenStore } from "@/lib/stores/active-screen-store";
 
 export interface UseScreenBindingOptions<
   TActions extends Record<string, ActionContract> = Record<string, ActionContract>,
@@ -55,7 +56,7 @@ export interface UseScreenBindingOptions<
 
 /**
  * Unified single-door binding hook connecting a ScreenContract to live React DOM state,
- * bidirectional LLM mirroring, direct RPC action dispatch, and multi-screen session journey.
+ * bidirectional LLM mirroring, direct RPC action dispatch, active screen store, and session journey.
  */
 export function useScreenBinding<
   TActions extends Record<string, ActionContract> = Record<string, ActionContract>,
@@ -77,17 +78,54 @@ export function useScreenBinding<
     getExitSnapshotRef.current = options.getExitSnapshot;
   });
 
+  const initialPrompts = options.quickPrompts;
   React.useEffect(() => {
     useScreenJourneyStore.getState().recordScreenEnter(effectiveRoute, contract.screenTitle);
+    useActiveScreenStore.getState().setScreen(contract, latestStateRef.current, initialPrompts);
+
     return () => {
       const snapshot = getExitSnapshotRef.current
         ? getExitSnapshotRef.current()
         : latestStateRef.current;
       useScreenJourneyStore.getState().recordScreenExit(effectiveRoute, snapshot);
+      useActiveScreenStore.getState().clearScreen();
     };
-  }, [effectiveRoute, contract.screenTitle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveRoute, contract.screenId, contract.screenTitle]);
 
-  // 2. Register with Screen Agent Context (Grid / Route store backward-compatibility)
+  // Sync state and quickPrompts changes to reactive activeScreenStore
+  const stateStr = JSON.stringify(options.state);
+  React.useEffect(() => {
+    if (options.state) {
+      useActiveScreenStore.getState().updateState(options.state);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateStr]);
+
+  const promptsStr = JSON.stringify(options.quickPrompts);
+  React.useEffect(() => {
+    if (options.quickPrompts) {
+      useActiveScreenStore.getState().setQuickPrompts(options.quickPrompts);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptsStr]);
+
+  // 2. Wrap action handlers with automatic undo history capture
+  const wrappedHandlers = React.useMemo(() => {
+    if (!options.handlers) return undefined;
+    const wrapped: Record<string, (payload: any) => any> = {};
+    for (const [actionName, handler] of Object.entries(options.handlers)) {
+      wrapped[actionName] = async (payload: any) => {
+        if (latestStateRef.current) {
+          useActiveScreenStore.getState().updateState(latestStateRef.current, true);
+        }
+        return (handler as any)(payload);
+      };
+    }
+    return wrapped as ActionHandlersMap<TActions>;
+  }, [options.handlers]);
+
+  // 3. Register with Screen Agent Context (Grid / Route store backward-compatibility)
   useScreenAgentContext({
     screenId: contract.screenId,
     screenTitle: contract.screenTitle,
@@ -101,7 +139,7 @@ export function useScreenBinding<
     },
   });
 
-  // 3. Register UI Component with @my-agent/react & uiRegistry
+  // 4. Register UI Component with @my-agent/react & uiRegistry
   const componentId = contract.screenId.includes(":")
     ? contract.screenId
     : `entity_form:${contract.screenId}`;
@@ -110,7 +148,7 @@ export function useScreenBinding<
     id: componentId,
     actions: contract.actions,
     events: contract.events,
-    handlers: options.handlers,
+    handlers: wrappedHandlers,
     onAction: options.onAction,
     meta: {
       ...contract.meta,

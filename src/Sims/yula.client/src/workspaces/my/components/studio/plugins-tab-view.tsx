@@ -5,30 +5,10 @@ import { pluginRegistry, type AgentPlugin } from "@/lib/plugins/yula-plugins";
 import { Badge } from "@/components/ui/badge";
 import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Blocks, CheckCircle2, Cpu, Wrench } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
 import { usePluginsAgentBinding } from "./use-plugins-agent-binding";
 
 export function PluginsTabView() {
-  const t = useTranslations("Studio");
   const [plugins] = React.useState<AgentPlugin[]>(() => pluginRegistry.getAll());
-
-  useScreenAgentContext({
-    screenId: "my-plugins",
-    screenTitle: t("plugins_title"),
-    workspaceId: "my",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
-    quickPrompts: [
-      t("prompt_list_plugins"),
-      t("prompt_check_python_plugin"),
-    ],
-    stateExtra: {
-      pluginsCount: plugins.length,
-    },
-  });
 
   usePluginsAgentBinding({ plugins });
 

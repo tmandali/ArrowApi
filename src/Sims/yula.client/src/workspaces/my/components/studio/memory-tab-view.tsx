@@ -6,35 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { panelHeaderClass } from "@/components/layout/panel-chrome";
 import { Brain, Trash2, RefreshCw, HardDrive, Clock, Check } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context";
 import { useMemoryAgentBinding } from "./use-memory-agent-binding";
 
 export function MemoryTabView() {
-  const t = useTranslations("Studio");
   const [entries, setEntries] = React.useState<MemoryEntry[]>(() => agentMemory.getAll());
   const [justCleared, setJustCleared] = React.useState(false);
 
   const reload = React.useCallback(() => {
     setEntries(agentMemory.getAll());
   }, []);
-
-  useScreenAgentContext({
-    screenId: "my-memory",
-    screenTitle: t("memory_title"),
-    workspaceId: "my",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
-    quickPrompts: [
-      t("prompt_list_memory"),
-      t("prompt_clear_memory"),
-    ],
-    stateExtra: {
-      factsCount: entries.length,
-    },
-  });
 
   useMemoryAgentBinding({ entries, reload });
 

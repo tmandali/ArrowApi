@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useScreenContract } from "@/hooks/use-screen-contract";
 import type { SettingsTabId } from "./settings-types";
 import type { useSettingsFormState } from "./use-settings-form-state";
@@ -29,7 +30,28 @@ export function useMySettingsAgent({
   form,
   handleTabChange,
 }: UseMySettingsAgentOptions) {
+  const t = useTranslations("MySettings");
+
   useScreenContract(UserSettingsContract, {
+    quickPrompts: [
+      t("prompt_save_settings"),
+      t("prompt_change_store"),
+    ],
+    state: {
+      activeTab,
+      email: form.profileEmail,
+      language: form.profileLanguage,
+      timeZone: form.profileTimeZone,
+      aiProvider: form.aiProvider,
+      aiModel: form.aiModel,
+      aiThinkingLevel: form.aiThinkingLevel,
+    },
+    getExitSnapshot: () => ({
+      activeTab,
+      email: form.profileEmail,
+      aiProvider: form.aiProvider,
+      aiModel: form.aiModel,
+    }),
     runtimeMeta: {
       entity: "user_settings",
       screenTitle,

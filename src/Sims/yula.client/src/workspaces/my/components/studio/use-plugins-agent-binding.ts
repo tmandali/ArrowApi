@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useScreenContract } from "@/hooks/use-screen-contract";
 import type { AgentPlugin } from "@/lib/plugins/yula-plugins";
 import { PluginsRegistryContract } from "./plugins-registry.contract";
@@ -16,7 +17,21 @@ export function usePluginsAgentBinding({
   plugins,
   screenTitle = "Kurumsal Eklentiler & Modüller",
 }: UsePluginsAgentBindingOptions) {
+  const t = useTranslations("Studio");
+
   useScreenContract(PluginsRegistryContract, {
+    quickPrompts: [
+      t("prompt_list_plugins"),
+      t("prompt_check_python_plugin"),
+    ],
+    state: {
+      pluginsCount: plugins.length,
+      pluginIds: plugins.map((p) => p.id),
+      pluginNames: plugins.map((p) => p.name),
+    },
+    getExitSnapshot: () => ({
+      pluginsCount: plugins.length,
+    }),
     runtimeMeta: {
       entity: "plugin_registry",
       screenTitle,

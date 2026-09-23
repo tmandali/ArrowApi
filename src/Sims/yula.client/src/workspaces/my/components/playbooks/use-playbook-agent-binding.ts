@@ -42,6 +42,21 @@ export function usePlaybookAgentBinding({
       t("prompt_list_playbooks"),
       t("prompt_create_playbook"),
     ],
+    state: {
+      workspace,
+      searchQuery,
+      rulesCount: screenRules.length,
+      workflowsCount: workflowRecipes.length,
+      selectedWorkflowId,
+      selectedWorkflowTitle: activeWorkflow?.title ?? null,
+      viewMode: workflowViewMode,
+    },
+    getExitSnapshot: () => ({
+      workspace,
+      searchQuery,
+      selectedWorkflowId,
+      viewMode: workflowViewMode,
+    }),
     stateExtra: {
       workspace,
       searchQuery,

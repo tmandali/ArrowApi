@@ -193,3 +193,31 @@ This document contains archived decision log entries from September 2026 to ensu
   - **Verification:** 124/124 `@my-agent/core` vitest tests pass, 11/11 `yula.client` node tests pass, 0 oxlint warnings/errors, clean typecheck (`tsc --noEmit`), and all files strictly $\le 500$ lines.
 - **Author:** Antigravity / Team
 
+---
+
+## [2026-09-23] Transition of AccountStatusGuard from Periodic Polling to Single-Mount Check
+- **Rationale:**
+  1. *Repetitive Polling & Focus Storms:* `AccountStatusGuard` was running a 60-second `setInterval` alongside a `window.addEventListener("focus")` handler. This triggered repeated calls to `GET /api/auth/account-status` whenever the developer switched windows, generating verbose NextAuth `CHUNKING_SESSION_COOKIE` debug messages and unnecessary network load.
+  2. *Architectural Alignment:* Live session invalidation and role gates are natively enforced server-side upon on-demand RPC/Server Action/API invocations (`assertSessionAdmin`). Polling continuously in the background is unnecessary for security.
+- **Decision:**
+  - Removed `POLL_INTERVAL_MS`, `window.setInterval`, and `window.addEventListener("focus")` from `AccountStatusGuard`.
+  - Retained single-mount `check()` invocation upon authentication to populate `useAuthRoleStore` and verify active status.
+- **Verification:** 0 oxlint errors, all modified files remain within 500 lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-23] Elimination of NextAuth SignOut Loops and Proxy API Redirect Storms
+- **Rationale:**
+  1. *SignOut & CSRF Loop Storm:* When sessions expired or became invalid, `AccountStatusGuard` triggered `signOut()` on every render without an in-flight guard, while also running on `/sign-in`, resulting in repetitive `POST /api/auth/signout` and `GET /api/auth/csrf` cascades.
+  2. *API Route 307 Redirect Pollution:* `proxy.ts` redirected all unauthenticated requests (including `/api/*`) to `/sign-in` HTML, causing background fetch calls (like `/api/agent/models`) to follow redirects into `GET /sign-in?next=/api/...`.
+  3. *Duplicate Provider Fetches:* `ProviderButtons` and child `<SmsOtpSignIn />` concurrently invoked `getProviders()`, issuing duplicate `GET /api/auth/providers` network requests.
+- **Decision:**
+  - **AccountStatusGuard (`account-status-guard.tsx`):** Added `signingOutRef` locking to ensure single-flight `signOut()` execution, added path checks to bypass signOut logic on auth routes (`/sign-in`, `/login`, `/sign-up`), and updated hook dependencies.
+  - **Proxy API Guard (`proxy.ts`):** Unauthenticated `/api/*` routes now cleanly return `401 Unauthorized` JSON instead of redirecting to the `/sign-in` HTML page.
+  - **SmsOtpSignIn Deduplication (`sms-otp-sign-in.tsx` & `provider-buttons.tsx`):** Added `isAvailable` prop to `SmsOtpSignIn` so that already-fetched providers from `ProviderButtons` are reused without issuing a duplicate `GET /api/auth/providers` call.
+  - **AI Model Warmup Guard (`yula-chat-provider.tsx`):** Guarded `fetchCachedYulaModels()` to avoid issuing model warmup requests when on authentication pages.
+- **Verification:** Clean TypeScript verification (`npx tsc --noEmit`), 0 type errors, all modified files conform to 500-line limit.
+- **Author:** Antigravity / Team
+
+

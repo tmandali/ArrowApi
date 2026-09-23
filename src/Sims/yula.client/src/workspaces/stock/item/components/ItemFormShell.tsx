@@ -28,7 +28,6 @@ import { useWorkspaceSearch } from "@/context/workspace-search-context"
 import { ItemTaxTab } from "./ItemTaxTab"
 import { ItemDetailsAside } from "./item-details-aside"
 import { cn } from "@/utils/cn"
-import { useScreenAgentContext } from "@/hooks/use-screen-agent-context"
 import { useStockItemAgent, type ItemFormTab } from "./use-stock-item-agent"
 import { useTranslations } from "next-intl"
 
@@ -57,18 +56,6 @@ export function ItemFormShell({
   const t = useTranslations("Stock")
   const visibleTabs = React.useMemo(() => new Set(tabs), [tabs])
   const isLedgerVariant = variant === "ledger"
-
-  useScreenAgentContext({
-    screenId: "item-form",
-    screenTitle: "Item Details",
-    workspaceId: "stock",
-    activeDataSummary: {
-      isViewingResults: false,
-      jobId: undefined,
-    },
-    quickPrompts: [],
-    tools: [],
-  })
 
   const initialTab =
     defaultTab && visibleTabs.has(defaultTab)

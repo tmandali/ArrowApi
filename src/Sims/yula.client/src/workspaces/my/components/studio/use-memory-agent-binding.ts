@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useScreenContract } from "@/hooks/use-screen-contract";
 import { agentMemory, type MemoryEntry } from "@my-agent/core";
 import { MemoryManagementContract } from "./memory-management.contract";
@@ -18,7 +19,20 @@ export function useMemoryAgentBinding({
   reload,
   screenTitle = "Kalıcı Bellek & Tercihler",
 }: UseMemoryAgentBindingOptions) {
+  const t = useTranslations("Studio");
+
   useScreenContract(MemoryManagementContract, {
+    quickPrompts: [
+      t("prompt_list_memory"),
+      t("prompt_clear_memory"),
+    ],
+    state: {
+      factsCount: entries.length,
+      keys: entries.map((e) => e.key),
+    },
+    getExitSnapshot: () => ({
+      factsCount: entries.length,
+    }),
     runtimeMeta: {
       entity: "agent_memory",
       screenTitle,
