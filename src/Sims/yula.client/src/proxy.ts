@@ -18,6 +18,14 @@ export async function proxy(request: NextRequest) {
   const isAuth = !!session?.user && !isExpired;
 
   if (!isAuth) {
+    // API uç noktaları HTML sign-in sayfasına redirect EDİLEMEZ; 401 JSON dönülür.
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: isExpired ? "session_expired" : "unauthorized" },
+        { status: 401 },
+      );
+    }
+
     const signInUrl = new URL("/sign-in", request.url);
     signInUrl.searchParams.set("next", request.nextUrl.pathname);
     if (isExpired) {

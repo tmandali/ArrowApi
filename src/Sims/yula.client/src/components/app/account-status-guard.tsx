@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { useAuthRoleStore } from "@/store/slices/auth-role-store";
+
+const AUTH_ROUTES = ["/sign-in", "/login", "/sign-up"] as const;
 
 /** Durum sorgulama sıklığı — ağ'a yük minimum: 60 sn + odaklanınca. */
 const POLL_INTERVAL_MS = 60_000;
@@ -20,9 +23,19 @@ const POLL_INTERVAL_MS = 60_000;
  * Tek kullanıcı / provider'sız modda guard ateşlemez (route `active:true`).
  */
 export function AccountStatusGuard() {
+  const pathname = usePathname();
   const { data: session, status } = useSession();
+  const signingOutRef = useRef(false);
+
+  const isAuthRoute = pathname ? AUTH_ROUTES.some((route) => pathname.startsWith(route)) : false;
 
   useEffect(() => {
+    // Auth ekranlarındayken (sign-in, login, sign-up vb.) guard ve signOut döngüsü çalıştırma
+    if (isAuthRoute) {
+      signingOutRef.current = false;
+      return;
+    }
+
     const user = session?.user as
       | (NonNullable<typeof session>["user"] & { accessToken?: string; provider?: string })
       | undefined;
@@ -31,13 +44,21 @@ export function AccountStatusGuard() {
       (status === "authenticated" && !!user && user.provider !== "sms" && !user.accessToken);
 
     if (isExpired) {
-      void signOut({
-        callbackUrl: "/sign-in?reason=session_expired",
-      }).catch(() => undefined);
+      if (!signingOutRef.current) {
+        signingOutRef.current = true;
+        void signOut({
+          callbackUrl: "/sign-in?reason=session_expired",
+        }).catch(() => {
+          signingOutRef.current = false;
+        });
+      }
       return;
     }
 
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      signingOutRef.current = false;
+      return;
+    }
 
     let disposed = false;
     let inFlight = false;
@@ -65,9 +86,14 @@ export function AccountStatusGuard() {
         if (data.role) useAuthRoleStore.getState().setRole(data.role);
         if (data.active === false) {
           // signOut Promise — asıl hata yönetimi sign-in kartında.
-          void signOut({
-            callbackUrl: "/sign-in?reason=deactivated",
-          }).catch(() => undefined);
+          if (!signingOutRef.current) {
+            signingOutRef.current = true;
+            void signOut({
+              callbackUrl: "/sign-in?reason=deactivated",
+            }).catch(() => {
+              signingOutRef.current = false;
+            });
+          }
           // Tek seferlik: sign-out sonrası status "unauthenticated" olur.
           return;
         }
@@ -88,7 +114,7 @@ export function AccountStatusGuard() {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [status, session]);
+  }, [status, session, isAuthRoute]);
 
   return null;
 }

@@ -25,6 +25,11 @@ export interface SmsOtpSignInProps {
   t: (key: string, values?: Record<string, string | number | Date>) => string;
   /** Giriş sonrası yönlendirilecek URL. */
   next?: string | null;
+  /**
+   * Üst bileşen (ProviderButtons) getProviders()'ı zaten çektiyse
+   * gereksiz ikinci bir ağ isteğini önlemek için iletilir.
+   */
+  isAvailable?: boolean;
 }
 
 type Step = "phone" | "code";
@@ -35,9 +40,11 @@ interface SendResult {
   lastCode?: string;
 }
 
-export function SmsOtpSignIn({ t, next = "/" }: SmsOtpSignInProps) {
+export function SmsOtpSignIn({ t, next = "/", isAvailable }: SmsOtpSignInProps) {
   const router = useRouter();
-  const [available, setAvailable] = React.useState<boolean | null>(null);
+  const [available, setAvailable] = React.useState<boolean | null>(
+    isAvailable !== undefined ? isAvailable : null,
+  );
   const [step, setStep] = React.useState<Step>("phone");
   const [phone, setPhone] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -49,10 +56,11 @@ export function SmsOtpSignIn({ t, next = "/" }: SmsOtpSignInProps) {
   const [devCode, setDevCode] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (isAvailable !== undefined) return;
     getProviders()
       .then((p) => setAvailable(!!p?.["sms-otp"]))
       .catch(() => setAvailable(false));
-  }, []);
+  }, [isAvailable]);
 
   if (available === null) return null; // provider listesi yükleniyor — kaplamama
   if (!available) return null; // provider register edilmemiş (env kapalı)

@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { resetGridCustomView } from "@/lib/yula-client-tools";
+
+const AUTH_ROUTES = ["/sign-in", "/login", "/sign-up"] as const;
 import {
   YulaChatContext,
   type YulaChatContextValue,
@@ -32,10 +34,12 @@ import { registerDefaultYulaPlugins } from "@/lib/plugins/yula-plugins";
  */
 
 export function YulaChatProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const activeId = useChatsStore((s) => s.activeId);
   const conversations = useChatsStore((s) => s.conversations);
   const model = useChatsStore((s) => s.model);
   const setModel = useChatsStore((s) => s.setModel);
+  const warmupAttemptedRef = React.useRef(false);
 
   // Dock açıldığında aktif konuşmanın varlığını garanti et
   React.useEffect(() => {
@@ -76,13 +80,18 @@ export function YulaChatProvider({ children }: { children: React.ReactNode }) {
   // Ekran bazlı aktif sohbet yönetimi (sayfa değişiminde taze/kayıtlı sohbet seçimi).
   useConversationRouteSync();
 
+  const isAuthRoute = pathname ? AUTH_ROUTES.some((route) => pathname.startsWith(route)) : false;
+
   // Soğuk başlangıç ısıtması: dock açılır açılmaz Ollama modeli belleğe
   // yüklenir (models route'u boş-prompt warmup tetikler) → ilk mesaj hızlı.
+  // Oturum / giriş ekranlarındayken gereksiz istek atma; korumalı alana geçildiğinde bir kez tetikle.
   React.useEffect(() => {
+    if (isAuthRoute || warmupAttemptedRef.current) return;
+    warmupAttemptedRef.current = true;
     void fetchCachedYulaModels().catch(() => {
       // Isıtma best-effort
     });
-  }, []);
+  }, [isAuthRoute]);
 
   // Sohbet geçmişini RAG vektör store'a indeksle (ilk yükleme + her yeni
   // sohbet/kayıtta artımlı). Ana sayfa araması menülerle birlikte geçmişi de

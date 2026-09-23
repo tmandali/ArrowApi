@@ -170,7 +170,7 @@ export function ProviderButtons({ labelPrefix, t, next = "/", googleTheme }: Pro
           </Button>
         );
       })}
-      {hasSmsOtp ? <SmsOtpSignIn t={t} next={next} /> : null}
+      {hasSmsOtp ? <SmsOtpSignIn t={t} next={next} isAvailable={true} /> : null}
       {unreachableProvider ? (
         <div
           role="alert"
