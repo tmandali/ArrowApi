@@ -7,17 +7,15 @@ import { useAuthRoleStore } from "@/store/slices/auth-role-store";
 
 const AUTH_ROUTES = ["/sign-in", "/login", "/sign-up"] as const;
 
-/** Durum sorgulama sıklığı — ağ'a yük minimum: 60 sn + odaklanınca. */
-const POLL_INTERVAL_MS = 60_000;
-
 /**
- * Hesap durumu koruması (provider'dan bağımsız: Keycloak + Google).
+ * Hesap durumu ve ilk rol yükleme koruması (provider'dan bağımsız: Keycloak + Google).
  *
- * `GET /api/auth/account-status` route'u session kullanıcısının
- * `app_users.status` değerini okur. Yönetici System Users ekranında
- * hesabı `Inactive` yaptığında (aynı oturum hâlâ canlıyken) kullanıcı
- * otomatik sign-out edilir ve sign-in kartında "hesabınız devre dışı
- * alındı" mesajıyla karşılaşır.
+ * `GET /api/auth/account-status` route'u session kullanıcısının `app_users.status`
+ * ve `role` değerini oturum açıldığında (mount) 1 kez sorgular ve Zustand rol
+ * store'unu başlatır.
+ *
+ * Pasife alma veya yetki kontrolleri devam eden işlemlerde (RPC / Server Actions /
+ * API çağrıları) sunucu tarafında doğrulanır. Arka planda sürekli polling yapılmaz.
  *
  * Fail-open: route DB hatasında `active:true` döner → login asla kırılmaz.
  * Tek kullanıcı / provider'sız modda guard ateşlemez (route `active:true`).
@@ -104,15 +102,11 @@ export function AccountStatusGuard() {
       }
     };
 
+    // Oturum açılışında / sayfa yüklenmesinde tek seferlik durum ve rol kontrolü
     void check();
-    const interval = window.setInterval(check, POLL_INTERVAL_MS);
-    const onFocus = () => void check();
-    window.addEventListener("focus", onFocus);
 
     return () => {
       disposed = true;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
     };
   }, [status, session, isAuthRoute]);
 
