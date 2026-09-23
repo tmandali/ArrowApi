@@ -18,3 +18,7 @@ require.extensions[".yaml"] = (module, filename) => {
 require.extensions[".yml"] = (module, filename) => {
   module.exports = fs.readFileSync(filename, "utf-8");
 };
+
+require.extensions[".css"] = (module) => {
+  module.exports = {};
+};

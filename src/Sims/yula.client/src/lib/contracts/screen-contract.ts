@@ -1,5 +1,8 @@
 import { z } from "zod";
 import type { ActionContract, EventContract } from "@my-agent/core";
+import type { BoundedContextContract } from "./bounded-context";
+
+export * from "./bounded-context";
 
 /**
  * Deterministic Screen AI Capability Tiers.
@@ -50,6 +53,10 @@ export interface ScreenContract<
    * Zod schema validating the live state mirrored upstream to LLM.
    */
   stateSchema?: z.ZodTypeAny;
+  /**
+   * 1:1 Bounded Context (Bounded State + Bounded Process) bound to this screen.
+   */
+  boundedContext?: BoundedContextContract<any, any, any>;
   meta?: Record<string, unknown>;
 }
 

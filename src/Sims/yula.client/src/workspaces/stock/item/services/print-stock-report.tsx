@@ -1,13 +1,15 @@
 "use client";
 
-import { pdf } from "@react-pdf/renderer";
-import { FinancialReportDocument } from "@/blocks/pdfx/report-financial/report-financial";
-
 /**
  * Stok Item ve Analiz raporu için PDF belgesi oluşturur ve
  * tarayıcının yerel yazıcı/baskı diyaloğunu başlatır.
  */
 export async function printStockItemReport(): Promise<void> {
+  const [{ pdf }, { FinancialReportDocument }] = await Promise.all([
+    import("@react-pdf/renderer"),
+    import("@/blocks/pdfx/report-financial/report-financial"),
+  ]);
+
   const blob = await pdf(<FinancialReportDocument />).toBlob();
   const url = URL.createObjectURL(blob);
 
@@ -57,5 +59,3 @@ export async function printStockItemReport(): Promise<void> {
     document.body.appendChild(iframe);
   });
 }
-
-

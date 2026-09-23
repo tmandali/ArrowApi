@@ -187,7 +187,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               errorType === "invalid_client" ||
               errorType === "unauthorized_client");
           if (fatal) {
-            console.error(
+            console.warn(
               `[auth] kalıcı refresh hatası (${provider}): ${label} — token'lar temizlendi`,
             );
             delete token.accessToken;
@@ -196,7 +196,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.error = "RefreshTokenError";
             return token;
           }
-          console.error(
+          console.warn(
             `[auth] geçici refresh hatası (${provider}): HTTP ${res.status} — ${label}`,
           );
           return token;

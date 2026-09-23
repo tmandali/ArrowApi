@@ -12,7 +12,11 @@ import type {
   EventContract,
 } from "@my-agent/core";
 import { useScreenAgentContext } from "./use-screen-agent-context";
-import type { ScreenContract } from "@/lib/contracts/screen-contract";
+import {
+  type ScreenContract,
+  formatBoundedContextPrompt,
+  resolveContextStrategy,
+} from "@/lib/contracts/screen-contract";
 import { useScreenJourneyStore } from "@/lib/stores/screen-journey-store";
 import { useActiveScreenStore } from "@/lib/stores/active-screen-store";
 
@@ -48,6 +52,14 @@ export interface UseScreenBindingOptions<
    * Quick action prompts rendered for the user in the chat dock.
    */
   quickPrompts?: string[];
+  /**
+   * Optional next-intl translation function for resolving localized Bounded Context prompts and quick prompts.
+   */
+  t?: (key: string, values?: Record<string, string | number>) => string;
+  /**
+   * Optional country code override for jurisdiction strategy resolution (e.g. "TR", "DE").
+   */
+  countryCode?: string;
   /**
    * Optional custom route override for multi-screen journey logging.
    */
@@ -134,6 +146,7 @@ export function useScreenBinding<
     stateExtra: {
       category: contract.category,
       aiEnabled: contract.aiEnabled,
+      ...(contract.boundedContext ? { boundedContext: contract.boundedContext } : {}),
       ...options.stateExtra,
       ...(options.state ? { state: options.state } : {}),
     },
@@ -143,6 +156,25 @@ export function useScreenBinding<
   const componentId = contract.screenId.includes(":")
     ? contract.screenId
     : `entity_form:${contract.screenId}`;
+
+  const effectiveBoundedContext = React.useMemo(() => {
+    if (!contract.boundedContext) return undefined;
+    return resolveContextStrategy(contract.boundedContext, options.countryCode);
+  }, [contract.boundedContext, options.countryCode]);
+
+  const effectivePromptGuidelines = React.useMemo(() => {
+    const list = [...(contract.promptGuidelines || [])];
+    if (effectiveBoundedContext) {
+      list.push(formatBoundedContextPrompt(effectiveBoundedContext, options.t));
+    }
+    return list;
+  }, [contract.promptGuidelines, effectiveBoundedContext, options.t]);
+
+  const sanitizedBoundedContext = React.useMemo(() => {
+    if (!effectiveBoundedContext) return undefined;
+    const { screen: _omitScreen, ...rest } = effectiveBoundedContext;
+    return rest;
+  }, [effectiveBoundedContext]);
 
   return useAgentComponent<TActions, TEvents>({
     id: componentId,
@@ -156,7 +188,8 @@ export function useScreenBinding<
       screenTitle: contract.screenTitle,
       workspace: contract.workspace,
       category: contract.category,
-      promptGuidelines: contract.promptGuidelines,
+      promptGuidelines: effectivePromptGuidelines,
+      boundedContext: sanitizedBoundedContext,
       state: options.state,
     },
   });

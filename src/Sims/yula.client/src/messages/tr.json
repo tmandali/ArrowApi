@@ -2069,5 +2069,24 @@
     "plugins_title": "Kurumsal Eklentiler & Modüller",
     "prompt_list_plugins": "Kayıtlı eklentileri ve araçlarını listele",
     "prompt_check_python_plugin": "Python AI eklentisi durumu nedir?"
+  },
+  "BoundedContext": {
+    "Process": {
+      "invalid_transition": "Geçersiz durum geçişi: '{from}' durumundan doğrudan '{to}' durumuna geçilemez. Geçerli sıradaki adımlar: [{allowed}]."
+    },
+    "StockItem": {
+      "title": "Malzeme Yönetimi (Stok Kartı)",
+      "description": "Stokta izlenen ticari mal, hammadde veya mamul kartı.",
+      "fields": {
+        "itemCode_label": "Stok Kodu",
+        "itemCode_desc": "Benzersiz malzeme kodu",
+        "itemCode_aliases": "Malzeme Kodu, SKU",
+        "stockUom_label": "Ana Birim",
+        "stockUom_desc": "Stok ana takip ölçü birimi",
+        "uom_AD": "Adet",
+        "uom_KG": "Kilogram",
+        "uom_MT": "Metre"
+      }
+    }
   }
 }

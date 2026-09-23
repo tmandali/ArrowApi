@@ -2069,5 +2069,24 @@
     "plugins_title": "Enterprise Plugins & Modules",
     "prompt_list_plugins": "List registered plugins and their tools",
     "prompt_check_python_plugin": "What is the status of Python AI plugin?"
+  },
+  "BoundedContext": {
+    "Process": {
+      "invalid_transition": "Invalid state transition: Cannot transition from '{from}' to '{to}'. Allowed next steps: [{allowed}]."
+    },
+    "StockItem": {
+      "title": "Item Management (Stock Card)",
+      "description": "Master data record for tracked commercial goods or raw materials.",
+      "fields": {
+        "itemCode_label": "Item Code",
+        "itemCode_desc": "Unique item code",
+        "itemCode_aliases": "Part Number, SKU",
+        "stockUom_label": "Stock UOM",
+        "stockUom_desc": "Primary tracking unit of measure",
+        "uom_AD": "Piece",
+        "uom_KG": "Kilogram",
+        "uom_MT": "Meter"
+      }
+    }
   }
 }

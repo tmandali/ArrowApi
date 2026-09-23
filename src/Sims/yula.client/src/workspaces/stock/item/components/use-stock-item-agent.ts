@@ -1,7 +1,8 @@
 "use client";
 
-import { useScreenContract } from "@/hooks/use-screen-contract";
-import { StockItemContract } from "./stock-item.contract";
+import { useTranslations } from "next-intl";
+import { useScreenBinding } from "@/hooks/use-screen-binding";
+import { itemContext } from "../item.context";
 
 export type ItemFormTab =
   | "details"
@@ -54,7 +55,10 @@ export function useStockItemAgent({
   setIsExempt,
   setIsFixedAsset,
 }: UseStockItemAgentOptions) {
-  useScreenContract(StockItemContract, {
+  const t = useTranslations();
+
+  useScreenBinding(itemContext.screen!, {
+    t,
     state: {
       activeTab,
       maintainStock,

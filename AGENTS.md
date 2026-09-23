@@ -37,6 +37,8 @@ Read the specialized instructions for your active scope before writing any code:
 - **Report Lifecycle:** [Single-Page Reports & SSE Stream](file:///Users/tmr/Source/ArrowApi/.agents/architecture/report-lifecycle-sse.md)
 - **Big Data & Tables:** [DuckDB WASM & OPFS Disk Cache](file:///Users/tmr/Source/ArrowApi/.agents/architecture/large-data-duckdb.md)
 - **Workspaces & Remotes:** [Module Federation Standards](file:///Users/tmr/Source/ArrowApi/.agents/architecture/module-federation.md)
+- **Bounded Contexts & Menus:** [1 Menu Item = 1 Bounded Context Architecture](file:///Users/tmr/Source/ArrowApi/.agents/standards/bounded-context-menu-standard.md)
+- **Workspace Orchestration & Sagas:** [Multi-Orchestrator & Saga Workflow Architecture](file:///Users/tmr/Source/ArrowApi/.agents/standards/workspace-orchestration-saga-standard.md)
 - **Coding Standards:** [Frontend Rules & i18n](file:///Users/tmr/Source/ArrowApi/.agents/standards/frontend-rules.md)
 - **Dev Operations & Ports:** [Process Lifecycle & Fast Shutdown](file:///Users/tmr/Source/ArrowApi/.agents/standards/dev-operations.md)
 - **Adding Reports:** [6-Step Report/Agent Checklist](file:///Users/tmr/Source/ArrowApi/.agents/standards/new-report-checklist.md)

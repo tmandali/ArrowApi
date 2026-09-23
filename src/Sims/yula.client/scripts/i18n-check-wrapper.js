@@ -49,6 +49,7 @@ const unusedIgnore = [
   "SearchCats.*",
   "WorkspaceLanding.cards",
   "WorkspaceLanding.system",
+  "BoundedContext.*",
 ].join(" ");
 
 const undefinedIgnore = [
