@@ -78,10 +78,14 @@ export function AccountStatusGuard() {
           cache: "no-store",
         });
         if (disposed || !res.ok) return;
-        const data = (await res.json()) as { active?: boolean; role?: string | null };
+        const data = (await res.json()) as {
+          active?: boolean;
+          role?: string | null;
+          tenantRoles?: Record<string, string>;
+        };
         // Etkin rol: guest ekran gating'i + admin nav filtrelemenin canlı kaynağı.
         // Yalnız gerçek değerleri yaz — `role` boş gelirse hazır rol ezmeyecek.
-        if (data.role) useAuthRoleStore.getState().setRole(data.role);
+        if (data.role) useAuthRoleStore.getState().setRole(data.role, data.tenantRoles);
         if (data.active === false) {
           // signOut Promise — asıl hata yönetimi sign-in kartında.
           if (!signingOutRef.current) {

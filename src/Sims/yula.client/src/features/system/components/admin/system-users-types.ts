@@ -9,6 +9,8 @@ export type SystemUser = {
   provider: string | null;
   /** Provider'daki ham sub (Keycloak UUID / Google sayısal). */
   providerId: string | null;
+  /** Şirket (tenant) bazlı yetki haritası: `{ [tenantId]: role }` */
+  tenantRoles?: Record<string, string>;
 };
 
 /** Login kimliği (`user_identities`) — guest picker satırı. */
@@ -28,3 +30,6 @@ export type SystemIdentity = {
 };
 
 export const ROLE_OPTIONS = ["System Administrator", "Stock Manager", "Financial Analyst", "Viewer"] as const;
+
+export const TENANT_ROLE_OPTIONS = ["Admin", "Member", "Viewer", "Guest"] as const;
+

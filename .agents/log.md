@@ -2,6 +2,24 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] Multi-Tenant Scoped RBAC (Tenant-Aware Role Management)
+- **Rationale:** In enterprise multi-company/holding architectures, a user may be an `Admin` in Tenant A (e.g. LC Waikiki) while acting as a `Guest` or `Viewer` in Tenant B (e.g. Dipen). Platform-level global roles (`app_users.role`) alone could not express company-scoped privileges without granting excessive rights across unrelated tenants.
+- **Decision:**
+  - **Database Schema:** Created `user_tenant_roles` table (`userId`, `tenantId`, `role`, `updatedAt`, `createdAt`) with unique index on `(userId, tenantId)`. Migration `0006_stiff_butterfly.sql` generated and applied to PostgreSQL.
+  - **Account Status Bridge:** Enhanced `GET /api/auth/account-status` to query and return `tenantRoles: Record<string, string>` alongside catalog status and global role.
+  - **Client Role Store:** Extended `auth-role-store` to maintain `tenantRoles: Record<string, string>`.
+  - **Dynamic Effective Role Hook:** Updated `useEffectiveRole()` to read `activeCompanyId` from `useCompanyStore` and dynamically calculate `role` ("Admin", "Member", "Viewer", "Guest") and `isTenantAdmin` for the active company, while preserving global `isSystemAdmin` for platform administration.
+  - **System Users UI:** Created `SystemUserTenantRolesCell` component allowing system administrators to inspect and modify tenant-specific roles per company (`COMPANY_CATALOG`) directly in `/system/users`.
+- **Verification:**
+  - `user_tenant_roles` seeded for `usr_bf4db720-6802-4273-8839-425df3011778` (`timur.mandali@lcwaikiki.com`) with `lcw` ➔ `Admin`, `dipen` ➔ `Guest`, and `sun-inc` ➔ `Viewer`.
+  - Full TypeScript compilation (`tsc --noEmit`) clean (0 errors).
+  - Code linting (`oxlint`) clean (0 errors).
+  - Test suite (491 tests across 117 suites) passed 100%.
+  - All files strictly verified under 500 lines (`SystemUsersView.tsx` at 458 lines).
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Auto-Linking of Dynamic IdP Sub Identities to Authorized Catalog Users
 - **Rationale:** Keycloak test realms and enterprise IdPs can issue dynamic/ephemeral subject identifiers (`sub`) across sessions or upon container restarts. Previously, new `sub` logins unconditionally created `user_identities` rows with `userId: null`, degrading authorized administrators to Guest status until manual database intervention.
 - **Decision:**

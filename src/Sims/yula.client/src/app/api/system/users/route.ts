@@ -1,7 +1,7 @@
 import { eq, isNull, ne, or } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/server/db/client";
-import { appUsersSchema } from "@/server/db/schema";
+import { appUsersSchema, userTenantRolesSchema } from "@/server/db/schema";
 import { SystemUserUpsertValidation } from "@/validations/settings.validation";
 import { assertSessionAdmin } from "@/features/auth/lib/admin-guard";
 
@@ -29,7 +29,27 @@ export async function GET() {
           ne(appUsersSchema.status, "Deleted"),
         ),
       );
-    return Response.json({ users: rows });
+
+    const tenantRoleRows = await db
+      .select({
+        userId: userTenantRolesSchema.userId,
+        tenantId: userTenantRolesSchema.tenantId,
+        role: userTenantRolesSchema.role,
+      })
+      .from(userTenantRolesSchema);
+
+    const tenantMap: Record<string, Record<string, string>> = {};
+    for (const tr of tenantRoleRows) {
+      if (!tenantMap[tr.userId]) tenantMap[tr.userId] = {};
+      tenantMap[tr.userId][tr.tenantId] = tr.role;
+    }
+
+    const usersWithTenantRoles = rows.map((u) => ({
+      ...u,
+      tenantRoles: tenantMap[u.id] ?? {},
+    }));
+
+    return Response.json({ users: usersWithTenantRoles });
   } catch (error) {
     return Response.json(
       { users: [], error: error instanceof Error ? error.message : String(error) },

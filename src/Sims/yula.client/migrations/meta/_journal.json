@@ -43,6 +43,13 @@
       "when": 1790059479017,
       "tag": "0005_high_rick_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790239621993,
+      "tag": "0006_stiff_butterfly",
+      "breakpoints": true
     }
   ]
 }

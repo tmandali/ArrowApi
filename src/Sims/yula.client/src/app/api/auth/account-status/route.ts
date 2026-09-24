@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
-import { appUsersSchema } from "@/server/db/schema";
+import { appUsersSchema, userTenantRolesSchema } from "@/server/db/schema";
 import { isAccountStatusActive } from "@/features/auth/lib/account-status";
 import { findIdentityRowForLogin, sessionIdentity } from "@/features/auth/lib/app-user-sync";
 
@@ -26,6 +26,7 @@ export const dynamic = "force-dynamic";
  * Yanıt `role` alanı guest ekran gating'inin verisidir:
  * - link yok → `"Guest"`; linkli → `app_users.role` değeri.
  * - Oturum yok → `role: null`.
+ * - `tenantRoles`: Tenant (şirket) bazlı roller haritası `{ [tenantId]: role }`.
  * (Realm claim `app-admin` bootstrap'i client tarafında session rolleriyle
  * birleştirilir — bu route salt DB katmanıdır.)
  */
@@ -33,6 +34,7 @@ export async function GET() {
   let userId: string | null = null;
   let status: string | null = null;
   let role: string | null = null;
+  const tenantRoles: Record<string, string> = {};
   let active = true;
 
   try {
@@ -55,6 +57,21 @@ export async function GET() {
         status = row?.status ?? null;
         role = row?.role ?? "Guest";
         active = isAccountStatusActive(status);
+
+        // 3) Tenant (şirket) bazlı roller haritası
+        const tenantRows = await db
+          .select({
+            tenantId: userTenantRolesSchema.tenantId,
+            role: userTenantRolesSchema.role,
+          })
+          .from(userTenantRolesSchema)
+          .where(eq(userTenantRolesSchema.userId, idRow.userId));
+
+        for (const tr of tenantRows) {
+          if (tr.tenantId && tr.role) {
+            tenantRoles[tr.tenantId] = tr.role;
+          }
+        }
       } else {
         role = "Guest";
       }
@@ -64,5 +81,5 @@ export async function GET() {
     active = true;
   }
 
-  return Response.json({ userId, status, role, active });
+  return Response.json({ userId, status, role, tenantRoles, active });
 }

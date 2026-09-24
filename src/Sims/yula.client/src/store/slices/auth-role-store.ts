@@ -19,10 +19,19 @@ import { create } from "zustand";
 type AuthRoleState = {
   /** `undefined` = ilk account-status yanıtı gelmeden. */
   role: string | undefined;
-  setRole: (role: string) => void;
+  /** Tenant (şirket) bazlı roller: `{ [tenantId]: role }` */
+  tenantRoles: Record<string, string>;
+  setRole: (role: string, tenantRoles?: Record<string, string>) => void;
+  setTenantRoles: (tenantRoles: Record<string, string>) => void;
 };
 
 export const useAuthRoleStore = create<AuthRoleState>()((set) => ({
   role: undefined,
-  setRole: (role) => set({ role }),
+  tenantRoles: {},
+  setRole: (role, tenantRoles) =>
+    set((state) => ({
+      role,
+      tenantRoles: tenantRoles ?? state.tenantRoles,
+    })),
+  setTenantRoles: (tenantRoles) => set({ tenantRoles }),
 }));

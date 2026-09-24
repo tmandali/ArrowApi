@@ -35,11 +35,16 @@ import { useJobSession } from "@/features/auth/hooks/use-job-session";
 import { useSystemUsersAgentBinding } from "./use-system-users-agent-binding";
 import { SystemUser, SystemIdentity, ROLE_OPTIONS } from "./system-users-types";
 import { SystemUsersGuestsTab } from "./SystemUsersGuestsTab";
+import { SystemUserTenantRolesCell } from "./SystemUserTenantRolesCell";
 
 function normalizeRow(row: Record<string, unknown>): SystemUser {
   const status = String(row.status ?? "Active") === "Inactive" ? "Inactive" : "Active";
   const provider = row.provider == null ? null : String(row.provider);
   const providerId = row.providerId == null ? null : String(row.providerId);
+  const tenantRoles =
+    row.tenantRoles && typeof row.tenantRoles === "object"
+      ? (row.tenantRoles as Record<string, string>)
+      : undefined;
   return {
     id: String(row.id ?? ""),
     name: String(row.name ?? ""),
@@ -49,6 +54,7 @@ function normalizeRow(row: Record<string, unknown>): SystemUser {
     lastActive: String(row.lastActive ?? ""),
     provider,
     providerId,
+    tenantRoles,
   };
 }
 
@@ -190,6 +196,21 @@ export function SystemUsersView() {
     }
   };
 
+  const handleTenantRoleChanged = (userId: string, tenantId: string, role: string) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id !== userId) return u;
+        return {
+          ...u,
+          tenantRoles: {
+            ...u.tenantRoles,
+            [tenantId]: role,
+          },
+        };
+      })
+    );
+  };
+
   const handleDelete = async (user: SystemUser) => {
     if (!window.confirm(`${user.name || user.email} ${t("delete_confirm")}`)) return;
     setRowBusyId(user.id);
@@ -280,6 +301,7 @@ export function SystemUsersView() {
                   <TableHead>{t("col_email")}</TableHead>
                   <TableHead>{t("col_provider")}</TableHead>
                   <TableHead>{t("col_role")}</TableHead>
+                  <TableHead>Tenant / Şirket</TableHead>
                   <TableHead>{t("col_status")}</TableHead>
                   <TableHead>{t("col_last_active")}</TableHead>
                   <TableHead className="w-10 text-center">{tc("actions")}</TableHead>
@@ -289,14 +311,14 @@ export function SystemUsersView() {
                 {loading &&
                   Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={`skeleton-${i}`}>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={9}>
                         <Skeleton className="h-6 w-full" />
                       </TableCell>
                     </TableRow>
                   ))}
                 {!loading && loadError && (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <Empty>
                         <EmptyHeader>
                           <EmptyTitle className="text-sm">{t("load_error_title")}</EmptyTitle>
@@ -311,7 +333,7 @@ export function SystemUsersView() {
                 )}
                 {!loading && !loadError && filteredUsers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <Empty>
                         <EmptyHeader>
                           <EmptyTitle className="text-sm">{t("empty_title")}</EmptyTitle>
@@ -348,6 +370,13 @@ export function SystemUsersView() {
                         <Badge variant="outline" className="text-[11px] font-medium">
                           {user.role}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <SystemUserTenantRolesCell
+                          userId={user.id}
+                          tenantRoles={user.tenantRoles}
+                          onRoleChanged={handleTenantRoleChanged}
+                        />
                       </TableCell>
                       <TableCell>
                         {user.status === "Active" ? (

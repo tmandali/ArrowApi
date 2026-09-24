@@ -134,6 +134,37 @@ export const identityAliasesSchema = pgTable(
 );
 
 export type IdentityAliasRow = typeof identityAliasesSchema.$inferSelect;
+
+/**
+ * `user_tenant_roles` — Tenant (şirket) bazlı yetki matrisi.
+ *
+ * Çoklu şirket (multi-tenant) yapısında kullanıcının şirket bazındaki rolü:
+ * - `userId`: `app_users.id` referansı.
+ * - `tenantId`: Şirket tanımlayıcısı (örn. 'lcw', 'dipen', 'sun-inc').
+ * - `role`: Tenant içi rol (örn. 'Admin', 'User', 'Guest', 'Viewer').
+ */
+export const userTenantRolesSchema = pgTable(
+  "user_tenant_roles",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => appUsersSchema.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    role: text("role").notNull().default("Guest"),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_tenant_roles_user_tenant_key").on(table.userId, table.tenantId),
+    index("user_tenant_roles_tenant_key").on(table.tenantId),
+  ],
+);
+
+export type UserTenantRoleRow = typeof userTenantRolesSchema.$inferSelect;
 export type AppUserRow = typeof appUsersSchema.$inferSelect;
 
 /**
