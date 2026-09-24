@@ -358,7 +358,11 @@ export function extractWorkedSteps(
       );
       const role = part.role ?? classifyTextPart(raw, hasToolsInMessage);
 
-      if (raw && hasToolsInMessage && role === "plan_rationale") {
+      const isTable = /\|[\s\S]*\|[\s\S]*\|/m.test(raw);
+      const isHeading = /^#{1,4}\s+/m.test(raw);
+      const isSubstantive = isTable || isHeading;
+
+      if (raw && hasToolsInMessage && role === "plan_rationale" && !isSubstantive) {
         pushStep({
           id: `${message.id}-plan-evaluation-${index}`,
           kind: "thought",

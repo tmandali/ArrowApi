@@ -97,9 +97,38 @@ This document is the **append-only audit log** recording fundamental architectur
 
 ---
 
+## [2026-09-24] Streamdown Streaming Markdown Architecture Integration
+- **Rationale:** Assistant streaming responses occasionally produced empty or broken code fence boxes due to a hybrid pipeline splitting markdown lists line-by-line (`marked.lexer` + `split('\n')`). Since the project standardizes on Vercel AI SDK (`ai: ^7.0.83`), transitioning the chat markdown engine to Vercel's official `streamdown` (`vercel/streamdown`) eliminates hybrid parsing and natively repairs unterminated tokens during active model streaming.
+- **Decision:**
+  - **Adopted `streamdown` (`streamdown: 2.6.0`):** Integrated Vercel's streaming-optimized markdown renderer featuring built-in `remend` token recovery (virtual completion of unclosed code fences, tables, and links during streaming).
+  - **Unified Component Mapping (`markdownComponents`):** Reused and mapped existing styled components (`p`, `li`, `table`, `code`, `MarkdownPreBlock`, `MermaidChip`) to Streamdown's `components` prop.
+  - **Pruned Redundant Markdown Stack:** Migrated `skill-markdown-doc.tsx` to `Streamdown`, removed `react-markdown` and `remark-gfm` from `package.json`, and deleted orphaned `mermaid-canvas-panel.tsx` (superseded by `mermaid-canvas-sheet.tsx`). Verified with `knip` (zero dead code, zero unused dependencies).
+  - **Substantive Content Preservation in Chat Turns:** Resolved an issue where multi-step assistant turns prematurely classified rich explanatory markdown tables or headings as transient `plan_rationale` when tools were invoked, mistakenly swallowing them into the collapsible Worked Steps accordion. `use-chat-turns.ts` and `yula-worked-steps.tsx` now distinguish rich substantive content (tables, headings, comprehensive text) so it remains in the primary assistant bubble as `final_synthesis`.
+  - **Streamdown in Worked Step Details:** Updated `yula-worked-phase-card.tsx` to render `step.detailText` via `Streamdown` instead of raw `whitespace-pre-wrap` text, guaranteeing rich formatting for any intermediate thought steps.
+  - **AST Preservation for Code Blocks in Lists:** Retained `hasEmbeddedCode` guard and full-block preservation so fences are never torn across lines.
+  - **Tailwind v4 Integration:** Added `@source "../../node_modules/streamdown/dist/*.js"` in `globals.css` for full utility class compilation.
+  - **Node Test Runner CJS Shim (`scripts/streamdown-shim.cjs`):** Configured `register-md.cjs` with a lightweight mock shim for headless unit test execution under `tsx`/CommonJS.
+  - **Resolved Lucide Icon Shadowing in `workflow-graph-canvas.tsx`:** Renamed `Map` import to `MapIcon` to avoid shadowing JavaScript's global `Map` constructor.
+- **Verification:** All 492 unit tests and 8 suite virtual spreadsheet grid tests passed green (100% pass rate). `knip` reported 0 unused dependencies/exports. `oxlint` reported 0 errors and 0 warnings across 900 files. `tsc --noEmit` clean with 0 errors.
+- **Author:** Antigravity / Team
+
+## [2026-09-24] Canvas Navigation Standard: Zoom-at-Cursor, Fit-to-View, Minimap & Code/View Toggle
+- **Rationale:** Users requested intuitive Figma/Miro-like canvas navigation and direct code inspection across all diagram viewers (`WorkflowGraphCanvas` DAG viewer and `MermaidBlock`/`MermaidCanvasSheet`). In accordance with graphical UI standards, wheel scroll performs zoom directly towards the cursor coordinate, Space + drag acts as the Hand tool (Pan), middle-click provides quick pan, diagrams offer an interactive radar MiniMap with a Fit-to-View action, and users can copy diagram code or toggle between visual rendering and raw source code.
+- **Decision:**
+  - **Zoom towards Cursor (Feature 1):** In `MermaidBlock.tsx`, implemented exact focal point zoom mathematics ($newPan = P - (P - pan) \times \frac{nextZoom}{prevZoom}$) ensuring the exact point under the mouse cursor remains static while zooming.
+  - **Fit to View & Shortcuts (Feature 2):** In `WorkflowGraphCanvas.tsx`, wrapped with `ReactFlowProvider` and integrated `useReactFlow().fitView` with an explicit toolbar button and keyboard shortcut (`F` / Double-click). In `MermaidBlock.tsx`, implemented container-aware SVG viewBox scaling with centered pan on render, `F` key, and Double-click.
+  - **Interactive MiniMap Navigation (Feature 3):** Created `MermaidMinimap.tsx` featuring a scaled preview and a draggable/clickable viewport indicator rectangle synchronizing 2D pan coordinates. Integrated `MiniMap` toggle (`MapIcon` / `M` key) in both React Flow and Mermaid viewers.
+  - **Copy Code & View / Code Toggle:** Implemented toolbar actions for one-click code copy (using `copyToClipboard` with checkmark visual feedback) and toggle button between interactive visual diagram (`Eye` icon) and formatted monospaced source code (`Code` icon) across both Mermaid and DAG workflow viewers.
+  - **Wheel Zoom Event Listener Lifecycle & Synchronous Ref Fix:** Resolved an issue where mouse wheel zoom did not fire because the `wheel` event listener effect was using an empty dependency array (`[]`) on mount, when the container DOM element was still `null` due to initial `"loading"` state. Fixed by keying the effect on `[cleanSvg, showCode, status]`, attaching native non-passive wheel listeners as soon as the canvas container is committed, and maintaining `zoomRef` and `panRef` to handle high-frequency wheel ticks synchronously without stale-state jitter or inter-state updater violations.
+- **Verification:** `npx oxlint` passed with 0 errors/warnings on all modified files. `npx tsx --test src/components/layout/chat-markdown/mermaid.test.ts` passed 6/6 tests. Full `tsc --noEmit` clean. All files strictly $\le 500$ lines (`workflow-graph-canvas.tsx`: 490, `mermaid-block.tsx`: 494, `mermaid-minimap.tsx`: 152, `mermaid-canvas-sheet.tsx`: 157, `mermaid-utils.ts`: 39).
+- **Author:** Antigravity / Team
+
+---
+
 ## 📜 Prior Decisions Archive
 Older architectural decisions have been archived to adhere to the 500-line limit:
 - [Decision Log Archive 4 (.agents/log-archive-4.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-4.md)
 - [Decision Log Archive 3 (.agents/log-archive-3.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-3.md)
 - [Decision Log Archive 2 (.agents/log-archive-2.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-2.md)
 - [Decision Log Archive 1 (.agents/log-archive-1.md)](file:///Users/tmr/Source/ArrowApi/.agents/log-archive-1.md)
+

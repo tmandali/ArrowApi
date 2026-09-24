@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { CodeBlock } from "@/components/ui/code-block";
+import { Streamdown } from "streamdown";
 import { cn } from "@/utils/cn";
 import { useOptionalYulaChat } from "@/hooks/use-yula-chat";
 import type { WorkedStepPhase } from "./yula-worked-steps";
@@ -176,14 +177,14 @@ export function YulaWorkedPhaseCard({
                 {/* Detay Gösterimi */}
                 {isExpanded && hasDetails ? (
                   isThought && step.detailText ? (
-                    <div className="pl-3 py-0.5 text-[11.5px] leading-relaxed text-muted-foreground/80 font-sans whitespace-pre-wrap select-text border-l-2 border-primary/20">
-                      {step.detailText}
+                    <div className="pl-3 py-0.5 text-[11.5px] leading-relaxed text-muted-foreground/80 font-sans select-text border-l-2 border-primary/20">
+                      <Streamdown>{step.detailText}</Streamdown>
                     </div>
                   ) : (
                     <div className="ml-2 mt-0.5 overflow-hidden rounded-md border border-border/30 bg-muted/20 p-2 space-y-1 font-mono text-[10.5px]">
                       {step.detailText ? (
-                        <div className="text-muted-foreground leading-snug whitespace-pre-wrap font-sans text-[11px] select-text">
-                          {step.detailText}
+                        <div className="text-muted-foreground leading-snug font-sans text-[11px] select-text">
+                          <Streamdown>{step.detailText}</Streamdown>
                         </div>
                       ) : null}
                       {step.info ? (

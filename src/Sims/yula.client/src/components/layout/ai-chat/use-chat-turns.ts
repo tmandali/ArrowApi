@@ -82,9 +82,21 @@ export function buildTurnAssistantMessage(
             role,
           });
         } else {
-          // Ara adım metni: Ana balona basılmaz; akordeonda ara plan/düşünce olarak korunur
+          // Ara adım metni: Eğer metin sadece kısa bir geçiş/plan cümlesiyse akordeona alınır.
+          // Fakat Markdown tablosu (|---|), başlık veya kapsamlı analiz içeriyorsa ana balonda kullanıcıya gösterilmelidir!
           const txt = part.text.trim();
-          if (txt) {
+          const isTable = /\|[\s\S]*\|[\s\S]*\|/m.test(txt);
+          const isHeading = /^#{1,4}\s+/m.test(txt);
+          const isSubstantive =
+            (isTable || isHeading || txt.length > 200) &&
+            !/(?:kontrol ediyorum|sorguluyorum|hazırlıyorum|deniyorum|çalıştırıyorum|bakıyorum)\b/i.test(txt);
+
+          if (isSubstantive) {
+            combinedParts.push({
+              ...part,
+              role: "final_synthesis" as TextPartRole,
+            });
+          } else if (txt) {
             combinedParts.push({
               type: "reasoning",
               text: txt,

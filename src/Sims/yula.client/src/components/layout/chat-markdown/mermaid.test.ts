@@ -101,4 +101,9 @@ sequenceDiagram
     assert.equal(closedState.isMaximized, false);
     assert.equal(closedState.activeDiagram, null);
   });
+
+  it("exports MermaidMinimap as a valid React component function", async () => {
+    const { MermaidMinimap } = await import("./mermaid-minimap.tsx");
+    assert.equal(typeof MermaidMinimap, "function");
+  });
 });

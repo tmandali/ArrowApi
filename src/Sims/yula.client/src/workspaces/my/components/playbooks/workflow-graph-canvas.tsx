@@ -3,6 +3,8 @@
 import * as React from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   Background,
   Controls,
   MiniMap,
@@ -35,7 +37,14 @@ import {
   RefreshCw,
   ListOrdered,
   Layers,
+  Scan,
+  Map as MapIcon,
+  Code,
+  Eye,
+  Copy,
+  Check,
 } from "lucide-react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const NODE_WIDTH = 250;
 const NODE_HEIGHT = 80;
@@ -197,17 +206,66 @@ export interface WorkflowGraphCanvasProps {
   className?: string;
 }
 
-export function WorkflowGraphCanvas({
+function WorkflowGraphCanvasInner({
   title: passedTitle,
   recipe,
   graph: initialGraph,
   contentMarkdown,
   className = "",
 }: WorkflowGraphCanvasProps) {
+  const { fitView } = useReactFlow();
   const title = passedTitle || recipe?.title || "Workflow Graph";
   const effectiveGraph = initialGraph || recipe?.graph;
   const effectiveMarkdown = contentMarkdown || recipe?.contentMarkdown;
   const [showExecutionOrder, setShowExecutionOrder] = React.useState(false);
+  const [showMinimap, setShowMinimap] = React.useState(true);
+  const [showCode, setShowCode] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const isHoveredRef = React.useRef(false);
+
+  const rawCode = React.useMemo(() => {
+    if (effectiveMarkdown) return effectiveMarkdown;
+    if (effectiveGraph) return JSON.stringify(effectiveGraph, null, 2);
+    return "";
+  }, [effectiveMarkdown, effectiveGraph]);
+
+  const handleCopyCode = React.useCallback(async () => {
+    if (!rawCode) return;
+    const ok = await copyToClipboard(rawCode);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [rawCode]);
+
+  const handleFit = React.useCallback(() => {
+    fitView({ padding: 0.2, duration: 250 });
+  }, [fitView]);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      const isInput =
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.getAttribute("contenteditable") === "true");
+      if (isInput) return;
+
+      if (isHoveredRef.current) {
+        if (e.code === "KeyF" || e.key === "f" || e.key === "F") {
+          e.preventDefault();
+          handleFit();
+        } else if (e.code === "KeyM" || e.key === "m" || e.key === "M") {
+          e.preventDefault();
+          setShowMinimap((prev) => !prev);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleFit]);
 
   // Compute graph either from passed prop or from markdown steps
   const activeDAG = React.useMemo(() => {
@@ -276,7 +334,8 @@ export function WorkflowGraphCanvas({
   const handleRelayout = React.useCallback(() => {
     const relayouted = applyDagreLayout(nodes, edges, "TB");
     setNodes([...relayouted.nodes]);
-  }, [nodes, edges, setNodes]);
+    setTimeout(() => handleFit(), 50);
+  }, [nodes, edges, setNodes, handleFit]);
 
   if (nodes.length === 0) {
     return (
@@ -291,7 +350,11 @@ export function WorkflowGraphCanvas({
   }
 
   return (
-    <div className={`relative flex flex-col w-full h-[460px] rounded-lg border border-border bg-card/40 overflow-hidden ${className}`}>
+    <div
+      onMouseEnter={() => { isHoveredRef.current = true; }}
+      onMouseLeave={() => { isHoveredRef.current = false; }}
+      className={`relative flex flex-col w-full h-[460px] rounded-lg border border-border bg-card/40 overflow-hidden ${className}`}
+    >
       {/* Top Bar Controls */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-muted/30 z-10">
         <div className="flex items-center gap-2">
@@ -301,6 +364,9 @@ export function WorkflowGraphCanvas({
           <Badge variant="secondary" className="h-4 px-1.5 text-[9.5px]">
             {nodes.length} Adım · {edges.length} Bağlantı
           </Badge>
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 bg-background/60 px-1.5 py-0.5 rounded border border-border/50 font-mono">
+            Scroll: Zoom · <kbd className="px-1 py-0.2 bg-muted rounded border border-border/60 text-[9px] font-sans">Space</kbd> + Sürükle: Pan · F: Sığdır
+          </span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -318,37 +384,107 @@ export function WorkflowGraphCanvas({
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            onClick={handleFit}
+            title="Ekrana Sığdır (F)"
+          >
+            <Scan className="size-3" />
+            Sığdır
+          </Button>
+
+          <Button
+            variant={showMinimap ? "default" : "outline"}
+            size="sm"
+            className="h-6 px-2 text-[10px] gap-1 cursor-pointer"
+            onClick={() => setShowMinimap((prev) => !prev)}
+            title="Mini Harita (M)"
+          >
+            <MapIcon className="size-3" />
+            Harita
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
             onClick={handleRelayout}
+            title="Otomatik Yeniden Hizala"
           >
             <RefreshCw className="size-3" />
             Hizala
           </Button>
+
+          {rawCode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={handleCopyCode}
+              title="Kodu Kopyala"
+            >
+              {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+              {copied ? "Kopyalandı" : "Kopyala"}
+            </Button>
+          )}
+
+          {rawCode && (
+            <Button
+              variant={showCode ? "default" : "outline"}
+              size="sm"
+              className="h-6 px-2 text-[10px] gap-1 cursor-pointer"
+              onClick={() => setShowCode((prev) => !prev)}
+              title={showCode ? "Diyagramı Göster" : "Kodu Göster"}
+            >
+              {showCode ? <Eye className="size-3" /> : <Code className="size-3" />}
+              {showCode ? "Diyagram" : "Kod"}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* React Flow Viewport */}
-      <div className="flex-1 w-full h-full min-h-0">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.2}
-          maxZoom={1.5}
-        >
-          <Background color="var(--border)" gap={16} size={1} />
-          <Controls showInteractive={false} className="!bg-card !border-border !rounded-md" />
-          <MiniMap
-            zoomable
-            pannable
-            className="!bg-card/80 !border !border-border !rounded-md !m-2"
-            nodeColor="var(--muted-foreground)"
-          />
-        </ReactFlow>
-      </div>
+      {/* React Flow Viewport or Code View */}
+      {showCode ? (
+        <pre className="flex-1 w-full h-full min-h-0 overflow-auto p-4 font-mono text-xs bg-muted/20 select-text whitespace-pre text-foreground">
+          <code>{rawCode}</code>
+        </pre>
+      ) : (
+        <div className="flex-1 w-full h-full min-h-0">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.2}
+            maxZoom={1.5}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panActivationKeyCode="Space"
+            panOnDrag={[1]}
+            preventScrolling={true}
+          >
+            <Background color="var(--border)" gap={16} size={1} />
+            <Controls showInteractive={false} className="!bg-card !border-border !rounded-md" />
+            {showMinimap && (
+              <MiniMap
+                zoomable
+                pannable
+                className="!bg-card/80 !border !border-border !rounded-md !m-2"
+                nodeColor="var(--muted-foreground)"
+              />
+            )}
+          </ReactFlow>
+        </div>
+      )}
     </div>
+  );
+}
+
+export function WorkflowGraphCanvas(props: WorkflowGraphCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <WorkflowGraphCanvasInner {...props} />
+    </ReactFlowProvider>
   );
 }

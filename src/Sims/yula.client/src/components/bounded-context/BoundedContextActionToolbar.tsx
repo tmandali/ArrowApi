@@ -39,7 +39,7 @@ export function BoundedContextActionToolbar({
   const availableTransitions = useMemo(() => {
     if (!process) return [];
     return process.transitions.filter((t) => t.from === currentStatus);
-  }, [process?.transitions, currentStatus]);
+  }, [process, currentStatus]);
 
   if (!process) {
     return null;

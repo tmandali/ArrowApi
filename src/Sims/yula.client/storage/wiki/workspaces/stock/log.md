@@ -144,3 +144,7 @@
 ## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
 ## [2026-09-23] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
 ## [2026-09-24] proposal_created | Stok Bakiye ekranı sipariş girişi için kullanılmaz (/stock/stock-balance) - Yula AI (Learned)
+## [2026-09-24] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-24] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-24] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi
+## [2026-09-24] proposal_approved | Simülasyon Özel Fason Üretim Onayı - Sistem Yöneticisi

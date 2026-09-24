@@ -94,6 +94,9 @@ export function MermaidCanvasSheet() {
           </div>
 
           <div className="flex items-center gap-1.5 pr-8">
+            <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 bg-background/60 px-1.5 py-0.5 rounded border border-border/50 font-mono mr-1">
+              Scroll: Zoom · <kbd className="px-1 py-0.2 bg-muted rounded border border-border/60 text-[9px] font-sans">Space</kbd> + Sürükle: Pan
+            </span>
             <Button
               type="button"
               variant="outline"
@@ -140,12 +143,12 @@ export function MermaidCanvasSheet() {
 
         <div
           ref={containerRef}
-          className="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center bg-muted/10 min-h-0"
+          className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-muted/10 p-0"
         >
           <MermaidBlock
             chart={activeDiagram.chart}
             fitCanvas
-            className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col items-center justify-center"
+            className="w-full h-full border-0 rounded-none my-0 bg-transparent flex flex-col"
           />
         </div>
       </SheetContent>

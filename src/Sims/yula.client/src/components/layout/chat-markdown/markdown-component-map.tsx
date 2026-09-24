@@ -1,8 +1,8 @@
 import * as React from "react";
-import type { Components } from "react-markdown";
+import type { Components } from "streamdown";
 import { ChatMarkdownLink, MarkdownHeading, MarkdownPreBlock } from "./markdown-components";
 
-/** react-markdown override haritası: grid-dili temalı tablo/başlık/liste/kod. */
+/** Streamdown override haritası: grid-dili temalı tablo/başlık/liste/kod. */
 export const markdownComponents: Components = {
   p: ({ children }) => (
     <p className="leading-relaxed text-[12px] text-foreground/90">{children}</p>

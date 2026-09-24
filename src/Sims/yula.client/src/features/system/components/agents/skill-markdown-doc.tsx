@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Streamdown, type Components } from "streamdown";
 import { cn } from "@/utils/cn";
 import { stripSkillFrontmatter } from "@/lib/skill-discovery";
 import { CodeBlock } from "@/components/ui/code-block";
@@ -131,9 +130,9 @@ export function MarkdownDoc({
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+      <Streamdown components={mdComponents}>
         {stripSkillFrontmatter(value)}
-      </ReactMarkdown>
+      </Streamdown>
     </div>
   );
 }

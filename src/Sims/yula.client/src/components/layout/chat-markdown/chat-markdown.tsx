@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Streamdown } from "streamdown";
 import { useTranslations } from "next-intl";
 import { cn } from "@/utils/cn";
 import { parseColonTitleLine } from "@/lib/finding-actions";
@@ -29,7 +28,7 @@ import {
 } from "@/lib/yula-choice-inference";
 
 /**
- * Sohbet markdown çekirdeği — react-markdown + remark-gfm + blok memoization.
+ * Sohbet markdown çekirdeği — Streamdown (Vercel AI SDK) + blok memoization.
  *
  * Katmanlar:
  *   1. parseMarkdownBlocks: marked.lexer ile top-level bloklar
@@ -38,16 +37,17 @@ import {
  *   3. remarkYulaEntities: tüm text node'larda rapor adları → tıklanabilir
  *      link, tırnaklı öneriler → prompt linki, [[file:..|..]] → dosya çipi
  *   4. components override'ları: grid-dili temalı tablo/başlık/liste/kod
+ *   5. Streamdown remend: akış sırasında tamamlanmamış kod blokları ve tabloları otomatik onarır
  */
 export const MarkdownBlock = React.memo(
   function MarkdownBlock({ content }: { content: string }) {
     return (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkYulaEntities]}
+      <Streamdown
+        remarkPlugins={[remarkYulaEntities]}
         components={markdownComponents}
       >
         {content}
-      </ReactMarkdown>
+      </Streamdown>
     );
   },
   (prev, next) => prev.content === next.content,
@@ -73,7 +73,10 @@ function renderBlock(
   }
 
   // Paragraf veya liste satırlarında bullet kontrolü:
-  if (block.type === "list" || isBulletBlock(trimmed)) {
+  // Kod blokları (``` veya ~~~) içeren listeler satır satır bölünemez;
+  // aksi halde kod çitleri (fences) tek başına kalıp boş kutu oluşturur.
+  const hasEmbeddedCode = block.raw.includes("```") || block.raw.includes("~~~");
+  if (!hasEmbeddedCode && (block.type === "list" || isBulletBlock(trimmed))) {
     const lines = block.raw.split("\n").filter((l) => l.trim());
     let currentQuestionContext = questionContext;
     return (

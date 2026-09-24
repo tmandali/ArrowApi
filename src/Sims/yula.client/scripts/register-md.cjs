@@ -22,3 +22,17 @@ require.extensions[".yml"] = (module, filename) => {
 require.extensions[".css"] = (module) => {
   module.exports = {};
 };
+
+// Node test runner shim for pure-ESM streamdown package under tsx/CJS
+const path = require("node:path");
+const Module = require("node:module");
+const originalResolveFilename = Module._resolveFilename;
+const shimPath = path.resolve(__dirname, "streamdown-shim.cjs");
+
+Module._resolveFilename = function (request, parent, isMain, options) {
+  if (request === "streamdown") {
+    return shimPath;
+  }
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
