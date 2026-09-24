@@ -232,6 +232,7 @@ export function ChatInstance({
   const retryResponse = React.useCallback(async () => {
     userStoppedRef.current = false;
     setStopped(false);
+    await chat.stop();
     await retryWithBackoff(
       async () => {
         await chat.regenerate();

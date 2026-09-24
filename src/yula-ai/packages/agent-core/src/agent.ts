@@ -194,6 +194,7 @@ export class Agent implements AgentState {
       this.currentAbortController = undefined;
     }
     this._isStreaming = false;
+    this._isSuspended = false;
   }
 
   async run(prompts: any[], externalSignal?: AbortSignal): Promise<any[]> {

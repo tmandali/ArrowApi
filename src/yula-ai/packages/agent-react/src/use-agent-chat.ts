@@ -285,6 +285,21 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     setMessages((prev) => [...prev, sysMsg]);
   }, []);
 
+  const stop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (sessionRef.current) {
+      sessionRef.current.abort();
+    } else if (agentRef.current) {
+      agentRef.current.abort();
+    }
+    setIsLoading(false);
+    setStatus('ready');
+    setIsSuspended(false);
+  }, []);
+
   // Pi Autonomous Loop Gönderim Fonksiyonu (Continuous While Loop)
   const sendMessage = useCallback(
     async (
@@ -318,6 +333,10 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         parts: [{ type: 'text', text: promptText }],
         createdAt: new Date(),
       };
+
+      if (agentRef.current?.isStreaming) {
+        stop();
+      }
 
       setMessages((prev) => [...prev, userMsg]);
       setInput('');
@@ -366,21 +385,8 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         abortControllerRef.current = null;
       }
     },
-    [input, availableModels, selectedProvider, selectedModel, selectModel, newConversation, compact, options, appendSystemMessage, messages, autoCompactEnabled]
+    [input, availableModels, selectedProvider, selectedModel, selectModel, newConversation, compact, options, appendSystemMessage, messages, autoCompactEnabled, stop]
   );
-
-  const stop = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    if (sessionRef.current) {
-      sessionRef.current.abort();
-    } else if (agentRef.current) {
-      agentRef.current.abort();
-    }
-    setIsLoading(false);
-    setStatus('ready');
-  }, []);
 
   const steer = useCallback((text: string) => {
     if (sessionRef.current) {
@@ -399,6 +405,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
   }, []);
 
   const regenerate = useCallback(async () => {
+    stop();
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser) {
       const text = lastUser.content || '';
@@ -407,7 +414,14 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       if (agentRef.current) agentRef.current.messages = filtered;
       await sendMessage(text);
     }
-  }, [messages, sendMessage]);
+  }, [messages, sendMessage, stop]);
+
+  const execBuiltInCmd = useCallback((cmd: string, args: string[] = []) =>
+    handleBuiltInCommand(cmd, args, {
+      availableModels, selectedProvider, selectedModel, selectModel,
+      newConversation, compact, onOpenLogin: options?.onOpenLogin,
+      onSelectProvider: options?.onSelectProvider, appendSystemMessage,
+    }), [availableModels, selectedProvider, selectedModel, selectModel, newConversation, compact, options?.onOpenLogin, options?.onSelectProvider, appendSystemMessage]);
 
   return {
     messages,
@@ -434,35 +448,13 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
     selectModel,
     availableModels,
     currentLocale,
-    executeCommand: (cmd: string, ...args: string[]) =>
-      handleBuiltInCommand(cmd, args, {
-        availableModels,
-        selectedProvider,
-        selectedModel,
-        selectModel,
-        newConversation,
-        compact,
-        onOpenLogin: options?.onOpenLogin,
-        onSelectProvider: options?.onSelectProvider,
-        appendSystemMessage,
-      }),
+    executeCommand: (cmd: string, ...args: string[]) => execBuiltInCmd(cmd, args),
     handleInputChange: (e: any) => setInput(e?.target?.value ?? String(e ?? '')),
     handleSubmit: (e?: any) => {
       e?.preventDefault?.();
       sendMessage();
     },
-    runSlashCommand: (cmd: string) =>
-      handleBuiltInCommand(cmd, [], {
-        availableModels,
-        selectedProvider,
-        selectedModel,
-        selectModel,
-        newConversation,
-        compact,
-        onOpenLogin: options?.onOpenLogin,
-        onSelectProvider: options?.onSelectProvider,
-        appendSystemMessage,
-      }),
+    runSlashCommand: (cmd: string) => execBuiltInCmd(cmd),
     undo: () => sessionManager.undo(),
     redo: () => sessionManager.redo(),
     activeSkills: skillsManager.getActiveSkills(),
