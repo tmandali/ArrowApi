@@ -26,9 +26,10 @@ async function fetchProviderPicture(user: ProviderUser): Promise<string | null> 
   if (!user.accessToken) return null;
 
   let url: string | null = null;
-  if (user.provider === "google") {
+  const prov = user.provider ?? "";
+  if (prov === "google" || prov.startsWith("google:")) {
     url = "https://openidconnect.googleapis.com/v1/userinfo";
-  } else if (user.provider === "keycloak") {
+  } else if (prov === "keycloak" || prov.startsWith("keycloak:")) {
     const issuer = process.env.KEYCLOAK_ISSUER;
     if (!issuer) return null;
     url = `${issuer.replace(/\/+$/, "")}/protocol/openid-connect/userinfo`;

@@ -13,18 +13,11 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/utils/cn";
 import {
-  ArrowUp,
-  FileCode,
-  FileText,
-  History,
-  ListOrdered,
-  Plus,
-  Square,
-  X,
-  Zap,
+  ArrowUp, FileCode, FileText, History, ListOrdered, Plus, Square, X, Zap,
 } from "lucide-react";
 import { formatHistoryAgo } from "./use-history-suggestions";
 import type { ChatComposerState } from "./use-chat-composer";
+import { HitlDecisionComposer } from "./hitl-decision-composer";
 
 /** Sohbet besteci görünümü: komut paleti + geçmiş önerileri + girdi formu. */
 export function ChatComposer({
@@ -40,39 +33,13 @@ export function ChatComposer({
   const locale = useLocale();
   const router = useRouter();
   const {
-    input,
-    setInput,
-    attachments,
-    setAttachments,
-    selectedCommand,
-    pastedChip,
-    setPastedChip,
-    selectedIndex,
-    setSelectedIndex,
-    historyIndex,
-    setHistoryIndex,
-    setHistoryClosed,
-    fileInputRef,
-    textareaRef,
-    commandMatches,
-    isRefreshingModels,
-    showCommands,
-    showNewAgentItem,
-    paletteItemCount,
-    isNewAgentSelected,
-    historySuggestions,
-    showHistory,
-    openHistoryConversation,
-    handleSend,
-    handleSteer,
-    handleFollowUp,
-    applyCommand,
-    onFilesSelected,
-    canSubmit,
-    modelTag,
-    closeCommands,
-    isModelSubmenu,
-    isProviderSubmenu,
+    input, setInput, attachments, setAttachments, selectedCommand, pastedChip, setPastedChip,
+    selectedIndex, setSelectedIndex, historyIndex, setHistoryIndex, setHistoryClosed,
+    fileInputRef, textareaRef, commandMatches, isRefreshingModels, showCommands,
+    showNewAgentItem, paletteItemCount, isNewAgentSelected, historySuggestions,
+    showHistory, openHistoryConversation, handleSend, handleSteer, handleFollowUp,
+    applyCommand, onFilesSelected, canSubmit, modelTag, closeCommands,
+    isModelSubmenu, isProviderSubmenu, isSuspended, pendingChoice, respondToChoice,
   } = composer;
 
   const commandPaletteRef = React.useRef<HTMLDivElement>(null);
@@ -115,6 +82,23 @@ export function ChatComposer({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showCommands, closeCommands, textareaRef]);
+
+  // HITL (Human-in-the-Loop) Decision & Approval Gate
+  if (isSuspended && pendingChoice) {
+    return (
+      <HitlDecisionComposer
+        prompt={pendingChoice}
+        onSubmit={(val) => {
+          if (respondToChoice) {
+            respondToChoice(val);
+          } else {
+            handleSend(val);
+          }
+        }}
+        disabled={isLoading}
+      />
+    );
+  }
 
   const paletteTitle = isModelSubmenu
     ? (locale === "tr" ? "Modeller" : "Models")

@@ -3,6 +3,7 @@ import { isFailedToolInfo, isDedupeSkipOutput } from "@/lib/yula-tool-info";
 import { describeDispatchAction } from "@/lib/my-agent-pi-bridge";
 import type { WorkedStepItem, WorkedStepsT } from "./yula-worked-steps";
 import { mapGridToolInfoToWorkedSteps } from "./yula-worked-steps-grid";
+import { isHitlResolved } from "@/lib/contracts/hitl-prompt";
 
 type TranslationFn = (
   key: Parameters<WorkedStepsT>[0],
@@ -137,22 +138,35 @@ export function mapToolInfoToWorkedSteps(
       break;
     }
     case "request_user_confirmation": {
-      const title = typeof inputObj.title === "string" ? inputObj.title : "User approval";
+      const outDetails = ((info.output as Record<string, unknown> | undefined)?.details ?? {}) as Record<string, unknown>;
+      const title =
+        typeof inputObj.title === "string" && inputObj.title.trim()
+          ? inputObj.title
+          : typeof outDetails.title === "string" && outDetails.title.trim()
+            ? outDetails.title
+            : "User approval";
+      const isAwaiting = isPending || !isHitlResolved(info.output);
       pushStep({
         id: info.toolCallId,
         kind: "confirmation",
         label: `Confirmation: ${title}`,
-        subLabel: isPending ? "Waiting for user confirmation..." : "User confirmation",
+        subLabel: isAwaiting ? "Waiting for user input..." : "User confirmation",
         isLive: false,
+        isSuspended: isAwaiting,
         isError,
         info,
       });
       break;
     }
     case "ask_user_choice": {
+      const outDetails = ((info.output as Record<string, unknown> | undefined)?.details ?? {}) as Record<string, unknown>;
       const question =
-        typeof inputObj.question === "string" ? inputObj.question : undefined;
-      const rawOpts = (inputObj as { options?: unknown }).options;
+        typeof inputObj.question === "string" && inputObj.question.trim()
+          ? inputObj.question
+          : typeof outDetails.question === "string" && outDetails.question.trim()
+            ? outDetails.question
+            : undefined;
+      const rawOpts = (inputObj as { options?: unknown }).options ?? outDetails.options;
       const count = Array.isArray(rawOpts) ? rawOpts.length : 0;
       if (isDedupeSkipOutput(info)) {
         pushStep({
@@ -166,16 +180,18 @@ export function mapToolInfoToWorkedSteps(
         });
         break;
       }
+      const isAwaiting = isPending || !isHitlResolved(info.output);
       pushStep({
         id: info.toolCallId,
         kind: "confirmation",
         label: question ? `Asked: ${question}` : "Asked user choice",
-        subLabel: isPending
-          ? "Waiting for user selection..."
+        subLabel: isAwaiting
+          ? "Waiting for user input..."
           : count > 0
             ? `${count} options presented`
             : "User choice",
         isLive: false,
+        isSuspended: isAwaiting,
         isError,
         info,
       });
@@ -208,11 +224,12 @@ export function mapToolInfoToWorkedSteps(
             ? `Asked user: ${first}`
             : "Asked user questions",
         subLabel: isPending
-          ? "Waiting for user answers..."
+          ? "Waiting for user input..."
           : count > 1
             ? `${count} questions answered`
             : "User answers",
         isLive: false,
+        isSuspended: isPending,
         isError,
         info,
       });

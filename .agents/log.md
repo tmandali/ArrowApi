@@ -2,6 +2,19 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] Spike Identity & Token Diagnostics Workbench (/spike/identity)
+- **Rationale:** Developers needed a live diagnostic view to inspect active authentication details: decoded JWT access tokens, raw refresh tokens, claim lists (`realm_access`, `sub`, `scope`, etc.), active provider, Keycloak realm name, live TTL countdown, and live userinfo proxy testing.
+- **Decision:**
+  - Created server-side diagnostic API endpoint `GET /api/spike/identity` ([`route.ts`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/app/api/spike/identity/route.ts)) that reads raw session state and NextAuth JWT via `getToken()`, extracting access token, refresh token, expiry TTL, and realm. Protected by `NEXT_PUBLIC_ENABLE_SPIKES === "true"`.
+  - Built diagnostic UI page at `/spike/identity` ([`page.tsx`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/app/spike/identity/page.tsx)) comprising:
+    - [`identity-bench.tsx`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/app/spike/identity/identity-bench.tsx): Tab switcher (Overview, Access Token, Refresh Token, Server JWT), Live TTL countdown, Userinfo test executor.
+    - [`identity-overview-cards.tsx`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/app/spike/identity/identity-overview-cards.tsx): High-level overview cards for provider/realm, user status, token countdown, and roles.
+    - [`identity-claims-table.tsx`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/app/spike/identity/identity-claims-table.tsx): Searchable, filterable, copyable table for raw decoded JWT claims.
+- **Verification:** Verified `tsc --noEmit` clean (0 errors), `oxlint` clean (0 errors, 0 warnings), all files strictly under 500 lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] URN Provider Architecture with Authority & Issuer Isolation
 - **Rationale:** Previously, all Keycloak instances (local Docker on `localhost:8080` vs. corporate test on `keycloaktest.lcwaikiki.com`) reported generic `provider = "keycloak"`. This prevented the system from distinguishing identities created in a developer's local Docker Keycloak from authorized corporate identities, potentially allowing privilege cross-contamination if a developer switched environments.
 - **Decision:**

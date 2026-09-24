@@ -8,7 +8,7 @@ import {
   formatLocalizedRelativeDateTerms,
 } from "../yula-prompt-directives";
 
-const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
+export const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
   const fields = Object.entries(r.criteriaSchema.properties)
     .map(
       ([key, prop]) =>

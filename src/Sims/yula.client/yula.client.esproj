@@ -4,6 +4,7 @@
     <StartupCommand>pnpm run dev</StartupCommand>
     <ShouldRunBuildScript>false</ShouldRunBuildScript>
     <ShouldRunNpmInstall>false</ShouldRunNpmInstall>
+    <ShouldRunNpmAudit>false</ShouldRunNpmAudit>
     <!-- next build çıktısı (SSR server) — publish sürecinde ayrı Node servisi olarak koşar -->
     <BuildOutputFolder>$(MSBuildProjectDirectory)\.next\standalone</BuildOutputFolder>
   </PropertyGroup>

@@ -8,7 +8,7 @@ import { YulaWorkedAccordion } from "@/components/layout/yula-worked-accordion";
 import { AiChatMessage } from "@/components/layout/ai-chat-message";
 import { YulaChartCard } from "@/components/layout/yula-chart-card";
 import { YulaQuestionnaireCard } from "@/components/layout/yula-questionnaire-card";
-import { YulaChoiceCard } from "@/components/layout/yula-choice-card";
+import { HitlResolutionBadge } from "@/components/layout/ai-chat/hitl-resolution-badge";
 import { YulaSuggestionChips } from "@/components/layout/yula-suggestion-chips";
 import { YulaJobStartedCard } from "@/components/layout/yula-job-started-card";
 import { useYulaChat } from "@/hooks/use-yula-chat";
@@ -420,12 +420,11 @@ export function YulaChatTurn({
             const isReady = info.state === "output-available" || info.state === "input-available";
             if (info.toolName === "ask_user_choice" && !isError && isReady) {
               return (
-                <YulaChoiceCard
+                <HitlResolutionBadge
                   key={info.toolCallId}
-                  toolCallId={info.toolCallId}
-                  messageId={assistantMessage?.id}
                   input={info.input}
                   output={info.state === "output-available" ? info.output : undefined}
+                  isPending={info.state === "input-available"}
                 />
               );
             }
@@ -445,7 +444,7 @@ export function YulaChatTurn({
             return null;
           })}
 
-        {isLive ? (
+        {isLive && !yula.isSuspended ? (
           <div className="flex items-center gap-2 py-1.5 px-2 text-[12px] text-muted-foreground">
             <Loader2 className="size-3.5 shrink-0 text-primary animate-spin" />
             <span>{liveStatusLabel(toolParts, t, turnLang)}</span>

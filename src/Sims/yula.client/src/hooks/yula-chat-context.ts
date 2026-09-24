@@ -69,14 +69,7 @@ export interface YulaChatContextValue {
   /** Ajan kullanıcı onayı / seçimi bekliyor mu (ask_user_choice askıda mı)? */
   isSuspended: boolean;
   /** Askıda olan seçim bilgisi */
-  pendingChoice: {
-    toolCallId: string;
-    messageId?: string;
-    question: string;
-    options: Array<any>;
-    allowCustom?: boolean;
-    customPlaceholder?: string;
-  } | null;
+  pendingChoice: import("@/lib/contracts/hitl-prompt").HitlPromptData | null;
   /** Askıdaki seçimi yanıtlayıp ajanın akışa devam etmesini sağlar */
   respondToChoice: (value: string) => void;
 }

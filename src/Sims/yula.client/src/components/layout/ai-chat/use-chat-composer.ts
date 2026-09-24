@@ -323,8 +323,8 @@ export function useChatComposer(args: {
     clearComposer();
   };
 
-  const handleSend = () => {
-    doSend(input);
+  const handleSend = (overrideText?: string) => {
+    doSend(overrideText ?? input);
   };
 
   const handleSteer = (text?: string) => {
@@ -456,6 +456,7 @@ export function useChatComposer(args: {
     isProviderSubmenu,
     isSuspended: yula.isSuspended,
     pendingChoice: yula.pendingChoice,
+    respondToChoice: yula.respondToChoice,
   };
 }
 

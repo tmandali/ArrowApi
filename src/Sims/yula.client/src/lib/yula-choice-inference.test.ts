@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseChoiceData } from "./yula-choice-card.tsx";
+import { parseChoiceData } from "@/lib/yula-choice-inference";
 
-describe("YulaChoiceCard dynamic custom_placeholder and choice parsing", () => {
+describe("parseChoiceData dynamic custom_placeholder and choice parsing", () => {
   it("resolves dynamic custom_placeholder hint from model", () => {
     const data = parseChoiceData({
       question: "Which date range would you like to inspect?",

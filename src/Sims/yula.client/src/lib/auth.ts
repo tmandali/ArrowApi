@@ -135,6 +135,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token;
       }
 
+      // 1d) Mevcut/eski session'da provider damgası eksikse access token'dan onar:
+      if (!token.provider && token.accessToken) {
+        try {
+          const part = String(token.accessToken).split(".")[1];
+          if (part) {
+            const payload = JSON.parse(
+              Buffer.from(part.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8"),
+            ) as { iss?: string; realm_access?: unknown };
+            const iss = typeof payload.iss === "string" ? payload.iss : "";
+            if (iss.includes("/realms/") || payload.realm_access) {
+              token.provider = normalizeProvider("keycloak");
+            } else if (iss.includes("google")) {
+              token.provider = "google";
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       // 2) Token hâlâ geçerli → iş yapma.
       if (token.expiresAt && Date.now() < (token.expiresAt as number)) return token;
 
@@ -206,7 +226,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessToken = data.access_token;
         token.expiresAt = (data.expires_in ?? 3600) * 1000 + Date.now();
         if (data.refresh_token) token.refreshToken = data.refresh_token;
-        if (provider === "keycloak") token.roles = realmRolesFromAccessToken(data.access_token);
+        if (provider === "keycloak" || provider.startsWith("keycloak:")) {
+          token.roles = realmRolesFromAccessToken(data.access_token);
+        }
         delete token.error;
       } catch (error) {
         console.error(`[auth] refresh isteği istisna (${provider}):`, error);

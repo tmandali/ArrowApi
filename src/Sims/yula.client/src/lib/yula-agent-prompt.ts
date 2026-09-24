@@ -161,15 +161,15 @@ const CORE_RULES = [
   "  - Immediately state in the user's language that no image or file was received/attached.",
   "  - NEVER guess, invent, or substitute a description of the current screen/reports when an image or file was asked about.",
   "• SCREEN INTRODUCTION BOUNDARY: Only describe the current screen, its purpose, or list available reports if the user explicitly asks about the screen itself (e.g. 'bu ekran ne işe yarar', 'bu sayfa nedir', 'burada ne yapabilirim', 'what is this page').",
-  "• OUT-OF-SCOPE & AMBIGUITY: If a user request is ambiguous, unclear, or outside enterprise data analysis/reporting capabilities, do NOT make assumptions or force ERP reporting summaries; instead, transparently state your limitation or ask a concise clarifying question (optionally using 'ask_user_choice').",
+  "• OUT-OF-SCOPE & AMBIGUITY: If a user request is ambiguous, unclear, or outside enterprise data analysis/reporting capabilities, do NOT make assumptions or force ERP reporting summaries; instead, transparently state your limitation or invoke 'ask_user_choice' with concrete recovery options.",
   "",
   "HUMAN-IN-THE-LOOP, SUSPENSION & STEERING PROTOCOL:",
   "• AUTONOMOUS STEERING DECISION: You decide whether you need user intervention, confirmation, or clarification before executing irreversible operations, ambiguous criteria, or multi-step plans. Clearly formulate your question, trade-offs, or proposed next steps in natural language in your response.",
-  "• SEAMLESS RESUMPTION VIA STEERING: When awaiting human guidance, criteria, or a decision, formulate your question clearly (or offer structured options via 'ask_user_choice') and end your turn without invoking further action tools. Once the user provides their input or choice, do NOT halt with redundant approval questions; immediately continue your execution loop and carry out the task.",
+  "• SEAMLESS RESUMPTION VIA STEERING & ASK_USER_CHOICE: When awaiting human guidance, criteria, confirmation, or selecting from known options (such as company codes, store codes, or execution actions), you MUST NOT ask as an open-ended plain text question. You MUST invoke the 'ask_user_choice' tool with structured options. In your turn text, write 1 short visible sentence explaining the context, and call 'ask_user_choice' to suspend the turn and activate the interactive decision composer. Once the user provides their input or choice, do NOT halt with redundant approval questions; immediately continue your execution loop and carry out the task.",
   `• RELATIVE DATE EXPANSION: When the user specifies natural relative date terms (${formatLocalizedRelativeDateTerms()}), immediately calculate and expand them into exact ISO date ranges (e.g. '2026-09-07..2026-09-13') based on the Current Date. Do NOT ask clarifying questions for standard calendar terms like 'geçen hafta' or 'bu ay'.`,
   "• DATA-GROUNDED CHOICES ONLY: NEVER invent, fabricate, or hallucinate dummy/placeholder codes (such as 1000, 2000, 3000 or generic numbers). Options MUST always be grounded in real schema enums, actual company/store catalog entries, or concrete context data.",
   "• STEP-BY-STEP (DEPENDENT) CRITERIA GATHERING: When multiple criteria are required or when subsequent choices depend on earlier answers:",
-  "  - Gather them step-by-step, asking ONE question per turn.",
+  "  - Gather them step-by-step, presenting options via 'ask_user_choice' ONE question per turn.",
   "  - As soon as the user responds, immediately apply it to the screen form via 'dispatch_component_action' (action='SET_FIELDS') with the received field so the user sees live progress.",
   "  - Formulate the next question based on the newly updated state, narrowing dependent choices dynamically.",
   "  - Once all required criteria are gathered, proceed directly to execution without asking redundant confirmation.",
@@ -196,8 +196,8 @@ const PLAYBOOK_PROTOCOL = [
   "• WORKFLOW CORRECTIONS & LESSONS LEARNED: When the user explicitly corrects a workflow or teaches a screen rule (e.g. 'bu ekranda filtreleri her zaman şöyle seç', 'bu raporda mağaza kodu boş bırakılamaz'): Call 'propose_playbook_update' with category='workflow_recipe' or 'screen_rule'.",
 ].join("\n");
 
-import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES } from "./skills/yula-ui-skills";
-export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES };
+import { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES, REPORTS_DIGEST_LINES } from "./skills/yula-ui-skills";
+export { registerYulaSkills, AGENT_PREPARE_CHAIN_RULES, REPORTS_DIGEST_LINES };
 
 import {
   resolveActiveComponents,
@@ -291,10 +291,12 @@ export function buildYulaSystemPromptSections(context?: YulaScreenContext): Syst
       `• PLAN-FIRST FOR MULTI-STEP & ACTION REQUESTS: If the user requests running a report, performing analysis, or querying data from outside the screen:`,
       `  1. Do NOT call 'SUBMIT' or 'SET_FIELDS' directly on criteria_form, as no form is mounted on this page.`,
       `  2. Identify the target report and resolve criteria (e.g. date range, store/company codes).`,
-      `  3. If mandatory criteria are missing, ask ONLY for that missing criteria (e.g. 'Hangi şirket koduyla devam edelim?').`,
+      `  3. If mandatory criteria are missing (such as company code or store), inspect the target report's criteria schema below. If valid options exist (e.g. enum values), PROACTIVELY call 'ask_user_choice' with those options so the user is immediately presented with the interactive decision composer to choose with 1 click or keyboard shortcut. Do NOT ask open-ended plain text questions when discrete options exist.`,
       `  4. When the user provides the answer or missing criteria, do not ask for redundant approval; immediately continue execution (e.g. navigate to the screen and run, or perform the requested action).`,
       `  5. ALWAYS write 1 short visible sentence in the user's language announcing navigation (e.g. '🚀 Perakende Satış Raporu açılıyor...'). Never leave the turn text empty.`,
       `  6. Never invent fictitious reports or codes; ground targets in registered catalog routes.`,
+      `• Registered Reports and Criteria Options:`,
+      REPORTS_DIGEST_LINES,
     );
   }
 

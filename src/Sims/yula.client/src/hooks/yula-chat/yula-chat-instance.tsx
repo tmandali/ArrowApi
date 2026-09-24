@@ -30,12 +30,10 @@ import {
 } from "@/lib/yula-ai-client-config";
 import { useProviderDialogStore } from "@/lib/stores/provider-dialog-store";
 
+import { normalizeHitlPrompt, isHitlResolved } from "@/lib/contracts/hitl-prompt";
+
 /**
  * Yula Chat Instance — Saf @my-agent/react motoru ve Headless UI-Agent bileşen kaydı.
- *
- * Demo projedeki gibi yapay Vercel SDK manuel döngüleri, prompt kuyruklama
- * veya süre kapıları (sendGate) içermez; araçlar ve olaylar doğrudan EventBus
- * ve @my-agent/core üzerinden yürütülür.
  */
 let errorIdCounter = 0;
 function nextErrorAssistantId(): string {
@@ -45,29 +43,30 @@ function nextErrorAssistantId(): string {
 
 function extractPendingChoice(messages?: any[]) {
   if (!messages || messages.length === 0) return null;
-  const lastMsg = messages[messages.length - 1];
-  if (!lastMsg || lastMsg.role !== "assistant") return null;
+  const lastAsst = [...messages].reverse().find((m) => m?.role === "assistant");
+  if (!lastAsst) return null;
 
-  const parts = (lastMsg as any).parts;
+  const lastAsstIdx = messages.lastIndexOf(lastAsst);
+  if (messages.slice(lastAsstIdx + 1).some((m) => m?.role === "user")) return null;
+
+  const parts = (lastAsst as any).parts;
   if (!Array.isArray(parts)) return null;
 
   for (const p of parts) {
-    if (
-      p &&
-      typeof p === "object" &&
-      (p.type === "tool-ask_user_choice" || p.toolName === "ask_user_choice")
-    ) {
-      if (p.state === "output-available" && p.output != null) continue;
+    const isHitlTool =
+      p && typeof p === "object" &&
+      (p.type === "tool-ask_user_choice" || p.toolName === "ask_user_choice" ||
+        p.type === "tool-request_user_confirmation" || p.toolName === "request_user_confirmation");
 
-      const args = (p.input || p.args || {}) as Record<string, any>;
-      return {
+    if (isHitlTool && !isHitlResolved(p.output)) {
+      const toolName = p.toolName || (typeof p.type === "string" && p.type.startsWith("tool-") ? p.type.slice(5) : undefined);
+      return normalizeHitlPrompt({
+        toolName,
         toolCallId: p.toolCallId || "",
-        messageId: lastMsg.id,
-        question: String(args.question || ""),
-        options: Array.isArray(args.options) ? args.options : [],
-        allowCustom: args.allow_custom !== false,
-        customPlaceholder: typeof args.custom_placeholder === "string" ? args.custom_placeholder : undefined,
-      };
+        messageId: lastAsst.id,
+        input: p.input || p.args || {},
+        output: p.output,
+      });
     }
   }
   return null;

@@ -65,23 +65,49 @@ export async function GET() {
       source: "session-claims",
     });
   }
-  switch (user.provider) {
-    case "google":
-      // Klâsik redirect'li Google OAuth — gerçek access token'la
-      // çalışır (refresh token varsayılmaz; ömrü dolmuş token 409'a
-      // döner, One Tap'teki gibi değil — gerçek token süresi ~1 saat).
-      url = "https://openidconnect.googleapis.com/v1/userinfo";
-      break;
-    case "keycloak": {
-      const issuer = process.env.KEYCLOAK_ISSUER;
-      if (!issuer) {
-        return NextResponse.json({ error: "misconfigured" }, { status: 500 });
+  let prov = user.provider ?? "";
+
+  // Dayanıklı fallback: Session'da provider damgası yoksa veya eski çerezse access token'dan çöz
+  if (!prov || (!prov.startsWith("keycloak") && !prov.startsWith("google"))) {
+    try {
+      const part = accessToken.split(".")[1];
+      if (part) {
+        const payload = JSON.parse(
+          Buffer.from(part.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8"),
+        ) as { iss?: string; realm_access?: unknown };
+        const iss = typeof payload.iss === "string" ? payload.iss : "";
+        if (iss.includes("/realms/") || payload.realm_access) {
+          prov = "keycloak";
+        } else if (iss.includes("google")) {
+          prov = "google";
+        }
       }
-      url = `${issuer.replace(/\/+$/, "")}/protocol/openid-connect/userinfo`;
-      break;
+    } catch {
+      // ignore
     }
-    default:
-      return NextResponse.json({ error: "unsupported_provider" }, { status: 400 });
+  }
+
+  // Hâlâ tespit edilemediyse ve KEYCLOAK_ISSUER varsa Keycloak varsay
+  if (!prov && process.env.KEYCLOAK_ISSUER) {
+    prov = "keycloak";
+  }
+
+  const isGoogle = prov === "google" || prov.startsWith("google:");
+  const isKeycloak = prov === "keycloak" || prov.startsWith("keycloak:");
+
+  if (isGoogle) {
+    url = "https://openidconnect.googleapis.com/v1/userinfo";
+  } else if (isKeycloak) {
+    const issuer = process.env.KEYCLOAK_ISSUER;
+    if (!issuer) {
+      return NextResponse.json({ error: "misconfigured", detail: "KEYCLOAK_ISSUER missing" }, { status: 500 });
+    }
+    url = `${issuer.replace(/\/+$/, "")}/protocol/openid-connect/userinfo`;
+  } else {
+    return NextResponse.json(
+      { error: "unsupported_provider", rawProvider: user.provider ?? null },
+      { status: 400 },
+    );
   }
 
   let upstream: Response;

@@ -12,7 +12,7 @@ import {
   extractJobStartedAction,
 } from "./yula-chat-turn-helpers.tsx";
 import { parseChartOutput } from "./yula-chart-utils";
-import { parseChoiceData } from "./yula-choice-card";
+import { parseChoiceData } from "@/lib/yula-choice-inference";
 import type { YulaToolPartInfo } from "@/lib/yula-tool-info";
 
 describe("hasVisibleTurnCard & hasVisibleTurnContent", () => {
