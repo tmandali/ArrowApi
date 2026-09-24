@@ -2,6 +2,19 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] URN Provider Architecture with Authority & Issuer Isolation
+- **Rationale:** Previously, all Keycloak instances (local Docker on `localhost:8080` vs. corporate test on `keycloaktest.lcwaikiki.com`) reported generic `provider = "keycloak"`. This prevented the system from distinguishing identities created in a developer's local Docker Keycloak from authorized corporate identities, potentially allowing privilege cross-contamination if a developer switched environments.
+- **Decision:**
+  - Implemented the **URN Format (Method A)**: `provider:authority` (e.g. `keycloak:keycloaktest.lcwaikiki.com` vs. `keycloak:localhost:8080`, `google`, `ldap:corp.lcwaikiki.local`).
+  - Enhanced `normalizeProvider` in [`session-identity.ts`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/features/auth/lib/session-identity.ts) to parse and stamp the active `KEYCLOAK_ISSUER` host domain onto the provider key.
+  - Enhanced `refreshEndpoint` in [`auth-helpers.ts`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/features/auth/lib/auth-helpers.ts) to recognize URN prefixes (`keycloak:*` and `google:*`).
+  - Updated `auth.ts` JWT callback to stamp URN provider into session token.
+  - Migrated existing catalog and identity records in PostgreSQL from `keycloak` to `keycloak:keycloaktest.lcwaikiki.com`.
+- **Verification:** Verified Docker Keycloak and Corporate Keycloak resolve to distinct, mutually isolated provider URNs. `tsc --noEmit` and `oxlint` 0 errors.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Same-Provider Auto-Linking with Cross-Provider Zero-Trust Isolation
 - **Rationale:** Keycloak test realms (such as `keycloaktest.lcwaikiki.com`) frequently issue transient/ephemeral subject identifiers (`sub`) upon session renewal or user re-synchronization. While cross-provider isolation must prevent unverified IdPs from escalating privileges by claiming a corporate email, logins originating from the *same* verified Identity Provider (e.g. `provider === 'keycloak'`) should automatically link to the existing `app_users` catalog record.
 - **Decision:**

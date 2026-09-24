@@ -7,16 +7,40 @@
 import type { Session } from "@/lib/auth";
 
 /**
- * Provider normalizasyonu: Google One Tap ("google-onesig") aslında Google
- * kimliğidir — aynı Google hesabı GIS butonu + One Tap ile 2 satır
- * üretmesin diye `google`'a yansır.
+ * Provider normalizasyonu (URN Formatı - Method A):
+ * - Google: "google"
+ * - SMS: "sms"
+ * - Keycloak: Aktif Issuer'a göre `keycloak:<host>` olarak çözülür.
+ *   Örn: `keycloak:keycloaktest.lcwaikiki.com` vs `keycloak:localhost:8080`.
+ *   Böylece Docker Keycloak ile Şirket Keycloak'u birbirinden %100 izole edilir.
+ * - LDAP (gelecekte): `ldap:<host>` (örn: `ldap:dc01.corp.lcwaikiki.local`).
  */
 export function normalizeProvider(provider?: string | null): string | null {
   if (!provider) return null;
   const p = provider.trim().toLowerCase();
   if (!p) return null;
   if (p === "google-onesig" || p === "google") return "google";
-  if (p === "keycloak") return "keycloak";
+  if (p === "sms") return "sms";
+
+  // Zaten URN formatındaysa (keycloak:host, ldap:host, azure:tenant vb.) koru:
+  if (p.startsWith("keycloak:") || p.startsWith("ldap:") || p.startsWith("azure:")) {
+    return p;
+  }
+
+  // Yalın "keycloak" geldiyse aktif KEYCLOAK_ISSUER env'inden hostu çöz:
+  if (p === "keycloak") {
+    const issuer = process.env.KEYCLOAK_ISSUER;
+    if (issuer) {
+      try {
+        const url = new URL(issuer);
+        return `keycloak:${url.host.toLowerCase()}`;
+      } catch {
+        return `keycloak:${issuer.toLowerCase()}`;
+      }
+    }
+    return "keycloak";
+  }
+
   return p;
 }
 

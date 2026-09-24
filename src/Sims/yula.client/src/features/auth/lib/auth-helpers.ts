@@ -45,22 +45,19 @@ export function refreshEndpoint(provider: string): {
   clientId: string;
   clientSecret: string;
 } | null {
-  switch (provider) {
-    case "google": {
-      const clientId = process.env.AUTH_GOOGLE_ID;
-      const clientSecret = process.env.AUTH_GOOGLE_SECRET;
-      if (!clientId || !clientSecret) return null;
-      return { url: "https://oauth2.googleapis.com/token", clientId, clientSecret };
-    }
-    case "keycloak": {
-      const issuer = process.env.KEYCLOAK_ISSUER;
-      const clientId = process.env.AUTH_KEYCLOAK_ID;
-      const clientSecret = process.env.AUTH_KEYCLOAK_SECRET;
-      if (!issuer || !clientId || !clientSecret) return null;
-      const tokenUrl = `${issuer.replace(/\/+$/, "")}/protocol/openid-connect/token`;
-      return { url: tokenUrl, clientId, clientSecret };
-    }
-    default:
-      return null;
+  if (provider === "google" || provider.startsWith("google:")) {
+    const clientId = process.env.AUTH_GOOGLE_ID;
+    const clientSecret = process.env.AUTH_GOOGLE_SECRET;
+    if (!clientId || !clientSecret) return null;
+    return { url: "https://oauth2.googleapis.com/token", clientId, clientSecret };
   }
+  if (provider === "keycloak" || provider.startsWith("keycloak:")) {
+    const issuer = process.env.KEYCLOAK_ISSUER;
+    const clientId = process.env.AUTH_KEYCLOAK_ID;
+    const clientSecret = process.env.AUTH_KEYCLOAK_SECRET;
+    if (!issuer || !clientId || !clientSecret) return null;
+    const tokenUrl = `${issuer.replace(/\/+$/, "")}/protocol/openid-connect/token`;
+    return { url: tokenUrl, clientId, clientSecret };
+  }
+  return null;
 }

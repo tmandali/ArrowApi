@@ -17,6 +17,7 @@ import {
   googleOneTapProvider,
   smsOtpProvider,
 } from "@/features/auth/lib/custom-credentials-providers";
+import { normalizeProvider } from "@/features/auth/lib/session-identity";
 
 // Session type extension (refreshToken bilinçli olarak dışarı verilmez)
 export interface Session extends NextAuthSession {
@@ -92,7 +93,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessToken = account.access_token;
         if (account.refresh_token) token.refreshToken = account.refresh_token;
         token.expiresAt = (account.expires_in ?? 3600) * 1000 + Date.now();
-        token.provider = account.provider;
+        token.provider = normalizeProvider(account.provider) ?? account.provider;
         token.roles =
           account.provider === "keycloak" && typeof account.access_token === "string"
             ? realmRolesFromAccessToken(account.access_token)
