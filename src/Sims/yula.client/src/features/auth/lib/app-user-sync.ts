@@ -242,15 +242,21 @@ export async function upsertIdentityFromSession(
         .returning();
       row = updated ?? row;
     } else {
-      // Yeni kayıt: bu e-posta adresiyle katalogda (app_users) zaten yetkilendirilmiş
-      // bir kullanıcı var mı kontrol et; varsa doğrudan ona bağla (oturum/sub yenilenmelerinde
-      // yetki kaybını önler), yoksa guest (null) kalır.
+      // Yeni kayıt: AYNI PROVIDER ve bu e-posta adresiyle katalogda (app_users) zaten yetkilendirilmiş
+      // bir kullanıcı var mı kontrol et; provider da aynıysa doğrudan bağla (oturum/sub yenilenmelerinde
+      // yetki kaybını önler). Provider farklıysa (örn. Google vs Keycloak) güvenlik gereği GUEST kalır,
+      // adminin manuel merge işlemi yapması gerekir.
       let existingUserId: string | null = null;
-      if (u.email) {
+      if (u.email && identity.provider) {
         const [existing] = await db
           .select({ id: appUsersSchema.id })
           .from(appUsersSchema)
-          .where(eq(sql`LOWER(${appUsersSchema.email})`, u.email.toLowerCase()))
+          .where(
+            and(
+              eq(appUsersSchema.provider, identity.provider),
+              eq(sql`LOWER(${appUsersSchema.email})`, u.email.toLowerCase()),
+            ),
+          )
           .limit(1);
         existingUserId = existing?.id ?? null;
       }
