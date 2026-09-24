@@ -199,7 +199,7 @@ export class Agent implements AgentState {
 
   async run(prompts: any[], externalSignal?: AbortSignal): Promise<any[]> {
     if (this._isStreaming) {
-      throw new Error('Agent is already running a turn. Steer or abort first.');
+      this.abort();
     }
 
     this._isStreaming = true;

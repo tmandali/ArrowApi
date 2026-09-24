@@ -15,7 +15,6 @@ import { isAiAllowedOnRoute } from "@/lib/contracts/screen-contract";
 import {
   executeComponentAction,
   multiLaneScheduler,
-  retryWithBackoff,
   uiEventBus,
   classifyDiagnosticError,
   getMessageText,
@@ -229,16 +228,21 @@ export function ChatInstance({
     await chat.stop();
   }, [chat]);
 
+  const isRetryingRef = React.useRef(false);
+
   const retryResponse = React.useCallback(async () => {
+    if (isRetryingRef.current) return;
+    isRetryingRef.current = true;
     userStoppedRef.current = false;
     setStopped(false);
-    await chat.stop();
-    await retryWithBackoff(
-      async () => {
-        await chat.regenerate();
-      },
-      { maxRetries: 2, initialDelayMs: 250, backoffMultiplier: 2 }
-    );
+    try {
+      chat.stop();
+      await chat.regenerate();
+    } catch (err) {
+      console.warn("[retryResponse] Regeneration error:", err);
+    } finally {
+      isRetryingRef.current = false;
+    }
   }, [chat]);
 
   const pendingChoice = extractPendingChoice(chat.messages);

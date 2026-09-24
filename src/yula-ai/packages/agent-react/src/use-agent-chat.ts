@@ -191,6 +191,7 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
   // Pi Autonomous Agent Engine & Session Instances
   const agentRef = useRef<Agent | null>(null);
   const sessionRef = useRef<AgentSession | null>(null);
+  const turnPromiseRef = useRef<Promise<any> | null>(null);
 
   const streamFn = useMemo(() => {
     return createYulaStreamFn({
@@ -334,8 +335,11 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         createdAt: new Date(),
       };
 
-      if (agentRef.current?.isStreaming) {
+      if (agentRef.current?.isStreaming || turnPromiseRef.current) {
         stop();
+        if (turnPromiseRef.current) {
+          try { await turnPromiseRef.current; } catch { /* noop */ }
+        }
       }
 
       setMessages((prev) => [...prev, userMsg]);
@@ -347,43 +351,49 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       const ac = new AbortController();
       abortControllerRef.current = ac;
 
-      try {
-        if (!agentRef.current) return;
-        agentRef.current.messages = [...messages, userMsg];
+      const runTurn = async () => {
+        try {
+          if (!agentRef.current) return;
+          agentRef.current.messages = [...messages, userMsg];
 
-        // Otonom ReAct Döngüsünü Başlat
-        const newTurns = sessionRef.current
-          ? await sessionRef.current.prompt([userMsg])
-          : await agentRef.current.run([userMsg], ac.signal);
-        setMessages((prev) => {
-          // Çakışan mesajları filtrele ve yeni turları transkripte bağla
-          const existingIds = new Set(prev.map((m) => m.id));
-          const additions = newTurns.filter((nt) => !existingIds.has(nt.id));
-          return [...prev, ...additions];
-        });
+          // Otonom ReAct Döngüsünü Başlat
+          const newTurns = sessionRef.current
+            ? await sessionRef.current.prompt([userMsg])
+            : await agentRef.current.run([userMsg], ac.signal);
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const additions = newTurns.filter((nt) => !existingIds.has(nt.id));
+            return [...prev, ...additions];
+          });
 
-        const lastAssistant = newTurns.reverse().find((m) => m.role === 'assistant');
-        if (lastAssistant) {
-          options?.onFinish?.(lastAssistant);
-        }
+          const lastAssistant = newTurns.reverse().find((m) => m.role === 'assistant');
+          if (lastAssistant) {
+            options?.onFinish?.(lastAssistant);
+          }
 
-        // Compaction kontrolü
-        const updatedUsage = calculateContextUsage([...messages, ...newTurns], selectedModel);
-        setContextUsage(updatedUsage);
-        if (autoCompactEnabled && shouldCompact(updatedUsage.tokens, updatedUsage.contextWindow, options?.compactionSettings)) {
-          setTimeout(() => compact(undefined, 'threshold'), 150);
+          // Compaction kontrolü
+          const updatedUsage = calculateContextUsage([...messages, ...newTurns], selectedModel);
+          setContextUsage(updatedUsage);
+          if (autoCompactEnabled && shouldCompact(updatedUsage.tokens, updatedUsage.contextWindow, options?.compactionSettings)) {
+            setTimeout(() => compact(undefined, 'threshold'), 150);
+          }
+        } catch (err: any) {
+          if (err.name !== 'AbortError') {
+            setError(err);
+            setStatus('error');
+            options?.onError?.(err);
+          }
+        } finally {
+          setIsLoading(false);
+          setStatus('ready');
+          abortControllerRef.current = null;
+          turnPromiseRef.current = null;
         }
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          setError(err);
-          setStatus('error');
-          options?.onError?.(err);
-        }
-      } finally {
-        setIsLoading(false);
-        setStatus('ready');
-        abortControllerRef.current = null;
-      }
+      };
+
+      const p = runTurn();
+      turnPromiseRef.current = p;
+      await p;
     },
     [input, availableModels, selectedProvider, selectedModel, selectModel, newConversation, compact, options, appendSystemMessage, messages, autoCompactEnabled, stop]
   );
@@ -406,6 +416,9 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
 
   const regenerate = useCallback(async () => {
     stop();
+    if (turnPromiseRef.current) {
+      try { await turnPromiseRef.current; } catch { /* noop */ }
+    }
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser) {
       const text = lastUser.content || '';
