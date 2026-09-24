@@ -19,10 +19,10 @@
  * KURAL: Bu modül Node runtime'ında çalışır (`@/server/db/client`
  * bağımlılığı). Asla client bileşeninden import etme.
  */
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
-import { appUsersSchema, identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
+import { identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
 import { appRoleForSession } from "./realm-roles";
 import { normalizeProvider, sessionIdentity } from "./session-identity";
 
@@ -242,26 +242,10 @@ export async function upsertIdentityFromSession(
         .returning();
       row = updated ?? row;
     } else {
-      // Yeni kayıt: AYNI PROVIDER ve bu e-posta adresiyle katalogda (app_users) zaten yetkilendirilmiş
-      // bir kullanıcı var mı kontrol et; provider da aynıysa doğrudan bağla (oturum/sub yenilenmelerinde
-      // yetki kaybını önler). Provider farklıysa (örn. Google vs Keycloak) güvenlik gereği GUEST kalır,
-      // adminin manuel merge işlemi yapması gerekir.
-      let existingUserId: string | null = null;
-      if (u.email && identity.provider) {
-        const [existing] = await db
-          .select({ id: appUsersSchema.id })
-          .from(appUsersSchema)
-          .where(
-            and(
-              eq(appUsersSchema.provider, identity.provider),
-              eq(sql`LOWER(${appUsersSchema.email})`, u.email.toLowerCase()),
-            ),
-          )
-          .limit(1);
-        existingUserId = existing?.id ?? null;
-      }
-
-      // Yeni kayıt: uygulama GUID'i — provider'dan bağımsız, stabil.
+      // Yeni kayıt: Zero-Trust güvenlik kuralı — her yeni gelen kimlik (provider + providerId)
+      // varsayılan olarak GUEST (userId: null) açılır. Çoklu IdP / LDAP yapılarında
+      // e-posta benzerliğinden kaynaklı yetki yükseltme (impersonation/collision) kesinlikle
+      // yapılmaz; yetkilendirme ve cross-provider birleştirme yalnız admin kontrolündedir.
       newId = crypto.randomUUID();
       await db
         .insert(userIdentitiesSchema)
@@ -275,7 +259,7 @@ export async function upsertIdentityFromSession(
           // SET listesinde YOK → mevcut değer korunur (birleşme yarışında
           // diğer istek de aynı ilk kayıt dilini taşır — eş değer).
           language: language ?? null,
-          userId: existingUserId,
+          userId: null,
           lastActive: "Now",
         })
         .onConflictDoNothing({
