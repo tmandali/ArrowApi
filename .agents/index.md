@@ -40,6 +40,7 @@ Follow the operational guide corresponding to your current development layer:
 | Category | Topic / Document | When to Read? |
 | :--- | :--- | :--- |
 | **Standards** | [Graph Documentation Standard](file:///Users/tmr/Source/ArrowApi/.agents/standards/graph-documentation-standard.md) | Authoring or refactoring any agent or architecture doc into the Node & Edge graph format (**Enforced Rule**). |
+| **Standards** | [Yula Minimalist System Harness](file:///Users/tmr/Source/ArrowApi/.agents/standards/yula-minimalist-harness-standard.md) | Enforced Pi Minimalist Standard: Zero-prompt maintenance via Action Contracts, Live DOM State, and Catalog Binding (**Enforced Rule**). |
 | **Architecture (ADR)** | [Master System Graph](file:///Users/tmr/Source/ArrowApi/src/yula-ai/agent.md) | Understanding the full topological flow, ReAct cycles, HITL gates, and component interactions across the ecosystem. |
 | **Architecture (ADR)** | [Headless React Agent](file:///Users/tmr/Source/ArrowApi/.agents/architecture/headless-react-agent.md) | Working on Yula AI, `@my-agent`, ReAct/Plan modes, telemetry, or UI action integration. |
 | **Architecture (ADR)** | [Causal Step Frames & State Machine](file:///Users/tmr/Source/ArrowApi/.agents/architecture/causal-step-frame-state-machine.md) | Working on ReAct step transparency, turn state machine, PostgreSQL telemetry, or Mermaid decision trees. |

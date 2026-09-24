@@ -28,98 +28,148 @@ export function HitlDecisionComposer({
     prompt.defaultOptionId || prompt.options[0]?.id || "",
   );
   const [customText, setCustomText] = React.useState<string>("");
+  const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const customInputRef = React.useRef<HTMLTextAreaElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const fallbackOptionId = prompt.defaultOptionId || prompt.options[0]?.id || "";
+  const effectiveOptionId = prompt.options.some((o) => o.id === selectedOptionId)
+    ? selectedOptionId
+    : fallbackOptionId;
 
   const activeOption = React.useMemo(
-    () => prompt.options.find((o) => o.id === selectedOptionId),
-    [prompt.options, selectedOptionId],
+    () => prompt.options.find((o) => o.id === effectiveOptionId),
+    [prompt.options, effectiveOptionId],
   );
 
   const isCustomActive = Boolean(activeOption?.isCustomInput);
 
-  // Focus custom input when its option is selected
+  // Focus custom input when selected, or focus container to capture keyboard navigation
   React.useEffect(() => {
     if (isCustomActive) {
       requestAnimationFrame(() => {
         customInputRef.current?.focus();
       });
+    } else {
+      if (document.activeElement && document.activeElement !== document.body && document.activeElement !== containerRef.current) {
+        (document.activeElement as HTMLElement).blur?.();
+      }
+      containerRef.current?.focus();
     }
   }, [isCustomActive]);
 
+  React.useEffect(() => {
+    const el = containerRef.current?.querySelector(`[data-option-id="${selectedOptionId}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [selectedOptionId]);
+
   const handleSelectOption = React.useCallback(
     (opt: HitlOption) => {
-      if (disabled) return;
+      if (disabled || isSubmitting) return;
       setSelectedOptionId(opt.id);
     },
-    [disabled],
+    [disabled, isSubmitting],
   );
 
   const handleFinalSubmit = React.useCallback(() => {
-    if (disabled || !activeOption) return;
+    if (disabled || isSubmitting || !activeOption) return;
 
     if (activeOption.isCustomInput) {
       const trimmed = customText.trim();
       if (!trimmed) return;
+      setIsSubmitting(true);
       onSubmit(trimmed);
       return;
     }
 
-    const payload =
-      activeOption.value && activeOption.value !== activeOption.label
-        ? `${activeOption.label} (${activeOption.value})`
-        : activeOption.label;
-
+    const payload = activeOption.value || activeOption.label;
+    setIsSubmitting(true);
     onSubmit(payload);
-  }, [disabled, activeOption, customText, onSubmit]);
+  }, [disabled, isSubmitting, activeOption, customText, onSubmit]);
 
   const handleSkip = React.useCallback(() => {
-    if (disabled) return;
+    if (disabled || isSubmitting) return;
+    setIsSubmitting(true);
     if (onSkip) {
       onSkip();
     } else {
       onSubmit("skip");
     }
-  }, [disabled, onSkip, onSubmit]);
+  }, [disabled, isSubmitting, onSkip, onSubmit]);
 
-  // Global keyboard shortcuts (1-9 to select, Enter to submit, Esc to skip)
+  // Global keyboard shortcuts (↑/↓ to navigate, 1-9 to select, Enter to submit, Esc to skip)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (disabled) return;
+      if (disabled || isSubmitting) return;
 
-      const isTypingInInput =
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA";
+      const isInsideCustom = document.activeElement === customInputRef.current;
 
-      // Allow Enter to submit if not a shift-enter in textarea
+      // 1. Enter Key
       if (e.key === "Enter" && !e.shiftKey) {
-        // If typing in custom textarea, enter submits if trimmed text exists
-        if (isCustomActive && isTypingInInput) {
+        if (isInsideCustom) {
           if (customText.trim()) {
             e.preventDefault();
             handleFinalSubmit();
           }
           return;
         }
-
-        // If not in a multiline textarea, Enter submits selected option
-        if (!isTypingInInput) {
-          e.preventDefault();
-          handleFinalSubmit();
-          return;
-        }
+        e.preventDefault();
+        handleFinalSubmit();
+        return;
       }
 
-      // Escape to skip
+      // If user is actively typing in the custom textarea, allow editing
+      if (isInsideCustom) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          customInputRef.current?.blur();
+          containerRef.current?.focus();
+        }
+        return;
+      }
+
+      // 2. Arrow Navigation (Down / Right = Next, Up / Left = Prev)
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const curIdx = prompt.options.findIndex((o) => o.id === selectedOptionId);
+        const nextIdx = curIdx < prompt.options.length - 1 ? curIdx + 1 : 0;
+        if (prompt.options[nextIdx]) {
+          setSelectedOptionId(prompt.options[nextIdx].id);
+        }
+        return;
+      }
+
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        const curIdx = prompt.options.findIndex((o) => o.id === selectedOptionId);
+        const prevIdx = curIdx > 0 ? curIdx - 1 : prompt.options.length - 1;
+        if (prompt.options[prevIdx]) {
+          setSelectedOptionId(prompt.options[prevIdx].id);
+        }
+        return;
+      }
+
+      // 3. Tab cycling
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const curIdx = prompt.options.findIndex((o) => o.id === selectedOptionId);
+        const targetIdx = e.shiftKey
+          ? (curIdx > 0 ? curIdx - 1 : prompt.options.length - 1)
+          : (curIdx < prompt.options.length - 1 ? curIdx + 1 : 0);
+        if (prompt.options[targetIdx]) {
+          setSelectedOptionId(prompt.options[targetIdx].id);
+        }
+        return;
+      }
+
+      // 4. Escape to skip
       if (e.key === "Escape" && prompt.allowSkip) {
         e.preventDefault();
         handleSkip();
         return;
       }
 
-      // If typing in custom input, don't capture digits
-      if (isTypingInInput) return;
-
-      // 1-9 keyboard shortcuts
+      // 5. 1-9 digit shortcuts
       const digit = parseInt(e.key, 10);
       if (!Number.isNaN(digit) && digit >= 1 && digit <= 9) {
         const targetOption = prompt.options.find(
@@ -136,10 +186,12 @@ export function HitlDecisionComposer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     disabled,
+    isSubmitting,
     prompt.options,
     prompt.allowSkip,
     isCustomActive,
     customText,
+    selectedOptionId,
     handleFinalSubmit,
     handleSkip,
   ]);
@@ -154,7 +206,7 @@ export function HitlDecisionComposer({
       : HelpCircle;
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl shrink-0 px-3 pb-2 pt-1.5">
+    <div ref={containerRef} tabIndex={-1} className="relative mx-auto w-full max-w-3xl shrink-0 px-3 pb-2 pt-1.5 focus:outline-none">
       <div className="overflow-hidden rounded-xl border border-border/80 bg-background/95 backdrop-blur-md shadow-lg transition-all">
         {/* Header Bar */}
         <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2 select-none">
@@ -186,13 +238,14 @@ export function HitlDecisionComposer({
               return (
                 <div
                   key={opt.id}
+                  data-option-id={opt.id}
                   onClick={() => handleSelectOption(opt)}
                   className={cn(
                     "flex flex-col gap-1 rounded-lg border p-2 cursor-pointer transition-colors text-left",
                     isSelected
-                      ? "border-primary/50 bg-primary/5 shadow-2xs dark:bg-primary/10"
+                      ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40 dark:bg-primary/15"
                       : "border-border/50 bg-background hover:bg-muted/40 hover:border-border",
-                    disabled && "opacity-60 cursor-not-allowed",
+                    (disabled || isSubmitting) && "opacity-60 cursor-not-allowed",
                   )}
                 >
                   <div className="flex items-center gap-2.5">
@@ -264,14 +317,14 @@ export function HitlDecisionComposer({
                 variant="ghost"
                 size="sm"
                 onClick={handleSkip}
-                disabled={disabled}
+                disabled={disabled || isSubmitting}
                 className="h-7 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 Skip
               </Button>
             ) : null}
             <span className="text-[10px] text-muted-foreground/60 font-mono hidden sm:inline">
-              1-9 tuşla seç · ↵ onayla
+              1-9 tuşla · ↑↓ gezin · ↵ onayla
             </span>
           </div>
 
@@ -280,7 +333,7 @@ export function HitlDecisionComposer({
             variant="default"
             size="sm"
             onClick={handleFinalSubmit}
-            disabled={disabled || !canSubmit}
+            disabled={disabled || isSubmitting || !canSubmit}
             className="h-7 gap-1 px-3 text-xs font-medium cursor-pointer"
           >
             <span>Submit</span>

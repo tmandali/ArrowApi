@@ -110,6 +110,7 @@ export function resolveActiveComponents(context?: YulaScreenContext): ComponentS
       id: "result_grid:active",
       meta: {
         description: `Active Result Grid (${context.grid.tableName || "active_view"}) - ${context.grid.rowCount ?? "?"} rows, Columns: ${(context.grid.columns || []).join(", ")}`,
+        state: context.grid,
         tableName: context.grid.tableName,
         columns: context.grid.columns,
         filters: context.grid.filters,

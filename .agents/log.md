@@ -2,6 +2,48 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] Yula Minimalist System Harness Standard (Pi Standard & Zero-Prompt-Maintenance)
+- **Rationale:** To make screen and report scaling completely sustainable without prompt regression or maintenance overhead, the repository adopted a strict **Zero-Prompt-Maintenance Rule**. Developers and AI agents must NEVER modify system prompts when creating, altering, or removing screens or reports. Instead, LLM reasoning is guided dynamically by three structural pillars: (1) Self-Describing Action Contracts, (2) Live DOM State (Screen Binding), and (3) Screen & Catalog Binding via Explorer Agent.
+- **Decision:**
+  - **Enforced Rule 6 in Root `AGENTS.md` and Client `AGENTS.md`:** Codified the rule as mandatory across all developer agent sessions.
+  - **Standard Formalization (`yula-minimalist-harness-standard.md`):** Authored formal graph-native specification defining the 3 pillars:
+    - *Pillar 1: Self-Describing Action Contracts:* Invariant rules (e.g. `GRID_RUN_SQL_CONTRACT` detailing DuckDB `active_view` and prohibiting SQL while SSE is streaming) are placed directly in contract schemas (`description` and `whenNotToCall`).
+    - *Pillar 2: Live DOM State (Screen Binding):* Mounted screens mirror real-time table columns, row count, filters, and criteria directly into JSON DOM state (`context.grid`, `context.criteria`). No artificial prompt-formatting functions.
+    - *Pillar 3: Explorer Agent (Screen & Catalog Binding):* Off-screen routes, schema discovery, and criteria inspections are resolved on-demand using `explore_context` and screen catalog registries.
+  - **Zero-Prompt Invariant:** System prompt (`yula-agent-prompt.ts`) remains strictly invariant and decoupled from individual business screens or ERP schemas.
+- **Verification:** Formalized in `AGENTS.md`, `src/Sims/yula.client/AGENTS.md`, `.agents/standards/yula-minimalist-harness-standard.md`, and indexed in `.agents/index.md`.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-24] Explorer & General 2-Base Agent Architecture (Pi Alignment)
+- **Rationale:** To avoid agent bloat (creating specialized hardcoded agents per screen or ERP business domain) and eliminate static prompt cheating (e.g., hardcoded company codes like `TJ01`, `TJ02` or manual criteria dumps), the agent runtime has been aligned with the reference Pi minimalist 2-agent architecture. System capabilities are divided cleanly into 2 base agent roles: `explorer` (read-only investigative subagent) and `general` (primary orchestration agent), with all domain logic, screen criteria, and workflows dynamically discovered via Skills, Playbooks, and Screen Bindings.
+- **Decision:**
+  - **Explorer Sub-Agent (`explorer-subagent.ts`):** Implemented an isolated, read-only investigative agent with low token overhead. It navigates routes, parses screen contracts, queries DuckDB schemas, and checks playbooks. It produces structured markdown findings adhering to the Pi Explorer standard (`## Screen / Contract Retrieved`, `## Key Criteria & Schema`, `## Recommended Next Step`) without triggering UI mutations or polluting the primary conversation history.
+  - **Context-Free Discovery Tool (`explore_context`):** Registered `explore_context` in `STANDARD_AGENT_TOOLS` allowing the primary `general` agent to delegate deep multi-step lookups to `explorer` when user intents are ambiguous or screen criteria are unknown.
+  - **Dynamic Screen Contract Matching:** Added Turkish token/stem matching in `matchScreenContract` to reliably match colloquial requests (e.g., `"geçen hafta satışlarını getir"` matches `"satış"`) to screen contracts dynamically.
+  - **Prompt Static Cleanup & Dynamic Workspace Grounding:** Removed static `REPORTS_DIGEST_LINES`, mock company codes, and hardcoded module paths from `yula-agent-prompt.ts`. Enterprise modules and routes are now dynamically sourced from `getAllWorkspaces()` in `@/lib/workspace-registry`. The general agent now asks clarifying questions or calls screen actions exclusively based on dynamically retrieved schema facts.
+  - **Complete Elimination of Legacy Grounding Files & Prompt Cleanliness:** Fully purged artificial grounding files (`wasm-sql-grounding.ts`, `criteria-agent-grounding.ts`, `grid-agent-grounding.ts`, `job-agent-grounding.ts`). Replaced them with pure state resolvers (`grid-state.ts`, `job-state.ts`). Enriched `GRID_RUN_SQL_CONTRACT` with self-describing execution rules (`active_view` and SSE streaming guard). Removed `customSections.grid_grounding` and `jobGrounding` from `yula-agent-prompt.ts`. The LLM now natively inspects real-time DOM JSON states via `LIVE SCREEN STATE`, matching reference Pi minimalist harness.
+  - **Telemetry & Worked Steps Integration:** Mapped `explore_context` in `yula-worked-steps-tools.ts` and `yula-tool-info.ts` with dedicated UI step rendering (`🔍 Explorer Sub-Agent`) and full i18n support.
+- **Verification:** Unit tests clean with 495/495 tests passing across 118 test suites. Typecheck (`tsc --noEmit`) clean (0 errors) and Oxlint clean (0 errors, 0 warnings across 910 files). All files under 500 lines.
+- **Author:** Antigravity / Team
+
+
+---
+
+## [2026-09-24] Seamless HITL Decision Suspension, Badge Pruning & Keyboard Navigation
+- **Rationale:** When the LLM called `ask_user_choice`, the agent loop kept streaming turns ("konuşma devam ediyor") because `stopWhen` on the API route lacked `hasToolCall("ask_user_choice")` and `shouldStopAfterTurn` in the client loop did not halt on `suspend: true`. As a consequence, the choice composer only showed up if the user manually pressed "Stop" in the textarea, which was compounded by a redundant yellow "Beklemede" badge in the message turn, and missing arrow key/Enter navigation in the decision dock.
+- **Decision:**
+  - **Server Stream Halting:** In `src/Sims/yula.client/src/app/api/agent/chat/route.ts`, added `hasToolCall("ask_user_choice")` and `hasToolCall("request_user_confirmation")` to `stopWhen`, cleanly halting SSE streaming immediately when a choice tool is invoked.
+  - **Client Loop Suspension:** In `src/yula-ai/packages/agent-react/src/use-agent-chat.ts`, updated `shouldStopAfterTurn` to return `true` when `suspend: true` or choice tools are present, transitioning status to `'ready'` so `isLoading` drops to `false` automatically without user intervention. In `src/yula-ai/packages/agent-core/src/agent-loop.ts`, emitted `agent_end` on suspended turns when no inline steering wait handler is provided.
+  - **Canonical Tool Parsing & Suspended State:** In `yula-chat-instance.tsx`, unified `extractPendingChoice` using `yulaToolPartInfo` and adjusted `isTurnActive` so pending choices properly designate suspended turns.
+  - **Removal of Redundant Amber Badge:** In `hitl-resolution-badge.tsx`, returned `null` when `isPending || !resolved`, completely removing the duplicate yellow "Beklemede" box from chat history while choices are active in the dock.
+  - **Full Keyboard Navigation & Enter Submission:** In `hitl-decision-composer.tsx`, added arrow navigation (`↑`, `↓`, `←`, `→`) and `Tab`/`Shift+Tab` cycling across options, auto-scroll to highlighted option, auto-focus container on mount, and Enter key submission. Enabled immediate interaction in `chat-composer.tsx` (`disabled={false}`).
+- **Verification:** TypeScript (`tsc --noEmit`) clean (0 errors), all 497 test suites and DuckDB grid tests passed 100%, all files verified under 500 lines.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Spike Identity & Token Diagnostics Workbench (/spike/identity)
 - **Rationale:** Developers needed a live diagnostic view to inspect active authentication details: decoded JWT access tokens, raw refresh tokens, claim lists (`realm_access`, `sub`, `scope`, etc.), active provider, Keycloak realm name, live TTL countdown, and live userinfo proxy testing.
 - **Decision:**
@@ -175,16 +217,15 @@ This document is the **append-only audit log** recording fundamental architectur
 
 ---
 
-## [2026-09-24] Enforcement of Dynamic Schema Grounding & `ask_user_choice` HITL Protocol
-- **Rationale:** When users issued requests missing mandatory report criteria (e.g. `"geçen hafta satışlarını getir"` missing company code), the assistant previously formulated open-ended natural language questions (e.g. `"Hangi şirket koduyla devam edelim?"`) as a direct answer without invoking the `ask_user_choice` tool. This occurred because:
-  1. The LLM lacked target report criteria options (`REPORTS_DIGEST_LINES`) in global orchestration mode, starving it of the concrete schema enum values needed to construct valid options without hallucinating.
-  2. The prompt phrased tool usage as optional `(or offer structured options via 'ask_user_choice')`.
-  3. Static prompt examples like `(e.g. TJ01, TJ02, TRLC)` were strictly avoided as misleading anti-patterns that bias the model with hardcoded mocks.
+## [2026-09-24] Elimination of Static Prompt Guidance & Adoption of Just-in-Time Screen Binding
+- **Rationale:** Attempting to inject full report criteria schemas, field lists, or static question patterns into global prompts leads to context bloat, token wastage, and violates the 1 Menu Item = 1 Bounded Context architecture. Screens already define their own self-describing metadata, validation, enums, and actions via `useScreenBinding`. Asking the agent to conduct criteria interviews from outside the screen bypassed live screen bindings and produced ungrounded hallucinations.
 - **Decision:**
-  - **Dynamic Report Digest Grounding:** Injected `REPORTS_DIGEST_LINES` directly into `GLOBAL ORCHESTRATION & PLAN-FIRST MODE` in `yula-agent-prompt.ts`, equipping the model with the exact report catalog, required criteria fields, and actual schema enum options (e.g. `sirketKod (options: TJ01|TJ02|TRLC)`).
-  - **Zero Domain Leakage into Orchestrator:** Strictly removed any hardcoded mock company codes from general orchestration directives.
-  - **Mandatory HITL Steering Directive:** Mandated that when missing criteria have discrete options in the schema or catalog, the model MUST call `ask_user_choice` to suspend the turn and present the interactive `HitlDecisionComposer`.
-- **Verification:** `yula-agent-prompt.test.ts` (26/26 tests passed), `pnpm typecheck` (0 errors), `pnpm lint` (0 errors across 904 files). File length 433 lines ($\le 500$).
+  - **Eliminated Static Injections:** Removed `REPORTS_DIGEST_LINES` and all hardcoded question examples/codes from global orchestration prompts.
+  - **Just-in-Time (2-Step) Navigation Protocol:**
+    1. **Discovery & Fast Navigation:** When outside the target screen (e.g. at `/`), the agent matches user intent against the lightweight module/report catalog and invokes `dispatch_component_action` with `component_id="app_router"` and action="NAVIGATE" directly in one step.
+    2. **Live Screen Binding:** Once the target screen mounts, its `useScreenBinding` hook dynamically injects the live criteria form, schema enums, validation guards, and country strategies into `uiContext`. The agent gathers missing criteria or executes actions directly against the live screen.
+  - **HitlDecisionComposer State Derivation Fix:** Resolved React cascading render warning by deriving `effectiveOptionId` directly during render instead of synchronous `setState` in `useEffect`.
+- **Verification:** `yula-agent-prompt.test.ts` (26/26 passed), `pnpm typecheck` (0 errors), `pnpm lint` (0 errors, 0 warnings across 911 files). File length 431 lines ($\le 500$).
 - **Author:** Antigravity / Team
 
 ---

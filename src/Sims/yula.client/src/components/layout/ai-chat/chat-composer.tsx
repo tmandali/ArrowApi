@@ -95,7 +95,7 @@ export function ChatComposer({
             handleSend(val);
           }
         }}
-        disabled={isLoading}
+        disabled={false}
       />
     );
   }

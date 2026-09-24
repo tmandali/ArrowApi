@@ -2,6 +2,7 @@ import {
   convertToModelMessages,
   createUIMessageStreamResponse,
   extractReasoningMiddleware,
+  hasToolCall,
   isStepCount,
   toUIMessageStream,
   type InferUITools,
@@ -440,6 +441,8 @@ export async function POST(req: Request) {
       },
       stopWhen: [
         isStepCount(6),
+        hasToolCall("ask_user_choice"),
+        hasToolCall("request_user_confirmation"),
       ],
     });
 

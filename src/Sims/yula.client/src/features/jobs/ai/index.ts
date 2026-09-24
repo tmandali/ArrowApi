@@ -1,6 +1,7 @@
 /**
  * Arrow Jobs AI Module.
- * Encapsulates job execution prompt grounding, action contracts, and live state.
+ * Encapsulates job execution state, action contracts, and lifecycle helpers.
  */
-export * from "./job-agent-grounding";
+export * from "./job-state";
 export * from "./job-agent-contracts";
+

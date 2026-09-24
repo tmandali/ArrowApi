@@ -345,6 +345,24 @@ export function mapToolInfoToWorkedSteps(
       });
       break;
     }
+    case "explore_context": {
+      const q = typeof inputObj.query === "string" ? inputObj.query : "Contracts & schemas";
+      const out = (info.output as any) || {};
+      const target = out.targetRoute ? ` · Route: ${out.targetRoute}` : "";
+      pushStep({
+        id: info.toolCallId,
+        kind: "explored",
+        label: `🔍 Explorer Sub-Agent · Investigated: "${q}"`,
+        subLabel: isPending
+          ? "Investigating screen contracts & schemas..."
+          : `Findings retrieved${target}`,
+        detailText: typeof out.findings === "string" ? out.findings : undefined,
+        isLive: isPending,
+        isError,
+        info,
+      });
+      break;
+    }
     case "propose_playbook_update": {
       const category = typeof inputObj.category === "string" ? inputObj.category : "screen_rule";
       const title = typeof inputObj.title === "string" ? inputObj.title : "Learned Rule";

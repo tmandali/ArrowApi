@@ -223,11 +223,10 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
       streamFn,
       model: selectedModel,
       maxIterations: 15,
-      shouldStopAfterTurn: (ctx) => {
-        // ask_user_choice tetiklendiyse veya terminate bayrağı varsa dur
-        const hasTerminate = ctx.toolResults?.some((tr: any) => tr?.terminate === true);
-        return hasTerminate;
-      },
+      shouldStopAfterTurn: (ctx) => Boolean(
+        ctx.toolResults?.some((tr: any) => tr?.terminate || tr?.suspend || tr?.toolName === 'ask_user_choice' || tr?.toolName === 'request_user_confirmation') ||
+        (ctx.message as any)?.parts?.some((p: any) => p?.tool === 'ask_user_choice' || p?.toolName === 'ask_user_choice' || p?.type === 'tool-ask_user_choice')
+      ),
     });
 
     sessionRef.current = new AgentSession({
@@ -246,11 +245,13 @@ export function useAgentChat(currentRoute: string = '/', options?: UseAgentChatO
         telemetryTracker.startTurn();
       } else if (event.type === 'turn_suspended') {
         setIsSuspended(true);
+        setStatus('ready');
       } else if (event.type === 'turn_resumed') {
         setIsSuspended(false);
       } else if (event.type === 'turn_end') {
         telemetryTracker.endTurn(0, 0);
       } else if (event.type === 'agent_end') {
+        setStatus('ready');
         setIsSuspended(false);
       } else if (event.type === 'compaction_start') {
         setIsCompacting(true);

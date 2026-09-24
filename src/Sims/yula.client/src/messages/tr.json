@@ -1639,6 +1639,7 @@
     "tool_dispatch_component_action": "Bileşen ve sayfa aksiyonları (Form/Rapor/Grid/Navigasyon)",
     "tool_inspect_ui_state": "Arayüz ve şema durumunu okuma",
     "tool_ask_user_choice": "İnteraktif seçenek ve onay sunma",
+    "tool_explore_context": "Explorer alt ajanı (Kontrat & şema araştırması)",
     "tool_time_travel": "Zaman yolculuğu (Geri/İleri alma)",
     "tool_remember_fact": "Oturum hafızasına kaydetme",
     "tool_recall_fact": "Oturum hafızasından hatırlama",

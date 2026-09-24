@@ -6,7 +6,7 @@ import type { ActionContract } from "@my-agent/core";
  */
 export const GRID_RUN_SQL_CONTRACT = {
   description:
-    "Executes a read-only DuckDB SQL query against 'active_view' ({ query }).",
+    "Executes a read-only DuckDB SQL query against 'active_view' ({ query }). 'active_view' represents currently visible & filtered rows on screen. Permitted read-only statements: SELECT, WITH, DESCRIBE, SHOW, SUMMARIZE.",
   inputSchema: z
     .object({
       query: z
@@ -31,7 +31,7 @@ export const GRID_RUN_SQL_CONTRACT = {
   whenToCall:
     "When the user requests calculations, top N, aggregations, or custom SQL analysis on active table data.",
   whenNotToCall:
-    "For simple column filtering or sorting (use FILTER or SORT instead).",
+    "For simple column filtering or sorting (use FILTER or SORT instead). Do NOT execute SQL while an arrow_job calculation is currently Running or streaming over SSE.",
 } satisfies ActionContract;
 
 /**

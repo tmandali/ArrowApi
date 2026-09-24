@@ -31,6 +31,7 @@ import {
 import { useProviderDialogStore } from "@/lib/stores/provider-dialog-store";
 
 import { normalizeHitlPrompt, isHitlResolved } from "@/lib/contracts/hitl-prompt";
+import { yulaToolPartInfo } from "@/lib/yula-tool-info";
 
 /**
  * Yula Chat Instance — Saf @my-agent/react motoru ve Headless UI-Agent bileşen kaydı.
@@ -53,19 +54,16 @@ function extractPendingChoice(messages?: any[]) {
   if (!Array.isArray(parts)) return null;
 
   for (const p of parts) {
-    const isHitlTool =
-      p && typeof p === "object" &&
-      (p.type === "tool-ask_user_choice" || p.toolName === "ask_user_choice" ||
-        p.type === "tool-request_user_confirmation" || p.toolName === "request_user_confirmation");
-
-    if (isHitlTool && !isHitlResolved(p.output)) {
-      const toolName = p.toolName || (typeof p.type === "string" && p.type.startsWith("tool-") ? p.type.slice(5) : undefined);
+    const info = yulaToolPartInfo(p);
+    if (!info) continue;
+    const isHitl = info.toolName === "ask_user_choice" || info.toolName === "request_user_confirmation";
+    if (isHitl && !isHitlResolved(info.output)) {
       return normalizeHitlPrompt({
-        toolName,
-        toolCallId: p.toolCallId || "",
+        toolName: info.toolName,
+        toolCallId: info.toolCallId || "",
         messageId: lastAsst.id,
-        input: p.input || p.args || {},
-        output: p.output,
+        input: info.input || {},
+        output: info.output,
       });
     }
   }
@@ -242,7 +240,9 @@ export function ChatInstance({
     );
   }, [chat]);
 
-  const isTurnActive = (status === "submitted" || status === "streaming") && !stopped;
+  const pendingChoice = extractPendingChoice(chat.messages);
+  const isSuspended = Boolean(pendingChoice || chat.isSuspended);
+  const isTurnActive = (status === "submitted" || status === "streaming") && !stopped && !isSuspended;
   const busy = isTurnActive;
 
   // Sayaç ve yanıt süresi takibi
@@ -394,9 +394,6 @@ export function ChatInstance({
     },
     [],
   );
-
-  const pendingChoice = extractPendingChoice(chat.messages);
-  const isSuspended = Boolean(pendingChoice || chat.isSuspended);
 
   const chatAddToolOutput = chat.addToolOutput;
   const chatSteer = chat.steer;

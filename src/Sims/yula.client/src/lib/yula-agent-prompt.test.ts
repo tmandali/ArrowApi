@@ -184,20 +184,22 @@ describe("buildSystemPrompt agent katmanı", () => {
       "Aktif rapor ekranı satırı olmalı",
     );
     assert.ok(
-      prompt.includes("ACTIVE REPORT CONTEXT RULE"),
-      "Aktif rapor bağlam kuralı olmalı",
+      prompt.includes("ACTIVE SCREEN CONTEXT"),
+      "Aktif ekran bağlam kuralı olmalı",
     );
     assert.ok(
-      prompt.includes("NEVER ask which report they mean"),
-      "Kullanıcıya hangi rapor diye sormama kuralı olmalı",
+      prompt.includes("NEVER ask which screen or report they mean"),
+      "Kullanıcıya hangi rapor/ekran diye sormama kuralı olmalı",
     );
   });
 
-  it("pathname verilmediğinde uiContext.route üzerinden aktif rapor ve rota çözülür", () => {
+  it("pathname verilmediğinde uiContext.route üzerinden rota ve ekran bağlamı çözülür", () => {
     const prompt = buildSystemPrompt({
       uiContext: {
         route: "/stock/stock-balance",
-        active_components: [],
+        active_components: [
+          { id: "criteria_form:stock-balance", meta: { screenTitle: "Stock Balance" } },
+        ],
         recent_events: [],
       },
     });
@@ -206,12 +208,12 @@ describe("buildSystemPrompt agent katmanı", () => {
       "uiContext.route'tan rota çözülmeli",
     );
     assert.ok(
-      prompt.includes("Active Report Screen:"),
-      "uiContext.route üzerinden aktif rapor tanınmalı",
+      prompt.includes("ACTIVE SCREEN CONTEXT"),
+      "Aktif ekran bağlam kuralı gömülmeli",
     );
     assert.ok(
-      prompt.includes("ACTIVE REPORT CONTEXT RULE"),
-      "Aktif rapor bağlam kuralı gömülmeli",
+      prompt.includes("Stock Balance"),
+      "Bileşen başlığı tanınmalı",
     );
   });
 
@@ -349,16 +351,16 @@ describe("buildSystemPrompt agent katmanı", () => {
     });
 
     assert.ok(
-      prompt.includes("Active table: report_c07ec130_7f37_41e1_b196_e666ecd33293 · 450398 rows."),
-      "Tablo adı ve satır sayısı promptta yer almalı",
+      prompt.includes("report_c07ec130_7f37_41e1_b196_e666ecd33293"),
+      "Tablo adı live_screen_state içinde yer almalı",
     );
     assert.ok(
-      prompt.includes("Columns: Depo, Satis ID, Miktar, Tutar."),
-      "Kolon listesi promptta yer almalı",
+      prompt.includes("450398"),
+      "Satır sayısı live_screen_state içinde yer almalı",
     );
     assert.ok(
-      prompt.includes('Active DuckDB View: "active_view"'),
-      "active_view referansı promptta yer almalı",
+      prompt.includes("Satis ID"),
+      "Kolon listesi live_screen_state içinde yer almalı",
     );
   });
 });
@@ -424,7 +426,7 @@ describe("isResultGridMeta & resolveEffectiveGrid type guards", () => {
     assert.equal(res?.activeViewName, "active_view");
   });
 
-  it("buildSystemPrompt explicitly grounds base table and active saved query distinction", () => {
+  it("buildSystemPrompt reflects mounted grid state in live screen state", () => {
     const prompt = buildSystemPrompt({
       pathname: "/stock/retail-sales-report",
       phase: "results",
@@ -445,16 +447,16 @@ describe("isResultGridMeta & resolveEffectiveGrid type guards", () => {
     });
 
     assert.ok(
-      prompt.includes('VIEW MODE: SAVED QUERY [ID: "view_top_5"] ("En Çok Satan 5 Depo")'),
-      "Seçili kayıtlı sorgu ID ve başlık promptta yer almalı",
+      prompt.includes("report_raw_table_guid"),
+      "Fiziksel ham veri tablosu live screen state içinde yer almalı",
     );
     assert.ok(
-      prompt.includes('• Base Physical Table: "report_raw_table_guid" (Stores all raw detail records).'),
-      "Fiziksel ham veri tablosu açıkça belirtilmeli",
+      prompt.includes("view_top_5"),
+      "Aktif görünüm ID live screen state içinde yer almalı",
     );
     assert.ok(
-      prompt.includes('AVAILABLE SAVED VIEWS: ["En Çok Satan 5 Depo" (ID: view_top_5), "Tüm Depolar" (ID: view_all)].'),
-      "Mevcut kayıtlı sorgular listesi promptta yer almalı",
+      prompt.includes("En Çok Satan 5 Depo"),
+      "Görünüm başlığı live screen state içinde yer almalı",
     );
   });
 

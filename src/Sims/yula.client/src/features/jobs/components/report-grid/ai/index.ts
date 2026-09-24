@@ -1,6 +1,7 @@
 /**
  * Virtual Grid & Result Grid AI Module.
- * Encapsulates prompt grounding, action contracts, and metadata extraction.
+ * Encapsulates action contracts and grid state extraction.
  */
-export * from "./grid-agent-grounding";
+export * from "./grid-state";
 export * from "@/lib/client-tools/result-grid-contracts";
+

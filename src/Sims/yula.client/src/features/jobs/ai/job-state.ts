@@ -1,6 +1,6 @@
 /**
- * Arrow Jobs Execution Engine AI Grounding & State Resolver.
- * Pure TypeScript (Server-safe, zero React/DOM imports) for Node.js API prompt generation.
+ * Arrow Jobs Execution Engine State Types & Context Resolver.
+ * Pure TypeScript (Server-safe, zero React/DOM imports).
  */
 import type { ComponentSchema } from "@my-agent/core";
 
@@ -25,7 +25,7 @@ export {
 };
 
 /**
- * Bileşen listesinden ve ekran bağlamından odaklanılmış Arrow Job durumunu çözer.
+ * Resolves focused Arrow Job context from active components and screen parameters.
  */
 export function resolveEffectiveJobContext(
   context?: { jobId?: string; pathname?: string },
@@ -74,51 +74,3 @@ export function resolveEffectiveJobContext(
     executionCount: typeof managerMeta?.totalExecutions === "number" ? managerMeta.totalExecutions : undefined,
   };
 }
-
-/**
- * Arrow Job durumunu ve yaşam döngüsünü durum makinesine (State Machine) uygun formatlar.
- */
-export function formatJobEnginePromptGrounding(jobContext?: ArrowJobContext): string | null {
-  if (!jobContext?.activeJobId && !jobContext?.activeJob) {
-    return null;
-  }
-
-  const job = jobContext.activeJob;
-  if (!job) {
-    return `• Focused Arrow Job: "${jobContext.activeJobId}" (Status: Unknown).`;
-  }
-
-  switch (job.status) {
-    case "Running":
-    case "Queued": {
-      const stepInfo = job.currentStep ? `, Step: "${job.currentStep}"` : "";
-      const phaseInfo = job.progressPhase ? `, Phase: "${job.progressPhase}"` : "";
-      return [
-        `• Focused Arrow Job: "${job.jobId}" (Status: ${job.status}${phaseInfo}${stepInfo}).`,
-        `  - Calculation is currently streaming over SSE. DO NOT run SQL or filter on 'result_grid:active' until completed.`,
-        `  - To cancel: call dispatch_component_action (component_id="arrow_job", action="CANCEL").`,
-      ].join("\n");
-    }
-
-    case "Completed": {
-      const rows = job.totalRows != null ? `, Total Rows: ${job.totalRows}` : "";
-      const dur = job.durationMs != null ? `, Duration: ${(job.durationMs / 1000).toFixed(1)}s` : "";
-      return `• Focused Arrow Job: "${job.jobId}" (Status: Completed${rows}${dur}). Tabular dataset is loaded in 'result_grid:active'.`;
-    }
-
-    case "Failed": {
-      const err = job.error ? `: "${job.error}"` : "";
-      return `• Focused Arrow Job: "${job.jobId}" (Status: Failed${err}). Execution encountered an error; result grid is not available. Suggest retrying or checking input criteria.`;
-    }
-
-    case "Cancelled": {
-      return `• Focused Arrow Job: "${job.jobId}" (Status: Cancelled). Execution was aborted.`;
-    }
-
-    case "Idle":
-    default: {
-      return `• Focused Arrow Job: "${job.jobId}" (Status: ${job.status}).`;
-    }
-  }
-}
-

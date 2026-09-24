@@ -251,6 +251,39 @@ export const STANDARD_AGENT_TOOLS = {
   }),
 
   synthesize_collected_information: synthesizeCollectedInformationTool,
+
+  explore_context: tool({
+    description: "Delegate investigation to the read-only Explorer Sub-Agent. Quickly analyzes screen contracts, Bounded Contexts, data schemas, or playbooks and returns structured findings for execution without cluttering the main conversation.",
+    inputSchema: z.object({
+      query: z.string().describe("Target task, question, or screen to investigate (e.g. 'satış raporu kriterleri', 'stok bakiye tablosu kolonları', 'siparişten irsaliyeye onay akışı')"),
+      thoroughness: z.enum(["quick", "medium", "thorough"]).optional().default("medium").describe("Depth of exploration"),
+      scope: z.string().optional().describe("Optional scope or workspace filter"),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      targetRoute: z.string().optional(),
+      targetComponentId: z.string().optional(),
+      targetScope: z.string().optional(),
+      requiredFields: z.array(z.string()).optional(),
+      fieldOptions: z.record(z.string(), z.array(z.string())).optional(),
+      recommendedAction: z.string().optional(),
+      findings: z.string(),
+    }),
+    execute: async ({ query, thoroughness, scope }) => {
+      try {
+        const { runExplorerSubagent } = await import("./explorer-subagent");
+        return await runExplorerSubagent({ query, thoroughness, scope });
+      } catch (err: any) {
+        return {
+          status: "error",
+          requiredFields: [],
+          fieldOptions: {},
+          recommendedAction: "Fallback to direct navigation",
+          findings: `Explorer subagent failed: ${err?.message || String(err)}`,
+        };
+      }
+    },
+  }),
 };
 
 export type StandardAgentTools = typeof STANDARD_AGENT_TOOLS;

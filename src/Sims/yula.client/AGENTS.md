@@ -23,6 +23,11 @@ This document is the **lightweight Client Router** for Yula Client frontend engi
 3. **Module Boundaries:** Preserve `src/workspaces/<workspace>/` boundaries. Cross-workspace direct imports are forbidden; external consumers must use `index.ts` (Public API) only.
 4. **Localization (i18n):** Never hardcode user-facing strings; resolve all labels from `messages/*.json` via `next-intl`.
 5. **Strict pnpm Enforcement:** All package management, testing, linting, and typechecking must use `pnpm` exclusively (`pnpm test`, `pnpm run typecheck`, `pnpm run lint`). Direct invocation of `npm` or `npx` is strictly forbidden.
+6. **Zero-Prompt Maintenance & Minimalist Harness (Pi Standard):** Adding, modifying, or removing screens, reports, or business logic must NEVER require prompt adjustments — neither as text nor as programmatic code (e.g. importing `REGISTERED_REPORTS` or hardcoding schema dumps into prompt generators). The system relies strictly on:
+   - **Self-Describing Action Contracts:** Tool behavior and operational rules (e.g., `whenNotToCall` guards, DuckDB `active_view`) live inside tool contracts.
+   - **Live DOM State (Screen Binding):** Dynamic components mirror live column schema, row counts, and filters into pure JSON DOM state (`context.grid`, `context.criteria`).
+   - **Explorer Agent (Screen & Catalog Binding):** Off-screen discovery and criteria schemas are explored via `explore_context` and screen catalog metadata without hardcoding or importing registries into prompts.
+   *Details:* [Yula Minimalist System Harness Standard](file:///Users/tmr/Source/ArrowApi/.agents/standards/yula-minimalist-harness-standard.md).
 
 ---
 

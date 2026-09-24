@@ -3,20 +3,9 @@
  * Bileşenler mount edildiğinde ilgili beceriler otomatik devreye girer.
  */
 import { skillsManager } from "@my-agent/core";
-import { REGISTERED_REPORTS } from "@/features/reports/report-registry";
 import {
   formatLocalizedRelativeDateTerms,
 } from "../yula-prompt-directives";
-
-export const REPORTS_DIGEST_LINES = REGISTERED_REPORTS.map((r) => {
-  const fields = Object.entries(r.criteriaSchema.properties)
-    .map(
-      ([key, prop]) =>
-        `${key} (${prop.title ?? key}${prop.enum ? `, options: ${prop.enum.join("|")}` : ""})`,
-    )
-    .join("; ");
-  return `- ${r.scope} (${r.title}) [route: ${r.pagePath}]: ${fields}`;
-}).join("\n");
 
 export const AGENT_PREPARE_CHAIN_RULES = [
   "AGENT SESSION PREPARE CHAIN (active persona + WORKSPACE phase + target report on another screen):",
@@ -41,8 +30,7 @@ export function registerYulaSkills(): void {
         "• To navigate to another page/report: dispatch_component_action with component_id='app_router', action='NAVIGATE', payload: { path: '/...' }.",
         "• To view past reports: dispatch_component_action with component_id='job_history', action='OPEN_LAST' or action='LIST'.",
         "• To ask choices/clarifications: present question and options and await user steering.",
-        "• Available reports in catalog:",
-        REPORTS_DIGEST_LINES,
+        "• To discover off-screen reports, schemas, or criteria: call 'explore_context' tool to dynamically investigate contracts and schemas.",
       ].join("\n"),
     });
   }

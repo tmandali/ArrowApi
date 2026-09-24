@@ -1,8 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { CheckCircle2, HelpCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CheckCircle2 } from "lucide-react";
 
 import { isHitlResolved } from "@/lib/contracts/hitl-prompt";
 
@@ -42,20 +40,7 @@ export function HitlResolutionBadge({
     outObj.selected ?? outObj.choice ?? (outObj.approved ? "Evet" : undefined) ?? (resolved ? outObj.value : undefined);
 
   if (isPending || !resolved) {
-    return (
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.03] dark:bg-amber-500/[0.06] px-3 py-2 text-[12px] my-1 transition-all">
-        <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/90 leading-tight">
-          <HelpCircle className="size-3.5 text-amber-500 shrink-0" />
-          <span>{question}</span>
-        </div>
-        <Badge
-          variant="outline"
-          className="animate-pulse bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] h-4.5 px-1.5 shrink-0 font-medium"
-        >
-          Beklemede
-        </Badge>
-      </div>
-    );
+    return null;
   }
 
   return (

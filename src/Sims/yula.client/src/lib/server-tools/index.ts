@@ -6,4 +6,9 @@ export {
   runDiagnosticSubagent,
   type DiagnosticSubagentParams,
 } from "./diagnostic-subagent";
+export {
+  runExplorerSubagent,
+  type ExplorerSubagentParams,
+  type ExplorerResult,
+} from "./explorer-subagent";
 

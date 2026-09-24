@@ -4,13 +4,18 @@ This file is the **lightweight Master Router** for AI coding agents and human en
 
 ---
 
-## ⚡ 5 Golden Rules (Enforced)
+## ⚡ 6 Golden Rules (Enforced)
 
 1. **Shadcn UI Immutability:** Never modify `components/ui/*` directly (strictly protected by `.oxlintrc.json`).
 2. **500-Line Limit:** No source code, test, or documentation file may exceed 500 lines (`wc -l`).
 3. **Module Boundaries (Public API):** Cross-workspace direct imports are strictly forbidden; external modules must consume only the workspace's `index.ts` entry point.
 4. **English-Only Docs & Evolutive Wiki Protocol:** All repository documentation, instructions, and `.agents/**/*.md` files MUST be written and updated exclusively in technical English (while conversing with the user in their preferred language, e.g. Turkish). Whenever a permanent architectural decision or rule correction is made, the agent MUST update the relevant `.agents/*.md` document in English and append an entry to `.agents/log.md`.
 5. **Graph-Native (Node & Edge) Documentation Standard:** All architecture, agent workflows, and component interactions MUST be documented using the Directed Graph standard (Mermaid topology, Nodes with Inbound/Outbound contracts, Edges with feedback/safety loops, and traversable neighbor markdown links) per [Graph Documentation Standard](file:///Users/tmr/Source/ArrowApi/.agents/standards/graph-documentation-standard.md).
+6. **Zero-Prompt Maintenance & Minimalist Harness (Pi Standard):** System prompts MUST remain clean and invariant. Adding, modifying, or removing screens, reports, or business logic must NEVER require prompt adjustments — neither as prompt text nor programmatically in code (e.g. importing `REGISTERED_REPORTS` or dumping schema strings into prompt generators). The agent architecture strictly enforces three dynamic pillars:
+   - **Self-Describing Action Contracts:** Tool behavior and operational rules (e.g. `active_view` usage, `whenNotToCall` guards during SSE) live exclusively in tool contracts.
+   - **Live DOM State (Screen Binding):** Active components mirror their live schema, active columns, row counts, and filters directly into the dynamic JSON DOM state (`context.grid`, `context.criteria`).
+   - **Explorer Agent (Screen & Catalog Binding):** Off-screen navigation, report discovery, and schema inspections are performed on-demand via `explore_context` and screen catalog metadata without hardcoding or importing registries into prompts.
+   *Details:* [Yula Minimalist System Harness Standard](file:///Users/tmr/Source/ArrowApi/.agents/standards/yula-minimalist-harness-standard.md).
 
 ---
 

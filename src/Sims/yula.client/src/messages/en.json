@@ -1639,6 +1639,7 @@
     "tool_dispatch_component_action": "Component and page actions (Form/Report/Grid/Navigation)",
     "tool_inspect_ui_state": "Inspect UI and schema state",
     "tool_ask_user_choice": "Interactive choices and confirmation",
+    "tool_explore_context": "Explorer sub-agent (Contract & schema discovery)",
     "tool_time_travel": "Time travel (Undo/Redo)",
     "tool_remember_fact": "Remember facts in session memory",
     "tool_recall_fact": "Recall facts from session memory",
