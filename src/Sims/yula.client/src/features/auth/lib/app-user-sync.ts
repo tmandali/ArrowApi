@@ -19,10 +19,10 @@
  * KURAL: Bu modül Node runtime'ında çalışır (`@/server/db/client`
  * bağımlılığı). Asla client bileşeninden import etme.
  */
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
-import { identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
+import { appUsersSchema, identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
 import { appRoleForSession } from "./realm-roles";
 import { normalizeProvider, sessionIdentity } from "./session-identity";
 
@@ -242,6 +242,19 @@ export async function upsertIdentityFromSession(
         .returning();
       row = updated ?? row;
     } else {
+      // Yeni kayıt: bu e-posta adresiyle katalogda (app_users) zaten yetkilendirilmiş
+      // bir kullanıcı var mı kontrol et; varsa doğrudan ona bağla (oturum/sub yenilenmelerinde
+      // yetki kaybını önler), yoksa guest (null) kalır.
+      let existingUserId: string | null = null;
+      if (u.email) {
+        const [existing] = await db
+          .select({ id: appUsersSchema.id })
+          .from(appUsersSchema)
+          .where(eq(sql`LOWER(${appUsersSchema.email})`, u.email.toLowerCase()))
+          .limit(1);
+        existingUserId = existing?.id ?? null;
+      }
+
       // Yeni kayıt: uygulama GUID'i — provider'dan bağımsız, stabil.
       newId = crypto.randomUUID();
       await db
@@ -256,7 +269,7 @@ export async function upsertIdentityFromSession(
           // SET listesinde YOK → mevcut değer korunur (birleşme yarışında
           // diğer istek de aynı ilk kayıt dilini taşır — eş değer).
           language: language ?? null,
-          userId: null,
+          userId: existingUserId,
           lastActive: "Now",
         })
         .onConflictDoNothing({

@@ -2,6 +2,17 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] Auto-Linking of Dynamic IdP Sub Identities to Authorized Catalog Users
+- **Rationale:** Keycloak test realms and enterprise IdPs can issue dynamic/ephemeral subject identifiers (`sub`) across sessions or upon container restarts. Previously, new `sub` logins unconditionally created `user_identities` rows with `userId: null`, degrading authorized administrators to Guest status until manual database intervention.
+- **Decision:**
+  - In `upsertIdentityFromSession` ([`app-user-sync.ts`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/features/auth/lib/app-user-sync.ts)), when inserting a new identity row, check if the session email already matches an authorized record in `app_users`.
+  - If a match is found, auto-link `user_identities.userId` directly to the existing `app_users.id`, preventing authorization loss while preserving strict isolation for uncataloged guests.
+  - Configured corporate proxy (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) in `launchSettings.json` and `--use-env-proxy` in `package.json`.
+- **Verification:** Tested with multiple Keycloak `sub` IDs; all resolved to `System Administrator`. `tsc --noEmit` and `oxlint` clean (0 errors).
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Fix: Circular Structure Serialization Guard for Bounded Contexts
 - **Rationale:** Next.js 16 (Turbopack) and `@my-agent/react` runtime serializes agent component metadata using `JSON.stringify(meta)`. The bidirectional link between `BoundedContextContract.screen` and `ScreenContract.boundedContext` triggered a fatal `TypeError: Converting circular structure to JSON` during page hydration in `useScreenBinding`.
 - **Decision:**
