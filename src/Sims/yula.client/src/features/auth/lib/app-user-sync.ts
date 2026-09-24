@@ -22,7 +22,12 @@
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { auth, type Session } from "@/lib/auth";
 import { db } from "@/server/db/client";
-import { identityAliasesSchema, userSettingsSchema, userIdentitiesSchema } from "@/server/db/schema";
+import {
+  appUsersSchema,
+  identityAliasesSchema,
+  userSettingsSchema,
+  userIdentitiesSchema,
+} from "@/server/db/schema";
 import { appRoleForSession } from "./realm-roles";
 import { normalizeProvider, sessionIdentity } from "./session-identity";
 
@@ -242,10 +247,34 @@ export async function upsertIdentityFromSession(
         .returning();
       row = updated ?? row;
     } else {
-      // Yeni kayıt: Zero-Trust güvenlik kuralı — her yeni gelen kimlik (provider + providerId)
-      // varsayılan olarak GUEST (userId: null) açılır. Çoklu IdP / LDAP yapılarında
-      // e-posta benzerliğinden kaynaklı yetki yükseltme (impersonation/collision) kesinlikle
-      // yapılmaz; yetkilendirme ve cross-provider birleştirme yalnız admin kontrolündedir.
+      // Yeni kayıt çözümlemesi:
+      // KURAL 1 (Aynı Sağlayıcı Koruması): Eğer giriş yapan kimlik, app_users tablosunda
+      // AYNI provider (örn. 'keycloak') ve aynı doğrulanmış kurumsal e-posta ile zaten yetkilendirilmişse,
+      // Keycloak test ortamının dynamic/ephemeral sub üretmesinden ötürü yetkisi kaybolmasın diye
+      // yeni sub otomatik olarak mevcut katalog kullanıcısına bağlanır.
+      //
+      // KURAL 2 (Zero-Trust Cross-Provider İzolasyonu): Eğer giriş FARKLI bir sağlayıcıdan
+      // (örn. Google OAuth, farklı LDAP realm) geliyorsa e-posta aynı olsa dahi userId NULL (Guest)
+      // olarak açılır ve asla otomatik admin yapılmaz.
+      let resolvedUserId: string | null = null;
+      if (identity.provider && u.email) {
+        const [existingSameProviderUser] = await db
+          .select({ id: appUsersSchema.id })
+          .from(appUsersSchema)
+          .where(
+            and(
+              eq(appUsersSchema.provider, identity.provider),
+              eq(appUsersSchema.email, u.email),
+              ne(appUsersSchema.status, "Deleted"),
+            ),
+          )
+          .limit(1);
+
+        if (existingSameProviderUser) {
+          resolvedUserId = existingSameProviderUser.id;
+        }
+      }
+
       newId = crypto.randomUUID();
       await db
         .insert(userIdentitiesSchema)
@@ -259,7 +288,7 @@ export async function upsertIdentityFromSession(
           // SET listesinde YOK → mevcut değer korunur (birleşme yarışında
           // diğer istek de aynı ilk kayıt dilini taşır — eş değer).
           language: language ?? null,
-          userId: null,
+          userId: resolvedUserId,
           lastActive: "Now",
         })
         .onConflictDoNothing({

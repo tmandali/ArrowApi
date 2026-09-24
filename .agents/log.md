@@ -2,6 +2,17 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-24] Same-Provider Auto-Linking with Cross-Provider Zero-Trust Isolation
+- **Rationale:** Keycloak test realms (such as `keycloaktest.lcwaikiki.com`) frequently issue transient/ephemeral subject identifiers (`sub`) upon session renewal or user re-synchronization. While cross-provider isolation must prevent unverified IdPs from escalating privileges by claiming a corporate email, logins originating from the *same* verified Identity Provider (e.g. `provider === 'keycloak'`) should automatically link to the existing `app_users` catalog record.
+- **Decision:**
+  - In `upsertIdentityFromSession` ([`app-user-sync.ts`](file:///c:/Users/TIMUR.MANDALI/source/git.tmandali/ArrowApi/src/Sims/yula.client/src/features/auth/lib/app-user-sync.ts)), when inserting a new identity row, check if `app_users` already has a non-deleted user with matching `provider` AND `email`.
+  - If both `provider` and `email` match, set `userId = existingSameProviderUser.id` automatically. This permanently prevents authorized users from reverting to Guest upon dynamic `sub` reissuance.
+  - If `provider` differs (e.g. Google OAuth or another external IdP), `userId` remains `null` (Guest), maintaining strict Zero-Trust isolation.
+- **Verification:** Verified with 4 historical Keycloak `sub` GUIDs for `timur.mandali@lcwaikiki.com`. `tsc --noEmit` and `oxlint` 0 errors.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Multi-Tenant Scoped RBAC (Tenant-Aware Role Management)
 - **Rationale:** In enterprise multi-company/holding architectures, a user may be an `Admin` in Tenant A (e.g. LC Waikiki) while acting as a `Guest` or `Viewer` in Tenant B (e.g. Dipen). Platform-level global roles (`app_users.role`) alone could not express company-scoped privileges without granting excessive rights across unrelated tenants.
 - **Decision:**
@@ -121,6 +132,33 @@ This document is the **append-only audit log** recording fundamental architectur
   - **Copy Code & View / Code Toggle:** Implemented toolbar actions for one-click code copy (using `copyToClipboard` with checkmark visual feedback) and toggle button between interactive visual diagram (`Eye` icon) and formatted monospaced source code (`Code` icon) across both Mermaid and DAG workflow viewers.
   - **Wheel Zoom Event Listener Lifecycle & Synchronous Ref Fix:** Resolved an issue where mouse wheel zoom did not fire because the `wheel` event listener effect was using an empty dependency array (`[]`) on mount, when the container DOM element was still `null` due to initial `"loading"` state. Fixed by keying the effect on `[cleanSvg, showCode, status]`, attaching native non-passive wheel listeners as soon as the canvas container is committed, and maintaining `zoomRef` and `panRef` to handle high-frequency wheel ticks synchronously without stale-state jitter or inter-state updater violations.
 - **Verification:** `npx oxlint` passed with 0 errors/warnings on all modified files. `npx tsx --test src/components/layout/chat-markdown/mermaid.test.ts` passed 6/6 tests. Full `tsc --noEmit` clean. All files strictly $\le 500$ lines (`workflow-graph-canvas.tsx`: 490, `mermaid-block.tsx`: 494, `mermaid-minimap.tsx`: 152, `mermaid-canvas-sheet.tsx`: 157, `mermaid-utils.ts`: 39).
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-24] Unified HITL Decision Composer Dock & Retired Inline Choice Cards
+- **Rationale:** Previously, user approvals and choices (`ask_user_choice`, `request_user_confirmation`) rendered bulky interactive button clusters inside chat bubbles (`YulaChoiceCard`). After users made selections or the conversation progressed, these inline buttons remained in the scrollback history, causing visual clutter, accidental duplicate clicks, and stale interaction states. Furthermore, they lacked keyboard navigation ergonomics (such as numbered 1-9 shortcuts and Enter-to-submit).
+- **Decision:**
+  - **Single Interactive Decision Dock (`HitlDecisionComposer`):** Morph the bottom `ChatComposer` into an interactive decision card matching terminal approval modal standards whenever an assistant turn requests input (`isSuspended && pendingChoice`).
+  - **Keyboard Ergonomics:** Numbered option badges `1`-`9` selectable with number keys, `Enter` to submit choice or custom input, `Esc` or `Skip` button to pass. Monospaced code/command box for command confirmation (e.g. CLI commands, SQL queries).
+  - **Contract Normalization (`hitl-prompt.ts`):** Created `normalizeHitlPrompt()` to map both `ask_user_choice` and `request_user_confirmation` to standard `HitlPromptData`.
+  - **Clean Retrospective Chat History:** Simplified `YulaChoiceCard` into an immutable resolution badge (`✓ [Question] ➔ [Selected Option]`) in chat history, eliminating duplicate interactive controls.
+  - **Worked Steps State:** Active steps now show `PauseCircle` with `text-amber-500 animate-pulse` and subLabel `"Waiting for user input..."`.
+- **Verification:** Added `hitl-prompt.test.ts`. All 495 tests pass across 118 suites. `pnpm typecheck` passed (0 errors), `pnpm lint` (oxlint) passed (0 errors across 904 files), `pnpm check:deps` (knip) passed (0 issues), `pnpm test:grid` passed. All files strictly adhere to $\le 500$ lines.
+- **Author:** Antigravity / Team
+
+---
+
+## [2026-09-24] Enforcement of Dynamic Schema Grounding & `ask_user_choice` HITL Protocol
+- **Rationale:** When users issued requests missing mandatory report criteria (e.g. `"geçen hafta satışlarını getir"` missing company code), the assistant previously formulated open-ended natural language questions (e.g. `"Hangi şirket koduyla devam edelim?"`) as a direct answer without invoking the `ask_user_choice` tool. This occurred because:
+  1. The LLM lacked target report criteria options (`REPORTS_DIGEST_LINES`) in global orchestration mode, starving it of the concrete schema enum values needed to construct valid options without hallucinating.
+  2. The prompt phrased tool usage as optional `(or offer structured options via 'ask_user_choice')`.
+  3. Static prompt examples like `(e.g. TJ01, TJ02, TRLC)` were strictly avoided as misleading anti-patterns that bias the model with hardcoded mocks.
+- **Decision:**
+  - **Dynamic Report Digest Grounding:** Injected `REPORTS_DIGEST_LINES` directly into `GLOBAL ORCHESTRATION & PLAN-FIRST MODE` in `yula-agent-prompt.ts`, equipping the model with the exact report catalog, required criteria fields, and actual schema enum options (e.g. `sirketKod (options: TJ01|TJ02|TRLC)`).
+  - **Zero Domain Leakage into Orchestrator:** Strictly removed any hardcoded mock company codes from general orchestration directives.
+  - **Mandatory HITL Steering Directive:** Mandated that when missing criteria have discrete options in the schema or catalog, the model MUST call `ask_user_choice` to suspend the turn and present the interactive `HitlDecisionComposer`.
+- **Verification:** `yula-agent-prompt.test.ts` (26/26 tests passed), `pnpm typecheck` (0 errors), `pnpm lint` (0 errors across 904 files). File length 433 lines ($\le 500$).
 - **Author:** Antigravity / Team
 
 ---
