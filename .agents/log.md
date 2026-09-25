@@ -2,6 +2,17 @@
 
 This document is the **append-only audit log** recording fundamental architectural decisions, major refactors, and rule updates chronologically across the repository.
 
+## [2026-09-25] Removal of Unsupported `--use-env-proxy` CLI Flag
+- **Rationale:** The CLI flag `--use-env-proxy` is only supported in Node.js v24+. In Node.js v22 (LTS), running `pnpm run dev` or `pnpm run dev:next` caused `node: bad option: --use-env-proxy` (exit code 9), causing `.NET SpaProxy` to fail during startup (`Couldn't start the SPA development server with command 'pnpm run dev:next'`).
+- **Decision:**
+  - Reverted `dev` and `dev:next` scripts in `src/Sims/yula.client/package.json` to standard `next dev -H 0.0.0.0 -p 56402`.
+  - Confirmed that corporate HTTP/HTTPS proxy support is already properly handled at the Node runtime level via `src/Sims/yula.client/src/instrumentation.ts` using `undici.EnvHttpProxyAgent`.
+  - Regenerated `package.g.props` through MSBuild.
+- **Verification:** `pnpm run dev:next` tested and boots in 262ms cleanly; `pnpm typecheck` (0 errors), `pnpm lint` (0 errors), all 497 tests passing.
+- **Author:** Antigravity / Team
+
+---
+
 ## [2026-09-24] Spike Identity & Token Diagnostics Workbench (/spike/identity)
 - **Rationale:** Developers needed a live diagnostic view to inspect active authentication details: decoded JWT access tokens, raw refresh tokens, claim lists (`realm_access`, `sub`, `scope`, etc.), active provider, Keycloak realm name, live TTL countdown, and live userinfo proxy testing.
 - **Decision:**

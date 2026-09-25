@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "scripts": {
-    "dev": "node --use-env-proxy ./node_modules/next/dist/bin/next dev -H 0.0.0.0 -p 56402",
-    "dev:next": "node --use-env-proxy ./node_modules/next/dist/bin/next dev -H 0.0.0.0 -p 56402",
+    "dev": "next dev -H 0.0.0.0 -p 56402",
+    "dev:next": "next dev -H 0.0.0.0 -p 56402",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -c -- drizzle-kit migrate",
     "db:dedupe": "dotenv -c -- tsx scripts/dedupe-guest-identities.ts",
